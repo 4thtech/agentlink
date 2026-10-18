@@ -23,8 +23,8 @@ import {
   taggedHash,
   type JsonObject,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
-import type { OwnerActionOutcome } from '@agentlink/core';
+} from '@4thtech-io/crypto';
+import type { OwnerActionOutcome } from '@4thtech-io/core';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {

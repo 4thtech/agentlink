@@ -71,7 +71,7 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
 
 10. Confirm Parts A and B are done and that step 4 was done no more than 2 days ago.
 11. Open PR **#124** "CHORE: Version packages". If its checks have not run (a PR made with `GITHUB_TOKEN` does not start them), close and reopen it. Review it:
-    - `apps/cli/package.json` goes to `0.1.0` (`@4thtech-io/agentlink`); the private `@agentlink/*` libraries go to `0.1.0` too (one fixed group; they are not published);
+    - `apps/cli/package.json` goes to `0.1.0` (`@4thtech-io/agentlink`); the private `@4thtech-io/*` libraries go to `0.1.0` too (one fixed group; they are not published);
     - `CHANGELOG.md` has a `## [0.1.0] - <date>` section and a fresh empty `## [Unreleased]`; that section becomes the GitHub Release text;
     - the changeset files are consumed and nothing else changed.
 12. Approve #124 (a code-owner approval on its head commit is what `review-gate` waits for), then say **"merge"** in chat. Agents enable auto-merge only after that word and never approve.

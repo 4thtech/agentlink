@@ -249,7 +249,7 @@ export async function checkWrap(
 }
 
 /**
- * KeyStore implementations only (@agentlink/crypto/keystore): opens one recipient entry with that
+ * KeyStore implementations only (@4thtech-io/crypto/keystore): opens one recipient entry with that
  * recipient's X25519 secret key and returns the 32-byte CEK. The argument order follows
  * `EnvelopeKeys.unwrapCek(wrapped, envelopeId, {epoch?})` (04 §3.1.1, G-2): it takes the 16-byte
  * envelope id and builds `info` itself, never an `info` from the caller, so it cannot open an HPKE

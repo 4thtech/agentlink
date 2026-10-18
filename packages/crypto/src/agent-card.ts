@@ -7,7 +7,7 @@
 // twelve fields; `0x` + lowercase hex addresses and bytes32; JSON integers in [0, 2^53 - 1] and in
 // range for their uint type; `version` 1; `agentEvm` != `ownerEvm` (§2.9). Time rules (expiry,
 // `expiresAt` after `issuedAt`) and the off-chain name and relay rules belong to the callers that
-// know the clock and the relay policy (@agentlink/types, the core).
+// know the clock and the relay policy (@4thtech-io/types, the core).
 //
 // Errors never contain the input (I-7): see errors.ts.
 import { decodeEcdsaSignature, recoverEvmAddress } from './ecdsa.js';

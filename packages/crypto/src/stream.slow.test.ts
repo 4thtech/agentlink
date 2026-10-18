@@ -1,7 +1,7 @@
 // M1-1d acceptance, slow-tagged: 1 GiB through ALF1 encrypt and decrypt in Node (Web Streams, 1 MiB
 // default chunks) in bounded memory, so a large file never fully loads into memory (07 §5.2). It
 // runs only when AGENTLINK_SLOW_TESTS=1:
-//   AGENTLINK_SLOW_TESTS=1 pnpm --filter @agentlink/crypto exec vitest run src/stream.slow.test.ts
+//   AGENTLINK_SLOW_TESTS=1 pnpm --filter @4thtech-io/crypto exec vitest run src/stream.slow.test.ts
 //
 // Gates (IR-M1-1d-1 M-1; proposed wording for the card, owner confirms at merge):
 // - after a 256 MiB warm-up, the peak of JS heap in use plus ArrayBuffer memory stays under 64 MiB

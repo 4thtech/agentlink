@@ -4,7 +4,7 @@
 // key of vitest.config.ts and every drop key is random.
 import { SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { signDropAuthorization } from '@agentlink/crypto/testing';
+import { signDropAuthorization } from '@4thtech-io/crypto/testing';
 import {
   SmokeFailure,
   smokeExpiredGet,

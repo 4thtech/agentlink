@@ -2,7 +2,7 @@
 """Independent generator for the `ucd15-table` suite: the pinned UCD 15.0.0 table (M1-21-b, D-74).
 
 The `terms` character rule (04 §3.4 "Characters") refuses every code point whose UCD 15.0.0
-General_Category is Cc, Cf, Zl, Zp, Co, Cs or Cn, from a table shipped in @agentlink/types. These
+General_Category is Cc, Cf, Zl, Zp, Co, Cs or Cn, from a table shipped in @4thtech-io/types. These
 vectors check that table in every runtime that loads it: the hash of its canonical serialization,
 the number of code points per refused category, and single lookups.
 
@@ -192,7 +192,7 @@ def build():
 
 SCHEMA = v.case_schema(
     SUITE,
-    "The pinned UCD 15.0.0 refused-category table of @agentlink/types: tableHash (hex SHA-256 of "
+    "The pinned UCD 15.0.0 refused-category table of @4thtech-io/types: tableHash (hex SHA-256 of "
     "the canonical serialization, and the number of runs), categoryCounts (decimal counts), and "
     "category (the refused category of one code point, or `none`).",
     {

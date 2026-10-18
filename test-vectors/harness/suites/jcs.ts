@@ -1,4 +1,4 @@
-// Suite `jcs` (M1-1a): RFC 8785 through @agentlink/crypto. `canonicalize` parses the JSON text with
+// Suite `jcs` (M1-1a): RFC 8785 through @4thtech-io/crypto. `canonicalize` parses the JSON text with
 // the strict parser and canonicalises it; `number` serialises one IEEE 754 double. A refusal by the
 // code under test (CryptoInputError) is reported as `outcome: reject`; any other error is a bug and
 // fails the case.
@@ -8,7 +8,7 @@ import {
   parseJson,
   serializeNumber,
   sha256,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

@@ -29,7 +29,7 @@
 // two holders at once cost relay connections, never a second effect.
 //
 // The holder ID is random, not a secret; it is still never logged (I-7: nothing here logs).
-import { encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { PUBLISHER_LEASE_RENEW_SECONDS, PUBLISHER_LEASE_SECONDS } from './constants.js';
 import type { Store } from './store/store.js';
 

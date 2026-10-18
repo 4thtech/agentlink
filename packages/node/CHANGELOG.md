@@ -1,4 +1,4 @@
-# @agentlink/node
+# @4thtech-io/node
 
 ## 0.1.1
 

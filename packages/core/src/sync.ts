@@ -41,7 +41,7 @@
 //
 // I-5, I-7: nothing from an inbound envelope reaches a log line, an error or a report beyond its
 // validated envelope ID and fixed codes. Logs carry counts only; relay URLs are never logged here.
-import { encodeHex, encodeHex0x, envelopeHash } from '@agentlink/crypto';
+import { encodeHex, encodeHex0x, envelopeHash } from '@4thtech-io/crypto';
 import {
   MAX_SYNC_IDENTITIES,
   seenPruneBefore,
@@ -51,7 +51,7 @@ import {
   type SyncItem,
   type SyncPersistence,
   type SyncResult,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import type { DeliveryAcks } from './acks.js';
 import { RATE_BUCKET_SECONDS, RATE_WINDOW_SECONDS } from './constants.js';
 import { screenInboundTx } from './contacts.js';

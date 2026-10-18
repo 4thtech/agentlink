@@ -1,7 +1,7 @@
 // M1-11a: the local approval UI's view of one agent's approvals (08 §1; 11 §6.2.1, §8; 04 §2.5.2;
 // 06 §2.1, §8; I-4, I-5).
 //
-// @agentlink/node's approval server asks this source for the pending requests, re-reads one before
+// @4thtech-io/node's approval server asks this source for the pending requests, re-reads one before
 // a decision and hands the signed object back. It is built from the same reader as `agentlink
 // approve` (M1-9b):
 // - pending.ts opens each sealed stored action, parses it strictly and recomputes its digest; a row
@@ -15,13 +15,13 @@
 //
 // I-4: nothing here decides. `apply` is core's `ownerActions.apply`, which verifies the owner
 // signature and applies the decision in one store transaction.
-import { canonicalize, type JsonObject, type JsonValue } from '@agentlink/crypto';
+import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
 import type {
   ApprovalDetails,
   ApprovalForDecision,
   ApprovalServerSource,
   PendingApprovalView,
-} from '@agentlink/node';
+} from '@4thtech-io/node';
 import { ownerContext } from '../commands/owner/common.js';
 import type { OwnerAgent } from '../commands/owner/deps.js';
 import {

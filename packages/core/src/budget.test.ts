@@ -1,7 +1,7 @@
 // M1-7i: the budget check and the reservation of the Record's `maxFee` in one store transaction
 // (06 §3 "Daily budget window", G-7; 07 §3.5). Settle on confirmation, release only after the
 // deadline with no record, and fail closed on a missing, corrupted or clock-skewed ledger.
-import { POLICY_DEFAULTS } from '@agentlink/types';
+import { POLICY_DEFAULTS } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import {
   checkAndReserveProof,

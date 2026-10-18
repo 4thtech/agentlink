@@ -2,7 +2,7 @@
 // `invite` ...) print their own plain-language output; structured JSON log lines are for debugging,
 // so by default only warnings and errors reach the terminal. `AGENTLINK_LOG=debug|info|warn|error`
 // turns more on. Lines are still redacted by the logger (I-7) and go to stderr.
-import { LEVELS, type Level } from '@agentlink/log';
+import { LEVELS, type Level } from '@4thtech-io/log';
 
 export const DEFAULT_CLI_LOG_LEVEL: Level = 'warn';
 

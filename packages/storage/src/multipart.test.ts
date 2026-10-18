@@ -1,8 +1,8 @@
 // M1-6b part 1: multipart upload with abort and cleanup (07 §5.2, 04 §4, I-2, I-7), against an
 // in-memory S3. The STREAM encryption wiring is part 2; here the input stands in for ALF1 ciphertext.
 import { describe, expect, it } from 'vitest';
-import { encodeHex, sha256 } from '@agentlink/crypto';
-import { captureOutput } from '@agentlink/log/testing';
+import { encodeHex, sha256 } from '@4thtech-io/crypto';
+import { captureOutput } from '@4thtech-io/log/testing';
 import {
   MULTIPART_DEFAULT_PART_BYTES,
   MULTIPART_MAX_BYTES,

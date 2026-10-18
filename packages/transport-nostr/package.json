@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/transport-nostr",
+  "name": "@4thtech-io/transport-nostr",
   "version": "0.1.1",
   "private": true,
   "description": "Nostr transport: gift wraps, relay pool, sync.",
@@ -33,9 +33,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/types": "workspace:*",
-    "@agentlink/log": "workspace:*",
-    "@agentlink/crypto": "workspace:*"
+    "@4thtech-io/types": "workspace:*",
+    "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*"
   },
   "devDependencies": {
     "nostr-tools": "2.25.2"

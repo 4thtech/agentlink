@@ -24,7 +24,7 @@ import {
   RESTRICTED_NAME_MAX_CODE_POINTS,
   type ContactDisplayName,
   type RestrictedName,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 
 /** UTS #39 Table 5, Recommended scripts. */
 const RECOMMENDED_SCRIPTS = [

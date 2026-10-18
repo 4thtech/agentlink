@@ -14,7 +14,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { KeychainProbe } from '@agentlink/node';
+import type { KeychainProbe } from '@4thtech-io/node';
 import {
   EXIT_FAILED,
   EXIT_OK,

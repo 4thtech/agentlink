@@ -18,7 +18,7 @@
 //     strict invite schema (unknown keys refused).
 // Nothing hashes, signs or compares the compressed bytes or the payload text (04 §3.6, not canonical).
 //
-// This module imports only @agentlink/crypto, @agentlink/types and the core's errors, so the vector
+// This module imports only @4thtech-io/crypto, @4thtech-io/types and the core's errors, so the vector
 // harness runs it from source in Node, browsers and workerd (test-vectors/harness/suites/invite-link.ts).
 import {
   canonicalize,
@@ -27,8 +27,8 @@ import {
   encodeBase64url,
   encodeUtf8,
   parseJson,
-} from '@agentlink/crypto';
-import { inviteSchema, type Invite } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { inviteSchema, type Invite } from '@4thtech-io/types';
 import { CoreError } from './errors.js';
 
 /** The canonical link prefix (04 §3.6, 06 §7.1). The payload follows the `#`. */

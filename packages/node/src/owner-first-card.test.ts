@@ -22,7 +22,7 @@ import {
   nostrTransport,
   type ApprovalChannel,
   type InitIdentityInput,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   AGENT_CARD_DOMAIN,
   AGENT_CARD_TYPES,
@@ -33,13 +33,13 @@ import {
   type NostrEvent,
   type OwnerSession,
   type TypedData,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import type {
   RelayConnector,
   RelaySocket,
   RelaySocketHandlers,
   RelayTarget,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';

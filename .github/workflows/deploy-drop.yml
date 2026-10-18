@@ -150,8 +150,8 @@ jobs:
         with:
           cache: "false"
 
-      - name: Build the workspace dependencies of @agentlink/drop
-        run: pnpm exec turbo run build --filter='@agentlink/drop...'
+      - name: Build the workspace dependencies of @4thtech-io/drop
+        run: pnpm exec turbo run build --filter='@4thtech-io/drop...'
 
       # --dry-run bundles without contacting Cloudflare. The bundle is the same for both
       # environments (no `define` or build-time vars differ); --env only selects the config to validate.

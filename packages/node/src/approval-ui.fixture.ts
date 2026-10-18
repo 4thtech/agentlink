@@ -26,8 +26,8 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
-import type { OwnerActionOutcome } from '@agentlink/core';
+} from '@4thtech-io/crypto';
+import type { OwnerActionOutcome } from '@4thtech-io/core';
 import type { ApprovalForDecision, ApprovalServerSource } from './approval-server.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';

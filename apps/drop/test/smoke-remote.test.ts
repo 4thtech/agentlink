@@ -3,7 +3,7 @@
 // staging origin as DROP_SMOKE_URL (vitest.config.ts `provide`); otherwise every test is skipped.
 // No credentials: a fresh random drop key and random bytes. Nothing is logged (I-7).
 import { describe, inject, it } from 'vitest';
-import { signDropAuthorization } from '@agentlink/crypto/testing';
+import { signDropAuthorization } from '@4thtech-io/crypto/testing';
 import {
   smokeExpiredGet,
   smokeHealth,

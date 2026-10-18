@@ -3,8 +3,8 @@
 // Miniflare project (vitest.config.ts `drop-global-cap`) whose global cap is 1 MiB per day.
 import { SELF, env as testEnv } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { encodeBase64url, encodeUtf8 } from '@agentlink/crypto';
-import { signDropAuthorization } from '@agentlink/crypto/testing';
+import { encodeBase64url, encodeUtf8 } from '@4thtech-io/crypto';
+import { signDropAuthorization } from '@4thtech-io/crypto/testing';
 import type { DropEnv } from '../src/index.js';
 
 const env = testEnv as DropEnv;

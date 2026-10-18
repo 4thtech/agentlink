@@ -1,6 +1,6 @@
 // OwnerAction / SignedOwnerAction (04 §2.5.1, decided D-58). Strict at every level (SignedOwnerAction,
 // OwnerAction, params): unknown keys are rejected, and every field must already be in its canonical
-// encoding. Signing and verification live in @agentlink/crypto and the core; this file fixes the shape.
+// encoding. Signing and verification live in @4thtech-io/crypto and the core; this file fixes the shape.
 //
 // What a schema cannot see: duplicate keys and textual number forms (`1.0`, `1e3`) in the JSON text
 // are gone after JSON.parse. Parsing the wire bytes strictly (I-JSON) is the caller's job.

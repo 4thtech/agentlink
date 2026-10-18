@@ -1,4 +1,4 @@
-// The Transport adapter over @agentlink/transport-nostr (07 §4.1, §4.2; M1-7k).
+// The Transport adapter over @4thtech-io/transport-nostr (07 §4.1, §4.2; M1-7k).
 //
 // 07 §4.1 sketches `publish(envelope, recipients, keys)` as one step. The outbox needs it in two
 // (07 §3.2 "Transaction"): the core wraps first, stores the envelope with every signed wrap as
@@ -17,8 +17,8 @@
 // The runtime supplies the relay I/O (connector, address check, NIP-11; packages/node for Node,
 // 07 §4.2), so the core opens no socket itself. The core supplies the keys: the agent's KeyStore
 // signs the seals and, only on the agent's own relays, NIP-42 AUTH (07 §4.3: deny by default).
-import type { Envelope, EnvelopeKeys, NostrEvent } from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
+import type { Envelope, EnvelopeKeys, NostrEvent } from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
 import {
   RelayPool,
   wrapEnvelope,
@@ -34,7 +34,7 @@ import {
   type Timers,
   type Unsubscribe,
   type WrappedEnvelope,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 
 /** One catch-up pass (07 §4.2 "Sync"; M1-7h). */
 export interface TransportSyncOptions {

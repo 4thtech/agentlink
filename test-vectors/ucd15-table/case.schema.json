@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/ucd15-table/case.schema.json",
   "title": "ucd15-table case",
-  "description": "The pinned UCD 15.0.0 refused-category table of @agentlink/types: tableHash (hex SHA-256 of the canonical serialization, and the number of runs), categoryCounts (decimal counts), and category (the refused category of one code point, or `none`).",
+  "description": "The pinned UCD 15.0.0 refused-category table of @4thtech-io/types: tableHash (hex SHA-256 of the canonical serialization, and the number of runs), categoryCounts (decimal counts), and category (the refused category of one code point, or `none`).",
   "type": "object",
   "additionalProperties": false,
   "required": [

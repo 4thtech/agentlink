@@ -41,8 +41,8 @@ import {
   wipe,
   type OwnerPublicKeys,
   type PasskeyBlobHeader,
-} from '@agentlink/crypto';
-import { openOwnerSeed, openPasskeySeed, sealPasskeySeed } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { openOwnerSeed, openPasskeySeed, sealPasskeySeed } from '@4thtech-io/crypto/keystore';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';

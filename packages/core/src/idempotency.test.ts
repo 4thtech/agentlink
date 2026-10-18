@@ -11,8 +11,8 @@ import {
   randomBytes,
   sha256,
   type JsonObject,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import {

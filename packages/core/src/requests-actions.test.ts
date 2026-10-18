@@ -2,8 +2,8 @@
 // (Accept, Ignore, Ignore all, Block, Unblock), refused-row retention on the local clock, and the
 // blocked-key drop at the start of 04 §3.1.1 step 5. A request never becomes a contact (04 §2.9):
 // none of these actions writes a contact or a pairing (07 §3.2).
-import { encodeBase64url, encodeHex, generateCek, randomBytes } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+import { encodeBase64url, encodeHex, generateCek, randomBytes } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MAX_REQUESTS_PER_SENDER,

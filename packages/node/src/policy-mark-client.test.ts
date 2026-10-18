@@ -12,7 +12,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, POLICY_DEFAULTS_EFFECTIVE, type ApprovalChannel } from '@agentlink/core';
+import { AgentLinkClient, POLICY_DEFAULTS_EFFECTIVE, type ApprovalChannel } from '@4thtech-io/core';
 import {
   encodeBase64url,
   encodeHex,
@@ -21,7 +21,7 @@ import {
   type JsonObject,
   type KeyStore,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';

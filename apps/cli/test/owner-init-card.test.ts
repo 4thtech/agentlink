@@ -1,10 +1,10 @@
 // M1-8h (IR-M1-9b-1 M-3): `agentlink owner init` uses node's result. In the same owner operation it
-// hands @agentlink/node the agent's first card to sign (04 §2.5: "the card signature at owner setup"),
+// hands @4thtech-io/node the agent's first card to sign (04 §2.5: "the card signature at owner setup"),
 // stored through core `identity.init`, so an agent is pairable after `init` + `owner init`.
 //
 // Two agents over a NIP-01 relay double, each with a real core and no identity yet (what `init`
 // leaves). `owner init` runs through the real dispatcher and the M1-9b handler. The owner step itself
-// stands in for @agentlink/node's `initOwner` (whose TTY prompt these tests cannot drive; node's own
+// stands in for @4thtech-io/node's `initOwner` (whose TTY prompt these tests cannot drive; node's own
 // tests run the real one against the keychain): it creates a test owner (MemoryOwnerKeyStore) and
 // does what node does with `firstCard`, one `identity.init` with the owner session. Then the agents
 // pair through invite and accept (core pairing; the `invite` and `accept` commands are M1-9l).
@@ -16,7 +16,7 @@ import {
   type Sealed,
   type SealContext,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   decodeBase64url,
   decodeUtf8,
@@ -27,16 +27,16 @@ import {
   sha256,
   verifyAgentCard,
   type NostrEvent,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import { NodeKeyStoreError, type OwnerSetupOptions } from '@agentlink/node';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import { NodeKeyStoreError, type OwnerSetupOptions } from '@4thtech-io/node';
 import type {
   RelayConnector,
   RelaySocket,
   RelaySocketHandlers,
   RelayTarget,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { describe, expect, it } from 'vitest';
 import {
   ownerCommandHandlers,
@@ -162,7 +162,7 @@ async function initAgent(name: string, seedByte: number, net: RelayNetwork): Pro
     listAgents: () => Promise.resolve([name]),
     open: () => Promise.resolve({ status: 'ok', agent: opened }),
     backendOf: () => Promise.resolve('keychain'),
-    // Stands in for @agentlink/node's initOwner: a new owner, then the first card in the same
+    // Stands in for @4thtech-io/node's initOwner: a new owner, then the first card in the same
     // operation (one code entry), as node does with `firstCard`.
     initOwner: async (options) => {
       agent.setups.push(options);

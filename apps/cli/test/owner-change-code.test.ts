@@ -1,10 +1,10 @@
 // M1-9z (04 §2.8 "Changing the owner code"; 07 §9.3): `agentlink owner change-code` †. The command
 // runs under the owner-terminal guard, finds the owner this computer's agents name (so node can check
-// the owner item unlocks to exactly that owner) and hands the owner step to @agentlink/node, whose
+// the owner item unlocks to exactly that owner) and hands the owner step to @4thtech-io/node, whose
 // TTY prompt reads the current code and shows the new one (node's owner-change-code.test.ts runs the
 // real flow against a keychain). These tests stand in for node's `changeOwnerCode`.
-import { encodeHex0x, type OwnerPublicKeys } from '@agentlink/crypto';
-import { NodeKeyStoreError, type ChangeOwnerCodeOptions } from '@agentlink/node';
+import { encodeHex0x, type OwnerPublicKeys } from '@4thtech-io/crypto';
+import { NodeKeyStoreError, type ChangeOwnerCodeOptions } from '@4thtech-io/node';
 import { describe, expect, it } from 'vitest';
 import {
   ownerCommandHandlers,

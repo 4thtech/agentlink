@@ -12,7 +12,7 @@ request); `approval.cancel` (sign); `policy.set` (sign, verify and reject: the p
 decimal strings, `contactRules: []`) and one policy with two `contactRules`, written here in
 non-JCS key order and sorted by `contact`. Its rejection vectors are the pre-G-32 form this file
 carried in version 1 (JSON-number USD, no `contactRules`) and one schema violation each; the
-policy is written here by hand from 06 §3, never taken from `@agentlink/types`. Its verify vectors
+policy is written here by hand from 06 §3, never taken from `@4thtech-io/types`. Its verify vectors
 accept a `version` above the highest applied one and reject an equal or lower one (04 §2.5.1
 rollback rule); the context's optional `appliedPolicyVersion` is that highest applied version, and
 an absent value means 0, no policy applied yet (06 §3). `actionDigest` is 64 lowercase hex, and the card's `ownerNostr` is
@@ -328,7 +328,7 @@ def build():
 
     # approval.decideBatch (D-68; 04 §2.5.1, §2.5.2): {items: [...]}, 2 to BATCH_MAX items, each
     # exactly the approval.decide params, in strictly ascending approvalId order compared as bytes.
-    # Written here from 04 §2.5.2, never taken from `@agentlink/types`. The context lists every
+    # Written here from 04 §2.5.2, never taken from `@4thtech-io/types`. The context lists every
     # pending request the batches below name (`pendingApprovals`), each expiring well after the
     # batch, so a rejection vector can only be refused for the defect its id names.
     batch_spec = "04 §2.5.1, §2.5.2 (D-68)"

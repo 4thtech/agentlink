@@ -3,7 +3,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STORE_SCHEMA_VERSION, rowKeyOf, type Sealed } from '@agentlink/core';
+import { STORE_SCHEMA_VERSION, rowKeyOf, type Sealed } from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';

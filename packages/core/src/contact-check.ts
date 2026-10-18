@@ -30,13 +30,13 @@ import {
   sha256,
   taggedHash,
   type JsonValue,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   CLOCK_SKEW_SECONDS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   signedContactCheckSchema,
   type SignedContactCheck,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 
 /**
  * Why a `contact.check` was refused. Fixed codes; never input text (I-5, I-7). Every code is also an

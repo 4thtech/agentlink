@@ -1,7 +1,7 @@
 // M1-21 (D-55, D-74): the pure negotiation-chain reducer (04 §3.4 "Negotiation chain", no forks rules
 // 1-4, "Canonical-form and chain clarifications"). A core replays its own store through
 // `recordSentTerms` and `receiveTerms`; duplicates (same envelopeHash) are dropped before, on the
-// receive path (D-71 (3)), and `termsHash` is recomputed by the core with @agentlink/crypto.
+// receive path (D-71 (3)), and `termsHash` is recomputed by the core with @4thtech-io/crypto.
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import {

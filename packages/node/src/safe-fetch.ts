@@ -18,8 +18,8 @@ import {
   checkFetchUrl,
   pickPublicAddress,
   resolveRedirect,
-} from '@agentlink/core';
-import type { CheckedFetchUrl } from '@agentlink/core';
+} from '@4thtech-io/core';
+import type { CheckedFetchUrl } from '@4thtech-io/core';
 import dns from 'node:dns';
 import { request as httpsRequest } from 'node:https';
 import type { IncomingMessage } from 'node:http';

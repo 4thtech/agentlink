@@ -12,9 +12,9 @@ import {
   type RespondToTermsInput,
   type RespondToTermsResult,
   type TermsCode,
-} from '@agentlink/core';
-import { createLogger, type Logger } from '@agentlink/log';
-import type { ContactDisplayName, RestrictedName, Terms } from '@agentlink/types';
+} from '@4thtech-io/core';
+import { createLogger, type Logger } from '@4thtech-io/log';
+import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import type { TermsTools, ToolClient, ToolContext } from './context.js';
 import { callTool } from './index.js';

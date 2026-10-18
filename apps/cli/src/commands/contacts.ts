@@ -6,7 +6,7 @@
 // `contacts rename | remove` † (M1-9za), which the dispatcher guards and the owner handler runs. `contacts --verify <id>` is an owner
 // operation (M1-9m): the dispatcher already requires an interactive terminal for it, and until that
 // card lands this handler says it is not available.
-import { renderContactName } from '@agentlink/core';
+import { renderContactName } from '@4thtech-io/core';
 import {
   EXIT_FAILED,
   EXIT_OK,

@@ -9,9 +9,9 @@ import {
   formatFingerprint,
   randomBytes,
   senderCode,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { MAX_REQUESTS_PER_SENDER, MAX_REQUESTS_TOTAL } from './constants.js';
 import type { InboundReport } from './envelopes.js';

@@ -1,5 +1,5 @@
 // Suite `fingerprint` (M1-1b; sender code M1-1-sc): 04 §2.9 owner and agent fingerprints and the
-// sender code through @agentlink/crypto. Card inputs are `0x` values and the sender's `from` is bare
+// sender code through @4thtech-io/crypto. Card inputs are `0x` values and the sender's `from` is bare
 // hex, each decoded with the strict decoder; outputs are the digest and its display forms (a sender
 // code has the short form only).
 import {
@@ -9,7 +9,7 @@ import {
   formatFingerprint,
   ownerFingerprint,
   senderCode,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { bytesToHex } from '../hex';
 import type { SuiteModule } from '../suite';
 

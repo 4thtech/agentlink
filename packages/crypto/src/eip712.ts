@@ -1,7 +1,7 @@
 // EIP-712 typed-data hashing (04 §2.4, §5; 05 §3.1). Keccak-256 comes from @noble/hashes and
 // signing from ecdsa.ts (@noble/curves); this file is the EIP-712 encoding over them, not a
 // primitive (I-8). It is in-repo rather than viem's for three reasons: 07 §1 and the deps-check
-// policy keep @agentlink/crypto on noble and hpke only (it is the trusted base); viem's typed-data
+// policy keep @4thtech-io/crypto on noble and hpke only (it is the trusted base); viem's typed-data
 // validation accepts what 04 §2.4.1 refuses (numbers as strings, extra fields); and its recovery
 // accepts malleable signatures. viem is the differential oracle in the tests instead.
 //

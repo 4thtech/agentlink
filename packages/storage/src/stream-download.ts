@@ -1,14 +1,14 @@
 // M1-6b part 2: the streaming download with decryption and a byte cap (07 §5.2, 04 §4, D-80).
 //
 // - The ciphertext comes from a source the caller provides: a byte stream (a Response body in a
-//   Worker), or a pull function given the byte cap, shaped for @agentlink/node's SSRF-safe fetch
+//   Worker), or a pull function given the byte cap, shaped for @4thtech-io/node's SSRF-safe fetch
 //   (`(maxBytes, onChunk) => safeFetch(url, { maxBytes, onChunk })`). The download URL is the
 //   caller's (it came in an envelope, I-5): the SSRF rules of 04 §4 (https, public addresses only,
 //   redirects capped and re-checked) are the source's job, and nothing here sees or logs the URL.
 // - The cap is exact: the ALF1 length of the declared plaintext size (the declared size plus
 //   overhead, 04 §4). This side counts too, whatever the source does: one byte past the cap stops
 //   the download (`too_large`); fewer bytes than the cap fail (`size_mismatch`).
-// - Decryption goes through @agentlink/crypto's opener, which checks the header before decrypting
+// - Decryption goes through @4thtech-io/crypto's opener, which checks the header before decrypting
 //   and both hashes at the end (04 §4 Integrity: `ciphertextSha256` and `plaintextSha256` are
 //   mandatory here). As 04 §4 allows a streaming recipient (D-84), plaintext reaches the sink
 //   only as provisional output (the quarantine), and the sink commits only after the ciphertext
@@ -24,7 +24,7 @@ import {
   wipe,
   ALF1_FILE_KEY_LENGTH,
   type Alf1Processor,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { StorageError } from './errors.js';
 import type { ProvisionalSink } from './stream-sink.js';
 import { alf1CiphertextSize } from './stream-upload.js';

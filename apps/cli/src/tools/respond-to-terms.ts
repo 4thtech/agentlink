@@ -17,7 +17,7 @@
 // I-4: nothing here creates, decides or widens an approval; `approvalId` is passed to the core,
 // which re-verifies the owner's stored signature. I-5, I-7: the terms, the note and anything the
 // counterparty wrote never reach a summary, `nextStep`, error or log line.
-import type { RespondToTermsInput } from '@agentlink/core';
+import type { RespondToTermsInput } from '@4thtech-io/core';
 import { displayRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import {

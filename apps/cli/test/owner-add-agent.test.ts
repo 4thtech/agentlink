@@ -1,10 +1,10 @@
 // M1-9t (D-78; 04 §2.8 "Adding an agent to the existing owner"; 06 §8): `agentlink owner add-agent
 // --agent <name>` †. Several agents under one OS user, the first with a card from the owner; the
-// command finds the owner the machine's agents name and hands @agentlink/node exactly the agent
+// command finds the owner the machine's agents name and hands @4thtech-io/node exactly the agent
 // being added. The owner step itself stands in for node's `addAgentToOwner` (whose TTY prompt these
 // tests cannot drive; node's own tests run the real one against one shared keychain): it signs one
 // card for the named agent with the existing owner, as node does.
-import { AgentLinkClient, MemoryStore, type ApprovalChannel } from '@agentlink/core';
+import { AgentLinkClient, MemoryStore, type ApprovalChannel } from '@4thtech-io/core';
 import {
   decodeBase64url,
   decodeUtf8,
@@ -14,11 +14,11 @@ import {
   encodeUtf8,
   sha256,
   verifyAgentCard,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import type { Sealed, SealContext, StoreCipher } from '@agentlink/core';
-import { createLogger } from '@agentlink/log';
-import { NodeKeyStoreError, type AddAgentOptions } from '@agentlink/node';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import type { Sealed, SealContext, StoreCipher } from '@4thtech-io/core';
+import { createLogger } from '@4thtech-io/log';
+import { NodeKeyStoreError, type AddAgentOptions } from '@4thtech-io/node';
 import { describe, expect, it } from 'vitest';
 import {
   ownerCommandHandlers,

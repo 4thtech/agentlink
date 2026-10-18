@@ -1,7 +1,7 @@
 // M1-11a: the local UI's approval source over the agent's real core (08 §1; 11 §6.2.1; 04 §2.5.2;
 // 06 §2.1; I-4, I-5).
 //
-// The CLI hands @agentlink/node's approval server an `ApprovalServerSource` built from the same
+// The CLI hands @4thtech-io/node's approval server an `ApprovalServerSource` built from the same
 // pending reader as `agentlink approve` (pending.ts, render.ts): what the page shows (who, what,
 // cost, expiry, the rule in plain words and the AI's arguments) is derived from the parsed stored
 // action, the action handed back for signing is that same parsed object, a damaged row is never
@@ -16,7 +16,7 @@ import {
   type Sealed,
   type SealContext,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   decodeBase64url,
   decodeUtf8,
@@ -26,9 +26,9 @@ import {
   randomBytes,
   sha256,
   type JsonObject,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { createUiApprovalSource } from '../../src/approval/ui-source.js';
 import type { OwnerAgent } from '../../src/commands/owner/deps.js';

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { checkManifest } from './check-manifests.mjs';
+import * as manifests from './check-manifests.mjs';
+
+const { checkManifest } = manifests;
 
 const ok = { license: 'MIT', private: true, scripts: { build: 'tsc -b' } };
 
@@ -40,5 +42,32 @@ describe('checkManifest', () => {
       publishConfig: { access: 'public', registry: 'https://example.com', tag: 'beta' },
     });
     expect(problems).toHaveLength(2);
+  });
+});
+
+// OPS-REL-2: workspace packages live in @4thtech-io/* and stay private; only the CLI publishes.
+// The old scope is spelled without its slash here so the repository scan (retired-scope.test.mjs)
+// finds no `<scope>/<name>` text outside history.
+const OLD = '@agentlink';
+const OLD_MIXED = '@AgentLink';
+describe('checkPackageName', () => {
+  const check = (manifest) => manifests.checkPackageName(manifest);
+
+  it('accepts a private @4thtech-io package and the published CLI', () => {
+    expect(check({ name: '@4thtech-io/core', private: true })).toEqual([]);
+    expect(check({ name: '@4thtech-io/agentlink' })).toEqual([]);
+  });
+
+  it.each([`${OLD}/core`, `${OLD_MIXED}/core`])('rejects the third-party scope (%s)', (name) => {
+    expect(check({ name, private: true })).toEqual([
+      expect.stringMatching(/@agentlink npm scope.*third party/),
+    ]);
+  });
+
+  it('rejects any other package that is not private', () => {
+    expect(check({ name: '@4thtech-io/core' })).toEqual([
+      expect.stringContaining('must be "private": true'),
+    ]);
+    expect(check({ name: '@4thtech-io/core', private: false })).toHaveLength(1);
   });
 });

@@ -1,4 +1,4 @@
-// Test fixtures for @agentlink/types. Not part of the build (tsconfig.json excludes src/testing).
+// Test fixtures for @4thtech-io/types. Not part of the build (tsconfig.json excludes src/testing).
 //
 // Every value here is a structurally valid example built by hand from the spec text (04 §2.4, §2.5.1,
 // §3.1, §3.4, §3.4.1, §3.6). Nothing is a real key, signature or secret: the "keys" and "signatures"

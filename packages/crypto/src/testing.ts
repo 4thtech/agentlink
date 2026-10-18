@@ -14,7 +14,7 @@
 //
 // It never ships: this file is excluded from the build (tsconfig.json), so dist/ has no testing.js;
 // package.json `exports` has no ./testing entry, so no consumer can resolve it; and the boundary
-// guards allow `@agentlink/crypto/testing` only in test-vectors/, whose Vitest config maps it to this
+// guards allow `@4thtech-io/crypto/testing` only in test-vectors/, whose Vitest config maps it to this
 // source file (tools/deps-check/policy.mjs RESTRICTED_ENTRY_POINTS). A fixed ephemeral key, nonce or
 // IV in production would break HPKE and AES-GCM, so nothing outside tests may reach these functions.
 import {

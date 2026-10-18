@@ -3,16 +3,16 @@
 // The real transport runs end to end: nostrTransport's RelayPool and transport-nostr's SyncEngine
 // over an in-memory relay network that keeps REQ subscriptions open until CLOSE and pushes each new
 // event to the open ones (NIP-01). Wraps are real NIP-59 gift wraps; keys come from fixed seeds.
-import { encodeHex, type Envelope, type KeyStore, type NostrEvent } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+import { encodeHex, type Envelope, type KeyStore, type NostrEvent } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import {
   wrapEnvelope,
   type RelayConnector,
   type RelaySocket,
   type RelaySocketHandlers,
   type RelayTarget,
-} from '@agentlink/transport-nostr';
+} from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { MemoryStore } from './store/memory-store.js';

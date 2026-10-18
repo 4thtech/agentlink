@@ -138,7 +138,7 @@ export const requestBodySchema = z.union([
 /**
  * offer / accept / reject (04 §3.4). `terms` is the strict, canonical `termsSchema` (M1-21);
  * `termsHash` binds it: `sha256(JCS(terms))`, recomputed by the core on send and on receipt with
- * `termsHash` from @agentlink/crypto (nothing here hashes). It is never a Record field, so it is bare
+ * `termsHash` from @4thtech-io/crypto (nothing here hashes). It is never a Record field, so it is bare
  * hex (04 §2.4.1).
  */
 const termsBody = <N extends z.ZodType>(note: N) =>

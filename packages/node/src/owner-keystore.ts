@@ -48,7 +48,7 @@ import {
   type UnlockOptions,
   type UnsignedNostrEvent,
   type WrappedCek,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   bip340PublicKey,
   bip340Sign,
@@ -66,7 +66,7 @@ import {
   signEnvelopeHash,
   signTypedData,
   unwrapCek,
-} from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto/keystore';
 import { NodeKeyStoreError } from './errors.js';
 import {
   KEYCHAIN_CALL_TIMEOUT_MS,
@@ -180,7 +180,7 @@ function sameOwner(a: OwnerPublicKeys, b: OwnerPublicKeys): boolean {
 /**
  * D-66 (3): refuses a chosen owner passphrase with fewer than 12 code points after NFKC, before any
  * KDF. Counted on normalizeSecret's output (UTF-8 bytes that are not continuation bytes), the rule
- * newKeystoreKek applies to `ALKS`. Moves into @agentlink/crypto with the M1-1f D-66 follow-up.
+ * newKeystoreKek applies to `ALKS`. Moves into @4thtech-io/crypto with the M1-1f D-66 follow-up.
  * An input that fails kind-2 normalisation is refused the same way.
  */
 export function assertOwnerPassphraseLength(secret: Uint8Array): void {
@@ -825,7 +825,7 @@ export interface KeychainOwnerKeyStoreOptions {
  * agent card names (ownerEvm, ownerNostr, ownerEnc): the unwrapped seed must derive exactly these
  * keys, so a planted `owner` item under another seed never unlocks (04 §2.8 "Expected owner").
  *
- * Internal to @agentlink/node: the package entry exposes only performOwnerOperation, which reads the
+ * Internal to @4thtech-io/node: the package entry exposes only performOwnerOperation, which reads the
  * presence proof at a TTY prompt and closes the session when the operation ends (no unlock session
  * outlives one owner operation).
  */

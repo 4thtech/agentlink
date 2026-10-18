@@ -14,7 +14,7 @@
 //
 // I-5, I-7: the terms, the note and the `to` query are agent-written (steerable) text; none of it
 // reaches a summary, `nextStep`, error or log line.
-import type { ProposeTermsInput } from '@agentlink/core';
+import type { ProposeTermsInput } from '@4thtech-io/core';
 import { contactRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
 import {

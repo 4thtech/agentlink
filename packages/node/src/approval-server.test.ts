@@ -32,8 +32,8 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
-import type { OwnerActionOutcome } from '@agentlink/core';
+} from '@4thtech-io/crypto';
+import type { OwnerActionOutcome } from '@4thtech-io/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   APPROVAL_SERVER_HOST,

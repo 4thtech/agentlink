@@ -1,6 +1,6 @@
 // termsHash (04 §3.4, D-32): sha256(JCS(terms)), RFC 8785, as bare 64 lower-case hex (04 §2.4.1:
 // it never reaches a Record). The shape and canonical form of `terms` are checked by
-// @agentlink/types (`termsSchema`) before hashing, on send and on receipt; this helper hashes exactly
+// @4thtech-io/types (`termsSchema`) before hashing, on send and on receipt; this helper hashes exactly
 // the JSON object it is given and never normalises it.
 import { decodeHex, encodeHex } from './encoding.js';
 import { equalBytes } from './bytes.js';

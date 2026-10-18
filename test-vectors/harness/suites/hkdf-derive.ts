@@ -1,4 +1,4 @@
-// Suite `hkdf-derive` (M1-1b): 04 §2.1 key derivation through @agentlink/crypto. `hkdf` is RFC 5869
+// Suite `hkdf-derive` (M1-1b): 04 §2.1 key derivation through @4thtech-io/crypto. `hkdf` is RFC 5869
 // HKDF-SHA256; `derive` is the raw okm for (masterSeed, label, epoch, counter); `key` is the public
 // key of (label, epoch) after the secp256k1 rejection loop; `agentId` is 04 §2.9. Inputs go to the
 // code under test unchecked, so its own refusals (CryptoInputError) are what `outcome: reject`
@@ -10,8 +10,8 @@ import {
   evmAddressChecksummed,
   hkdfSha256,
   type KeyLabel,
-} from '@agentlink/crypto';
-import { deriveAgentId, deriveKey, derivePublicKey } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { deriveAgentId, deriveKey, derivePublicKey } from '@4thtech-io/crypto/keystore';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

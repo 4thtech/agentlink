@@ -9,7 +9,7 @@
 // and one approval serves either (M1-13a follow-up). `inviteId` and `counterparty`
 // come from the decoded link, so an approval for one invite can never be used for another (I-4).
 // Runtime-agnostic: core only.
-import { INVITE_LINK_PREFIX, decodeInviteLink } from '@agentlink/core';
+import { INVITE_LINK_PREFIX, decodeInviteLink } from '@4thtech-io/core';
 
 export interface AcceptInviteAction {
   readonly tool: 'agentlink_accept_invite';

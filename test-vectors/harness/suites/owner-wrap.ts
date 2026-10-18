@@ -1,10 +1,10 @@
-// Suite `owner-wrap` (M1-1f): Argon2id v1.3 (RFC 9106) through @agentlink/crypto, at the RFC's own
+// Suite `owner-wrap` (M1-1f): Argon2id v1.3 (RFC 9106) through @4thtech-io/crypto, at the RFC's own
 // parameters and at the owner-wrap and file KeyStore parameters (04 §2.3, §2.8). A case with no
 // secret value (K) and no associated data (X) runs the production function; the RFC 9106 case, which
 // has both, runs the same code path through the test seam. Runs in all five runtimes: the timing at
 // m = 64 MiB in browsers and workerd is part of M1-1f's acceptance.
-import { argon2id } from '@agentlink/crypto/keystore';
-import { argon2idWithSecretAndAd } from '@agentlink/crypto/testing';
+import { argon2id } from '@4thtech-io/crypto/keystore';
+import { argon2idWithSecretAndAd } from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';
 

@@ -1,5 +1,5 @@
 // The command dispatcher (M1-9k; 06 §8): the M1a commands, the guards, and fixed text only.
-import { encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import {
   COMMAND_NAMES,

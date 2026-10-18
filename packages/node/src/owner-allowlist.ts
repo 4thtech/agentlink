@@ -8,7 +8,7 @@
 //   `Registration` (05 §4, `regOwnerSig`) is not signed by any M1 owner flow yet: the card that adds
 //   one widens this list, with its domain.
 // - SignedOwnerAction by the owner Nostr key: only the ops 04 §2.5.1 defines (`OWNER_ACTION_OPS` of
-//   @agentlink/types, repeated here because node does not depend on types; the strict params schema
+//   @4thtech-io/types, repeated here because node does not depend on types; the strict params schema
 //   and every binding check stay with core, M1-7d). Later ops (storage credentials, key export,
 //   content-key disclosure) are added by the tasks that define them.
 //
@@ -22,7 +22,7 @@ import {
   parseJson,
   type JsonObject,
   type TypedData,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 
 /** The fixed refusal (I-5: no part of the request is ever echoed). */

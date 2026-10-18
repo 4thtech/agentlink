@@ -6,7 +6,7 @@
 // to hand over, and nowhere else: never a log line (I-7). The `label` is agent-written, so the core
 // stores it sealed as a suggested alias and it is shown restricted until the owner confirms it
 // (06 §2.1); it is never echoed here.
-import { CoreError } from '@agentlink/core';
+import { CoreError } from '@4thtech-io/core';
 import { copy, formatDate, renderCopy } from './strings/index.js';
 import type { ToolContext } from './context.js';
 import { INVITE_TEXT, inviteFailure } from './invite-common.js';

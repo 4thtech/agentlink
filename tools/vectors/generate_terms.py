@@ -3,7 +3,7 @@
 
 Written from the spec only (04 §2.4.1, §3.1, §3.4 with the D-74 clarifications; 06 §2.2a with the
 D-74 TermsInput rules; D-32, D-55, D-74), by a session that does not implement the TypeScript schema,
-under the M1-1h rules. Nothing here reads `@agentlink/types`.
+under the M1-1h rules. Nothing here reads `@4thtech-io/types`.
 
 What the spec fixes (04 §3.4, D-74):
   terms       {termsId, version, parties, subject, deliverables[{id, description, by, plaintextSha256}],

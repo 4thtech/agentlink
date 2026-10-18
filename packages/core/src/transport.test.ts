@@ -1,9 +1,9 @@
 // M1-7k: the Transport adapter over transport-nostr (07 §4.1, §4.2). No network: the connector
 // records what it is asked to open and never connects.
-import { TransportError, type RelayConnector } from '@agentlink/transport-nostr';
+import { TransportError, type RelayConnector } from '@4thtech-io/transport-nostr';
 import { describe, expect, it } from 'vitest';
 import { nostrTransport } from './transport.js';
-import { MemoryKeyStore } from '@agentlink/crypto/testing';
+import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
 import { seed } from './testing/fixtures.js';
 
 const opened: string[] = [];

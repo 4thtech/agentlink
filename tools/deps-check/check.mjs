@@ -40,12 +40,14 @@ import {
   SUBTLE_ZONES,
   ZONES,
   allowedWorkspaceNames,
+  isRetiredScope,
   isSubtleExempt,
   layerMessage,
   libraryAllowed,
   libraryMessage,
   matchesGroup,
   misnamedTestFile,
+  retiredScopeMessage,
   testSeamViolation,
   violationFor,
   workspaceNameOf,
@@ -165,6 +167,9 @@ export function checkManifest(zone, manifest, { bundledRuntime = new Map() } = {
     ];
   }
   const problems = [];
+  if (isRetiredScope(manifest.name)) {
+    problems.push(`${zone}: package name: ${retiredScopeMessage(manifest.name)}`);
+  }
   if (manifest.name !== policy.name) {
     problems.push(
       `${zone}: package name is ${JSON.stringify(manifest.name)}, policy.mjs expects "${policy.name}"`,
@@ -184,6 +189,12 @@ export function checkManifest(zone, manifest, { bundledRuntime = new Map() } = {
       const where = `${zone}: ${field}.${declared}`;
       const alias = real === declared ? '' : ` (alias of ${real})`;
 
+      if (isRetiredScope(declared) || isRetiredScope(real)) {
+        problems.push(
+          `${where}${alias}: ${retiredScopeMessage(isRetiredScope(real) ? real : declared)}`,
+        );
+        continue;
+      }
       const bad = specProblem(spec);
       if (bad !== null) {
         problems.push(`${where}: ${bad}`);

@@ -6,7 +6,7 @@
 // serializable through a single lock and all-or-nothing across tables, its body must be synchronous,
 // a refused statement changes nothing, and comparisons with null follow SQL (only an explicit null
 // matches null). It holds only what the core gives it: `enc` columns arrive sealed.
-import { isUsdAmount } from '@agentlink/types';
+import { isUsdAmount } from '@4thtech-io/types';
 import { StoreConstraintError, StoreUsageError } from '../errors.js';
 import { STORE_SCHEMA_VERSION } from '../constants.js';
 import {

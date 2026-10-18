@@ -18,8 +18,8 @@ import {
   verifyNostrEvent,
   wrapCek,
   type TypedData,
-} from '@agentlink/crypto';
-import { deriveAgentId, derivePublicIdentity } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { deriveAgentId, derivePublicIdentity } from '@4thtech-io/crypto/keystore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 // The raw keychain backend is internal (IR-M1-8a-1 M-2): tests reach it through the modules, never
 // through the package entry, which exports only opaque entry points (fence.test.ts).

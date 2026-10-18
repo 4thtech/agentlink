@@ -53,7 +53,7 @@ import { agentCard } from './testing/fixtures.js';
 
 describe('constants (04, 05, 06)', () => {
   it('exports its package name', () => {
-    expect(packageName).toBe('@agentlink/types');
+    expect(packageName).toBe('@4thtech-io/types');
   });
 
   it('has exactly the 17 payload types of 04 §3.4, in spec order', () => {

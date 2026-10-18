@@ -8,17 +8,17 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 
 | Package | Depends on | Exposes |
 |---|---|---|
-| `@agentlink/types` | zod | Shared types, zod schemas, constants (kinds, receipt types, fee types) |
-| `@agentlink/log` | — | Redacting structured logger used by every package (04 §8 rule 4, I-7); secret-canary test helper (`@agentlink/log/testing`) |
-| `@agentlink/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers; `KeyStore`, `OwnerKeyStore` and `EnvelopeKeys` interfaces (G-2, 04 §3.1.1) |
-| `@agentlink/chain` | viem, types, crypto | Chain configs, contract ABIs, fee quotes, credits, record/receipt building, submitter client, proof verification |
-| `@agentlink/transport-nostr` | nostr-tools, types, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
-| `@agentlink/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
-| `@agentlink/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
-| `@agentlink/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
-| `@4thtech-io/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers (`src/tools/`) import no Node built-in, Node global or `@agentlink/node` module and nothing outside `src/tools/` (06 §1), and are moved into a shared package for the cloud agent at M2-3b (06 §1, G-15, D-73 (1)) |
+| `@4thtech-io/types` | zod | Shared types, zod schemas, constants (kinds, receipt types, fee types) |
+| `@4thtech-io/log` | — | Redacting structured logger used by every package (04 §8 rule 4, I-7); secret-canary test helper (`@4thtech-io/log/testing`) |
+| `@4thtech-io/crypto` | noble, hpke | Key derivation, HPKE seal/open, AES-GCM, STREAM file encryption, hashing, JCS, BIP-340 sign/verify, EIP-712 helpers; `KeyStore`, `OwnerKeyStore` and `EnvelopeKeys` interfaces (G-2, 04 §3.1.1) |
+| `@4thtech-io/chain` | viem, types, crypto | Chain configs, contract ABIs, fee quotes, credits, record/receipt building, submitter client, proof verification |
+| `@4thtech-io/transport-nostr` | nostr-tools, types, crypto | `Transport` implementation: relay pool, gift wrap/unwrap, subscriptions, sync cursors |
+| `@4thtech-io/storage` | types, crypto | `StorageAdapter` interface; `inline`, `drop` (default, D-48) and `s3` adapters (P0); `gdrive`, `dropbox`, `onedrive` connectors (P1, M2, D-49); `ipfs-pinning` (P2); storage selection (§5.6) |
+| `@4thtech-io/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
+| `@4thtech-io/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
+| `@4thtech-io/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers (`src/tools/`) import no Node built-in, Node global or `@4thtech-io/node` module and nothing outside `src/tools/` (06 §1), and are moved into a shared package for the cloud agent at M2-3b (06 §1, G-15, D-73 (1)) |
 
-Integrators use `@agentlink/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
+Integrators use `@4thtech-io/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
 
 ---
 
@@ -118,11 +118,11 @@ Every mutating call runs: **policy check → (approval) → action → store →
   - `json`: the exact JSON text received or signed, never re-serialised.
   - `enc`: encrypted at rest (below).
   - An enum column holds exactly the listed values. Any other value is an inconsistency, and each table says what the core then does.
-- **At rest.** An `enc` column is encrypted under the store key with AES-256-GCM through `@agentlink/crypto`, with AAD bound to the table, the column and the row key (M1-8b), so a value copied into another row or column does not open. A value that does not open makes the row unreadable. It is never read as empty. **Sealed form (proposed; owner confirms at merge; M1-8b, IR-M1-8b-1 L-2):** the store key is the AES-256-GCM key, each value gets a random 12-byte nonce, the AAD is JCS(`["agentlink/v1/store-column", table, column, rowKey]`) with rowKey the JSON text of the primary-key values in key order, and the stored text is `v1.` + base64url without padding of nonce ‖ ciphertext ‖ 16-byte tag.
+- **At rest.** An `enc` column is encrypted under the store key with AES-256-GCM through `@4thtech-io/crypto`, with AAD bound to the table, the column and the row key (M1-8b), so a value copied into another row or column does not open. A value that does not open makes the row unreadable. It is never read as empty. **Sealed form (proposed; owner confirms at merge; M1-8b, IR-M1-8b-1 L-2):** the store key is the AES-256-GCM key, each value gets a random 12-byte nonce, the AAD is JCS(`["agentlink/v1/store-column", table, column, rowKey]`) with rowKey the JSON text of the primary-key values in key order, and the stored text is `v1.` + base64url without padding of nonce ‖ ciphertext ‖ 16-byte tag.
 - **Time.** The core passes `now` into every store call that compares times; the store never reads a clock. This keeps the boundaries testable, as for G-7.
 - **Store transactions.** "One store transaction" means that every read and write inside it commits together or not at all, and that no other write to the same store interleaves with it (serializable). Everything it writes, including signed items and `enc` values, is prepared before it starts. Its body is synchronous: no network call, no KeyStore call, no `await`, and no encryption or decryption of an `enc` value (WebCrypto AES-GCM is asynchronous; values are encrypted before and decrypted after). Nothing is published, submitted or returned to the caller before its transaction commits. A signature made for a transaction that then does not commit is discarded, never published or submitted.
 - **Fail closed.** A store error or an unreadable row never counts as absent, empty or allowed. Each table states what the core does then. Losing `seen` costs only work, and at worst a dropped item is evaluated again (§3.2).
-- **Keyed digests.** A digest of low-entropy sensitive data (`idempotency.request_digest`) is an HMAC-SHA256 under an index key that `@agentlink/crypto` derives from the store key with HKDF (M1-8b), never a plain hash, so the file alone cannot confirm a guessed message or policy. The index key is HKDF-SHA256 of the store key with an empty salt, info `agentlink/v1/store-index` and 32 bytes of output, and a digest is written as 64 lowercase hex (proposed; owner confirms at merge; M1-8b, IR-M1-8b-1 L-2).
+- **Keyed digests.** A digest of low-entropy sensitive data (`idempotency.request_digest`) is an HMAC-SHA256 under an index key that `@4thtech-io/crypto` derives from the store key with HKDF (M1-8b), never a plain hash, so the file alone cannot confirm a guessed message or policy. The index key is HKDF-SHA256 of the store key with an empty salt, info `agentlink/v1/store-index` and 32 bytes of output, and a digest is written as 64 lowercase hex (proposed; owner confirms at merge; M1-8b, IR-M1-8b-1 L-2).
 - **Pruning** runs in its own store transaction and deletes only rows past the retention stated for them.
 
 ### 3.2 Delivery: outbox, seen-set, held envelopes, requests and rate counters
@@ -483,7 +483,7 @@ interface Transport {
 //   signNostr(event), nip44Encrypt(peerPubkey, plaintext), nip44Decrypt(peerPubkey, ciphertext, {epoch})
 // It is the agent's KeyStore, or an OwnerSession on owner surfaces (owner-authored envelopes, owner copies).
 // Seal signing uses the sender's key (seal key = envelope `from`); gift-wrap encryption uses a fresh
-// ephemeral key created inside @agentlink/crypto. Size checks before JSON.parse: 04 §3.1.1.
+// ephemeral key created inside @4thtech-io/crypto. Size checks before JSON.parse: 04 §3.1.1.
 ```
 
 **Two steps, store first (proposed, owner confirms at merge; IR-M1-7k-1 Q1).** Wrapping and publishing are separate calls so that the core can meet §3.2: it calls `wrap`, stores the outbound envelope with one outbox row per returned wrap in one store transaction, and only then calls `publish` for each stored wrap, with that row's relay list. A retry republishes the same stored wrap; nothing is wrapped or signed again. `wrap` publishes nothing; `publish` sends to exactly the relays it is given.
@@ -542,7 +542,7 @@ An owner has no relay list of its own: a card carries only the agent's `relaysHa
   - the owner link from the CLI (M2-2c), which carries `{card, cardSig, name, relays}` for each agent the CLI holds, inside the same encrypted, code-checked transfer.
 
   A list replaces the stored one only with a card of strictly greater `keyEpoch` for the same `agentEvm` (compare-and-set). A revoked agent stays revoked. If a second relay change arrives while the surface's overlap for that agent still runs (a conforming agent refuses this, below), `prev_relays` becomes the union of both previous lists, at most 16 relays, until the later end time, so no list that contacts may still use is dropped.
-- **Contacts of an invitee.** When the owner's agent was the invitee, the invite is not an envelope, so the owner learns the inviter's list from its copy of the `handshake-ack`, which now carries `relays` (04 §3.4.1; D-65, amends D-58). This changes `handshakeAckBodySchema` in `@agentlink/types` and the pairing vectors (`safety-code-recompute`), so it lands before M1-7c (card M1-2d).
+- **Contacts of an invitee.** When the owner's agent was the invitee, the invite is not an envelope, so the owner learns the inviter's list from its copy of the `handshake-ack`, which now carries `relays` (04 §3.4.1; D-65, amends D-58). This changes `handshakeAckBodySchema` in `@4thtech-io/types` and the pairing vectors (`safety-code-recompute`), so it lands before M1-7c (card M1-2d).
 - **The bootstrap set.** The release's default relay set (the list that `init` picks from, §4.2), plus relays the owner enters under Settings. The owner's entries are local settings, pass the relay URL rule and are never published.
 - **Never a source:** NIP-65 or NIP-17 relay-list events (kinds 10002 and 10050), relay hints in event tags, NIP-11 documents, redirects, or any list from a contact about another party. No public relay-list event is published for an agent or an owner. An `OwnerSession` cannot sign one anyway (04 §3.1.1).
 - **SSRF.** Every list from any source is checked by the raw-string schema at parse (04 §4), and every connection by the connect-time rules of §4.2 on runtimes that own their sockets (Node, the desktop app). The console keeps the browser residual risk stated in §4.2.
@@ -698,7 +698,7 @@ type Source = { url: string; verifiedOn: string };  // https URL; YYYY-MM-DD
 
 - Every chain entry and every `feeTokens[]` element carries a required `source`: the issuer's or chain's official page and the date it was last checked (12 §3.2). The private deploy configuration (occ-v2-contracts `script/config`) records the same values, and its verify-chain script checks them against chain state.
 - `finalizedTag` is true where the chain answers the `finalized` block tag (proven by verify-chain), so the client never probes. There, 04 §5 reads chain state at `finalized`, and `confirmations` is only the threshold for showing a proof as included. On a chain without the tag, `confirmations` is also the 04 §5 fallback depth. It is never a reorg-safety bound.
-- The client ships one network entry per chain without `contracts` (`@agentlink/chain`, M1-14). The registry (M1-4a) composes each `ChainConfig` from that entry plus `contracts` from the pinned in-repo `@4thtech-io/occ-v2-abi`, once M1-3g has deployed them.
+- The client ships one network entry per chain without `contracts` (`@4thtech-io/chain`, M1-14). The registry (M1-4a) composes each `ChainConfig` from that entry plus `contracts` from the pinned in-repo `@4thtech-io/occ-v2-abi`, once M1-3g has deployed them.
 - At most one fee token per symbol on a chain, so the user can tell tokens apart by symbol.
 
 At launch `feeTokens` lists only USD stablecoins (D-46, 12 §3): USDC, USDT where available, and on Gnosis the native xDAI (`symbol: "NATIVE"`, `address: null`). A volatile native coin is never a fee token at launch (`NATIVE` on other chains is used only for gas in direct mode).
@@ -807,7 +807,7 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 
 ## 9. Node KeyStore backends (D-54)
 
-`@agentlink/node` ships two backends behind the same `KeyStore` interface from `@agentlink/crypto` (04 §3.1.1, G-2): the **OS keychain**, which is the default (04 §2.2), and the **passphrase-locked file KeyStore** for headless machines, which is opt-in (04 §2.8). Formats, KDF parameters, the owner-key rules, the threat model and the required tests are in 04 §2.8. This section covers runtime behaviour. Neither backend weakens `OwnerKeyStore` (04 §2.5).
+`@4thtech-io/node` ships two backends behind the same `KeyStore` interface from `@4thtech-io/crypto` (04 §3.1.1, G-2): the **OS keychain**, which is the default (04 §2.2), and the **passphrase-locked file KeyStore** for headless machines, which is opt-in (04 §2.8). Formats, KDF parameters, the owner-key rules, the threat model and the required tests are in 04 §2.8. This section covers runtime behaviour. Neither backend weakens `OwnerKeyStore` (04 §2.5).
 
 ### 9.1 Selection and the recorded backend
 

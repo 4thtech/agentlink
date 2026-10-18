@@ -1,10 +1,10 @@
 // M1-9p: `agentlink_inbox` (06 §2.2 `InboundMessage`/`OutboundMessage`, order and paging, read
 // state; §2.1 D-72 accepted requests; §4 wrapper; §6 sync; §9 injection; I-5, I-7, zero access).
 // The handler against a fake core surface whose `inboxPage` follows the port's contract (context.ts).
-import type { ContactView, InboxSender, OpenOffer } from '@agentlink/core';
-import { encodeUtf8 } from '@agentlink/crypto';
-import { createLogger, type Logger } from '@agentlink/log';
-import type { ContactDisplayName, RestrictedName } from '@agentlink/types';
+import type { ContactView, InboxSender, OpenOffer } from '@4thtech-io/core';
+import { encodeUtf8 } from '@4thtech-io/crypto';
+import { createLogger, type Logger } from '@4thtech-io/log';
+import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
 import { Ajv } from 'ajv';
 import { describe, expect, it } from 'vitest';
 import type {

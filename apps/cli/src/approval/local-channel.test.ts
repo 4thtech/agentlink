@@ -1,7 +1,7 @@
 // The M1a local approval channel (06 §2.5, D-73 (3)): request() returns a ticket with no URL;
 // status() is `pending` or `unknown`, never `signed`, and fails closed.
-import { MemoryStore, type Sealed, type Store } from '@agentlink/core';
-import { encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { MemoryStore, type Sealed, type Store } from '@4thtech-io/core';
+import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import {
   createLocalApprovalChannel,

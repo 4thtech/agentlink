@@ -1,4 +1,4 @@
-# @agentlink/crypto
+# @4thtech-io/crypto
 
 ## 0.1.1
 

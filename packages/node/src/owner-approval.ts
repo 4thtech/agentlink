@@ -25,7 +25,7 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 import { assertAgentId, osKeychain } from './keychain.js';
 import { KeychainOwnerKeyStore, ownerKeysCopy } from './owner-keystore.js';

@@ -9,7 +9,7 @@ import {
   ALF1_TAG_LENGTH,
   encodeHex,
   sha256,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   StorageError,
   alf1CiphertextSize,

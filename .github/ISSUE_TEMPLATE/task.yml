@@ -86,6 +86,6 @@ body:
       label: Dependencies
       description: Task IDs or issues that must be finished first, and external prerequisites. Write "None" if there are none.
       placeholder: |
-        - Blocked by M1-1 (@agentlink/crypto)
+        - Blocked by M1-1 (@4thtech-io/crypto)
     validations:
       required: true

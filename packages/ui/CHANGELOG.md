@@ -1,4 +1,4 @@
-# @agentlink/ui
+# @4thtech-io/ui
 
 ## 0.1.1
 

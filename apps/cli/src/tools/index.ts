@@ -4,7 +4,7 @@
 //
 // Every M1a tool has its handler: invites (M1-9o), send and inbox (M1-9p), terms (M1-9q). A tool
 // whose card has not landed would answer the fixed "not available yet" error (06 §1 rule 3).
-import type { McpToolName } from '@agentlink/types';
+import type { McpToolName } from '@4thtech-io/types';
 import { acceptInviteHandler } from './accept-invite.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';

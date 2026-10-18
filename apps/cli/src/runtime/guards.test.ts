@@ -33,7 +33,7 @@ describe('terminal guards', () => {
     });
   });
 
-  it('the marker list matches the one @agentlink/node uses for the owner prompt', () => {
+  it('the marker list matches the one @4thtech-io/node uses for the owner prompt', () => {
     // The node package does not export its list; this keeps the two in step by reading its source.
     const source = readFileSync(
       fileURLToPath(new URL('../../../../packages/node/src/owner-terminal.ts', import.meta.url)),

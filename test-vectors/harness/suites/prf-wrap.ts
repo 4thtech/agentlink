@@ -1,5 +1,5 @@
 // Suite `prf-wrap` (M1-1k): the passkey PRF salt and wrap key (04 §2.3 step 3) and the owner seed
-// blobs `ALKP` v1 (04 §2.3.1) and `ALKR` v1 (04 §2.3.2), D-82, through @agentlink/crypto. Seals with
+// blobs `ALKP` v1 (04 §2.3.1) and `ALKR` v1 (04 §2.3.2), D-82, through @4thtech-io/crypto. Seals with
 // the vector's fixed nonce (and salt) go through the test seam; production seals draw fresh ones. An
 // empty `expectedOwnerNostr` means the caller knows no expected owner. Recovery codes are encoded
 // with the package's strict UTF-8 encoder and given to the code under test as bytes. A refusal by the
@@ -10,12 +10,12 @@ import {
   encodeUtf8,
   ownerPrfSalt,
   readPasskeyBlobHeader,
-} from '@agentlink/crypto';
-import { derivePrfWrapKey, openPasskeySeed, openRecoverySeed } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { derivePrfWrapKey, openPasskeySeed, openRecoverySeed } from '@4thtech-io/crypto/keystore';
 import {
   sealPasskeySeedWithNonce,
   sealRecoverySeedWithSaltAndNonce,
-} from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

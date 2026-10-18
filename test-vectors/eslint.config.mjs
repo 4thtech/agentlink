@@ -2,12 +2,13 @@ import { builtinModules } from 'node:module';
 import root from '../eslint.config.mjs';
 
 // The repository config, plus zones for the harness: it runs in Node, browsers and workerd, so no
-// Node built-ins, and suites reach crypto only through @agentlink/crypto (AGENTS.md, 04 §8.1). The
+// Node built-ins, and suites reach crypto only through @4thtech-io/crypto (AGENTS.md, 04 §8.1). The
 // placeholder suite's direct crypto.subtle call is a global, not an import; M0-10 exempts exactly
 // test-vectors/**/placeholder-sha256.ts. ESLint applies only the last matching
 // no-restricted-imports block, so the suites block repeats the harness list.
 const NODE = 'The vector harness also runs in browsers and workerd: no Node built-ins.';
-const CRYPTO = 'Vector suites test @agentlink/crypto; they never import crypto libraries directly.';
+const CRYPTO =
+  'Vector suites test @4thtech-io/crypto; they never import crypto libraries directly.';
 const EXPECTED =
   'Suite modules never read vectors: they get id and input, and compare.ts checks expected values.';
 

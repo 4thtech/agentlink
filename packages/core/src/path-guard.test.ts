@@ -1,5 +1,5 @@
 // M1-15: the pure allowed-folder decision (04 §4 "Allowed folders"), both path flavours on every
-// platform. The realpath half is tested in @agentlink/node (allowed-path.test.ts).
+// platform. The realpath half is tested in @4thtech-io/node (allowed-path.test.ts).
 import { describe, expect, it } from 'vitest';
 import {
   decidePath,

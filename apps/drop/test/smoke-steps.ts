@@ -14,7 +14,7 @@ import {
   encodeHex,
   encodeUtf8,
   randomBytes,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 
 export interface DropAuthRequest {
   readonly method: string;

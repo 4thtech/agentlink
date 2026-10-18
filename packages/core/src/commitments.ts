@@ -23,7 +23,7 @@
 //   owner sees the warning (04 §3.4.2 "Counter-offers and late accepts"; IR-M1-20-1 F01).
 // - A grant is a ledger row, never authority: before each part the core re-runs the rule on the
 //   verified policy and requires the same policy hash (recheckCommitmentGrant).
-import { verifyTermsHash } from '@agentlink/crypto';
+import { verifyTermsHash } from '@4thtech-io/crypto';
 import {
   compareDecimalWithUsd,
   commitmentScopeSchema,
@@ -31,7 +31,7 @@ import {
   type CommitmentDecision,
   type CommitmentScope,
   type Terms,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { computeActionDigest } from './owner-action.js';
 import type { EffectivePolicy, PolicyDocument } from './policy-engine.js';
 

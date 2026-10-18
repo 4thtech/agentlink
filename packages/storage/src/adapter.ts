@@ -1,6 +1,6 @@
 // The storage adapter interface (07 §5.1) and the helpers every adapter shares. Every adapter
 // receives only ALF1 ciphertext (04 §4, I-2); none sees a file key, a file name or plaintext.
-import { encodeHex, sha256 } from '@agentlink/crypto';
+import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import { StorageError } from './errors.js';
 
 export type StorageKind = 'inline' | 'drop' | 's3' | 'gdrive' | 'dropbox' | 'onedrive' | 'ipfs';

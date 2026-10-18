@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/node",
+  "name": "@4thtech-io/node",
   "version": "0.1.1",
   "private": true,
   "description": "Node implementations: keychain KeyStore, SQLite Store, local approval server.",
@@ -33,9 +33,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentlink/core": "workspace:*",
-    "@agentlink/crypto": "workspace:*",
-    "@agentlink/transport-nostr": "workspace:*",
+    "@4thtech-io/core": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*",
+    "@4thtech-io/transport-nostr": "workspace:*",
     "@napi-rs/keyring": "2.1.1",
     "better-sqlite3": "13.0.3",
     "ws": "8.22.0"

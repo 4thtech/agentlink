@@ -12,7 +12,7 @@
 // inter-process lock (06 §6), so two processes cannot lower the mark and a write that did not stick
 // is reported. Residual (G-1, D-67): a same-user process can rewrite the item directly, outside the
 // lock; the mark makes a policy rollback need that edit as well as the store edit.
-import type { PolicyVersionMark } from '@agentlink/core';
+import type { PolicyVersionMark } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';

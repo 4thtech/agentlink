@@ -4,7 +4,7 @@
 // - The file key is 32 fresh CSPRNG bytes made here for every file and never taken from the caller,
 //   so a key (and with it a nonce sequence) is never reused for another file (04 §4 "File key").
 //   The caller puts it in the envelope only (I-2) and never logs it.
-// - Encryption goes through @agentlink/crypto (alf1EncryptStream: random nonce prefix, 1 MiB
+// - Encryption goes through @4thtech-io/crypto (alf1EncryptStream: random nonce prefix, 1 MiB
 //   chunks); nothing here touches a primitive (I-8).
 // - Memory is bounded by the target: the S3 multipart target (multipart.ts) holds one part, the
 //   sealer one chunk. Nothing buffers the file.
@@ -23,7 +23,7 @@ import {
   encodeHex,
   randomBytes,
   wipe,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import type { PutOptions, StoredObject } from './adapter.js';
 import { StorageError } from './errors.js';
 

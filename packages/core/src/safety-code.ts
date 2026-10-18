@@ -17,7 +17,7 @@
 //  5. T = sha256(JCS(K.card)) ‖ sha256(JCS(H.card)) ‖ inviteId ‖ codeReveal ‖ H.codeNonce.
 // Each body must also pass its strict schema (04 §3.4.1, G-24).
 //
-// This module imports only @agentlink/crypto, @agentlink/types and the core's errors, so the vector
+// This module imports only @4thtech-io/crypto, @4thtech-io/types and the core's errors, so the vector
 // harness runs it from source in every runtime (test-vectors/harness/suites/safety-code-recompute.ts).
 import {
   agentCardJcsHash,
@@ -38,14 +38,14 @@ import {
   wipe,
   type AgentCard,
   type Envelope,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   envelopeSchema,
   payloadSchema,
   type HandshakeAckBody,
   type HandshakeBody,
   type Payload,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { CoreError } from './errors.js';
 
 /** A pairing message as signed and opened: the strict envelope and its strict payload. */

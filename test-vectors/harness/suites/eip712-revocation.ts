@@ -1,13 +1,13 @@
 // Suite `eip712-revocation` (M1-1j, vectors M1-1i-b): EIP-712 hashing of the OCCRegistry
 // `Revocation` struct (05 §4, D-81) and of a `Registration` that shares its owner nonce, through
-// @agentlink/crypto. A refusal by the code under test (CryptoInputError) is reported as
+// @4thtech-io/crypto. A refusal by the code under test (CryptoInputError) is reported as
 // `outcome: reject`. Any other error is a bug and fails the case.
 import {
   CryptoInputError,
   hashRegistration,
   hashRevocation,
   type ProofTypeHashes,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { bytesToHex } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

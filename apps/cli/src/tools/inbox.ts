@@ -20,7 +20,7 @@
 //
 // I-5, I-7: summaries and `nextStep` are fixed text with counts and names under the 06 §2.1 rule;
 // logs carry counts only.
-import { canonicalize, encodeUtf8 } from '@agentlink/crypto';
+import { canonicalize, encodeUtf8 } from '@4thtech-io/crypto';
 import {
   activeContacts,
   contactRef,

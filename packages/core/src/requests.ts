@@ -22,7 +22,7 @@
 // app), never an MCP tool (I-4); in M1 they need no owner presence (11 §6.2.1, IR-D-72-1 F02).
 // Nothing here creates or changes a contact row or a pairing: a contact comes only from a completed
 // pairing (04 §2.9). Each action is one store transaction.
-import { CLOCK_SKEW_SECONDS } from '@agentlink/types';
+import { CLOCK_SKEW_SECONDS } from '@4thtech-io/types';
 import {
   MAX_REQUESTS_PER_SENDER,
   MAX_REQUESTS_TOTAL,

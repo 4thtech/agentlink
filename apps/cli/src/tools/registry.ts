@@ -13,7 +13,7 @@
 //   description (I-5); they never change at run time.
 // - No tool changes policies, exports keys, adds storage credentials, decides or bypasses approvals,
 //   reads arbitrary files or touches harness hooks (I-4, 06 §1 rule 4). Owner commands are not tools.
-import { INVITE_LINK_PREFIX, INVITE_MAX_PAYLOAD_CHARS } from '@agentlink/core';
+import { INVITE_LINK_PREFIX, INVITE_MAX_PAYLOAD_CHARS } from '@4thtech-io/core';
 import {
   APPROVAL_STATUSES,
   APPROVAL_TOOL_NAMES,
@@ -28,7 +28,7 @@ import {
   TERMS_LIMITS,
   TERMS_TOKEN_SYMBOLS,
   type McpToolName,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 
 type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
 export type JsonSchema = { readonly [key: string]: Json };

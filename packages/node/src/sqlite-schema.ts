@@ -13,7 +13,7 @@ import {
   type ColumnSpec,
   type TableName,
   type TableSpec,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 
 /** PRAGMA application_id of an AgentLink store ('ALST'), so a foreign SQLite file is refused. */
 export const STORE_APPLICATION_ID = 0x414c5354;
@@ -42,7 +42,7 @@ export function columnsOf(table: TableName): readonly string[] {
 }
 
 /**
- * The SQL check of a USD amount (04 §2.4.1; @agentlink/types isUsdAmount):
+ * The SQL check of a USD amount (04 §2.4.1; @4thtech-io/types isUsdAmount):
  * `^(0|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$`, written with GLOB and instr so that it needs no
  * application function.
  */

@@ -1,4 +1,4 @@
-# @agentlink/chain
+# @4thtech-io/chain
 
 ## 0.1.1
 

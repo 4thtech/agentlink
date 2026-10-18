@@ -15,7 +15,7 @@ import {
   type CommitmentCard,
   type ProposeTermsResult,
   type TermsCode,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { approvalStateOf } from './get-approval.js';

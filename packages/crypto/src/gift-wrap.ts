@@ -1,6 +1,6 @@
 // NIP-59 gift wrap (04 §3.5, 07 §4.1): a kind 1059 event whose content is the NIP-44 v2 encryption of
 // a signed seal (kind 13) to one recipient, signed by a fresh ephemeral key. The ephemeral key is
-// created, used and wiped inside this call and never leaves @agentlink/crypto (07 §4.1, M1-1g).
+// created, used and wiped inside this call and never leaves @4thtech-io/crypto (07 §4.1, M1-1g).
 // It takes no long-term secret, so it is in the main entry. The rumor, the seal (signed through
 // KeyStore.signNostr), the randomised created_at and every unwrap rule are M1-5a.
 import { randomBytes } from './random.js';

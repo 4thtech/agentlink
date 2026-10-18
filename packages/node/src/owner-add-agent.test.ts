@@ -15,7 +15,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, computeActionDigest, type ApprovalChannel } from '@agentlink/core';
+import { AgentLinkClient, computeActionDigest, type ApprovalChannel } from '@4thtech-io/core';
 import {
   encodeBase64url,
   encodeHex,
@@ -27,7 +27,7 @@ import {
   type JsonObject,
   type KeyStore,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';

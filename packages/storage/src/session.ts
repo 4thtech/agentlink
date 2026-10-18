@@ -10,7 +10,7 @@
 //   in an error;
 // - a network error is replaced by a fixed one, since the original can carry the URL.
 import { AwsClient } from 'aws4fetch';
-import type { Logger } from '@agentlink/log';
+import type { Logger } from '@4thtech-io/log';
 import { validateBucket, validateRegion, validateS3Endpoint } from './endpoint.js';
 import { StorageError } from './errors.js';
 

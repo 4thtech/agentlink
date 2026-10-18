@@ -9,8 +9,8 @@
 // - `contact.remove` writes the 07 §3 tombstone: the contact leaves every listing, and later
 //   envelopes from its keys are dropped. The nonce row (op, action hash, applied time) is the audit
 //   record. Nothing is sent to the contact.
-import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
+import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';
 import {

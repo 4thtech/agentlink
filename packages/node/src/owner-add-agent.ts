@@ -35,7 +35,7 @@ import {
   type AgentCard,
   type OwnerPublicKeys,
   type OwnerSession,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
 import {

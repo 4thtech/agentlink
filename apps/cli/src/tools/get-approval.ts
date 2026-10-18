@@ -17,8 +17,8 @@
 // complete it with only the `approvalId`. Every value is checked again here against its exact
 // pattern or enum before it is used; anything else drops `action` (fail closed). It authorises
 // nothing: the call that names the `approvalId` is checked against the owner-signed digest (I-4).
-import type { ApprovalResume, ApprovalState as CoreApprovalState } from '@agentlink/core';
-import { APPROVAL_TOOL_NAMES, approvalIdSchema, type ApprovalStatus } from '@agentlink/types';
+import type { ApprovalResume, ApprovalState as CoreApprovalState } from '@4thtech-io/core';
+import { APPROVAL_TOOL_NAMES, approvalIdSchema, type ApprovalStatus } from '@4thtech-io/types';
 import { copy } from './strings/index.js';
 import type { ToolContext } from './context.js';
 import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';

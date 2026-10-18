@@ -4,7 +4,7 @@
 // Hidden files, and anything under `~/.ssh`, `~/.agentlink` or a keychain directory, are always
 // refused, even when the owner allowed a folder that contains them.
 //
-// This module compares paths that the platform has already resolved (`@agentlink/node`'s
+// This module compares paths that the platform has already resolved (`@4thtech-io/node`'s
 // `resolveAllowedFile` runs realpath and passes the results here). It does no I/O and imports no
 // Node built-in, so it parses both path flavours itself: `posix` and `win32` (drive letters, UNC
 // shares, `\\?\` prefixes, either separator, case-insensitive). Every function fails closed: a

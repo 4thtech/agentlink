@@ -1,6 +1,6 @@
 // Placeholder suite (M0-9): SHA-256 over published NIST and RFC test values. Its only job is to
 // prove the harness. The "code under test" here is the platform's own WebCrypto, which is why this
-// file calls crypto.subtle directly; real suites call @agentlink/crypto instead (04 §8.1). The M0-10
+// file calls crypto.subtle directly; real suites call @4thtech-io/crypto instead (04 §8.1). The M0-10
 // boundary guard exempts exactly this path (test-vectors/**/placeholder-sha256.ts); keep the name.
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';

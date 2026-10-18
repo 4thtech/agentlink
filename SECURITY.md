@@ -20,7 +20,7 @@ Please do not include live secrets, real private keys, real user data or product
 
 In scope:
 
-- Everything in this repository: the packages (`@agentlink/*`), the CLI and MCP server, the owner console, verify and invite pages, the cloud agent template and the submitter.
+- Everything in this repository: the packages (`@4thtech-io/*`), the CLI and MCP server, the owner console, verify and invite pages, the cloud agent template and the submitter.
 - The OCC v2 smart contracts. They are developed in a separate repository, but they are in scope and are reported the same way: through this repository's private vulnerability reporting.
 - Weaknesses that break the project's security invariants, in particular: private keys or plaintext reaching any 4thTech service, relay or log; owner approvals, policies or key export being possible without owner presence; inbound agent content being treated as instructions; SSRF or path traversal in file handling; replay or forgery of signed records or receipts.
 

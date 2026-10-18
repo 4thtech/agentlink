@@ -10,9 +10,9 @@ import {
   randomBytes,
   senderCode,
   termsHash,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';

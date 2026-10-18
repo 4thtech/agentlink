@@ -9,7 +9,7 @@ method, URL and body, then |now - created_at| <= 60, then the id and signature.
 
 URL MAC = HMAC-SHA256(key, utf8("agentlink/v1/drop-url") || 0x00 || purpose (0x01 put, 0x02 get) ||
 objectId (16 bytes) || u16be(part) || u64be(expiresAt)). Computed here with CPython's hmac and coincurve
-(BIP-340), independently of @agentlink/crypto. Keys, bodies and nonces are deterministic test bytes.
+(BIP-340), independently of @4thtech-io/crypto. Keys, bodies and nonces are deterministic test bytes.
 
 Usage: python3 -I tools/vectors/generate_drop_auth.py --check [FILE] | --write
 """

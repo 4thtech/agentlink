@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/crypto",
+  "name": "@4thtech-io/crypto",
   "version": "0.1.1",
   "private": true,
   "description": "Key derivation, HPKE, AES-GCM, STREAM, JCS, BIP-340 and EIP-712 helpers.",

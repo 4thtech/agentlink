@@ -1,10 +1,10 @@
 // Core-side wrap checks for 04 §3.1.1 step 8 and §3.3 (G-46, D-66; IR-M1-1l-1 L-2).
 //
-// checkWrap (@agentlink/crypto) recomputes one entry from the CEK and compares `enc` and `wk`. It
+// checkWrap (@4thtech-io/crypto) recomputes one entry from the CEK and compares `enc` and `wk`. It
 // does not look at `kid`: picking the entry is the caller's job. This helper decodes the base64url
 // entry and first asserts that its `kid` is the `kid` of the public key it is checked against
 // (sha256(pk)[:16], 04 §3.1), so a wrong pick fails closed instead of comparing the wrong entry.
-// Every crypto operation is a call into @agentlink/crypto (I-8).
+// Every crypto operation is a call into @4thtech-io/crypto (I-8).
 import {
   HPKE_ENC_LENGTH,
   KID_LENGTH,
@@ -15,7 +15,7 @@ import {
   equalBytes,
   kidFromEncPublicKey,
   type EnvelopeRecipient,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 
 /** The `kid` of a raw 32-byte X25519 `enc` key, base64url as in an envelope entry (04 §3.1). */
 export function kidOf(encPublicKey: Uint8Array): string {

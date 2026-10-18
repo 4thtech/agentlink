@@ -17,7 +17,7 @@ import {
   type Envelope,
   type JsonValue,
   type KeyStore,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import type { SignedCard } from '../card.js';
 import type { Row } from '../store/schema.js';
 import { rowKeyOf, type Store, type StoreCipher } from '../store/store.js';

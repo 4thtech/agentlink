@@ -1,5 +1,5 @@
 // Secret-canary helper (04 §8.4: "a CI test asserts known secret patterns never appear in logs").
-// Import it from "@agentlink/log/testing" in tests only. It has no test-framework dependency: it
+// Import it from "@4thtech-io/log/testing" in tests only. It has no test-framework dependency: it
 // returns leaks or throws, so it works under Vitest, Playwright or Miniflare alike.
 //
 // How a package adds its canaries (see README.md):

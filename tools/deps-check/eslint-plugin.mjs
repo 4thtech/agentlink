@@ -90,7 +90,7 @@ const rule = {
       require:
         '"require" may only be called directly with a string literal; other uses bypass the import checks.',
       subtle:
-        'crypto.subtle may be used only in packages/crypto; everything else uses @agentlink/crypto (AGENTS.md).',
+        'crypto.subtle may be used only in packages/crypto; everything else uses @4thtech-io/crypto (AGENTS.md).',
     },
   },
   create(context) {

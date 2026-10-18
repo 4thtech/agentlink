@@ -1,7 +1,7 @@
 // M1-5b acceptance: the outbox (07 §3.2, §4.2). The stored gift wrap is republished, never re-wrapped,
 // to exactly the relays of its row; a row is `sent` at 2 OKs and `not_delivered` after 24 h; it
 // survives a restart (persistence fake); and no content reaches the logs. Mock relays, a fake clock.
-import { createLogger, type Level } from '@agentlink/log';
+import { createLogger, type Level } from '@4thtech-io/log';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {

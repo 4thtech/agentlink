@@ -1,4 +1,4 @@
-// Test data for @agentlink/types. Not part of the build (tsconfig.json excludes src/testing).
+// Test data for @4thtech-io/types. Not part of the build (tsconfig.json excludes src/testing).
 //
 // A verbatim copy of the M1-1h `decode` cases from test-vectors/encodings/vectors.json whose
 // path belongs to an M1-2b schema (Record, Receipt, ProofPack, ProofStatus, CommitmentScope,

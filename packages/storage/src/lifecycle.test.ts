@@ -1,7 +1,7 @@
 // M1-6b part 1: the bucket lifecycle helper (07 §5.2): a rule that deletes `agentlink/` objects after
 // 30 days, set and read back, without touching the bucket's other rules. Against an in-memory S3.
 import { describe, expect, it } from 'vitest';
-import { captureOutput } from '@agentlink/log/testing';
+import { captureOutput } from '@4thtech-io/log/testing';
 import {
   LIFECYCLE_ABORT_INCOMPLETE_DAYS,
   LIFECYCLE_DEFAULT_DAYS,

@@ -1,4 +1,4 @@
-# @agentlink/log
+# @4thtech-io/log
 
 ## 0.1.1
 

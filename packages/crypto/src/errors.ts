@@ -49,7 +49,7 @@ export type CryptoInputErrorCode =
   | 'passphrase_too_short';
 
 /**
- * The one error type @agentlink/crypto throws for input it refuses.
+ * The one error type @4thtech-io/crypto throws for input it refuses.
  *
  * I-7: the message is a fixed sentence that names the rule that failed. It never contains the input,
  * any part of it, its length or an offset into it, because inputs here are often keys, salts,

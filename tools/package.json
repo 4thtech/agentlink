@@ -1,5 +1,5 @@
 {
-  "name": "@agentlink/tools",
+  "name": "@4thtech-io/tools",
   "version": "0.0.0",
   "private": true,
   "description": "Repository check scripts (manifest policy, knowledge-base size budget and links, architecture boundaries, generated status docs, the UCD 15.0.0 table drift check). Not published.",

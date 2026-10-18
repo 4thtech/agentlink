@@ -4,7 +4,7 @@
 // contact and the real one); every send by name returned AMBIGUOUS_CONTACT and nothing could fix it.
 // These owner commands sign a `contact.rename` or `contact.remove` (04 §2.5, §2.5.1) and the core
 // applies it. Three real cores over an in-memory relay network; the owner signature comes from the
-// crypto test seam (MemoryOwnerKeyStore), standing in for @agentlink/node's TTY prompt.
+// crypto test seam (MemoryOwnerKeyStore), standing in for @4thtech-io/node's TTY prompt.
 //
 // - rename sets the owner alias (06 §2.1 rule 1), so a send by name resolves again;
 // - remove makes the contact unreachable and its later Talk is dropped (07 §3 `removed`, 02 F-14);
@@ -17,7 +17,7 @@ import {
   type ApprovalChannel,
   type Sealed,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   decodeBase64url,
   decodeUtf8,
@@ -28,16 +28,16 @@ import {
   randomBytes,
   type JsonObject,
   type NostrEvent,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import type {
   RelayConnector,
   RelaySocket,
   RelaySocketHandlers,
   RelayTarget,
-} from '@agentlink/transport-nostr';
-import { defaultPolicy } from '@agentlink/types';
+} from '@4thtech-io/transport-nostr';
+import { defaultPolicy } from '@4thtech-io/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -320,7 +320,7 @@ beforeEach(async () => {
     addAgent: () => Promise.reject(new Error('not used')),
     changeOwnerCode: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
-    // Stands in for @agentlink/node's performOwnerOperation: the summary is shown, the owner code is
+    // Stands in for @4thtech-io/node's performOwnerOperation: the summary is shown, the owner code is
     // read once, and exactly the given object is signed.
     signOwnerAction: async (_owner, item) => {
       if (item.kind !== 'owner-action') throw new Error('unexpected');

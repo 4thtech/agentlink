@@ -2,7 +2,7 @@
 
 > **Status: Design.** The contracts are deployed on the Base Sepolia testnet and passed a live smoke test (pre-audit); no released AgentLink version uses them yet. Gnosis Chiado is planned next, at the same addresses, with released testnet support planned for v0.2.0 (M1); mainnet (Base, Gnosis) for v1.0.0 (M3), after the external audit. This page lists no addresses yet. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md).
 
-The contract source lives in a separate private repository during the beta. Verified source is planned to be published at mainnet (licence proposed: BUSL-1.1, to be confirmed). This repository consumes only the ABI package `@agentlink/occ-v2-abi` and shared test vectors.
+The contract source lives in a separate private repository during the beta. Verified source is planned to be published at mainnet (licence proposed: BUSL-1.1, to be confirmed). This repository consumes only the ABI package `@4thtech-io/occ-v2-abi` and shared test vectors.
 
 ## Contracts
 
@@ -38,7 +38,7 @@ function creditsOf(address payer, address token) external view returns (uint256)
 
 ## Addresses
 
-None yet. Addresses and the verified per-chain configuration are published here and in `@agentlink/occ-v2-abi` at each deployment.
+None yet. Addresses and the verified per-chain configuration are published here and in `@4thtech-io/occ-v2-abi` at each deployment.
 
 ## Outline (filled in at deployment)
 

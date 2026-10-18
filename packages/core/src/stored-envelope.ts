@@ -15,7 +15,7 @@ import {
   type AgentCard,
   type Envelope,
   type EnvelopeRecipient,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import {

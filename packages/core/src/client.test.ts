@@ -1,5 +1,5 @@
 // AgentLinkClient.create wiring (07 §2) and the store-open rules (07 §3.7).
-import { MemoryKeyStore } from '@agentlink/crypto/testing';
+import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';

@@ -208,7 +208,7 @@ const commitmentContext = (decisions: readonly CommitmentDecision[]) =>
         ctx.addIssue({ code: 'custom', message, path });
       // The stored terms are the ones the scope binds (04 §3.4.2): same negotiation and version,
       // exactly this agent and the counterparty as parties, and the scope never outlives them.
-      // (`termsHash` itself is recomputed by the core with @agentlink/crypto.)
+      // (`termsHash` itself is recomputed by the core with @4thtech-io/crypto.)
       const s = c.scope;
       const t = c.terms;
       if (s !== undefined && t !== undefined) {

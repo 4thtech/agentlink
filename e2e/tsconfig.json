@@ -14,7 +14,7 @@
     // The crypto test seam is never built and has no package export: type-check it from source, as
     // vitest.config.ts resolves it (04 §3.1.1: allowed in e2e).
     "paths": {
-      "@agentlink/crypto/testing": ["../packages/crypto/src/testing.ts"]
+      "@4thtech-io/crypto/testing": ["../packages/crypto/src/testing.ts"]
     }
   },
   "include": ["test", "llm", "vitest.config.ts"]

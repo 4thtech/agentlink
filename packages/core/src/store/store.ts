@@ -78,7 +78,7 @@ export interface SealContext {
 }
 
 /**
- * Seals and opens `enc` columns under the store key with AES-256-GCM through @agentlink/crypto (07
+ * Seals and opens `enc` columns under the store key with AES-256-GCM through @4thtech-io/crypto (07
  * §3.1; the Node and Durable Object implementations land with M1-8b and M2-3a). `open` throws for a
  * value that does not open, including one copied from another row or column; it never returns an
  * empty string in its place.

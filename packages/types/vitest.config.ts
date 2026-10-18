@@ -1,4 +1,4 @@
-// Cross-runtime test run for @agentlink/types (M1-2c; 07 header: Node, browsers, Workers). The same
+// Cross-runtime test run for @4thtech-io/types (M1-2c; 07 header: Node, browsers, Workers). The same
 // test files run in five runtimes: Node, Chromium, Firefox and WebKit (Playwright) and workerd
 // (Cloudflare Workers pool, the harness M0-9 uses for the test vectors). Each project provides the
 // runtime it expects (`typesRuntime`); src/runtime.test.ts compares that with what the engine

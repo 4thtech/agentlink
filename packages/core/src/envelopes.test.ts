@@ -15,9 +15,9 @@ import {
   randomBytes,
   type EnvelopeRecipient,
   type JsonValue,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { payloadSchema } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { payloadSchema } from '@4thtech-io/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SignedCard } from './card.js';
 import { checkRecipientWrap } from './envelope-wraps.js';
@@ -41,8 +41,8 @@ import {
 } from './testing/envelopes.js';
 
 // Counts the step 8 recomputed seals (04 §3.1.1 limits: at most 7 per envelope).
-vi.mock('@agentlink/crypto', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agentlink/crypto')>();
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@4thtech-io/crypto')>();
   return { ...actual, checkWrap: vi.fn(actual.checkWrap) };
 });
 

@@ -1,7 +1,7 @@
 // Test-only: an in-memory S3 that speaks multipart upload and bucket lifecycle (M1-6b), behind an
 // injected fetch. No real network is used. Bodies of part PUTs are counted, not kept, beyond the
 // assembled object, so large uploads stay cheap.
-import { encodeBase64url, encodeHex, randomBytes, sha256 } from '@agentlink/crypto';
+import { encodeBase64url, encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
 
 export interface FakeRequest {
   readonly method: string;

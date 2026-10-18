@@ -1,7 +1,7 @@
 // The frozen M1a tool surface (06 §2.0, §9; I-4; M1-9c). The snapshot below is the committed
 // tool-surface record: any rename, new tool, schema or annotation change fails here until the
 // snapshot is updated in a reviewed change (with M1-9e's snapshot, 06 §9).
-import { APPROVAL_TOOL_NAMES, MCP_TOOL_NAMES } from '@agentlink/types';
+import { APPROVAL_TOOL_NAMES, MCP_TOOL_NAMES } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { PENDING_M1A_TOOLS, TOOLS } from './registry.js';
 

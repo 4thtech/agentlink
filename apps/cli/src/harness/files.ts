@@ -18,7 +18,7 @@ import { constants, type Stats } from 'node:fs';
 import { chmod, link, lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
-import { encodeHex, randomBytes } from '@agentlink/crypto';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { HarnessError } from './errors.js';
 
 /** `~/.claude.json` can hold a long project history; anything above this is refused unread. */

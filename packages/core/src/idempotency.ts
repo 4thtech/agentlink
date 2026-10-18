@@ -22,8 +22,8 @@ import {
   encodeUtf8,
   parseJson,
   randomBytes,
-} from '@agentlink/crypto';
-import { CLOCK_SKEW_SECONDS, MCP_TOOL_NAMES } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import { CLOCK_SKEW_SECONDS, MCP_TOOL_NAMES } from '@4thtech-io/types';
 import {
   IDEMPOTENCY_KEY_REUSED,
   IDEMPOTENCY_LEASE_SECONDS,

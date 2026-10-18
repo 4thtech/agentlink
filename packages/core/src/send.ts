@@ -19,8 +19,8 @@
 //
 // Errors are CoreErrors with fixed sentences; nothing of the message, the contact or a key goes
 // into an error or a log line (I-5, I-7). Logs carry counts only.
-import { encodeUtf8 } from '@agentlink/crypto';
-import { SEND_TOOL_PAYLOAD_TYPES, payloadSchema } from '@agentlink/types';
+import { encodeUtf8 } from '@4thtech-io/crypto';
+import { SEND_TOOL_PAYLOAD_TYPES, payloadSchema } from '@4thtech-io/types';
 import { IDEMPOTENCY_KEY_REUSED } from './constants.js';
 import type { ContactBook } from './contacts.js';
 import type { CoreContext } from './context.js';

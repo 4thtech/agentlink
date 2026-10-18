@@ -4,7 +4,7 @@
 
 ## Product version
 
-AgentLink follows SemVer 2.0. During the beta, all public packages (the CLI and MCP server, the `@agentlink/*` libraries and, from M2, the desktop apps) share one product version, tagged `v<version>` with a GitHub Release.
+AgentLink follows SemVer 2.0. During the beta, all public packages (the CLI and MCP server, the `@4thtech-io/*` libraries and, from M2, the desktop apps) share one product version, tagged `v<version>` with a GitHub Release.
 
 | Milestone | Version | Meaning |
 |---|---|---|

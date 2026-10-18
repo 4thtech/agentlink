@@ -1,5 +1,5 @@
 // One OS process of the two-process store test (two-process.keychain.test.ts; IR-M1-9k-1 F01).
-// It runs the BUILT CLI runtime (dist/) with the real @agentlink/node pieces: the OS keychain and the
+// It runs the BUILT CLI runtime (dist/) with the real @4thtech-io/node pieces: the OS keychain and the
 // agent's SQLite file. The parent talks to it over the fork IPC channel only; nothing is printed.
 //
 // Roles:
@@ -11,7 +11,7 @@
 // - `server`: the MCP-side process. It opens the same agent with `openAgent`, asks the M1a channel
 //   about both requests and asks its own core to use each one for its exact action.
 import process from 'node:process';
-import { openAgentStore } from '@agentlink/node';
+import { openAgentStore } from '@4thtech-io/node';
 import { openAgent, readAgentConfig } from '../../dist/runtime/index.js';
 
 const send = (message) =>

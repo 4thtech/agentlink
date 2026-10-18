@@ -5,7 +5,7 @@
 // but are different keys, both are shown in the extended form (`2B9E·04D1·5D0E·88B1`), so the owner
 // can tell them apart (04 §2.9 "Collisions"). The code only tells senders apart and authenticates
 // nothing; it never comes from anything the sender chose, only from its `from` key.
-import { decodeHex, formatFingerprint, senderCode } from '@agentlink/crypto';
+import { decodeHex, formatFingerprint, senderCode } from '@4thtech-io/crypto';
 import type { StoreTx } from './store/store.js';
 
 const NOSTR_KEY = /^[0-9a-f]{64}$/;

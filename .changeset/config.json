@@ -4,15 +4,15 @@
   "commit": false,
   "fixed": [
     [
-      "@agentlink/types",
-      "@agentlink/log",
-      "@agentlink/crypto",
-      "@agentlink/chain",
-      "@agentlink/transport-nostr",
-      "@agentlink/storage",
-      "@agentlink/core",
-      "@agentlink/node",
-      "@agentlink/ui",
+      "@4thtech-io/types",
+      "@4thtech-io/log",
+      "@4thtech-io/crypto",
+      "@4thtech-io/chain",
+      "@4thtech-io/transport-nostr",
+      "@4thtech-io/storage",
+      "@4thtech-io/core",
+      "@4thtech-io/node",
+      "@4thtech-io/ui",
       "@4thtech-io/agentlink"
     ]
   ],

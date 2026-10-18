@@ -1,6 +1,6 @@
-// @agentlink/core: AgentLinkClient, the Store and ApprovalChannel interfaces, identity and contacts
-// (M1-7a). The key interfaces (KeyStore, OwnerKeyStore, OwnerSession) are in @agentlink/crypto (G-2).
-export const packageName = '@agentlink/core';
+// @4thtech-io/core: AgentLinkClient, the Store and ApprovalChannel interfaces, identity and contacts
+// (M1-7a). The key interfaces (KeyStore, OwnerKeyStore, OwnerSession) are in @4thtech-io/crypto (G-2).
+export const packageName = '@4thtech-io/core';
 
 export { AgentLinkClient, type AgentLinkClientOptions } from './client.js';
 export type {
@@ -330,7 +330,7 @@ export {
 // test-only subpath needs a boundary-policy change (S1): backlog M1-7a-b.
 export { MemoryStore, type MemoryStoreOptions } from './store/memory-store.js';
 // M1-15: pure security checks for files and downloads (04 §4). The platform halves (DNS-pinned
-// fetch, realpath, exclusive inbox writes) are in @agentlink/node.
+// fetch, realpath, exclusive inbox writes) are in @4thtech-io/node.
 export {
   MAX_FETCH_REDIRECTS,
   MAX_FETCH_URL_LENGTH,

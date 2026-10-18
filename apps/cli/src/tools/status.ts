@@ -10,7 +10,7 @@
 // earlier session, are counted by contact (`openOffers`, `offers`) from the core's store read, so a
 // fresh session can find them; their content is read only through `agentlink_inbox` with
 // `openOffers: true`. A failed read counts none (fail closed); its error text is never logged.
-import { MAX_TOOL_TEXT_CHARS } from '@agentlink/types';
+import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import { copy } from './strings/index.js';
 import { activeContacts, contactRef, renderRef, type ContactRef } from './contacts.js';
 import type { Counts, ToolContext } from './context.js';

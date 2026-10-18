@@ -15,9 +15,9 @@
 // never print a URL, an object key or a credential.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AwsClient } from 'aws4fetch';
-import { createSha256, encodeBase64url, encodeHex, randomBytes, sha256 } from '@agentlink/crypto';
-import { createLogger } from '@agentlink/log';
-import { captureOutput, findCanaryLeaks, type Canary } from '@agentlink/log/testing';
+import { createSha256, encodeBase64url, encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
+import { createLogger } from '@4thtech-io/log';
+import { captureOutput, findCanaryLeaks, type Canary } from '@4thtech-io/log/testing';
 import {
   LIFECYCLE_RULE_ID,
   MAX_PRESIGN_SECONDS,
@@ -406,7 +406,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   // 1 GiB through MinIO in bounded memory (card M1-6b acceptance), on the production path: default
   // part size (8 MiB), 1 MiB ALF1 chunks, download through a presigned URL with global fetch. After a
   // 1 GiB warm-up (first use of WebCrypto AES-GCM and TLS grows RSS on its own, see
-  // stream.slow.test.ts in @agentlink/crypto; allocator pools settle over the first GiB), RSS is
+  // stream.slow.test.ts in @4thtech-io/crypto; allocator pools settle over the first GiB), RSS is
   // taken as the baseline; then a 256 MiB and a 1 GiB round trip each measure their peak against
   // that same baseline. Gates:
   // - RSS growth of the 1 GiB run < 128 MiB (the card's acceptance);
@@ -416,7 +416,7 @@ describe.skipIf(MODE === undefined)(`S3 adapter against ${MODE ?? 'no endpoint'}
   //   limit): what the pipeline keeps alive. vitest.config.ts runs this file with --expose-gc; without
   //   gc() the test fails rather than skip the check. Unforced held memory is reported only: it
   //   mostly measures garbage the collector has not reached yet (flaked at 65 MiB, IR-M1-6b-2-1 H-1).
-  // The figures are logged on every run (numbers only, through @agentlink/log), and go into the
+  // The figures are logged on every run (numbers only, through @4thtech-io/log), and go into the
   // assertion messages, an annotation and the JSON report's `meta`.
   // MinIO only: the R2 job runs daily on a shared test bucket and need not move a GiB each day. The
   // test is not registered (rather than skipped) on R2, since the jobs fail on a skipped test.

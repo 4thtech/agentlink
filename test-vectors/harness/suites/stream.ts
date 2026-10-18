@@ -1,12 +1,12 @@
 // Suite `stream` (M1-1d, vectors M1-1i-b): ALF1 STREAM file encryption (04 §4, D-80) through
-// @agentlink/crypto. `seal` uses the test seam's fixed nonce prefix and chunk size (the vectors use
+// @4thtech-io/crypto. `seal` uses the test seam's fixed nonce prefix and chunk size (the vectors use
 // 16 and 32 B chunks as well as the 1 MiB default), returns the object, its header and both
 // hashes, and then opens the object through the public API, which must give the plaintext back.
 // `open` gives an object that must be refused: a refusal by the code under test
 // (CryptoInputError) is reported as `outcome: reject`, an object that opens as `outcome: accept`.
 // Any other error is a bug and fails the case.
-import { CryptoInputError, openAlf1 } from '@agentlink/crypto';
-import { sealAlf1WithNoncePrefix } from '@agentlink/crypto/testing';
+import { CryptoInputError, openAlf1 } from '@4thtech-io/crypto';
+import { sealAlf1WithNoncePrefix } from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

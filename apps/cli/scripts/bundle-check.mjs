@@ -10,13 +10,13 @@
 //    crypto-capable transitive packages of the MCP SDK's HTTP and OAuth transports (jose,
 //    pkce-challenge, cookie-signature, etag, hono, @hono/node-server) and every SDK dependency the
 //    stdio path does not use. SDK imports must name a subpath in SDK_ENTRIES. A workspace
-//    (`@agentlink/*`) or relative import, any `require(…)` and an `import(…)` without a string
+//    (`@4thtech-io/*`) or relative import, any `require(…)` and an `import(…)` without a string
 //    literal fail too: the bundle is one ESM file whose imports can all be read statically. The
 //    runtime counterpart, which traces the modules the stdio server really loads, is
 //    test/mcp-module-graph.test.ts.
 // 2. src/tools/ for a neutral (Worker) platform (06 §1 runtime-agnostic, IR-M1-9j-1 F04). Vite
 //    bundles src/tools/index.ts with Worker resolve conditions and nothing external; a Node built-in
-//    (`node:` or one Vite resolves to its browser-external stub), `@agentlink/node`, the MCP SDK or
+//    (`node:` or one Vite resolves to its browser-external stub), `@4thtech-io/node`, the MCP SDK or
 //    a banned package anywhere in its module graph (workspace packages and third-party code
 //    included) fails the check, except the narrow NEUTRAL_EXCEPTIONS.
 //
@@ -54,7 +54,7 @@ const SDK = '@modelcontextprotocol/sdk';
  * The Node built-ins the published bundle may import: exactly the ones it uses today (IR-M1-9c-c-1
  * L1). Anything else (`node:module`, `node:vm`, `node:child_process`, `node:worker_threads`,
  * `node:crypto`, …) fails until a reviewed change adds it here. No `node:crypto`: crypto goes through
- * @agentlink/crypto on @noble/* and @hpke/core (I-8).
+ * @4thtech-io/crypto on @noble/* and @hpke/core (I-8).
  */
 export const BUNDLE_BUILTINS = [
   'node:dns',
@@ -202,7 +202,7 @@ export function checkBundleSource(source, dependencies, banned) {
     const name = packageName(specifier);
     if (banned.has(name)) {
       findings.push(`${quoted}: banned on the stdio path (D-76: SDK HTTP, OAuth or crypto code)`);
-    } else if (name.startsWith('@agentlink/')) {
+    } else if (name.startsWith('@4thtech-io/')) {
       findings.push(`${quoted}: a workspace package must be bundled, not imported`);
     } else if (!Object.hasOwn(dependencies, name)) {
       findings.push(`${quoted}: not a declared runtime dependency of apps/cli/package.json`);
@@ -254,7 +254,7 @@ export async function checkToolsEntry(entry, banned) {
     const quoted = JSON.stringify(source);
     if (source.startsWith('node:')) return `${quoted}: Node built-in`;
     const name = packageName(source);
-    if (name === '@agentlink/node') return `${quoted}: the Node runtime package`;
+    if (name === '@4thtech-io/node') return `${quoted}: the Node runtime package`;
     if (name === SDK) return `${quoted}: the MCP SDK belongs to src/mcp/`;
     if (banned.has(name)) return `${quoted}: banned (D-76)`;
     return undefined;

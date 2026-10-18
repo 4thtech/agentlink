@@ -1,4 +1,4 @@
-// M1-21-b (D-74, D-77): the UCD 15.0.0 table of @agentlink/types is generated from the vendored
+// M1-21-b (D-74, D-77): the UCD 15.0.0 table of @4thtech-io/types is generated from the vendored
 // DerivedGeneralCategory.txt only, and the `pnpm lint` drift check fails on an edited table entry,
 // on an edited vendored file and on an edited pinned hash, and passes on the committed state.
 import { spawnSync } from 'node:child_process';

@@ -1,15 +1,15 @@
 // What the owner commands (M1-9b) need from the outside world, behind one interface so tests can
-// script it. Production wires @agentlink/node's owner entry points (M1-8c) and the M1-9k runtime.
+// script it. Production wires @4thtech-io/node's owner entry points (M1-8c) and the M1-9k runtime.
 //
 // I-1/I-4: no member of this interface carries an owner secret. The owner code is read by
-// @agentlink/node's own TTY prompt inside `initOwner`, `addAgent`, `changeOwnerCode`, `decide` and `signOwnerAction`, never from an
+// @4thtech-io/node's own TTY prompt inside `initOwner`, `addAgent`, `changeOwnerCode`, `decide` and `signOwnerAction`, never from an
 // argument, an environment variable or a pipe (04 §2.5, §2.8; D-67). `ask` reads a visible answer
 // (approve, deny or later; an agent number) and is never used for a secret.
 import { homedir } from 'node:os';
 import process from 'node:process';
 import { createInterface } from 'node:readline/promises';
-import type { AgentLinkClient, Store, StoreCipher } from '@agentlink/core';
-import type { JsonObject, OwnerPublicKeys } from '@agentlink/crypto';
+import type { AgentLinkClient, Store, StoreCipher } from '@4thtech-io/core';
+import type { JsonObject, OwnerPublicKeys } from '@4thtech-io/crypto';
 import {
   addAgentToOwner,
   changeOwnerCode,
@@ -28,7 +28,7 @@ import {
   type OwnerOperationItem,
   type OwnerSignature,
   type ReviewedApproval,
-} from '@agentlink/node';
+} from '@4thtech-io/node';
 import {
   listAgentNames,
   nodeRuntimeDeps,
@@ -138,7 +138,7 @@ async function openWithStore(
 /**
  * A visible one-line question on this process's terminal. The question goes through the CLI's
  * user-output channel; the answer is one line read from stdin in cooked mode, so the terminal echoes
- * it. Never used for a secret (the owner code is read by @agentlink/node's own prompt).
+ * it. Never used for a secret (the owner code is read by @4thtech-io/node's own prompt).
  */
 async function askAtTerminal(question: string): Promise<string> {
   createOutput().print(question);

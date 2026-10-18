@@ -1,7 +1,7 @@
 // Inline adapter (07 §5.3): ciphertext of at most 12 288 bytes (a 12 255-byte file, 04 §3.4)
 // travels base64url inside the end-to-end-encrypted payload. No storage, no URL.
-import { decodeBase64url, encodeBase64url } from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
+import { decodeBase64url, encodeBase64url } from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
 import {
   checkFuture,
   checkSize,

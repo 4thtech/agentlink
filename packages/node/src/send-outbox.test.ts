@@ -15,14 +15,14 @@ import {
   type ApprovalChannel,
   type StoreCipher,
   type TransportFactory,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   encodeUtf8,
   type KeyStore,
   type NostrEvent,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
-import { wrapEnvelope, type PublishOutcome } from '@agentlink/transport-nostr';
+} from '@4thtech-io/crypto';
+import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { createKeychainAgent, openRecordedKeyStore } from './keychain-keystore.js';

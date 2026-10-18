@@ -9,9 +9,9 @@
 // createTempFileSink is that rule for files: write to a temporary file in the target folder, rename
 // it to the final name on success, remove it on failure. The file system is injected (TempFileOps),
 // because this package runs in Workers as well and never imports Node built-ins; the Node binding
-// lives with the consumer (@agentlink/node), which also applies the allowed-folder and realpath
+// lives with the consumer (@4thtech-io/node), which also applies the allowed-folder and realpath
 // rules of 04 §4 to the folder and sanitises the final name (createInboxFile) before it gets here.
-import { encodeHex, randomBytes } from '@agentlink/crypto';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { StorageError } from './errors.js';
 
 /** A destination for provisional plaintext. */

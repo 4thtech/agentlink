@@ -32,7 +32,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
   type PublicIdentity,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   cardTypedData,
   checkName,

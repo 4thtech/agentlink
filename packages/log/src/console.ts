@@ -1,4 +1,4 @@
-// The only module of @agentlink/log that touches the runtime console and the process output
+// The only module of @4thtech-io/log that touches the runtime console and the process output
 // streams. eslint.config.mjs exempts exactly this file (and the CLI's user-output channel) from the
 // repo-wide console ban. Shared packages compile without DOM or Node types, so both are reached
 // through globalThis.

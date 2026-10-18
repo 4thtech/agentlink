@@ -3,7 +3,12 @@
 // once, imported into non-extractable keys and wiped (withStoreKey); it never leaves this package.
 // M1-8g: the store also comes with the agent's policy-version mark (04 §2.5.1; 07 §3.4), a KeyStore
 // item raised under the store's inter-process lock, for AgentLinkClient.create's `policyMark`.
-import { StoreUsageError, type PolicyVersionMark, type Store, type StoreTx } from '@agentlink/core';
+import {
+  StoreUsageError,
+  type PolicyVersionMark,
+  type Store,
+  type StoreTx,
+} from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KeychainKeyStore, type KeychainKeyStoreOptions } from './keychain-keystore.js';
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';

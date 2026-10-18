@@ -34,7 +34,7 @@ import {
   encodeUtf8,
   parseJson,
   randomBytes,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   BYTE_LENGTHS,
   base64url,
@@ -50,7 +50,7 @@ import {
   type CommitmentScope,
   type ContactDisplayName,
   type Terms,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import {
   insertCommitmentPartsTx,
   voidPendingScopeTx,

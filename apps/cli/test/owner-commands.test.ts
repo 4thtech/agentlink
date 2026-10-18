@@ -3,7 +3,7 @@
 //
 // End to end with the real core (M1-7d owner actions, M1-7e approvals) over an in-memory store. The
 // owner signature comes from the crypto test seam (MemoryOwnerKeyStore), standing in for
-// @agentlink/node's TTY prompt (M1-8c), which these tests cannot drive. The production wiring is
+// @4thtech-io/node's TTY prompt (M1-8c), which these tests cannot drive. The production wiring is
 // checked separately: without a TTY it refuses before anything is read or signed.
 import {
   AgentLinkClient,
@@ -14,7 +14,7 @@ import {
   type Sealed,
   type SealContext,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   canonicalize,
   decodeBase64url,
@@ -25,15 +25,15 @@ import {
   randomBytes,
   sha256,
   type JsonObject,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import {
   NodeKeyStoreError,
   type ApprovalContext,
   type OwnerSetupOptions,
   type ReviewedApproval,
-} from '@agentlink/node';
+} from '@4thtech-io/node';
 import { describe, expect, it } from 'vitest';
 import {
   nodeOwnerDeps,
@@ -189,7 +189,7 @@ async function world(): Promise<World> {
       }
       return Promise.reject(new Error('not reached in these tests'));
     },
-    // Stands in for @agentlink/node's decideReviewedApprovals: one code entry, one signed object
+    // Stands in for @4thtech-io/node's decideReviewedApprovals: one code entry, one signed object
     // built from exactly the reviewed items, with the digest recomputed from each action.
     addAgent: () => Promise.reject(new Error('not used')),
     changeOwnerCode: () => Promise.reject(new Error('not used')),
@@ -348,7 +348,7 @@ describe('an agent without a terminal can never approve (04 §2.5, 06 §8; UX gu
   });
 
   it('the production wiring refuses without an interactive terminal before reading or signing', async () => {
-    // Vitest's stdin is a pipe: @agentlink/node's TTY prompt refuses (or the harness marker does).
+    // Vitest's stdin is a pipe: @4thtech-io/node's TTY prompt refuses (or the harness marker does).
     const deps = nodeOwnerDeps('/nonexistent-home-for-test');
     const refused = ['owner_prompt_unavailable', 'harness_detected'];
     const owner = {
@@ -369,7 +369,7 @@ describe('an agent without a terminal can never approve (04 §2.5, 06 §8; UX gu
     const a = await deps.decide({ agent: evm(), owner }, [reviewed]).catch(codeOf);
     const b = await deps
       // M1-8h: an allowlisted op, so the request reaches the terminal checks (an op outside the
-      // allowlist is refused even earlier, owner-allowlist.test.ts in @agentlink/node).
+      // allowlist is refused even earlier, owner-allowlist.test.ts in @4thtech-io/node).
       .signOwnerAction(owner, {
         kind: 'owner-action',
         action: { v: 1, op: 'approval.cancel' },

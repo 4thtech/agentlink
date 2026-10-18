@@ -3,10 +3,10 @@
 // the stored decision: a request whose status column was edited to `approved` with no signed object
 // stays `pending` (channel and core), while a request the owner really signed is used once.
 //
-// Opt-in, like @agentlink/node's keychain-native.test.ts: it runs only with
+// Opt-in, like @4thtech-io/node's keychain-native.test.ts: it runs only with
 // AGENTLINK_REQUIRE_KEYCHAIN=1 (the keychain CI jobs), so a plain `pnpm test` never writes to a
 // developer's keychain. With the flag set, a missing keychain or a missing build FAILS the run
-// instead of skipping it. It goes through the public @agentlink/node entry, which uses the
+// instead of skipping it. It goes through the public @4thtech-io/node entry, which uses the
 // `agentlink` keychain service: the agent's two items stay on the ephemeral runner (the entry has
 // no delete, by design: IR-M1-8a-1 M-2).
 //
@@ -21,7 +21,7 @@ import { mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { computeActionDigest } from '@agentlink/core';
+import { computeActionDigest } from '@4thtech-io/core';
 import {
   encodeBase64url,
   encodeHex,
@@ -29,9 +29,9 @@ import {
   randomBytes,
   type JsonObject,
   type OwnerPresence,
-} from '@agentlink/crypto';
-import { MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createOsKeychainAgent, probeOsKeychain } from '@agentlink/node';
+} from '@4thtech-io/crypto';
+import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createOsKeychainAgent, probeOsKeychain } from '@4thtech-io/node';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { writeAgentConfig } from '../src/runtime/agent-dir.js';
 import { openAgent } from '../src/runtime/open-agent.js';

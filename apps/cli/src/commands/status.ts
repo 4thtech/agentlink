@@ -11,7 +11,7 @@
 // `--brief` prints only the unread counts, the requests count and the contact names. Without it the
 // command adds the agent's local name and ID and the number of contacts. Credits, prices, storage
 // and pending approvals are not part of M1-9l (they need the chain and storage packages, M1-9h).
-import { renderContactName, type CatchUpResult, type InboxCounts } from '@agentlink/core';
+import { renderContactName, type CatchUpResult, type InboxCounts } from '@4thtech-io/core';
 import { DISPATCH_TEXT, EXIT_OK, EXIT_USAGE, type CommandHandler } from '../dispatch.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy } from '../tools/strings/index.js';

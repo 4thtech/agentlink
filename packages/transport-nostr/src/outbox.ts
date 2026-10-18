@@ -15,9 +15,9 @@
 // loses nothing: the next processDue() reads the pending rows again. Times are Unix seconds, the
 // store's clock (07 §3.1). Logs carry counts only: never wrap_json, relay URLs or keys (I-7).
 import { MIN_ACKS, MAX_RELAYS_PER_WRAP, type RelayPool } from './relay-pool.js';
-import { verifyNostrEvent, parseJson, type NostrEvent } from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
-import { isAllowedRelayUrl } from '@agentlink/types';
+import { verifyNostrEvent, parseJson, type NostrEvent } from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
+import { isAllowedRelayUrl } from '@4thtech-io/types';
 import { SYNC_LOOKBACK_SECONDS, SYNC_SKEW_SECONDS } from './sync.js';
 
 /** 07 §3.2: give_up_at = min(created_at + 86 400, wrap created_at + 48 h + S) (G-49); this is the first term. */

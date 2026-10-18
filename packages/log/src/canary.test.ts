@@ -1,4 +1,4 @@
-// Secret-canary test for @agentlink/log itself (04 §8.4, M0-8). Runs in `pnpm test`, so ci-gate
+// Secret-canary test for @4thtech-io/log itself (04 §8.4, M0-8). Runs in `pnpm test`, so ci-gate
 // fails when a canary reaches any log line at any level. Later packages add their own
 // `*.canary.test.ts` with their canaries (see README.md).
 
@@ -101,7 +101,7 @@ function exercise({ logger }: CanaryRun): void {
 
 const ALL: readonly Canary[] = [...PATTERN_CANARIES, KEY_ONLY_CANARY];
 
-describe('secret canaries (@agentlink/log)', () => {
+describe('secret canaries (@4thtech-io/log)', () => {
   it('no canary appears in any captured line at any level', async () => {
     await assertNoCanaryLeaks({ canaries: ALL, exercise, minLines: 100 });
   });

@@ -11,7 +11,7 @@
 //   that core verifies, and that differs from the vector only in `owner` (the owner key is this
 //   test's, not the vector's).
 import { readFileSync } from 'node:fs';
-import { computeActionDigest, ownerActionSigningParts, verifyOwnerAction } from '@agentlink/core';
+import { computeActionDigest, ownerActionSigningParts, verifyOwnerAction } from '@4thtech-io/core';
 import {
   canonicalize,
   decodeBase64url,
@@ -22,7 +22,7 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import type { KeychainBackend } from './keychain.js';
 import {

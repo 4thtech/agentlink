@@ -41,9 +41,9 @@ import {
   randomBytes,
   type Envelope,
   type EnvelopeKeys,
-} from '@agentlink/crypto';
-import type { Logger } from '@agentlink/log';
-import { isAllowedRelayUrl } from '@agentlink/types';
+} from '@4thtech-io/crypto';
+import type { Logger } from '@4thtech-io/log';
+import { isAllowedRelayUrl } from '@4thtech-io/types';
 import { TransportError } from './errors.js';
 import { unwrapGiftWrap } from './gift-wrap.js';
 import type { Timers } from './relay-io.js';

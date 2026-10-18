@@ -1,11 +1,11 @@
-// Suite `encodings` (M1-2a; 04 §2.4.1 canonical binary encodings). `decode` runs the @agentlink/types
+// Suite `encodings` (M1-2a; 04 §2.4.1 canonical binary encodings). `decode` runs the @4thtech-io/types
 // decoder that 04 §2.4.1 assigns to the schema path and returns the bytes as hex, or `reject` when
 // the value is not in that path's one canonical form. `equalBytes` decodes both values, each by its
 // own path, and compares the bytes (`reject` when either does not parse). `parseInteger` runs the
-// strict JSON tokenizer of @agentlink/crypto with `integersOnly` (M1-1e) on the number token, so the
+// strict JSON tokenizer of @4thtech-io/crypto with `integersOnly` (M1-1e) on the number token, so the
 // token text decides, not the parsed value. Nothing here converts or compares encoded text itself.
-import { CryptoInputError, parseJson } from '@agentlink/crypto';
-import { decodeAtPath, equalAtPaths, isEncodingPath, type EncodingPath } from '@agentlink/types';
+import { CryptoInputError, parseJson } from '@4thtech-io/crypto';
+import { decodeAtPath, equalAtPaths, isEncodingPath, type EncodingPath } from '@4thtech-io/types';
 import { bytesToHex } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

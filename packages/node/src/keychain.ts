@@ -2,7 +2,7 @@
 // through @napi-rs/keyring (03 §6). Items are generic credentials under service `agentlink`; values
 // are bytes and never become JS strings. Also the keychain probe and backend selection at `init`
 // (04 §2.8 "Selection", 07 §9.1).
-import { equalBytes, encodeHex, randomBytes } from '@agentlink/crypto';
+import { equalBytes, encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 
 /** The keychain service of every AgentLink item (04 §2.2). */
@@ -71,7 +71,7 @@ const LOADER_OVERRIDES = [
  * The OS keychain through @napi-rs/keyring. The native binding loads on first use, so importing this
  * package loads no native code. `service` is `agentlink` except in tests.
  *
- * Internal to @agentlink/node (IR-M1-8a-1 M-2): it returns raw item bytes, the agent seed included,
+ * Internal to @4thtech-io/node (IR-M1-8a-1 M-2): it returns raw item bytes, the agent seed included,
  * so the package entry never exports it (fence.test.ts).
  */
 export function osKeychain(service: string = KEYCHAIN_SERVICE): KeychainBackend {

@@ -4,12 +4,12 @@
 // each one before it leaves the server:
 //
 // - `summary` and `nextStep` are our text: I-JSON, 1 to 500 code points, no control or format
-//   character (`toolTextSchema`, @agentlink/types). Inbound content never reaches them (I-5).
+//   character (`toolTextSchema`, @4thtech-io/types). Inbound content never reaches them (I-5).
 // - A `url` must start with one of the context's allowed origins (the local UI or the console;
 //   IR-M1-2b-1 F-5). M1a has none (D-73 (3)), so any `url` is refused.
 // - A result that breaks a rule is replaced by a fixed internal error: the server never echoes the
 //   offending text.
-import { toolResultCommonSchema, type McpStatus } from '@agentlink/types';
+import { toolResultCommonSchema, type McpStatus } from '@4thtech-io/types';
 import type { ToolContext } from './context.js';
 
 /** A tool result: the common fields plus the tool's own `structuredContent` fields. */
@@ -112,7 +112,7 @@ function urlAllowed(url: unknown, origins: readonly string[]): boolean {
 /**
  * The rule check of 06 §1 rule 3 and §2.5; returns false on any break. The field rules (text, `code`,
  * `nextStep` on every non-ok result, `approvalId` only on `pending_approval`, a well-formed `url`)
- * are the ones in @agentlink/types; only the origin pin of `url` is ours (IR-M1-9c-1 F06).
+ * are the ones in @4thtech-io/types; only the origin pin of `url` is ours (IR-M1-9c-1 F06).
  */
 export function resultIsValid(result: ToolResult, urlOrigins: readonly string[]): boolean {
   if (!toolResultCommonSchema.safeParse(result).success) return false;

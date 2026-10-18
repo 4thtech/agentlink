@@ -1,15 +1,15 @@
 // M1-5b acceptance: an inbound relay frame of 131 073 bytes is dropped before JSON.parse and one of
 // 131 072 bytes is parsed (04 §3.1.1, G-2). Spy test: neither the strict parser the pool uses nor the
 // global JSON.parse ever sees an oversized frame. The limit is on UTF-8 bytes of the raw message.
-import { encodeUtf8 } from '@agentlink/crypto';
+import { encodeUtf8 } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MAX_FRAME_BYTES, RelayPool } from './relay-pool.js';
 import { MockNetwork, makeWrapEvent, relayUrls } from './testing/mock-network.js';
 
 const parsed = vi.hoisted(() => ({ calls: [] as string[] }));
 
-vi.mock('@agentlink/crypto', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@agentlink/crypto')>();
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@4thtech-io/crypto')>();
   return {
     ...original,
     parseJson: (text: string, options?: Parameters<typeof original.parseJson>[1]) => {

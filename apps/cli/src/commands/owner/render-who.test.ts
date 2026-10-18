@@ -1,6 +1,6 @@
 // M1-9zb: the "Who" line of an accept-invite approval shows the inviter's self-declared name (06
 // §2.1 restrictName, untrusted, I-5) and the owner fingerprint from the verified invite card.
-import { restrictName, type AgentLinkClient } from '@agentlink/core';
+import { restrictName, type AgentLinkClient } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import type { PendingRequest } from './pending.js';
 import { cardFacts, cardLines } from './render.js';

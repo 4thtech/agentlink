@@ -42,13 +42,13 @@ import {
   type JsonObject,
   type JsonValue,
   type OwnerPublicKeys,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   sealPasskeySeed,
   sealRecoverySeed,
   generateRecoveryCode,
-} from '@agentlink/crypto/keystore';
-import type { OwnerActionOutcome } from '@agentlink/core';
+} from '@4thtech-io/crypto/keystore';
+import type { OwnerActionOutcome } from '@4thtech-io/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { APP_JS } from './approval-page.js';
 import {
@@ -79,8 +79,8 @@ import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
 
 // Every owner seed opened, copied before it is wiped, so the scan knows what to look for.
 const seen = vi.hoisted(() => ({ seeds: [] as Uint8Array[], prfs: [] as Uint8Array[] }));
-vi.mock('@agentlink/crypto/keystore', async (importOriginal) => {
-  const real = await importOriginal<typeof import('@agentlink/crypto/keystore')>();
+vi.mock('@4thtech-io/crypto/keystore', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@4thtech-io/crypto/keystore')>();
   return {
     ...real,
     openOwnerSeed: async (...args: Parameters<typeof real.openOwnerSeed>) => {

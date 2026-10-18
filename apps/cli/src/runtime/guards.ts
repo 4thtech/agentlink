@@ -5,7 +5,7 @@
 
 /**
  * Environment markers of AI apps that run shell commands. Mirrors the list in
- * `@agentlink/node`'s owner terminal (owner-terminal.ts, maintained in M1-8f), which the package
+ * `@4thtech-io/node`'s owner terminal (owner-terminal.ts, maintained in M1-8f), which the package
  * entry does not export; a test keeps the two in step.
  */
 export const HARNESS_MARKERS: readonly string[] = Object.freeze([

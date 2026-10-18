@@ -86,7 +86,7 @@ const CONSOLE_CHANNELS = [
   'packages/node/src/owner-terminal.ts',
 ];
 const CONSOLE_MESSAGE =
-  'No console output: log through @agentlink/log (redacting). Deliberate channels: eslint.config.mjs CONSOLE_CHANNELS.';
+  'No console output: log through @4thtech-io/log (redacting). Deliberate channels: eslint.config.mjs CONSOLE_CHANNELS.';
 const CONSOLE_SYNTAX = [
   // globalThis.console, window.console, (globalThis as T).console
   "MemberExpression[computed=false][property.name='console']",
@@ -108,12 +108,12 @@ const CONSOLE_SYNTAX = [
 
 // --- The runtime-agnostic tool module (06 §1, D-73 (1); M1-9c) ----------------------------------
 // apps/cli/src/tools/ moves unchanged into a shared package for the cloud agent (M2-3b), so it may
-// import no Node built-in, nothing from @agentlink/node or the MCP SDK, and nothing outside
+// import no Node built-in, nothing from @4thtech-io/node or the MCP SDK, and nothing outside
 // src/tools/ by a relative path; no dynamic import(), require or Node global. These are guards for
 // portability and hygiene, not a security boundary (06 §1). The block keeps the apps/cli zone's own
 // list (ESLint applies only the last matching no-restricted-imports block) and CONSOLE_SYNTAX.
 const TOOLS_MSG =
-  'apps/cli/src/tools/ is runtime-agnostic (06 §1, D-73): no Node built-ins, @agentlink/node, MCP SDK or imports from outside src/tools/.';
+  'apps/cli/src/tools/ is runtime-agnostic (06 §1, D-73): no Node built-ins, @4thtech-io/node, MCP SDK or imports from outside src/tools/.';
 
 function toolModuleRestrictions(escapes) {
   const zone = restrictionsFor('apps/cli');
@@ -127,7 +127,7 @@ function toolModuleRestrictions(escapes) {
         patterns: [
           ...patterns,
           { group: ['node:*'], message: TOOLS_MSG },
-          { group: ['@agentlink/node', '@agentlink/node/*'], message: TOOLS_MSG },
+          { group: ['@4thtech-io/node', '@4thtech-io/node/*'], message: TOOLS_MSG },
           { group: ['@modelcontextprotocol/*'], message: TOOLS_MSG },
           { group: escapes, message: TOOLS_MSG },
         ],
@@ -163,7 +163,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Never log secrets (AGENTS.md, 04 §8.4): no console output; log through @agentlink/log, which
+    // Never log secrets (AGENTS.md, 04 §8.4): no console output; log through @4thtech-io/log, which
     // redacts. Shared packages compile without DOM or Node types, so code reaches the console only
     // through globalThis or a local `declare const console`, and no-console sees neither:
     // CONSOLE_SYNTAX closes those routes. The only exceptions are the channels in CONSOLE_CHANNELS.

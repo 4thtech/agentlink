@@ -18,7 +18,7 @@
 // Changing a bucket's lifecycle is a bucket-level permission, which the recommended bucket-scoped key
 // (07 §5.2: object read, write and delete, plus multipart abort and listing) does not have; the caller maps `lifecycle_failed` with status 403
 // to "add the rule in the provider's console" guidance.
-import { encodeBase64url, encodeHex, sha256 } from '@agentlink/crypto';
+import { encodeBase64url, encodeHex, sha256 } from '@4thtech-io/crypto';
 import { StorageError } from './errors.js';
 import {
   createS3Session,

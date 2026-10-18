@@ -16,4 +16,4 @@
 | Passkeys | WebAuthn PRF output to wrap the owner seed (`ALKP` v1, AES-256-GCM); recovery code wrap `ALKR` v1 (Argon2id, AES-256-GCM) |
 | Pairing | HMAC-SHA256 handshake proof; commit-then-reveal safety code (tagged SHA-256 over both cards, the invite ID and a nonce from each side), shown as 12 digits |
 
-**Libraries:** `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, `@hpke/core`, `nostr-tools`, `viem` and WebCrypto. No custom primitives; all crypto goes through `@agentlink/crypto`.
+**Libraries:** `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, `@hpke/core`, `nostr-tools`, `viem` and WebCrypto. No custom primitives; all crypto goes through `@4thtech-io/crypto`.

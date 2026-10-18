@@ -10,7 +10,7 @@
 // and stores it as refused only when the wait lapses (envelopes.ts, M1-32-b). So any arrival
 // order of one chain converges on the same stored set, and the replay below on the same state.
 //
-// Rebuilding is a replay through the pure reducer of @agentlink/types (`recordSentTerms`,
+// Rebuilding is a replay through the pure reducer of @4thtech-io/types (`recordSentTerms`,
 // `receiveTerms`) in a fixed order that never depends on store order or on a sender-chosen time:
 // version; offers before answers; resend round (a resend follows the envelope it names); this side's
 // envelope before the other side's; then createdAt and envelopeHash. Why this reproduces the state
@@ -25,7 +25,7 @@
 // Rules: inbound terms are untrusted (I-5). Nothing here logs or throws inbound text; errors are
 // fixed codes. A stored row whose payload does not open or parse fails the whole read closed
 // (`store_unreadable`), never an empty chain.
-import { termsHash as computeTermsHash, parseJson, verifyTermsHash } from '@agentlink/crypto';
+import { termsHash as computeTermsHash, parseJson, verifyTermsHash } from '@4thtech-io/crypto';
 import {
   EMPTY_NEGOTIATION,
   acceptBodySchema,
@@ -41,7 +41,7 @@ import {
   type TermsEnvelope,
   type TermsReceipt,
   type TermsRefusal,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { StoreTx } from './store/store.js';
@@ -93,7 +93,7 @@ const BODY = {
 
 /**
  * The terms body of a payload: strict schema for its type and a `termsHash` that is the recomputed
- * one (04 §3.4, through @agentlink/crypto). Undefined for anything else. Never throws.
+ * one (04 §3.4, through @4thtech-io/crypto). Undefined for anything else. Never throws.
  */
 export function termsBodyOf(
   type: unknown,
@@ -465,5 +465,5 @@ export class TermsInbound implements TermsInboundHook {
   }
 }
 
-/** sha256(JCS(terms)) as bare hex, through @agentlink/crypto (04 §3.4). */
+/** sha256(JCS(terms)) as bare hex, through @4thtech-io/crypto (04 §3.4). */
 export const termsHashOf = (terms: Terms): string => computeTermsHash(terms);

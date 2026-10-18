@@ -1,17 +1,17 @@
 // Suite `keystore-file` (M1-1f): 04 §2.8 `ALKS` v1 (file KeyStore) and `ALKO` v1 (owner seed wrap)
-// through @agentlink/crypto. Text secrets are encoded with the package's strict UTF-8 encoder (a lone
+// through @4thtech-io/crypto. Text secrets are encoded with the package's strict UTF-8 encoder (a lone
 // surrogate is refused, never replaced) and given to the code under test as bytes. Seals with the
 // vector's fixed nonce go through the test seam; production seals draw a fresh nonce. A refusal by
 // the code under test (CryptoInputError) is `outcome: reject`; any other error fails the case. Node
 // only, as the vector file declares (04 §2.8 runtime table).
-import { CryptoInputError, decodeHex0x, encodeUtf8 } from '@agentlink/crypto';
+import { CryptoInputError, decodeHex0x, encodeUtf8 } from '@4thtech-io/crypto';
 import {
   deriveKeystoreKek,
   normalizeSecret,
   openKeystoreFile,
   openOwnerSeed,
-} from '@agentlink/crypto/keystore';
-import { sealKeystoreFileWithNonce, sealOwnerSeedWithNonce } from '@agentlink/crypto/testing';
+} from '@4thtech-io/crypto/keystore';
+import { sealKeystoreFileWithNonce, sealOwnerSeedWithNonce } from '@4thtech-io/crypto/testing';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { Comparison, SuiteModule } from '../suite';
 

@@ -311,7 +311,7 @@ jobs:
   # cannot pass green. The suite writes only under a random `agentlink-test-*` service on the
   # ephemeral runner and deletes it afterwards. The job runs only the keychain-specific tests (the
   # keychain file and the CLI two-process test), so unrelated slow or timing-sensitive suites cannot
-  # turn it red; the whole @agentlink/node suite runs in `checks` (Linux) and in `node-os` below
+  # turn it red; the whole @4thtech-io/node suite runs in `checks` (Linux) and in `node-os` below
   # (macOS and Windows). `keychain` is in `ci-gate`'s `needs`; it needs the CLI two-process test from
   # PR #107 on main, so that PR must merge first.
   keychain:
@@ -355,10 +355,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
-      # The workspace dependencies of @agentlink/node (core, crypto) are consumed from dist/. The
+      # The workspace dependencies of @4thtech-io/node (core, crypto) are consumed from dist/. The
       # CLI package and its dependencies are built too: the child processes of the CLI two-process
       # test run apps/cli's dist/.
-      - name: Build the workspace dependencies of @agentlink/node and the CLI
+      - name: Build the workspace dependencies of @4thtech-io/node and the CLI
         shell: bash
         run: pnpm exec turbo run build --filter='@4thtech-io/agentlink...'
 
@@ -367,7 +367,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+          pnpm --filter @4thtech-io/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
           pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
 
       # A fresh D-Bus session, then gnome-keyring started with --unlock, which creates and unlocks
@@ -379,7 +379,7 @@ jobs:
         run: |
           set -euo pipefail
           dbus-run-session -- tools/ci/with-keyring.sh bash -euo pipefail -c '
-            pnpm --filter @agentlink/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
+            pnpm --filter @4thtech-io/node exec vitest run src/keychain-native.test.ts --reporter=default --reporter=json --outputFile.json="$KEYCHAIN_REPORT"
             pnpm --filter @4thtech-io/agentlink exec vitest run test/two-process.keychain.test.ts --reporter=default --reporter=json --outputFile.json="$CLI_KEYCHAIN_REPORT"
           '
 
@@ -419,7 +419,7 @@ jobs:
 
   # OPS-CI-5: the Windows and POSIX path-guard tests (packages/node/src/allowed-path.test.ts, M1-15)
   # as a required check on the two OS families the Linux `checks` job cannot cover. `node-os` runs
-  # the whole @agentlink/node suite there but is not in `ci-gate` (unrelated flakes); this job runs
+  # the whole @4thtech-io/node suite there but is not in `ci-gate` (unrelated flakes); this job runs
   # only the path-guard file and fails if it did not run, ran too few tests, or skipped any.
   # `path-guard` is in `ci-gate`'s `needs`. It needs allowed-path.test.ts from PR #208 on main, so
   # #208 must merge first.
@@ -449,15 +449,15 @@ jobs:
         shell: bash
         run: echo "PATH_GUARD_REPORT=$RUNNER_TEMP/path-guard-vitest.json" >> "$GITHUB_ENV"
 
-      - name: Build the workspace dependencies of @agentlink/node
+      - name: Build the workspace dependencies of @4thtech-io/node
         shell: bash
-        run: pnpm exec turbo run build --filter='@agentlink/node...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/node...'
 
       - name: Run the path-guard tests
         shell: bash
         run: |
           set -euo pipefail
-          pnpm --filter @agentlink/node exec vitest run src/allowed-path.test.ts --passWithNoTests=false --reporter=default --reporter=json --outputFile.json="$PATH_GUARD_REPORT"
+          pnpm --filter @4thtech-io/node exec vitest run src/allowed-path.test.ts --passWithNoTests=false --reporter=default --reporter=json --outputFile.json="$PATH_GUARD_REPORT"
 
       # The file must have run, at least 10 tests, all passed (none skipped, todo or failed).
       - name: Check that allowed-path.test.ts ran in full, with no skipped test
@@ -474,7 +474,7 @@ jobs:
             if (tests.length < 10 || bad.length > 0) { console.error("::error::allowed-path.test.ts must run at least 10 tests, all passed (none skipped)"); process.exit(1); }
           '
 
-  # The whole @agentlink/node suite on macOS and Windows (it used to run inside the keychain job).
+  # The whole @4thtech-io/node suite on macOS and Windows (it used to run inside the keychain job).
   # Not part of `ci-gate`: OS-timing flakes in unrelated suites must not block merges, but a real
   # OS-specific bug stays visible here. The keychain files themselves run in `keychain`.
   node-os:
@@ -499,15 +499,15 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build the workspace dependencies of @agentlink/node
+      - name: Build the workspace dependencies of @4thtech-io/node
         shell: bash
-        run: pnpm exec turbo run build --filter='@agentlink/node...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/node...'
 
       # M1-8e, M1-11a: the real-browser tests need Playwright's Chromium, which only the `checks`
       # job installs (and there a missing browser fails the test). They are excluded here only.
-      - name: Run the @agentlink/node tests
+      - name: Run the @4thtech-io/node tests
         shell: bash
-        run: pnpm --filter @agentlink/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts
+        run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
@@ -532,14 +532,14 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build the workspace dependencies of @agentlink/node
-        run: pnpm exec turbo run build --filter='@agentlink/node^...'
+      - name: Build the workspace dependencies of @4thtech-io/node
+        run: pnpm exec turbo run build --filter='@4thtech-io/node^...'
 
       - name: Choose the test report path
         run: echo "DOCKER_REPORT=$RUNNER_TEMP/relay-docker-vitest.json" >> "$GITHUB_ENV"
 
       - name: Run the Docker relay suite
-        run: pnpm --filter @agentlink/node exec vitest run src/relay-docker.test.ts --reporter=default --reporter=json --outputFile.json="$DOCKER_REPORT"
+        run: pnpm --filter @4thtech-io/node exec vitest run src/relay-docker.test.ts --reporter=default --reporter=json --outputFile.json="$DOCKER_REPORT"
 
       - name: Check that relay-docker.test.ts ran in full, with no skipped test
         run: |
@@ -584,8 +584,8 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build the workspace dependencies of @agentlink/storage
-        run: pnpm exec turbo run build --filter='@agentlink/storage...'
+      - name: Build the workspace dependencies of @4thtech-io/storage
+        run: pnpm exec turbo run build --filter='@4thtech-io/storage...'
 
       - name: Create the certificate, the credentials and the host entry
         shell: bash
@@ -640,7 +640,7 @@ jobs:
           report="$RUNNER_TEMP/storage-it.json"
           echo "STORAGE_IT_REPORT=$report" >> "$GITHUB_ENV"
           set +e
-          pnpm --filter @agentlink/storage exec vitest run src/integration.test.ts --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
+          pnpm --filter @4thtech-io/storage exec vitest run src/integration.test.ts --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
           code=$?
           set -e
           # The log canary of the job: the output must hold no URL query string and no credential.
@@ -670,7 +670,7 @@ jobs:
   # apps/cli/scripts/bundle-check.mjs: every import the published dist/agentlink.js keeps must be a
   # Node built-in or a declared runtime dependency, never jose, pkce-challenge, cookie-signature,
   # etag, hono or another SDK HTTP/OAuth package, and SDK imports only the stdio subpaths; and
-  # src/tools/ bundled for a neutral (Worker) platform reaches no Node built-in, @agentlink/node or
+  # src/tools/ bundled for a neutral (Worker) platform reaches no Node built-in, @4thtech-io/node or
   # the MCP SDK. The script's own test (an injected `jose` import must fail it) and the runtime
   # module-graph guard against the bundle run in the same job. In `ci-gate`'s `needs`.
   bundle-check:

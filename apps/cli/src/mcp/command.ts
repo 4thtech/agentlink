@@ -17,7 +17,7 @@ import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { createLogger, type Logger } from '@agentlink/log';
+import { createLogger, type Logger } from '@4thtech-io/log';
 import { approvalNextStep } from '../approval/next-step.js';
 import { EXIT_OK, type CommandHandler } from '../dispatch.js';
 import {

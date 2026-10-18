@@ -1,11 +1,11 @@
-// Unit tests in Node. The crypto test seam `@agentlink/crypto/testing` (MemoryKeyStore,
+// Unit tests in Node. The crypto test seam `@4thtech-io/crypto/testing` (MemoryKeyStore,
 // MemoryOwnerKeyStore and the deterministic helpers; M1-1g-b, 04 §3.1.1) has no package export and is
 // never built: this alias is the only thing that resolves it, and only for tests. deps-check and
 // ESLint allow it by that exact name in this package's *.test.ts files only (tools/deps-check/policy.mjs).
 //
-// `@agentlink/crypto` maps to the same source, so a test sees one copy of the crypto module (one
+// `@4thtech-io/crypto` maps to the same source, so a test sees one copy of the crypto module (one
 // CryptoInputError, one KeyStoreError) whether a value comes from the seam or the main entry. The
-// entries are anchored: `@agentlink/crypto/keystore` is not mapped (and stays refused here).
+// entries are anchored: `@4thtech-io/crypto/keystore` is not mapped (and stays refused here).
 import { defineConfig } from 'vitest/config';
 
 const cryptoSource = (file: string): string =>
@@ -14,8 +14,8 @@ const cryptoSource = (file: string): string =>
 export default defineConfig({
   resolve: {
     alias: [
-      { find: /^@agentlink\/crypto$/, replacement: cryptoSource('index.ts') },
-      { find: /^@agentlink\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
+      { find: /^@4thtech-io\/crypto$/, replacement: cryptoSource('index.ts') },
+      { find: /^@4thtech-io\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
     ],
   },
   test: {

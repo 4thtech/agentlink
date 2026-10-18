@@ -277,14 +277,14 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Spec:** 09 §5, §5.1, §5.2 (private); 03 §2; 07 §1; D-19, D-26; `development-process.md` §8
 - **Invariants:** —
 - **Scope:**
-  - The public repo must not depend on 09 being public. The monorepo layout already lives in `AGENTS.md`. Add to 03 (spec-change PR) a short "Repositories" section: `agentlink` (public), `occ-v2-contracts` (private, layout `src/`, `test/`, `script/`, `audits/`), `agentlink-ops` (private), `agentlink-cloud-agent` (public template), and the `@agentlink/occ-v2-abi` + shared `test-vectors/` boundary.
+  - The public repo must not depend on 09 being public. The monorepo layout already lives in `AGENTS.md`. Add to 03 (spec-change PR) a short "Repositories" section: `agentlink` (public), `occ-v2-contracts` (private, layout `src/`, `test/`, `script/`, `audits/`), `agentlink-ops` (private), `agentlink-cloud-agent` (public template), and the `@4thtech-io/occ-v2-abi` + shared `test-vectors/` boundary.
   - Replace public references that send readers to 09 for something they need (00 reading order, 03, 07, 08) with "(private)" plus the restated fact.
 - **Acceptance:**
   - `grep -rn "09-repositories\|09 §" docs/ AGENTS.md` shows only references marked private, none required to complete a public task.
 
 #### M0-8 · Shared redacting logger and secret-canary CI test (new)
 - **Status:** done · **Size:** M · **Tier:** Opus · **Security:** S1
-- **Repo/path:** agentlink · packages/log (`@agentlink/log`, resolves gap G-11)
+- **Repo/path:** agentlink · packages/log (`@4thtech-io/log`, resolves gap G-11)
 - **Depends on:** M0-2d
 - **Spec:** 04 §1 I-7, §8.4; 07 §7 (submitter logging); `audit-rules.md` §6
 - **Invariants:** I-7
@@ -659,17 +659,18 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - The owner has confirmed the package list in chat.
 
 #### OPS-REL-2 · Rename the internal workspace packages away from the `@agentlink` npm scope (new, IR-OPS-REL-1-1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (supply chain: package names, manifests, lockfile, deps-check policy, sensitive paths)
-- **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, every `@agentlink/*` import, `tools/deps-check/policy.mjs`, `eslint.config.mjs`, `.changeset/config.json`, `.changeset/*.md`, `tsconfig*`, `vitest.config.*`, `.github/workflows/*` filters, docs
+- **Decision (Tali, chat, 2026-10-18):** the new scope is `@4thtech-io/*` (the org we own), every workspace package stays `"private": true`; the CLI `@4thtech-io/agentlink` keeps its name and remains the only published package.
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (supply chain: package names, manifests, lockfile, deps-check policy, sensitive paths)
+- **Repo/path:** agentlink · `packages/*/package.json`, `apps/*/package.json`, every import from the old `@agentlink` scope, `tools/deps-check/policy.mjs`, `eslint.config.mjs`, `.changeset/config.json`, `.changeset/*.md`, `tsconfig*`, `vitest.config.*`, `.github/workflows/*` filters, docs
 - **Depends on:** OPS-REL-1
 - **Spec:** D-43; `release-and-deployment.md` §4.1; 07 §1 (package map)
 - **Invariants:** I-8 (the crypto allowlist and zones move with the names)
 - **Scope:**
   - The `@agentlink` npm organisation belongs to a third party (checked 2026-10-16). Our private workspace packages use that scope, so any tool or person that resolves one of those names from the registry (a misconfigured install, a copied snippet, a future published package) would get someone else's code. OPS-REL-1 keeps the names out of the published package; this card removes the confusion surface entirely.
-  - Rename every workspace package to a scope we own or to unscoped private names (for example `@4thtech-internal/*`, owner picks), in one PR, with deps-check, ESLint zones, the Changesets fixed group, CI filters and docs updated together. Specs that name `@agentlink/*` packages (07 §1 and others) change in the same PR.
+  - Rename every workspace package to a scope we own or to unscoped private names (for example `@4thtech-internal/*`, owner picks), in one PR, with deps-check, ESLint zones, the Changesets fixed group, CI filters and docs updated together. Specs that name packages in the old scope (07 §1 and others) change in the same PR.
 - **Acceptance:**
-  - A repository search for `@agentlink/` finds nothing except history (CHANGELOG, decision log); `pnpm lint`, `typecheck`, `test` and the vectors job are green.
-  - deps-check refuses any `@agentlink/*` dependency or import.
+  - A repository search for a package name in the old `@agentlink` scope finds nothing except history (CHANGELOG, decision log); `pnpm lint`, `typecheck`, `test` and the vectors job are green.
+  - deps-check refuses any dependency or import in the old `@agentlink` scope.
 
 #### OPS-CI-3 · pr-hygiene accepts `OPS-<WORD>-<n>` task IDs (new)
 - **Status:** done (4thtech/agentlink#197) · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
@@ -951,7 +952,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M3-13 becomes `ready`.
 
-### Crypto (`@agentlink/crypto`)
+### Crypto (`@4thtech-io/crypto`)
 
 #### M1-1h · Independent test vectors for all protocol suites
 - **Status:** in-progress (vectors merged in 4thtech/agentlink#25; the G-2 follow-up vectors, including `envelope-sig`, are outstanding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1010,7 +1011,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 04 §2.5.1, §2.4.1; 06 §3 (policy JSON form, G-32)
 - **Invariants:** I-4, I-8
 - **Scope:**
-  - Regenerate the `sign-policy-set` vector of the `owner-action` suite from the independent generator `tools/vectors/generate_owner_action.py`, not derived from the `@agentlink/types` schema. The current vector predates G-32: it must use the 06 §3 defaults in the JSON form (USD values as strings, `contactRules: []`).
+  - Regenerate the `sign-policy-set` vector of the `owner-action` suite from the independent generator `tools/vectors/generate_owner_action.py`, not derived from the `@4thtech-io/types` schema. The current vector predates G-32: it must use the 06 §3 defaults in the JSON form (USD values as strings, `contactRules: []`).
   - Add one vector with a non-empty, sorted `contactRules` (JCS key order inside the rules, 04 §2.5.1).
   - Keep the old number-USD form as a rejection vector.
 - **Acceptance:**
@@ -1235,8 +1236,8 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 04 §3.1.1 (Key interfaces, Location: the test doubles are in an entry point "that deps-check allows only in tests, `test-vectors` and e2e, never in production `src`"); 04 §8.1
 - **Invariants:** I-1, I-8
 - **Scope:**
-  - The guards allowed `@agentlink/crypto/testing` only in `test-vectors`, which is stricter than 04 §3.1.1, and M1-5a and M1-7a need `MemoryKeyStore` in their tests. `*.test.ts` files of `packages/core` and `packages/transport-nostr` may import it by that exact name (no subpath); `e2e/` may use it. Production files of every package stay refused by name, relative path and deep `dist/`/`src/` path. Another package's tests are a reviewed widening of the policy entry.
-  - Each consuming package resolves the seam only through its Vitest alias and its noEmit `tsconfig.test.json` `paths` (both map `@agentlink/crypto` to the same source, so tests see one copy of the module); no build config can resolve it.
+  - The guards allowed `@4thtech-io/crypto/testing` only in `test-vectors`, which is stricter than 04 §3.1.1, and M1-5a and M1-7a need `MemoryKeyStore` in their tests. `*.test.ts` files of `packages/core` and `packages/transport-nostr` may import it by that exact name (no subpath); `e2e/` may use it. Production files of every package stay refused by name, relative path and deep `dist/`/`src/` path. Another package's tests are a reviewed widening of the policy entry.
+  - Each consuming package resolves the seam only through its Vitest alias and its noEmit `tsconfig.test.json` `paths` (both map `@4thtech-io/crypto` to the same source, so tests see one copy of the module); no build config can resolve it.
   - IR-M1-1c-G2-1 L-1: a test file is exactly `*.test.ts`, the one name every build excludes. Other test-like names (`.test.mts`, `.test.cts`, `.test.tsx`, `.test.js`, `.spec.*`) count as production code and deps-check reports them.
 - **Acceptance:**
   - deps-check and ESLint regressions: test files of the two packages are allowed; their production files, deep and relative paths, subpaths, other zones' tests and a `src/x.test.mts` are refused. Repository tests: every build excludes `src/**/*.test.ts` and maps no paths, and no `dist/` contains the seam.
@@ -1248,7 +1249,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 04 §3.1.1 (test doubles allowed in e2e), §8.1; development-process.md §11
 - **Invariants:** I-1, I-8
 - **Scope:**
-  - deps-check (`check.mjs`) and the root ESLint config scan neither `e2e/` nor give it zone rules, so an `e2e/src/a.ts` importing `@noble/curves`, `@agentlink/crypto/keystore`, the test seam or `crypto.subtle` passes both tools. e2e is never built or published and may use the seam (04 §3.1.1), but its suites touch real crypto paths.
+  - deps-check (`check.mjs`) and the root ESLint config scan neither `e2e/` nor give it zone rules, so an `e2e/src/a.ts` importing `@noble/curves`, `@4thtech-io/crypto/keystore`, the test seam or `crypto.subtle` passes both tools. e2e is never built or published and may use the seam (04 §3.1.1), but its suites touch real crypto paths.
   - Give `e2e` a deps-check zone and an ESLint block: primitive libraries refused, the `/keystore` entry refused, `crypto.subtle` refused, Node built-ins as M1-13 decides, the seam allowed.
 - **Acceptance:**
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
@@ -1272,7 +1273,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - A concurrent advance fails the compare-and-set and changes nothing; a crash at each step leaves a state that either finishes or refuses to send, never one that sends under a key no contact knows. The epoch + 1 preview returns public keys only, and signing and decryption at that epoch stay `epoch_unavailable`.
 
-### Types (`@agentlink/types`)
+### Types (`@4thtech-io/types`)
 
 #### M1-1l · crypto: key commitment and CEK-derived wraps (G-46, D-66) (new)
 - **Status:** done (4thtech/agentlink#61, merged 2026-10-14; vectors from the independent session on `feat/M1-1l-v-vectors`) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1285,7 +1286,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `aead.ts`: `encKey` and `kc` from the CEK (HKDF-SHA256, labels `agentlink/v1/payload-key` and `agentlink/v1/payload-commit`, `info` = label ‖ id); AES-256-GCM under `encKey`. `decryptPayload` compares `kc` in constant time (`equalBytes`) before GCM; a mismatch and a failed tag are the same `open_failed`. A separate exported commitment check lets the core classify a `kc` mismatch (04 §3.1.1 step 5). The derived keys are wiped.
   - `hpke.ts`: `wrapCek` derives `ikm_j` (label `agentlink/v1/cek-eph`, `info` = label ‖ id ‖ pk_j) and uses it as the raw X25519 ephemeral secret through the existing explicit-ephemeral path: `ekm` gets the imported key pair of `skE_j`, never the bytes of `ikm_j` (which the library would route through RFC 9180 `DeriveKeyPair`). A vector case shows that the two paths give different bytes (IR-D-66-1 L-5). The all-zero shared-secret pre-check stays. A main-entry `checkWrap(pk, id, cek, entry)` recomputes and compares one entry (public key and CEK only). No HPKE context is used for `export` or a second message.
   - `@hpke/core` stays pinned exactly (1.9.0; `@hpke/common` 1.10.1 in the lockfile). Add to the dependency-update rule (`renovate.json` group note and `development-process.md`) that any `@hpke/*` update runs `hpke` and `aead-envelope` in every runtime before it merges (04 §3.3, IR-G-46-1 F-1).
-  - `@agentlink/types` `aeadSchema` and fixtures: `alg` `A256GCM-KC`, `kc` base64url 32 bytes.
+  - `@4thtech-io/types` `aeadSchema` and fixtures: `alg` `A256GCM-KC`, `kc` base64url 32 bytes.
   - Size assertions: the worst case moves from 24 509 to 24 563 bytes (`packages/transport-nostr/src/gift-wrap.test.ts`, `packages/crypto/src/envelope.test.ts`). Keep one test that the largest parser-accepted envelope is at most 24 576 bytes.
   - Vectors, by an independent generator session (M1-1h rules): regenerate `aead-envelope` and `safety-code-recompute`. In `hpke`, add derived-ephemeral cases and keep the RFC 9180 cases. Add one case per derivation label. Add reject cases: missing `kc`, `kc` with one bit flipped, 31- and 33-byte `kc`, the old `alg`, and a two-key ciphertext that opens under AES-GCM with both keys but fails `kc` for one.
   - `docs-site/technical/concepts/envelopes.md` and `docs-site/technical/reference/proof-pack-format.md` describe the new form.
@@ -1322,7 +1323,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - G-23/G-28 (04 §2.9, §3.6, §3.6.1, §3.4.1): `agentId` (`0x` + 40 lowercase hex). Invite: `cardAgentSig` and `codeCommit`. `handshake`: `cardAgentSig`, `codeNonce`, `codeCommit` and `inviterCardHash` (bare hex 64). `handshake-ack`: `handshakeHash` (`0x` + 64 hex, an `envelopeHash`), `codeReveal`, `card` and `cardSig`. `contact.check` params: `{contact, pairingDigest}`, where `pairingDigest` is 64 lowercase hex with no prefix. The 32-byte fields are base64url of exactly 32 bytes, and `inviteId` is exactly 16 bytes. Every field is required, and non-canonical forms are rejected.
   - Security S2 because envelope/payload schema changes are S2 (`audit-rules.md` §2.2).
 - **Split (orchestrator):** the G-23/G-28 pairing-body fields above (invite, `handshake`, `handshake-ack`) are done under M1-2d together with the G-24 `relays` change, so the pairing bodies land complete before M1-7c. The other parts stay here.
-- **Remaining (orchestrator, 2026-10-15):** only the `encodings` suite. `@agentlink/types` gets the per-path decoder of 04 §2.4.1 (one decoder for each schema path of the table, built on the schema leaf where a schema has the path) and the byte comparison of two encoded values; the suite's integer-token cases run through the strict `parseJson` of `@agentlink/crypto` (`integersOnly`, M1-1e). The G-23/G-28 parts are done in M1-2d and M1-2f; the browser and workerd runs of the package's own tests are M1-2c.
+- **Remaining (orchestrator, 2026-10-15):** only the `encodings` suite. `@4thtech-io/types` gets the per-path decoder of 04 §2.4.1 (one decoder for each schema path of the table, built on the schema leaf where a schema has the path) and the byte comparison of two encoded values; the suite's integer-token cases run through the strict `parseJson` of `@4thtech-io/crypto` (`integersOnly`, M1-1e). The G-23/G-28 parts are done in M1-2d and M1-2f; the browser and workerd runs of the package's own tests are M1-2c.
 - **Acceptance:**
   - Vector suite `encodings`: its harness module is registered and the suite is removed from `test-vectors/pending-suites.json`; every case passes in every runtime the suite declares (M1-1h, IR-M1-1h-1 F2).
   - Round-trip tests for every schema; property-based fuzzing never throws anything but a validation error.
@@ -1362,7 +1363,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
       - approval-request `expiresAt` after `requestedAt`;
       - `summary` with no control or format characters;
       - EIP-712 `uint64` capped at 2^53 − 1.
-    - L-5: 07 §1 lists `zod` as a dependency of `@agentlink/types`.
+    - L-5: 07 §1 lists `zod` as a dependency of `@4thtech-io/types`.
     - L-6: `downloadUrlSchema` requires a lowercase host and a port in 1–65535, as the relay schema does.
     - L-7: the round-trip helper uses `toStrictEqual`.
     - L-8: payload fuzzing also covers text with files, approval-request, revoke and request fixtures.
@@ -1415,7 +1416,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Spec:** 04 §2.5.1 (op table: `contact.check` `{contact, pairingDigest}`, `L(op)` 86 400 s), §2.4.1 (encodings), §3.6.1; G-28
 - **Invariants:** I-4
 - **Scope:**
-  - `contact.check` params schema: exactly `contact` (agent ID, `0x` + 40 lowercase hex) and `pairingDigest` (bare hex 64); any other key, an uppercase or `0x` digest, or another `op`'s params is rejected, never normalised. Today only its lifetime constant exists in `@agentlink/types` (`constants.ts` notes the schema lands "with the task that builds it"); no card owned it.
+  - `contact.check` params schema: exactly `contact` (agent ID, `0x` + 40 lowercase hex) and `pairingDigest` (bare hex 64); any other key, an uppercase or `0x` digest, or another `op`'s params is rejected, never normalised. Today only its lifetime constant exists in `@4thtech-io/types` (`constants.ts` notes the schema lands "with the task that builds it"); no card owned it.
   - Core verification and the `contacts.safety_check` write are M1-7c-b (split from M1-7c); signing from `agentlink contacts --verify <id>` is M1-9m.
 - **Acceptance:**
   - The schema accepts the `contact.check` signing vector and rejects every `contact.check` reject vector in every runtime the suite declares.
@@ -1562,7 +1563,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Tagged contracts release emits ABI JSON, per-chain addresses (empty until M1-3g) and a SHA-256 manifest; no Solidity source leaves the private repo.
   - The ABI includes the G-4 events `RecordSkipped` and `ReceiptSkipped` (05 §6).
-  - Decided (G-10, D-83, Tali, 2026-10-18): `@4thtech-io/occ-v2-abi` is a private workspace package in `packages/occ-v2-abi`, built from the exported ABI/addresses/manifest artifacts and the shared vectors, bundled into the CLI and not published to npm. A PR imports the artifacts; CI verifies the manifest. (The rename from `@agentlink/*` to `@4thtech-io/*` is in flight in #250; until it lands the name reads `@agentlink/occ-v2-abi`.)
+  - Decided (G-10, D-83, Tali, 2026-10-18): `@4thtech-io/occ-v2-abi` is a private workspace package in `packages/occ-v2-abi`, built from the exported ABI/addresses/manifest artifacts and the shared vectors, bundled into the CLI and not published to npm. A PR imports the artifacts; CI verifies the manifest. (The rename from `@4thtech-io/*` to `@4thtech-io/*` is in flight in #250; until it lands the name reads `@4thtech-io/occ-v2-abi`.)
   - `@4thtech-io/chain` pins the imported release exactly; Renovate never automerges it.
   - Follow-up (IR-M1-3b-1 I-4): no `@4thtech-io/occ-v2-abi` import is taken from a contracts build whose concrete ABI differs from the interface in mutability (the `depositWithAuthorization` stub until M1-3c); generate the ABI from the interface, or import only after M1-3c.
   - Spec note (IR-M1-3b-1 choices 1 and 10, proposed; owner confirms at merge): 05 §7 lists the inherited OpenZeppelin errors that appear in the ABI (`AccessManagedUnauthorized`, `ReentrancyGuardReentrantCall`, `SafeERC20FailedOperation`, the UUPS and ERC-1967 errors) and decides whether a dedicated `ValueMismatch()` replaces `TransferFailed()` for a native value mismatch.
@@ -1653,7 +1654,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope (proposed, owner confirms at merge):** the pre-audit's Infos and the docs condition of its go/no-go (§8 condition 4). Spec text only; no contract change.
   - FA-9: 05 §3.3 lists `charge` before the store; the contract stores and emits first, then charges, which is the safer order under reentrancy. Fix the spec text to match.
   - FA-10: 05 §6 says which address `Paused(account)` names at initialisation under CREATE3 (the CREATE3 intermediate proxy or CreateX, not the deployer), and that monitoring must not treat it as an ops key. Mainnet only; testnets start unpaused.
-  - FA-2 (§8 condition 4): the 04 §5 and 07 text for EIP-7702-delegated agent keys, as decided in G-47 (D-66): option (a), the documented limitation and the `@agentlink/chain` pre-sign code check with a typed error, now; the note that the contract fallback (M1-3l) lands before mainnet.
+  - FA-2 (§8 condition 4): the 04 §5 and 07 text for EIP-7702-delegated agent keys, as decided in G-47 (D-66): option (a), the documented limitation and the `@4thtech-io/chain` pre-sign code check with a typed error, now; the note that the contract fallback (M1-3l) lands before mainnet.
   - FA-11: 07 notes that ERC-7739 smart accounts need the client to build the nested typed-data signature around the `Record` or `Receipt`, and that such signatures are several hundred bytes, which raises batch calldata. Hand-off: M1-4a typed-data builders.
   - FA-12: 05 §3.1 states that `kind` is not constrained on-chain, so clients and the proof-pack verifier validate it (hand-off: M1-4d); an app `name` is inbound content (I-5), and the console and indexers bound what they render (hand-off: the M2 console cards).
 - **Acceptance:**
@@ -1710,7 +1711,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The config check rejects a fee token outside the stablecoin allowlist (including a volatile native coin), a token without an issuer source, a fee-on-transfer token (mock), and any fee or cap whose USD value differs between chains or tokens; it passes on the committed testnet config.
   - The config check also fails on an allowlisted token with a zero `NOTARIZE` or `REGISTER` fee or cap, and on the native coin outside Gnosis chain IDs; each has a negative test. It also confirms the transient-storage opcode (Cancun) is available on every target chain.
 
-### Chain client (`@agentlink/chain`)
+### Chain client (`@4thtech-io/chain`)
 
 #### M1-4a · chain: config, clients, typed-data builders, parity
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1761,7 +1762,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §6.2, §8; 05 §3.3; 02 J5, F-44; 06 §2.4
 - **Invariants:** I-3, I-6
 - **Scope:**
-  - Static `verifyProofPack(pack, {chains})`: `getRecord`, recompute `recordStructHash` from `pack.record`, envelope hash, commitment with disclosed salt, signer signature (EOA, or ERC-1271 via `eth_call`), receipts from `RecordState`; optional decryption with a disclosed content key, only in the 07 §8 order (G-46, D-66): `envelope` required with `disclosure`, a 32-byte `contentKey`, the recomputed `envelopeHash` equal to the pack field and the Record, `sig`, the `kc` check through `@agentlink/crypto`, decryption, then the payload schema.
+  - Static `verifyProofPack(pack, {chains})`: `getRecord`, recompute `recordStructHash` from `pack.record`, envelope hash, commitment with disclosed salt, signer signature (EOA, or ERC-1271 via `eth_call`), receipts from `RecordState`; optional decryption with a disclosed content key, only in the 07 §8 order (G-46, D-66): `envelope` required with `disclosure`, a 32-byte `contentKey`, the recomputed `envelopeHash` equal to the pack field and the Record, `sig`, the `kc` check through `@4thtech-io/crypto`, decryption, then the payload schema.
   - Structured result with a specific reason per failure, ready for plain-language rendering. No log queries (some RPCs prune logs) and no 4thTech service.
 - **Acceptance:**
   - Vector packs: valid; each single-field tamper → its specific reason; ERC-1271 signer; disclosed-key content check; a `disclosure` without `envelope`, a 31-byte `contentKey`, and a key that opens a two-key ciphertext under AES-GCM but fails `kc` are each rejected (G-46).
@@ -1788,7 +1789,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §3.5; 07 §4.1, §4.2 (wrapping, size)
 - **Invariants:** I-1, I-2, I-5
 - **Scope:**
-  - Rumor kind 14 with tag `["agentlink","1"]` and `content` = envelope JSON; seal kind 13 signed via `EnvelopeKeys.signNostr` (the agent's `KeyStore`, or an `OwnerSession` for owner-authored envelopes, 04 §3.1.1); gift wrap kind 1059 per recipient Nostr key with an ephemeral key created inside `@agentlink/crypto`; NIP-44 v2; `created_at` randomised up to 2 days back.
+  - Rumor kind 14 with tag `["agentlink","1"]` and `content` = envelope JSON; seal kind 13 signed via `EnvelopeKeys.signNostr` (the agent's `KeyStore`, or an `OwnerSession` for owner-authored envelopes, 04 §3.1.1); gift wrap kind 1059 per recipient Nostr key with an ephemeral key created inside `@4thtech-io/crypto`; NIP-44 v2; `created_at` randomised up to 2 days back.
   - Unwrap rejects unless: wrap and seal signatures verify, rumor pubkey == seal pubkey, seal pubkey == `envelope.from`, the `agentlink` tag is present, the envelope parses.
   - Envelope ≤ 24 KB (24 576 bytes) before wrapping; on receipt, the rumor `content` is checked against the same limit before `JSON.parse` (04 §3.1.1); one gift wrap per distinct recipient key; final gift-wrap size computed per recipient for M1-5b.
 - **Acceptance:**
@@ -1809,7 +1810,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - NIP-11 fetch and cache; skip relays whose `max_message_length` is below the wrap size. NIP-42 AUTH signed via `EnvelopeKeys.signNostr`.
   - Inbound relay frames above 131 072 bytes are dropped before `JSON.parse` (04 §3.1.1, G-2).
   - Event contents never logged; per-relay health and timeouts.
-  - (hand-off from M1-2c, IR-M1-2a-1 M-1 part 2) Re-check every relay host at connect time, and again on every reconnect: resolve it, and refuse the relay if any address is private, loopback, link-local, CGNAT, unique-local or a metadata address, because a DNS name can resolve to one (04 §4, 07 §4.2). The schema in `@agentlink/types` checks only the string.
+  - (hand-off from M1-2c, IR-M1-2a-1 M-1 part 2) Re-check every relay host at connect time, and again on every reconnect: resolve it, and refuse the relay if any address is private, loopback, link-local, CGNAT, unique-local or a metadata address, because a DNS name can resolve to one (04 §4, 07 §4.2). The schema in `@4thtech-io/types` checks only the string.
 - **Acceptance:**
   - Against in-memory fake relays behind the injected `RelayConnector`: success only with ≥ 2 `OK`; a relay whose `max_message_length` is below the wrap size is skipped; AUTH is answered on a challenge. The Docker suite against real local relays (one requiring AUTH, one with a small `max_message_length`) moves to M1-5b-b, because it needs the Node connector.
   - Routing (07 §4.3): with disjoint sender and recipient lists, the recipient owner's wrap reaches only the recipient's relays and the sender owner's only the sender's; a wrap is never published to a relay outside its row's list.
@@ -1824,7 +1825,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §4.2 (relays, size, NIP-42), §4.3 (relay routing); 04 §4 (relay URL rule, SSRF)
 - **Invariants:** I-3, I-5
 - **Scope:**
-  - The Node implementations of the `RelayConnector`, `HostResolver` and `Nip11Fetcher` interfaces of `@agentlink/transport-nostr`.
+  - The Node implementations of the `RelayConnector`, `HostResolver` and `Nip11Fetcher` interfaces of `@4thtech-io/transport-nostr`.
   - The connector connects to the address that the checks approved (the pinned address), never to a second lookup of the name.
   - Redirects are refused, for the socket upgrade and for NIP-11. Proxy environment settings are ignored.
   - Inbound socket messages are capped at 131 072 bytes in the socket layer itself, so an oversized message never reaches the pool.
@@ -1917,7 +1918,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Existing M1-5b and M1-5c tests stay green; no test is weakened.
   - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
 
-### Storage (`@agentlink/storage`)
+### Storage (`@4thtech-io/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
 - **Status:** done (4thtech/agentlink#216) · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
@@ -1998,7 +1999,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-D48-1 F10, F16) A transient 429 or 503 from the drop yields the retryable code and never `needs_setup`; a quota or size limit still yields `needs_setup`; the configured endpoint is used for upload, commit and download, and an `http:` endpoint is refused.
 - Review note (IR-M1-6a-1 L1/L2, 2026-10-17): wire the M1-15 fetch into the S3 adapter and consider making `fetch` required; extend the denied host-suffix list (defence in depth).
 
-### Core (`@agentlink/core`)
+### Core (`@4thtech-io/core`)
 
 #### M1-7a · core: client skeleton, Store and ApprovalChannel interfaces, identity, contacts
 - **Status:** done (4thtech/agentlink#48, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2022,10 +2023,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §3.1 (in-memory Store for tests); 04 §2.5.1 (nonce retention)
 - **Invariants:** I-4
 - **Scope:**
-  - `MemoryStore` is exported from the `@agentlink/core` root, documented as NOT FOR PRODUCTION. A host that wires it in production forgets `owner_action_nonces`, `seen` and `idempotency` on restart, which reopens replay windows for signed owner actions until they expire.
-  - Move it to a `@agentlink/core/testing` export (package `exports`) and let the boundary guards allow that entry only in `*.test.ts` files, `e2e/` and the M1-8b store conformance tests, as for `@agentlink/crypto/testing`.
+  - `MemoryStore` is exported from the `@4thtech-io/core` root, documented as NOT FOR PRODUCTION. A host that wires it in production forgets `owner_action_nonces`, `seen` and `idempotency` on restart, which reopens replay windows for signed owner actions until they expire.
+  - Move it to a `@4thtech-io/core/testing` export (package `exports`) and let the boundary guards allow that entry only in `*.test.ts` files, `e2e/` and the M1-8b store conformance tests, as for `@4thtech-io/crypto/testing`.
 - **Acceptance:**
-  - deps-check and ESLint regressions: production source importing `@agentlink/core/testing` fails both tools; test files pass. The root entry no longer exports `MemoryStore`.
+  - deps-check and ESLint regressions: production source importing `@4thtech-io/core/testing` fails both tools; test files pass. The root entry no longer exports `MemoryStore`.
 
 #### M1-7b · core: envelope build/open and threads
 - **Status:** done (4thtech/agentlink#66, merged 2026-10-14; IR-M1-7b-1 follow-ups in G-50 and G-51, now M1-7b-b; its spec lines are in 04 §3.1.1 and 07 §3.2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2093,7 +2094,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Invite `{v, inviteId, secret, card, cardSig, cardAgentSig, codeCommit, name, relays, expiresAt}` → base64url(raw DEFLATE, D-69) → `https://<invite-host>/i#<payload>`; accept from the full URL or the bare payload; default expiry 7 days.
   - (hand-off from M1-2c) The invite decoder caps the inflated size before parsing (a deflate bomb), and fails closed on a cap hit.
-  - D-69 codec (04 §3.6, with its implementation note): one encode/decode pair in `@agentlink/core` on the platform `CompressionStream("deflate-raw")` / `DecompressionStream("deflate-raw")`, no new dependency; compact JSON; the encoder refuses an invite over 16 384 bytes of JSON or 21 846 payload characters. Decoder tests, in Node, the three browsers and workerd:
+  - D-69 codec (04 §3.6, with its implementation note): one encode/decode pair in `@4thtech-io/core` on the platform `CompressionStream("deflate-raw")` / `DecompressionStream("deflate-raw")`, no new dependency; compact JSON; the encoder refuses an invite over 16 384 bytes of JSON or 21 846 payload characters. Decoder tests, in Node, the three browsers and workerd:
     - an input string over the bound (the canonical prefix plus 21 846 characters), another URL form, percent-encoding and non-canonical base64url (including a length of 1 mod 4) are refused before any URL parsing or inflating;
     - a deflate bomb, fed in slices of at most 1 KiB and read by a slow reader, is refused once the output passes 16 384 bytes, with no unhandled error or rejection and bounded peak memory;
     - malformed and truncated streams are refused; a trailing `0x00`, other trailing bytes and a second complete stream are refused through the re-inflate check (the input without its last byte must fail), and every valid invite still decodes;
@@ -2155,7 +2156,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Property test: `evaluate` is deterministic and has no side effects.
   - `approval.decideBatch` verification (D-68, 04 §2.5.1, §2.5.2; moved here from M1-2e, which covers only the schema and its vectors). Each is refused and reported, applies nothing and burns the nonce where 04 §2.5.2 says so: items for more than one agent (the object's `agent` must own every item's request); a commitment item in a batch; `expiresAt` later than the earliest item's request expiry, or a lifetime above `L(op)`; an item whose `actionDigest` does not match its pending request; a batch signature presented as another op, or another op's signature presented as a batch (cross-op replay); a batch signed by a key other than the agent's owner key.
 - **Planning notes (2026-10-15):**
-  - The policy-version high-water mark is a KeyStore item (04 §2.5.1, §2.2, §2.8), but the `KeyStore` interface (`@agentlink/crypto`) has no such item yet. M1-7d defines a narrow `PolicyVersionMark` interface in core (read; raise to max(mark, version), never lower) that the client takes as an option; without one, a stored policy always fails closed. The Node keychain and file backends implement it in M1-8g (S2, filed from IR-M1-7d-1 F-2); until then a Node client cannot apply a policy, and every loaded policy fails closed.
+  - The policy-version high-water mark is a KeyStore item (04 §2.5.1, §2.2, §2.8), but the `KeyStore` interface (`@4thtech-io/crypto`) has no such item yet. M1-7d defines a narrow `PolicyVersionMark` interface in core (read; raise to max(mark, version), never lower) that the client takes as an option; without one, a stored policy always fails closed. The Node keychain and file backends implement it in M1-8g (S2, filed from IR-M1-7d-1 F-2); until then a Node client cannot apply a policy, and every loaded policy fails closed.
   - Out of scope here, with their owners: applying `contact.check` (M1-7c-b); revocation envelopes and the `revoked_agents` write (M1-7h; `agent.revoke` verification, which skips expiry, lifetime and the nonce, is here); the auto-accept limits of `commitments` (M1-20; until then `commitments.accept` is read as is and auto-accept never applies); the files, proofs and receipts rules (M1-7i; until then a proof or file action that the policy does not deny gives `approval`, never `allow`); creating requests, use-once and the requests queue (M1-7e).
 - **Threat note (draft):** assets: the owner's authority over approvals and policy (I-4) and the policy itself. Entry points: a `SignedOwnerAction` from the CLI, the local UI or an `approval` / `policy` envelope (untrusted bytes until verified, I-5); the stored `policies`, `approvals` and `owner_action_nonces` rows (writable by a same-user process); the KeyStore policy mark. Abuse cases: (a) a forged, re-encoded or cross-op object (envelope-tagged signature, another agent's or another owner's object, a batch read as a decide) is applied; (b) a replay of an applied object within its lifetime, or two concurrent deliveries applying twice; (c) a stale or future-dated object, or a decision that outlives its request; (d) a batch that slips in another agent's, an already-decided, an expired, a mismatched or a commitment item, or is applied in part, or whose refused nonce can be reused later; (e) a policy row edited, deleted or rolled back in the store, or the mark deleted, falling back to looser defaults (G-6); (f) a stored approval reused for another action after its row was edited. Stopped by: strict parsing (I-JSON, integers only) and the strict schemas, which reject instead of normalising; the owner-action tag over sha256(JCS(body)) with `op` and `params` inside; the `agent` and `owner` binding against the own card; G-7 skew, expiry and `L(op)` with `now` passed in; nonce check, record and effects in one store transaction, with a refused batch's nonce burnt in that transaction; the digest recomputed from the stored request; re-verification on every load and use; fail closed when the mark is above 0 or unknown. Residual: a same-user process that rolls back both the store and the KeyStore mark, or deletes nonce rows, can replay or roll back within the G-1 residual (04 §2.5, D-67); a modified installation can have a different object signed (G-1).
 
@@ -2223,7 +2224,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Accept: sets the flag on one row only, creates no `contacts` or `pairings` row, the row still counts toward the limits, and a later envelope from the key is a new, unaccepted request; a sender-chosen `createdAt` far in the future does not extend a refused row's life.
   - No MCP-reachable path calls accept, ignore, block or unblock (I-4; checked against the tool-surface snapshot with M1-9c).
   - Rotation through a block (IR-D-72-1 F01): a contact's held envelope from its new epoch key is released into the requests queue; the owner blocks that key; a `card-update` from that key (new epoch) for the stored contact is then applied and the `blocked_keys` row removed, and the contact's later envelopes are processed as the contact's. An envelope from a blocked key that carries a contact owner's `kid` but is never claimed is held, then dropped when due, and never reaches the requests queue.
-  - Sender code (04 §2.9, IR-D-72-1 F07, F12): moved to M1-1-sc (IR-M1-7e-2-1 F05), because `@agentlink/crypto` has no helper or tag and core must not compute it itself (I-8). This card exposes the sender's `fromKey`; the surfaces derive the code through the M1-1-sc helper.
+  - Sender code (04 §2.9, IR-D-72-1 F07, F12): moved to M1-1-sc (IR-M1-7e-2-1 F05), because `@4thtech-io/crypto` has no helper or tag and core must not compute it itself (I-8). This card exposes the sender's `fromKey`; the surfaces derive the code through the M1-1-sc helper.
   - Pairing through a block (IR-D-72-1 F10): a `handshake` or `handshake-ack` from a blocked key whose recipients carry a contact owner's `kid` is dropped after step 6 and completes no pairing; a non-`card-update` envelope from that key that step 7 does not hold is dropped too.
 - **Review notes (IR-D-72-1, Lows and Info; settle in this card):**
   - F03: unblock by `from_key` or by a local row ID that `requests blocked` shows, not by the sender-chosen `via_envelope_id`, which another key can reuse once the row is deleted; keep `via_envelope_id` as information only. Test: two blocked keys whose requests had the same envelope ID unblock separately.
@@ -2244,7 +2245,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - `ApprovalService.read(approvalId)`: opens the sealed stored action, parses it under the strict action schema and asks `OwnerActions.readApproval` for its state, which re-verifies the stored cancel and decision against the digest recomputed from that action before it reads the `status` cache. Result: `pending | approved | denied | cancelled | expired | used | void` with `actionDigest`, `expiresAt` and `decidedAt?`, or `unknown` with `not_found` (no such ID) or `invalid` (a row that does not verify: an edited row authorises nothing). Never the owner signature, the decision payload, the action, the summary or anything sealed. Read-only: no apply, no claim, no channel `collect` (a `signed` result would be applied twice and refused as a used nonce).
   - `ApprovalService.countPending()`: undecided, uncancelled, not voided, not lapsed rows at the current time (a display count).
-  - `@agentlink/types` reconciled with 06 §2.5: `pending_approval` no longer requires `url` (M1a has none, D-73 (3)); `getApprovalResultSchema` gains `used: true`, allowed only on `expired`.
+  - `@4thtech-io/types` reconciled with 06 §2.5: `pending_approval` no longer requires `url` (M1a has none, D-73 (3)); `getApprovalResultSchema` gains `used: true`, allowed only on `expired`.
   - `checkApproval` keeps its order and results; its decision and cancel checks move into shared helpers used by `readApproval`.
   - Out of scope: the MCP and CLI mapping (06 §2.5 table: `cancelled` → `denied`, `used` → `expired` + `used: true`, `void` → `expired`, `unknown`/`invalid` → `denied`, `unknown`/`not_found` → `not_found`) in M1-9c; replacing the CLI's `ApprovalRowReader` in M1-9k's follow-up.
 - **Acceptance:** a tampered row (copied decision, moved sealed action, edited decision bytes) reads `unknown`/`invalid`; a status edited to `approved` reads `pending`; a used approval reads `used`, a voided undecided one `void`; pending and approved rows read `expired` after `expiresAt`; the count ignores void, used, approved, denied, cancelled and lapsed rows; the result carries only its five allowed keys and no signature, nonce, summary or action text; reading never changes the row.
@@ -2366,7 +2367,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 07 §2 (`sendMessage`), §3.2 (`outbox`), §3.3, §4.1, §4.2; 03 §4.1; 04 §3.1, §3.2, §3.5; 06 §1 rules 3 and 6, §2.2 (`agentlink_send` validation); D-70, D-73 (2)
 - **Invariants:** I-2, I-3, I-4, I-5, I-7
 - **Scope:**
-  - No send pipeline exists yet: `@agentlink/core` has `EnvelopeService` (build and open), `PairingService` (stages a handshake "ready to publish") and the approvals, requests and idempotency services, but no `sendMessage`, no `Transport` adapter (07 §4.1) and no `OutboxPersistence` over the Store, and nothing publishes a staged handshake or ack. This card is on the J9 critical path.
+  - No send pipeline exists yet: `@4thtech-io/core` has `EnvelopeService` (build and open), `PairingService` (stages a handshake "ready to publish") and the approvals, requests and idempotency services, but no `sendMessage`, no `Transport` adapter (07 §4.1) and no `OutboxPersistence` over the Store, and nothing publishes a staged handshake or ack. This card is on the J9 critical path.
   - `client.sendMessage({to, text?, type, body?, replyTo?, clientRequestId?})` for `text | note | request | delivery`: `identity.assertCanSend()`, the policy check (D-70: paired contacts Talk without approval), a `body` with a `terms` key → `USE_TERMS_TOOLS`, envelope build (M1-7b), one gift wrap per distinct recipient key (`wrapEnvelope`), the `outbox` rows and the outbound `envelopes` row in one store transaction, then publish through `RelayPool`; result `{envelopeId, thread, sentAt}`; idempotent under `clientRequestId` (M1-7e).
   - `Transport` adapter over transport-nostr (07 §4.1), injected into `AgentLinkClient.create` (connector, resolver and NIP-11 fetcher come from the caller; node supplies them).
   - `OutboxPersistence` over the Store (07 §3.2) for `OutboxWorker`. A single active publisher per agent: a lease row or the M1-8b inter-process lock decides which process runs the worker and the subscriptions, because several harnesses on one machine each run `agentlink mcp` over one shared store (06 §6).
@@ -2392,7 +2393,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two processes on one store: only one holds the lease; the other takes it after expiry; a lease never holds forever after a crash.
   - Migration from the previous schema version keeps all existing rows.
 
-### Node runtime (`@agentlink/node`)
+### Node runtime (`@4thtech-io/node`)
 
 #### M1-8a · node: OS keychain KeyStore
 - **Status:** done (4thtech/agentlink#54, merged 2026-10-14; the CI matrix acceptance M-1 is open in M1-8a-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2434,7 +2435,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §3.1.1, §8.1
 - **Invariants:** I-1, I-8
 - **Scope:**
-  - Move one `KeyStore` core over an async `loadSeed()` (wipe after use) into `@agentlink/crypto/keystore`, with `signNostrEvent` used from there instead of the copy in `packages/node`. `MemoryKeyStore`, the keychain backend and the file backend share it.
+  - Move one `KeyStore` core over an async `loadSeed()` (wipe after use) into `@4thtech-io/crypto/keystore`, with `signNostrEvent` used from there instead of the copy in `packages/node`. `MemoryKeyStore`, the keychain backend and the file backend share it.
 - **Acceptance:**
   - One conformance suite runs against every backend; the node package keeps no copy of the sign and decrypt logic.
 
@@ -2459,7 +2460,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-2, I-7
 - **Scope:**
   - `better-sqlite3` Store implementing the full `Store` interface (07 §3 with §3.1–§3.7) with forward migrations; schema reusable by the Durable Object (M2-3a). Native build allowlisted explicitly in CI (`ci-cd.md`).
-  - Sensitive columns encrypted with the store key via `@agentlink/crypto` (AES-GCM, AAD bound to table/column/row ID). The `enc` markings in 07 §3 and §3.2–§3.6 are the source of truth (decrypted payloads, contact names, file names, URLs, file keys, salts, policy parameters, approval actions and summaries, stored tool results, outbox relays and acks, held payloads, the policy hash); the request digest is an HMAC under an index key derived from the store key. Everything else stays in clear, including the columns the spec states are clear (IDs, timestamps, statuses, fee amounts, gift-wrap events, signed Records and Receipts, signed revocations).
+  - Sensitive columns encrypted with the store key via `@4thtech-io/crypto` (AES-GCM, AAD bound to table/column/row ID). The `enc` markings in 07 §3 and §3.2–§3.6 are the source of truth (decrypted payloads, contact names, file names, URLs, file keys, salts, policy parameters, approval actions and summaries, stored tool results, outbox relays and acks, held payloads, the policy hash); the request digest is an HMAC under an index key derived from the store key. Everything else stays in clear, including the columns the spec states are clear (IDs, timestamps, statuses, fee amounts, gift-wrap events, signed Records and Receipts, signed revocations).
   - WAL + inter-process lock so several harnesses share one agent.
 - **Acceptance:**
   - Scanning the raw DB file finds none of the canary plaintexts; without the store key only the columns 07 §3 marks as clear are readable.
@@ -2545,7 +2546,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The M1-8c same-user script test passes with the passkey path enabled (virtual authenticator with PRF); a PRF-less authenticator falls back to the passphrase.
   - No owner-seed bytes on disk after passkey setup and after an operation (scan).
 - Review note (IR-M1-31-1 L-1, 2026-10-17): add "on `http://localhost:<port>`" to this card's acceptance (the approval page origin is localhost, D-79).
-- Review note (IR-M1-1k-1 (PR #223), 2026-10-17): wiping the PRF output after use is the caller's duty (JSDoc in `@agentlink/crypto`); do it in the node and console callers and test it.
+- Review note (IR-M1-1k-1 (PR #223), 2026-10-17): wiping the PRF output after use is the caller's duty (JSDoc in `@4thtech-io/crypto`); do it in the node and console callers and test it.
 
 #### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
@@ -2554,7 +2555,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
 - **Invariants:** I-1, I-4, I-7, I-10
 - **Scope:**
-  - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check and exact 04 §2.9 form (`0x` + 40 lowercase hex); expected-agent-ID check before the KDF and seed-derived check (the seed's EVM address) after decryption. All crypto through `@agentlink/crypto`; this package only handles files, locking and unlock sources.
+  - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check and exact 04 §2.9 form (`0x` + 40 lowercase hex); expected-agent-ID check before the KDF and seed-derived check (the seed's EVM address) after decryption. All crypto through `@4thtech-io/crypto`; this package only handles files, locking and unlock sources.
   - Selection per 07 §9.1: opt-in only, only when the keychain probe fails (with timeout and fix message), only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; backend recorded per agent and never switched.
   - Unlock sources per 07 §9.2: passphrase file (`O_NOFOLLOW`, `fstat` checks), environment variable (allowed with the 04 §2.8 conditions; both variables removed from `process.env`; never written by `init`), interactive prompt for CLI commands; no CLI argument takes a passphrase. Async unlock after MCP `initialize`. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
   - Secrets: generated unlock code by default (pinned base32 encoding, `secretKind` in the header); chosen passphrase ≥ 12 characters. Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko`, generated 120-bit owner code required. Agent ≠ owner enforced in both directions across all agents, with the owner wrap's normalisation.
@@ -2573,7 +2574,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-8g · node: policy-version mark in the keychain and file KeyStores (new, IR-M1-7d-1 F-2)
 - **Status:** ready (planning 2026-10-15: dependencies M1-7d #79, M1-8a #54 and M1-8b #60 merged) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/node (keychain item; file KeyStore item), packages/crypto (`ALKS` item kind, if the file format changes), test-vectors (`keystore-file`, if it changes)
-- **Depends on:** M1-7d (the `PolicyVersionMark` interface in `@agentlink/core`), M1-8a, M1-8b (the inter-process lock)
+- **Depends on:** M1-7d (the `PolicyVersionMark` interface in `@4thtech-io/core`), M1-8a, M1-8b (the inter-process lock)
 - **Spec:** 04 §2.5.1 ("Stored objects are re-verified": the highest applied version is a KeyStore item), §2.2, §2.8; 07 §3.4 (`policies` apply order: store first, then the mark; max-only); 06 §6 (inter-process lock); 06 §3 (G-6)
 - **Invariants:** I-4
 - **Scope:**
@@ -2653,7 +2654,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Without a TTY: print the diff and a one-time confirmation code; the write happens only with `init --confirm <code>`.
   - Without an OS keychain (D-54): `needs_setup` with the 07 §9.4 copy. When M1-8f lands: `init --keystore file` opt-in (interactive terminal, no harness marker, agent identity only), the generated unlock code shown once with re-type and screen clear, `keystore passphrase`.
   - `init` records the absolute path of the installed, exact-version `agentlink` binary for hook snippets (M1-29, 06 §6.1).
-  - All key creation delegated to `@agentlink/node`; no new crypto here.
+  - All key creation delegated to `@4thtech-io/node`; no new crypto here.
 - **Acceptance:**
   - Snapshot tests per harness on fixture home directories: no config, config with other servers (preserved), malformed config (abort, no write), and the Codex TOML diff.
   - An agent-run `init` never writes without `--confirm` and never prints or accepts an owner secret; `init` on clean macOS, Windows and Linux machines completes (recorded).
@@ -2739,11 +2740,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - stdio server on the official MCP TypeScript SDK; every tool declares `inputSchema` and `outputSchema` and returns `structuredContent` plus a one-sentence summary; status values with `nextStep` and `url`; contact resolution with `AMBIGUOUS_CONTACT`; server instructions verbatim from 06 §5.
   - The registry holds all nine M1a tools: seven now, and the two terms tools when M1-21's `TermsInput` exists (else M1-9q adds them). Annotations exactly per the 06 §2.0 table; `approvalId?` on every tool that can return `pending_approval`; unimplemented handlers return `status: "error"` with fixed text.
   - Untrusted-content wrapper exactly per 06 §4, in text and `structuredContent`: escape `</untrusted_content>` including case, whitespace and look-alike variants, control, bidi and zero-width characters; attribute escaping; 128 code points.
-  - (hand-off from M1-2c, IR-M1-2b-1 F-5) Pin the `url` of a `pending_approval` result to the local UI origin or the console origin (`resultUrlSchema` in `@agentlink/types` accepts any https host). In M1a there is no URL: `nextStep` names the owner's CLI command (`agentlink approve <id>`, run in a terminal the agent does not control, D-73 (3)); M1-11a adds the local UI `url`.
+  - (hand-off from M1-2c, IR-M1-2b-1 F-5) Pin the `url` of a `pending_approval` result to the local UI origin or the console origin (`resultUrlSchema` in `@4thtech-io/types` accepts any https host). In M1a there is no URL: `nextStep` names the owner's CLI command (`agentlink approve <id>`, run in a terminal the agent does not control, D-73 (3)); M1-11a adds the local UI `url`.
   - Handlers: `agentlink_status` (read-only through the M1-7h catch-up; no `credits` or `prices` fields until M1-9d; `pendingApprovals` from `ApprovalService.countPending()`, M1-7e-3), `agentlink_list_contacts`, `agentlink_get_approval`.
   - (IR-M1-7e-3-1 L-2) `agentlink_get_approval` calls `ApprovalService.read` (M1-7e-3), never `checkApproval` or the channel's `collect`, and maps per 06 §2.5: `pending` → `pending`; `approved` → `approved`; `denied` and `cancelled` → `denied`; `expired` → `expired`; `used` → `expired` with `used: true`; `void` → `expired` without `used`; `unknown`/`invalid` → `denied` (fail closed); `unknown`/`not_found` → `status: "not_found"`. One behaviour test per mapped state, including a tampered row reading `denied`.
-  - (IR-M1-7e-3-1 L-3) `url` is optional on `pending_approval` in `@agentlink/types` since M1-7e-3 (none in M1a). When a channel returns a `url` (M1-11a, M1b), the result must carry it, pinned to the origin above; test that a ticket with a `url` yields a result with it.
-  - The handler module is runtime-agnostic: no `node:*` and no `@agentlink/node` imports, fenced by an ESLint `no-restricted-imports` rule (D-73 (1)); summaries come from the D1 copy-sheet string keys where they exist (D1 has landed, #33).
+  - (IR-M1-7e-3-1 L-3) `url` is optional on `pending_approval` in `@4thtech-io/types` since M1-7e-3 (none in M1a). When a channel returns a `url` (M1-11a, M1b), the result must carry it, pinned to the origin above; test that a ticket with a `url` yields a result with it.
+  - The handler module is runtime-agnostic: no `node:*` and no `@4thtech-io/node` imports, fenced by an ESLint `no-restricted-imports` rule (D-73 (1)); summaries come from the D1 copy-sheet string keys where they exist (D1 has landed, #33).
   - (IR-M1-7e-1 F02, schema part) Input bounds in the tool schemas: `clientRequestId` 1 to 256 bytes (07 §3.3). The matching core bound is in M1-7e-2.
 - **Acceptance:**
   - Schema test and behaviour test for each `status` value of each of the three tools.
@@ -2939,7 +2940,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - FA-1: every transaction's gas limit is its simulated gas plus a fixed margin (setting).
     - FA-3: an item already on-chain in identical form at simulation time is reported `skipped` with the existing `recordId` and not transmitted; such items count against the per-IP limit, not the signer's.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
-  - The submitter uses viem only through `@agentlink/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@agentlink/chain`, not by widening the zone.
+  - The submitter uses viem only through `@4thtech-io/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@4thtech-io/chain`, not by widening the zone.
   - No request logging beyond aggregate metrics; never signatures together with IPs. `/v1/deposit-authorization` present but disabled until M3-4b.
 - **Acceptance:**
   - Miniflare tests per endpoint: invalid signature, insufficient credits (rejected before sending), rate limit, concurrent nonce handling.
@@ -2990,7 +2991,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-1, I-2, I-3, I-7
 - **Scope:**
   - Endpoints per 07 §5.4: `POST /v1/upload` (signature, nonce and time-window check; size cap; weekly quota per drop key; rate limits per drop key and per IP, IPv6 per /64; global cap), a single-use signed PUT target that accepts exactly the declared size and never overwrites a stored object, the signed commit (bytes verified against `ciphertextSha256`, mismatch deletes), a signed GET valid until `expiresAt`, `DELETE` signed by the uploading drop key only, `POST /v1/report` (deletes only that object; no automatic key block), `GET /v1/health` (liveness only).
-  - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@agentlink/crypto` helpers, with vectors for the URL MAC.
+  - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@4thtech-io/crypto` helpers, with vectors for the URL MAC.
   - Random 128-bit object IDs chosen by the Worker; no file names or metadata on objects; quota and nonce counters in Durable Objects; no accounts.
   - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (proposed 10).
   - Serving only as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for GET.
@@ -3275,7 +3276,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Activate the prepared `release.yml`: Changesets versioning; trusted publishing (OIDC) with provenance; prereleases to `next` automatically on merge (`publish-next`, environment `npm-next`); stable releases to `latest` only after the owner's approval click (D-52; `publish-latest`, environment `npm-publish`).
   - Tarball allowlist (`files`) and size check; SBOM attached to the GitHub release; dry-run on a throwaway package first.
 - **Acceptance:**
-  - A `next` prerelease of `@agentlink/types` with provenance visible on npm.
+  - A `next` prerelease of `@4thtech-io/types` with provenance visible on npm.
   - A workflow run from a fork or a non-`main` ref cannot publish (demonstrated).
   - Release checklist includes "update the README Status and roadmap; never claim unimplemented features".
   - **Deploy (D-25, D-52):** `publish-latest` waits for the owner's approval click; the post-publish health check moves `latest` back automatically on failure; nothing publishes while `DEPLOY_FREEZE` is set.
@@ -3287,7 +3288,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 05 §8; 04 §8.5; 10 M3-1; `audit-rules.md` §8
 - **Invariants:** —
 - **Scope:**
-  - RFP: contracts (`OCCFeeVault`, `OCCNotary`, `OCCRegistry`, deploy scripts) for an external firm; independent review of `@agentlink/crypto` and `@agentlink/core`, and whether to include `packages/node` owner paths and console identity (owner decision).
+  - RFP: contracts (`OCCFeeVault`, `OCCNotary`, `OCCRegistry`, deploy scripts) for an external firm; independent review of `@4thtech-io/crypto` and `@4thtech-io/core`, and whether to include `packages/node` owner paths and console identity (owner decision).
   - Estimated nSLOC, code-freeze date, deliverables (report, fix review), budget. Book early: firms schedule weeks to months ahead.
 - **Acceptance:**
   - RFP sent to ≥ 3 firms; ≥ 2 quotes received; signed engagement with dates before M3 starts; code-freeze date fed into M2 planning.
@@ -3358,7 +3359,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Round-trip and strictness tests; property fuzzing raises only validation errors; vectors pass in Node, browsers and Workers.
   - The hash is canonical (key order and whitespace do not change it; any covered field does); an `accept` whose `termsHash` does not match the offer it answers is rejected.
   - `TermsInput` rejects `termsId`, `version`, `parties`, `previousTermsHash`, `termsHash` and unknown keys.
-  - D-74 (IR-D-74-1 F02): the Unicode 15.0.0 table is generated by a generator under `tools/` from UCD 15.0.0 `extracted/DerivedGeneralCategory.txt` with its SHA-256 pinned (and recorded in 04 §3.4); the source file is vendored under `tools/` next to its pinned SHA-256, so the drift check needs no network (IR-D-74-1 D1-I01); the table is committed in `@agentlink/types`, and checked by a drift check in `pnpm lint`; the same table serves the `approval-request.summary` rule (replacing the runtime `\p{…}` classes); the core runs the Unicode 15.0 probe at load and, if it fails, refuses every `terms` body with `UNSUPPORTED_RUNTIME`. Vectors cover the table hash, code points new in 15.0 (accepted) and unassigned in 15.0 (refused), and the probe string.
+  - D-74 (IR-D-74-1 F02): the Unicode 15.0.0 table is generated by a generator under `tools/` from UCD 15.0.0 `extracted/DerivedGeneralCategory.txt` with its SHA-256 pinned (and recorded in 04 §3.4); the source file is vendored under `tools/` next to its pinned SHA-256, so the drift check needs no network (IR-D-74-1 D1-I01); the table is committed in `@4thtech-io/types`, and checked by a drift check in `pnpm lint`; the same table serves the `approval-request.summary` rule (replacing the runtime `\p{…}` classes); the core runs the Unicode 15.0 probe at load and, if it fails, refuses every `terms` body with `UNSUPPORTED_RUNTIME`. Vectors cover the table hash, code points new in 15.0 (accepted) and unassigned in 15.0 (refused), and the probe string.
   - D-74 chain and answer vectors: a resend that arrives before the original, from both sides (IR-D-74-1 F01); a received answer with `createdAt` = `validUntil` delivered later (timely) and `validUntil` + 1 (refused) (F03); a path-(b) `reject` whose `replyTo` is the sender's own offer (F04); `XDAI` accepted and `EURC` refused as a currency, and auto-accept only for the USD set (F05).
   - Vectors include rejected inputs for every canonical-form rule (an RLO in `subject`, a zero-width space in a deliverable, Cyrillic `ЕUR`, `1500.0000001`, `0`, a due date with an offset instead of `Z`, upper-case hex) and chain cases (a version gap, a pointer to an older version, the same `termsId` from another pair, two envelopes for one version from the same sender, a fork after an accept, concurrent counters from both sides).
 
@@ -3507,8 +3508,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - The loop: an owner item exists on this machine but no local agent has a card naming it (for example after every carded agent was removed). `owner init` refuses because an owner exists and points to `owner add-agent`; `owner add-agent` needed another agent's card to learn the owner's public keys. Dead end.
   - `agentlink owner add-agent --agent <name>` with no agent naming an owner takes the owner's public keys from the owner item itself: the owner code (or opted-in passphrase), typed once, unwraps the seed, which derives them. With no card to compare against (04 §2.8 "Expected owner"), the authenticated decryption under the typed secret is the only check, so the owner sees the owner fingerprint and confirms it (`[y/N]`) before the one card is signed. Same guards (TTY only, AI-app marker refused before the owner item is read, owner presence per 04 §2.5), same restricted first-card session; it never writes or removes the owner item.
-  - `@agentlink/crypto/keystore` gains `openOwnerSeedWithoutCard` (all other `openOwnerSeed` rules unchanged; `openOwnerSeed` still refuses a missing expected owner).
-  - `hasOwnerOnMachine()` (`@agentlink/node`): a store-only check (no secret read, nothing unlocked) whether the owner item exists, for `doctor` and messages (not wired yet; M1-9u (a) landed a `doctor` hint from the cards alone, whose copy now points to this recovery).
+  - `@4thtech-io/crypto/keystore` gains `openOwnerSeedWithoutCard` (all other `openOwnerSeed` rules unchanged; `openOwnerSeed` still refuses a missing expected owner).
+  - `hasOwnerOnMachine()` (`@4thtech-io/node`): a store-only check (no secret read, nothing unlocked) whether the owner item exists, for `doctor` and messages (not wired yet; M1-9u (a) landed a `doctor` hint from the cards alone, whose copy now points to this recovery).
 - **Acceptance:** tests first (RED commit): after every agent is removed, add-agent succeeds and names the same owner; a call with an AI-app marker is refused before the owner item is read; declining the fingerprint or three wrong entries writes nothing; no owner code in the output, an error or the result; the existing add-agent path is unchanged.
 - **Notes (IR-M1-9x-1):**
   - Round 1 fixes: spec 04 §2.8 "No local card names the owner" added (M-1); `owner add-agent` uses a revoked card's owner as the expected owner and refuses, naming them, when an agent can't be read (M-2); a warning before the code prompt (L-1); the owner session starts after the fingerprint answer (L-2).
@@ -3550,7 +3551,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Live finding (two-Mac run, 2026-10-17): one agent had two contacts that both declared "oc-test" (a stale test contact and the real one). Every send by that name returned `AMBIGUOUS_CONTACT`, and nothing could rename or remove a contact.
   - New owner-action ops `contact.rename {contact, alias}` and `contact.remove {contact}` (L(op) 600 s, no envelope carrier), verified and applied by the core in one store transaction with the nonce (the nonce row is the audit record). The alias must be its own restricted form (`restrictName` leaves it unchanged); remove writes the 07 §3 tombstone and refuses a revoked contact; the contact is not notified.
-  - `agentlink contacts rename <contactId> <name>` † and `agentlink contacts remove <contactId>` †: owner-terminal guard (refused under an AI-harness marker or piped stdin), then the owner code at @agentlink/node's prompt; the CLI refuses an alias another active contact already shows. `agentlink contacts` lists each contact's ID. The `AMBIGUOUS_CONTACT` `nextStep` names the two commands. No MCP tool (I-4).
+  - `agentlink contacts rename <contactId> <name>` † and `agentlink contacts remove <contactId>` †: owner-terminal guard (refused under an AI-harness marker or piped stdin), then the owner code at @4thtech-io/node's prompt; the CLI refuses an alias another active contact already shows. `agentlink contacts` lists each contact's ID. The `AMBIGUOUS_CONTACT` `nextStep` names the two commands. No MCP tool (I-4).
 - **Acceptance:** RED commit; rename resolves the ambiguity (send by name works after it); remove makes the contact unreachable and its later Talk is dropped, never a request; refused under an AI environment; tool surface unchanged; docs-site contacts and troubleshooting pages.
 
 #### M1-9zb · cli: invite approval shows who is inviting (new, live finding 2026-10-17)
@@ -3978,7 +3979,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Invariants:** I-3
 - **Scope:**
   - D-71 (1) (supersedes D-64 (2)): testnet and mainnet contract addresses differ; the verify page still labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
-  - G-52 (D-71 (6), 08 §4 "Proof-pack links"): the link uses the invite's format (raw DEFLATE, base64url) and the same bounded strict decoder with pack-sized caps (decided); one generic capped-inflate function in `@agentlink/core` is derived and proposed; a pack above the link limit is shared as a file, never a link. The exact caps are set when the M1b proof work starts.
+  - G-52 (D-71 (6), 08 §4 "Proof-pack links"): the link uses the invite's format (raw DEFLATE, base64url) and the same bounded strict decoder with pack-sized caps (decided); one generic capped-inflate function in `@4thtech-io/core` is derived and proposed; a pack above the link limit is shared as a file, never a link. The exact caps are set when the M1b proof work starts.
   - Drop zone, or a pack compressed in the URL fragment; verification in the browser via public RPC; plain-language result with self-declared labels; disclosed-key content check; what it proves and does not prove; print-friendly; Advanced data.
   - Beta at `verify.agentlink.4thtech.io`.
 - **Acceptance:**
@@ -4207,7 +4208,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Tests first: PKCE verifier and challenge, `state` and redirect checks (a wrong `state`, port or path is refused).
   - A filesystem diff and the log canary show no token in any file, log or backup; connecting without the biometric prompt is impossible (test); the MCP tool list has no connector or token tool (06 §1 rule 4).
   - Against a fake provider, the revocation job removes links and objects at expiry, including after an app restart.
-  - The granted scopes in the token response must equal the minimal set; a fake provider granting a broader scope is refused (test). PKCE and randomness come from `@agentlink/crypto` helpers.
+  - The granted scopes in the token response must equal the minimal set; a fake provider granting a broader scope is refused (test). PKCE and randomness come from `@4thtech-io/crypto` helpers.
 
 #### M2-15b · storage: Google Drive connector (new, D-49)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -4428,7 +4429,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Spec:** 05 §9, §10; D-11; 10 M3-6
 - **Invariants:** —
 - **Scope:**
-  - BUSL-1.1 headers and LICENSE with counsel-approved parameters; verification on Sourcify and the explorers; published source (repo made public or a public mirror at the audited tag); addresses in `@agentlink/occ-v2-abi` and docs.
+  - BUSL-1.1 headers and LICENSE with counsel-approved parameters; verification on Sourcify and the explorers; published source (repo made public or a public mirror at the audited tag); addresses in `@4thtech-io/occ-v2-abi` and docs.
   - Update the README Status and roadmap; never claim unimplemented features.
   - CreateX test fixture (D-66 (5)): the contracts repo's test fixture of CreateX's AGPL-3.0 runtime bytecode is acceptable with a licence notice and a `PROVENANCE.md` entry. It is reviewed together with this source-publication review (D-11), as recommended (the recommendation the owner accepted: covered by this review, no separate counsel). The bytecode stays in the private contracts repo and never enters this public repo.
 - **Acceptance:**
@@ -4609,7 +4610,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Status hints, "What works today", Status and roadmap and Versioning (format table) updated for v0.2.0.
   - Follow-up (IR-M1-3b-1 I-1): the contracts page states that native coin sent to the vault outside the deposit functions, or attached to an upgrade call, is surplus that no one can recover (no admin path moves funds, I-10).
 - **Acceptance:**
-  - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@agentlink/occ-v2-abi`.
+  - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@4thtech-io/occ-v2-abi`.
 
 #### DOCS-KNOW · Consolidate `knowledge/` into an overview and a user guide (new)
 - **Status:** done (4thtech/agentlink#210) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -4703,7 +4704,7 @@ Epics are decomposed into cards (same format, same rules) when the milestone sta
   - ERC-8004 bridge for registered agents.
   - Hosted remote MCP in approval mode (F-73, P2) — only after a design review against I-1–I-3 (08 §5); self-hosting in the user's own Cloudflare account stays the default cloud path (D-37).
   - IPFS pinning storage adapter (F-35); XMTP transport adapter (same `Transport` interface).
-  - ElizaOS plugin rewrite on `@agentlink/core`; group threads (F-24); webhooks for self-hosted agents (F-72).
+  - ElizaOS plugin rewrite on `@4thtech-io/core`; group threads (F-24); webhooks for self-hosted agents (F-72).
   - Notary `freezeUpgrades()` at GA once GA criteria are defined (G-18).
   - Native-coin fees (D-46): **DECISION NEEDED (owner)** whether to offer volatile native coins at all; if yes, a bounded `PRICE_UPDATER` role (narrow band around the USD target, rate-limited, never above the cap) with contract design, security review and an external audit delta before any such token is allowlisted, plus a USD price source for display (formerly G-30).
   - Revenue operations (D-50), in `agentlink-ops`: an internal read-only finance dashboard indexing the on-chain events (revenue by day, chain, fee type and `appId`; payers; credit flows; treasury balances; sweep status; current fees and caps; alerts). It holds no keys; fee and treasury changes are only drafted as Safe transaction proposals and signed in the Safe. **DECISION NEEDED (owner):** the indexer.
@@ -4786,12 +4787,12 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 2. **G-2 (H) `KeyStore` location and methods.** Resolved by 4thtech/agentlink#34 (merged 2026-10-14; D-62 accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34), in 04 §3.1.1, with 03 §3, 04 §2.6, §3.5 and 07 §1, §4.1, §4.2 aligned. Reviews IR-M1-1g-1 (M-1, M-2, L-1, L-2, I-4, I-5) and IR-M1-1c-1 (F3, F5) are folded in.
    - **Signature.** `sig` = BIP-340 by `from` over `taggedHash("agentlink/envelope/v1", envelopeHash)`, where `envelopeHash = sha256(JCS(envelope without sig))` over the strictly parsed envelope, with the 32 raw hash bytes inside the tagged hash. A table of every BIP-340 use of a Nostr key (envelope, owner action, NIP-01 seal and AUTH) fixes one message per object. A new use needs its own tag, and nothing signs an untagged digest.
    - **Keys.** Agent-sent types are signed by the agent Nostr key at the current epoch. `approval`, `policy` (owner → agent) and `revoke` are signed by the owner Nostr key, only in an `OwnerSession` from `unlock(presence)`, in the same gesture as the carried `SignedOwnerAction`. The envelope signature authorises nothing. Receivers enforce the type ↔ key table.
-   - **Interfaces.** The interfaces are types in `@agentlink/crypto`, and the seed holders are in `/keystore` and `@agentlink/node`. Test doubles are unreachable from production `src`. `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`/`nip44Decrypt`, `unwrapCek(wrapped, envelopeId, {epoch})`, which replaces `hpkeOpen(wrapped, info)`) is shared by `KeyStore` and `OwnerSession` (IR-M1-1g-1 M-1). An `OwnerSession` signs only Nostr kinds 13 and 22242. `{epoch}` is accepted only on decrypting methods and `getPublicBundle`.
+   - **Interfaces.** The interfaces are types in `@4thtech-io/crypto`, and the seed holders are in `/keystore` and `@4thtech-io/node`. Test doubles are unreachable from production `src`. `EnvelopeKeys` (`signEnvelopeHash`, `signNostr`, `nip44Encrypt`/`nip44Decrypt`, `unwrapCek(wrapped, envelopeId, {epoch})`, which replaces `hpkeOpen(wrapped, info)`) is shared by `KeyStore` and `OwnerSession` (IR-M1-1g-1 M-1). An `OwnerSession` signs only Nostr kinds 13 and 22242. `{epoch}` is accepted only on decrypting methods and `getPublicBundle`.
    - **Owner reading.** Recipient entries are deduplicated per distinct key. The owner reads its copies inside one `OwnerSession`: gift wrap and seal through `nip44Decrypt`, then the `ownerEnc` entry by `kid`, then `unwrapCek` and the AEAD. Reading needs presence, because the gift wrap is addressed to the owner's signing key.
    - **Verification** runs in nine fail-closed steps. A new envelope from a superseded sender key is refused (except `card-update`), and the own owner's `kid` must be present (I-9).
    - **Limits.** Relay frame ≤ 128 KiB before `JSON.parse` (transport). Envelope ≤ 24 576 bytes before `JSON.parse` (transport). 1–8 recipients with distinct `kid`s, and `ct` ≤ 17 152 bytes checked before decoding (crypto parser). Exact set and one HPKE open (core). The IR-M1-1c-1 `ct` ≤ 64 KiB is not adopted: such an envelope exceeds the NIP-44 plaintext limit of the seal, and D-48 moves files off-envelope.
 
-   *Was:* 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lived "in core", but `transport-nostr` depends only on `crypto` (a dependency cycle). Missing were envelope-hash signing (`signNostr` signs events, while the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. The first proposal was to define `KeyStore`/`OwnerKeyStore` in `@agentlink/crypto` and add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
+   *Was:* 03 §3; 07 §1, §4.1; 04 §2.6, §3.1. The interface lived "in core", but `transport-nostr` depends only on `crypto` (a dependency cycle). Missing were envelope-hash signing (`signNostr` signs events, while the envelope signature is BIP-340 over a tagged hash) and epoch selection for decrypting with old keys. The first proposal was to define `KeyStore`/`OwnerKeyStore` in `@4thtech-io/crypto` and add `signEnvelopeHash` and epoch parameters. *Blocks:* M1-1g, M1-5a, M1-7b.
 3. **G-3 (H) AccessManager role mapping.** Resolved by PR #11 (D-59, confirmed by the owner at merge): 05 §5.1 role map with role IDs, selectors, holders (mainnet Safe and ops hardware key; separate testnet Safe and key with scaled delays), execution and grant delays, `GUARDIAN` (cancel only), role admins, 7-day target admin delays and the OZ default `minSetback`. The AccessManager delays are the timelock (no `TimelockController`). `ADMIN_ROLE` moves to 7 days, and module registration and every upgrade move to 7 days, because any module can charge credits. The cap is lowered and raised through two functions (`InvalidCapChange()`). `unpause` is Safe-only. Mainnet contracts start paused until the configured delays are in effect. *Was:* per-function delays that AccessManager cannot express; two UPGRADER delays; `freezeUpgrades` under the 48 h ADMIN; guardians, grant delays and `minSetback` unspecified. *Blocks:* M1-3a, M1-3b, M1-3g.
 4. **G-4 (H) Batch failure semantics.** Resolved (decided by the owner in chat, 14 Oct 2026, D-61; wording confirmed at merge; recorded by branch `docs/G-2-envelope-signatures`), in 05 §3.3.
    - Batches are all-or-nothing. The exception is an item that is already on-chain in identical form: a Record with the same `recordStructHash`, or a receipt type already set by the committed recipient. Such an item is skipped, with no charge and no revert, and emits `RecordSkipped` or `ReceiptSkipped`. Any other failure reverts the whole batch. Single calls still revert.
@@ -4832,12 +4833,12 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    - **Review IR-G-9-1 fixes:** execution lease (H-1); `received` state for stored, unprocessed envelopes, at most 1 000 (M-1); the signed Record and its salt stored in the reserve transaction (M-2); the policy version checked inside check-and-reserve and part claims (M-3); one live scope while an approved scope has unclaimed parts (M-4); revocation stops queued deliveries (M-5); refused envelopes counted against the contact's rate (M-6); a new `policy.set` resets the broken ledger's clock check (M-7). Round 2: the held pool is aligned with 04 step 7 (R2-M1), and there is no refusal notice to senders (R2-M2).
 
    *Was:* 07 §3 lacked the outbox (07 §4.2, 24 h retry), the ≥ 7-day seen-set (07 §4.2), idempotency results (06 §1 rule 6), budget ledger and rate counters (06 §3), and `SignedOwnerAction` nonces, the stored signed objects, the revoked-agent set and contact status `revoked` (04 §2.5.1, §3.4.1); the policy-version high-water mark lives in the KeyStore (04 §2.5.1). *Blocks:* M1-5b, M1-5c, M1-7a, M1-8b.
-10. **G-10 (M) Where `@agentlink/occ-v2-abi` is published.** **RESOLVED (D-83, Tali, 2026-10-18):** it is not published. `@4thtech-io/occ-v2-abi` is a private in-repo workspace package built from the contracts repo's exported artifacts and the shared vectors, and bundled into the CLI (`development-process.md` §9.2). *Was:* 05 §9; D-19; npm provenance is not generated for private source repos. *Blocked:* M1-3f.
-11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@agentlink/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
-12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@agentlink/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
+10. **G-10 (M) Where `@4thtech-io/occ-v2-abi` is published.** **RESOLVED (D-83, Tali, 2026-10-18):** it is not published. `@4thtech-io/occ-v2-abi` is a private in-repo workspace package built from the contracts repo's exported artifacts and the shared vectors, and bundled into the CLI (`development-process.md` §9.2). *Was:* 05 §9; D-19; npm provenance is not generated for private source repos. *Blocked:* M1-3f.
+11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@4thtech-io/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
+12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@4thtech-io/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocks:* M1-7g.
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14; the Workers egress part stays open for M2-3b.
-15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@agentlink/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
+15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
 16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d.
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". *Proposed:* off-chain flag (client + submitter), contract relies on the token call reverting. *Blocks:* M1-3c.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
@@ -4878,7 +4879,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 46. **G-46 (H) One plaintext for every recipient.** RESOLVED by D-66 (owner decision, Tali, 14 Oct 2026): construction A + D of the decision note [`docs/process/proposals/G-46-key-commitment.md`](proposals/G-46-key-commitment.md), as recommended by its independent review IR-G-46-1. The payload key and a 32-byte key commitment `aead.kc` are derived from the CEK and `kc` is checked before decrypting; every wrap's ephemeral key is derived from the CEK, so every opener checks the entries it can, always its own owner's (04 §3.1, §3.1.1 steps 5 and 8, §3.3). Proof packs carry the envelope with any disclosed key, and the verifier checks hash, `sig`, `kc`, then decrypts (07 §8). The review's conditions F-1 to F-4 are in the spec. Code and vectors: M1-1l, before the `aead-envelope`, `envelope-sig` and `hpke` vectors freeze; core: M1-7b; packs: M1-4d, M1-7g; audit scope: M3-1b. *Was:* the requirement (D-61, 04 §3.3) with the construction open, timed by D-62. The payload AEAD was not key-committing and each recipient's wrap was free, so a sender could give parties to one signed envelope different plaintexts or make the owner's entry fail. *Blocked:* the vector freeze (M1-1h), M1-7b, M1-7g.
 
 47. **G-47 (M) EIP-7702-delegated agent keys.** **DECIDED (D-66, Tali, in chat, 14 Oct 2026):** option (a) now (document the limitation: M1-3m) and option (b) before mainnet (the contract fallback: M1-3l), with the ERC-1271 gas bound **required** under (b). Found by the contracts pre-audit AUDIT-FABLE-OCCv2-1 (FA-2, Low). 05 §3.2; 04 §5; 07 §7. An EOA with an EIP-7702 delegation has code (a 23-byte delegation designator), so the Notary checks its Record and Receipt signatures through ERC-1271 only. The agent key's own valid EIP-712 signature is refused (`InvalidSignature()`) unless the delegate implements `isValidSignature` and validates that key's signatures. Wallets are moving EOAs to 7702, so agent keys held in general-purpose wallets are at risk. There is no security loss: the delegate is the key holder's choice, and the key can always re-delegate. Today the spec does not mention 7702.
-   - **Option (a), document a limitation (no contract change).** 04 §5 and 07 state that an agent key must not be 7702-delegated, or only to a delegate that validates the key's own signatures. `@agentlink/chain` reads the signer's code before signing and returns a typed error, so the MCP does not present it as a key problem. Enough for the testnet.
+   - **Option (a), document a limitation (no contract change).** 04 §5 and 07 state that an agent key must not be 7702-delegated, or only to a delegate that validates the key's own signatures. `@4thtech-io/chain` reads the signer's code before signing and returns a typed error, so the MCP does not present it as a key problem. Enough for the testnet.
    - **Option (b), contract fallback (new card M1-3l, S2).** When the signer's code is exactly a 7702 designator and the ERC-1271 check fails, the Notary also accepts the address's own ECDSA signature. This is a 05 §3.2 change with tests for both outcomes. The key can already act for its account, so authority does not change. Under (b) the ERC-1271 gas bound in M3-1a scope becomes **required**, not optional, so the fallback is always reached. If a future EIP lets a 7702 account turn off its ECDSA key, the fallback must respect that.
    - **Recommendation (adopted by D-66):** (a) now, for the Base Sepolia testnet. Then (b) before mainnet, carded as M1-3l and in M3-1a scope, with the gas bound required. The reason is signer availability (FA-2): agent keys in wallets that move EOAs to 7702 keep working whatever their delegate checks. (b) does not close the FA-1 residual (07 §7): any signer can still cost other signers one batch per fresh address.
    - *Blocks:* M1-3k (the 7702 tests pin the chosen behaviour), M1-4a (pre-sign code check under (a)), M3-1a (scope under (b)).
@@ -4895,7 +4896,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 
 51. **G-51 (M) Require the sender's own owner entry when the sender's card is held.** **RESOLVED (D-71 (4), Tali, in chat, 15 Oct 2026: yes, on the orchestrator's and the reviewer's recommendation):** on receive, when the sender's card is held, the recipients must include that card's `ownerEnc` `kid`; otherwise the envelope is stored as refused and the contact is flagged (04 §3.1.1 step 8, §3.2). Implemented by card M1-7b-b (S2). Raised by IR-M1-7b-1 (Q7). 04 §3.1.1 step 8, §3.2; I-9. Step 8 requires the receiving agent's own owner entry and, when it holds the sender's card, recomputes the sender's agent and owner entries **that are present**; an envelope that leaves out the sender's owner entry is not refused, and M1-7b follows step 8 as written. Question for the owner: should receive refuse (stored as refused, contact flagged) an envelope whose sender's card is held but whose recipients lack that card's `ownerEnc` `kid`? The independent reviewer recommends yes: it stops an agent from sending to contacts without its own owner being able to read the message (I-9 on the sender's side), and every honest sender already includes that entry (04 §3.2). Cost: a refusal path for senders whose card the receiver holds, and new tests. *Blocks:* M1-7b-b; M1-GATE review of I-9.
 
-52. **G-52 (M) Proof-pack links.** **RESOLVED (D-71 (6), Tali, in chat, 15 Oct 2026, on the orchestrator's recommendation):** proof-pack links use the invite's raw DEFLATE link format and decoder with a pack-sized cap; larger packs are shared as files, not links (08 §4, "Proof-pack links"). The exact cap is set when the M1b proof work starts and stays proposed until then. 08 §4 (Verify) and M2-5a offered "a pack compressed in the URL fragment", with no format, size cap or decoder rules; D-69 covers only the invite (04 §3.6). Found by review IR-D-69-1. A proof pack (07 §8) can carry a disclosed envelope of up to 24 KB of mostly incompressible ciphertext, so a link could pass about 33 000 characters. *Proposal (adopted by D-71 (6)):* the same format family and decoder as D-69 (raw DEFLATE, base64url, the bounded strict decoder), through one generic capped-inflate function in `@agentlink/core` parameterised per payload type; a pack-sized cap derived from the largest pack the 07 §8 schema allows; a size above which a pack is not offered as a link (drop zone or file only); and copy noting that a pack link with a disclosed key is itself a disclosure. *Blocks:* M2-5a (link form only).
+52. **G-52 (M) Proof-pack links.** **RESOLVED (D-71 (6), Tali, in chat, 15 Oct 2026, on the orchestrator's recommendation):** proof-pack links use the invite's raw DEFLATE link format and decoder with a pack-sized cap; larger packs are shared as files, not links (08 §4, "Proof-pack links"). The exact cap is set when the M1b proof work starts and stays proposed until then. 08 §4 (Verify) and M2-5a offered "a pack compressed in the URL fragment", with no format, size cap or decoder rules; D-69 covers only the invite (04 §3.6). Found by review IR-D-69-1. A proof pack (07 §8) can carry a disclosed envelope of up to 24 KB of mostly incompressible ciphertext, so a link could pass about 33 000 characters. *Proposal (adopted by D-71 (6)):* the same format family and decoder as D-69 (raw DEFLATE, base64url, the bounded strict decoder), through one generic capped-inflate function in `@4thtech-io/core` parameterised per payload type; a pack-sized cap derived from the largest pack the 07 §8 schema allows; a size above which a pack is not offered as a link (drop zone or file only); and copy noting that a pack link with a disclosed key is itself a disclosure. *Blocks:* M2-5a (link form only).
 
 ---
 

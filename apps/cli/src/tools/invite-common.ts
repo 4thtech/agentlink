@@ -2,8 +2,8 @@
 // built from a value: an invite link, a label or a name from another party never reaches a summary,
 // `nextStep` or error except through the 06 §2.1 name rule (I-5). Moving these sentences into the
 // copy sheet is M1-9g's, after M1-9o/p/q.
-import { CoreError } from '@agentlink/core';
-import { approvalIdSchema } from '@agentlink/types';
+import { CoreError } from '@4thtech-io/core';
+import { approvalIdSchema } from '@4thtech-io/types';
 import { fail, type HandlerOutput } from './result.js';
 import { noOwnerCard } from './text.js';
 

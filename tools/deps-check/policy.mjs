@@ -22,31 +22,35 @@ export const BUILTINS = builtinModules.filter((name) => !name.startsWith('node:'
 
 /**
  * Crypto and transport libraries (04 §8.1): our code reaches primitives only through
- * @agentlink/crypto. Each library may be used only by the zones that 07 §1 names as its consumer.
+ * @4thtech-io/crypto. Each library may be used only by the zones that 07 §1 names as its consumer.
  * `apps/pay` is the deposit page on the isolated `pay.` origin (08 §2.3, M2-2f); it does not exist yet.
  */
 export const LIBRARIES = [
-  { group: ['@noble/*'], zones: ['packages/crypto'], via: '@agentlink/crypto' },
-  { group: ['@hpke/*'], zones: ['packages/crypto'], via: '@agentlink/crypto' },
+  { group: ['@noble/*'], zones: ['packages/crypto'], via: '@4thtech-io/crypto' },
+  { group: ['@hpke/*'], zones: ['packages/crypto'], via: '@4thtech-io/crypto' },
   {
     group: ['nostr-tools', 'nostr-tools/*'],
     zones: ['packages/crypto', 'packages/transport-nostr'],
-    via: '@agentlink/transport-nostr',
+    via: '@4thtech-io/transport-nostr',
   },
   {
     group: ['viem', 'viem/*'],
     zones: ['packages/chain', 'apps/pay'],
-    via: '@agentlink/chain',
-    // Tests only (IR-M1-1e-1 L-1): @agentlink/crypto implements EIP-712 on noble (07 §1) and uses
+    via: '@4thtech-io/chain',
+    // Tests only (IR-M1-1e-1 L-1): @4thtech-io/crypto implements EIP-712 on noble (07 §1) and uses
     // viem as an independent oracle in its *.test.ts files, as a devDependency. Runtime source and
     // runtime dependencies of packages/crypto may not use it.
     testZones: ['packages/crypto'],
   },
-  { group: ['aws4fetch'], zones: ['packages/storage'], via: '@agentlink/storage' },
+  { group: ['aws4fetch'], zones: ['packages/storage'], via: '@4thtech-io/storage' },
   // M1-5b-b: relay sockets are opened only by the Node relay connector, which pins the checked
   // address, refuses redirects, ignores proxies and caps messages (04 §4, 07 §4.2). Any other zone
-  // goes through the RelayConnector interface of @agentlink/transport-nostr.
-  { group: ['ws', 'ws/*'], zones: ['packages/node'], via: '@agentlink/node (the relay connector)' },
+  // goes through the RelayConnector interface of @4thtech-io/transport-nostr.
+  {
+    group: ['ws', 'ws/*'],
+    zones: ['packages/node'],
+    via: '@4thtech-io/node (the relay connector)',
+  },
   {
     // Other crypto libraries are not on the 04 §8.1 allowlist: no zone may use them. Adding one is a
     // decision (D-xx) with the owner's approval, then an entry here.
@@ -67,7 +71,7 @@ export const LIBRARIES = [
       '@scure/*',
     ],
     zones: [],
-    via: '@agentlink/crypto',
+    via: '@4thtech-io/crypto',
   },
 ];
 
@@ -95,7 +99,7 @@ export const libraryAllowed = (lib, zone, { test = false } = {}) =>
 
 /**
  * Restricted entry points of workspace packages (IR-M1-1b-1 M-1). A zone that may import the package
- * may still not import these subpaths unless it is listed. `@agentlink/crypto/keystore` holds every
+ * may still not import these subpaths unless it is listed. `@4thtech-io/crypto/keystore` holds every
  * function that takes a master seed or a secret key (04 §8.1: secret-key operations go through the
  * KeyStore interface; 04 §2.5: the agent may run shell commands as the same user), so only the zones
  * that host KeyStore backends may import it: packages/node (the file and keychain backends) and the
@@ -106,7 +110,7 @@ export const libraryAllowed = (lib, zone, { test = false } = {}) =>
  */
 export const RESTRICTED_ENTRY_POINTS = [
   {
-    group: ['@agentlink/crypto/keystore', '@agentlink/crypto/keystore/*'],
+    group: ['@4thtech-io/crypto/keystore', '@4thtech-io/crypto/keystore/*'],
     zones: ['packages/node', 'test-vectors'],
     via: 'the KeyStore interface (04 §8.1)',
     reason: 'master seeds and secret keys stay inside KeyStore backends (04 §8.1, §2.5)',
@@ -118,11 +122,11 @@ export const RESTRICTED_ENTRY_POINTS = [
   // packages/core, packages/transport-nostr). This entry refuses it by name everywhere else.
   // 04 §3.1.1: an entry point "that deps-check allows only in tests, test-vectors and e2e, never in
   // production src". `zones` are the test-only directories (never built or published); `testZones`
-  // are the packages whose *.test.ts files may import the exact name `@agentlink/crypto/testing`
+  // are the packages whose *.test.ts files may import the exact name `@4thtech-io/crypto/testing`
   // (M1-1g-b, IR-M1-1g-G2-1 R2-L-1): transport-nostr for M1-5a and core for M1-7a. packages/crypto's
   // own tests use the relative path (TEST_SEAM_SOURCE). Another package's tests: add it here (S1).
   {
-    group: ['@agentlink/crypto/testing', '@agentlink/crypto/testing/*'],
+    group: ['@4thtech-io/crypto/testing', '@4thtech-io/crypto/testing/*'],
     zones: ['test-vectors', 'e2e'],
     testZones: ['packages/core', 'packages/transport-nostr'],
     // IR-M1-9k-1 F01 (S1, owner-side decision on #107): narrower than a test zone. Only *.test.ts
@@ -168,7 +172,7 @@ export const entryTestNames = (entry) =>
 
 /**
  * The test seam's source file (M1-1c, M1-1f), without extension. RESTRICTED_ENTRY_POINTS refuses
- * `@agentlink/crypto/testing` by name; inside packages/crypto a relative path reaches the file too.
+ * `@4thtech-io/crypto/testing` by name; inside packages/crypto a relative path reaches the file too.
  * Only test files may import it: tsc builds every file that a built module imports (tsconfig
  * `exclude` only limits the roots), so one production import would also put the seam into dist/.
  */
@@ -212,7 +216,7 @@ export const SUBTLE_EXEMPT_FILES = [
   {
     file: 'test-vectors/harness/suites/placeholder-sha256.ts',
     reason:
-      "M0-9 placeholder suite: it tests the runtime's own SHA-256 against NIST/RFC values before @agentlink/crypto exists. Remove when the first real suite lands.",
+      "M0-9 placeholder suite: it tests the runtime's own SHA-256 against NIST/RFC values before @4thtech-io/crypto exists. Remove when the first real suite lands.",
   },
 ];
 
@@ -251,15 +255,15 @@ const entry = (name, uses, external = []) => ({ name, uses, external });
  */
 export const ZONES = {
   'packages/types': entry(
-    '@agentlink/types',
+    '@4thtech-io/types',
     [],
     [{ pattern: 'zod', reason: 'schemas for the shared types (07 §1)' }],
   ),
   // The redacting logger (M0-8): zero dependencies, imports nothing, usable by every package that
   // does I/O. types, crypto and ui do not log (yet); widening that is a reviewed change.
-  'packages/log': entry('@agentlink/log', []),
+  'packages/log': entry('@4thtech-io/log', []),
   'packages/crypto': entry(
-    '@agentlink/crypto',
+    '@4thtech-io/crypto',
     [],
     [
       { pattern: '@noble/*', reason: 'the only package that implements primitives (04 §8.1)' },
@@ -270,19 +274,19 @@ export const ZONES = {
     ],
   ),
   'packages/chain': entry(
-    '@agentlink/chain',
+    '@4thtech-io/chain',
     ['types', 'log', 'crypto'],
     [
       { pattern: 'viem', reason: 'chain clients and OCC v2 bindings (07 §1)' },
       { pattern: 'viem/*', reason: 'viem subpath exports (chains, actions)' },
       {
-        pattern: '@agentlink/occ-v2-abi',
+        pattern: '@4thtech-io/occ-v2-abi',
         reason: 'contract ABIs; the Solidity source stays private',
       },
     ],
   ),
   'packages/transport-nostr': entry(
-    '@agentlink/transport-nostr',
+    '@4thtech-io/transport-nostr',
     ['types', 'log', 'crypto'],
     [
       { pattern: 'nostr-tools', reason: 'relay pool and NIP-17/59 plumbing (07 §1)' },
@@ -290,11 +294,11 @@ export const ZONES = {
     ],
   ),
   'packages/storage': entry(
-    '@agentlink/storage',
+    '@4thtech-io/storage',
     ['types', 'log', 'crypto'],
     [{ pattern: 'aws4fetch', reason: 'S3-compatible presigning for the s3 adapter (07 §1)' }],
   ),
-  'packages/core': entry('@agentlink/core', [
+  'packages/core': entry('@4thtech-io/core', [
     'types',
     'log',
     'crypto',
@@ -306,7 +310,7 @@ export const ZONES = {
   // M1-5b-b: `transport-nostr` for the RelayConnector, HostResolver and Nip11Fetcher interfaces that
   // this package implements, and for the Docker relay suite (RelayPool, OutboxWorker).
   'packages/node': entry(
-    '@agentlink/node',
+    '@4thtech-io/node',
     ['core', 'log', 'crypto', 'transport-nostr'],
     [
       {
@@ -327,7 +331,7 @@ export const ZONES = {
     ],
   ),
   'packages/ui': entry(
-    '@agentlink/ui',
+    '@4thtech-io/ui',
     ['types'],
     [
       { pattern: 'react', reason: 'component library (03 §tech stack)' },
@@ -347,13 +351,13 @@ export const ZONES = {
     ]),
     bundles: true,
   },
-  'apps/console': entry('@agentlink/console', NO_NODE),
-  'apps/verify': entry('@agentlink/verify', NO_NODE),
-  'apps/invite': entry('@agentlink/invite', NO_NODE),
-  'apps/pay': entry('@agentlink/pay', NO_NODE),
-  'apps/cloud-agent': entry('@agentlink/cloud-agent', WORKER_APP),
-  'apps/submitter': entry('@agentlink/submitter', WORKER_APP),
-  'apps/drop': entry('@agentlink/drop', WORKER_APP),
+  'apps/console': entry('@4thtech-io/console', NO_NODE),
+  'apps/verify': entry('@4thtech-io/verify', NO_NODE),
+  'apps/invite': entry('@4thtech-io/invite', NO_NODE),
+  'apps/pay': entry('@4thtech-io/pay', NO_NODE),
+  'apps/cloud-agent': entry('@4thtech-io/cloud-agent', WORKER_APP),
+  'apps/submitter': entry('@4thtech-io/submitter', WORKER_APP),
+  'apps/drop': entry('@4thtech-io/drop', WORKER_APP),
 };
 
 /** Every workspace package name known to the policy. */
@@ -387,9 +391,9 @@ export function isBuiltin(specifier) {
 /** True for the Node crypto module (`crypto`, `node:crypto`, `crypto/...`). */
 export const isNodeCrypto = (specifier) => /^(node:)?crypto(\/|$)/.test(specifier);
 
-export const NODE_MSG = 'Node built-ins are allowed only in @agentlink/node and apps/cli.';
+export const NODE_MSG = 'Node built-ins are allowed only in @4thtech-io/node and apps/cli.';
 export const CRYPTO_MSG =
-  'Node crypto is a primitive entry point; use @agentlink/crypto (AGENTS.md hard rules).';
+  'Node crypto is a primitive entry point; use @4thtech-io/crypto (AGENTS.md hard rules).';
 export const libraryMessage = (lib) =>
   lib.zones.length === 0
     ? `${lib.group[0]} is not on the crypto allowlist (04 §8.1); adding a library needs a decision and the owner's approval.`
@@ -421,13 +425,31 @@ export function isDeepImport(name, specifier) {
   );
 }
 
-/** The npm scopes of the workspace packages (`@agentlink/`, `@4thtech-io/`). */
+/** The npm scopes of the workspace packages (today only `@4thtech-io/`). */
 const WORKSPACE_SCOPES = [...new Set(WORKSPACE_NAMES.map((name) => `${name.split('/')[0]}/`))];
 
 /**
+ * Retired npm scopes (OPS-REL-2, IR-OPS-REL-1-1). The workspace packages were named in the
+ * `@agentlink` scope, which belongs to a third party on npm: any name in it would resolve to someone
+ * else's code. Every dependency, alias target, package name and import in it is refused, in any
+ * letter case. Spelled without the slash so the repository scan (tools/retired-scope.test.mjs)
+ * finds no package name in the old scope.
+ */
+export const RETIRED_SCOPES = ['@agentlink'];
+
+/** True when `name` (a package name or import specifier) is in a retired scope, in any case. */
+export function isRetiredScope(name) {
+  const lower = String(name).toLowerCase();
+  return RETIRED_SCOPES.some((scope) => lower === scope || lower.startsWith(`${scope}/`));
+}
+
+export const retiredScopeMessage = (name) =>
+  `"${name}" is in the @agentlink npm scope, which belongs to a third party; the workspace packages are @4thtech-io/* (OPS-REL-2).`;
+
+/**
  * True for a specifier in a workspace scope that is not in canonical form (IR-M1-1g-b-1 L-2): an
- * upper-case letter, or an empty, `.` or `..` segment (`@agentlink/crypto//testing`,
- * `@agentlink/crypto/Testing`, `@agentlink/crypto/./testing`, a trailing `/`). The policy matches
+ * upper-case letter, or an empty, `.` or `..` segment (`@4thtech-io/crypto//testing`,
+ * `@4thtech-io/crypto/Testing`, `@4thtech-io/crypto/./testing`, a trailing `/`). The policy matches
  * exact, lower-case names; a case-insensitive file system or a lenient resolver could map such a
  * spelling onto a restricted entry point, so every guard refuses it outright.
  */
@@ -475,6 +497,7 @@ export function violationFor(zone, specifier, file) {
     }
     return null;
   }
+  if (isRetiredScope(specifier)) return retiredScopeMessage(specifier);
   if (isNonCanonicalWorkspaceSpecifier(specifier)) return nonCanonicalMessage(specifier);
   const workspace = workspaceNameOf(specifier);
   if (workspace !== null && isDeepImport(workspace, specifier)) return deepImportMessage(workspace);

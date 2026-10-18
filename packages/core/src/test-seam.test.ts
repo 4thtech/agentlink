@@ -1,10 +1,10 @@
 // M1-1g-b (IR-M1-1g-G2-1 R2-L-1): core tests use the in-memory KeyStore by package name (04 §3.1.1:
 // the test doubles are allowed in tests, test-vectors and e2e, never in production src).
-import { CryptoInputError, KeyStoreError } from '@agentlink/crypto';
-import { MemoryKeyStore } from '@agentlink/crypto/testing';
+import { CryptoInputError, KeyStoreError } from '@4thtech-io/crypto';
+import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 
-describe('the crypto test seam in @agentlink/core tests', () => {
+describe('the crypto test seam in @4thtech-io/core tests', () => {
   it('resolves MemoryKeyStore, with one copy of the crypto module', async () => {
     const store = new MemoryKeyStore(new Uint8Array(32).fill(7));
     const bundle = await store.getPublicBundle();

@@ -9,7 +9,7 @@
 //   it never works again; a link also dies after SESSION_LINK_LIFETIME_MS. `open()` mints a new one.
 // - After FREE_PRESENCE_ATTEMPTS wrong owner codes or passkeys in a row, every owner operation waits
 //   (429 `wait`, Retry-After) before the owner store is opened, doubling up to a cap; a success resets.
-import { encodeUtf8 } from '@agentlink/crypto';
+import { encodeUtf8 } from '@4thtech-io/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   FREE_PRESENCE_ATTEMPTS,

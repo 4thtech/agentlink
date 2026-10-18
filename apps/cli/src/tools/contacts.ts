@@ -5,8 +5,8 @@
 // A contact is shown outside the untrusted block only as the core's `display`: the owner's alias, or
 // the restricted name (`restrictName`, M1-7c) with its identity label. The self-declared name
 // (`ContactView.name.value`) is never read here.
-import { renderContactName, type ContactView } from '@agentlink/core';
-import type { ContactDisplayName, IdentityLabel, NameSource } from '@agentlink/types';
+import { renderContactName, type ContactView } from '@4thtech-io/core';
+import type { ContactDisplayName, IdentityLabel, NameSource } from '@4thtech-io/types';
 import { fail, type HandlerOutput } from './result.js';
 import { TOOL_TEXT } from './text.js';
 import { removeInvisible } from './untrusted.js';

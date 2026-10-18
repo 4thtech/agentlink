@@ -1,7 +1,7 @@
-// @agentlink/transport-nostr: the Nostr Transport (07 §4). M1-5a adds the gift wrap and unwrap
+// @4thtech-io/transport-nostr: the Nostr Transport (07 §4). M1-5a adds the gift wrap and unwrap
 // (04 §3.5, §3.1.1); M1-5b adds the relay pool, publish and outbox delivery (07 §4.2, §4.3); M1-5c adds
 // subscribe and sync with cursors and dedup (07 §4.2, §3.2).
-export const packageName = '@agentlink/transport-nostr';
+export const packageName = '@4thtech-io/transport-nostr';
 
 export { TransportError, type TransportErrorCode } from './errors.js';
 export {

@@ -19,7 +19,7 @@
 //
 // Same-user processes can change all of this (G-1, D-67): these checks keep mistakes and other
 // users out; they are not a boundary against the agent.
-import { encodeHex, randomBytes } from '@agentlink/crypto';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { constants, type Stats } from 'node:fs';
 import {
   chmod,
@@ -34,7 +34,7 @@ import {
 } from 'node:fs/promises';
 import { join } from 'node:path';
 import process from 'node:process';
-import { assertAgentId, type KeyStoreBackendKind } from '@agentlink/node';
+import { assertAgentId, type KeyStoreBackendKind } from '@4thtech-io/node';
 import { isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 

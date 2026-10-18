@@ -13,7 +13,7 @@
 //   provider response text in a log or an error.
 //
 // STREAM encryption feeding this, and routing the adapter's `put` above 64 MiB here, are M1-6b part 2.
-import { createSha256, encodeHex, sha256 } from '@agentlink/crypto';
+import { createSha256, encodeHex, sha256 } from '@4thtech-io/crypto';
 import { checkFuture, checkSize, type PutOptions, type StoredObject } from './adapter.js';
 import { isOwnObjectKey, newObjectKey, validateStoragePrefix } from './endpoint.js';
 import { StorageError } from './errors.js';

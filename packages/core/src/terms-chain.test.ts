@@ -5,8 +5,8 @@
 // emulated as the set of envelopes the receive path took; before each step the negotiations are
 // REBUILT from that set in several shuffled orders, so the result must never depend on store order
 // (terms-store.ts replay order) or on a sender-chosen time.
-import { canonicalize, encodeBase64url, encodeUtf8, sha256, termsHash } from '@agentlink/crypto';
-import { checkSendAccept, negotiationKey, nextTermsLink, type Terms } from '@agentlink/types';
+import { canonicalize, encodeBase64url, encodeUtf8, sha256, termsHash } from '@4thtech-io/crypto';
+import { checkSendAccept, negotiationKey, nextTermsLink, type Terms } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { admitInbound, rebuildNegotiations, replayOrder, type TermsRecord } from './terms-store.js';
 
@@ -34,7 +34,7 @@ interface Step {
   readonly createdAt: number;
 }
 
-/** Builds a scenario's envelopes; hashes are recomputed with @agentlink/crypto. */
+/** Builds a scenario's envelopes; hashes are recomputed with @4thtech-io/crypto. */
 class Log {
   readonly steps: Step[] = [];
   readonly #terms = new Map<string, Terms>();

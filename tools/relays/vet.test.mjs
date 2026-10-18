@@ -25,7 +25,7 @@ describe('judgeNip11', () => {
 });
 
 // The 04 §4 check with injected stand-ins for isAllowedRelayUrl (the real one is in
-// @agentlink/types) and isGloballyRoutable, so this test needs no build and no network.
+// @4thtech-io/types) and isGloballyRoutable, so this test needs no build and no network.
 const deps = (answers) => ({
   isAllowedRelayUrl: (u) => /^wss:\/\/[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+(:\d+)?$/.test(u),
   isGloballyRoutable: (a) => !/^(10\.|127\.|192\.168\.|169\.254\.|::1$|fe80|fc|fd)/.test(a),

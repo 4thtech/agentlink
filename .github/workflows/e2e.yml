@@ -69,7 +69,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       - name: Build the e2e dependencies (the CLI and its packages)
-        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/e2e^...'
 
       - name: Choose the artifact and canary paths
         run: |
@@ -87,7 +87,7 @@ jobs:
         run: |
           set -euo pipefail
           dbus-run-session -- tools/ci/with-keyring.sh bash -euo pipefail -c '
-            pnpm --filter @agentlink/e2e exec vitest run test/pair-and-message.test.ts test/negotiate-and-agree.test.ts --reporter=default --reporter=json --outputFile.json="$E2E_REPORT"
+            pnpm --filter @4thtech-io/e2e exec vitest run test/pair-and-message.test.ts test/negotiate-and-agree.test.ts --reporter=default --reporter=json --outputFile.json="$E2E_REPORT"
           ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
 
       - name: Check that the scenarios ran in full, with no skipped test
@@ -187,7 +187,7 @@ jobs:
           fi
 
       - name: Build the e2e dependencies (the CLI and its packages)
-        run: pnpm exec turbo run build --filter='@agentlink/e2e^...'
+        run: pnpm exec turbo run build --filter='@4thtech-io/e2e^...'
 
       # The platform tarballs straight from the npm registry, checked against the pinned integrity
       # before they are unpacked. Nothing is installed and no package script runs.
@@ -248,7 +248,7 @@ jobs:
         run: |
           set -euo pipefail
           dbus-run-session -- tools/ci/with-keyring.sh bash -euo pipefail -c '
-            pnpm --filter @agentlink/e2e exec vitest run llm/llm-run.test.ts --reporter=default
+            pnpm --filter @4thtech-io/e2e exec vitest run llm/llm-run.test.ts --reporter=default
           ' 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/vitest-output.log"
 
       - name: Canary scan of every log, transcript and artifact (including the API keys)

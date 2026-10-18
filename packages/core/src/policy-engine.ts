@@ -21,7 +21,7 @@ import {
   isUsdAmount,
   parseUsd,
   type Policy,
-} from '@agentlink/types';
+} from '@4thtech-io/types';
 import { evaluateCommitment, type CommitmentFacts } from './commitments.js';
 import { CoreError } from './errors.js';
 

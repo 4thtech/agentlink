@@ -1,10 +1,10 @@
 // The key interfaces of 03 §3 and 04 §3.1.1 (G-2): EnvelopeKeys, KeyStore, OwnerKeyStore and
 // OwnerSession; 04 §2.5 owner presence; 04 §8.1 secret-key operations go through a KeyStore.
 //
-// G-2: the interfaces live in @agentlink/crypto, not core, so transport-nostr (which depends only on
+// G-2: the interfaces live in @4thtech-io/crypto, not core, so transport-nostr (which depends only on
 // crypto) can take them without a dependency cycle. They are types only and hold no secret, so they
 // are in the main entry. The in-memory implementations, which hold a seed, are in the test-only
-// subpath @agentlink/crypto/testing. Backends: Node keychain and file (packages/node, M1-8a, M1-8f)
+// subpath @4thtech-io/crypto/testing. Backends: Node keychain and file (packages/node, M1-8a, M1-8f)
 // and the self-host Worker (M2-3a).
 //
 // Contract for every implementation:
@@ -271,7 +271,7 @@ export interface OwnerSession extends EnvelopeKeys {
    * 04 §2.5.1: BIP-340 by the owner Nostr key over
    * taggedHash("agentlink/owner-action/v1", sha256(JCS(body))), as 128 lowercase hex. `body` is an
    * OwnerAction with `v` = 1 and `owner` equal to this owner's Nostr key (64 lowercase hex). Its
-   * strict schema is @agentlink/types (M1-2a, M1-2b); verification is core (M1-7d).
+   * strict schema is @4thtech-io/types (M1-2a, M1-2b); verification is core (M1-7d).
    */
   signOwnerAction(body: JsonObject): Promise<string>;
 

@@ -23,7 +23,7 @@ import {
   type TypedData,
   type UnsignedNostrEvent,
   type WrappedCek,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   bip340PublicKey,
   bip340Sign,
@@ -36,7 +36,7 @@ import {
   signEnvelopeHash,
   signTypedData,
   unwrapCek,
-} from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto/keystore';
 import { NodeKeyStoreError } from './errors.js';
 import {
   assertAgentId,

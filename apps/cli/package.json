@@ -52,15 +52,15 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@agentlink/chain": "workspace:*",
-    "@agentlink/core": "workspace:*",
-    "@agentlink/crypto": "workspace:*",
-    "@agentlink/log": "workspace:*",
-    "@agentlink/node": "workspace:*",
-    "@agentlink/storage": "workspace:*",
-    "@agentlink/transport-nostr": "workspace:*",
-    "@agentlink/types": "workspace:*",
-    "@agentlink/ui": "workspace:*",
+    "@4thtech-io/chain": "workspace:*",
+    "@4thtech-io/core": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*",
+    "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/node": "workspace:*",
+    "@4thtech-io/storage": "workspace:*",
+    "@4thtech-io/transport-nostr": "workspace:*",
+    "@4thtech-io/types": "workspace:*",
+    "@4thtech-io/ui": "workspace:*",
     "@types/node": "22.20.5"
   }
 }

@@ -1,8 +1,8 @@
-// Suite `bip340` (M1-1b): BIP-340 Schnorr through @agentlink/crypto. `sign` derives the x-only
+// Suite `bip340` (M1-1b): BIP-340 Schnorr through @4thtech-io/crypto. `sign` derives the x-only
 // public key and signs with the given aux randomness; `verify` reports accept or reject. A refusal
 // by the code under test (CryptoInputError) counts as reject; any other error fails the case.
-import { CryptoInputError, bip340Verify } from '@agentlink/crypto';
-import { bip340PublicKey, bip340Sign } from '@agentlink/crypto/keystore';
+import { CryptoInputError, bip340Verify } from '@4thtech-io/crypto';
+import { bip340PublicKey, bip340Sign } from '@4thtech-io/crypto/keystore';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';
 

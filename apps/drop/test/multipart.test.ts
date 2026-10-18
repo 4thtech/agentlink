@@ -5,8 +5,8 @@
 // and a 1 KiB final part.
 import { SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
-import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@agentlink/crypto';
-import { signDropAuthorization } from '@agentlink/crypto/testing';
+import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@4thtech-io/crypto';
+import { signDropAuthorization } from '@4thtech-io/crypto/testing';
 
 const HOST = 'https://drop.test';
 const PART = 5 * 1024 * 1024;

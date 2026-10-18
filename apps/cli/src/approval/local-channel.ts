@@ -20,8 +20,8 @@ import type {
   ApprovalRequest,
   ApprovalTicket,
   Store,
-} from '@agentlink/core';
-import { approvalIdSchema } from '@agentlink/types';
+} from '@4thtech-io/core';
+import { approvalIdSchema } from '@4thtech-io/types';
 
 /** What the channel needs from an approval row: presence of the signed objects and the expiry. */
 export interface ApprovalRowView {

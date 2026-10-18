@@ -14,7 +14,7 @@
 // I-5: the link, and the name and relays it carries, are untrusted. Nothing from the link is echoed
 // except the counterparty's name under the 06 §2.1 rule (restricted name plus label, never the
 // self-declared name). No safety code is ever returned (04 §3.6.1).
-import type { PendingContact } from '@agentlink/core';
+import type { PendingContact } from '@4thtech-io/core';
 import { acceptInviteAction, acceptInviteApprovalSummary } from './accept-action.js';
 import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';

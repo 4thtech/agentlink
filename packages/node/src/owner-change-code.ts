@@ -21,8 +21,8 @@ import {
   type Argon2idParams,
   type OwnerPublicKeys,
   type SecretKind,
-} from '@agentlink/crypto';
-import { generateSecretCode } from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto';
+import { generateSecretCode } from '@4thtech-io/crypto/keystore';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';

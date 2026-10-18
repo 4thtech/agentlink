@@ -38,7 +38,7 @@ Each layer has its own number; the product version never stands in for a format'
 
 | Layer | Version | Defined in | Moves when |
 |---|---|---|---|
-| **Product** | `0.0.x` now | D-43; `CHANGELOG.md` | Every release. One Changesets **fixed group** moves together during beta: the CLI `@4thtech-io/agentlink`, the `@agentlink/*` libraries (not the ABI package) and, from M2, the desktop apps (private workspace packages). Only the CLI is published; the libraries are private and bundled into it (OPS-REL-1), and `privatePackages.version: true` keeps them in the group, so a library change releases a new CLI. Set in `.changeset/config.json` |
+| **Product** | `0.0.x` now | D-43; `CHANGELOG.md` | Every release. One Changesets **fixed group** moves together during beta: the CLI `@4thtech-io/agentlink`, the `@4thtech-io/*` libraries (not the ABI package) and, from M2, the desktop apps (private workspace packages). Only the CLI is published; the libraries are private and bundled into it (OPS-REL-1), and `privatePackages.version: true` keeps them in the group, so a library change releases a new CLI. Set in `.changeset/config.json` |
 | **OCC v2 EIP-712 domain** | `version: "2"` | 05 §3.1; 04 §5 | Only for a new contract generation (OCC v3) |
 | **Agent card** | domain `version: "1"` | 04 §2.4 | The card struct or its domain changes |
 | **Envelope** | `v: 1`; labels `agentlink/envelope/v1`, `agentlink/v1/*` | 04 §2.1, §3 | An incompatible change to fields, signing input or labels |

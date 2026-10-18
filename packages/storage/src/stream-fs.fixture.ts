@@ -1,9 +1,9 @@
 // Test-only: an in-memory folder behind the TempFileOps seam of stream-sink.ts (M1-6b part 2), and a
 // sink that only hashes. The package runs in Workers too and may not import Node built-ins, even in
 // tests (tools/deps-check); the Node binding of TempFileOps belongs to the consumer in
-// @agentlink/node. This fake keeps the same rules a real one must: create is exclusive, rename never
+// @4thtech-io/node. This fake keeps the same rules a real one must: create is exclusive, rename never
 // overwrites, and a write after close fails.
-import { createSha256, encodeHex } from '@agentlink/crypto';
+import { createSha256, encodeHex } from '@4thtech-io/crypto';
 import type { ProvisionalSink, TempFileHandle, TempFileOps } from './index.js';
 
 export interface FakeFolder {

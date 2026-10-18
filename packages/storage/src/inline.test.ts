@@ -1,6 +1,6 @@
 // M1-6a: inline adapter (07 §5.3). Ciphertext of at most 12 288 bytes travels base64url in the payload.
 import { describe, expect, it } from 'vitest';
-import { encodeBase64url, encodeHex, sha256 } from '@agentlink/crypto';
+import { encodeBase64url, encodeHex, sha256 } from '@4thtech-io/crypto';
 import { INLINE_MAX_CIPHERTEXT_BYTES, StorageError, createInlineAdapter } from './index.js';
 import { NOW, DAY_MS, bytes, streamOf } from './fake-s3.fixture.js';
 

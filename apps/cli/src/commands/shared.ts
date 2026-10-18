@@ -7,8 +7,8 @@
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import process from 'node:process';
-import { CoreError } from '@agentlink/core';
-import { NodeKeyStoreError, NodeStoreError } from '@agentlink/node';
+import { CoreError } from '@4thtech-io/core';
+import { NodeKeyStoreError, NodeStoreError } from '@4thtech-io/node';
 import type { CommandContext } from '../dispatch.js';
 import { EXIT_FAILED } from '../dispatch.js';
 import { RuntimeError } from '../runtime/errors.js';
@@ -37,12 +37,12 @@ export interface CommandDeps {
   readonly prompter: () => Prompter;
   /**
    * Keychain hygiene (IR-M1-8a-1 L-10): the unrecorded seed and `probe:` items an interrupted
-   * keychain write can leave. @agentlink/node exports no such listing yet, so there is no default.
+   * keychain write can leave. @4thtech-io/node exports no such listing yet, so there is no default.
    */
   readonly strayItems?: StrayItems;
   /**
    * M1-9z (IR-M1-9z-1 F2): true when an owner code change didn't finish (a leftover `owner-next`
-   * item). Store-only: nothing is unlocked. Production wires @agentlink/node's check in doctor.ts;
+   * item). Store-only: nothing is unlocked. Production wires @4thtech-io/node's check in doctor.ts;
    * there is no default, so tests never touch the OS keychain.
    */
   readonly unfinishedOwnerCodeChange?: () => Promise<boolean>;

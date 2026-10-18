@@ -23,7 +23,7 @@ import {
   randomBytes,
   sha256,
   taggedHash,
-} from '@agentlink/crypto';
+} from '@4thtech-io/crypto';
 import {
   bip340PublicKey,
   bip340Sign,
@@ -32,7 +32,7 @@ import {
   newKeystoreKek,
   openOwnerSeed,
   sealOwnerSeed,
-} from '@agentlink/crypto/keystore';
+} from '@4thtech-io/crypto/keystore';
 
 const job = JSON.parse(readFileSync(process.argv[2], 'utf8'));
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 };

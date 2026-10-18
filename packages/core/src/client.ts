@@ -4,8 +4,8 @@
 //
 // I-4: the client holds the agent's KeyStore only. It never holds an OwnerKeyStore, never takes owner
 // presence, and exports no key. Owner flows pass a session they unlocked themselves (identity.ts).
-import type { KeyStore } from '@agentlink/crypto';
-import { createLogger, type Logger } from '@agentlink/log';
+import type { KeyStore } from '@4thtech-io/crypto';
+import { createLogger, type Logger } from '@4thtech-io/log';
 import type { ApprovalChannel } from './approval-channel.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
 import { ContactBook } from './contacts.js';

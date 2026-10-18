@@ -8,8 +8,13 @@
 // - The rule reads only the verified policy and the core's own scope and stored terms (I-4, I-5).
 // - Commitments are never batch items (D-68, 04 §2.5.2), including `accepted`/`rejected`
 //   acknowledgements (D-31).
-import { encodeBase64url, termsHash } from '@agentlink/crypto';
-import { POLICY_DEFAULTS, TERMS_TOKEN_SYMBOLS, defaultPolicy, type Policy } from '@agentlink/types';
+import { encodeBase64url, termsHash } from '@4thtech-io/crypto';
+import {
+  POLICY_DEFAULTS,
+  TERMS_TOKEN_SYMBOLS,
+  defaultPolicy,
+  type Policy,
+} from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import {
   AUTO_ACCEPT_USD_CURRENCIES,

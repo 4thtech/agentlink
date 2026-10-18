@@ -1,5 +1,5 @@
 // The M1a nextStep text (06 §2.5 step 2, IR-M1-9j-1 F02).
-import { encodeBase64url, randomBytes } from '@agentlink/crypto';
+import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import { approveCommand, approvalNextStep, isApprovalId } from './next-step.js';
 

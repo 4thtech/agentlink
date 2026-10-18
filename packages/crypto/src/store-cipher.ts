@@ -7,7 +7,7 @@
 // holds no raw key bytes for its lifetime; the caller wipes the store key it passed in, and the
 // derived index key bytes are wiped here. AES-GCM, HMAC and HKDF are WebCrypto and @noble/hashes;
 // nothing here implements a primitive (I-8). Only KeyStore backends reach this, through the
-// restricted @agentlink/crypto/keystore entry, because it takes the store key.
+// restricted @4thtech-io/crypto/keystore entry, because it takes the store key.
 //
 // Sealed form: `v1.` + base64url(nonce (12 bytes) ‖ ciphertext ‖ tag (16 bytes)). The nonce is
 // random per seal: under one store key, stay well below 2^32 seals (NIST SP 800-38D §8.3).

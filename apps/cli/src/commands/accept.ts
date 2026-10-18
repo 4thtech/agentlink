@@ -12,7 +12,7 @@
 //
 // The link is untrusted input (I-5): core decodes and checks it; nothing the link carries is
 // printed except through the contact-name rule (restricted name plus label).
-import { CoreError, evaluate, renderContactName, type CoreErrorCode } from '@agentlink/core';
+import { CoreError, evaluate, renderContactName, type CoreErrorCode } from '@4thtech-io/core';
 import { approvalNextStep, isApprovalId } from '../approval/next-step.js';
 import {
   DISPATCH_TEXT,

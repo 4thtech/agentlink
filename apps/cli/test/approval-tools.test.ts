@@ -10,7 +10,7 @@ import {
   type ApprovalChannel,
   type Sealed,
   type StoreCipher,
-} from '@agentlink/core';
+} from '@4thtech-io/core';
 import {
   decodeBase64url,
   decodeUtf8,
@@ -21,10 +21,10 @@ import {
   randomBytes,
   type JsonObject,
   type OwnerKeyStore,
-} from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
-import type { RelayConnector, RelaySocket, RelaySocketHandlers } from '@agentlink/transport-nostr';
+} from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
+import type { RelayConnector, RelaySocket, RelaySocketHandlers } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { agentToolContext } from '../src/mcp/command.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';

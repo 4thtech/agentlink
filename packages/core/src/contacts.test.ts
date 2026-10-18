@@ -2,9 +2,9 @@
 // the handshake completes (04 §2.9); re-pair rules and revoked agents (04 §2.9, §3.4.1); card updates
 // (04 §2.6, §3.4.1); list, block and remove with a tombstone (02 F-14); names marked self-declared
 // (04 §2.4, 06 §2.1); the inbound sender screen.
-import { encodeHex0x, type AgentCard, type KeyStore, type OwnerKeyStore } from '@agentlink/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@agentlink/crypto/testing';
-import { createLogger } from '@agentlink/log';
+import { encodeHex0x, type AgentCard, type KeyStore, type OwnerKeyStore } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { cardTypedData } from './card.js';
 import { AgentLinkClient } from './client.js';

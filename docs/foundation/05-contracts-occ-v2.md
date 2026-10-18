@@ -410,7 +410,7 @@ Notes:
   - Role map (§5.1): every restricted selector has exactly the role and delay of the table; with the Safe compromised, no path to a 7-day power (use, new grant, selector remap, `updateAuthority`, delay reduction) completes in under 7 days.
 - ERC-1271 signer tests (Safe-style and passkey-style smart accounts).
 - Static analysis: Slither and Aderyn clean (or justified) in CI. Gas snapshots in CI.
-- Shared EIP-712 test vectors with `@agentlink/chain` (TypeScript) to guarantee identical hashing, including the chain-agnostic AgentCard domain.
+- Shared EIP-712 test vectors with `@4thtech-io/chain` (TypeScript) to guarantee identical hashing, including the chain-agnostic AgentCard domain.
 - **External audit before mainnet** (M3 gate). Bug bounty after mainnet.
 
 ---
