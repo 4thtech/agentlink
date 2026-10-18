@@ -12,7 +12,7 @@ _Updated 2026-10-17 13:00 UTC by @talirezun_
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
 | M1b waves — orchestrator | @talirezun (agents) | in-progress | ~35 PRs merged 10-17 | 2026-10-17 |
-| M1 gate two-machine test — Tali | @talirezun | in-progress | run 1 done; rerun pending | 2026-10-17 |
+| M1 gate two-machine test — Tali | @talirezun | J1/J4/J8/J9 passed 17/17 (2026-10-18); J2/J3/J5 after M1b | auto-sync dogfood | 2026-10-18 |
 
 ## Waiting on a decision
 | # | Question | Decider | Raised by / when |

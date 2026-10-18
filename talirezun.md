@@ -4,6 +4,7 @@ _Updated 2026-10-17 13:00 UTC · claude-code / claude-opus-5-5 · orchestrator s
 
 ## Now
 - **2026-10-17 merged:** live relay subscriptions; `init --harness claude-desktop`; Gemini CLI vs Antigravity detection; "no card from your owner yet" status/doctor; owner recovery without an attached agent; local approval server on localhost (passkey-ready, D-79); terms idempotency; SSRF-safe fetch + path guard (Windows fixes); storage adapters; files/proof policy engine; EIP-712 proof hashing + vectors; ALKP/ALKR backup formats spec (D-82); G-26/G-20 resolved (D-80/D-81); Node ≥ 22.14 check; contact names instead of addresses; changelog fragments (`changelog.d/`); CI gates (bundle-check, e2e in merge gate, Windows/macOS path tests, sync pin guard); knowledge/ consolidated; beginner setup page; two-machine dogfood.
+- **2026-10-18: Two-Mac gate run PASSED 17/17** (auto-sync mode, run 20261018-054102): Mac A Claude Code (main build) ↔ Mac B OpenCode (npm 0.1.0), two owners; J1, J4, J9, I-5, F1, J8 verified; secret scan clean both Macs. J2/J3/J5 wait for M1b files/credits/proof.
 - **Two-Mac gate run 1:** pairing + receive passed; sends hit AMBIGUOUS_CONTACT (stale duplicate test contact; product behaved correctly). Rerun with fresh agent names pending.
 
 ## In flight
