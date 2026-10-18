@@ -2,6 +2,7 @@
 // private key or seed bytes"; 04 §2.5: owner operations need a presence proof). Checked by
 // `tsc -p tsconfig.test.json` (pnpm typecheck) and by Vitest's expectTypeOf.
 import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { DropAuthRequest } from './drop-auth.js';
 import type { TypedData } from './eip712.js';
 import type { JsonObject } from './jcs.js';
 import type { PublicIdentity } from './keys.js';
@@ -97,9 +98,9 @@ describe('KeyStore (type level)', () => {
     >();
   });
 
-  it('has exactly EnvelopeKeys plus getPublicBundle, sign712 and close (G-2); no hpkeOpen', () => {
+  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, signDropRequest and close (G-2); no hpkeOpen', () => {
     expectTypeOf<MethodNames<KeyStore>>().toEqualTypeOf<
-      EnvelopeKeyName | 'getPublicBundle' | 'sign712' | 'close'
+      EnvelopeKeyName | 'getPublicBundle' | 'sign712' | 'signDropRequest' | 'close'
     >();
     expectTypeOf<'hpkeOpen'>().not.toExtend<keyof KeyStore>();
   });
@@ -112,6 +113,29 @@ describe('KeyStore (type level)', () => {
       [(EpochOptions | undefined)?]
     >();
     expectTypeOf<Params<KeyStore, 'sign712'>>().toEqualTypeOf<[TypedData]>();
+  });
+});
+
+/** The drop adapter's signer (@4thtech-io/storage, M1-6c), restated so crypto need not import it. */
+interface DropSigner {
+  signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string>;
+}
+
+describe('KeyStore.signDropRequest (type level, M1-1g-e)', () => {
+  it('is the DropSigner of the drop adapter: request and createdAt in, header text out', () => {
+    expectTypeOf<KeyStore>().toExtend<DropSigner>();
+    expectTypeOf<Params<KeyStore, 'signDropRequest'>>().toEqualTypeOf<[DropAuthRequest, number]>();
+    expectTypeOf<Result<KeyStore, 'signDropRequest'>>().toEqualTypeOf<string>();
+  });
+
+  it('takes no kind, tag, event or epoch: the KeyStore fixes them', () => {
+    expectTypeOf<keyof DropAuthRequest>().toEqualTypeOf<'method' | 'url' | 'body'>();
+  });
+
+  it('is on the agent KeyStore only, never on EnvelopeKeys or an OwnerSession', () => {
+    expectTypeOf<'signDropRequest'>().not.toExtend<keyof EnvelopeKeys>();
+    expectTypeOf<'signDropRequest'>().not.toExtend<keyof OwnerSession>();
+    expectTypeOf<'signDropRequest'>().not.toExtend<keyof OwnerKeyStore>();
   });
 });
 

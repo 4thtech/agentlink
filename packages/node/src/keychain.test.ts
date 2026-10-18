@@ -15,11 +15,22 @@ import {
   envelopeSignatureInput,
   hashTypedData,
   recoverEvmAddress,
+  KEY_LABELS,
+  decodeBase64url,
+  decodeUtf8,
+  encodeUtf8,
+  verifyDropAuthorization,
   verifyNostrEvent,
   wrapCek,
+  type DropAuthRequest,
   type TypedData,
 } from '@4thtech-io/crypto';
-import { deriveAgentId, derivePublicIdentity } from '@4thtech-io/crypto/keystore';
+import {
+  deriveAgentId,
+  derivePublicIdentity,
+  derivePublicKey,
+  deriveSecretKey,
+} from '@4thtech-io/crypto/keystore';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 // The raw keychain backend is internal (IR-M1-8a-1 M-2): tests reach it through the modules, never
 // through the package entry, which exports only opaque entry points (fence.test.ts).
@@ -302,6 +313,78 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
   });
 });
 
+// M1-1g-e (IR-M1-6c-1): the drop adapter's DropSigner (07 §5.4, 04 §2.1 drop key).
+describe('KeychainKeyStore.signDropRequest (M1-1g-e)', () => {
+  const TS = 1_790_000_000;
+  const NONCE = 'IQmYQx-k6oKFW4qJwstHFw';
+  const UPLOAD: DropAuthRequest = {
+    method: 'POST',
+    url: 'https://drop.agentlink.4thtech.io/v1/upload',
+    body: encodeUtf8(
+      JSON.stringify({ v: 1, size: 20000, expiresAt: TS + 86_400, nonce: NONCE, ts: TS }),
+    ),
+  };
+  const dropHex = (seed: Uint8Array, epoch: number): string => {
+    const key = derivePublicKey(seed, KEY_LABELS.drop, epoch);
+    if (key.label !== KEY_LABELS.drop) throw new Error('unreachable');
+    return encodeHex(key.publicKey);
+  };
+  let keychain: FakeKeychain;
+
+  beforeEach(() => {
+    keychain = new FakeKeychain();
+    keychain.put(ID_A, SEED_A);
+  });
+
+  it('signs with the current-epoch drop key; the drop Worker verifier accepts it', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A, { keyEpoch: 2 });
+    const authorization = await store.signDropRequest(UPLOAD, TS);
+    expect(verifyDropAuthorization(authorization, UPLOAD, TS)).toEqual({
+      ok: true,
+      pubkey: dropHex(SEED_A, 2),
+      createdAt: TS,
+    });
+    const identity = derivePublicIdentity(SEED_A, 2);
+    expect(dropHex(SEED_A, 2)).not.toBe(encodeHex(identity.agentNostr));
+    await store.close();
+  });
+
+  it('refuses GET, PUT and a createdAt other than the body ts before reading the seed', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A);
+    const before = keychain.reads;
+    for (const [request, ts] of [
+      [{ ...UPLOAD, method: 'GET' }, TS],
+      [{ ...UPLOAD, method: 'PUT' }, TS],
+      [UPLOAD, TS + 1],
+      [{ ...UPLOAD, body: encodeUtf8('not json') }, TS],
+    ] as const) {
+      expect(await codeOf(() => store.signDropRequest(request, ts))).toBe('invalid_argument');
+    }
+    expect(keychain.reads).toBe(before);
+    await store.close();
+  });
+
+  it('wipes the seed it read and returns no key bytes', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A);
+    const authorization = await store.signDropRequest(UPLOAD, TS);
+    expect(keychain.handedOut.every(allZero)).toBe(true);
+    const decoded = decodeUtf8(decodeBase64url(authorization.slice('Nostr '.length)));
+    for (const label of [KEY_LABELS.drop, KEY_LABELS.nostr, KEY_LABELS.evm]) {
+      expect(decoded).not.toContain(encodeHex(deriveSecretKey(SEED_A, label, 0)));
+    }
+    expect(decoded).not.toContain(encodeHex(SEED_A));
+    await store.close();
+    expect(await codeOf(() => store.signDropRequest(UPLOAD, TS))).toBe('keystore_closed');
+  });
+
+  it('is on the KeyStore facade that openRecordedKeyStore returns', async () => {
+    const facade = await openRecordedKeyStore('keychain', ID_A, { keychain });
+    const authorization = await facade.signDropRequest(UPLOAD, TS);
+    expect(verifyDropAuthorization(authorization, UPLOAD, TS).ok).toBe(true);
+    await facade.close();
+  });
+});
+
 describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', () => {
   let keychain: FakeKeychain;
   beforeEach(() => {
@@ -362,6 +445,7 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
       'nip44Decrypt',
       'nip44Encrypt',
       'sign712',
+      'signDropRequest',
       'signEnvelopeHash',
       'signNostr',
       'unwrapCek',
