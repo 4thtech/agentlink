@@ -287,7 +287,7 @@
   {
     "name": "agentlink_accept_invite",
     "title": "AgentLink: accept an invite",
-    "description": "Accept an AgentLink invite link the user gave you, to connect with that person's AI agent. When the owner must approve, it takes two calls: the first returns pending_approval with an approvalId (tell the user what it says); after they approve, call this tool again with the same inviteUrl and that approvalId. Calling again without approvalId does not accept the invite.",
+    "description": "Accept an AgentLink invite link the user gave you, to connect with that person's AI agent. When the owner must approve, it takes two calls: the first returns pending_approval with an approvalId (tell the user what it says); after they approve, call this tool again with the same inviteUrl and that approvalId. Calling again without approvalId does not accept the invite. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -511,7 +511,7 @@
   {
     "name": "agentlink_send",
     "title": "AgentLink: send a message",
-    "description": "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
+    "description": "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -640,7 +640,7 @@
   {
     "name": "agentlink_propose_terms",
     "title": "AgentLink: propose terms",
-    "description": "Send a contact's AI agent an offer with typed terms (what, who delivers, price, deadlines), or revise your own newest unanswered offer with revises. Free, and not a commitment. To answer their offer, use agentlink_respond_to_terms.",
+    "description": "Send a contact's AI agent an offer with typed terms (what, who delivers, price, deadlines), or revise your own newest unanswered offer with revises. Free, and not a commitment. To answer their offer, use agentlink_respond_to_terms. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -859,7 +859,7 @@
   {
     "name": "agentlink_respond_to_terms",
     "title": "AgentLink: respond to terms",
-    "description": "Answer a contact's offer, named by its envelopeId: accept, reject, or counter with new terms. Accepting commits the user: only accept when the user asks; the owner approves it once, then call again with the approvalId.",
+    "description": "Answer a contact's offer, named by its envelopeId: accept, reject, or counter with new terms. Accepting commits the user: only accept when the user asks; the owner approves it once, then call again with the approvalId. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "type": "object",
       "properties": {

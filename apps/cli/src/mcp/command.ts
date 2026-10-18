@@ -13,20 +13,28 @@
 //   agent's publisher lease and, while it holds it, keeps receiving, processing and delivering. On
 //   close the loop stops and releases the lease before the agent closes. `agentlink://inbox`
 //   notifications are optional (06 §6).
+// - M1-11a-b, the local approval UI (approval-ui.ts): when the agent is set up, the handlers get an
+//   `approvalLink` that starts the local approval server on the first `pending_approval` and reuses
+//   it; the result then carries the approval page's url next to the `agentlink approve` command. On
+//   close the server stops after the loop and before the agent closes (its source reads the store).
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { createLogger, type Logger } from '@4thtech-io/log';
+import { startApprovalServer, type AgentStore } from '@4thtech-io/node';
 import { approvalNextStep } from '../approval/next-step.js';
+import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_OK, type CommandHandler } from '../dispatch.js';
 import {
+  nodeRuntimeDeps,
   openAgent,
   type OpenAgentOptions,
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
+import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
@@ -43,6 +51,11 @@ export interface McpCommandDeps {
     BackgroundLoopOptions,
     'timers' | 'leaseIntervalMs' | 'syncIntervalMs' | 'passBudgetMs'
   >;
+  /**
+   * M1-11a-b: the local approval UI for an opened agent (started on demand, closed with the
+   * server). Without it, `pending_approval` results carry the CLI command only (M1a).
+   */
+  readonly approvalUi?: (agent: OpenedAgent, logger: Logger) => ApprovalUi;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -52,6 +65,7 @@ export function agentToolContext(
   agent: OpenedAgent,
   logger: Logger,
   clock: () => number = systemClock,
+  approvalUi?: ApprovalUi,
 ): ToolContext {
   return Object.freeze<ToolContext>({
     client: coreToolClient(agent.client),
@@ -59,8 +73,11 @@ export function agentToolContext(
     logger,
     agentName: agent.name,
     approvalNextStep: (approvalId: string) => approvalNextStep(approvalId, agent.name),
-    // M1a has no result URL (D-73 (3)); M1-11a adds the local UI origin.
+    // No fixed result origin: only the local UI link's own origin, added with it (M1-11a-b).
     urlOrigins: Object.freeze([]),
+    ...(approvalUi === undefined
+      ? {}
+      : { approvalLink: (approvalId: string) => approvalUi.link(approvalId) }),
   });
 }
 
@@ -72,9 +89,10 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       logger,
     });
     const agent = opened.status === 'ok' ? opened.agent : undefined;
+    const approvalUi = agent === undefined ? undefined : deps.approvalUi?.(agent, logger);
     const env: HandlerEnvironment =
       opened.status === 'ok'
-        ? agentToolContext(opened.agent, logger, deps.clock)
+        ? agentToolContext(opened.agent, logger, deps.clock, approvalUi)
         : { needsSetup: { message: opened.message }, logger };
 
     const server = createMcpServer(env, deps.version);
@@ -96,8 +114,10 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       loop?.start();
       await closed;
     } finally {
-      // Stop the passes and release the lease while the store is still open (06 §6).
+      // Stop the passes and release the lease while the store is still open (06 §6), then the
+      // approval server, whose source reads the same store (M1-11a-b).
       await loop?.stop();
+      await approvalUi?.close();
       await agent?.close();
     }
     return EXIT_OK;
@@ -134,10 +154,50 @@ export function stdioTransport(io?: StdioSource): Transport {
   return transport;
 }
 
-/** The production `agentlink mcp` handler: stdio, the real runtime. */
-export const mcpCommand = (version: string): CommandHandler =>
-  createMcpCommand({
-    openAgent: (options) => openAgent(options),
+/** The production `agentlink mcp` handler: stdio, the real runtime, the local approval UI. */
+export const mcpCommand = (version: string): CommandHandler => {
+  // The approval source reads the agent's store and opens its sealed rows (M1-11a ui-source.ts),
+  // so the store the runtime opens is kept here, as the owner commands do (commands/owner/deps.ts).
+  let opened: AgentStore | undefined;
+  return createMcpCommand({
+    openAgent: (options) =>
+      openAgent({
+        ...options,
+        deps: {
+          ...nodeRuntimeDeps,
+          openStore: async (backend, agentId, path) => {
+            opened = await nodeRuntimeDeps.openStore(backend, agentId, path);
+            return opened;
+          },
+        },
+      }),
     transport: () => stdioTransport(),
     version,
+    approvalUi: (agent, logger) => {
+      const store = opened;
+      return createApprovalUi({
+        agentName: agent.name,
+        logger,
+        start: () => {
+          if (store === undefined) return Promise.reject(new Error('approval ui: no store'));
+          const source = createUiApprovalSource(
+            {
+              name: agent.name,
+              client: agent.client,
+              store: store.store,
+              cipher: store.cipher,
+              // The MCP server owns the agent's lifetime; the source never closes it.
+              close: () => Promise.resolve(),
+            },
+            { now: systemClock },
+          );
+          return startApprovalServer({
+            source,
+            // Fixed values only (ApprovalServerEvent, I-7).
+            onEvent: (event) => logger.debug('approval ui event', { ...event }),
+          });
+        },
+      });
+    },
   });
+};

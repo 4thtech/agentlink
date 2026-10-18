@@ -147,6 +147,28 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
       },
     );
 
+    // M1-11a-b: node:child_process only as `import { execFile }` (the approval UI's OS opener).
+    it('allows node:child_process only as the named execFile import', () => {
+      const ok = checkInjected(
+        'cp-execfile',
+        'import { execFile as run2 } from "node:child_process";',
+      );
+      expect(ok.stderr).toBe('');
+      expect(ok.code).toBe(0);
+      for (const [name, line] of [
+        ['spawn', 'import { spawn } from "node:child_process";'],
+        ['mixed', 'import { execFile as e2, exec } from "node:child_process";'],
+        ['namespace', 'import * as cp from "node:child_process";'],
+        ['default', 'import cp from "node:child_process";'],
+        ['reexport', 'export { spawn } from "node:child_process";'],
+        ['dynamic', 'const cp = import("node:child_process");'],
+      ] as const) {
+        const run = checkInjected(`cp-${name}`, line);
+        expect(run.code, name).toBe(1);
+        expect(run.stderr, name).toContain('"node:child_process"');
+      }
+    });
+
     // IR-M1-9c-c-1 L1: require-equivalents that load a module without an import.
     it.each([
       ['createRequire', 'const cr = createRequire; cr(import.meta.url)("jose");', 'createRequire'],

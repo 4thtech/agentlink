@@ -848,6 +848,70 @@ describe('owner presence for every decision (04 §2.5, I-4)', () => {
   });
 });
 
+// M1-11a-b: `agentlink mcp` puts approvalUrl(id) in the `pending_approval` result, so the agent sees
+// it. It must grant nothing: the session comes only from the one-shot link handed to the OS opener,
+// and a decision needs owner presence even with a session.
+describe('the agent-visible approval url (M1-11a-b, 06 §2.5, I-4)', () => {
+  it('holds no token and opens nothing by itself', async () => {
+    const h = await harness();
+    h.source.add(1);
+    const url = h.server.approvalUrl(id(1));
+    expect(url).toBe(`${h.origin}/approve/${id(1)}`);
+    expect(new URL(url).search).toBe('');
+    const res = await send(h.port, new URL(url).pathname);
+    expect(res.status).toBe(401);
+    expect(res.headers['set-cookie']).toBeUndefined();
+    expect(res.body).toContain('This link has expired');
+  });
+
+  it('the one-shot link the opener gets for a request works once, then lands on the same url', async () => {
+    const h = await harness();
+    h.source.add(1);
+    const at = h.opened.length;
+    await h.server.open(id(1));
+    const link = new URL(h.opened[at] ?? '');
+    expect(link.pathname).toBe(`/approve/${id(1)}`);
+    const first = await send(h.port, `${link.pathname}${link.search}`);
+    expect(first.status).toBe(303);
+    expect(`${h.origin}${first.headers.location ?? ''}`).toBe(h.server.approvalUrl(id(1)));
+    const cookie = (first.headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
+    const again = await send(h.port, `${link.pathname}${link.search}`);
+    expect(again.status).toBe(401);
+    expect(again.headers['set-cookie']).toBeUndefined();
+    // The owner's browser, holding the cookie, opens the url the agent showed.
+    const page = await send(h.port, new URL(h.server.approvalUrl(id(1))).pathname, {
+      headers: { Cookie: cookie },
+    });
+    expect(page.status).toBe(200);
+  });
+
+  it('a same-user agent with the url, and even with a stolen session, cannot approve', async () => {
+    const h = await harness();
+    h.source.add(1);
+    const row = await h.source.get(id(1));
+    // Only the url: no cookie, so every decision route answers 401 before any body is read.
+    const bare = await send(h.port, `/api/approvals/${id(1)}/approve`, {
+      method: 'POST',
+      headers: {
+        Origin: h.origin,
+        'Content-Type': 'application/octet-stream',
+        'X-AgentLink-Digest': row?.actionDigest ?? '',
+      },
+      body: encodeUtf8(code),
+    });
+    expect(bare.status).toBe(401);
+    // A session raced out of the opener's argv (the accepted residual): still no decision without
+    // owner presence.
+    const none = await decide(h, id(1), 'approve', undefined);
+    expect(none.status).toBe(403);
+    expect(JSON.parse(none.body)).toMatchObject({ status: 'presence_required' });
+    const guess = await decide(h, id(1), 'approve', 'AAAA BBBB CCCC DDDD EEEE FFFF');
+    expect(guess.status).toBe(403);
+    expect(h.source.calls.apply).toBe(0);
+    expect(h.source.applied).toEqual([]);
+  });
+});
+
 describe('the token and the owner code stay out of files, logs and URLs (08 §1, I-7)', () => {
   it('never writes or logs them', async () => {
     const logged: string[] = [];

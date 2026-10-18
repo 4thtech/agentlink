@@ -256,6 +256,25 @@ export interface ToolContext {
    * F-5). Empty in M1a: there is no URL (D-73 (3)), so any `url` is refused.
    */
   readonly urlOrigins: readonly string[];
+  /**
+   * M1-11a-b: the local approval UI's link for one request (08 §1, 06 §2.5), built by `agentlink
+   * mcp`; absent elsewhere (the CLI commands and tests keep the M1a result). It may start the local
+   * approval server. Undefined when no link can be given: the result then stays the M1a one.
+   */
+  readonly approvalLink?: (approvalId: string) => Promise<ApprovalLink | undefined>;
+}
+
+/**
+ * The approval page link of a `pending_approval` result. The url holds no secret (no session
+ * link): it grants nothing to the agent that sees it (04 §2.5, I-4).
+ */
+export interface ApprovalLink {
+  /** `http://localhost:<port>/approve/<approvalId>`. */
+  readonly url: string;
+  /** `http://localhost:<port>`: the only origin the result `url` may use. */
+  readonly origin: string;
+  /** The nextStep text with the link, which replaces the M1a `approvalNextStep` text. */
+  readonly nextStep: string;
 }
 
 /** When the server runs for an agent that is not set up: every tool answers `needs_setup`. */
