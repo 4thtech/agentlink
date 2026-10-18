@@ -66,7 +66,7 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 | `@4thtech-io/agentlink` (CLI + MCP stdio; the `@agentlink/*` libraries bundled in, OPS-REL-1; npm org `4thtech-io`, because the `@4thtech` scope was not available, owner decision 2026-10-16) | public `apps/cli` | `release.yml` (§4.1) | npm `next` (automatic) | Owner's click (`npm-publish`, D-52); a release that changes crypto also needs the owner's "merge" and an independent review (D-51) |
 | `@agentlink/types`, `crypto`, `chain`, `transport-nostr`, `storage`, `core`, `node`, `ui` | public `packages/*` | Not published: `"private": true`, bundled into `@4thtech-io/agentlink` (owner decision, 2026-10-16, OPS-REL-1). Publishing one later is a decision plus its own trusted publishers | — | — |
 | Claude Desktop extension bundle (06 §7) | public `apps/cli` | DECISION NEEDED: build, signing and distribution | — | Owner |
-| `@agentlink/occ-v2-abi` (ABIs + addresses) | contracts release artifacts | DECISION NEEDED (`development-process.md` §9.2) | npm `next` | Owner's click (`npm-publish`, D-52) |
+| `@4thtech-io/occ-v2-abi` (ABIs + addresses) | contracts release artifacts | Private in-repo workspace package, bundled into the CLI (D-83, `development-process.md` §9.2) | Not published | None: it ships inside the CLI release |
 | `OCCFeeVault`, `OCCNotary` (M1), `OCCRegistry` (M2) proxies and implementations | private `src/`, `script/` | §4.2 testnet (CI, private repo), §4.3 mainnet (by hand) | Testnets | Mainnet: owner by hand after an independent review, with a second person witnessing; `@denisjazbec`'s review recommended |
 | Contract upgrades and config changes | private repo + Safe | §4.4 (by hand) | Testnet Safe | Owner + Safe signers |
 | Submitter Worker (+ DO rate limits), `submit.` | public `apps/submitter` | Cloudflare deploy workflow (§4.5) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52) |
@@ -149,7 +149,7 @@ Testnet contract deploys stay CI-driven from the private repo (§4.2).
 1. `contracts-gate` green on the commit; the commit is tagged in the private repo.
 2. CI in the private repo runs `script/Deploy.s.sol` per chain with the per-chain config: **CreateX CREATE3**, deployer-guarded salts per 05 §9.1, all roles transferred to the testnet Safe in the same script, after a fork dry-run (05 §9.1). The testnet deployer key is a **repository secret** (the repo stays on GitHub Free, where private repositories have no environments, D-27). Protection is process-only: the workflow runs only by manual `workflow_dispatch`, broadcasts only after the owner's explicit "go", and refuses mainnet chain IDs; agents never approve or broadcast on their own. The secret is for testnets only and is deleted when the testnets end (D-71 (1)). Order: Base Sepolia first; Gnosis Chiado later (D-63 (1)), with the same testnet deployer key and campaign (card M1-3j).
 3. Post-deploy checks in CI: proxy addresses equal the campaign's address file (05 §9.1), and on Gnosis Chiado equal to the published Base Sepolia addresses; roles check; deployer holds no role.
-4. ABIs and addresses published as an `@agentlink/occ-v2-abi` prerelease (`next`); `@agentlink/chain` bumped by PR (`development-process.md` §9.3).
+4. ABIs and addresses imported into the private in-repo `@4thtech-io/occ-v2-abi` by PR (not published, D-83); `@4thtech-io/chain` bumped by PR (`development-process.md` §9.3).
 5. Faucet configured against the new vault (§4.5), on each chain only after that chain's deployment.
 
 **No explorer or Sourcify source verification on testnets.** The source stays private during the beta (D-11), and 05 §9 verifies at mainnet. Testnet deploys publish ABIs and addresses only.
@@ -208,7 +208,7 @@ DECISION NEEDED (owner): who witnesses when `@denisjazbec` is unavailable.
 - Contracts stay paused (05 §5.1). Order: role check (above) → wait until `getRoleGrantDelay` and `getTargetAdminDelay` return the configured values (deployment + 5 days) → the Safe unpauses (`PAUSE_ADMIN`) → smoke test → publish. Each step is recorded.
 - Smoke test with small amounts (after unpausing): deposit credits, `notarize`, `acknowledge`, verify the proof pack via `agentlink verify` and the verify page, withdraw the remaining credits.
 
-**Publishing:** addresses and ABIs in `@agentlink/occ-v2-abi` (`latest`, through §4.1); `@agentlink/chain` config PR; audit reports and verified source published; release notes; owner's sync file updated.
+**Publishing:** addresses and ABIs imported into the in-repo `@4thtech-io/occ-v2-abi` (not published, D-83); `@4thtech-io/chain` config PR; audit reports and verified source published; release notes; owner's sync file updated.
 
 ### 4.4 Contract upgrades and configuration changes
 
@@ -401,7 +401,7 @@ Every automatic rollback sets `DEPLOY_FREEZE`; the owner clears it after the inc
 | Artifact | Rollback | Limits |
 |---|---|---|
 | npm packages | **Automatic:** `publish-latest` moves `latest` back to the recorded version after a failed health check; after a failed smoke test, `rollback-latest` does the same after one click (D-52). **Manual (owner, 2FA):** `npm dist-tag add <pkg>@<previous> latest`; `npm deprecate` the bad version; publish a patch | Never unpublish; the first version of a package has no previous version (deprecate instead); users who installed keep the bad version until they update |
-| `@agentlink/occ-v2-abi` | Same as npm | Wrong addresses are Critical: deprecate immediately |
+| `@4thtech-io/occ-v2-abi` | Revert the import PR and re-release the CLI | Wrong addresses are Critical: fix and release immediately |
 | Submitter / faucet / encrypted drop / cloud-agent demo Worker | **Automatic:** `deploy-production` runs `wrangler rollback` to the recorded versions after a failed health check (drop: also after a failed read-back, §4.5.1; rehearsed on staging with the `rehearse-rollback` dispatch). Manual: redeploy the previous release through the pipeline | DO migrations are forward-only (§4.5); the drop's first production deploy has no earlier version to roll back to (freeze only) |
 | Static sites | **Automatic:** back to the previous version (hash-identical) | Clients may cache; service-worker update needed |
 | Contracts (upgradeable, Notary before freeze) | Manual (§3.2): pause charging; schedule an upgrade back to the previous implementation | 7-day delay (05 §5); storage layout must stay compatible; users can always withdraw |

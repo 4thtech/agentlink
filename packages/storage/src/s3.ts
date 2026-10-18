@@ -8,9 +8,9 @@
 //   credentials (04 §4).
 // - Requests go through an injected fetch with redirects refused. The caller passes the SSRF-safe
 //   fetch (M1-15) where one is available; the endpoint grammar check here runs either way.
-// Multipart upload and streaming without buffering are M1-6b.
-import { AwsClient } from 'aws4fetch';
-import type { Logger } from '@agentlink/log';
+// The configuration checks, credentials and signed sending live in session.ts, shared with multipart
+// upload and the lifecycle helper (M1-6b). Multipart for objects above 64 MiB is multipart.ts; routing
+// `put` there, with streaming encryption, is M1-6b part 2.
 import {
   checkFuture,
   checkSize,
@@ -20,46 +20,20 @@ import {
   type StorageAdapter,
   type StoredObject,
 } from './adapter.js';
-import {
-  isOwnObjectKey,
-  newObjectKey,
-  validateBucket,
-  validateRegion,
-  validateS3Endpoint,
-  validateStoragePrefix,
-} from './endpoint.js';
+import { isOwnObjectKey, newObjectKey, validateStoragePrefix } from './endpoint.js';
 import { StorageError } from './errors.js';
+import { createS3Session, discard, type S3SessionConfig } from './session.js';
+
+export type { FetchLike, S3Credentials, S3CredentialsProvider } from './session.js';
 
 /** SigV4 presigned URLs are valid for at most 7 days. */
 export const MAX_PRESIGN_SECONDS = 604_800;
 /** Larger objects need multipart upload (07 §5.2, M1-6b). */
 export const S3_MAX_SINGLE_PUT_BYTES = 64 * 1024 * 1024;
 
-export interface S3Credentials {
-  readonly accessKeyId: string;
-  readonly secretAccessKey: string;
-  readonly sessionToken?: string;
-  /** Expiry of temporary credentials; presigned URLs never outlive it. */
-  readonly expiresAt?: Date;
-}
-
-/** Called for every operation, so rotated or refreshed credentials take effect at once. */
-export type S3CredentialsProvider = () => Promise<S3Credentials>;
-
-export type FetchLike = (request: Request) => Promise<Response>;
-
-export interface S3AdapterConfig {
-  /** `https://host[:port]`; path-style requests go to `<endpoint>/<bucket>/<key>`. */
-  readonly endpoint: string;
-  readonly bucket: string;
-  /** Defaults to `auto` (Cloudflare R2). */
-  readonly region?: string;
+export interface S3AdapterConfig extends S3SessionConfig {
   /** 16 random bytes, base64url (04 §2.9); never the agent ID. */
   readonly storagePrefix: string;
-  readonly credentials: S3CredentialsProvider;
-  readonly fetch?: FetchLike;
-  readonly now?: () => Date;
-  readonly logger?: Logger;
 }
 
 export interface PresignedGet {
@@ -75,69 +49,11 @@ export interface S3Adapter extends StorageAdapter {
 }
 
 export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
-  const origin = validateS3Endpoint(config.endpoint);
-  const bucket = validateBucket(config.bucket);
-  const region = validateRegion(config.region ?? 'auto');
+  const session = createS3Session(config, 's3');
   const storagePrefix = validateStoragePrefix(config.storagePrefix);
-  if (typeof config.credentials !== 'function') {
-    throw new StorageError('invalid_config', 'invalid storage credentials provider');
-  }
-  const provider = config.credentials;
-  const fetchImpl: FetchLike = config.fetch ?? ((request) => globalThis.fetch(request));
-  const now = config.now ?? (() => new Date());
-  const log = config.logger?.child({ storage: 's3' });
+  const { log, now } = session;
 
-  const objectUrl = (key: string): string => `${origin}/${bucket}/${key}`;
-
-  async function credentials(at: Date): Promise<S3Credentials> {
-    let creds: S3Credentials;
-    try {
-      creds = await provider();
-    } catch {
-      throw new StorageError('credentials_unavailable', 'storage credentials are unavailable');
-    }
-    if (
-      creds === null ||
-      typeof creds !== 'object' ||
-      typeof creds.accessKeyId !== 'string' ||
-      creds.accessKeyId.length === 0 ||
-      typeof creds.secretAccessKey !== 'string' ||
-      creds.secretAccessKey.length === 0
-    ) {
-      throw new StorageError('credentials_unavailable', 'storage credentials are unavailable');
-    }
-    if (creds.expiresAt !== undefined) {
-      const t = creds.expiresAt instanceof Date ? creds.expiresAt.getTime() : Number.NaN;
-      if (Number.isNaN(t) || t <= at.getTime()) {
-        throw new StorageError('credentials_expired', 'storage credentials have expired');
-      }
-    }
-    return creds;
-  }
-
-  function client(creds: S3Credentials): AwsClient {
-    return new AwsClient({
-      accessKeyId: creds.accessKeyId,
-      secretAccessKey: creds.secretAccessKey,
-      ...(creds.sessionToken !== undefined ? { sessionToken: creds.sessionToken } : {}),
-      service: 's3',
-      region,
-      retries: 0,
-    });
-  }
-
-  function amzDate(at: Date): string {
-    return at.toISOString().replace(/[:-]|\.\d{3}/g, '');
-  }
-
-  async function send(request: Request): Promise<Response> {
-    try {
-      return await fetchImpl(request);
-    } catch {
-      // The underlying error can carry the URL; it is dropped (I-7).
-      throw new StorageError('network', 'storage request failed');
-    }
-  }
+  const objectUrl = (key: string): string => `${session.bucketUrl}/${key}`;
 
   function checkOwn(obj: StoredObject): string {
     if (obj === null || typeof obj !== 'object' || obj.kind !== 's3') {
@@ -153,7 +69,7 @@ export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
     const key = checkOwn(obj);
     const at = now();
     checkFuture(expiresAt, at, 'expiresAt');
-    const creds = await credentials(at);
+    const creds = await session.credentials(at);
     let until = Math.min(expiresAt.getTime(), at.getTime() + MAX_PRESIGN_SECONDS * 1000);
     if (creds.expiresAt !== undefined) until = Math.min(until, creds.expiresAt.getTime());
     const seconds = Math.floor((until - at.getTime()) / 1000);
@@ -162,9 +78,9 @@ export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
     }
     const url = new URL(objectUrl(key));
     url.searchParams.set('X-Amz-Expires', String(seconds));
-    const signed = await client(creds).sign(url.toString(), {
+    const signed = await session.client(creds).sign(url.toString(), {
       method: 'GET',
-      aws: { signQuery: true, datetime: amzDate(at) },
+      aws: { signQuery: true, datetime: session.amzDate(at) },
     });
     log?.debug('storage presign', { ttlSeconds: seconds });
     return { url: signed.url, expiresAt: new Date(at.getTime() + seconds * 1000) };
@@ -179,20 +95,20 @@ export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
       checkFuture(opts.expiresAt, at, 'expiresAt');
       const bytes = await readExactly(ciphertext, opts.size);
       const hash = sha256Hex(bytes);
-      const creds = await credentials(at);
       const key = newObjectKey(storagePrefix);
-      const request = await client(creds).sign(objectUrl(key), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'X-Amz-Content-Sha256': hash,
+      const response = await session.send(
+        objectUrl(key),
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'X-Amz-Content-Sha256': hash,
+          },
+          body: bytes,
         },
-        body: bytes,
-        redirect: 'error',
-        aws: { datetime: amzDate(at) },
-      });
-      const response = await send(request);
-      await response.body?.cancel().catch(() => undefined);
+        at,
+      );
+      await discard(response);
       if (!response.ok) {
         log?.warn('storage put failed', { status: response.status });
         throw new StorageError('upload_failed', 'storage upload failed', response.status);
@@ -209,15 +125,8 @@ export function createS3Adapter(config: S3AdapterConfig): S3Adapter {
 
     async delete(obj: StoredObject): Promise<void> {
       const key = checkOwn(obj);
-      const at = now();
-      const creds = await credentials(at);
-      const request = await client(creds).sign(objectUrl(key), {
-        method: 'DELETE',
-        redirect: 'error',
-        aws: { datetime: amzDate(at) },
-      });
-      const response = await send(request);
-      await response.body?.cancel().catch(() => undefined);
+      const response = await session.send(objectUrl(key), { method: 'DELETE' });
+      await discard(response);
       // 404: already gone, which is the goal of a delete.
       if (!response.ok && response.status !== 404) {
         log?.warn('storage delete failed', { status: response.status });

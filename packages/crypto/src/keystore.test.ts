@@ -84,6 +84,9 @@ const TEST_SEAM = [
   'MemoryOwnerKeyStore',
   // M1-27a: a drop request signed with a raw test drop key (drop Worker tests and vectors).
   'signDropAuthorization',
+  // M1-1d: the ALF1 sealer with a fixed nonce prefix and chunk size.
+  'sealAlf1WithNoncePrefix',
+  'createAlf1SealerWithNoncePrefix',
 ];
 
 describe('@agentlink/crypto/keystore', () => {
@@ -206,6 +209,14 @@ describe('@agentlink/crypto/keystore', () => {
       'sealRecoverySeedWithSaltAndNonceUnsafe',
       'sealPasskeySeedWithNonce',
       'sealRecoverySeedWithSaltAndNonce',
+      // M1-1d: the ALF1 internals with a caller-chosen nonce prefix or start index.
+      'sealAlf1At',
+      'createAlf1SealerAt',
+      'createAlf1OpenerAt',
+      // M1-1d (IR-M1-1d-1 L-3): the raw AES-GCM key API stays internal to the package.
+      'importAes256GcmKey',
+      'aes256GcmSealWithKey',
+      'aes256GcmOpenWithKey',
     ]) {
       expect(Object.keys(main), name).not.toContain(name);
       expect(Object.keys(keystore), name).not.toContain(name);

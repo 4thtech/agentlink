@@ -73,7 +73,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | Node runtime (@agentlink/node) | Relay connection | Done | [#81](https://github.com/4thtech/agentlink/pull/81), [#84](https://github.com/4thtech/agentlink/pull/84) |
 | Node runtime (@agentlink/node) | Policy version record in the keychain | Done | [#86](https://github.com/4thtech/agentlink/pull/86) |
 | Node runtime (@agentlink/node) | First agent card at owner setup | Done | [#118](https://github.com/4thtech/agentlink/pull/118) |
-| Node runtime (@agentlink/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
+| Node runtime (@agentlink/node) | Local approval server | Done | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247), [#256](https://github.com/4thtech/agentlink/pull/256) |
 | Node runtime (@agentlink/node) | Owner recovery without an attached agent | Done | [#206](https://github.com/4thtech/agentlink/pull/206), [#227](https://github.com/4thtech/agentlink/pull/227) |
 | Node runtime (@agentlink/node) | Path guard fixes for Windows and macOS | Done | [#229](https://github.com/4thtech/agentlink/pull/229), [#214](https://github.com/4thtech/agentlink/pull/214) |
 | Node runtime (@agentlink/node) | Passphrase-locked key file for headless machines | Planned | - |
@@ -82,7 +82,7 @@ Code that is merged is not necessarily published: nothing is released or install
 | MCP server, CLI and apps | End-to-end tests | In progress | [#155](https://github.com/4thtech/agentlink/pull/155), [#163](https://github.com/4thtech/agentlink/pull/163), [#165](https://github.com/4thtech/agentlink/pull/165), [#166](https://github.com/4thtech/agentlink/pull/166), [#169](https://github.com/4thtech/agentlink/pull/169), [#171](https://github.com/4thtech/agentlink/pull/171), [#232](https://github.com/4thtech/agentlink/pull/232) |
 | MCP server, CLI and apps | Multi-harness dogfood runbook | Done | [#168](https://github.com/4thtech/agentlink/pull/168), [#202](https://github.com/4thtech/agentlink/pull/202), [#236](https://github.com/4thtech/agentlink/pull/236) |
 | MCP server, CLI and apps | Several agents of one owner on one computer | Done | [#172](https://github.com/4thtech/agentlink/pull/172), [#178](https://github.com/4thtech/agentlink/pull/178) |
-| MCP server, CLI and apps | Local approval page | In progress | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247) |
+| MCP server, CLI and apps | Local approval page | In progress | [#207](https://github.com/4thtech/agentlink/pull/207), [#225](https://github.com/4thtech/agentlink/pull/225), [#247](https://github.com/4thtech/agentlink/pull/247), [#256](https://github.com/4thtech/agentlink/pull/256) |
 | MCP server, CLI and apps | Beginner setup page | Done | [#234](https://github.com/4thtech/agentlink/pull/234) |
 | MCP server, CLI and apps | Owner console, desktop apps, cloud agent | Planned | - |
 | MCP server, CLI and apps | Encrypted drop service | In progress | - |
