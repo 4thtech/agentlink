@@ -210,6 +210,38 @@ describe('deploy-drop.yml structure', () => {
     expect(workflow).not.toMatch(/(echo|printf)[^\n]*\$\{?auth\b/);
     expect(workflow).not.toMatch(/set -x|set -o xtrace/);
   });
+
+  // M1-27b-b: the first real run deployed `<bundle>/index.js --no-bundle --env staging` without a
+  // config. Wrangler looks for its config next to a positional script, not in the working directory,
+  // so no [env.*] section, name, binding, var, limit, observability setting or route applied.
+  it('passes the drop wrangler config to every wrangler call, for both environments', () => {
+    const lines = workflow.split('\n');
+    const calls = [];
+    lines.forEach((line, index) => {
+      if (/^\s*#/.test(line)) return;
+      // Executed wrangler commands only; owner hints inside echo strings are not calls.
+      const code = line.replace(/"[^"]*::(notice|error)::[^"]*"/g, '""');
+      if (!/(^|[\s"(=$])(pnpm exec |npx |pnpm dlx )?wrangler\s/.test(code)) return;
+      if (/^\s*(echo|printf)\b/.test(code)) return;
+      let step = index;
+      while (step > 0 && !/^ {6}- name:/.test(lines[step])) step -= 1;
+      const header = lines.slice(step, index).join('\n');
+      calls.push({ line: line.trim(), inDrop: /\n {8}working-directory: apps\/drop\n/.test(header) });
+    });
+    expect(calls.length).toBeGreaterThanOrEqual(10);
+    for (const call of calls) {
+      expect(call.line).toMatch(/^(?:[A-Za-z_]+="[^"]*" )?(?:if [a-z]+="\$\(|live="\$\()?pnpm exec wrangler /);
+      expect(call.line).toMatch(/ --env (staging|production) /);
+      const config = call.inDrop ? '--config wrangler.toml' : '--config apps/drop/wrangler.toml';
+      expect(call.line, call.line).toContain(` ${config}`);
+    }
+    const deploys = calls.filter((c) => / wrangler deploy .*--no-bundle/.test(c.line));
+    expect(deploys.map((c) => c.line.match(/--env (\w+)/)[1]).sort()).toEqual(['production', 'staging']);
+    for (const env of ['staging', 'production']) {
+      expect(calls.some((c) => c.line.includes(`deployments status --env ${env} `))).toBe(true);
+      expect(calls.some((c) => c.line.includes(`rollback "$`) && c.line.includes(`--env ${env} `))).toBe(true);
+    }
+  });
 });
 
 describe('lifecycle read-back', () => {
