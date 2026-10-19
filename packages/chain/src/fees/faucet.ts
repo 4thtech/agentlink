@@ -2,7 +2,7 @@
 //
 // - Testnets only: `FAUCET_CHAIN_IDS` is a hard-coded allowlist, checked again by
 //   `createFaucetChain` together with the config's `testnet` flag. Base Sepolia only until Gnosis
-//   Chiado is deployed (M1-3j, D-63, D-92): adding Chiado is a reviewed code change here, never a
+//   Chiado's smoke test has passed (M1-3j-b): adding Chiado is a reviewed code change here, never a
 //   setting, and never against a predicted vault address.
 // - `buildDepositFor` builds the calls a funder sends to top up another agent's credits: for a
 //   stablecoin an `approve` of exactly the amount to the vault (never an unlimited allowance), then
@@ -23,7 +23,7 @@ import { createRpcCaller, RpcAnswerError, type AnyFetch, type FetchFn } from '..
 import type { DepositStep } from './deposit.js';
 import { offeredToken, offeredTokens } from './tokens.js';
 
-/** The chains a faucet may serve: testnets only (SUB-7). Chiado (10200) joins after M1-3j. */
+/** The chains a faucet may serve: testnets only (SUB-7). Chiado (10200) joins with M1-3j-b (after its smoke test), together with its faucet configuration. */
 export const FAUCET_CHAIN_IDS: readonly number[] = Object.freeze([84532]);
 
 /** The most one claim may credit, in US cents ($10). */

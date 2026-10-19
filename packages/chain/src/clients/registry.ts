@@ -98,6 +98,19 @@ export function chainRegistry(): readonly ChainConfig[] {
   return registry;
 }
 
+/**
+ * Chains in the registry (their addresses and ABIs are shipped and an explicit override may name
+ * them) that automatic selection must not pick yet. Gnosis Chiado (10200) is deployed, but its smoke
+ * test has not run and the faucet does not serve it, so an unfunded payer would be routed to a chain
+ * it cannot get credits on. Enabling it is card M1-3j-b (owner accepts the routing change).
+ */
+const NOT_AUTO_SELECTED: ReadonlySet<number> = new Set([10200]);
+
+/** The registry chains that automatic selection and the default proof platform may use. */
+export function autoSelectableChains(): readonly ChainConfig[] {
+  return chainRegistry().filter((c) => !NOT_AUTO_SELECTED.has(c.chainId));
+}
+
 /** The config for `chainId`, or undefined when this release does not support it. */
 export function getChainConfig(chainId: number): ChainConfig | undefined {
   return chainRegistry().find((c) => c.chainId === chainId);
@@ -110,9 +123,10 @@ export interface SelectChainOptions {
 }
 
 /**
- * Picks the chain for an action with no user choice (D-40, 02 F-51). Today: the override when it
- * names a supported chain, otherwise the first supported chain. The funded and cheapest-chain
- * steps of 07 §6.3 need credits and quotes and land with M1-26.
+ * Picks the chain for an action with no user choice (D-40, 02 F-51): the override when it names a
+ * supported chain (Chiado included), otherwise the first automatically selectable chain. The
+ * funded and cheapest-chain steps of 07 §6.3 live in `select/` (M1-26) and run over
+ * `autoSelectableChains()`.
  */
 export function selectChain(options: SelectChainOptions = {}): ChainConfig {
   if (options.chainId !== undefined) {
@@ -120,7 +134,7 @@ export function selectChain(options: SelectChainOptions = {}): ChainConfig {
     if (!chosen) fail('unsupported_chain', 'that chain is not supported by this release');
     return chosen;
   }
-  const first = chainRegistry()[0];
+  const first = autoSelectableChains()[0];
   if (!first) fail('unsupported_chain', 'this release supports no chain');
   return first;
 }

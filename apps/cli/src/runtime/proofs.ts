@@ -3,7 +3,7 @@
 // proofs/platform.ts); this module supplies them from the shipped chain list, plus the file and
 // network halves of the proof tools:
 //
-// - nodeProofs: for every supported chain (`chainRegistry()`: the shipped testnets with a deployment
+// - nodeProofs: for every automatically selectable chain (`autoSelectableChains()`, the `chainRegistry()` set minus Chiado until M1-3j-b: the shipped testnets with a deployment
 //   in the pinned contracts release) an address-checked read client (`nodeRpcFetch`, 04 §4), its
 //   chain-state port and a proof submitter (the 4thTech submitter, failover per 07 §6.2); the
 //   chain package's own functions as the core's `kit`; one chain selector shared by the core and the
@@ -198,7 +198,7 @@ export interface NodeProofsOptions extends NodeProofPacksOptions {
   readonly fetchFn?: chain.RpcFetchFn;
   /** Submitter base URLs. Default: SUBMITTER_DEFAULT_URLS. */
   readonly submitterUrls?: readonly string[];
-  /** The supported chains. Default: `chainRegistry()`. */
+  /** The supported chains. Default: `autoSelectableChains()` (Chiado is held back, M1-3j-b). */
   readonly configs?: readonly chain.ChainConfig[];
 }
 
@@ -225,7 +225,7 @@ async function within<T>(work: Promise<T>, ms: number): Promise<T | undefined> {
 
 /** The proof platform over the shipped chains, or undefined when this release supports none. */
 export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefined {
-  const configs = options.configs ?? chain.chainRegistry();
+  const configs = options.configs ?? chain.autoSelectableChains();
   if (configs.length === 0) return undefined;
   const fetchFn = options.fetchFn ?? nodeRpcFetch();
   const urls = options.submitterUrls ?? SUBMITTER_DEFAULT_URLS;
