@@ -7,7 +7,7 @@
 // Worker wrote to the console, and every metric name it keeps, for the URLs, object IDs, drop keys,
 // signatures and nonces the tests used (I-7, 04 §4 Logging).
 import { SELF, env as testEnv } from 'cloudflare:test';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@4thtech-io/crypto';
 import { signDropAuthorization } from '@4thtech-io/crypto/testing';
 import type { DropEnv } from '../src/index.js';
@@ -484,12 +484,18 @@ describe('GET', () => {
   it('refuses after expiresAt', async () => {
     const key = newKey();
     const ip = newIp();
-    const { getUrl } = await storeFile(key, ip, bytesOf(13_000), now() + 2);
-    expect((await SELF.fetch(getUrl)).status).toBe(200);
-    await new Promise((resolve) => setTimeout(resolve, 3_100));
-    const late = await SELF.fetch(getUrl);
-    expect(late.status).toBe(410);
-    expect((await errorOf(late)).error).toBe('expired');
+    // Only Date is faked (timers and I/O stay real), so the expiry window cannot race a slow runner.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() });
+    try {
+      const { getUrl, expiresAt } = await storeFile(key, ip, bytesOf(13_000), now() + 60);
+      expect((await SELF.fetch(getUrl)).status).toBe(200);
+      vi.setSystemTime((expiresAt + 1) * 1000);
+      const late = await SELF.fetch(getUrl);
+      expect(late.status).toBe(410);
+      expect((await errorOf(late)).error).toBe('expired');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('refuses a tampered getUrl', async () => {
