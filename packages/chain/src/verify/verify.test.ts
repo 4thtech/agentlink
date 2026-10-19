@@ -7,17 +7,28 @@
 // test-vectors/ (deps-check). The EOA signer is a fixed test scalar; viem signs the digest as an
 // independent signer (test only: production code verifies through @4thtech-io/crypto).
 import {
+  canonicalizeToBytes,
   decodeHex,
   encodeBase64url,
+  encodeHex,
   encodeHex0x,
   envelopeHash,
   hashRecord,
   occV2Domain,
   recipientCommitment,
+  sha256,
+  termsHash,
   type Envelope,
   type OccRecord,
 } from '@4thtech-io/crypto';
-import { decodeFunctionData, encodeFunctionResult, parseAbi, type Hex as ViemHex } from 'viem';
+import {
+  decodeFunctionData,
+  encodeAbiParameters,
+  encodeEventTopics,
+  encodeFunctionResult,
+  parseAbi,
+  type Hex as ViemHex,
+} from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { GNOSIS_CHIADO, type ChainConfig, type ChainNetwork } from '../config/index.js';
@@ -29,8 +40,10 @@ import * as packageRoot from '../index.js';
 import {
   MAX_PROOF_PACK_BYTES,
   PROOF_CONTENT_FAILURES,
+  PROOF_NOTICES,
   PROOF_PACK_FAILURES,
   proofFailureMessage,
+  proofNoticeMessage,
   verifyProofPack,
   type ProofPackResult,
   type VerifyChain,
@@ -328,6 +341,12 @@ interface FakeChain {
   erc1271?: (hash: string, signature: string) => string;
   /** The ERC-1271 call reverts. */
   erc1271Reverts?: boolean;
+  /** The RPC fails (503) for the ERC-1271 call only: the chain could not be asked (D-96). */
+  erc1271Down?: boolean;
+  /** eth_getTransactionReceipt by hash (M1-4d-c); a missing hash answers null (not found). */
+  txReceipts?: Map<string, unknown>;
+  /** The RPC fails (503) for eth_getTransactionReceipt only. */
+  txDown?: boolean;
   down?: boolean;
 }
 
@@ -346,6 +365,8 @@ const EMPTY_STATE: RecordState = {
 
 function chainFetch(config: ChainConfig, chain: FakeChain) {
   const calls: RpcCall[] = [];
+  /** The transaction hashes read with eth_getTransactionReceipt, in order. */
+  const txCalls: string[] = [];
   const impl = async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const body = JSON.parse(String(init?.body)) as {
       id: number;
@@ -363,6 +384,12 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
       const [address] = body.params as [string];
       calls.push({ method: body.method, to: address.toLowerCase() });
       return answer(chain.code?.get(address.toLowerCase()) ?? '0x');
+    }
+    if (body.method === 'eth_getTransactionReceipt') {
+      const [hash] = body.params as [string];
+      txCalls.push(hash);
+      if (chain.txDown === true) return new Response('down at rpcpathmarker', { status: 503 });
+      return answer(chain.txReceipts?.get(hash) ?? null);
     }
     if (body.method !== 'eth_call') throw new Error(`unexpected ${body.method}`);
     const tx = body.params[0] as { to: string; data: ViemHex };
@@ -386,6 +413,7 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
     }
     const { functionName, args } = decodeFunctionData({ abi: ERC1271_ABI, data: tx.data });
     calls.push({ method: body.method, to, fn: functionName });
+    if (chain.erc1271Down === true) return new Response('down at rpcpathmarker', { status: 503 });
     if (chain.erc1271Reverts === true) {
       return new Response(
         JSON.stringify({
@@ -409,13 +437,13 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
   };
   const fetchFn = vi.fn(impl) as Mock<typeof impl>;
   Object.defineProperty(fetchFn, ADDRESS_CHECKED, { value: true });
-  return { fetchFn, calls };
+  return { fetchFn, calls, txCalls };
 }
 
 function chainFor(config: ChainConfig, chain: FakeChain) {
-  const { fetchFn, calls } = chainFetch(config, chain);
+  const { fetchFn, calls, txCalls } = chainFetch(config, chain);
   const client = createReadClient(config, { fetchFn, retryCount: 0, rpcUrls: [SECRET_RPC_URL] });
-  return { reader: { config, client } satisfies VerifyChain, fetchFn, calls };
+  return { reader: { config, client } satisfies VerifyChain, fetchFn, calls, txCalls };
 }
 
 // --- pack fixtures --------------------------------------------------------------------------------
@@ -610,7 +638,7 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
       finality: 'finalized',
       envelopeHash: MESSAGE_ENVELOPE_HASH,
       recipient: { evm: RECIPIENT },
-      receipts: [{ type: 'DELIVERED', at: iso(DELIVERED_AT) }],
+      receipts: [{ type: 'DELIVERED', at: iso(DELIVERED_AT), tx: { status: 'not_checked' } }],
       contentVerified: false,
       content: {
         status: 'unattributed',
@@ -624,6 +652,8 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
         },
         sender: MESSAGE_ENVELOPE.from,
       },
+      ownerApproval: { status: 'none' },
+      notices: [],
     });
     // One getRecord at the configured Notary, at the finalized block; an EOA needs no code read.
     expect(calls).toEqual([
@@ -668,14 +698,15 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
 
   it('reports the receipts the chain holds, not only the ones the pack lists', async () => {
     const f = await eoaFixture();
+    f.state.receiptFlags = 0b0011;
     f.state.receiptAt = [BigInt(DELIVERED_AT), BigInt(DELIVERED_AT + 60), 0n, 0n];
     const { reader } = chainWith(f);
     const result = await verify(f.pack, [reader]);
     expect(result.valid).toBe(true);
     if (!result.valid) return;
     expect(result.receipts).toEqual([
-      { type: 'DELIVERED', at: iso(DELIVERED_AT) },
-      { type: 'OPENED', at: iso(DELIVERED_AT + 60) },
+      { type: 'DELIVERED', at: iso(DELIVERED_AT), tx: { status: 'not_checked' } },
+      { type: 'OPENED', at: iso(DELIVERED_AT + 60), tx: { status: 'not_checked' } },
     ]);
   });
 
@@ -888,36 +919,10 @@ describe('verifyProofPack: each tamper fails with its own fixed code', () => {
     });
   }
 
-  it('an ERC-1271 account that does not accept the signature', async () => {
-    const f = erc1271Fixture();
-    const { reader } = chainWith(f, { code: new Map([[VECTOR_RECORD.signer, '0x6080604052']]) });
-    expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
-  });
-
-  it('an ERC-1271 call that reverts', async () => {
-    const f = erc1271Fixture();
-    const { reader } = chainWith(f, {
-      code: new Map([[VECTOR_RECORD.signer, '0x6080604052']]),
-      erc1271Reverts: true,
-    });
-    expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
-  });
-
   it('a non-ECDSA signature from a signer with no code', async () => {
     const f = erc1271Fixture();
     const { reader } = chainWith(f);
     expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
-  });
-
-  it('an ERC-1271 account that answers with no data or less than a word (L-1)', async () => {
-    for (const raw of ['0x', ERC1271_MAGIC]) {
-      const f = erc1271Fixture();
-      const { reader } = chainWith(f, {
-        code: new Map([[VECTOR_RECORD.signer, '0x6080604052']]),
-        erc1271Raw: raw,
-      });
-      expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
-    }
   });
 
   it('a record time no timestamp can hold (uint64 max) is malformed_record (L-1)', async () => {
@@ -979,19 +984,21 @@ describe('verifyProofPack: finality (IR-M1-4d-1 M-3)', () => {
 
   it('a receipt newer than the finalized block verifies at latest (IR-M1-4d-2 R2-M-1)', async () => {
     const f = await eoaFixture();
-    const finalState = { ...f.state, receiptAt: [0n, 0n, 0n, 0n] as const };
+    const finalState = { ...f.state, receiptFlags: 0, receiptAt: [0n, 0n, 0n, 0n] as const };
     const { reader, calls } = chainWith(f, {
       finalizedRecords: new Map([[f.recordId, finalState]]),
     });
     const result = await verify(f.pack, [reader]);
     expect(result.valid && result.finality).toBe('latest');
-    expect(result.valid && result.receipts).toEqual([{ type: 'DELIVERED', at: iso(DELIVERED_AT) }]);
+    expect(result.valid && result.receipts).toEqual([
+      { type: 'DELIVERED', at: iso(DELIVERED_AT), tx: { status: 'not_checked' } },
+    ]);
     expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
   });
 
   it('a receipt missing at both blocks still fails receipt_not_on_chain', async () => {
     const f = await eoaFixture();
-    const bare = { ...f.state, receiptAt: [0n, 0n, 0n, 0n] as const };
+    const bare = { ...f.state, receiptFlags: 0, receiptAt: [0n, 0n, 0n, 0n] as const };
     const { reader, calls } = chainFor(base(), {
       records: new Map([[f.recordId, bare]]),
     });
@@ -1606,6 +1613,597 @@ describe('verifyProofPack: strict parsing of untrusted input (I-5)', () => {
       expect(text.length).toBeGreaterThan(10);
       expect(text).not.toMatch(/wallet|gas|seed phrase|transaction/i);
     }
+    for (const code of PROOF_NOTICES) {
+      const text = proofNoticeMessage(code);
+      expect(text.length).toBeGreaterThan(10);
+      expect(text).not.toMatch(/wallet|gas|seed phrase|transaction/i);
+    }
+  });
+});
+
+// --- M1-4d-c: receipt flags, contract signers, receipt transactions and owner approval -------------
+
+describe('verifyProofPack: receiptFlags cross-check (D-97; 05 §3.3, 07 §8)', () => {
+  const D = BigInt(DELIVERED_AT);
+  type FlagCase = {
+    name: string;
+    flags: number;
+    at: readonly [bigint, bigint, bigint, bigint];
+  };
+  const mismatches: FlagCase[] = [
+    { name: 'a bit set without its time (OPENED)', flags: 0b0011, at: [D, 0n, 0n, 0n] },
+    { name: 'a time without its bit (DELIVERED)', flags: 0b0000, at: [D, 0n, 0n, 0n] },
+    { name: 'a time without its bit (REJECTED)', flags: 0b0001, at: [D, 0n, 0n, D + 9n] },
+    { name: 'bit 4 set', flags: 0b0001_0001, at: [D, 0n, 0n, 0n] },
+    { name: 'bit 7 set', flags: 0b1000_0001, at: [D, 0n, 0n, 0n] },
+    { name: 'the flags shifted by one (type t at bit t)', flags: 0b0010, at: [D, 0n, 0n, 0n] },
+    {
+      name: 'ACCEPTED and REJECTED both set, with both times',
+      flags: 0b1101,
+      at: [D, 0n, D + 5n, D + 9n],
+    },
+  ];
+  for (const c of mismatches) {
+    it(`${c.name} is malformed_record`, async () => {
+      const f = await eoaFixture();
+      f.state.receiptFlags = c.flags;
+      f.state.receiptAt = c.at;
+      const { reader } = chainWith(f);
+      const result = await verify(f.pack, [reader]);
+      expectFailure(result, 'malformed_record');
+      expectNoEcho(result, f.recordId.slice(2));
+    });
+  }
+
+  it('the mismatch is checked at every block read: a malformed finalized state is not used', async () => {
+    const f = await eoaFixture();
+    const bad = { ...f.state, receiptFlags: 0b0011 };
+    const { reader } = chainWith(f, { finalizedRecords: new Map([[f.recordId, bad]]) });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.finality).toBe('latest');
+  });
+
+  it('consistent flags verify: DELIVERED, OPENED and ACCEPTED', async () => {
+    const f = await eoaFixture();
+    f.state.receiptFlags = 0b0111;
+    f.state.receiptAt = [D, D + 1n, D + 2n, 0n];
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid).toBe(true);
+    expect(result.valid && result.receipts.map((r) => r.type)).toEqual([
+      'DELIVERED',
+      'OPENED',
+      'ACCEPTED',
+    ]);
+  });
+
+  it('consistent flags verify: REJECTED alone, and no receipts at all', async () => {
+    const f = await eoaFixture();
+    f.pack.receipts = [];
+    f.state.receiptFlags = 0b1000;
+    f.state.receiptAt = [0n, 0n, 0n, D];
+    expect((await verify(f.pack, [chainWith(f).reader])).valid).toBe(true);
+    f.state.receiptFlags = 0;
+    f.state.receiptAt = [0n, 0n, 0n, 0n];
+    expect((await verify(f.pack, [chainWith(f).reader])).valid).toBe(true);
+  });
+});
+
+describe('verifyProofPack: a contract account that no longer confirms (D-96; 07 §8)', () => {
+  const CODE = new Map([[VECTOR_RECORD.signer, '0x6080604052']]);
+  const NOTICE = {
+    code: 'signer_no_longer_confirms',
+    message:
+      "The signer's account no longer confirms this record. The proof network checked it when the record was made.",
+  };
+
+  function expectNotice(result: ProofPackResult): void {
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.verdict).toBe('record_only');
+    expect(result.signerType).toBe('contract');
+    expect(result.notices).toEqual([NOTICE]);
+    expectNoEcho(result);
+  }
+
+  it('an account that answers another value: the pack stands, with its own non-fatal code', async () => {
+    const f = erc1271Fixture();
+    const { reader } = chainWith(f, { code: CODE });
+    expectNotice(await verify(f.pack, [reader]));
+  });
+
+  it('an account whose isValidSignature reverts: the same non-fatal code', async () => {
+    const f = erc1271Fixture();
+    const { reader } = chainWith(f, { code: CODE, erc1271Reverts: true });
+    expectNotice(await verify(f.pack, [reader]));
+  });
+
+  it('an account that answers with no data or less than a word: the same non-fatal code', async () => {
+    for (const raw of ['0x', ERC1271_MAGIC]) {
+      const f = erc1271Fixture();
+      const { reader } = chainWith(f, { code: CODE, erc1271Raw: raw });
+      expectNotice(await verify(f.pack, [reader]));
+    }
+  });
+
+  it('an account that still confirms carries no notice', async () => {
+    const f = erc1271Fixture();
+    const { reader } = chainWith(f, {
+      code: CODE,
+      erc1271: (hash) => (hash === VECTOR_DIGEST ? ERC1271_MAGIC : '0xffffffff'),
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.notices).toEqual([]);
+    expect(result.valid && result.signerType).toBe('contract');
+  });
+
+  it('an account that cannot be asked is chain_unavailable, never the notice', async () => {
+    const f = erc1271Fixture();
+    const { reader } = chainWith(f, { code: CODE, erc1271Down: true });
+    expectFailure(await verify(f.pack, [reader]), 'chain_unavailable');
+  });
+
+  it('an ECDSA signer whose signature fails stays signature_invalid', async () => {
+    const f = await eoaFixture({ signWith: OTHER });
+    expectFailure(await verify(f.pack, [chainWith(f).reader]), 'signature_invalid');
+    const g = erc1271Fixture();
+    expectFailure(await verify(g.pack, [chainWith(g).reader]), 'signature_invalid');
+  });
+
+  it('a refusing contract signer with a card and disclosed content: content unattributed, verdict unchanged', async () => {
+    const f = await eoaFixture({ signWith: OTHER });
+    const { reader } = chainWith(f, { code: new Map([[SIGNER_EVM, '0x6080604052']]) });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.verdict).toBe('record_only');
+    expect(result.content.status).toBe('unattributed');
+    expect(result.notices).toEqual([NOTICE]);
+  });
+
+  it('the notice codes are listed with fixed text and are not failure codes', () => {
+    expect(PROOF_NOTICES).toEqual(['signer_no_longer_confirms', 'receipt_tx_mismatch']);
+    expect(proofNoticeMessage('signer_no_longer_confirms')).toBe(NOTICE.message);
+    expect(PROOF_PACK_FAILURES).not.toContain('signer_no_longer_confirms');
+    expect(PROOF_CONTENT_FAILURES).not.toContain('signer_no_longer_confirms');
+  });
+});
+
+describe('verifyProofPack: receipt txHash check (M1-4d-c; a transaction receipt read, no log query)', () => {
+  const NOTARY = () => base().contracts.notary;
+  const RECEIPT_EVENT = parseAbi([
+    'event ReceiptRecorded(bytes32 indexed recordId, uint8 receiptType, address indexed signer, uint64 timestamp)',
+    'event ReceiptSkipped(bytes32 indexed recordId, uint8 receiptType)',
+  ]);
+
+  function recordedLog(
+    recordId: string,
+    over: { address?: string; type?: number; signer?: string; at?: number } = {},
+  ) {
+    return {
+      address: over.address ?? NOTARY(),
+      topics: encodeEventTopics({
+        abi: RECEIPT_EVENT,
+        eventName: 'ReceiptRecorded',
+        args: {
+          recordId: recordId as ViemHex,
+          signer: (over.signer ?? RECIPIENT) as ViemHex,
+        },
+      }),
+      data: encodeAbiParameters(
+        [{ type: 'uint8' }, { type: 'uint64' }],
+        [over.type ?? 1, BigInt(over.at ?? DELIVERED_AT)],
+      ),
+      logIndex: '0x0',
+      transactionHash: TX_HASH,
+    };
+  }
+
+  function txReceipt(logs: unknown[], status = '0x1') {
+    return { status, transactionHash: TX_HASH, blockNumber: '0x10', logs };
+  }
+
+  it('a receipt whose transaction records it is confirmed, with its hash', async () => {
+    const f = await eoaFixture();
+    const { reader, txCalls } = chainWith(f, {
+      txReceipts: new Map([[TX_HASH, txReceipt([recordedLog(f.recordId)])]]),
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.receipts).toEqual([
+      { type: 'DELIVERED', at: iso(DELIVERED_AT), tx: { status: 'confirmed', txHash: TX_HASH } },
+    ]);
+    expect(result.valid && result.notices).toEqual([]);
+    expect(txCalls).toEqual([TX_HASH]);
+  });
+
+  it('a transaction the chain does not show (pruned or unknown) is not checked', async () => {
+    const f = await eoaFixture();
+    const result = await verify(f.pack, [chainWith(f).reader]);
+    expect(result.valid && result.receipts[0]?.tx).toEqual({ status: 'not_checked' });
+    expect(result.valid && result.notices).toEqual([]);
+  });
+
+  it('a failed transaction-receipt read is not checked, not a failure of the pack', async () => {
+    const f = await eoaFixture();
+    const result = await verify(f.pack, [chainWith(f, { txDown: true }).reader]);
+    expect(result.valid).toBe(true);
+    expect(result.valid && result.receipts[0]?.tx).toEqual({ status: 'not_checked' });
+    expectNoEcho(result);
+  });
+
+  it('a chain receipt the pack does not list is not checked and is not read', async () => {
+    const f = await eoaFixture();
+    f.state.receiptFlags = 0b0011;
+    f.state.receiptAt = [BigInt(DELIVERED_AT), BigInt(DELIVERED_AT + 60), 0n, 0n];
+    const { reader, txCalls } = chainWith(f, {
+      txReceipts: new Map([[TX_HASH, txReceipt([recordedLog(f.recordId)])]]),
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.receipts.map((r) => r.tx)).toEqual([
+      { status: 'confirmed', txHash: TX_HASH },
+      { status: 'not_checked' },
+    ]);
+    expect(txCalls).toEqual([TX_HASH]);
+  });
+
+  const MISMATCH_NOTICE = {
+    code: 'receipt_tx_mismatch',
+    message:
+      'A receipt in the proof points to a record on the proof network that does not show it. The receipt itself is on the proof network.',
+  };
+  const mismatches: { name: string; receipt: (recordId: string) => unknown }[] = [
+    { name: 'a reverted transaction', receipt: (id) => txReceipt([recordedLog(id)], '0x0') },
+    { name: 'a transaction with no logs', receipt: () => txReceipt([]) },
+    {
+      name: 'the event from another contract',
+      receipt: (id) => txReceipt([recordedLog(id, { address: `0x${'ee'.repeat(20)}` })]),
+    },
+    {
+      name: 'the event for another record',
+      receipt: () => txReceipt([recordedLog(`0x${'ab'.repeat(32)}`)]),
+    },
+    {
+      name: 'the event for another receipt type',
+      receipt: (id) => txReceipt([recordedLog(id, { type: 2 })]),
+    },
+    {
+      name: 'the event by another signer',
+      receipt: (id) => txReceipt([recordedLog(id, { signer: `0x${'ee'.repeat(20)}` })]),
+    },
+    {
+      name: 'the event at another time',
+      receipt: (id) => txReceipt([recordedLog(id, { at: DELIVERED_AT + 1 })]),
+    },
+    {
+      name: 'only a ReceiptSkipped event (never evidence of a receipt, 05 §6)',
+      receipt: (id) =>
+        txReceipt([
+          {
+            address: NOTARY(),
+            topics: encodeEventTopics({
+              abi: RECEIPT_EVENT,
+              eventName: 'ReceiptSkipped',
+              args: { recordId: id as ViemHex },
+            }),
+            data: encodeAbiParameters([{ type: 'uint8' }], [1]),
+          },
+        ]),
+    },
+    {
+      name: 'a log that does not decode',
+      receipt: (id) =>
+        txReceipt([
+          { ...recordedLog(id), data: '0x01' },
+          { address: NOTARY(), topics: [], data: '0x' },
+        ]),
+    },
+    { name: 'an answer that is not a receipt object', receipt: () => 'nonsense' },
+  ];
+  for (const c of mismatches) {
+    it(`${c.name}: mismatch, reported with a non-fatal code, the verdict unchanged`, async () => {
+      const f = await eoaFixture();
+      const { reader } = chainWith(f, { txReceipts: new Map([[TX_HASH, c.receipt(f.recordId)]]) });
+      const result = await verify(f.pack, [reader]);
+      expect(result.valid).toBe(true);
+      if (!result.valid) return;
+      expect(result.verdict).toBe('record_only');
+      expect(result.receipts[0]?.tx).toEqual({ status: 'mismatch' });
+      expect(result.notices).toEqual([MISMATCH_NOTICE]);
+      // The pack's hash is not repeated for a receipt it does not point to.
+      expectNoEcho(result, TX_HASH.slice(2));
+    });
+  }
+});
+
+describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)', () => {
+  // BIP-340 signatures by the owner key 0x5c…5c (and one by 0x5d…5d), made with
+  // @4thtech-io/crypto's bip340Sign and an all-zero auxRand outside this package, over
+  // taggedHash("agentlink/owner-action/v1", sha256(JCS(body))) for the bodies built below.
+  const APPROVING_OWNER = '474c9c627ad19d0ae5c70050703dc62ebbee99885d054623f59f8f79a277904e';
+  const SIG_OFFER =
+    '84fe85c3ebdedbaef33e60bbae89bce3ff394c52b413f9f90f154f1bb556b165233f2a4c333b9863a7c250dd98b647e9776846ec543eb664fefae73708ed8814';
+  const SIG_ACCEPT =
+    'bfce39e5dfbbd6ccb66e8ba34e0963e9b72b922a164ecace2801b78184d9c16a931bbbb89d3d1a490ddc4d1d6815bf53874ed24b448480f80a2f9e907cd873da';
+  /** A firm offer approved for OTHER (an agent that is neither the signer nor its counterparty). */
+  const SIG_STRANGER =
+    '53579d335531c0c1047f9b5d661a2dfc746cb4808e0073bfb66093f6601a072423ad07b237aef98f3b34610dfef485b204b616128bb70328c17680429a754f21';
+  /** A firm offer whose scope termsHash is not the hash of its stored terms. */
+  const SIG_BAD_TERMS =
+    'c42c4ca655c72a16843461410422d7d80fcb58d37e7efd59e82aa2362547aca976cc825b92b8c70c41f5c0ac5c383c4e8c6be6b06bd26b3d4fc694385a40a4e0';
+  /** The firm offer body signed by another key (0x5d…5d). */
+  const SIG_OFFER_WRONG_KEY =
+    'c254e975d7be6656d34ff31c98aee8ba583b05e4346716d197f99f6a9ddab54c2b50a5b5cedffd3532fd00e5771a7677868963cbb6e534eef680b1697f241d51';
+  const OTHER_EVM = OTHER.address.toLowerCase();
+  const ENVELOPE_ID = MESSAGE_ENVELOPE.id;
+  const OFFER = 3;
+  const ACCEPT = 4;
+
+  const sortParties = (a: string, b: string) => (a < b ? [a, b] : [b, a]);
+  function storedTerms(payer: string, deliverer: string) {
+    return {
+      termsId: 'VFRUVFRUVFRUVFRUVFRUVA',
+      version: 1,
+      parties: sortParties(payer, deliverer),
+      subject: 'Logo design',
+      deliverables: [
+        { id: 'd1', description: 'Three logo drafts', by: deliverer, plaintextSha256: null },
+      ],
+      price: { amount: '250.00', currency: 'USD', payer },
+      deadlines: [{ ref: 'd1', due: '2026-11-30T17:00:00Z' }],
+      validUntil: 1760600000,
+      previousTermsHash: null,
+    };
+  }
+  const scopeBase = {
+    v: 1,
+    kind: 'agentlink/commitment',
+    thread: 'Jqgjx2tXGK5rxsnWiTwjtw',
+    termsId: 'VFRUVFRUVFRUVFRUVFRUVA',
+    version: 1,
+    createdAt: 1760000000,
+    expiresAt: 1760600000,
+  };
+
+  /** A firm offer (decision `offer`) by `agentId` to RECIPIENT. */
+  function offerAction(over: { agentId?: string; termsHash?: string } = {}) {
+    const self = over.agentId ?? SIGNER_EVM;
+    const terms = storedTerms(self, RECIPIENT);
+    return {
+      tool: 'agentlink_propose_terms',
+      args: {
+        to: RECIPIENT,
+        terms: {
+          subject: 'Logo design',
+          deliverables: [{ description: 'Three logo drafts', by: 'them' }],
+          price: { amount: '250.00', currency: 'USD', payer: 'me' },
+          deadlines: [{ ref: 'd1', due: '2026-11-30T17:00:00Z' }],
+          validUntil: '2025-10-16T07:33:20Z',
+        },
+        notarize: true,
+      },
+      context: {
+        triggers: ['commitments.accept'],
+        scope: {
+          ...scopeBase,
+          agentId: self,
+          decision: 'offer',
+          counterparty: { agentId: RECIPIENT, ownerKey: '77'.repeat(32) },
+          termsHash: over.termsHash ?? termsHash(terms),
+          answers: null,
+          notarize: true,
+          maxFeeUsd: '0.1',
+        },
+        terms,
+        fee: { token: FEE_ASSET, amount: '100000', usd: '0.1' },
+      },
+    };
+  }
+
+  /** The recipient accepts the signer's offer (the record's envelope), without notarizing. */
+  function acceptAction() {
+    const terms = storedTerms(RECIPIENT, SIGNER_EVM);
+    return {
+      tool: 'agentlink_respond_to_terms',
+      args: { envelopeId: ENVELOPE_ID, decision: 'accept', notarize: false },
+      context: {
+        triggers: ['commitments.accept'],
+        scope: {
+          ...scopeBase,
+          agentId: RECIPIENT,
+          decision: 'accept',
+          counterparty: { agentId: SIGNER_EVM, ownerKey: '66'.repeat(32) },
+          termsHash: termsHash(terms),
+          answers: { envelopeId: ENVELOPE_ID, envelopeHash: MESSAGE_ENVELOPE_HASH },
+          notarize: false,
+          maxFeeUsd: null,
+        },
+        terms,
+        fee: null,
+      },
+    };
+  }
+
+  function decideBody(action: unknown, agent: string) {
+    return {
+      v: 1,
+      agent,
+      owner: APPROVING_OWNER,
+      op: 'approval.decide',
+      params: {
+        approvalId: 'apr_QUFBQUFBQUFBQUFBQUFBQQ',
+        actionDigest: encodeHex(sha256(canonicalizeToBytes(action))),
+        decision: 'approve',
+      },
+      nonce: 'Tk5OTk5OTk5OTk5OTk5OTg',
+      issuedAt: 1760000000,
+      expiresAt: 1760000600,
+    };
+  }
+
+  const approvalOf = (action: { context: { scope: { agentId: string } } }, sig: string) => ({
+    signed: { body: decideBody(action, action.context.scope.agentId), sig },
+    action,
+  });
+
+  /** A pack for a record of `kind` with the approval, and no disclosed content. */
+  async function packWith(
+    approval: unknown,
+    options: FixtureOptions & { ownerNostr?: string } = {},
+  ): Promise<Fixture> {
+    const { ownerNostr, ...rest } = options;
+    let card = rest.card;
+    if (ownerNostr !== undefined) {
+      const agentCard = cardFor({ ownerNostr });
+      card = { agentCard, cardSig: await signCard(agentCard) };
+    }
+    const f = await eoaFixture({ kind: OFFER, ...rest, ...(card === undefined ? {} : { card }) });
+    delete f.pack.envelope;
+    f.pack.disclosure = null;
+    f.pack.ownerApproval = approval;
+    return f;
+  }
+
+  const verifyFixture = async (f: Fixture) => verify(f.pack, [chainWith(f).reader]);
+
+  it('no approval in the pack is reported as none', async () => {
+    const f = await packWith(null);
+    const result = await verifyFixture(f);
+    expect(result.valid && result.ownerApproval).toEqual({ status: 'none' });
+  });
+
+  it('a standing rule is reported with its policy hash; the policy is not in the pack', async () => {
+    const policyHash = 'ab'.repeat(32);
+    const f = await packWith({ standingRule: true, policyHash });
+    const result = await verifyFixture(f);
+    expect(result.valid && result.ownerApproval).toEqual({ status: 'standing_rule', policyHash });
+  });
+
+  it("the signer's firm offer, approved by the owner its card names: verified and bound", async () => {
+    const f = await packWith(approvalOf(offerAction(), SIG_OFFER), {
+      ownerNostr: `0x${APPROVING_OWNER}`,
+    });
+    const result = await verifyFixture(f);
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.ownerApproval).toEqual({
+      status: 'signed',
+      approver: 'signer',
+      decision: 'offer',
+      termsHash: termsHash(storedTerms(SIGNER_EVM, RECIPIENT)),
+      version: 1,
+      ownerKey: APPROVING_OWNER,
+      ownerBound: true,
+    });
+    // The approval never raises the verdict on its own.
+    expect(result.verdict).toBe('record_only');
+  });
+
+  it('the same approval without a card verifies but is not bound to an owner', async () => {
+    const f = await packWith(approvalOf(offerAction(), SIG_OFFER), { card: false });
+    const result = await verifyFixture(f);
+    expect(result.valid && result.ownerApproval).toMatchObject({
+      status: 'signed',
+      approver: 'signer',
+      ownerBound: false,
+    });
+  });
+
+  it("the recipient's accept of the recorded offer: verified, approver recipient, not bound", async () => {
+    const f = await packWith(approvalOf(acceptAction(), SIG_ACCEPT));
+    const result = await verifyFixture(f);
+    expect(result.valid && result.ownerApproval).toEqual({
+      status: 'signed',
+      approver: 'recipient',
+      decision: 'accept',
+      termsHash: termsHash(storedTerms(RECIPIENT, SIGNER_EVM)),
+      version: 1,
+      ownerKey: APPROVING_OWNER,
+      ownerBound: false,
+    });
+  });
+
+  const refusals: {
+    name: string;
+    build: () => Promise<Fixture>;
+  }[] = [
+    {
+      name: "an approval by an owner other than the one the signer's card names",
+      build: () => packWith(approvalOf(offerAction(), SIG_OFFER)),
+    },
+    {
+      name: 'a signature by another key',
+      build: () =>
+        packWith(approvalOf(offerAction(), SIG_OFFER_WRONG_KEY), {
+          ownerNostr: `0x${APPROVING_OWNER}`,
+        }),
+    },
+    {
+      name: 'a signed body changed after signing',
+      build: () => {
+        const a = approvalOf(offerAction(), SIG_OFFER);
+        a.signed.body.issuedAt += 1;
+        return packWith(a, { ownerNostr: `0x${APPROVING_OWNER}` });
+      },
+    },
+    {
+      name: 'an action that is not the one the owner signed (digest)',
+      build: () => {
+        const a = approvalOf(offerAction(), SIG_OFFER);
+        a.action.context.terms.subject = 'Logo design and website';
+        a.action.context.scope.termsHash = termsHash(a.action.context.terms);
+        return packWith(a, { ownerNostr: `0x${APPROVING_OWNER}` });
+      },
+    },
+    {
+      name: 'a scope whose termsHash is not the hash of its terms',
+      build: () =>
+        packWith(approvalOf(offerAction({ termsHash: 'ee'.repeat(32) }), SIG_BAD_TERMS), {
+          ownerNostr: `0x${APPROVING_OWNER}`,
+        }),
+    },
+    {
+      name: 'an approval for an agent that is not a party to the record',
+      build: () => packWith(approvalOf(offerAction({ agentId: OTHER_EVM }), SIG_STRANGER)),
+    },
+    {
+      name: "the signer's firm offer approval on a record that is not an OFFER",
+      build: () =>
+        packWith(approvalOf(offerAction(), SIG_OFFER), {
+          ownerNostr: `0x${APPROVING_OWNER}`,
+          kind: 1,
+        }),
+    },
+    {
+      name: "the recipient's accept on a record that is not an OFFER",
+      build: () => packWith(approvalOf(acceptAction(), SIG_ACCEPT), { kind: ACCEPT }),
+    },
+    {
+      name: "the recipient's accept of another envelope",
+      build: () =>
+        packWith(approvalOf(acceptAction(), SIG_ACCEPT), { envelope: TWO_WRAP_ENVELOPE }),
+    },
+    {
+      name: "the recipient's accept on a record with no recipient (a self-note)",
+      build: () => packWith(approvalOf(acceptAction(), SIG_ACCEPT), { selfNote: true }),
+    },
+    {
+      name: "the recipient's accept naming another owner for the signer than its card",
+      build: () =>
+        packWith(approvalOf(acceptAction(), SIG_ACCEPT), { ownerNostr: `0x${APPROVING_OWNER}` }),
+    },
+  ];
+  for (const c of refusals) {
+    it(`${c.name} is refused: owner_approval_invalid`, async () => {
+      const f = await c.build();
+      const result = await verifyFixture(f);
+      expectFailure(result, 'owner_approval_invalid');
+      expectNoEcho(result, APPROVING_OWNER, f.recordId.slice(2));
+    });
+  }
+
+  it('the new code is listed with fixed text', () => {
+    expect(PROOF_PACK_FAILURES).toContain('owner_approval_invalid');
+    expect(proofFailureMessage('owner_approval_invalid' as never)).toMatch(/owner approval/);
   });
 });
 
