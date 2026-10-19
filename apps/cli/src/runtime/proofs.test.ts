@@ -19,6 +19,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
+import * as chain from '@4thtech-io/chain';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeProofPacks, nodeProofs } from './proofs.js';
 
@@ -153,5 +154,84 @@ describe('nodeProofs: the default chain set (M1-3j-b)', () => {
     const proofs = nodeProofs();
     const ids = proofs?.platform.chains.map((c) => c.config.chainId) ?? [];
     expect(ids).toEqual([84532]);
+  });
+});
+
+// M1-26-b (02 F-51, 07 §6.3 step 4, §8; D-40): a proof pack carries its chain, so it verifies with
+// no chain configured. Verification resolves the pack's `chainId` from the whole shipped list
+// (`chainRegistry()`), not from the automatic-selection set: a pack recorded through the Advanced
+// override on a chain that automatic selection holds back (Gnosis Chiado, M1-3j-b) is still read
+// from that chain's shipped RPC and its known Notary. The stub RPC is offline, so the check ends
+// as `chain_unavailable` after reading that chain; without the fix a held-back chain's pack ends
+// as `unsupported_chain` without any read.
+describe('nodeProofs: a pack verifies with no chain configured (M1-26-b)', () => {
+  const ADDRESS_CHECKED = Symbol.for('agentlink.address-checked-rpc-fetch');
+  const hex = (bytes: number, byte: string) => `0x${byte.repeat(bytes)}` as `0x${string}`;
+
+  function offlineRpc(): { fetchFn: chain.RpcFetchFn; hosts: string[] } {
+    const hosts: string[] = [];
+    const fn = (input: string | URL | Request): Promise<Response> => {
+      const url = input instanceof Request ? input.url : String(input);
+      hosts.push(new URL(url).host);
+      return Promise.reject(new Error('offline'));
+    };
+    Object.defineProperty(fn, ADDRESS_CHECKED, { value: true });
+    return { fetchFn: fn as unknown as chain.RpcFetchFn, hosts };
+  }
+
+  function packFor(chainId: number, notaryAddress: string): Record<string, unknown> {
+    const signer = hex(20, 'a1');
+    const notary = notaryAddress.toLowerCase() as `0x${string}`;
+    const envelopeHash = hex(32, '2e');
+    return {
+      type: 'agentlink.proof',
+      version: 1,
+      chainId,
+      notary,
+      recordId: chain.computeRecordId(chainId, notary, signer, 7n),
+      record: {
+        signer,
+        envelopeHash,
+        recipientCommitment: hex(32, 'c1'),
+        parentRecordId: hex(32, '00'),
+        appId: hex(32, '00'),
+        kind: 1,
+        feeToken: hex(20, '3d'),
+        maxFee: '100000',
+        nonce: '7',
+        deadline: 1_760_003_600,
+      },
+      signature: hex(65, '1b'),
+      signer: { evm: signer },
+      envelopeHash,
+      receipts: [],
+      disclosure: null,
+      ownerApproval: null,
+      exportedAt: '2026-10-19T10:00:00Z',
+    };
+  }
+
+  it('reads a pack from every shipped chain, including one automatic selection holds back', async () => {
+    const shipped = chain.chainRegistry();
+    expect(shipped.map((c) => c.chainId)).toContain(10200);
+    for (const config of shipped) {
+      const { fetchFn, hosts } = offlineRpc();
+      // No `configs`, no default chain, no user RPC: the shipped defaults only.
+      const proofs = nodeProofs({ fetchFn, submitterUrls: [] });
+      const result = await proofs!.tools.verify(packFor(config.chainId, config.contracts.notary));
+      expect(result.valid, config.key).toBe(false);
+      expect(result.valid ? undefined : result.reason, config.key).toBe('chain_unavailable');
+      const shippedHosts = config.rpcUrls.map((u) => new URL(u).host);
+      expect(hosts.length, config.key).toBeGreaterThan(0);
+      for (const host of hosts) expect(shippedHosts, config.key).toContain(host);
+    }
+  }, 60_000);
+
+  it('a pack naming a chain this release does not ship is refused without any read', async () => {
+    const { fetchFn, hosts } = offlineRpc();
+    const proofs = nodeProofs({ fetchFn, submitterUrls: [] });
+    const result = await proofs!.tools.verify(packFor(999_999, hex(20, '9a')));
+    expect(result.valid ? undefined : result.reason).toBe('unsupported_chain');
+    expect(hosts).toEqual([]);
   });
 });

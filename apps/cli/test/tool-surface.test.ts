@@ -136,6 +136,44 @@ const FILE_JARGON =
   /\b(chains?|presigned|locators?|s3|r2|buckets?|ciphertext|alf1|nostr|relays?)\b/i;
 const FILE_TOOLS: ReadonlySet<string> = new Set(['agentlink_send', 'agentlink_fetch_file']);
 
+/**
+ * M1-26-b (D-40, 02 F-51, 11 §5.1): users never choose or see a chain outside Advanced.
+ * - Output: a network (`chain`, `chainId`, `network`) or a fee-token name (`token`, except the hex
+ *   address of `fee.token`, 06 §2.4) appears only inside an `advanced` member, at any depth.
+ * - Input: only agentlink_notarize takes the Advanced `chain?` override, and never as required.
+ * - Titles and descriptions name no network or fee token; "chain" appears only in the description
+ *   of the one tool with the override (to say: leave it out).
+ */
+const NETWORK_NAMES = /\b(base|sepolia|gnosis|chiado|usdc|usdt|xdai|blockchain|on-chain)\b/i;
+const CHAIN_WORD = /\bchains?\b/i;
+const CHAIN_OVERRIDE_TOOL = 'agentlink_notarize';
+const NETWORK_FIELD = /^(chain|chainId|network)$/;
+
+/** Output fields that name a network or a fee token outside `advanced`, as dotted paths. */
+export function networkFieldsOutsideAdvanced(schema: unknown, at = ''): string[] {
+  const out: string[] = [];
+  if (Array.isArray(schema)) {
+    for (const item of schema) out.push(...networkFieldsOutsideAdvanced(item, at));
+    return out;
+  }
+  if (typeof schema !== 'object' || schema === null) return out;
+  const record = schema as Record<string, unknown>;
+  const props = record['properties'];
+  if (typeof props === 'object' && props !== null) {
+    for (const [key, sub] of Object.entries(props as Record<string, unknown>)) {
+      if (key === 'advanced') continue;
+      const where = at === '' ? key : `${at}.${key}`;
+      if (NETWORK_FIELD.test(key)) out.push(where);
+      if (key === 'token' && !at.endsWith('fee')) out.push(where);
+      out.push(...networkFieldsOutsideAdvanced(sub, where));
+    }
+  }
+  for (const [key, value] of Object.entries(record)) {
+    if (key !== 'properties') out.push(...networkFieldsOutsideAdvanced(value, at));
+  }
+  return out;
+}
+
 function argNames(schema: unknown, out: string[] = []): string[] {
   if (Array.isArray(schema)) {
     for (const item of schema) argNames(item, out);
@@ -211,6 +249,29 @@ export function auditSurface(
         ['description', tool.description ?? ''],
       ] as const) {
         if (pattern.test(text)) bad.push(`${name}: ${where} uses "${word}" (11 §5)`);
+      }
+    }
+    // M1-26-b: no network outside Advanced, no chain prompt (D-40, 11 §5.1).
+    for (const field of new Set(networkFieldsOutsideAdvanced(tool.outputSchema ?? {}))) {
+      bad.push(`${name}: output field "${field}" names a network outside advanced (D-40)`);
+    }
+    for (const arg of argNames(tool.inputSchema)) {
+      if (NETWORK_FIELD.test(arg) && !(name === CHAIN_OVERRIDE_TOOL && arg === 'chain')) {
+        bad.push(`${name}: argument "${arg}" asks for a network (D-40)`);
+      }
+    }
+    const required = (tool.inputSchema['required'] ?? []) as unknown[];
+    if (required.some((r) => typeof r === 'string' && NETWORK_FIELD.test(r))) {
+      bad.push(`${name}: requires a network argument (D-40)`);
+    }
+    for (const [where, text] of [
+      ['title', tool.title ?? ''],
+      ['description', tool.description ?? ''],
+    ] as const) {
+      const word = NETWORK_NAMES.exec(text)?.[0];
+      if (word !== undefined) bad.push(`${name}: ${where} names a network "${word}" (11 §5.1)`);
+      if (CHAIN_WORD.test(text) && !(where === 'description' && name === CHAIN_OVERRIDE_TOOL)) {
+        bad.push(`${name}: ${where} says "chain" (11 §5.1)`);
       }
     }
     if (name === 'agentlink_send') {
@@ -447,6 +508,58 @@ describe('auditSurface catches bad surfaces (local demonstration, kept as a test
     );
     expect(audit(jargon).join('\n')).toMatch(/agentlink_send: description uses jargon/);
   });
+  it('a network outside advanced: an output field, a chain argument, a network name (M1-26-b)', () => {
+    const status = surface.find((t) => t.name === 'agentlink_status')!;
+    const withChain = (outputSchema: Record<string, unknown>) =>
+      surface.map((t) => (t === status ? { ...t, outputSchema } : t));
+    const credit = (props: Record<string, unknown>) => ({
+      type: 'object',
+      properties: { credits: { type: 'array', items: { type: 'object', properties: props } } },
+    });
+    expect(audit(withChain(credit({ chain: { type: 'string' } }))).join('\n')).toMatch(
+      /agentlink_status: output field "credits.chain" names a network outside advanced/,
+    );
+    expect(audit(withChain(credit({ token: { type: 'string' } }))).join('\n')).toMatch(
+      /output field "credits.token"/,
+    );
+    // Under `advanced` both are fine; `fee.token` (a hex address, 06 §2.4) is fine too.
+    expect(
+      audit(
+        withChain(
+          credit({
+            advanced: {
+              type: 'object',
+              properties: { chain: { type: 'string' }, token: { type: 'string' } },
+            },
+            fee: { type: 'object', properties: { token: { type: 'string' } } },
+          }),
+        ),
+      ).join('\n'),
+    ).not.toMatch(/agentlink_status: output field/);
+    const getProof = surface.find((t) => t.name === 'agentlink_get_proof')!;
+    const chainArg = surface.map((t) =>
+      t === getProof
+        ? { ...t, inputSchema: { type: 'object', properties: { chain: { type: 'string' } } } }
+        : t,
+    );
+    expect(audit(chainArg).join('\n')).toMatch(/agentlink_get_proof: argument "chain" asks/);
+    const notarize = surface.find((t) => t.name === 'agentlink_notarize')!;
+    const required = surface.map((t) =>
+      t === notarize
+        ? { ...t, inputSchema: { ...t.inputSchema, required: ['envelopeId', 'chain'] } }
+        : t,
+    );
+    expect(audit(required).join('\n')).toMatch(/agentlink_notarize: requires a network/);
+    expect(
+      audit(fixture({ name: 'agentlink_status', description: 'Credits on Base Sepolia.' })).join(
+        '\n',
+      ),
+    ).toMatch(/agentlink_status: description names a network "Base"/);
+    expect(
+      audit(fixture({ name: 'agentlink_status', description: 'Pick a chain first.' })).join('\n'),
+    ).toMatch(/agentlink_status: description says "chain"/);
+  });
+
   it('banned vocabulary in a description and in the instructions', () => {
     expect(
       audit(fixture({ name: 'agentlink_status', description: 'Pays the gas fee.' })).join('\n'),
