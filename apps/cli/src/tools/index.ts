@@ -2,12 +2,14 @@
 // helpers and the untrusted-content wrapper. `callTool` is the one entry the MCP binding
 // (src/mcp/) and the mirroring CLI commands use, so a command and its tool cannot drift.
 //
-// Every M1a tool has its handler: invites (M1-9o), send and inbox (M1-9p), terms (M1-9q). A tool
+// Every M1a tool has its handler: invites (M1-9o), send and inbox (M1-9p), terms (M1-9q); the file
+// tools of M1b (M1-9d-1): `path` on send and agentlink_fetch_file. A tool
 // whose card has not landed would answer the fixed "not available yet" error (06 §1 rule 3).
 import type { McpToolName } from '@4thtech-io/types';
 import { acceptInviteHandler } from './accept-invite.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
+import { fetchFileHandler } from './fetch-file.js';
 import { getApprovalHandler } from './get-approval.js';
 import { inboxHandler } from './inbox.js';
 import { matchesSchema } from './input.js';
@@ -43,6 +45,7 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_propose_terms: proposeTermsHandler,
   agentlink_respond_to_terms: respondToTermsHandler,
   agentlink_inbox: inboxHandler,
+  agentlink_fetch_file: fetchFileHandler,
   agentlink_get_approval: getApprovalHandler,
 });
 
@@ -91,6 +94,12 @@ export { TOOLS, PENDING_M1A_TOOLS, findTool, type ToolDefinition } from './regis
 export {
   coreToolClient,
   type ApprovalLink,
+  type AttachedFile,
+  type AttachOutcome,
+  type AttachRefusal,
+  type CoreToolClientOptions,
+  type FileOpener,
+  type FileTools,
   type HandlerEnvironment,
   type InboxPage,
   type InboxPageQuery,

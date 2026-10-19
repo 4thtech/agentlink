@@ -4,7 +4,16 @@
 // `agentlink_fetch_file` saves into a real inbox folder on disk. Two real cores talk over an
 // in-memory relay network; the drop is not configured here (files-drop.worker.test.ts runs the real
 // drop Worker), so a file above the inline limit needs own storage.
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
@@ -87,7 +96,9 @@ beforeAll(async () => {
   await setPolicy(alice, (p) => {
     p.files.allowedFolders = ['~/Work'];
   });
-  aliceMcp = await connect(toolContext(coreToolClient(alice.client, { files: countingOpener }), 'alice'));
+  aliceMcp = await connect(
+    toolContext(coreToolClient(alice.client, { files: countingOpener }), 'alice'),
+  );
   bobMcp = await connect(
     toolContext(coreToolClient(bob.client, { files: nodeFileOpener({ home: bobHome }) }), 'bob'),
   );
@@ -189,7 +200,7 @@ describe('agentlink_send with path and agentlink_fetch_file on disk', () => {
     expect(result.structured).toMatchObject({ status: 'not_found' });
   });
 
-  it('no result or log line carries a URL, a file key or alice\'s file paths (canary scan)', () => {
+  it("no result or log line carries a URL, a file key or alice's file paths (canary scan)", () => {
     const all = [...results, ...logLines].join('\n');
     expect(all).not.toMatch(/https?:\/\//);
     expect(all).not.toMatch(/fileKey|ciphertextSha256/);

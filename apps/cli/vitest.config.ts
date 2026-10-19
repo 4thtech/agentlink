@@ -17,9 +17,7 @@ const MiB = 1024 * 1024;
 const cryptoSource = (file: string): string =>
   decodeURIComponent(new URL(`../../packages/crypto/src/${file}`, import.meta.url).pathname);
 const dropWorker = decodeURIComponent(new URL('../drop/src/index.ts', import.meta.url).pathname);
-const alias = [
-  { find: /^@4thtech-io\/crypto\/testing$/, replacement: cryptoSource('testing.ts') },
-];
+const alias = [{ find: /^@4thtech-io\/crypto\/testing$/, replacement: cryptoSource('testing.ts') }];
 
 export default defineConfig({
   test: {

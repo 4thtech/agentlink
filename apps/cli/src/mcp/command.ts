@@ -68,7 +68,7 @@ export function agentToolContext(
   approvalUi?: ApprovalUi,
 ): ToolContext {
   return Object.freeze<ToolContext>({
-    client: coreToolClient(agent.client),
+    client: coreToolClient(agent.client, agent.files === undefined ? {} : { files: agent.files }),
     clock,
     logger,
     agentName: agent.name,

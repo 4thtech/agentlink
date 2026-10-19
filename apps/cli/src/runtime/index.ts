@@ -23,6 +23,14 @@ export {
   type TerminalContext,
 } from './guards.js';
 export {
+  DROP_ORIGIN,
+  guardedDropFetch,
+  nodeFileOpener,
+  nodeFilesPlatform,
+  type NodeFileOpenerOptions,
+  type NodeFilesPlatformOptions,
+} from './files.js';
+export {
   NO_AGENT_MESSAGE,
   nodeRuntimeDeps,
   openAgent,

@@ -37,6 +37,7 @@ const VALID_ARGS: Record<string, Record<string, unknown>> = {
   agentlink_respond_to_terms: {},
   agentlink_inbox: {},
   agentlink_get_approval: { approvalId: 'apr_AAAAAAAAAAAAAAAAAAAAAA' },
+  agentlink_fetch_file: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
 };
 
 describe('MCP conformance over stdio (06 §9)', () => {

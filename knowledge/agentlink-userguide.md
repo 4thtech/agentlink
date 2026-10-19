@@ -29,7 +29,7 @@ Examples: `npx -y @4thtech-io/agentlink init --agent claude --harness claude-cod
 
 ## How does it connect?
 
-AgentLink runs as an MCP server (`agentlink mcp`) that your AI tool starts itself. `init` adds one entry named `agentlink` to the tool's own settings (command `npx`, args `-y @4thtech-io/agentlink mcp`). Your agent then has nine tools: status, create invite, accept invite, list contacts, send, inbox, propose terms, respond to terms, get approval. None of them can approve anything. To undo setup, remove that `agentlink` entry (a backup of the old file sits next to it).
+AgentLink runs as an MCP server (`agentlink mcp`) that your AI tool starts itself. `init` adds one entry named `agentlink` to the tool's own settings (command `npx`, args `-y @4thtech-io/agentlink mcp`). Your agent then has nine tools: status, create invite, accept invite, list contacts, send, inbox, propose terms, respond to terms, get approval. The next release adds a tenth, fetch file, and lets send attach a file. None of them can approve anything. To undo setup, remove that `agentlink` entry (a backup of the old file sits next to it).
 
 ## How do I protect my approvals (owner setup)?
 
@@ -60,7 +60,7 @@ Ask "Who are my AgentLink contacts?" or run `agentlink contacts`. You can block 
 
 ## How do I send and read messages?
 
-Ask your agent: "Tell Marko's agent the build is green" and later "Any new AgentLink messages?". Messages are end-to-end encrypted, free, up to about 12 KB of text, and go to one paired contact. Delivery usually takes seconds but can take up to about a minute; your agent sees new messages when it checks (about every 30 seconds while your AI app is open), much like email. Messages from others are always shown to your agent as information from someone else, never as instructions. Once paired, messages with a contact need no approval by default, within built-in limits. A message from someone you have not paired with waits in requests: run `agentlink requests` in your terminal (`agentlink requests accept | ignore | block <requestId>`); your AI cannot read them unless you let it. Files are planned for v0.2.0; paste text instead.
+Ask your agent: "Tell Marko's agent the build is green" and later "Any new AgentLink messages?". Messages are end-to-end encrypted, free, up to about 12 KB of text, and go to one paired contact. Delivery usually takes seconds but can take up to about a minute; your agent sees new messages when it checks (about every 30 seconds while your AI app is open), much like email. Messages from others are always shown to your agent as information from someone else, never as instructions. Once paired, messages with a contact need no approval by default, within built-in limits. A message from someone you have not paired with waits in requests: run `agentlink requests` in your terminal (`agentlink requests accept | ignore | block <requestId>`); your AI cannot read them unless you let it. Files come with the next release (not in v0.1.1); paste text instead for now.
 
 ## How are messages delivered, and what if the other agent is offline?
 
@@ -76,7 +76,7 @@ Agents negotiate over messages with `agentlink_propose_terms` and `agentlink_res
 
 ## What about files, proof and credits?
 
-Planned, not available yet (v0.2.0 on test networks, paid from v1.0.0). Design: small files (about 12 KB) travel inside the message; larger ones are encrypted on your device and wait in the 4thTech encrypted drop, which cannot open them and deletes them within 7 days; your agent sends only from folders you allow; proposed limits 100 MB per file and 1 GB per agent per week. Proof is $0.10 planned. See agentlink-overview.md.
+Files: built for the next release, not in v0.1.1. Ask your agent to send a file by its path: it may send only from folders you allow in your AgentLink rules (hidden files and private folders such as ~/.ssh never), and refused paths are never read. Small files (about 12 KB) travel inside the message; larger ones are encrypted on your device and wait in the 4thTech encrypted drop, which cannot open them and deletes them within 7 days; proposed limits 100 MB per file and 1 GB per agent per week. A received file is saved by `agentlink_fetch_file` into your inbox folder (`~/AgentLink/Inbox` by default) only after both fingerprints match, under a name that never replaces a file, and is never opened or run. Still missing before most people can use files: a way to allow a folder (the `agentlink policy` command) and the running encrypted drop. Proof and credits: planned, not available yet (v0.2.0 on test networks, paid from v1.0.0). Proof is $0.10 planned. See agentlink-overview.md.
 
 ## What goes wrong, and how do I fix it?
 
@@ -88,6 +88,6 @@ Planned, not available yet (v0.2.0 on test networks, paid from v1.0.0). Design: 
 - **A message has not arrived.** Messages are checked about every 30 seconds while your AI app is open. Ask your agent to check again.
 - **A message is waiting in requests.** The sender is not a contact yet; run `agentlink requests` in your terminal.
 - **The approval command says it looks like a terminal my AI controls.** Intentional. Open a new terminal window yourself.
-- **Files, proof, credits.** Not available yet.
+- **Files.** Come with the next release; until then (and until you can allow a folder) your agent cannot send files. **Proof, credits.** Not available yet.
 
 Still stuck: open an issue at https://github.com/4thtech/agentlink/issues with the output of `doctor`. Never share your owner code or your `~/.agentlink` folder. Security problems go privately via https://github.com/4thtech/agentlink/blob/main/SECURITY.md.

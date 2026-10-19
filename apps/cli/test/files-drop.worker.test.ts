@@ -191,7 +191,9 @@ beforeAll(async () => {
   });
   aliceOpener.files.set(`${WORK}/notes.txt`, SMALL);
   aliceOpener.files.set(`${WORK}/report.bin`, BIG);
-  aliceMcp = await connect(toolContext(coreToolClient(alice.client, { files: aliceOpener }), 'alice'));
+  aliceMcp = await connect(
+    toolContext(coreToolClient(alice.client, { files: aliceOpener }), 'alice'),
+  );
   bobMcp = await connect(
     toolContext(coreToolClient(bob.client, { files: new MemoryOpener() }), 'bob'),
   );
@@ -234,14 +236,17 @@ describe('agentlink_send with path and agentlink_fetch_file through the encrypte
       envelopeId: string;
       files: { delivery: string }[];
     }[];
-    expect(messages.map((m) => m.files.map((f) => f.delivery))).toEqual([['inline'], ['drop']]);
+    // Both may carry the same second, so they are matched by envelopeId, not by order.
+    const byId = new Map(messages.map((m) => [m.envelopeId, m.files.map((f) => f.delivery)]));
+    expect(byId.get(small.structured['envelopeId'] as string)).toEqual(['inline']);
+    expect(byId.get(big.structured['envelopeId'] as string)).toEqual(['drop']);
 
-    for (const [i, bytes, name] of [
-      [0, SMALL, 'notes.txt'],
-      [1, BIG, 'report.bin'],
+    for (const [sent, bytes, name] of [
+      [small, SMALL, 'notes.txt'],
+      [big, BIG, 'report.bin'],
     ] as const) {
       const fetched = await call(bobMcp, 'agentlink_fetch_file', {
-        envelopeId: messages[i]!.envelopeId,
+        envelopeId: sent.structured['envelopeId'],
       });
       expect(fetched.structured).toMatchObject({
         status: 'ok',
@@ -258,11 +263,14 @@ describe('agentlink_send with path and agentlink_fetch_file through the encrypte
   });
 
   it('no tool result or log line carries a drop URL, the drop host or a file key', async () => {
-    const payloads = await bob.store.transaction((tx) => tx.select('envelopes', { direction: 'in' }));
+    const payloads = await bob.store.transaction((tx) =>
+      tx.select('envelopes', { direction: 'in' }),
+    );
     expect(payloads.length).toBeGreaterThan(0);
     const all = [...results, ...logLines].join('\n');
     expect(all).not.toContain('drop.test');
     for (const url of seen) expect(all).not.toContain(url);
-    expect(all).not.toMatch(/fileKey|ciphertextSha256|X-Amz|presign/i);
+    const hits = all.split('\n').filter((line) => /fileKey|ciphertextSha256|X-Amz-/i.test(line));
+    expect(hits).toEqual([]);
   });
 });

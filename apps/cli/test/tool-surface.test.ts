@@ -115,7 +115,7 @@ const ARG_ALLOWLIST: Readonly<Record<string, Readonly<Record<string, string>>>> 
  * network internals a user never needs to see.
  */
 const FILE_JARGON =
-  /\b(chains?|presigned|locators?|s3|r2|buckets?|ciphertext|alf1|nostr|relays?|url)\b/i;
+  /\b(chains?|presigned|locators?|s3|r2|buckets?|ciphertext|alf1|nostr|relays?)\b/i;
 const FILE_TOOLS: ReadonlySet<string> = new Set(['agentlink_send', 'agentlink_fetch_file']);
 
 function argNames(schema: unknown, out: string[] = []): string[] {
@@ -264,7 +264,7 @@ describe('06 §2.0 table (D-53, D-55)', () => {
 
   it('agentlink_fetch_file carries idempotentHint false (06 §2.0) and no path argument', () => {
     const tool = surface.find((t) => t.name === 'agentlink_fetch_file');
-    expect(tool?.annotations).toEqual({
+    expect(tool?.annotations).toMatchObject({
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,

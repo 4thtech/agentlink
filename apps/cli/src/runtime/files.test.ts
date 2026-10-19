@@ -3,7 +3,16 @@
 // opening a refused file), the inbox folder's file operations (exclusive create without following a
 // link, mode 0600, rename that never overwrites), and the drop fetch guard (the configured origin
 // only, no redirects).
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
@@ -37,7 +46,8 @@ describe('nodeFileOpener', () => {
     const source = await outcome.file.file.open();
     const chunks: Uint8Array[] = [];
     if (source instanceof Uint8Array) chunks.push(source);
-    else for await (const chunk of source as unknown as AsyncIterable<Uint8Array>) chunks.push(chunk);
+    else
+      for await (const chunk of source as unknown as AsyncIterable<Uint8Array>) chunks.push(chunk);
     expect(new TextDecoder().decode(Buffer.concat(chunks))).toBe('hello');
     expect(opens).toBe(1);
     expect(await outcome.file.plaintextSha256()).toBe(
@@ -164,7 +174,8 @@ describe('guardedDropFetch', () => {
       'https://drop.example.evil.test/v1',
       'https://user@drop.example/v1',
     ]) {
-      await expect(fetch(new Request(url))).rejects.toThrow();
+      // A Request cannot carry user info, so the guard is given the URL as a request-like object.
+      await expect(fetch({ url } as Request)).rejects.toThrow();
     }
     expect(seen).toHaveLength(1);
   });

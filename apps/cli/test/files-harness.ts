@@ -128,7 +128,10 @@ export class RelayNetwork implements RelayConnector {
   }
 }
 
-export const presence = () => ({ kind: 'passphrase' as const, secret: encodeUtf8('correct horse') });
+export const presence = () => ({
+  kind: 'passphrase' as const,
+  secret: encodeUtf8('correct horse'),
+});
 
 /** Every log line, for the canary scan. */
 export const logLines: string[] = [];
