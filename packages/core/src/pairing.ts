@@ -35,6 +35,7 @@ import {
   pairingProof,
   randomBytes,
   safetyCodeCommit,
+  verifyCardPop,
   verifyPairingProof,
   wipe,
   type AgentCard,
@@ -305,6 +306,8 @@ export class PairingService implements PairingHandler {
           card: own.card,
           cardSig: own.cardSig,
           cardAgentSig: own.cardAgentSig,
+          // 04 §2.9, §3.6 (D-102): B's proof of possession travels with its card.
+          cardPop: own.cardPop,
           name: own.name,
           relays: [...own.relays],
           proof: encodeBase64url(proof),
@@ -471,6 +474,8 @@ export class PairingService implements PairingHandler {
           card: body.card,
           cardSig: body.cardSig,
           cardAgentSig: body.cardAgentSig,
+          // Optional (a peer before M1-4d-d); present and invalid drops the whole handshake.
+          ...(body.cardPop === undefined ? {} : { cardPop: body.cardPop }),
           name: body.name,
           relays: body.relays,
           role: 'inviter',
@@ -491,6 +496,8 @@ export class PairingService implements PairingHandler {
             card: own.card,
             cardSig: own.cardSig,
             relays: [...own.relays],
+            // 04 §2.9, §3.4.1 (D-102): A's proof of possession over the invite card.
+            cardPop: own.cardPop,
           },
           replyTo: inbound.envelopeId,
           files: [],
@@ -564,7 +571,19 @@ export class PairingService implements PairingHandler {
     ) {
       return drop('safety_commit_mismatch', contactId);
     }
-    return this.#complete(inbound, staged, undefined, { handshake, now: nowOf(ctx) });
+    // 04 §2.9, §3.4.1 (D-102): A's cardPop, when present, must verify over the invite card (whose
+    // cardAgentSig the invite carried); one that does not drops the whole ack, which stays pending.
+    let cardPop: string | null = null;
+    if (body.cardPop !== undefined) {
+      if (staged.cardAgentSig === null || !verifyCardPop(staged.card, body.cardPop)) {
+        return drop('pairing_invalid', contactId);
+      }
+      cardPop = body.cardPop;
+    }
+    return this.#complete(inbound, { ...staged, cardPop }, undefined, {
+      handshake,
+      now: nowOf(ctx),
+    });
   }
 
   /**

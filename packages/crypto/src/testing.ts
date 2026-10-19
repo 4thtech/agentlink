@@ -60,6 +60,8 @@ import {
   type OwnerSession,
   type UnlockOptions,
 } from './keystore-api.js';
+import type { AgentCard } from './agent-card.js';
+import { cardPopSnapshot, signCardPop as signCardPopWithKey } from './card-pop.js';
 import {
   dropRequestEpoch,
   dropRequestSnapshot,
@@ -408,6 +410,17 @@ export class MemoryKeyStore implements KeyStore {
         signTypedData(typedData, secretKey),
       ),
     );
+  }
+
+  signCardPop(card: AgentCard): Promise<string> {
+    // 04 §2.9 (D-102): only the own card at the current epoch, checked before the key is used.
+    return Promise.resolve().then(() => {
+      const seed = this.#open();
+      const own = cardPopSnapshot(card, derivePublicIdentity(seed, this.#keyEpoch));
+      return withSecret(seed, KEY_LABELS.nostr, this.#keyEpoch, (secretKey) =>
+        encodeHex(signCardPopWithKey(secretKey, own)),
+      );
+    });
   }
 
   signDropRequest(

@@ -21,6 +21,7 @@
 // - The key epoch moves only through KeyEpochControl.advanceEpoch (M1-1g-d), an owner-only
 //   compare-and-set on the backend's management surface, never on the KeyStore the agent path uses.
 // - Errors are fixed sentences that never contain an input (I-7).
+import type { AgentCard } from './agent-card.js';
 import type { DropAuthRequest } from './drop-auth.js';
 import type { TypedData } from './eip712.js';
 import type { WrappedCek } from './hpke.js';
@@ -130,6 +131,16 @@ export interface KeyStore extends EnvelopeKeys {
    * ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
    */
   sign712(typedData: TypedData): Promise<string>;
+
+  /**
+   * The card's `cardPop` (M1-4d-d; 04 §2.9, D-102): BIP-340 by the Nostr key of the current epoch
+   * over taggedHash("agentlink/card-pop/v1", sha256(JCS(card))), as 128 lowercase hex. Only for this
+   * agent's own card at the current epoch: a card that does not parse, or whose agentEvm, agentNostr,
+   * agentEnc or keyEpoch is not this store's current one, is CryptoInputError `invalid_argument` with
+   * one fixed message (cardPopSnapshot), so the store never names another agent or key as its own.
+   * The tag is applied here, so this is never a general signer.
+   */
+  signCardPop(card: AgentCard): Promise<string>;
 
   /**
    * Signs one encrypted-drop request (M1-1g-e; 07 §5.4, 04 §2.1, §4) with the agent's separate drop

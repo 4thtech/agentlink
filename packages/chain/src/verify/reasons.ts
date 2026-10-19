@@ -24,6 +24,7 @@ export const PROOF_PACK_FAILURES = Object.freeze([
   'signature_invalid',
   'card_invalid',
   'card_expired',
+  'card_pop_invalid',
   'recipient_mismatch',
   'receipt_not_on_chain',
   'receipt_mismatch',
@@ -32,10 +33,11 @@ export type ProofPackFailure = (typeof PROOF_PACK_FAILURES)[number];
 
 /**
  * Why a disclosed content key proves no content (07 §8 steps 1 to 6, then the D-86 kind check), or
- * why it is not attributed to the record signer (M1-4d-b): `sender_mismatch` when the signer's card
- * names another sender, `sender_not_bound` when the pack carries no card, and
- * `sender_attribution_pending` when the card names the sender (full sender attribution is in
- * development, M1-4d-d). The record and its receipts still verify on their own.
+ * why it is not attributed to the record signer (M1-4d-b, M1-4d-d): `sender_mismatch` when the
+ * signer's card names another sender, `sender_not_bound` when the pack carries no card, and
+ * `card_pop_missing` when the card names the sender but the pack carries no proof that the card's
+ * agent keys signed it (or the signer is a contract account, D-102). The record and its receipts
+ * still verify on their own.
  */
 export const PROOF_CONTENT_FAILURES = Object.freeze([
   'envelope_invalid',
@@ -43,7 +45,7 @@ export const PROOF_CONTENT_FAILURES = Object.freeze([
   'envelope_signature_invalid',
   'sender_mismatch',
   'sender_not_bound',
-  'sender_attribution_pending',
+  'card_pop_missing',
   'key_commitment_mismatch',
   'decrypt_failed',
   'payload_invalid',
@@ -72,6 +74,7 @@ const MESSAGES: Readonly<Record<ProofPackFailure | ProofContentFailure, string>>
   signature_invalid: 'The signature on the record is not valid for its signer.',
   card_invalid: 'The agent profile in the proof is not signed by its owner.',
   card_expired: 'The agent profile had expired when the record was made.',
+  card_pop_invalid: "The agent profile in the proof is not confirmed by the agent's own keys.",
   recipient_mismatch: 'The disclosed recipient does not match the record.',
   receipt_not_on_chain: 'The proof lists a receipt that was never recorded.',
   receipt_mismatch: 'A receipt time in the proof does not match the recorded one.',
@@ -81,8 +84,8 @@ const MESSAGES: Readonly<Record<ProofPackFailure | ProofContentFailure, string>>
     'The included message was sent by someone other than the agent that made the record.',
   sender_not_bound:
     'The included message opens, but nothing in the proof shows that the agent that made the record sent it.',
-  sender_attribution_pending:
-    'The included message opens and the agent profile names its sender. Full sender attribution is in development.',
+  card_pop_missing:
+    'The included message opens, but the proof does not confirm that the agent that made the record sent it.',
   key_commitment_mismatch: 'The shared content key is not the key this message was sealed with.',
   decrypt_failed: 'The included message could not be opened with the shared key.',
   payload_invalid: 'The opened message is not in the expected format.',

@@ -208,6 +208,9 @@ export {
   type AgentCard,
   type AgentCardHashes,
 } from './agent-card.js';
+// M1-4d-d (D-102; 04 §2.9, 07 §8): the card's proof of possession checks and the own-card check of
+// KeyStore.signCardPop (public values only). The signer is in the restricted keystore entry.
+export { cardPopSnapshot, verifyCardPop, verifyCardPossession } from './card-pop.js';
 // M1-1j: the OCC v2 proof types (05 §3.1, §4; 04 §5), the recipient commitment and the EIP-3009
 // typed data. The revoke struct waits for G-20 (M1-1i-b).
 export {

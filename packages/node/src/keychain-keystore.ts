@@ -9,6 +9,7 @@ import {
   KeyStoreError,
   MASTER_SEED_LENGTH,
   MAX_KEY_EPOCH,
+  cardPopSnapshot,
   decodeHex,
   decodeHex0x,
   dropRequestEpoch,
@@ -16,8 +17,10 @@ import {
   encodeHex,
   equalBytes,
   nostrEventId,
+  parseAgentCard,
   randomBytes,
   wipe,
+  type AgentCard,
   type DropAuthRequest,
   type EpochOptions,
   type KeyLabel,
@@ -37,6 +40,7 @@ import {
   nip44ConversationKey,
   nip44DecryptWithKey,
   nip44EncryptWithKey,
+  signCardPop,
   signDropRequest,
   signEnvelopeHash,
   signTypedData,
@@ -170,6 +174,14 @@ export interface KeychainKeyStoreOptions {
   readonly keyEpoch?: number;
   /** Limit for each keychain call in milliseconds. Default KEYCHAIN_CALL_TIMEOUT_MS. */
   readonly timeoutMs?: number;
+}
+
+/** The one refusal of signCardPop (cardPopSnapshot's message): it names no input (I-7). */
+function notOwnCard(): CryptoInputError {
+  return new CryptoInputError(
+    'invalid_argument',
+    'signCardPop: the card must be this agent card at the current key epoch',
+  );
 }
 
 export class KeychainKeyStore implements KeyStore {
@@ -324,6 +336,27 @@ export class KeychainKeyStore implements KeyStore {
     );
   }
 
+  async signCardPop(card: AgentCard): Promise<string> {
+    // 04 §2.9 (D-102): only the own card at the current epoch. A card of another agent or epoch, or
+    // one that does not parse, is refused before the keychain is read; the message keys are checked
+    // against the seed's, at this epoch, before the Nostr key is derived.
+    let parsed: AgentCard;
+    try {
+      parsed = parseAgentCard(card);
+    } catch {
+      throw notOwnCard();
+    }
+    if (parsed.agentEvm !== this.#agentId || parsed.keyEpoch !== this.#keyEpoch) {
+      throw notOwnCard();
+    }
+    return this.#withSeed((seed) => {
+      const own = cardPopSnapshot(parsed, derivePublicIdentity(seed, this.#keyEpoch));
+      return withSecret(seed, KEY_LABELS.nostr, this.#keyEpoch, (secretKey) =>
+        encodeHex(signCardPop(secretKey, own)),
+      );
+    });
+  }
+
   async signDropRequest(
     request: DropAuthRequest,
     createdAt: number,
@@ -444,6 +477,7 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
     unwrapCek: (wrapped: WrappedCek, envelopeId: Uint8Array, options?: EpochOptions) =>
       store.unwrapCek(wrapped, envelopeId, options),
     sign712: (typedData: TypedData) => store.sign712(typedData),
+    signCardPop: (card: AgentCard) => store.signCardPop(card),
     signDropRequest: (request: DropAuthRequest, createdAt: number, options?: EpochOptions) =>
       store.signDropRequest(request, createdAt, options),
     close: () => store.close(),

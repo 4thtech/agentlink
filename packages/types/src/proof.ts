@@ -8,10 +8,11 @@
 // chain itself are checked by the verifier (crypto, chain), not by these shapes.
 import { z } from 'zod';
 import { commitmentApprovalActionSchema } from './approval.js';
-import { agentCardSchema, cardSigSchema } from './card.js';
+import { agentCardSchema, cardAgentSigSchema, cardSigSchema } from './card.js';
 import { BYTE_LENGTHS, MAX_URL_LENGTH, RECEIPT_TYPES, RECORD_KINDS } from './constants.js';
 import {
   base64url,
+  bip340SigHex,
   bytes32Hex,
   evmAddress,
   isUtcTimestamp,
@@ -122,13 +123,32 @@ export const proofPackReceiptSchema = z.strictObject({
 /**
  * `signer`: the record signer and, optionally, its agent card with the owner's `cardSig` (07 §8):
  * `cardSig` is present exactly when `agentCard` is, since a card without its signature cannot be
- * checked.
+ * checked (the pack schema holds that rule). The card's proof of possession (04 §2.9, 07 §8; D-102,
+ * M1-4d-d): `cardAgentSig` (the agent EVM key's EIP-712 signature over the card, canonical ECDSA)
+ * and `cardPop` (BIP-340 by the card's `agentNostr`, bare 128 hex) are present together or not at
+ * all, and only with `agentCard`. Whether they verify is the verifier's check.
  */
-export const proofPackSignerSchema = z.strictObject({
-  evm: evmAddress,
-  agentCard: agentCardSchema.exactOptional(),
-  cardSig: cardSigSchema.exactOptional(),
-});
+export const proofPackSignerSchema = z
+  .strictObject({
+    evm: evmAddress,
+    agentCard: agentCardSchema.exactOptional(),
+    cardSig: cardSigSchema.exactOptional(),
+    cardAgentSig: cardAgentSigSchema.exactOptional(),
+    cardPop: bip340SigHex.exactOptional(),
+  })
+  .superRefine((o, ctx) => {
+    const hasAgentSig = o.cardAgentSig !== undefined;
+    if (hasAgentSig !== (o.cardPop !== undefined)) {
+      ctx.addIssue({ code: 'custom', message: 'cardAgentSig and cardPop come together', path: [] });
+    }
+    if (hasAgentSig && o.agentCard === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'cardAgentSig and cardPop come only with agentCard',
+        path: ['agentCard'],
+      });
+    }
+  });
 
 /** Optional disclosure of the recipient and the salt that opens `recipientCommitment`. */
 export const proofPackRecipientSchema = z.strictObject({
