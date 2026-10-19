@@ -1,7 +1,7 @@
 // M1-26: zero-config chain selection (07 §6.3, D-40, 02 F-51; 06 §2.1, §2.4; 12 §4). Table-driven
 // over detected funding, plus detection through a mocked RPC (an injected, branded fetch that plays
 // the fee vault and the stablecoin). No network.
-import { decodeFunctionData, encodeFunctionResult, erc20Abi, type Hex } from 'viem';
+import { decodeFunctionData, encodeFunctionResult, erc20Abi, getAddress, type Hex } from 'viem';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { GNOSIS_CHIADO } from '../config/index.js';
 import type { ChainConfig, ChainNetwork, FeeTokenSymbol } from '../config/index.js';
@@ -27,7 +27,8 @@ import {
 const filled = (byte: string): Hex => `0x${byte.repeat(20)}`;
 const ZERO = filled('00');
 const PAYER = filled('11');
-const PAYER_MIXED = `0x${'aB'.repeat(20)}` as Hex;
+/** An EIP-55 checksummed payer; detection lowercases it. */
+const PAYER_MIXED = getAddress(filled('ab'));
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
