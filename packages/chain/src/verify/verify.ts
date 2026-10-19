@@ -10,16 +10,20 @@
 //   ERC-1271 `isValidSignature` through `eth_call` when the signer has code;
 // - with the signer's agent card, checks `cardSig` (by the card's `ownerEvm`, 04 §2.4) and that the
 //   card had not expired when the record was made, and that its owner and agent keys differ (04 §2.9;
-//   M1-4d-b);
+//   M1-4d-b); with the card's proof of possession, checks that the agent's EVM key (`cardAgentSig`)
+//   and message key (`cardPop`) both signed this exact card (04 §2.9, 07 §8; M1-4d-d, D-102);
 // - opens the recipient commitment with a disclosed salt, and takes receipts from `RecordState`;
 // - with a disclosed content key, checks the content in the 07 §8 order (content.ts), including that
-//   the card names the envelope's sender (IR-M1-4d-1 M-1). Interim rule: content is never reported
-//   as attributed (`verified`) until full sender attribution lands (M1-4d-d).
+//   the card names the envelope's sender (IR-M1-4d-1 M-1). Content is attributed to the record
+//   signer (`verified`) only with a valid proof of possession and an ECDSA signer (D-102).
 // No log queries (some RPCs prune logs) and no 4thTech service. The result carries fixed codes,
 // values from the chain or from fields the chain has confirmed, and `signerCard`, which the owner
 // signed (checked by `cardSig`, not by the chain); nothing is echoed from a refused pack.
 import {
+  agentCardJcsHash,
+  bip340Verify,
   decodeEcdsaSignature,
+  decodeHex,
   encodeHex0x,
   equalBytes,
   decodeHex0x,
@@ -27,6 +31,8 @@ import {
   occV2Domain,
   recipientCommitment,
   recoverEvmAddress,
+  taggedHash,
+  verifyCardAgentSig,
   verifyCardOwnerSig,
 } from '@4thtech-io/crypto';
 import {
@@ -70,11 +76,13 @@ export interface VerifiedReceipt {
  * The disclosed content. A payload is untrusted content (I-5): show it only inside the untrusted
  * block (06 §4). `sender` is the envelope's `from` (64 lowercase hex, 04 §3.1), whose signature over
  * the envelope verified.
- * - `verified`: reserved for content attributed to the record signer; not reported until full
- *   sender attribution lands (M1-4d-d);
+ * - `verified`: the content is attributed to the record signer: the signer's card names `sender`
+ *   as its key, both of the card's agent keys signed the card (`cardAgentSig`, `cardPop`), and the
+ *   signer is not a contract account (07 §8; M1-4d-d, D-102);
  * - `unattributed`: the content verifies, but it is not attributed to the record signer: the pack
- *   carries no card (`sender_not_bound`), or the card names `sender` as the agent's key
- *   (`sender_attribution_pending`, interim rule); never show the signer as its author;
+ *   carries no card (`sender_not_bound`), or the card names `sender` as the agent's key without
+ *   proof of possession, or the signer is a contract account (`card_pop_missing`); never show the
+ *   signer as its author;
  * - `failed`: the pack proves no content (`reason`), including `sender_mismatch`, when the card
  *   names another key (a recipient that notarized an envelope it received, IR-M1-4d-1 M-1).
  */
@@ -83,7 +91,7 @@ export type ProofContentResult =
   | { readonly status: 'verified'; readonly payload: Payload; readonly sender: string }
   | {
       readonly status: 'unattributed';
-      readonly reason: 'sender_not_bound' | 'sender_attribution_pending';
+      readonly reason: 'sender_not_bound' | 'card_pop_missing';
       readonly message: string;
       readonly payload: Payload;
       readonly sender: string;
@@ -93,7 +101,7 @@ export type ProofContentResult =
 /**
  * How far the result can be trusted, the field to show first (IR-M1-4d-1 M-2):
  * - `verified`: the record, its receipts and the disclosed content all verify, and the content is
- *   attributed to the signer; not reported until full sender attribution lands (M1-4d-d);
+ *   attributed to the signer (proof of possession, M1-4d-d);
  * - `record_only`: the record and its receipts verify, but no content was disclosed, the
  *   disclosed content failed, or it is not attributed to the signer (`content`); never show this
  *   as a full pass;
@@ -334,8 +342,32 @@ function matchState(
   return { seconds: state.timestamp, timestamp, finality, receipts };
 }
 
-/** Content attributed to the record signer; none is until M1-4d-d (interim rule, M1-4d-b). */
+/** Content attributed to the record signer (07 §8; M1-4d-d). */
 const isAttributed = (content: ProofContentResult): boolean => content.status === 'verified';
+
+/** The domain-separation tag of `cardPop` (04 §2.9, D-102). */
+const CARD_POP_TAG = 'agentlink/card-pop/v1';
+
+/**
+ * The card's proof of possession (04 §2.9, 07 §8; D-102): `cardAgentSig` is a canonical ECDSA
+ * signature by the card's `agentEvm` over the card's EIP-712 digest, and `cardPop` a BIP-340
+ * signature by the card's `agentNostr` over taggedHash("agentlink/card-pop/v1", sha256(JCS(card))).
+ * Both cover the whole card, so either one made for another card (epoch, owner, name, key) fails.
+ * Never throws: any failure is false.
+ */
+function verifyCardPossession(card: AgentCard, cardAgentSig: string, cardPop: string): boolean {
+  try {
+    if (!verifyCardAgentSig(card, cardAgentSig)) return false;
+    const message = taggedHash(CARD_POP_TAG, agentCardJcsHash(card));
+    return bip340Verify(
+      decodeHex0x(card.agentNostr, { length: 32 }),
+      message,
+      decodeHex(cardPop, { length: 64 }),
+    );
+  } catch {
+    return false;
+  }
+}
 
 async function verifyParsed(
   pack: ParsedProofPack,
@@ -393,6 +425,24 @@ async function verifyParsed(
       signerCard = Object.freeze({ ...card });
     }
 
+    // 2c. The card's proof of possession (07 §8; M1-4d-d, D-102). The schema holds the two
+    // signatures together and only with the card; checked again here, fail closed. Either one that
+    // does not verify over this exact card refuses the pack before any content step. Possession is
+    // proven only for an ECDSA signer: a contract account is not attributed through a card in this
+    // version (M1-4d-e), though its signatures, when present, must still verify.
+    const { cardAgentSig, cardPop } = pack.signer;
+    let cardPossession = false;
+    if (cardAgentSig !== undefined || cardPop !== undefined) {
+      if (signerCard === null || cardAgentSig === undefined || cardPop === undefined) {
+        return invalid('malformed_pack');
+      }
+      if (!verifyCardPossession(signerCard, cardAgentSig, cardPop)) {
+        return invalid('card_pop_invalid');
+      }
+      cardPossession = true;
+    }
+    const attributable = cardPossession && signerType === 'account';
+
     // 3. A disclosed recipient must open the commitment (04 §5); a self-note has none to open.
     let recipient: { evm: Hex } | null = null;
     if (pack.recipient !== undefined) {
@@ -427,11 +477,19 @@ async function verifyParsed(
           reason: check.reason,
           message: proofFailureMessage(check.reason),
         });
+      } else if (attributable) {
+        // Opened, from the card's agentNostr (content.ts), and both of the card's agent keys
+        // signed that card: the content is the record signer's (07 §8; D-102).
+        content = Object.freeze({
+          status: 'verified',
+          payload: check.payload,
+          sender: check.sender,
+        });
       } else {
         // Opened. Without a card nothing in the pack binds the sender to the signer (IR-M1-4d-1
-        // M-1). With one, the card names the sender, but the interim rule (M1-4d-b) keeps the
-        // content unattributed until full sender attribution lands (M1-4d-d).
-        const reason = signerCard === null ? 'sender_not_bound' : 'sender_attribution_pending';
+        // M-1). With one, the card names the sender, but without its proof of possession, or for a
+        // contract-account signer, the content stays unattributed (07 §8; D-95, D-102).
+        const reason = signerCard === null ? 'sender_not_bound' : 'card_pop_missing';
         content = Object.freeze({
           status: 'unattributed',
           reason,
