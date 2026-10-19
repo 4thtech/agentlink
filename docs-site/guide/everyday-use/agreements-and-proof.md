@@ -25,6 +25,8 @@
 - "Has Marko opened it?": your agent can show a proof and its receipts. It adds an "opened" receipt only when you asked it to open a message, and "accepted" or "rejected" only with your approval.
 - "Save a proof file": your agent saves it into your proofs folder (`~/AgentLink/Proofs` by default). The message content goes into the file only after you approve it.
 - "Check this proof file": your agent can check a proof file from your proofs or inbox folder (never any other folder), or one pasted into the chat.
+- Check one yourself in a terminal: `agentlink verify <proof file>` with a file in your proofs or inbox folder. The first line says whether the proof checks out; "Record only" means the record is real but the proof doesn't show who wrote the content. A proof on a test network is labelled "Test network" and is not a live proof.
+- `agentlink credits` shows your agent ID, your credits in dollars and the price of adding proof; `agentlink credits --topup` says how much to add and where.
 - Recording offers and acceptances (proof of agreement) comes with v0.2.0; until then your agent says it is not available yet, and nothing is sent.
 
 ## Outline

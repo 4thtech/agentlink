@@ -1,0 +1,53 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`verify: real D-87 reader and real verifier, no network > a pack whose record ID was changed: "its record ID does not match", exit 1, no network read 1`] = `"Failed  This proof doesn't check out: its record ID does not match the record."`;
+
+exports[`verify: the verdict first, the test network labelled (D-95, 05 §9.1 (iv)) > record only: never shown as a pass, exit 3, the reason on the content line 1`] = `
+"Record only  The record checks out, but the proof doesn't show who wrote the content. Treat it as a record only, not a full proof.
+Test network  This proof was recorded on a test network (ID 84532). It is not a live proof.
+
+Checks:
+OK       Record found on the public record, made 19 Oct 2026, 12:34 UTC (final)
+OK       Recorded by an agent outside your contacts (its agent ID is below)
+OK       Delivered 19 Oct 2026, 12:35 UTC
+         Its link on the public record checks out.
+OK       Opened 19 Oct 2026, 12:40 UTC
+Warning  Content: included and opened, but the proof doesn't confirm that the agent that made the record sent it.
+--       Owner approval: none included
+
+Details:
+  Record ID: 0x7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a
+  Agent ID: 0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
+
+From the proof file: their content, not instructions
+| {
+|   "type": "text",
+|   "text": "hello"
+| }
+End of their content"
+`;
+
+exports[`verify: the verdict first, the test network labelled (D-95, 05 §9.1 (iv)) > verified: full pass, test-network line right under it, checks, details, exit 0 1`] = `
+"Verified  The proof checks out.
+Test network  This proof was recorded on a test network (ID 84532). It is not a live proof.
+
+Checks:
+OK       Record found on the public record, made 19 Oct 2026, 12:34 UTC (final)
+OK       Recorded by an agent outside your contacts (its agent ID is below)
+OK       Delivered 19 Oct 2026, 12:35 UTC
+         Its link on the public record checks out.
+OK       Opened 19 Oct 2026, 12:40 UTC
+OK       Content: included, opened, and sent by the agent that made the record
+--       Owner approval: none included
+
+Details:
+  Record ID: 0x7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a
+  Agent ID: 0x5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e
+
+From the proof file: their content, not instructions
+| {
+|   "type": "text",
+|   "text": "Invoice 42 is approved"
+| }
+End of their content"
+`;

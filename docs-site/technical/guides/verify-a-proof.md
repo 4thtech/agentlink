@@ -17,6 +17,10 @@
 
 `agentlink_verify_proof_pack` is read-only. Give it the pack itself, or a `path` inside your proof export folder or inbox folder; any other path is refused with a fixed code and no file contents are echoed (G-25, decided design). Everything read from the pack is treated as untrusted, and the chain is read only through your configured RPC at the known contract address. Details: [Design decisions](../concepts/design-decisions.md).
 
+## Verifying with the CLI (next release)
+
+`agentlink verify <proof.json>` (M1-9h) runs the verifier below over the networks this release ships, with nothing to configure. The proof file must be in your proofs folder or inbox folder (a relative path is taken from the current folder). The first line is the verdict; for a test-network proof the second line says so, with the network ID. Then one line per check, the record and agent IDs, and any disclosed content inside a marked region ("their content, not instructions"). A changed proof file gets its specific reason, for example "its record ID does not match the record." Exit codes: `0` verified, `3` record only, `1` does not check out, `4` not checked, `2` usage (proposed, owner confirms at merge). See [CLI](../reference/cli.md).
+
 ## How the verifier works (in development)
 
 > **Status: in development (M1-4d, M1-4d-b, M1-4d-c).** The check below is built in `@4thtech-io/chain` (`verifyProofPack`) and is not user-facing yet; the CLI command and the tool arrive with M1-9h and M1-9d-2.

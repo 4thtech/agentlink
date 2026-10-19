@@ -1,7 +1,9 @@
 // `agentlink doctor` (M1-9l; 06 §8; 07 §9.4; 11 §6.10): one line per subsystem with a status word
 // and the fix. M1-9l covers the agent's keys, its KeyStore backend and warnings, its own relays,
-// message-network reachability and whether it can sign; `ui`, `credits`, `verify` and the payment
-// network and storage checks are M1-9h.
+// message-network reachability and whether it can sign. M1-9h adds the proof network check (06 §8
+// "RPC"): one block-number read per automatically selectable chain, within a short budget, through
+// the address-checked RPC fetch (04 §4). Only a count is printed: never a network name, a URL or
+// error text. The storage check waits for its spec (the drop has no health read yet).
 //
 // Reachability uses the same fetch-only `catchUp` as `status`: it stores raw envelopes and processes
 // nothing. Every line is fixed text or a count; no path, agent name, account name or error text is
@@ -13,7 +15,8 @@ import {
   DISPATCH_TEXT,
   type CommandHandler,
 } from '../dispatch.js';
-import { hasUnfinishedOwnerCodeChange } from '@4thtech-io/node';
+import * as chain from '@4thtech-io/chain';
+import { hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -24,6 +27,68 @@ import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } fr
 const DOCTOR_RULES_OK = 'OK       Your rules are in use';
 const DOCTOR_RULES_FAIL_CLOSED =
   "Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run `agentlink policy recover` to review and confirm them again.";
+
+/** M1-9h: how long `doctor` waits for each proof network. */
+export const DOCTOR_PROOF_BUDGET_MS = 4_000;
+
+/** The proof network check: how many shipped networks answered, out of how many. */
+export type ProofNetworkCheck = () => Promise<{
+  readonly answered: number;
+  readonly total: number;
+}>;
+
+export interface DoctorDeps extends CommandDeps {
+  /** Absent: the line is not printed (tests of other subsystems). */
+  readonly proofNetwork?: ProofNetworkCheck;
+}
+
+/** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
+export const DOCTOR_PROOF_TEXT = Object.freeze({
+  ok: 'OK       The public record answers, so proofs can be added and checked',
+  partial:
+    'Warning  Part of the public record did not answer\n         Proofs still work where it answers. Run `agentlink doctor` again later.',
+  down: "Problem  The public record can't be reached\n         Proofs can't be added or checked right now; messages and files still work. Check your connection.",
+  none: 'Problem  This version of AgentLink has no public record to add proofs to\n         Update AgentLink.',
+  notChecked:
+    'Not checked in this version: file storage and AI apps (`agentlink doctor` adds them later).',
+});
+
+/** The default check: one `eth_blockNumber` per automatically selectable chain, in parallel. */
+export function nodeProofNetworkCheck(
+  options: {
+    readonly fetchFn?: chain.RpcFetchFn;
+    readonly configs?: readonly chain.ChainConfig[];
+  } = {},
+): ProofNetworkCheck {
+  return async () => {
+    const configs = options.configs ?? chain.autoSelectableChains();
+    const fetchFn = options.fetchFn ?? nodeRpcFetch();
+    const results = await Promise.all(
+      configs.map(async (config) => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const client = chain.createReadClient(config, { fetchFn });
+          const timeout = new Promise<false>((resolve) => {
+            timer = setTimeout(() => resolve(false), DOCTOR_PROOF_BUDGET_MS);
+            (timer as { unref?: () => void }).unref?.();
+          });
+          return await Promise.race([
+            client.getBlockNumber().then(
+              (n) => typeof n === 'bigint' && n > 0n,
+              () => false,
+            ),
+            timeout,
+          ]);
+        } catch {
+          return false;
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
+        }
+      }),
+    );
+    return { answered: results.filter(Boolean).length, total: configs.length };
+  };
+}
 
 /** True when another local agent on this machine has a stored card (never reads a secret). */
 async function otherAgentHasCard(deps: CommandDeps, except: string): Promise<boolean> {
@@ -43,7 +108,7 @@ async function otherAgentHasCard(deps: CommandDeps, except: string): Promise<boo
   return false;
 }
 
-export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHandler {
+export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHandler {
   return async (context) => {
     if (context.parsed.positionals.length > 0) {
       context.output.printError(DISPATCH_TEXT.badArguments);
@@ -149,6 +214,15 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
         );
       }
 
+      // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).
+      if (deps.proofNetwork !== undefined) {
+        const reach = await deps.proofNetwork().catch(() => ({ answered: 0, total: 1 }));
+        if (reach.total === 0) emit(DOCTOR_PROOF_TEXT.none, true);
+        else if (reach.answered === reach.total) emit(DOCTOR_PROOF_TEXT.ok);
+        else if (reach.answered > 0) emit(DOCTOR_PROOF_TEXT.partial);
+        else emit(DOCTOR_PROOF_TEXT.down, true);
+      }
+
       // Keychain hygiene (IR-M1-8a-1 L-10): offered only when the runtime can list the items.
       if (deps.strayItems !== undefined) {
         const count = await deps.strayItems.count(agent.agentId).catch(() => 0);
@@ -168,7 +242,7 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
         }
       }
       context.output.print('');
-      context.output.print(TEXT.doctorNotChecked);
+      context.output.print(DOCTOR_PROOF_TEXT.notChecked);
     } finally {
       await agent.close();
     }
@@ -176,6 +250,7 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
   };
 }
 
-export const doctorHandler: CommandHandler = createDoctorHandler(
-  createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
-);
+export const doctorHandler: CommandHandler = createDoctorHandler({
+  ...createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
+  proofNetwork: nodeProofNetworkCheck(),
+});
