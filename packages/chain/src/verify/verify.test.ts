@@ -155,6 +155,37 @@ const TWO_WRAP_OTHER_CEK_HEX = '777ccec60275ab2ed1035b9270c51f58f8f773099933cc42
 
 // vector-copies:end
 
+// --- card proof of possession (04 §2.9, 07 §8; M1-4d-d, D-102) -----------------------------------
+// BIP-340 signatures by the vector envelope's sender key (the aead-envelope `sign` case's secret, so
+// that the card's `agentNostr` is the envelope's `from`), made with @4thtech-io/crypto's bip340Sign
+// and an all-zero auxRand outside this package: this package may not import a signing entry point
+// (deps-check). Each is over taggedHash(tag, sha256(JCS(card))) for the card named.
+
+/** `cardPop` for cardFor(): tag `agentlink/card-pop/v1`. Valid. */
+const CARD_POP =
+  '3b09c98edec5b87c9feb1ad4e6b77ee0c37506219f10f3da3abe5c4fadeaaca03fdbc5667e0a69f0d002ff0438b2230e692b9244f486540e3a1abcff0dc7559a';
+/** The same key and tag over cardFor({ keyEpoch: 1 }): another key epoch's card. */
+const CARD_POP_EPOCH_1 =
+  '5082289ac55972d5fd27dcabbf4892967633f2b7de78e46dcf3bdb175ad4871c1b9f55054e0207e8eeb81035cf09c2ccc7a9fdf67405710a483f0738538b93e1';
+/** Over cardFor({ ownerEvm: OTHER_OWNER }): the same agent keys under another owner. */
+const CARD_POP_OTHER_OWNER =
+  '829eaceaa677abbac15bf915eda5c798d3c89bf0100b2a8c4a2502832e135be11652ec8de4b57f550f89798d416aa50701f98d2681d2d31a9dd7997597f8202c';
+/** Over cardFor({ nameHash: 0x8a… }): another display name. */
+const CARD_POP_OTHER_NAME =
+  'c6994cdd84ee8781b3bfa2d0c7663caefb55652056dd41fb72f9362e432018d74fe7dfd57ef7f258f8ce177dda014e040b0b82aa0fdba42a75ab8792ed4accf1';
+/** Over cardFor()'s hash under the envelope tag `agentlink/envelope/v1`. */
+const CARD_POP_ENVELOPE_TAG =
+  '056c3b75f2babf1571bd57bea147c027787f81d6121a5f12cb60ff294cb709576bec0ffdeb72ee22efd6dce873d7bb4b63d14bf51199ed2d9c10069968763cef';
+/** Over cardFor()'s hash under the owner-action tag `agentlink/owner-action/v1`. */
+const CARD_POP_OWNER_ACTION_TAG =
+  '31a3aebe542d420e270249238769718484a385e7e862188311f20ab6165cce7692acd41c868c171530af27fa4942273e1b993bcb939ef057c33dd7f80c115c70';
+/** Over cardFor()'s bare sha256(JCS(card)), no tag. */
+const CARD_POP_UNTAGGED =
+  'fd9666fcb397941d502e0b0be6ec7282e9fdc641e9d7da4e98ded55b05f2564034fac68291ce1f8360d85ce3d1f9fe4da166a7816e2afe03bedcf186eab7ef9a';
+/** The right tag and card, signed by another key (scalar 0xabab…ab), not the card's agentNostr. */
+const CARD_POP_WRONG_SIGNER =
+  'cc0883a1cd172400ffe00fb3defda911b047b68dfe1cc2f781122a589c62bc88707b7f2695bfd34b526966191fce572a577e8b7c0780cfbf48bcf47416406ca0';
+
 // --- test signers (scanner-safe repeated-byte scalars; test only) --------------------------------
 
 const SIGNER_SCALAR = `0x${'11'.repeat(32)}` as ViemHex;
@@ -406,6 +437,8 @@ interface FixtureOptions {
   selfNote?: boolean;
   /** The signer's card in the pack: a valid owner-signed card by default; `false` for none. */
   card?: false | { agentCard: CardJson; cardSig: string };
+  /** Proof of possession next to the card (M1-4d-d): each field is added only when given. */
+  pop?: { cardAgentSig?: string; cardPop?: string };
 }
 
 async function eoaFixture(options: FixtureOptions = {}): Promise<Fixture> {
@@ -435,6 +468,8 @@ async function eoaFixture(options: FixtureOptions = {}): Promise<Fixture> {
     const cardSig = options.card?.cardSig ?? (await signCard(agentCard));
     signer = { evm: SIGNER_EVM, agentCard, cardSig };
   }
+  if (options.pop?.cardAgentSig !== undefined) signer.cardAgentSig = options.pop.cardAgentSig;
+  if (options.pop?.cardPop !== undefined) signer.cardPop = options.pop.cardPop;
   const state: RecordState = {
     signer: SIGNER_EVM,
     timestamp: BigInt(NOTARIZED_AT),
@@ -558,8 +593,8 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
     const { reader, calls } = chainWith(f);
     const result = await verify(f.pack, [reader]);
     expect(Object.keys(result)[0]).toBe('verdict');
-    // Interim rule (M1-4d-b): content attributed through a card reports record_only until full
-    // sender attribution lands (M1-4d-d).
+    // A card without its proof of possession (M1-4d-d): the content opens but is not attributed
+    // (card_pop_missing), and the verdict is record_only.
     expect(result).toEqual({
       verdict: 'record_only',
       valid: true,
@@ -579,8 +614,8 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
       contentVerified: false,
       content: {
         status: 'unattributed',
-        reason: 'sender_attribution_pending',
-        message: proofFailureMessage('sender_attribution_pending' as never),
+        reason: 'card_pop_missing',
+        message: proofFailureMessage('card_pop_missing' as never),
         payload: {
           type: 'text',
           body: 'Hello from the AgentLink test vectors ✓',
@@ -1195,7 +1230,7 @@ describe('verifyProofPack: sender bound to the record signer (M1-4d-b, IR-M1-4d-
     expect(result.valid && result.signerCard).toEqual(agentCard);
   });
 
-  it('interim rule: card-bound content never reports verified (M1-4d-d pending)', async () => {
+  it('card-bound content without proof of possession never reports verified (card_pop_missing)', async () => {
     const f = await eoaFixture();
     const result = await verify(f.pack, [chainWith(f).reader]);
     expect(result.verdict).toBe('record_only');
@@ -1233,8 +1268,240 @@ describe('verifyProofPack: sender bound to the record signer (M1-4d-b, IR-M1-4d-
   it('the new codes are listed with fixed text', () => {
     expect(PROOF_PACK_FAILURES).toEqual(expect.arrayContaining(['card_invalid', 'card_expired']));
     expect(PROOF_CONTENT_FAILURES).toEqual(
-      expect.arrayContaining(['sender_mismatch', 'sender_not_bound', 'sender_attribution_pending']),
+      expect.arrayContaining(['sender_mismatch', 'sender_not_bound', 'card_pop_missing']),
     );
+  });
+});
+
+describe('verifyProofPack: card proof of possession (M1-4d-d; 07 §8, 04 §2.9, D-102)', () => {
+  /** `cardAgentSig`: the agent EVM key's EIP-712 signature over the card (04 §2.9). */
+  const agentSig = (card: CardJson = cardFor(), account: typeof SIGNER = SIGNER) =>
+    signCard(card, account);
+  const PAYLOAD = {
+    type: 'text',
+    body: 'Hello from the AgentLink test vectors ✓',
+    files: [],
+    replyTo: null,
+  };
+
+  async function withPop(over: { cardAgentSig?: string; cardPop?: string } = {}) {
+    return eoaFixture({ pop: { cardAgentSig: await agentSig(), cardPop: CARD_POP, ...over } });
+  }
+
+  it('both signatures valid, content passes every step: verified and attributed to the signer', async () => {
+    const f = await withPop();
+    const { reader, calls } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.verdict).toBe('verified');
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.contentVerified).toBe(true);
+    expect(result.signerType).toBe('account');
+    expect(result.signerCard).toEqual(cardFor());
+    expect(result.content).toEqual({
+      status: 'verified',
+      payload: PAYLOAD,
+      sender: MESSAGE_ENVELOPE.from,
+    });
+    // Proof of possession is checked locally: no extra chain read.
+    expect(calls.map((c) => c.fn ?? c.method)).toEqual(['getRecord']);
+    expectNoEcho(result, CARD_POP);
+  });
+
+  it('a recipient-exported pack carrying the sender card signatures it received verifies', async () => {
+    // The pack is the same whoever exports it: the record signer's card with its two signatures,
+    // as received in a handshake or card-update (04 §2.9).
+    const f = await withPop();
+    const exported = clone(f.pack);
+    const result = await verify(exported, [chainWith(f).reader]);
+    expect(result.verdict).toBe('verified');
+  });
+
+  it('valid proof of possession without a disclosed key: record_only, the card is reported', async () => {
+    const f = await withPop();
+    delete f.pack.envelope;
+    f.pack.disclosure = null;
+    const result = await verify(f.pack, [chainWith(f).reader]);
+    expect(result.verdict).toBe('record_only');
+    expect(result.valid && result.content).toEqual({ status: 'not_disclosed' });
+    expect(result.valid && result.signerCard).toEqual(cardFor());
+  });
+
+  it('a card without either signature stays record_only with card_pop_missing', async () => {
+    const f = await eoaFixture();
+    const result = await verify(f.pack, [chainWith(f).reader]);
+    expect(result.verdict).toBe('record_only');
+    expect(result.valid && result.content).toEqual({
+      status: 'unattributed',
+      reason: 'card_pop_missing',
+      message: proofFailureMessage('card_pop_missing' as never),
+      payload: PAYLOAD,
+      sender: MESSAGE_ENVELOPE.from,
+    });
+  });
+
+  it('a card naming another message key cannot carry the sender key cardPop', async () => {
+    // The card's owner and agent EVM signatures are fine, but the cardPop is by the vector key,
+    // not the card's agentNostr: the pack is refused before any content step.
+    const RECIPIENT_NOSTR = `0x${'ab'.repeat(32)}`;
+    const agentCard = cardFor({ agentNostr: RECIPIENT_NOSTR });
+    const f = await eoaFixture({
+      card: { agentCard, cardSig: await signCard(agentCard) },
+      pop: { cardAgentSig: await agentSig(agentCard), cardPop: CARD_POP },
+    });
+    expectFailure(await verify(f.pack, [chainWith(f).reader]), 'card_pop_invalid');
+  });
+
+  it('one signature without the other is a malformed pack', async () => {
+    const f1 = await eoaFixture({ pop: { cardAgentSig: await agentSig() } });
+    expectFailure(await verify(f1.pack, [chainWith(f1).reader]), 'malformed_pack');
+    const f2 = await eoaFixture({ pop: { cardPop: CARD_POP } });
+    expectFailure(await verify(f2.pack, [chainWith(f2).reader]), 'malformed_pack');
+  });
+
+  it('the signatures without the card are a malformed pack', async () => {
+    const f = await eoaFixture({
+      card: false,
+      pop: { cardAgentSig: await agentSig(), cardPop: CARD_POP },
+    });
+    expectFailure(await verify(f.pack, [chainWith(f).reader]), 'malformed_pack');
+  });
+
+  it('a cardPop not in bare 128 lowercase hex is a malformed pack', async () => {
+    for (const cardPop of [
+      `0x${CARD_POP}`,
+      CARD_POP.toUpperCase(),
+      CARD_POP.slice(2),
+      `${CARD_POP}00`,
+    ]) {
+      const f = await withPop({ cardPop });
+      expectFailure(await verify(f.pack, [chainWith(f).reader]), 'malformed_pack');
+    }
+  });
+
+  const flipped = `${CARD_POP.slice(0, 127)}${CARD_POP.endsWith('a') ? 'b' : 'a'}`;
+  const forgedPop: [string, string][] = [
+    ['by another key', CARD_POP_WRONG_SIGNER],
+    ['replayed from another key epoch of the same agent', CARD_POP_EPOCH_1],
+    ['replayed from the same agent keys under another owner', CARD_POP_OTHER_OWNER],
+    ['replayed from a card with another display name', CARD_POP_OTHER_NAME],
+    ['over the card hash under the envelope tag', CARD_POP_ENVELOPE_TAG],
+    ['over the card hash under the owner-action tag', CARD_POP_OWNER_ACTION_TAG],
+    ['over the untagged card hash', CARD_POP_UNTAGGED],
+    ['that is the envelope signature', MESSAGE_ENVELOPE.sig],
+    ['with one bit flipped', flipped],
+  ];
+  for (const [name, cardPop] of forgedPop) {
+    it(`a cardPop ${name} is refused: card_pop_invalid, no content opened`, async () => {
+      const f = await withPop({ cardPop });
+      const result = await verify(f.pack, [chainWith(f).reader]);
+      expectFailure(result, 'card_pop_invalid');
+      expectNoEcho(result, 'Hello from', cardPop, OWNER_EVM);
+    });
+  }
+
+  it('this card cardPop, moved to the next epoch card of the same agent, is refused', async () => {
+    const agentCard = cardFor({ keyEpoch: 1 });
+    const f = await eoaFixture({
+      card: { agentCard, cardSig: await signCard(agentCard) },
+      pop: { cardAgentSig: await agentSig(agentCard), cardPop: CARD_POP },
+    });
+    expectFailure(await verify(f.pack, [chainWith(f).reader]), 'card_pop_invalid');
+  });
+
+  it('a cardAgentSig that is forged or made for another card is refused: card_pop_invalid', async () => {
+    const cases: string[] = [
+      await agentSig(cardFor(), OTHER),
+      await signCard(cardFor()),
+      await agentSig(cardFor({ keyEpoch: 1 })),
+      await agentSig(cardFor({ ownerEvm: OTHER_OWNER.address.toLowerCase() })),
+      await agentSig(cardFor({ nameHash: `0x${'8a'.repeat(32)}` })),
+    ];
+    for (const cardAgentSig of cases) {
+      const f = await withPop({ cardAgentSig });
+      const result = await verify(f.pack, [chainWith(f).reader]);
+      expectFailure(result, 'card_pop_invalid');
+      expect(JSON.stringify(result)).not.toContain('Hello from');
+    }
+  });
+
+  it('a cardAgentSig in its high-s twin is refused (canonical ECDSA, 04 §2.4.1)', async () => {
+    const sig = await agentSig();
+    const n = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+    const s = BigInt(`0x${sig.slice(66, 130)}`);
+    const v = sig.slice(130) === '1b' ? '1c' : '1b';
+    const twin = `${sig.slice(0, 66)}${(n - s).toString(16).padStart(64, '0')}${v}`;
+    const f = await withPop({ cardAgentSig: twin });
+    const result = await verify(f.pack, [chainWith(f).reader]);
+    expect(result.verdict).toBe('failed');
+    expect(JSON.stringify(result)).not.toContain('Hello from');
+  });
+
+  it('a pack with an invalid proof of possession fails even without a disclosed key', async () => {
+    const f = await withPop({ cardPop: CARD_POP_EPOCH_1 });
+    delete f.pack.envelope;
+    f.pack.disclosure = null;
+    expectFailure(await verify(f.pack, [chainWith(f).reader]), 'card_pop_invalid');
+  });
+
+  it('the card checks run first: a forged cardSig is card_invalid, an expired card card_expired', async () => {
+    const f1 = await eoaFixture({
+      card: { agentCard: cardFor(), cardSig: await signCard(cardFor(), OTHER_OWNER) },
+      pop: { cardAgentSig: await agentSig(), cardPop: CARD_POP_WRONG_SIGNER },
+    });
+    expectFailure(await verify(f1.pack, [chainWith(f1).reader]), 'card_invalid');
+    const expired = cardFor({ expiresAt: NOTARIZED_AT });
+    const f2 = await eoaFixture({
+      card: { agentCard: expired, cardSig: await signCard(expired) },
+      pop: { cardAgentSig: await agentSig(expired), cardPop: CARD_POP_WRONG_SIGNER },
+    });
+    expectFailure(await verify(f2.pack, [chainWith(f2).reader]), 'card_expired');
+  });
+
+  it('a contract-account (ERC-1271) signer with both valid signatures stays record_only (M1-4d-e)', async () => {
+    // The record signature does not recover to the signer, so it goes to the account's
+    // isValidSignature, which accepts it: signerType is contract.
+    const f = await eoaFixture({
+      signWith: OTHER,
+      pop: { cardAgentSig: await agentSig(), cardPop: CARD_POP },
+    });
+    const { reader } = chainWith(f, {
+      code: new Map([[SIGNER_EVM, '0x6080604052']]),
+      erc1271: (hash) => (hash === f.digest ? ERC1271_MAGIC : '0xffffffff'),
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.verdict).toBe('record_only');
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.signerType).toBe('contract');
+    expect(result.contentVerified).toBe(false);
+    expect(result.content).toEqual({
+      status: 'unattributed',
+      reason: 'card_pop_missing',
+      message: proofFailureMessage('card_pop_missing' as never),
+      payload: PAYLOAD,
+      sender: MESSAGE_ENVELOPE.from,
+    });
+  });
+
+  it('a contract-account signer with a forged cardPop is still refused', async () => {
+    const f = await eoaFixture({
+      signWith: OTHER,
+      pop: { cardAgentSig: await agentSig(), cardPop: CARD_POP_WRONG_SIGNER },
+    });
+    const { reader } = chainWith(f, {
+      code: new Map([[SIGNER_EVM, '0x6080604052']]),
+      erc1271: (hash) => (hash === f.digest ? ERC1271_MAGIC : '0xffffffff'),
+    });
+    expectFailure(await verify(f.pack, [reader]), 'card_pop_invalid');
+  });
+
+  it('the codes are listed with fixed text; sender_attribution_pending is retired', () => {
+    expect(PROOF_PACK_FAILURES).toContain('card_pop_invalid');
+    expect(PROOF_CONTENT_FAILURES).toContain('card_pop_missing');
+    expect(PROOF_CONTENT_FAILURES).not.toContain('sender_attribution_pending');
+    expect(PROOF_PACK_FAILURES).not.toContain('card_pop_missing');
+    expect(proofFailureMessage('card_pop_invalid' as never)).toMatch(/agent profile/);
   });
 });
 

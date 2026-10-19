@@ -83,6 +83,7 @@ const SPEC_PATHS = {
     'invite.cardAgentSig',
     'handshake.cardAgentSig',
     'ProofPack.signer.cardSig',
+    'ProofPack.signer.cardAgentSig',
   ],
   // An ECDSA or ERC-1271 signature, 0x + even hex; the canonical rule is the EOA check's (04 §2.4.1).
   recordSignature: [
@@ -105,7 +106,7 @@ const SPEC_PATHS = {
     'CommitmentScope.counterparty.ownerKey',
     'nostr.eventId',
   ],
-  bip340: ['envelope.sig', 'SignedOwnerAction.sig'],
+  bip340: ['envelope.sig', 'SignedOwnerAction.sig', 'ProofPack.signer.cardPop'],
   digest: [
     'approval-request.actionDigest',
     'approval.decide.params.actionDigest',
