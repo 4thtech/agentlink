@@ -1119,7 +1119,8 @@ function withoutAdvanced(value: unknown): unknown {
 }
 
 /** Network and fee-token names of the shipped chains, and the word "chain" itself (11 §5.1). */
-const NETWORK_NAMES = /\b(chains?|on-chain|blockchain|base|sepolia|gnosis|chiado|usdc|usdt|xdai)\b/i;
+const NETWORK_NAMES =
+  /\b(chains?|on-chain|blockchain|base|sepolia|gnosis|chiado|usdc|usdt|xdai)\b/i;
 
 describe('no network name, token name or chain prompt outside Advanced in any proof tool result', () => {
   it('summary, nextStep, code, text and structured fields outside `advanced` name no network', () => {

@@ -7,7 +7,8 @@
 // senders appear only as the `requests` count.
 //
 // Credits and prices (M1-9d-2; 06 §2.1, D-53, D-45, G-43): where the runtime has the proof platform,
-// `credits` (per supported chain and fee token, base units and USD), `prices` (the notarize fee in
+// `credits` (per supported chain and fee token: USD, with the chain, token and base units only
+// under `advanced`, M1-26-b, D-40), `prices` (the notarize fee in
 // USD with the AgentLink part `protocolUsd` and the app part `integratorUsd` separately; 0 for
 // official clients), `agentAddress` (the agent ID) and `topUpUrl`. They are read within a short
 // budget by the platform; when no chain answers they are left out and status still answers. The
@@ -124,11 +125,10 @@ async function accountFields(
   if (account === undefined) return base;
   return {
     ...base,
+    // M1-26-b (D-40, 11 §5.1): the network, token and base-unit amount only under `advanced`.
     credits: account.credits.map((c) => ({
-      chain: c.chain,
-      token: c.token,
-      amount: c.amount,
       usd: c.usd,
+      advanced: { chain: c.chain, token: c.token, amount: c.amount },
     })),
     prices: account.prices.map((p) => ({
       action: p.action,

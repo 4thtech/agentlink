@@ -96,6 +96,11 @@ const usd = str({ pattern: '^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$' });
 const receiptType = oneOf(['DELIVERED', 'OPENED', 'ACCEPTED', 'REJECTED']);
 /** A shipped chain's config key (Advanced only; 07 §6.1). */
 const chainKey = str({ pattern: '^[a-z0-9-]{1,32}$' });
+/**
+ * M1-26-b (D-40, 02 F-51, 11 §5.1): the proof network appears only under `advanced`, never as a
+ * default field, so a default view (chat, CLI) can drop the whole member and name no network.
+ */
+const advancedChain = obj({ chain: chainKey }, ['chain']);
 /** 06 §2.1 `topUpUrl`: the deposit page (08 §1 `pay.`), our own link. */
 const topUpUrl = str({
   maxLength: MAX_URL_LENGTH,
@@ -104,7 +109,7 @@ const topUpUrl = str({
 
 /** 06 §2.4 `ProofStatus` fields (without `status`, which is the result's own). */
 const proofStatusFields = {
-  chain: chainKey,
+  advanced: advancedChain,
   recordId,
   txHash: bytes32,
   fee: obj(
@@ -335,15 +340,22 @@ const DEFINITIONS: readonly ToolDefinition[] = [
       offers: arr(obj({ contact: contactRef, open: int(1) }, ['contact', 'open'])),
       storage: obj({ mode: oneOf(['drop', 'own']), provider: str() }, ['mode']),
       // M1-9d-2 (06 §2.1, D-53, G-43): credits, prices with the USD split, agent address, top-up.
+      // M1-26-b (D-40, 11 §5.1): credits in USD; the network, the fee token and its base-unit
+      // amount only under `advanced`.
       credits: arr(
         obj(
           {
-            chain: chainKey,
-            token: str({ maxLength: 16 }),
-            amount: str({ pattern: '^[0-9]{1,78}$' }),
             usd,
+            advanced: obj(
+              {
+                chain: chainKey,
+                token: str({ maxLength: 16 }),
+                amount: str({ pattern: '^[0-9]{1,78}$' }),
+              },
+              ['chain', 'token', 'amount'],
+            ),
           },
-          ['chain', 'token', 'amount', 'usd'],
+          ['usd', 'advanced'],
         ),
       ),
       prices: arr(
@@ -657,7 +669,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     outputSchema: output({
       valid: bool(),
       verdict: oneOf(['verified', 'record_only', 'failed']),
-      chain: chainKey,
+      advanced: advancedChain,
       recordId,
       signer: agentId,
       signerName: str({ minLength: 1, maxLength: MAX_DISPLAY_NAME_CODE_POINTS }),

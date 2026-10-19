@@ -19,7 +19,8 @@ import { TERMS_TEXT } from './terms-common.js';
 import { TOOL_TEXT } from './text.js';
 import { VERIFY_TEXT } from './verify-proof-pack.js';
 
-const NETWORK_NAMES = /\b(chains?|on-chain|blockchain|base|sepolia|gnosis|chiado|usdc|usdt|xdai)\b/i;
+const NETWORK_NAMES =
+  /\b(chains?|on-chain|blockchain|base|sepolia|gnosis|chiado|usdc|usdt|xdai)\b/i;
 
 function strings(value: unknown, at: string, out: [string, string][] = []): [string, string][] {
   if (typeof value === 'string') out.push([at, value]);

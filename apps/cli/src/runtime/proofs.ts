@@ -9,8 +9,9 @@
 //   chain package's own functions as the core's `kit`; one chain selector shared by the core and the
 //   submitters (07 §6.3). The Notary address always comes from the shipped config, never from a
 //   message or a pack.
-// - verify: `verifyProofPack` against those chains only (07 §8): a pack naming any other chain or
-//   Notary fails with a fixed code.
+// - verify: `verifyProofPack` against every shipped chain (`chainRegistry()`, M1-26-b), so a pack
+//   verifies with no chain configured (07 §6.3, §8): a pack naming any other chain or Notary fails
+//   with a fixed code.
 // - account: credits on every chain and the notarize price (USD, protocol and app parts) on the
 //   first chain that answers, within a short budget; undefined when none answered.
 // - nodeProofPacks: the pack files. `readPack` confines `path` to `proofs.exportFolder` and
@@ -241,6 +242,18 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
     return Object.freeze({ config, client, state, submitter });
   });
   const readers = chains.map(({ config, client }) => ({ config, client }));
+  // M1-26-b (02 F-51, 07 §6.3 step 4, §8): a pack carries its chain, so verification needs no
+  // setup. It resolves the pack's chainId from the whole shipped list (`chainRegistry()`), not only
+  // from the chains automatic selection may pick: a pack recorded through the Advanced override on a
+  // held-back chain (Chiado, M1-3j-b) still verifies. Each read goes to that chain's shipped RPC and
+  // its known Notary only, never to an address or URL from the pack.
+  const verifyReaders =
+    options.configs === undefined
+      ? chain.chainRegistry().map((config) => {
+          const own = readers.find((r) => r.config.chainId === config.chainId);
+          return own ?? { config, client: chain.createReadClient(config, { fetchFn }) };
+        })
+      : readers;
   const packs = nodeProofPacks(options);
 
   const platform: ProofsPlatform = Object.freeze({ kit: chain, chains, selector });
@@ -248,7 +261,7 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
   const tools = Object.freeze<ProofPlatformTools>({
     ...packs,
     async verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck> {
-      const result = await chain.verifyProofPack(pack, { chains: readers });
+      const result = await chain.verifyProofPack(pack, { chains: verifyReaders });
       if (!result.valid) return { valid: false, verdict: 'failed', reason: result.reason };
       const content =
         result.content.status === 'verified' || result.content.status === 'unattributed'
