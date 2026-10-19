@@ -522,3 +522,38 @@ describe('owner-channel bodies (04 §3.4.1)', () => {
     });
   });
 });
+
+// M1-4d-d (D-102; 04 §2.9, §3.4.1, §3.6): the card's proof of possession travels with the card.
+describe('cardPop and cardAgentSig on pairing and card-update bodies (D-102)', () => {
+  const POP = 'ab'.repeat(64);
+  const update = () => payloads()['card-update'];
+
+  it('handshake and handshake-ack take an optional cardPop (bare 128 lowercase hex)', () => {
+    for (const type of ['handshake', 'handshake-ack'] as const) {
+      expectAccept(payloadSchema, payloads()[type]);
+      expectAccept(payloadSchema, edit(payloads()[type], ['body', 'cardPop'], POP));
+      for (const bad of [`0x${POP}`, POP.toUpperCase(), POP.slice(2), `${POP}ab`, 1, null]) {
+        expectReject(payloadSchema, edit(payloads()[type], ['body', 'cardPop'], bad));
+      }
+    }
+    // The ack carries no cardAgentSig: A's is in the invite (04 §3.4.1).
+    expectReject(
+      payloadSchema,
+      edit(payloads()['handshake-ack'], ['body', 'cardAgentSig'], CARD_AGENT_SIG),
+    );
+  });
+
+  it('card-update takes cardAgentSig and cardPop together or not at all', () => {
+    const both = edit(
+      edit(update(), ['body', 'cardPop'], POP),
+      ['body', 'cardAgentSig'],
+      CARD_AGENT_SIG,
+    );
+    expectAccept(payloadSchema, update());
+    expectAccept(payloadSchema, both);
+    expectReject(payloadSchema, edit(update(), ['body', 'cardPop'], POP));
+    expectReject(payloadSchema, edit(update(), ['body', 'cardAgentSig'], CARD_AGENT_SIG));
+    expectReject(payloadSchema, edit(both, ['body', 'cardPop'], `0x${POP}`));
+    expectReject(payloadSchema, edit(both, ['body', 'cardAgentSig'], CARD_AGENT_SIG.slice(2)));
+  });
+});

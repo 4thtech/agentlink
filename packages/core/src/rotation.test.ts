@@ -405,6 +405,7 @@ describe('opening with a pending rotation (M1-1g-d)', () => {
       card,
       cardSig: await session.sign712(cardTypedData(card)),
       cardAgentSig: await s.keyStore.sign712(cardTypedData(card)),
+      cardPop: null,
     });
     const row = await identityRow(s.store);
     const sealed = await s.cipher.seal(
@@ -481,6 +482,7 @@ async function forgePending(
     cardSig: await session.sign712(cardTypedData(card)),
     cardAgentSig:
       options.withoutAgentSig === true ? null : await s.keyStore.sign712(cardTypedData(card)),
+    cardPop: null,
   });
   // Both signatures verify: the card is refused for what it says, not for its signatures.
   expect(parseStoredCard(text).card).toEqual(card);

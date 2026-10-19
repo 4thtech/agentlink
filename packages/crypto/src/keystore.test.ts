@@ -32,6 +32,8 @@ const SEED_OR_SECRET = [
   'signDropRequest',
   'signTypedData',
   'signAgentCard',
+  // M1-4d-d (D-102): cardPop with the agent Nostr secret key (KeyStore.signCardPop).
+  'signCardPop',
   // M1-1f: Argon2id, password() normalisation and code generation, and the ALKS / ALKO seal and
   // open functions (04 §2.8), which take or return a passphrase-derived key, a seed or the entries.
   'argon2id',

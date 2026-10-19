@@ -82,6 +82,7 @@ const SPEC_PATHS = {
     'card-update.cardSig',
     'invite.cardAgentSig',
     'handshake.cardAgentSig',
+    'card-update.cardAgentSig',
     'ProofPack.signer.cardSig',
     'ProofPack.signer.cardAgentSig',
   ],
@@ -106,7 +107,14 @@ const SPEC_PATHS = {
     'CommitmentScope.counterparty.ownerKey',
     'nostr.eventId',
   ],
-  bip340: ['envelope.sig', 'SignedOwnerAction.sig', 'ProofPack.signer.cardPop'],
+  bip340: [
+    'envelope.sig',
+    'SignedOwnerAction.sig',
+    'handshake.cardPop',
+    'handshake-ack.cardPop',
+    'card-update.cardPop',
+    'ProofPack.signer.cardPop',
+  ],
   digest: [
     'approval-request.actionDigest',
     'approval.decide.params.actionDigest',
