@@ -12,7 +12,13 @@
 //   card had not expired when the record was made, and that its owner and agent keys differ (04 §2.9;
 //   M1-4d-b); with the card's proof of possession, checks that the agent's EVM key (`cardAgentSig`)
 //   and message key (`cardPop`) both signed this exact card (04 §2.9, 07 §8; M1-4d-d, D-102);
-// - opens the recipient commitment with a disclosed salt, and takes receipts from `RecordState`;
+// - opens the recipient commitment with a disclosed salt, and takes receipts from `RecordState`,
+//   whose `receiptFlags` must agree with `receiptAt` (D-97); checks each listed receipt's `txHash`
+//   with one transaction-receipt read, or reports it as not checked (receipts.ts; M1-4d-c);
+// - reports a contract-account signer that no longer confirms its signature with the non-fatal
+//   code `signer_no_longer_confirms`, the verdict unchanged (D-96);
+// - checks the owner approval against the record and the card, or reports the standing rule
+//   (approval.ts; M1-4d-c);
 // - with a disclosed content key, checks the content in the 07 §8 order (content.ts), including that
 //   the card names the envelope's sender (IR-M1-4d-1 M-1). Content is attributed to the record
 //   signer (`verified`) only with a valid proof of possession and an ECDSA signer (D-102).
@@ -44,9 +50,17 @@ import { notaryReader } from '../clients/calls.js';
 import { ChainError } from '../clients/errors.js';
 import type { ReadClient } from '../clients/read-client.js';
 import { ChainInputError, computeRecordId, type Hex } from '../ids/index.js';
+import { verifyOwnerApproval, type OwnerApprovalResult } from './approval.js';
 import { checkDisclosedContent } from './content.js';
 import { parseProofPack, type ParsedProofPack } from './parse.js';
-import { proofFailureMessage, type ProofContentFailure, type ProofPackFailure } from './reasons.js';
+import {
+  proofFailureMessage,
+  proofNoticeMessage,
+  type ProofContentFailure,
+  type ProofNoticeCode,
+  type ProofPackFailure,
+} from './reasons.js';
+import { NOT_CHECKED, checkReceiptTx, receiptFlagsConsistent, type ReceiptTx } from './receipts.js';
 
 /** A chain the verifier may read: its shipped config and a read client for it. */
 export interface VerifyChain {
@@ -67,6 +81,14 @@ export interface VerifiedReceipt {
   readonly type: ReceiptTypeName;
   /** RFC 3339 UTC, from the block timestamp the Notary stored. */
   readonly at: string;
+  /** What the `txHash` the pack names for it shows (M1-4d-c); the receipt stands either way. */
+  readonly tx: ReceiptTx;
+}
+
+/** A non-fatal finding: the pack verifies and the verdict is unchanged (M1-4d-c). */
+export interface ProofNotice {
+  readonly code: ProofNoticeCode;
+  readonly message: string;
 }
 
 /**
@@ -141,6 +163,10 @@ export interface ProofPackValid {
   readonly receipts: readonly VerifiedReceipt[];
   readonly contentVerified: boolean;
   readonly content: ProofContentResult;
+  /** The owner approval the pack carries, checked against this record (07 §8; M1-4d-c). */
+  readonly ownerApproval: OwnerApprovalResult;
+  /** Non-fatal findings, in a fixed order; empty when there are none. */
+  readonly notices: readonly ProofNotice[];
 }
 
 export interface ProofPackInvalid {
@@ -171,6 +197,9 @@ const CHAIN_FAILURES: ReadonlySet<string> = new Set([
   'rpc_error',
   'method_refused',
 ]);
+
+const notice = (code: ProofNoticeCode): ProofNotice =>
+  Object.freeze({ code, message: proofNoticeMessage(code) });
 
 const invalid = (reason: ProofPackFailure): ProofPackInvalid =>
   Object.freeze({
@@ -222,6 +251,7 @@ interface RecordState {
   readonly envelopeHash: string;
   readonly recipientCommitment: string;
   readonly recordStructHash: string;
+  readonly receiptFlags: number;
   readonly receiptAt: readonly bigint[];
 }
 
@@ -253,19 +283,32 @@ const exists = (state: RecordState): boolean =>
 const blockTags = (chain: VerifyChain): readonly Finality[] =>
   chain.config.finalizedTag ? ['finalized', 'latest'] : ['latest'];
 
+/** The signer's kind, and whether a contract account still confirms the signature (D-96). */
+interface SignatureCheck {
+  readonly type: 'account' | 'contract';
+  readonly confirms: boolean;
+}
+
+const ACCOUNT: SignatureCheck = Object.freeze({ type: 'account', confirms: true });
+const CONTRACT_CONFIRMS: SignatureCheck = Object.freeze({ type: 'contract', confirms: true });
+const CONTRACT_REFUSES: SignatureCheck = Object.freeze({ type: 'contract', confirms: false });
+
 /**
  * OpenZeppelin `SignatureChecker.isValidSignatureNow` (05 §3.2): a canonical 65-byte ECDSA signature
- * that recovers `signer`, else an ERC-1271 account at `signer` that returns the magic value.
+ * that recovers `signer`, else an ERC-1271 account at `signer` that returns the magic value. Null
+ * when the signer has no code and the signature does not recover to it (`signature_invalid`). An
+ * account with code that does not return the magic value now is `confirms: false`: the Notary
+ * checked the signature when it stored the record, so that is a non-fatal finding (D-96).
  */
 async function checkSignature(
   chain: VerifyChain,
   signer: Hex,
   digest: Uint8Array,
   signature: string,
-): Promise<'account' | 'contract' | null> {
+): Promise<SignatureCheck | null> {
   try {
     const recovered = recoverEvmAddress(digest, decodeEcdsaSignature(signature));
-    if (equalBytes(recovered, decodeHex0x(signer, { length: 20 }))) return 'account';
+    if (equalBytes(recovered, decodeHex0x(signer, { length: 20 }))) return ACCOUNT;
   } catch {
     // Not a canonical ECDSA signature: only an ERC-1271 account can accept it.
   }
@@ -289,9 +332,18 @@ async function checkSignature(
     // Only a failure to reach or ask the chain is the chain's. A revert, an empty answer or one that
     // does not decode is a refusal by the account, as in SignatureChecker (IR-M1-4d-1 L-1).
     if (error instanceof ChainError && CHAIN_FAILURES.has(error.code)) throw new Unavailable();
-    return null;
+    return CONTRACT_REFUSES;
   }
-  return typeof word === 'string' && word.toLowerCase() === ERC1271_MAGIC_WORD ? 'contract' : null;
+  return typeof word === 'string' && word.toLowerCase() === ERC1271_MAGIC_WORD
+    ? CONTRACT_CONFIRMS
+    : CONTRACT_REFUSES;
+}
+
+/** A receipt the chain holds, before its `txHash` is checked. */
+interface ChainReceipt {
+  readonly type: ReceiptTypeName;
+  readonly at: string;
+  readonly seconds: bigint;
 }
 
 interface OnChainMatch {
@@ -299,7 +351,7 @@ interface OnChainMatch {
   readonly seconds: bigint;
   readonly timestamp: string;
   readonly finality: Finality;
-  readonly receipts: readonly VerifiedReceipt[];
+  readonly receipts: readonly ChainReceipt[];
 }
 
 /**
@@ -319,6 +371,8 @@ function matchState(
   if (timestamp === null || state.receiptAt.some((at) => at > MAX_TIMESTAMP)) {
     return 'malformed_record';
   }
+  // D-97: the flags must agree with the receipt times (05 §3.3 layout).
+  if (!receiptFlagsConsistent(state.receiptFlags, state.receiptAt)) return 'malformed_record';
   if (state.signer.toLowerCase() !== record.signer) return 'signer_mismatch';
   if (state.kind !== record.kind) return 'kind_mismatch';
   if (state.envelopeHash.toLowerCase() !== record.envelopeHash) return 'envelope_hash_mismatch';
@@ -326,10 +380,10 @@ function matchState(
     return 'commitment_mismatch';
   }
   if (state.recordStructHash.toLowerCase() !== structHash) return 'record_mismatch';
-  const receipts: VerifiedReceipt[] = [];
+  const receipts: ChainReceipt[] = [];
   RECEIPT_TYPE_NAMES.forEach((type, i) => {
     const at = state.receiptAt[i] ?? 0n;
-    if (at > 0n) receipts.push(Object.freeze({ type, at: iso(at) as string }));
+    if (at > 0n) receipts.push(Object.freeze({ type, at: iso(at) as string, seconds: at }));
   });
   for (const claimed of pack.receipts) {
     const onChain = receipts.find((r) => r.type === claimed.type);
@@ -375,9 +429,14 @@ async function verifyParsed(
     if (!matched) return invalid(failure);
     const { seconds, timestamp, finality, receipts } = matched;
 
-    // 2. The signer's signature over the EIP-712 digest under this chain's OCC v2 domain.
-    const signerType = await checkSignature(chain, signer, hashes.digest, pack.signature);
-    if (signerType === null) return invalid('signature_invalid');
+    // 2. The signer's signature over the EIP-712 digest under this chain's OCC v2 domain. A contract
+    // account that no longer confirms it is a non-fatal finding (D-96); a signer without code whose
+    // signature does not recover to it fails.
+    const signatureCheck = await checkSignature(chain, signer, hashes.digest, pack.signature);
+    if (signatureCheck === null) return invalid('signature_invalid');
+    const signerType = signatureCheck.type;
+    const notices: ProofNotice[] = [];
+    if (!signatureCheck.confirms) notices.push(notice('signer_no_longer_confirms'));
 
     // 2b. The signer's agent card, when the pack carries one (04 §2.4; M1-4d-b). The schema already
     // holds `cardSig` with the card and the card's `agentEvm` equal to the signer; checked again
@@ -427,7 +486,21 @@ async function verifyParsed(
       recipient = Object.freeze({ evm: pack.recipient.evm as Hex });
     }
 
-    // 4. Receipts came from RecordState (matchState): each one the pack lists is there, on time.
+    // 4. Receipts came from RecordState (matchState): each one the pack lists is there, on time,
+    // and the flags agree with the times (D-97). The `txHash` the pack names for each is checked
+    // with one transaction-receipt read; a mismatch is a non-fatal finding (receipts.ts).
+    const verifiedReceipts: VerifiedReceipt[] = [];
+    let txMismatch = false;
+    for (const onChain of receipts) {
+      const claimed = pack.receipts.find((r) => r.type === onChain.type);
+      const tx =
+        claimed === undefined
+          ? NOT_CHECKED
+          : await checkReceiptTx(chain, notary, recordId, claimed, onChain.seconds);
+      if (tx.status === 'mismatch') txMismatch = true;
+      verifiedReceipts.push(Object.freeze({ type: onChain.type, at: onChain.at, tx }));
+    }
+    if (txMismatch) notices.push(notice('receipt_tx_mismatch'));
 
     // 5. Content, only with a disclosed key, in the 07 §8 order.
     let content: ProofContentResult = Object.freeze({ status: 'not_disclosed' });
@@ -473,6 +546,13 @@ async function verifyParsed(
       }
     }
 
+    // 6. The owner approval, against this record, the signer's card and the opened content
+    // (approval.ts; M1-4d-c): a signer-side approval is bound to this record only through it.
+    const opened =
+      content.status === 'verified' || content.status === 'unattributed' ? content.payload : null;
+    const ownerApproval = verifyOwnerApproval(pack, signerCard, opened);
+    if (ownerApproval === null) return invalid('owner_approval_invalid');
+
     const contentVerified = isAttributed(content);
     return Object.freeze({
       verdict: contentVerified ? 'verified' : 'record_only',
@@ -489,9 +569,11 @@ async function verifyParsed(
       finality,
       envelopeHash: record.envelopeHash as Hex,
       recipient,
-      receipts: Object.freeze(receipts),
+      receipts: Object.freeze(verifiedReceipts),
       contentVerified,
       content,
+      ownerApproval,
+      notices: Object.freeze(notices),
     });
   } catch (error) {
     if (error instanceof Unavailable) return invalid('chain_unavailable');
