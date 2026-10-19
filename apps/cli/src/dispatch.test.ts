@@ -75,7 +75,11 @@ describe('--help (06 §8)', () => {
       'agentlink contacts rename <contactId> <name> [--agent <name>]',
       'agentlink contacts remove <contactId> [--agent <name>]',
       'agentlink requests [accept | ignore | block <requestId>]',
-      'agentlink policy show | set <key> <value>',
+      // M1-9m.
+      'agentlink policy show [--agent <name>]',
+      'agentlink policy allow-folder <path> [--agent <name>]',
+      'agentlink policy remove-folder <path> [--agent <name>]',
+      'agentlink policy set <key> <value>',
       'agentlink approve <approvalId> [--agent <name>]',
       'agentlink approve [--agent <name>]',
       'agentlink deny <approvalId> [--agent <name>]',
