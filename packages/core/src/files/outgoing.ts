@@ -139,8 +139,8 @@ export interface OutgoingDeps {
   readonly policy: EffectivePolicy;
 }
 
-/** Builds the drop adapter for this send (no I/O until a put). */
-function dropAdapter(ctx: CoreContext, platform: FilesPlatform): DropAdapter | undefined {
+/** Builds the drop adapter for this send or delete (no I/O until a request). */
+export function dropAdapter(ctx: CoreContext, platform: FilesPlatform): DropAdapter | undefined {
   const drop = platform.drop;
   if (drop === undefined) return undefined;
   try {

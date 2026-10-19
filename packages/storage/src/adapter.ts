@@ -11,6 +11,11 @@ export interface StoredObject {
   readonly locator: string;
   readonly size: number;
   readonly sha256: string;
+  /**
+   * The encrypted drop only (M1-1g-g; 04 §2.1, 07 §5.4): the drop key epoch the object was uploaded
+   * under. Its DELETE is signed with that epoch's drop key, so it stays deletable after a rotation.
+   */
+  readonly keyEpoch?: number;
 }
 
 export interface PutOptions {

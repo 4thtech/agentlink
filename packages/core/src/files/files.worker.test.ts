@@ -8,7 +8,10 @@ import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing'
 import { decodeBase64url, encodeHex, sha256, type JsonObject } from '@4thtech-io/crypto';
 import type { FetchLike } from '@4thtech-io/storage';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createLogger } from '@4thtech-io/log';
+import type { CoreContext } from '../context.js';
 import { rowKeyOf } from '../store/store.js';
+import { deleteFileObject } from './records.js';
 import type { Sealed } from '../store/schema.js';
 import { FakeClock, passphrase, seed } from '../testing/fixtures.js';
 import {
@@ -169,5 +172,97 @@ describe('a file through the encrypted drop, no own storage (D-48, 07 §5.6)', (
       );
       for (const canary of [url, objectId, mac]) expect(raw).not.toContain(canary);
     }
+  });
+});
+
+// M1-1g-g (04 §2.1, 07 §5.4): the sender's `files` row records the drop key epoch of the upload, so
+// a delete after a key rotation is signed with the drop key the object was uploaded under.
+describe('a drop object stays deletable after a key rotation (M1-1g-g)', () => {
+  function contextOf(agent: FileAgent, lines: string[]): CoreContext {
+    return {
+      keyStore: agent.keyStore,
+      store: agent.store,
+      cipher: agent.cipher,
+      now: clock.now,
+      log: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
+    };
+  }
+
+  async function sendViaDrop(): Promise<string> {
+    const sent = await a.client.sendMessage({
+      to: b.id,
+      text: 'file',
+      files: [outgoing('rotate.bin', fileBytes(30_000, 'DROP-EPOCH-PLAINTEXT'))],
+    });
+    expect(sent).toMatchObject({ status: 'ok', files: [{ index: 0, delivery: 'drop' }] });
+    if (sent.status !== 'ok') throw new Error('not sent');
+    return sent.envelopeId;
+  }
+
+  async function locatorOf(envelopeId: string): Promise<JsonObject> {
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0];
+    return JSON.parse(
+      await a.cipher.open(
+        { table: 'files', column: 'locator', rowKey: rowKeyOf([envelopeId, 0]) },
+        row?.locator as Sealed,
+      ),
+    ) as JsonObject;
+  }
+
+  it('the sealed locator records the upload epoch', async () => {
+    const envelopeId = await sendViaDrop();
+    expect(await locatorOf(envelopeId)).toMatchObject({ kind: 'drop', keyEpoch: 0 });
+  });
+
+  it('after the epoch advance, the delete is signed at the upload epoch and the drop accepts it', async () => {
+    const envelopeId = await sendViaDrop();
+    const url = (await locatorOf(envelopeId)).locator as string;
+    expect((await SELF.fetch(url)).status).toBe(200);
+
+    await ownerA
+      .epochControl(a.keyStore as MemoryKeyStore)
+      .advanceEpoch(0, await ownerA.unlock(passphrase()));
+    expect((await a.keyStore.getPublicBundle()).keyEpoch).toBe(1);
+
+    const lines: string[] = [];
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0]!;
+    seen.length = 0;
+    await deleteFileObject(contextOf(a, lines), a.platform, row);
+    expect(seen.map((r) => r.method)).toEqual(['DELETE']);
+    expect((await SELF.fetch(url)).status).not.toBe(200);
+
+    // I-7: no drop URL, object ID or signature in any log line.
+    const objectId = /\/v1\/get\/([A-Za-z0-9_-]{22})/.exec(url)?.[1] as string;
+    const auth = (JSON.parse(seen[0]!.headers) as [string, string][]).find(
+      ([k]) => k === 'authorization',
+    )?.[1] as string;
+    expect(auth).toMatch(/^Nostr /);
+    for (const line of lines) {
+      for (const canary of [url, objectId, auth]) expect(line).not.toContain(canary);
+    }
+  });
+
+  it('a recorded epoch above the current one is refused with the fixed error, nothing sent', async () => {
+    const envelopeId = await sendViaDrop();
+    const locator = await locatorOf(envelopeId);
+    const rowKey = rowKeyOf([envelopeId, 0]);
+    const tampered = await a.cipher.seal(
+      { table: 'files', column: 'locator', rowKey },
+      JSON.stringify({ ...locator, keyEpoch: 5 }),
+    );
+    await a.store.transaction((tx) =>
+      tx.update('files', { envelope_id: envelopeId, idx: 0 }, { locator: tampered }),
+    );
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0]!;
+    seen.length = 0;
+    const lines: string[] = [];
+    const error = await deleteFileObject(contextOf(a, lines), a.platform, row).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toMatchObject({ code: 'storage_failed' });
+    expect(String((error as Error).message)).not.toContain(locator.locator as string);
+    expect(seen).toHaveLength(0);
+    expect((await SELF.fetch(locator.locator as string)).status).toBe(200);
   });
 });
