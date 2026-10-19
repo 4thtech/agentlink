@@ -495,7 +495,8 @@ describe('policy allow-folder <path> †', () => {
       { table: 'policies', column: 'signed_json', rowKey: rowKeyOf([SINGLETON_SLOT]) },
       row?.signed_json as Sealed,
     );
-    const ownerNostr = (await alice.owner.getPublicKeys()).ownerNostr;
+    // The card spells it `0x` + 64 hex (04 §2.4.1).
+    const ownerNostr = `0x${encodeHex((await alice.owner.getPublicKeys()).ownerNostr)}`;
     const verified = verifyStoredOwnerAction(text, { agent: alice.client.agentId, ownerNostr });
     expect(verified.ok).toBe(true);
     if (!verified.ok) return;
@@ -506,7 +507,7 @@ describe('policy allow-folder <path> †', () => {
     };
     expect(params.version).toBe(2);
     expect(params.policy.files.allowedFolders).toEqual([join(home, 'Work')]);
-    const otherOwner = (await bob.owner.getPublicKeys()).ownerNostr;
+    const otherOwner = `0x${encodeHex((await bob.owner.getPublicKeys()).ownerNostr)}`;
     expect(
       verifyStoredOwnerAction(text, { agent: alice.client.agentId, ownerNostr: otherOwner }).ok,
     ).toBe(false);

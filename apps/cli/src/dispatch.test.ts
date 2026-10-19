@@ -103,7 +103,8 @@ describe('--help (06 §8)', () => {
       expect(help).not.toContain(absent);
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
-    expect(commandLines).toHaveLength(19);
+    // M1-9m: three more `policy` lines (show, allow-folder, remove-folder next to set).
+    expect(commandLines).toHaveLength(22);
   });
 
   it('prints help for no arguments, --help, -h and help', async () => {

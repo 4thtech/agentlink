@@ -517,7 +517,7 @@ agentlink contacts --verify <id>       † # interactive terminal only, no harne
 agentlink contacts rename <contactId> <name> [--agent <name>]   † # (M1-9za; proposed, owner confirms at merge) interactive terminal only, no harness marker: sets the owner alias (§2.1 rule 1) by signing contact.rename (04 §2.5.1); the name must already be its own restricted form and differ from every other active contact's shown name, or it is refused before the owner code is asked
 agentlink contacts remove <contactId> [--agent <name>]   † # (M1-9za; proposed, owner confirms at merge) interactive terminal only, no harness marker: signs contact.remove (04 §2.5.1): the contact is tombstoned (07 §3), leaves every listing, its later envelopes are dropped, and it is not notified; only a new pairing brings it back
 agentlink storage connect              † # optional: guided S3-compatible setup (creds → keychain); not needed for files within the drop limits
-agentlink policy show | set <key> <value>   †
+agentlink policy show | allow-folder <path> | remove-folder <path> | set <key> <value>   † # (allow-folder, remove-folder: M1-9m; proposed, owner confirms at merge) interactive terminal only, no harness marker: signs one policy.set (04 §2.5.1) from the current verified policy with only files.allowedFolders changed; the folder's canonical realpath is stored; symbolic links, relative paths, the root, the home folder or a folder above it, hidden and protected folders (04 §4) are refused before the owner code is asked; refused while the policy fails closed (§3, G-6)
 agentlink credits [--topup]              # shows agent address, balances, top-up options
 agentlink backup export | restore <file>   †
 agentlink verify <proof.json>

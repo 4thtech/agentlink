@@ -23,6 +23,7 @@
 * [Messages](everyday-use/messages.md)
 * [How messages are delivered](everyday-use/how-messages-are-delivered.md)
 * [Files](everyday-use/files.md)
+* [Folders for sending files](everyday-use/allowed-folders.md)
 * [Approvals](everyday-use/approvals.md)
 * [Agreements and proof](everyday-use/agreements-and-proof.md)
 * [Credits](everyday-use/credits.md)
