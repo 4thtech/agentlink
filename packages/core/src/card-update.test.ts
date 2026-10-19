@@ -15,6 +15,7 @@
 //   compare-and-set; a lost race is re-read (the winner's value is used) or reported, never ignored.
 import {
   canonicalize,
+  encodeHex,
   encodeBase64url,
   encodeHex0x,
   envelopeHash,
@@ -84,6 +85,16 @@ class RelaySpy {
         sent: true,
       } as PublishOutcome);
     },
+    // An empty catch-up pass: nothing new on the relays.
+    sync: () =>
+      Promise.resolve({
+        partial: false,
+        delivered: 0,
+        duplicates: 0,
+        dropped: 0,
+        deferred: 0,
+        relays: [],
+      }),
   });
 }
 
@@ -304,6 +315,45 @@ describe('card-update sender (04 §2.6, §2.9, §3.4.1)', () => {
     expect(await sentCardUpdates(a)).toHaveLength(4);
   });
 
+  it('syncInbox sends the pending card-updates, once', async () => {
+    await rotate(a);
+    await a.client.syncInbox();
+    expect((await sentCardUpdates(a)).map((s) => s.row.contact_id).sort()).toEqual(
+      [b.id, c.id].sort(),
+    );
+    await a.client.syncInbox();
+    expect(await sentCardUpdates(a)).toHaveLength(2);
+  });
+
+  it('a card-update the outbox gave up on is sent again', async () => {
+    await rotate(a);
+    await a.client.sendCardUpdates();
+    const toB = (await sentCardUpdates(a)).find((s) => s.row.contact_id === b.id);
+    await a.store.transaction((tx) =>
+      tx.update(
+        'envelopes',
+        { envelope_id: toB?.row.envelope_id ?? '' },
+        { delivery: 'not_delivered' },
+      ),
+    );
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 1, failed: 0 });
+  });
+
+  it('refuses to send without a transport, before anything is stored', async () => {
+    const store = new MemoryStore();
+    const keyStore = new MemoryKeyStore(seed(54));
+    const offline = await AgentLinkClient.create({
+      keyStore,
+      store,
+      cipher: new TestStoreCipher(),
+      approvals: new RecordingApprovalChannel(),
+      clock: clock.now,
+    });
+    await expect(offline.sendCardUpdates()).rejects.toMatchObject({
+      code: 'transport_unavailable',
+    });
+  });
+
   it('skips a blocked contact', async () => {
     await a.client.contacts.block(c.id);
     await rotate(a);
@@ -379,7 +429,7 @@ describe('own card history: proofSigner for earlier key epochs (07 §8)', () => 
   it('never returns a card for a future epoch or an unfinished rotation', async () => {
     const control = a.owner.epochControl(a.keyStore);
     const next = await control.previewEpoch(1);
-    const nextKey = Buffer.from(next.agentNostr).toString('hex');
+    const nextKey = encodeHex(next.agentNostr);
     expect(await a.client.proofSigner(nextKey)).toBeUndefined();
     // The KeyStore advances, the card is not committed (rotation_pending): still no signer.
     await control.advanceEpoch(0, await a.owner.unlock(passphrase()));
@@ -438,12 +488,16 @@ describe('own card history: proofSigner for earlier key epochs (07 §8)', () => 
 
   it('a stored history entry that does not verify makes the identity unreadable', async () => {
     await rotate(a);
+    const current = await nostrOf(a);
     await editOwnCard(a, (value) => {
       const history = value.history as Record<string, unknown>[];
       const entry = history[0] as Record<string, unknown>;
       history[0] = { ...entry, cardSig: `0x${'11'.repeat(65)}` };
     });
-    await expect(a.client.proofSigner(await nostrOf(a))).rejects.toMatchObject({
+    await expect(a.client.proofSigner(current)).rejects.toMatchObject({
+      code: 'store_unreadable',
+    });
+    await expect(a.client.identity.signedCard()).rejects.toMatchObject({
       code: 'store_unreadable',
     });
   });

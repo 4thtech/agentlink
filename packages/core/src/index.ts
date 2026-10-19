@@ -230,6 +230,11 @@ export {
   type DeliveryAckStatus,
 } from './acks.js';
 export {
+  CardUpdateSender,
+  MAX_CARD_UPDATES_PER_PASS,
+  type CardUpdateSendResult,
+} from './card-update.js';
+export {
   INBOX_PAGE_MAX_LIMIT,
   INBOX_TYPES,
   InboxService,

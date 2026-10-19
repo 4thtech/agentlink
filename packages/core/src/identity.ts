@@ -10,7 +10,12 @@
 //   the card's agentNostr through KeyStore.signCardPop, which signs only at the KeyStore's current
 //   epoch. So init signs it at once, and a rotation signs it once the KeyStore is at the new epoch
 //   (after the advance, or when finishing a pending rotation). A card stored before M1-4d-d gets it
-//   on first use while the KeyStore still holds that epoch's keys (signedCard).
+//   on first use while the KeyStore still holds that epoch's keys (signedCard), written with a
+//   compare-and-set on the sealed card read: a lost race is read again, never ignored (M1-4d-f).
+// - Card history (M1-4d-f; 07 §8): the sealed own card also keeps the agent's earlier cards, one per
+//   key epoch with their signatures (ownCardText), so a proof pack for an envelope sent at an
+//   earlier epoch carries that epoch's card. A rotation moves the current card into the history,
+//   and signs its `cardPop` first when it still lacks one and the KeyStore is still at its epoch.
 // - Rotation issues the card for keyEpoch + 1 (04 §2.6; M1-1g-d, IR-M1-7a-1 Q1). The owner flow passes
 //   the backend's KeyEpochControl: preview the next epoch's public keys, sign the next card, store it
 //   as pending, advance the KeyStore with a compare-and-set, then commit key_epoch. Old epoch keys
@@ -44,8 +49,10 @@ import {
   cardTypedData,
   checkName,
   checkRelays,
+  ownCardText,
   ownerKeyFields,
   parseCard,
+  parseOwnCardText,
   parseStoredCard,
   sameOwnerKeys,
   storedCardText,
@@ -139,9 +146,9 @@ export function readIdentity(
 export async function openOwnCard(
   ctx: CoreContext,
   row: Row<'identity'>,
-): Promise<(StoredCard & { readonly cardAgentSig: string }) | undefined> {
+): Promise<OwnStoredCard | undefined> {
   const text = await open(ctx, 'identity', 'agent_card_json', [row.agent_id], row.agent_card_json);
-  const stored = parseStoredCard(text);
+  const { current: stored, history } = parseOwnCardText(text);
   if (
     stored.cardAgentSig === null ||
     stored.card.agentEvm !== row.agent_id ||
@@ -149,8 +156,25 @@ export async function openOwnCard(
   ) {
     return undefined;
   }
-  return { ...stored, cardAgentSig: stored.cardAgentSig };
+  return { ...stored, cardAgentSig: stored.cardAgentSig, history };
 }
+
+/** The own current card, re-verified, with its earlier cards (oldest first, M1-4d-f). */
+export type OwnStoredCard = StoredCard & {
+  readonly cardAgentSig: string;
+  readonly history: readonly StoredCard[];
+};
+
+/** Only the stored-card fields of a card (a history entry). */
+const storedOf = (h: StoredCard): StoredCard => ({
+  card: h.card,
+  cardSig: h.cardSig,
+  cardAgentSig: h.cardAgentSig,
+  cardPop: h.cardPop,
+});
+
+/** Attempts of signedCard() to add a late `cardPop` before a lost compare-and-set is reported. */
+const CARD_POP_ATTEMPTS = 3;
 
 export class IdentityService {
   readonly #ctx: CoreContext;
@@ -187,55 +211,76 @@ export class IdentityService {
 
   /** The current card with its signatures, name and relays (for invites and handshakes, M1-7c). */
   async signedCard(): Promise<SignedCard> {
-    const got = await readIdentity(this.#ctx);
-    if (got === undefined) {
-      throw new CoreError('identity_missing', 'This agent has no identity yet. Run init first.');
+    // A card without its `cardPop` gets one here; a lost compare-and-set reads the row again, so the
+    // card returned is always the one stored (M1-4d-f). A race that keeps losing is reported.
+    for (let attempt = 0; attempt < CARD_POP_ATTEMPTS; attempt += 1) {
+      const got = await readIdentity(this.#ctx);
+      if (got === undefined) {
+        throw new CoreError('identity_missing', 'This agent has no identity yet. Run init first.');
+      }
+      // 07 §3.4: a revoked agent stops signing and sending, so it hands out no card (L-3).
+      if (got.revoked) {
+        throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
+      }
+      const stored = await openOwnCard(this.#ctx, got.row);
+      if (stored === undefined) {
+        throw new CoreError('store_unreadable', 'The stored identity could not be read.');
+      }
+      const cardPop = stored.cardPop ?? (await this.#addCardPop(got.row, stored));
+      if (cardPop === undefined) continue;
+      const key = [got.row.agent_id];
+      const name = await open(this.#ctx, 'identity', 'name', key, got.row.name);
+      const relays = checkStoredRelays(
+        await open(this.#ctx, 'identity', 'relays', key, got.row.relays),
+      );
+      return {
+        card: stored.card,
+        cardSig: stored.cardSig,
+        cardAgentSig: stored.cardAgentSig,
+        cardPop,
+        name,
+        relays,
+      };
     }
-    // 07 §3.4: a revoked agent stops signing and sending, so it hands out no card (L-3).
-    if (got.revoked) {
-      throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
-    }
-    const v = await this.#view(got.row, false);
-    const cardPop = v.cardPop ?? (await this.#addCardPop(got.row, v));
-    const key = [got.row.agent_id];
-    const name = await open(this.#ctx, 'identity', 'name', key, got.row.name);
-    const relays = checkStoredRelays(
-      await open(this.#ctx, 'identity', 'relays', key, got.row.relays),
-    );
-    return {
-      card: v.card,
-      cardSig: v.cardSig,
-      cardAgentSig: v.cardAgentSig,
-      cardPop,
-      name,
-      relays,
-    };
+    this.#ctx.log.warn('card proof of possession not stored: the identity kept changing');
+    throw concurrentRotation();
   }
 
   /**
    * A card stored before M1-4d-d (04 §2.9): signs its `cardPop` once, while the KeyStore is at the
-   * card's epoch, and stores it with the card (a compare-and-set on the sealed card read). With the
+   * card's epoch, and stores it with the card and its history, as a compare-and-set on the sealed
+   * card read. Undefined when that write lost (another process changed the card meanwhile): the
+   * caller reads again, so a value that was not stored is never handed out (M1-4d-f). With the
    * KeyStore at another epoch the card's Nostr key cannot sign: `key_epoch_mismatch` or
    * `rotation_pending`, the states in which the agent does not send anyway.
    */
-  async #addCardPop(row: Row<'identity'>, v: IdentityView): Promise<string> {
+  async #addCardPop(row: Row<'identity'>, stored: OwnStoredCard): Promise<string | undefined> {
     const ctx = this.#ctx;
     await this.assertCanSend();
-    const cardPop = await this.#signCardPop(v.card);
+    const cardPop = await this.#signCardPop(stored.card);
     const sealed = await seal(
       ctx,
       'identity',
       'agent_card_json',
       [row.agent_id],
-      storedCardText({ card: v.card, cardSig: v.cardSig, cardAgentSig: v.cardAgentSig, cardPop }),
+      ownCardText({ ...stored, cardPop }, stored.history),
     );
-    await ctx.store.transaction((tx) => {
+    const written = await ctx.store.transaction((tx) =>
       tx.update(
         'identity',
-        { agent_id: row.agent_id, key_epoch: row.key_epoch, agent_card_json: row.agent_card_json },
+        {
+          agent_id: row.agent_id,
+          key_epoch: row.key_epoch,
+          revoked_at: null,
+          agent_card_json: row.agent_card_json,
+        },
         { agent_card_json: sealed },
-      );
-    });
+      ),
+    );
+    if (written !== 1) {
+      ctx.log.info('card proof of possession race lost', { keyEpoch: row.key_epoch });
+      return undefined;
+    }
     ctx.log.info('card proof of possession added', { keyEpoch: row.key_epoch });
     return cardPop;
   }
@@ -346,6 +391,10 @@ export class IdentityService {
       throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
     }
     const old = await this.#view(current.row, false);
+    const oldStored = await openOwnCard(ctx, current.row);
+    if (oldStored === undefined) {
+      throw new CoreError('store_unreadable', 'The stored identity could not be read.');
+    }
     const bundle = await ctx.keyStore.getPublicBundle();
     if (bundle.agentId !== old.agentId) {
       throw new CoreError('identity_mismatch', 'The keys do not belong to this agent.');
@@ -383,6 +432,11 @@ export class IdentityService {
     // that is what binds the session handed to advanceEpoch to this agent's owner.
     const signed = await this.#issue(next, input, name, relays, now);
     const text = storedCardText(signed);
+    // M1-4d-f: the current card joins the history. A card stored before M1-4d-d gets its `cardPop`
+    // now, while the KeyStore is still at its epoch (04 §2.9); after the advance it no longer can.
+    const oldCardPop =
+      oldStored.cardPop ?? (control !== undefined ? await this.#signCardPop(oldStored.card) : null);
+    const history = [...oldStored.history, { ...oldStored, cardPop: oldCardPop }].map(storedOf);
     // Every write is a compare-and-set on the epoch the card was issued from.
     const where = { agent_id: old.agentId, key_epoch: old.keyEpoch, revoked_at: null };
 
@@ -428,7 +482,7 @@ export class IdentityService {
       'identity',
       'agent_card_json',
       key,
-      storedCardText({ ...signed, cardPop }),
+      ownCardText({ ...signed, cardPop }, history),
     );
 
     // 3. Commit the card and key_epoch, and clear the pending card.
@@ -605,12 +659,16 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
   // 04 §2.9 (D-102): the KeyStore is at the pending card's epoch, so its Nostr key signs `cardPop`.
   const cardPop = pending.cardPop ?? (await ctx.keyStore.signCardPop(pending.card));
   if (!verifyCardPop(pending.card, cardPop)) throw cardPopInvalid();
+  // M1-4d-f: the current card joins the history (its `cardPop` as stored: the KeyStore has moved).
+  const current = await openOwnCard(ctx, row);
+  if (current === undefined) return;
+  const history = [...current.history, current].map(storedOf);
   const sealedCard = await seal(
     ctx,
     'identity',
     'agent_card_json',
     [row.agent_id],
-    storedCardText({ ...pending, cardPop }),
+    ownCardText({ ...pending, cardPop }, history),
   );
   const finished = await ctx.store.transaction((tx) => {
     if (isRevoked(tx, row)) return false;
@@ -620,6 +678,7 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
       key_epoch: row.key_epoch,
       revoked_at: null,
       pending_card_json: sealed,
+      agent_card_json: row.agent_card_json,
     };
     const patch = {
       agent_card_json: sealedCard,

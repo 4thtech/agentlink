@@ -23,6 +23,7 @@ import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
+import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
 import { InboxService } from './inbox.js';
@@ -119,6 +120,8 @@ export class AgentLinkClient {
   readonly inbox: InboxService;
   /** Delivery acknowledgements (02 F-23; M1-7h): behind the `deliveryAcks` flag. */
   readonly acks: DeliveryAcks;
+  /** The `card-update` sender (M1-4d-f; 04 §3.4.1): the current card to contacts that lack it. */
+  readonly cardUpdates: CardUpdateSender;
   /**
    * Terms and commitments (M1-32; 06 §2.2a, 04 §3.4.2): propose, respond, the negotiations, the
    * commitment card, and the deferred-receipt lookup and part claim for M1-7g.
@@ -200,6 +203,11 @@ export class AgentLinkClient {
       },
       deliveryAcks,
     );
+    this.cardUpdates = new CardUpdateSender(ctx, {
+      identity: this.identity,
+      envelopes: this.envelopes,
+      outbox: this.outbox,
+    });
     this.#sync = new SyncService(ctx, {
       envelopes: this.envelopes,
       outbox: this.outbox,
@@ -214,8 +222,23 @@ export class AgentLinkClient {
    * M1-7h): fetch with the 48 h look-back, dedup, verify once, store, per-contact rate limit, then
    * 04 §3.1.1 steps 5 to 9 (`card-update` first) and, behind the flag, delivery acks.
    */
-  syncInbox(options?: SyncInboxOptions): Promise<SyncInboxResult> {
-    return this.#sync.syncInbox(options);
+  async syncInbox(options?: SyncInboxOptions): Promise<SyncInboxResult> {
+    const result = await this.#sync.syncInbox(options);
+    // M1-4d-f: announce the current card to contacts that lack it (after a rotation, also one made
+    // without a transport). Best effort: it never fails the sync, and the next pass tries again.
+    await this.cardUpdates.sendPending().catch(() => {
+      this.#ctx.log.warn('card updates not sent');
+    });
+    return result;
+  }
+
+  /**
+   * Sends the current card in a `card-update` (with `cardSig`, `cardAgentSig` and `cardPop`) to every
+   * active contact that does not hold it yet (M1-4d-f; 04 §2.6, §2.9, §3.4.1). The owner flow calls
+   * it after a rotation; `syncInbox` also runs it. Idempotent.
+   */
+  sendCardUpdates(): Promise<CardUpdateSendResult> {
+    return this.cardUpdates.sendPending();
   }
 
   /**
@@ -269,7 +292,8 @@ export class AgentLinkClient {
   /**
    * The proof pack `signer` card for an envelope sent from `from` (07 §8; M1-4d-d, D-102): this
    * agent's own card or a contact's, with its proof of possession when stored. For
-   * `exportProofPack` (M1-7g). Undefined for an unknown or earlier-epoch key.
+   * `exportProofPack` (M1-7g). Own cards of earlier key epochs are kept (M1-4d-f); undefined for an
+   * unknown key, a contact's earlier-epoch key, or an own epoch whose card is not stored.
    */
   proofSigner(from: string): Promise<ProofPackSigner | undefined> {
     return this.contacts.proofSigner(from);
