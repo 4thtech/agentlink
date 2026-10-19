@@ -181,6 +181,7 @@ const DECODERS = Object.freeze(
     'card-update.cardSig': hex0x(cardSigSchema),
     'invite.cardAgentSig': hex0x(invite.cardAgentSig),
     'handshake.cardAgentSig': hex0x(cardAgentSigSchema),
+    'card-update.cardAgentSig': hex0x(cardAgentSigSchema),
     'ProofPack.signer.cardSig': hex0x(cardSigSchema),
     'ProofPack.signer.cardAgentSig': hex0x(cardAgentSigSchema),
     'ProofPack.signature': hex0x(pack.signature),
@@ -205,6 +206,9 @@ const DECODERS = Object.freeze(
     // Bare hex, 128 (BIP-340)
     'envelope.sig': bare(envelope.sig),
     'SignedOwnerAction.sig': bare(signedOwnerActionSchema.shape.sig),
+    'handshake.cardPop': bare(bip340SigHex),
+    'handshake-ack.cardPop': bare(bip340SigHex),
+    'card-update.cardPop': bare(bip340SigHex),
     'ProofPack.signer.cardPop': bare(bip340SigHex),
 
     // Bare hex, 64 (digest under a Nostr key only)

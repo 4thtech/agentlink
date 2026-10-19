@@ -6,6 +6,11 @@
 //   endorsed by the agent (cardAgentSig, EIP-712 by agentEvm) through the KeyStore. Both signatures
 //   are checked before anything is stored, so a session of another owner is refused. The signed card
 //   is sealed at rest (`enc`), like the name and relays (IR-M1-7a-1 M-3).
+// - Each own card also gets its proof of possession (M1-4d-d; 04 §2.9, D-102): `cardPop`, BIP-340 by
+//   the card's agentNostr through KeyStore.signCardPop, which signs only at the KeyStore's current
+//   epoch. So init signs it at once, and a rotation signs it once the KeyStore is at the new epoch
+//   (after the advance, or when finishing a pending rotation). A card stored before M1-4d-d gets it
+//   on first use while the KeyStore still holds that epoch's keys (signedCard).
 // - Rotation issues the card for keyEpoch + 1 (04 §2.6; M1-1g-d, IR-M1-7a-1 Q1). The owner flow passes
 //   the backend's KeyEpochControl: preview the next epoch's public keys, sign the next card, store it
 //   as pending, advance the KeyStore with a compare-and-set, then commit key_epoch. Old epoch keys
@@ -27,6 +32,7 @@ import {
   randomBytes,
   verifyCardAgentSig,
   verifyCardOwnerSig,
+  verifyCardPop,
   type AgentCard,
   type KeyEpochControl,
   type OwnerPublicKeys,
@@ -34,6 +40,7 @@ import {
   type PublicIdentity,
 } from '@4thtech-io/crypto';
 import {
+  cardPopInvalid,
   cardTypedData,
   checkName,
   checkRelays,
@@ -61,6 +68,11 @@ export interface IdentityView {
   readonly card: AgentCard;
   readonly cardSig: string;
   readonly cardAgentSig: string;
+  /**
+   * The card's `cardPop` (04 §2.9, D-102). Null only for a card stored before M1-4d-d that has not
+   * been used since; signedCard() adds it.
+   */
+  readonly cardPop: string | null;
   readonly revoked: boolean;
   readonly createdAt: number;
   readonly updatedAt: number;
@@ -160,6 +172,7 @@ export class IdentityService {
       card: stored.card,
       cardSig: stored.cardSig,
       cardAgentSig: stored.cardAgentSig,
+      cardPop: stored.cardPop,
       revoked,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -183,12 +196,55 @@ export class IdentityService {
       throw new CoreError('identity_revoked', 'This agent has been revoked by its owner.');
     }
     const v = await this.#view(got.row, false);
+    const cardPop = v.cardPop ?? (await this.#addCardPop(got.row, v));
     const key = [got.row.agent_id];
     const name = await open(this.#ctx, 'identity', 'name', key, got.row.name);
     const relays = checkStoredRelays(
       await open(this.#ctx, 'identity', 'relays', key, got.row.relays),
     );
-    return { card: v.card, cardSig: v.cardSig, cardAgentSig: v.cardAgentSig, name, relays };
+    return {
+      card: v.card,
+      cardSig: v.cardSig,
+      cardAgentSig: v.cardAgentSig,
+      cardPop,
+      name,
+      relays,
+    };
+  }
+
+  /**
+   * A card stored before M1-4d-d (04 §2.9): signs its `cardPop` once, while the KeyStore is at the
+   * card's epoch, and stores it with the card (a compare-and-set on the sealed card read). With the
+   * KeyStore at another epoch the card's Nostr key cannot sign: `key_epoch_mismatch` or
+   * `rotation_pending`, the states in which the agent does not send anyway.
+   */
+  async #addCardPop(row: Row<'identity'>, v: IdentityView): Promise<string> {
+    const ctx = this.#ctx;
+    await this.assertCanSend();
+    const cardPop = await this.#signCardPop(v.card);
+    const sealed = await seal(
+      ctx,
+      'identity',
+      'agent_card_json',
+      [row.agent_id],
+      storedCardText({ card: v.card, cardSig: v.cardSig, cardAgentSig: v.cardAgentSig, cardPop }),
+    );
+    await ctx.store.transaction((tx) => {
+      tx.update(
+        'identity',
+        { agent_id: row.agent_id, key_epoch: row.key_epoch, agent_card_json: row.agent_card_json },
+        { agent_card_json: sealed },
+      );
+    });
+    ctx.log.info('card proof of possession added', { keyEpoch: row.key_epoch });
+    return cardPop;
+  }
+
+  /** `cardPop` through the KeyStore (current epoch only), verified before it is used or stored. */
+  async #signCardPop(card: AgentCard): Promise<string> {
+    const cardPop = await this.#ctx.keyStore.signCardPop(card);
+    if (!verifyCardPop(card, cardPop)) throw cardPopInvalid();
+    return cardPop;
   }
 
   /** Whether the agent may send and sign now (L-1). The send paths (M1-7b) call assertCanSend. */
@@ -327,7 +383,6 @@ export class IdentityService {
     // that is what binds the session handed to advanceEpoch to this agent's owner.
     const signed = await this.#issue(next, input, name, relays, now);
     const text = storedCardText(signed);
-    const sealedCard = await seal(ctx, 'identity', 'agent_card_json', key, text);
     // Every write is a compare-and-set on the epoch the card was issued from.
     const where = { agent_id: old.agentId, key_epoch: old.keyEpoch, revoked_at: null };
 
@@ -366,6 +421,15 @@ export class IdentityService {
         throw nextEpochMismatch();
       }
     }
+    // 04 §2.9 (D-102): the KeyStore is at the new epoch now, so its Nostr key signs the card.
+    const cardPop = signed.cardPop ?? (await this.#signCardPop(signed.card));
+    const sealedCard = await seal(
+      ctx,
+      'identity',
+      'agent_card_json',
+      key,
+      storedCardText({ ...signed, cardPop }),
+    );
 
     // 3. Commit the card and key_epoch, and clear the pending card.
     const patch = {
@@ -393,7 +457,7 @@ export class IdentityService {
     name: string,
     relays: readonly string[],
     now: number,
-  ): Promise<{ card: AgentCard; cardSig: string; cardAgentSig: string }> {
+  ): Promise<StoredCard & { readonly cardAgentSig: string }> {
     const owner = ownerKeyFields(input.ownerKeys);
     const card = parseCard({
       version: 1,
@@ -427,7 +491,11 @@ export class IdentityService {
         'The agent key did not endorse the card.',
       );
     }
-    return { card, cardSig, cardAgentSig };
+    // 04 §2.9 (D-102): `cardPop` now when the KeyStore is at the card's epoch (init, or a rotation
+    // whose KeyStore already advanced); otherwise the rotation signs it after the advance.
+    const current = await this.#ctx.keyStore.getPublicBundle();
+    const cardPop = sameAgentKeys(current, card) ? await this.#signCardPop(card) : null;
+    return { card, cardSig, cardAgentSig, cardPop };
   }
 }
 
@@ -534,12 +602,15 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
     ctx.log.warn('pending rotation card not usable', { keyEpoch: row.key_epoch });
     return;
   }
+  // 04 §2.9 (D-102): the KeyStore is at the pending card's epoch, so its Nostr key signs `cardPop`.
+  const cardPop = pending.cardPop ?? (await ctx.keyStore.signCardPop(pending.card));
+  if (!verifyCardPop(pending.card, cardPop)) throw cardPopInvalid();
   const sealedCard = await seal(
     ctx,
     'identity',
     'agent_card_json',
     [row.agent_id],
-    storedCardText(pending),
+    storedCardText({ ...pending, cardPop }),
   );
   const finished = await ctx.store.transaction((tx) => {
     if (isRevoked(tx, row)) return false;

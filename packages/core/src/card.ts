@@ -14,6 +14,7 @@ import {
   parseJson,
   verifyCardAgentSig,
   verifyCardOwnerSig,
+  verifyCardPop,
   type AgentCard,
   type JsonValue,
   type OwnerPublicKeys,
@@ -26,23 +27,33 @@ import { CoreError } from './errors.js';
 export interface StoredCard {
   readonly card: AgentCard;
   readonly cardSig: string;
-  /** Null after a card-update, which carries no agent signature (04 §3.4.1). */
+  /**
+   * EIP-712 by `agentEvm` (04 §2.9). Null for a contact card that arrived without it: a card-update
+   * from a peer that predates M1-4d-d.
+   */
   readonly cardAgentSig: string | null;
+  /**
+   * BIP-340 by `agentNostr` over this card (04 §2.9, D-102). Present only with `cardAgentSig`; null
+   * for a card stored before M1-4d-d or received from a peer that predates it.
+   */
+  readonly cardPop: string | null;
 }
 
-/** The plaintext of a sealed `agent_card_json`: JCS of {card, cardSig, cardAgentSig}. */
+/** The plaintext of a sealed `agent_card_json`: JCS of {card, cardSig, cardAgentSig, cardPop}. */
 export function storedCardText(stored: StoredCard): string {
   return canonicalize({
     card: stored.card as unknown as JsonValue,
     cardSig: stored.cardSig,
     cardAgentSig: stored.cardAgentSig,
+    cardPop: stored.cardPop,
   });
 }
 
 /**
  * Reads a stored card back and checks it again: the card parses strictly and `cardSig` is by
- * `ownerEvm`; `cardAgentSig`, when present, is by `agentEvm`. Anything else is unreadable (fail
- * closed), never trusted.
+ * `ownerEvm`; `cardAgentSig`, when present, is by `agentEvm`; `cardPop`, when present, is by
+ * `agentNostr` and comes only with `cardAgentSig` (a text written before M1-4d-d has no `cardPop`
+ * key and reads as null). Anything else is unreadable (fail closed), never trusted.
  */
 export function parseStoredCard(text: string): StoredCard {
   const unreadable = (): never => {
@@ -55,7 +66,7 @@ export function parseStoredCard(text: string): StoredCard {
     return unreadable();
   }
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return unreadable();
-  const { card: rawCard, cardSig, cardAgentSig } = value as Record<string, unknown>;
+  const { card: rawCard, cardSig, cardAgentSig, cardPop = null } = value as Record<string, unknown>;
   let card: AgentCard;
   try {
     card = parseAgentCard(rawCard);
@@ -64,7 +75,15 @@ export function parseStoredCard(text: string): StoredCard {
   }
   if (typeof cardSig !== 'string' || !verifyCardOwnerSig(card, cardSig)) return unreadable();
   if (cardAgentSig !== null && !verifyCardAgentSig(card, cardAgentSig)) return unreadable();
-  return { card, cardSig, cardAgentSig: cardAgentSig as string | null };
+  if (cardPop !== null && (cardAgentSig === null || !verifyCardPop(card, cardPop))) {
+    return unreadable();
+  }
+  return {
+    card,
+    cardSig,
+    cardAgentSig: cardAgentSig as string | null,
+    cardPop: cardPop as string | null,
+  };
 }
 
 /** The long owner fingerprint (04 §2.9) of a card, 64 lowercase hex. A hash of public keys only. */
@@ -85,6 +104,8 @@ export interface SignedCard {
   readonly cardSig: string;
   /** EIP-712 by `agentEvm` over the same card (04 §2.9). */
   readonly cardAgentSig: string;
+  /** BIP-340 by `agentNostr` over the same card (04 §2.9, D-102): the card's proof of possession. */
+  readonly cardPop: string;
   /** Self-declared display name; `nameHash` = keccak256 of its UTF-8. */
   readonly name: string;
   /** Relay URLs; `relaysHash` = keccak256(JCS(relays)). */
@@ -96,6 +117,8 @@ export interface CardInput {
   readonly card: unknown;
   readonly cardSig: unknown;
   readonly cardAgentSig?: unknown;
+  /** The card's `cardPop` (04 §2.9, D-102), when the body carries one. */
+  readonly cardPop?: unknown;
   readonly name: unknown;
   readonly relays: unknown;
 }
@@ -156,15 +179,23 @@ export function agentNostrKey(card: AgentCard): string {
   return card.agentNostr.slice(2);
 }
 
+/** A received card after checkReceivedCard: the signatures it carried that verified, else null. */
+export type CheckedCard = Omit<SignedCard, 'cardAgentSig' | 'cardPop'> & {
+  readonly cardAgentSig: string | null;
+  readonly cardPop: string | null;
+};
+
 /**
  * Checks a received card (04 §2.4, §2.9, §3.4.1): the card parses strictly, `cardSig` is by
- * `ownerEvm`, `cardAgentSig` by `agentEvm` when required (invite, handshake; not a card-update), the
- * name and relays match their hashes and pass their rules, and the card has not expired at `now`.
+ * `ownerEvm`, `cardAgentSig` by `agentEvm` when required (invite, handshake; not a card-update) or
+ * present, `cardPop` (D-102) by `agentNostr` over this card when present and only next to a
+ * `cardAgentSig`, the name and relays match their hashes and pass their rules, and the card has not
+ * expired at `now`. A present signature that does not verify fails the whole card, never only itself.
  */
 export function checkReceivedCard(
   input: CardInput,
   options: { readonly requireAgentSig: boolean; readonly now: number },
-): Omit<SignedCard, 'cardAgentSig'> & { readonly cardAgentSig: string | null } {
+): CheckedCard {
   const card = parseCard(input.card);
   if (!verifyCardOwnerSig(card, input.cardSig)) {
     throw new CoreError(
@@ -182,6 +213,11 @@ export function checkReceivedCard(
     }
     cardAgentSig = input.cardAgentSig as string;
   }
+  let cardPop: string | null = null;
+  if (input.cardPop !== undefined) {
+    if (cardAgentSig === null || !verifyCardPop(card, input.cardPop)) throw cardPopInvalid();
+    cardPop = input.cardPop as string;
+  }
   const name = checkName(input.name);
   if (encodeHex0x(agentCardNameHash(name)) !== card.nameHash) {
     throw new CoreError('name_invalid', 'The display name does not match the agent card.');
@@ -193,5 +229,13 @@ export function checkReceivedCard(
   if (card.expiresAt !== 0 && card.expiresAt <= options.now) {
     throw new CoreError('card_expired', 'The agent card has expired.');
   }
-  return { card, cardSig: input.cardSig as string, cardAgentSig, name, relays };
+  return { card, cardSig: input.cardSig as string, cardAgentSig, cardPop, name, relays };
+}
+
+/** A present card proof of possession that does not verify, or half of one (04 §2.9, D-102). */
+export function cardPopInvalid(): CoreError {
+  return new CoreError(
+    'card_pop_invalid',
+    'The agent card proof of possession is not valid for this card.',
+  );
 }
