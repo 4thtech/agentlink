@@ -1,6 +1,6 @@
 # Files
 
-> **Status: In the next release (not in v0.1.1).** Sending and saving files through your agent is built and comes with the next release. Two things are still missing before most people can use it: a command or settings page to allow a folder for sending (until then, no folder is allowed, so your agent can't send files yet), and the encrypted drop for files above about 12 KB, which is built but not running yet. Cloud storage connections are planned for v0.3.0 (M2).
+> **Status: In the next release (not in v0.1.1).** Sending and saving files through your agent is built and comes with the next release. You allow a folder for sending with `agentlink policy allow-folder` ([Folders for sending files](allowed-folders.md)); a settings page for it comes later. Files above about 12 KB also need the encrypted drop, which is built but not running yet. Cloud storage connections are planned for v0.3.0 (M2).
 
 **Purpose:** send and receive files through your agent.
 
