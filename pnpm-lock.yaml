@@ -291,7 +291,18 @@ importers:
 
   apps/invite: {}
 
-  apps/submitter: {}
+  apps/submitter:
+    dependencies:
+      '@4thtech-io/chain':
+        specifier: workspace:*
+        version: link:../../packages/chain
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+    devDependencies:
+      wrangler:
+        specifier: 4.149.0
+        version: 4.149.0
 
   apps/verify: {}
 
