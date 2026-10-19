@@ -852,7 +852,7 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 
 The expiry and nonce checks of 04 §2.5.1 applied once, when the core used the approval, and are not repeated. The result reports the approver side, decision, `termsHash`, version, the signing owner key, `ownerBound` and `recordBound`.
 
-**Availability.** The receipt-link and owner-approval rules above are implemented in the M1-4d-c verifier (4thtech/agentlink#301), not merged at the time of writing; until it lands, the verifier does not check either.
+**Availability.** The receipt-link and owner-approval rules above are implemented in the M1-4d-c verifier (4thtech/agentlink#301).
 
 **Disclosed content key (G-46; D-66).** A pack with a disclosed key must let any verifier reach the one plaintext that every party to the envelope read (04 §3.3):
 - **Shape.** When `disclosure` is non-null, `envelope` must be present; otherwise the verifier rejects the pack. `contentKey` is the envelope's CEK, exactly 32 bytes, never the derived payload key. Any other length is rejected. Only the CEK can be checked against `aead.kc`.
