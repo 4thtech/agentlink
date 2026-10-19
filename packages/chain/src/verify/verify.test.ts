@@ -162,11 +162,82 @@ const OTHER_SCALAR = `0x${'22'.repeat(32)}` as ViemHex;
 const SIGNER = privateKeyToAccount(SIGNER_SCALAR);
 const OTHER = privateKeyToAccount(OTHER_SCALAR);
 const SIGNER_EVM = SIGNER.address.toLowerCase();
+/** The signer agent's owner: it signs the agent card (`cardSig`, 04 §2.4). */
+const OWNER_SCALAR = `0x${'33'.repeat(32)}` as ViemHex;
+const OWNER = privateKeyToAccount(OWNER_SCALAR);
+const OWNER_EVM = OWNER.address.toLowerCase();
+/** Another owner (M1-4d-b: a card under a different owner). */
+const OTHER_OWNER = privateKeyToAccount(`0x${'44'.repeat(32)}` as ViemHex);
 
 const NOTARIZED_AT = 1760000100;
 const DELIVERED_AT = 1760000200;
 const TX_HASH = `0x${'cd'.repeat(32)}`;
 const b64 = (hex: string): string => encodeBase64url(decodeHex(hex));
+
+// --- agent cards (04 §2.4; M1-4d-b) ------------------------------------------------------------------
+
+type CardJson = {
+  version: number;
+  agentEvm: string;
+  agentNostr: string;
+  agentEnc: string;
+  ownerEvm: string;
+  ownerNostr: string;
+  ownerEnc: string;
+  nameHash: string;
+  relaysHash: string;
+  issuedAt: number;
+  expiresAt: number;
+  keyEpoch: number;
+};
+
+/** The record signer's card: its `agentNostr` is the vector envelope's `from`. */
+function cardFor(over: Partial<CardJson> = {}): CardJson {
+  return {
+    version: 1,
+    agentEvm: SIGNER_EVM,
+    agentNostr: `0x${MESSAGE_ENVELOPE.from}`,
+    agentEnc: `0x${'55'.repeat(32)}`,
+    ownerEvm: OWNER_EVM,
+    ownerNostr: `0x${'66'.repeat(32)}`,
+    ownerEnc: `0x${'77'.repeat(32)}`,
+    nameHash: `0x${'88'.repeat(32)}`,
+    relaysHash: `0x${'99'.repeat(32)}`,
+    issuedAt: 1759000000,
+    expiresAt: 0,
+    keyEpoch: 0,
+    ...over,
+  };
+}
+
+const t = (name: string, type: string) => ({ name, type });
+/** The AgentCard EIP-712 type (04 §2.4), written out here so viem signs it as an independent signer. */
+const CARD_TYPES = {
+  AgentCard: [
+    t('version', 'uint8'),
+    t('agentEvm', 'address'),
+    t('agentNostr', 'bytes32'),
+    t('agentEnc', 'bytes32'),
+    t('ownerEvm', 'address'),
+    t('ownerNostr', 'bytes32'),
+    t('ownerEnc', 'bytes32'),
+    t('nameHash', 'bytes32'),
+    t('relaysHash', 'bytes32'),
+    t('issuedAt', 'uint64'),
+    t('expiresAt', 'uint64'),
+    t('keyEpoch', 'uint32'),
+  ],
+} as const;
+
+/** `cardSig`: an EIP-712 signature over the card under the chain-agnostic card domain. */
+async function signCard(card: CardJson, account: typeof OWNER = OWNER): Promise<string> {
+  return account.signTypedData({
+    domain: { name: 'OCC AgentCard', version: '1' },
+    types: CARD_TYPES,
+    primaryType: 'AgentCard',
+    message: card as never,
+  });
+}
 
 // --- chains ---------------------------------------------------------------------------------------
 
@@ -333,6 +404,8 @@ interface FixtureOptions {
   /** Sign under another domain. */
   domain?: { chainId: number; notary: string };
   selfNote?: boolean;
+  /** The signer's card in the pack: a valid owner-signed card by default; `false` for none. */
+  card?: false | { agentCard: CardJson; cardSig: string };
 }
 
 async function eoaFixture(options: FixtureOptions = {}): Promise<Fixture> {
@@ -356,6 +429,12 @@ async function eoaFixture(options: FixtureOptions = {}): Promise<Fixture> {
     hash: encodeHex0x(signed.digest) as ViemHex,
   });
   const recordId = computeRecordId(config.chainId, notary, SIGNER_EVM, BigInt(record.nonce));
+  let signer: Record<string, unknown> = { evm: SIGNER_EVM };
+  if (options.card !== false) {
+    const agentCard = options.card?.agentCard ?? cardFor();
+    const cardSig = options.card?.cardSig ?? (await signCard(agentCard));
+    signer = { evm: SIGNER_EVM, agentCard, cardSig };
+  }
   const state: RecordState = {
     signer: SIGNER_EVM,
     timestamp: BigInt(NOTARIZED_AT),
@@ -374,7 +453,7 @@ async function eoaFixture(options: FixtureOptions = {}): Promise<Fixture> {
     recordId,
     record,
     signature,
-    signer: { evm: SIGNER_EVM },
+    signer,
     envelopeHash: envHash,
     envelope,
     disclosure: {
@@ -488,6 +567,7 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
       recordId: f.recordId,
       signer: SIGNER_EVM,
       signerType: 'account',
+      signerCard: cardFor(),
       kind: 1,
       timestamp: iso(NOTARIZED_AT),
       finality: 'finalized',
@@ -503,6 +583,7 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
           files: [],
           replyTo: null,
         },
+        sender: MESSAGE_ENVELOPE.from,
       },
     });
     // One getRecord at the configured Notary, at the finalized block; an EOA needs no code read.
@@ -989,6 +1070,151 @@ describe('verifyProofPack: disclosed content key, in the 07 §8 order (G-46, D-6
       expectNoEcho(result, 'Hello from', MESSAGE_CEK_HEX, b64(MESSAGE_CEK_HEX));
     });
   }
+});
+
+describe('verifyProofPack: sender bound to the record signer (M1-4d-b, IR-M1-4d-1 M-1)', () => {
+  /** A Nostr key that is not the envelope's sender: the recipient's own agent key. */
+  const RECIPIENT_NOSTR = `0x${'ab'.repeat(32)}`;
+
+  it('the recipient notarizes an envelope it received, under its own card: not shown as the author', async () => {
+    const agentCard = cardFor({ agentNostr: RECIPIENT_NOSTR });
+    const f = await eoaFixture({ card: { agentCard, cardSig: await signCard(agentCard) } });
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.verdict).toBe('record_only');
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.contentVerified).toBe(false);
+    expect(result.content).toEqual({
+      status: 'failed',
+      reason: 'sender_mismatch',
+      message: proofFailureMessage('sender_mismatch' as never),
+    });
+    expectNoEcho(result, 'Hello from', MESSAGE_CEK_HEX, b64(MESSAGE_CEK_HEX));
+  });
+
+  it('the sender check runs before the content key is used (07 §8 step 3)', async () => {
+    const agentCard = cardFor({ agentNostr: RECIPIENT_NOSTR });
+    const f = await eoaFixture({ card: { agentCard, cardSig: await signCard(agentCard) } });
+    f.pack.disclosure = { contentKey: b64(TWO_WRAP_COMMITTED_CEK_HEX) };
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.content).toEqual({
+      status: 'failed',
+      reason: 'sender_mismatch',
+      message: proofFailureMessage('sender_mismatch' as never),
+    });
+  });
+
+  it('without a card the content opens but is not attributed: verdict stays record_only', async () => {
+    const f = await eoaFixture({ card: false });
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.verdict).toBe('record_only');
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.signerCard).toBeNull();
+    expect(result.contentVerified).toBe(false);
+    expect(result.content).toEqual({
+      status: 'unattributed',
+      reason: 'sender_not_bound',
+      message: proofFailureMessage('sender_not_bound' as never),
+      sender: MESSAGE_ENVELOPE.from,
+      payload: {
+        type: 'text',
+        body: 'Hello from the AgentLink test vectors ✓',
+        files: [],
+        replyTo: null,
+      },
+    });
+  });
+
+  it('a valid card without a disclosed key: the card is reported, the verdict is record_only', async () => {
+    const f = await eoaFixture();
+    delete f.pack.envelope;
+    f.pack.disclosure = null;
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.verdict).toBe('record_only');
+    expect(result.valid && result.signerCard).toEqual(cardFor());
+  });
+
+  it('a card whose cardSig is not by its owner (forged) is refused', async () => {
+    const agentCard = cardFor();
+    const f = await eoaFixture({
+      card: { agentCard, cardSig: await signCard(agentCard, OTHER_OWNER) },
+    });
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expectFailure(result, 'card_invalid');
+    expectNoEcho(result, OWNER_EVM, 'Hello from');
+  });
+
+  it('a card moved to a different owner after signing is refused', async () => {
+    const signed = cardFor();
+    const cardSig = await signCard(signed);
+    const agentCard = cardFor({ ownerEvm: OTHER_OWNER.address.toLowerCase() });
+    const f = await eoaFixture({ card: { agentCard, cardSig } });
+    const { reader } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'card_invalid');
+  });
+
+  it('a card changed after signing to name the envelope sender is refused', async () => {
+    const signed = cardFor({ agentNostr: RECIPIENT_NOSTR });
+    const cardSig = await signCard(signed);
+    const f = await eoaFixture({ card: { agentCard: cardFor(), cardSig } });
+    const { reader } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'card_invalid');
+  });
+
+  it('a cardSig that is the agent key signature (cardAgentSig), not the owner one, is refused', async () => {
+    const agentCard = cardFor();
+    const f = await eoaFixture({ card: { agentCard, cardSig: await signCard(agentCard, SIGNER) } });
+    const { reader } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'card_invalid');
+  });
+
+  it('a card that had expired when the record was made is refused', async () => {
+    for (const expiresAt of [NOTARIZED_AT - 1, NOTARIZED_AT]) {
+      const agentCard = cardFor({ expiresAt });
+      const f = await eoaFixture({ card: { agentCard, cardSig: await signCard(agentCard) } });
+      const { reader } = chainWith(f);
+      expectFailure(await verify(f.pack, [reader]), 'card_expired');
+    }
+  });
+
+  it('a card that was still valid when the record was made verifies', async () => {
+    const agentCard = cardFor({ expiresAt: NOTARIZED_AT + 1 });
+    const f = await eoaFixture({ card: { agentCard, cardSig: await signCard(agentCard) } });
+    const { reader } = chainWith(f);
+    const result = await verify(f.pack, [reader]);
+    expect(result.verdict).toBe('verified');
+  });
+
+  it('a card for another agent, or a card without its cardSig, is a malformed pack', async () => {
+    const other = cardFor({ agentEvm: OTHER.address.toLowerCase() });
+    const f1 = await eoaFixture({ card: { agentCard: other, cardSig: await signCard(other) } });
+    expectFailure(await verify(f1.pack, [chainWith(f1).reader]), 'malformed_pack');
+    const f2 = await eoaFixture();
+    delete (f2.pack.signer as Record<string, unknown>).cardSig;
+    expectFailure(await verify(f2.pack, [chainWith(f2).reader]), 'malformed_pack');
+  });
+
+  it('a card failure is a property of the pack: no content is opened', async () => {
+    const agentCard = cardFor();
+    const f = await eoaFixture({
+      card: { agentCard, cardSig: await signCard(agentCard, OTHER_OWNER) },
+    });
+    const result = await verify(f.pack, [chainWith(f).reader]);
+    expect(JSON.stringify(result)).not.toContain('Hello from');
+  });
+
+  it('the new codes are listed with fixed text', () => {
+    expect(PROOF_PACK_FAILURES).toEqual(expect.arrayContaining(['card_invalid', 'card_expired']));
+    expect(PROOF_CONTENT_FAILURES).toEqual(
+      expect.arrayContaining(['sender_mismatch', 'sender_not_bound']),
+    );
+  });
 });
 
 describe('verifyProofPack: strict parsing of untrusted input (I-5)', () => {
