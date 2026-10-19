@@ -193,12 +193,12 @@ An object embedded in another one keeps its own bytes. For example, a proof pack
 - `agentId`: the agent's EVM address on every path (`terms`, CommitmentScope, tool results), and the same address as text in the keychain account, the `.alks` file name and its header (§2.9, G-23). There is no separate local handle.
 - `signer`: an address in a Record, a Receipt and a proof pack's `receipts[]`, but an object `{evm, agentCard}` at the top of a proof pack.
 
-**Canonical ECDSA signatures** (proposed; owner confirms at merge). Every 65-byte secp256k1 ECDSA signature (`cardSig`, a proof pack `signature`, and Record and Receipt signatures from an EOA) is `r || s || v`, with:
+**Canonical ECDSA signatures** (proposed; owner confirms at merge). Every 65-byte secp256k1 ECDSA signature (`cardSig`, and a Record, Receipt or proof-pack `signature` checked by ECDSA recovery, that is, from an EOA) is `r || s || v`, with:
 - `r` and `s` in [1, n − 1];
 - `s ≤ n/2` (EIP-2 low-s), which verifiers check themselves, because viem and noble recovery accept a high `s`;
 - `v` ∈ {27, 28}.
 
-Any other form is rejected, for example `v` ∈ {0, 1}, a high `s`, or a length other than 65 bytes. An ERC-1271 signature has the length its account returns: `0x` followed by a non-empty, even number of hex characters.
+Any other form is rejected, for example `v` ∈ {0, 1}, a high `s`, or a length other than 65 bytes. A Record, Receipt or proof-pack `signature` for an ERC-1271 signer may be 65 bytes in any form (for example a Safe's `v` of 0, 1 or above 30): it never passes ECDSA recovery unless canonical, and only the account's `isValidSignature` accepts it. An ERC-1271 signature has the length its account returns: `0x` followed by a non-empty, even number of hex characters.
 
 **Other decimal amounts.** `terms.price.amount` (§3.4) is an amount in the terms' own currency, written by a party and hashed as written. It keeps its D-55 grammar (`^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$`, greater than zero), which allows trailing zeros such as `"1500.00"` and is bounded only by the D-74 size limit (§3.4: at most 18 digits before the point). Comparing it with a USD limit (auto-accept, §3.4.2) uses the same exact-decimal helper, which must handle an amount far above any limit without overflow or rejection: such an amount is simply above the limit.
 
