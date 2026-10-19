@@ -28,7 +28,12 @@
 #                      HTTP (no repository code runs against production), reads back the lifecycle
 #                      rule and the logging settings, and on any failure rolls back automatically
 #                      with `wrangler rollback`. Writes the deploy record draft to the run summary.
-#   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying.
+#                      The health check waits up to 15 minutes while there is no TLS or connection
+#                      yet (a new Custom Domain's certificate); an unhealthy HTTP answer fails after
+#                      10 attempts. A rollback Cloudflare refuses across a binding or storage change
+#                      is reported as impossible: the new version stays live (M1-27b-c).
+#   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying; fails loudly,
+#                      naming the owner fix, when its token cannot set the variable.
 #   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
 #                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
 #
@@ -439,7 +444,8 @@ jobs:
     needs: [build, deploy-staging, smoke-staging]
     if: needs.deploy-staging.outputs.deployed == 'true' && needs.smoke-staging.result == 'success' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # The health check alone may wait 20 minutes for a new Custom Domain's certificate (M1-27b-c).
+    timeout-minutes: 45
     environment: production
     concurrency:
       group: deploy-drop-production
@@ -448,6 +454,7 @@ jobs:
       contents: read
     outputs:
       deployed: ${{ steps.deploy.outputs.deployed }}
+      rollback: ${{ steps.rollback.outputs.result }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -608,24 +615,53 @@ jobs:
 
       # HTTP only; no repository code runs against production. A 401 for an unsigned upload proves
       # the Worker loaded its configuration (a missing or invalid DROP_URL_KEY answers 503).
+      # M1-27b-c: the first deploy to a new Custom Domain met a TLS handshake failure (curl exit 35)
+      # for minutes while Cloudflare provisioned the edge certificate. No HTTP answer at all
+      # (HTTP 000) waits up to 15 minutes; a real answer that is not the healthy pair fails after 10
+      # attempts, as before.
       - name: Health check
         id: health
         if: steps.ready.outputs.ready == 'true'
+        timeout-minutes: 20
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in 1 2 3 4 5 6 7 8 9 10; do
-            health="$(curl -sS --proto '=https' --max-time 15 -o "$RUNNER_TEMP/health.json" -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
-            config="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$DROP_PRODUCTION_ORIGIN/v1/upload" || true)"
+          # HEALTH-CHECK-BEGIN
+          # Healthy: /v1/health answers 200 {"ok":true} and an unsigned upload answers 401.
+          answer_limit=10    # attempts with a real HTTP answer that is not the healthy pair
+          connect_limit=60   # attempts in all (15 s apart)
+          connect_window=900 # seconds without TLS or a connection (curl exit 35, 6, 7: HTTP 000)
+          started=$SECONDS
+          answered=0
+          attempt=0
+          while :; do
+            attempt=$((attempt + 1))
+            health_exit=0
+            health="$(curl -sS --proto '=https' --max-time 15 -o "$RUNNER_TEMP/health.json" -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health")" || health_exit=$?
+            config_exit=0
+            config="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' --data '{}' "$DROP_PRODUCTION_ORIGIN/v1/upload")" || config_exit=$?
             if [ "$health" = "200" ] && jq -e '. == {"ok": true}' "$RUNNER_TEMP/health.json" > /dev/null 2>&1 && [ "$config" = "401" ]; then
               echo "Healthy: /v1/health 200, unsigned upload 401 (attempt $attempt)."
               exit 0
             fi
-            echo "Attempt $attempt: /v1/health $health, unsigned upload $config; retrying in 15 s."
+            if [[ "$health" =~ ^[1-5][0-9][0-9]$ ]] || [[ "$config" =~ ^[1-5][0-9][0-9]$ ]]; then
+              answered=$((answered + 1))
+              if [ "$answered" -ge "$answer_limit" ]; then
+                echo "::error::The production health check failed: /v1/health $health, unsigned upload $config after $answered attempts that got an HTTP answer."
+                exit 1
+              fi
+              echo "Attempt $attempt: /v1/health $health, unsigned upload $config; retrying in 15 s."
+            else
+              elapsed=$((SECONDS - started))
+              if [ "$attempt" -ge "$connect_limit" ] || [ "$elapsed" -ge "$connect_window" ]; then
+                echo "::error::The production health check failed: no TLS or connection to $DROP_PRODUCTION_ORIGIN after $attempt attempts ($elapsed s; curl exit $health_exit and $config_exit). Check the Custom Domain and its edge certificate in the Cloudflare dashboard."
+                exit 1
+              fi
+              echo "Attempt $attempt: no TLS or connection yet (curl exit $health_exit and $config_exit, HTTP ${health:-000} and ${config:-000}); a new Custom Domain's certificate can take minutes. Retrying in 15 s."
+            fi
             sleep 15
           done
-          echo "::error::The production health check failed."
-          exit 1
+          # HEALTH-CHECK-END
 
       - name: Fetch the live Worker settings and the bucket lifecycle rule
         if: steps.ready.outputs.ready == 'true'
@@ -692,8 +728,9 @@ jobs:
           # READBACK-LIFECYCLE-END
 
       # Any failure after the deploy started rolls back. Durable Object migrations are forward-only
-      # (§4.5): a version from before a migration may be refused; the freeze then stops everything
-      # and the owner decides the forward fix.
+      # (§4.5): Cloudflare refuses a version that depends on a binding or storage this deploy changed
+      # (seen on the first production deploy, M1-27b-c). The step then reports that the new version
+      # stays live, the freeze stops everything and the owner decides the forward fix.
       # No head-of-main gate here (IR-M1-27b-2 M-3): the production concurrency group serializes runs,
       # so the version this run deployed is live and must be rolled back even if main moved on.
       - name: Roll back to the recorded version
@@ -708,12 +745,33 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
+          # ROLLBACK-BEGIN
           if [ -z "${PREVIOUS:-}" ]; then
             echo "::error::No recorded rollback target. DEPLOY_FREEZE is set by the freeze job; the owner decides the fix."
             echo "result=no-target" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          pnpm exec wrangler rollback "$PREVIOUS" --env production --config wrangler.toml --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes
+          if rolled="$(pnpm exec wrangler rollback "$PREVIOUS" --env production --config wrangler.toml --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes 2>&1)"; then
+            printf '%s\n' "$rolled"
+          else
+            printf '%s\n' "$rolled"
+            # M1-27b-c: Cloudflare refuses a version whose Durable Object or other bindings this
+            # deploy changed ("cannot be deployed because it has a resource that was modified").
+            if grep -qiE 'resource that was modified|cannot be deployed because' <<<"$rolled"; then
+              message="Rollback impossible across a binding/storage change: Cloudflare refuses $PREVIOUS because it depends on a Durable Object or binding that this deploy changed. The new version stays live; DEPLOY_FREEZE is set by the freeze job; owner action required (forward fix, release-and-deployment.md §8)."
+              echo "::error::$message"
+              echo "result=impossible-binding-change" >> "$GITHUB_OUTPUT"
+              {
+                echo "### Rollback"
+                echo
+                echo "$message"
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            echo "::error::wrangler rollback to $PREVIOUS failed; the new version may still be live. DEPLOY_FREEZE is set by the freeze job; owner action required."
+            echo "result=rollback-failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
           live="$(pnpm exec wrangler deployments status --env production --config wrangler.toml --json \
             | awk 'f || /^\{/ { f = 1; print }' \
             | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' || true)"
@@ -722,7 +780,7 @@ jobs:
             echo "result=rollback-not-live" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          for attempt in 1 2 3 4 5 6; do
+          for _ in 1 2 3 4 5 6; do
             health="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
             if [ "$health" = "200" ]; then
               echo "::warning::Rolled back: $PREVIOUS is live and /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
@@ -734,6 +792,7 @@ jobs:
           echo "::error::Rolled back: $PREVIOUS is live, but /v1/health does not answer 200."
           echo "result=rolled-back-unhealthy" >> "$GITHUB_OUTPUT"
           exit 1
+          # ROLLBACK-END
 
       - name: Write the deploy record draft
         if: always() && steps.deploy.outputs.deployed == 'true'
@@ -790,15 +849,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.DEPLOY_FREEZE_TOKEN }}
           REPOSITORY: ${{ github.repository }}
+          ROLLBACK_RESULT: ${{ needs.deploy-production.outputs.rollback }}
         run: |
           set -euo pipefail
+          # FREEZE-BEGIN
           if [ -z "${GH_TOKEN:-}" ]; then
             echo "::error::DEPLOY_FREEZE_TOKEN is not configured. The orchestrator or the owner sets DEPLOY_FREEZE=true now (release-and-deployment.md §3.1)."
+            echo "- **DEPLOY_FREEZE is NOT set**: DEPLOY_FREEZE_TOKEN is not configured. Set DEPLOY_FREEZE=true now." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY"
-          echo "::error::The drop's production deploy failed after deploying. DEPLOY_FREEZE is set; only the owner clears it."
+          # M1-27b-c: the first production failure met HTTP 403 here; a failed freeze must be loud.
+          if ! failure="$(gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY" 2>&1)"; then
+            failure="$(printf '%s' "$failure" | head -n 3 | tr '\n' ' ')"
+            echo "::error::Setting DEPLOY_FREEZE failed (${failure:-no output}); DEPLOY_FREEZE is NOT set. Owner fix: the token behind the secret DEPLOY_FREEZE_TOKEN (environment deploy-freeze) needs Variables: read and write on 4thtech/agentlink. Until then the orchestrator or the owner sets DEPLOY_FREEZE=true by hand (release-and-deployment.md §3.1). Rollback: ${ROLLBACK_RESULT:-none}."
+            {
+              echo "### DEPLOY_FREEZE is NOT set"
+              echo
+              echo "Setting it failed: ${failure:-no output}. Owner fix: the token behind the secret DEPLOY_FREEZE_TOKEN needs Variables: read and write on 4thtech/agentlink. Set DEPLOY_FREEZE=true by hand now. Rollback: ${ROLLBACK_RESULT:-none}."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "::error::The drop's production deploy failed after deploying. DEPLOY_FREEZE is set; only the owner clears it. Rollback: ${ROLLBACK_RESULT:-none}."
+          echo "DEPLOY_FREEZE is set after a failed production deploy of the drop (rollback: ${ROLLBACK_RESULT:-none}); only the owner clears it." >> "$GITHUB_STEP_SUMMARY"
           exit 1
+          # FREEZE-END
 
   rollback-rehearsal:
     name: rollback-rehearsal
@@ -844,7 +918,7 @@ jobs:
               | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty'
           }
           healthy() {
-            for attempt in 1 2 3 4 5 6; do
+            for _ in 1 2 3 4 5 6; do
               code="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$ORIGIN/v1/health" || true)"
               if [ "$code" = "200" ]; then return 0; fi
               sleep 10
