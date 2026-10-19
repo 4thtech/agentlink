@@ -399,3 +399,102 @@ describe('KeyStore.signDropRequest: no key material out (I-1, I-7)', () => {
     expect(nostrEventId(event.pubkey, dropAuthEvent(UPLOAD, TS))).toBe(event.id);
   });
 });
+
+// M1-1g-f (IR-M1-1g-e-1): a DELETE may name the retained epoch its object was uploaded under
+// (04 §2.1: an object's locator records the epoch, so older objects stay deletable; 07 §5.4). The
+// same cases run against the keychain KeyStore and its facade (packages/node keychain.test.ts).
+describe('KeyStore.signDropRequest: the epoch of a DELETE (M1-1g-f, 04 §2.1)', () => {
+  const PRESENCE = { kind: 'passphrase', secret: encodeUtf8('correct horse battery') } as const;
+
+  /** A MemoryKeyStore at epoch 0, advanced once to epoch 1 through the owner's control. */
+  async function advanced(): Promise<KeyStore> {
+    const keys = new MemoryKeyStore(SEED);
+    const owner = new MemoryOwnerKeyStore(OWNER_SEED, PRESENCE);
+    await owner.epochControl(keys).advanceEpoch(0, await owner.unlock(PRESENCE));
+    await owner.close();
+    return keys;
+  }
+
+  it('after an advance, a DELETE with {epoch: n} verifies and carries the epoch-n drop key', async () => {
+    store = await advanced();
+    expect((await store.getPublicBundle()).keyEpoch).toBe(1);
+    const old = await store.signDropRequest(DELETE, TS, { epoch: 0 });
+    expect(verifyDropAuthorization(old, DELETE, TS)).toEqual({
+      ok: true,
+      pubkey: dropHex(SEED, 0),
+      createdAt: TS,
+    });
+    const current = await store.signDropRequest(DELETE, TS, { epoch: 1 });
+    expect(verifyDropAuthorization(current, DELETE, TS)).toEqual({
+      ok: true,
+      pubkey: dropHex(SEED, 1),
+      createdAt: TS,
+    });
+  });
+
+  it('without an epoch (or with epoch undefined) it signs with the current epoch', async () => {
+    store = await advanced();
+    expect(decode(await store.signDropRequest(DELETE, TS)).pubkey).toBe(dropHex(SEED, 1));
+    expect(decode(await store.signDropRequest(UPLOAD, TS, {})).pubkey).toBe(dropHex(SEED, 1));
+    expect(
+      decode(await store.signDropRequest(UPLOAD, TS, { epoch: undefined } as never)).pubkey,
+    ).toBe(dropHex(SEED, 1));
+  });
+
+  const refusedVariants: [string, () => Promise<unknown>][] = [
+    ['a POST with an older epoch', () => store.signDropRequest(UPLOAD, TS, { epoch: 0 })],
+    ['a POST with the current epoch', () => store.signDropRequest(UPLOAD, TS, { epoch: 1 })],
+    [
+      'a POST with an epoch above the current one',
+      () => store.signDropRequest(UPLOAD, TS, { epoch: 2 }),
+    ],
+    ['a negative epoch', () => store.signDropRequest(DELETE, TS, { epoch: -1 })],
+    ['a fractional epoch', () => store.signDropRequest(DELETE, TS, { epoch: 0.5 })],
+    ['a NaN epoch', () => store.signDropRequest(DELETE, TS, { epoch: Number.NaN })],
+    ['an epoch above 2^32 - 1', () => store.signDropRequest(DELETE, TS, { epoch: 2 ** 32 })],
+    ['an epoch as text', () => store.signDropRequest(DELETE, TS, { epoch: '0' as never })],
+    ['null options', () => store.signDropRequest(DELETE, TS, null as never)],
+    ['options that are not an object', () => store.signDropRequest(DELETE, TS, 0 as never)],
+    [
+      'options with another key',
+      () => store.signDropRequest(DELETE, TS, { epoch: 0, label: 'x' } as never),
+    ],
+  ];
+
+  for (const [name, call] of refusedVariants) {
+    it(`refuses ${name} with the one fixed error, before any key is read`, async () => {
+      store = await advanced();
+      // A closed store fails with keystore_closed as soon as it touches its seed, so the fixed
+      // refusal shows the request was refused before that.
+      await store.close();
+      expectRefused(await refusal(call));
+    });
+  }
+
+  it('refuses a DELETE epoch above the current one with epoch_unavailable, before any key is read', async () => {
+    store = await advanced();
+    for (const epoch of [2, 3, 2 ** 32 - 1]) {
+      const error = await refusal(() => store.signDropRequest(DELETE, TS, { epoch }));
+      expect(error).toBeInstanceOf(KeyStoreError);
+      expect((error as KeyStoreError).code).toBe('epoch_unavailable');
+    }
+    await store.close();
+    const error = await refusal(() => store.signDropRequest(DELETE, TS, { epoch: 2 }));
+    expect(error).toBeInstanceOf(KeyStoreError);
+    expect((error as KeyStoreError).code).toBe('epoch_unavailable');
+  });
+
+  it('reads the epoch once and signs with that value (no swap after the check)', async () => {
+    store = await advanced();
+    let reads = 0;
+    const options = {
+      get epoch(): number {
+        reads += 1;
+        return reads === 1 ? 0 : 7;
+      },
+    };
+    const authorization = await store.signDropRequest(DELETE, TS, options);
+    expect(reads).toBe(1);
+    expect(decode(authorization).pubkey).toBe(dropHex(SEED, 0));
+  });
+});

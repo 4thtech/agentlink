@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   CryptoInputError,
+  DROP_REQUEST_REFUSED,
   KeyStoreError,
   bip340Verify,
   decodeEcdsaSignature,
@@ -23,6 +24,7 @@ import {
   verifyNostrEvent,
   wrapCek,
   type DropAuthRequest,
+  type KeyStore,
   type TypedData,
 } from '@4thtech-io/crypto';
 import {
@@ -398,6 +400,135 @@ describe('KeychainKeyStore.signDropRequest (M1-1g-e)', () => {
     const authorization = await facade.signDropRequest(UPLOAD, TS);
     expect(verifyDropAuthorization(authorization, UPLOAD, TS).ok).toBe(true);
     await facade.close();
+  });
+});
+
+// M1-1g-f (IR-M1-1g-e-1): the same cases as MemoryKeyStore's in packages/crypto
+// keystore-drop.test.ts, run against the keychain KeyStore and the facade openRecordedKeyStore
+// returns, so every backend refuses and signs alike. The keychain store's epoch is the one recorded
+// in the agent's `identity` row, so "after an advance" is a store opened at epoch 1.
+describe.each([
+  [
+    'KeychainKeyStore',
+    (keychain: FakeKeychain): Promise<KeyStore> =>
+      KeychainKeyStore.open(keychain, ID_A, { keyEpoch: 1 }),
+  ],
+  [
+    'the KeyStore facade',
+    (keychain: FakeKeychain): Promise<KeyStore> =>
+      openRecordedKeyStore('keychain', ID_A, { keychain }, { keyEpoch: 1 }),
+  ],
+] as const)('%s.signDropRequest: the epoch of a DELETE (M1-1g-f, 04 §2.1)', (_name, open) => {
+  const TS = 1_790_000_000;
+  const NONCE = 'IQmYQx-k6oKFW4qJwstHFw';
+  const UPLOAD: DropAuthRequest = {
+    method: 'POST',
+    url: 'https://drop.agentlink.4thtech.io/v1/upload',
+    body: encodeUtf8(
+      JSON.stringify({ v: 1, size: 20000, expiresAt: TS + 86_400, nonce: NONCE, ts: TS }),
+    ),
+  };
+  const DELETE: DropAuthRequest = {
+    method: 'DELETE',
+    url: 'https://drop.agentlink.4thtech.io/v1/o/ZWOMpLAsUhfSBVsghbLRDw',
+    body: encodeUtf8(
+      JSON.stringify({ v: 1, objectId: 'ZWOMpLAsUhfSBVsghbLRDw', nonce: NONCE, ts: TS }),
+    ),
+  };
+  const dropHex = (seed: Uint8Array, epoch: number): string => {
+    const key = derivePublicKey(seed, KEY_LABELS.drop, epoch);
+    if (key.label !== KEY_LABELS.drop) throw new Error('unreachable');
+    return encodeHex(key.publicKey);
+  };
+  const pubkeyOf = (authorization: string): string =>
+    (
+      JSON.parse(decodeUtf8(decodeBase64url(authorization.slice('Nostr '.length)))) as {
+        pubkey: string;
+      }
+    ).pubkey;
+  let keychain: FakeKeychain;
+  let store: KeyStore;
+
+  beforeEach(async () => {
+    keychain = new FakeKeychain();
+    keychain.put(ID_A, SEED_A);
+    store = await open(keychain);
+  });
+
+  afterEach(async () => {
+    await store.close();
+  });
+
+  it('a DELETE with {epoch: n} verifies and carries the epoch-n drop key', async () => {
+    expect((await store.getPublicBundle()).keyEpoch).toBe(1);
+    for (const epoch of [0, 1]) {
+      const authorization = await store.signDropRequest(DELETE, TS, { epoch });
+      expect(verifyDropAuthorization(authorization, DELETE, TS)).toEqual({
+        ok: true,
+        pubkey: dropHex(SEED_A, epoch),
+        createdAt: TS,
+      });
+    }
+    expect(keychain.handedOut.every(allZero)).toBe(true);
+  });
+
+  it('without an epoch (or with epoch undefined) it signs with the current epoch', async () => {
+    expect(pubkeyOf(await store.signDropRequest(DELETE, TS))).toBe(dropHex(SEED_A, 1));
+    expect(pubkeyOf(await store.signDropRequest(UPLOAD, TS, {}))).toBe(dropHex(SEED_A, 1));
+    expect(pubkeyOf(await store.signDropRequest(UPLOAD, TS, { epoch: undefined } as never))).toBe(
+      dropHex(SEED_A, 1),
+    );
+  });
+
+  it('refuses a POST with an epoch and a malformed epoch with the fixed error, before reading the seed', async () => {
+    const before = keychain.reads;
+    for (const [request, options] of [
+      [UPLOAD, { epoch: 0 }],
+      [UPLOAD, { epoch: 1 }],
+      [UPLOAD, { epoch: 2 }],
+      [DELETE, { epoch: -1 }],
+      [DELETE, { epoch: 0.5 }],
+      [DELETE, { epoch: Number.NaN }],
+      [DELETE, { epoch: 2 ** 32 }],
+      [DELETE, { epoch: '0' }],
+      [DELETE, null],
+      [DELETE, 0],
+      [DELETE, { epoch: 0, label: 'x' }],
+    ] as const) {
+      let error: unknown = 'accepted';
+      try {
+        await store.signDropRequest(request, TS, options as never);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(CryptoInputError);
+      expect((error as CryptoInputError).code).toBe('invalid_argument');
+      expect((error as CryptoInputError).message).toBe(DROP_REQUEST_REFUSED);
+    }
+    expect(keychain.reads).toBe(before);
+  });
+
+  it('refuses a DELETE epoch above the current one with epoch_unavailable, before reading the seed', async () => {
+    const before = keychain.reads;
+    for (const epoch of [2, 3, 2 ** 32 - 1]) {
+      expect(await codeOf(() => store.signDropRequest(DELETE, TS, { epoch }))).toBe(
+        'epoch_unavailable',
+      );
+    }
+    expect(keychain.reads).toBe(before);
+  });
+
+  it('reads the epoch once and signs with that value (no swap after the check)', async () => {
+    let reads = 0;
+    const options = {
+      get epoch(): number {
+        reads += 1;
+        return reads === 1 ? 0 : 7;
+      },
+    };
+    const authorization = await store.signDropRequest(DELETE, TS, options);
+    expect(reads).toBe(1);
+    expect(pubkeyOf(authorization)).toBe(dropHex(SEED_A, 0));
   });
 });
 
