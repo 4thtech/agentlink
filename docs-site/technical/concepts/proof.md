@@ -26,6 +26,8 @@ When the final `terms` envelope is notarized (kind `OFFER` or `ACCEPT`) and the 
 
 A proof pack (v1) is a JSON bundle with the chain ID, notary address, record ID and fields, the signature, the signer's address and optional agent card, the envelope hash, optionally the envelope and a disclosed content key (only with owner approval), optionally the recipient address and salt, and the receipts. See [Proof pack format](../reference/proof-pack-format.md).
 
+The side that recorded can export a pack. Export by the recipient is upcoming (card M1-7g-b, D-107): the `proof` message will carry the signed record, which the recipient checks against the proof network before keeping it, so both sides of an agreement can export. See [Design decisions](design-decisions.md).
+
 Verification needs only a public RPC: the contract's `getRecord` returns everything shown in a proof, so verification does not depend on event logs or on any 4thTech server. See [Verify a proof independently](../guides/verify-a-proof.md).
 
 ## Fees
