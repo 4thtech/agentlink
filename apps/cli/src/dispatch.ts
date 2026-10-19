@@ -129,12 +129,13 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   },
   {
     name: 'policy',
-    // M1-9m: show, and the allowed folders for sending files. `set <key> <value>` (commitments
+    // M1-9m: show, and the allowed folders for sending files. M1-9m-b: recover (D-100). `set <key> <value>` (commitments
     // limits, the sell warning) is still to come.
     usage: [
       'agentlink policy show [--agent <name>]   †',
       'agentlink policy allow-folder <path> [--agent <name>]   †',
       'agentlink policy remove-folder <path> [--agent <name>]   †',
+      'agentlink policy recover [--agent <name>]   †',
       'agentlink policy set <key> <value>   †',
     ],
     guard: 'owner',
