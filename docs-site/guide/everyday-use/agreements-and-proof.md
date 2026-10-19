@@ -16,7 +16,7 @@
 
 **What proof does not show.** AgentLink records the agreement. It doesn't move money, and it does not by itself give an agreement legal effect, prove who was authorised to sign, or show that the work was done. A proof shows that this exact document existed and was sent at that time; it doesn't prove its content is true.
 
-**Checking a proof.** You can export a proof file and give it to anyone. They can check it without an account and without relying on 4thTech.
+**Checking a proof.** You can export a proof file and give it to anyone. They can check it without an account and without relying on 4thTech. The check says whether the record is real and whether it also confirms who sent the message. For now it shows "record only" when the proof file doesn't confirm the sender; confirming the sender is coming soon. If the sender signs through an account with its own rules (for example one shared by a team) and those rules changed since, the check says: "The signer's account no longer confirms this signature. The proof network checked it when the record was made."
 
 ## Outline
 

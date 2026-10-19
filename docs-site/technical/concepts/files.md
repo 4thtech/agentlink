@@ -43,7 +43,7 @@ The core does no file-system or network I/O itself; the CLI supplies it (`apps/c
 
 A send retried after a crash between the upload and the stored message uploads the file again; the first copy is never referenced and expires with the drop or the storage lifecycle rule (the residual of 07 §3.3).
 
-Not yet built (M1-7f-2): the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt).
+Not yet built (M1-7f-2): the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt). On the receiving side the core will move each file key out of the stored message into its own sealed `files` row at ingest, so retention can delete it (D-98).
 
 ## The encrypted drop
 
@@ -57,7 +57,7 @@ Not yet built (M1-7f-2): the refresh-link request and answer, and retention (del
 
 ## Delivery and retention
 
-Download URLs are valid for at most 7 days. Retention follows policy `files.deleteAfter` (`expiry` by default, or `receipt`); then the sender deletes the object and both sides discard the file key (crypto-shredding). Recipients can request a fresh link. Consumer connectors cannot always enforce link expiry; the sender's agent revokes links on a best-effort basis.
+Download URLs are valid for at most 7 days. Retention follows policy `files.deleteAfter` (`expiry` by default, or `receipt`); then the sender deletes the object and both sides discard the file key (crypto-shredding). Relay and owner copies of the message still carry the key inside the end-to-end encryption, so the effective shred is deleting the object (D-98). Recipients can request a fresh link. Consumer connectors cannot always enforce link expiry; the sender's agent revokes links on a best-effort basis.
 
 ## Safety rules for fetching
 

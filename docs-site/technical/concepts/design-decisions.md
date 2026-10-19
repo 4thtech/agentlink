@@ -56,6 +56,24 @@ The drop uses random object names, no accounts (each upload is signed by a dedic
 
 **Availability.** The drop service and its deployment pipeline are merged and tested locally; it is not yet live for users, and the tools that use it are in development.
 
+### Deleting a received file's key (D-98)
+
+When a message with files arrives, the receiving agent moves each file key out of the stored message into its own encrypted local record. When the file's retention ends (`files.deleteAfter`: at expiry by default, or on receipt), that record is deleted, and the sender deletes the stored object. Copies of the message held by relays and by the owners' own copies still carry the key, inside the end-to-end encryption, and nobody can delete those. The key is then useless because the encrypted file it opens is gone: deleting the object is what really removes the file.
+
+**Availability.** Decided design, in development (card M1-7f-2).
+
+### Allowed folders never contain a protected folder (D-99)
+
+`agentlink policy allow-folder` refuses a folder that contains a protected folder, for example `~/Library`, which holds `~/Library/Keychains`. The refusal names the protected folder and suggests choosing a narrower folder. It happens before the owner code is asked, so nothing changes. Before this, only the per-file check at send time kept such files out.
+
+**Availability.** Decided design, in development (card M1-9m-b).
+
+### Recovering rules that can't be read (D-100)
+
+When the agent's signed rules (policy) can't be trusted (rolled back, out of step with the stored version mark, or tampered with), AgentLink fails closed and never falls back to the defaults on its own. `agentlink policy recover` is the owner's deliberate way back. It shows only the kind of failure. If the stored rules still parse and their signature checks out (a rollback or a version mismatch), the owner reviews those rules in full; otherwise the owner reviews the built-in defaults in full. After an explicit `y` and the owner code, it signs a complete new policy at the next version. `agentlink doctor` names the command when it is needed.
+
+**Availability.** Decided design, in development (card M1-9m-b).
+
 ## Proof
 
 ### Which record kind goes with which message (G-13, D-86)
@@ -93,13 +111,37 @@ The pack is untrusted content: every value taken from it is shown as untrusted, 
 
 Until agent-card proof-of-possession is built (its own card, M1-4d-d), a proof pack whose sender attribution relies on a card reports `record_only`, not `verified`. The record, its signature and its receipts are still checked on their own. The result says in neutral words that the record exists and that the pack does not confirm the sender.
 
-**Availability.** Decided design, in development (card M1-4d-b).
+**Availability.** In effect in the verifier (card M1-4d-b, merged). Proof of possession is specified next and built in card M1-4d-d.
+
+### Proof of possession for the sender's card (M1-4d-d, proposed)
+
+A pack will confirm its sender only when both of the agent's keys have signed its card: the agent's EVM key (`cardAgentSig`, the same signature the agent already gives when it pairs) and its message key (`cardPop`, a BIP-340 signature over the card hash under the tag `agentlink/card-pop/v1`). Each signature fits only the card it was made for. A pack with a card but without these signatures stays `record_only` (`card_pop_missing`); a forged signature, or one taken from another card, makes the pack fail with `card_pop_invalid`; a pack with both, whose content checks out, is `verified`. A signer that is a smart-contract account is not confirmed through a card in this version. Only the agent itself can attach the signatures, for its own cards.
+
+**Availability.** Proposed specification (07 §8, 04 §2.9), owner confirms at merge; in development (card M1-4d-d).
+
+### A smart-contract signer that no longer confirms (M1-4d-c, D-96)
+
+The verifier asks a smart-contract account (ERC-1271) at verification time whether it accepts the record's signature. The account may have changed its rules since the proof network checked the signature when it stored the record. If it no longer accepts it, the pack does not fail: the result carries the non-fatal code `signer_no_longer_confirms` next to an unchanged verdict, with the text "The signer's account no longer confirms this signature. The proof network checked it when the record was made."
+
+**Availability.** Decided design, in development (card M1-4d-c).
+
+### Receipt flags (D-97)
+
+The record keeps one bit per receipt type: type `t` sets bit `t − 1` (DELIVERED bit 0, OPENED bit 1, ACCEPTED bit 2, REJECTED bit 3), next to the receipt's time in `receiptAt[t − 1]`. The verifier checks that the bits and the times agree, that no other bit is set and that ACCEPTED and REJECTED are not both set; any mismatch is `malformed_record`.
+
+**Availability.** Decided design, in development (card M1-4d-c).
 
 ### Revoking an agent (D-81)
 
 An owner revokes an agent by signing an EIP-712 `Revocation` with four fields: `agentEvm`, `keyEpoch` (uint32), `nonce` and `deadline`. The contract checks that the signer is the stored owner, that the key epoch matches, and that the nonce is unused. Registration and revocation share one set of single-use random nonces per owner. Revocation also works while the contracts are paused, so an owner can always cut off a compromised agent. Revoking an unknown or already-revoked agent reverts.
 
 **Availability.** The signing data and its vectors are merged in the crypto package; the contract side lives in the private contracts repository and the registry is planned for M2.
+
+### The proof tools are their own security-critical card (M1-9d-2, D-101)
+
+The proof half of the file and proof tools (notarizing on send, propose and respond; `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`; exporting and verifying proof packs; credits and prices in `agentlink_status`) is its own card with the strictest review class, because it can disclose a content key and spend credits.
+
+**Availability.** In development (card M1-9d-2).
 
 ## Packages
 

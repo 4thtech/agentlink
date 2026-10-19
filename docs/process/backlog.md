@@ -1799,7 +1799,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A submitter that reports `failed` for a Record it included: no replacement is signed.
 
 #### M1-4d · chain: proof-pack verification
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#285, merged 2026-10-19) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a, M1-2b
 - **Spec:** 07 §6.2, §8; 05 §3.3; 02 J5, F-44; 06 §2.4
@@ -1812,7 +1812,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Runs in browser and Workers (M0-9 harness).
 
 #### M1-4d-b · chain: proof-pack sender binding and agent card check (new, IR-M1-4d-1 M-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (blocks M1-9h)
+- **Status:** done (4thtech/agentlink#290, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (blocks M1-9h)
 - **Repo/path:** agentlink · packages/chain/src/verify
 - **Depends on:** M1-4d
 - **Spec:** 07 §8; 04 §2.4, §3.1.1; 02 J5
@@ -1831,21 +1831,22 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Verify `ownerApproval` (the signed `approval.decide` and its commitment action, or the standing-rule hash) and report it.
   - Check each receipt `txHash` (a transaction receipt read, no log query) or report it as not checked.
-  - Give an ERC-1271 refusal at verification time its own code (the account may have changed since the Notary checked it at inclusion), distinct from `signature_invalid`; owner decides how it renders.
-  - Optional: cross-check `receiptFlags` with `receiptAt` once 05 §3.3 states the bit layout.
+  - Give an ERC-1271 refusal at verification time its own non-fatal code, `signer_no_longer_confirms`, distinct from `signature_invalid`, with the verdict unchanged and the fixed wording of 07 §8 (D-96, decided).
+  - Cross-check `receiptFlags` with `receiptAt` per the 05 §3.3 layout (type `t` is bit `t − 1`); any mismatch is `malformed_record` (D-97, decided; 07 §8).
 
 #### M1-4d-d · chain: agent-card proof-of-possession in proof packs (new, D-95)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain/src/verify, packages/types (pack schema), docs/foundation/07 §8
-- **Depends on:** M1-4d-b; a spec change to 07 §8 and 04 §2.9 (an agent key signature over the pack's binding), taken first in its own docs PR
+- **Depends on:** M1-4d-b (done); the spec change to 07 §8 and 04 §2.9 (`cardAgentSig` and `cardPop` over the card, proposed in the owner-decisions-2026-10-19-b docs PR)
 - **Spec:** 07 §8; 04 §2.4, §2.9, §3.1.1; 02 J5
 - **Invariants:** I-5
 - **Scope:**
   - Let a pack carry proof that the card's agent key took part, so a card alone no longer attributes the sender. Until this lands, the interim rule of D-95 holds: a proof whose sender attribution relies on a card reports `record_only`, not `verified`, in neutral wording.
-- **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only`; a pack with a valid proof becomes `verified`; a forged or replayed proof is refused with a fixed code (RED commit).
+  - Pack schema: optional `signer.cardAgentSig` (`0x` ECDSA) and `signer.cardPop` (BIP-340, bare hex 128), together and only with `agentCard` (07 §8). Verifier: the 07 §8 proof-of-possession rules (`card_pop_missing` replaces `sender_attribution_pending`; `card_pop_invalid` refuses the pack; contract-account signers stay `record_only`). Core: make and store both signatures with each own card (04 §2.9) and attach them in `exportProofPack` (M1-7g) for the card of the envelope's key epoch. Vectors: a `card-pop` suite in M1-1h.
+- **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only` (`card_pop_missing`); a pack with a valid proof becomes `verified`; a forged `cardPop` or `cardAgentSig`, and one replayed from another card (another key epoch, owner or display name), are refused with `card_pop_invalid`; one signature without the other is `malformed_pack`; a contract-account signer with both stays `record_only` (RED commit).
 
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#284, merged 2026-10-19) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a, M1-4b, M1-14
 - **Spec:** D-39, D-40; 02 F-51; 07 §6.1, §6.2, §6.3 (auto-detection and selection); 06 §2.1 (`agentlink_status`: `prices`, `credits`, `topUpUrl`, D-53), §2.4 (`agentlink_notarize`: chain chosen automatically; `needs_credits`); 11 §5 (Vocabulary and microcopy)
@@ -2367,10 +2368,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-2, I-5, I-7, I-9
 - **Scope (the parts of M1-7f left after #278):**
   - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`) and the sender's answer from its sealed `files` row; expired links on the recipient side lead into it.
-  - Retention per `files.deleteAfter` (`expiry` | `receipt`): delete the object (the drop with a DELETE signed by the drop key, D-48, G-44) and discard the file key on both sides; the receiver's key lives today only in its sealed payload, so retention needs a receiver-side record or a payload redaction.
+  - Retention per `files.deleteAfter` (`expiry` | `receipt`): delete the object (the drop with a DELETE signed by the drop key, D-48, G-44) and discard the file key on both sides. Receiver side (D-98, decided): at ingest the core moves each `fileKey` out of the stored payload into a sealed local `files` row (07 §3: `file_key`, `expires_at`, `deleted_at`), and deletes that row when retention triggers. Relay and owner copies of the envelope still carry the key, so the effective shred is deleting the object (04 §4).
   - The card's 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
   - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
-- **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
+- **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides, and the receiver's stored payload holds no `fileKey` after ingest; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
 - **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
@@ -2816,11 +2817,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Depends on:** M1-9m (part 1), M1-7c-b; M1-20 for the `commitments` keys
 - **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
 - **Invariants:** I-4, I-5
-- **Scope:** the rest of M1-9m: `policy set <key> <value>` † (including the `commitments` limits and `autoAcceptDirection`, M1-20; turning on selling auto-accept first prints the sell warning, 06 §3, and needs an explicit `y`), and `contacts --verify <id>` † as in the M1-9m scope.
-- **Acceptance:** as M1-9m: piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; RED commit.
-- **Review lows carried here (IR-M1-9m-1):**
-  - L2: `policy allow-folder` accepts a folder that contains protected folders (for example `~/Library`, which holds `~/Library/Keychains`). Today only the per-file check at send time (04 §4 protected roots, M1-15, M1-9d-1) keeps such files out. Decide whether to refuse a folder that contains a protected root, or to warn before the owner code.
-  - L3: recovering from a fail-closed policy (G-6: `mark_mismatch`, `rolled_back`, `tampered`). `policy` refuses while the policy fails closed and never rebuilds it from the defaults; give the owner a deliberate recovery path (show the problem, then sign a complete policy above the mark after an explicit confirmation), with `doctor` naming it.
+- **Scope:** the rest of M1-9m: `policy set <key> <value>` † (including the `commitments` limits and `autoAcceptDirection`, M1-20; turning on selling auto-accept first prints the sell warning, 06 §3, and needs an explicit `y`), and `contacts --verify <id>` † as in the M1-9m scope; the two review lows below as decided (D-99, D-100): `policy allow-folder` refuses a folder that contains a protected root, and `policy recover` † with `doctor` naming it (06 §8).
+- **Acceptance:** as M1-9m: piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; `policy allow-folder ~/Library` is refused before the owner prompt, naming `~/Library/Keychains`; `policy recover` after a rollback shows the stored policy in full and after tampering the defaults in full, signs at mark + 1 only after `y` and owner presence, and is refused while the policy is valid; `doctor` names it when the policy fails closed; RED commit.
+- **Review lows carried here (IR-M1-9m-1), both decided 2026-10-19:**
+  - L2: `policy allow-folder` accepts a folder that contains protected folders (for example `~/Library`, which holds `~/Library/Keychains`). Today only the per-file check at send time (04 §4 protected roots, M1-15, M1-9d-1) keeps such files out. Decided (D-99): refuse it, fail closed; the refusal names the protected folder and suggests a narrower folder.
+  - L3: recovering from a fail-closed policy (G-6: `mark_mismatch`, `rolled_back`, `tampered`). `policy` refuses while the policy fails closed and never rebuilds it from the defaults; give the owner a deliberate recovery path (show the problem, then sign a complete policy above the mark after an explicit confirmation), with `doctor` naming it. Decided (D-100): `agentlink policy recover` † shows only the failure kind; when the stored policy parses and its signature verifies (`rolled_back`, `mark_mismatch`) the owner reviews it in full, otherwise the 06 §3 defaults in full; explicit `y` plus owner presence; it signs a complete policy at version mark + 1.
 
 #### M1-9n · CLI: `relays set` (†) (new, split from M1-9b, D-73 (5))
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2961,7 +2962,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-9s-1 L1/L2, 2026-10-17): guard post-handler cursor writes against `close()` and test the race; fix the `subscribe` line in the 07 §4.1 sketch.
 
 #### M1-9d · MCP server: file and proof tools
-- **Status:** in progress (M1-9d-1 done, 4thtech/agentlink#281, merged 2026-10-19; M1-9d-2 backlog) · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (M1-9d-1 done, 4thtech/agentlink#281, merged 2026-10-19; M1-9d-2 is its own S2 card, D-101) · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli
 - **Depends on:** M1-9c, M1-7f, M1-7g, M1-15; gaps G-25 (D-87) and G-43 resolved
 - **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`path`, `notarize`), §2.2a (receipts and `notarize`), §2.3, §2.4, §9; 04 §3.4.2, §4; 02 J2, J3, J8; D-53, D-55
@@ -2983,6 +2984,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Schema + behaviour test per `status` value of each tool.
   - (IR-D48-1 F15f) A scan of every file-tool result and error in the test run finds no URL from the drop or a connector, and no key material.
 - **Split (2026-10-19):** M1-9d-1 (`agentlink_send` `path`, `agentlink_fetch_file`, `agentlink_status` `storage`) is in review; M1-9d-2 (`notarize`, `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, the proof-pack tools, receipts, `credits`, `agentAddress`, `topUpUrl`, `prices`) follows. M1-9d-1 notes: `expiresInDays` on send is not exposed yet (the core uses `files.defaultExpiryDays`); a send with `path` and no `text` or `body` carries an empty text; the `needs_setup` next steps name no local settings link, because neither `agentlink policy` (M1-9m) nor the settings page has landed, so owners cannot yet allow a folder; the drop fetch is the global fetch held to the drop's https origin with redirects off (an SSRF-safe non-GET fetch in `@4thtech-io/node` would be the stricter form). Map any chain wording at the tool layer in M1-9d-2; add `aws4fetch` to the CLI when own S3 storage is wired.
+
+#### M1-9d-2 · MCP server: proof tools (new, split from M1-9d, D-101)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/tools/**`)
+- **Depends on:** M1-9d-1 (done); M1-4d-c (D-96 code and wording); D-95 (interim `record_only`); M1-26 (done); M1-10a (done); M1-9o, M1-9p, M1-9q (copy templates; file and proof templates through M1-9g)
+- **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`notarize`), §2.2a (receipts and `notarize`), §2.4, §9; 07 §8; 04 §3.4.2; 12 §4.3; D-53, D-55, D-87, D-95, D-96; G-25, G-43
+- **Invariants:** I-4, I-5, I-6
+- **Scope:**
+  - `notarize` on `agentlink_send`, `agentlink_propose_terms` and `agentlink_respond_to_terms` (D-55).
+  - `agentlink_notarize`: `needs_credits` with `agentAddress` and `topUpUrl`; an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS`, and nothing is submitted.
+  - `agentlink_acknowledge`: `opened` only when the user asked; `accepted` or `rejected` on a record with `terms` → `USE_RESPOND_TO_TERMS`.
+  - `agentlink_get_proof`.
+  - `agentlink_export_proof_pack` to `proofs.exportFolder`; including the content key needs the owner's approval (`proofs.allowKeyDisclosure`).
+  - `agentlink_verify_proof_pack`: `path` confined per D-87 (lexical, realpath, no-follow, size, fixed codes); `signerName` under the 06 §2.1 name rule (canary); verdict and codes rendered with 11 §5 copy, including D-95's neutral wording and D-96's sentence.
+  - `agentlink_status` `credits` and `prices` with the USD split `protocolUsd` / `integratorUsd` (G-43), plus `agentAddress` and `topUpUrl`.
+  - Register the proof tools against the 06 §2.0 table in M1-9e's rules, with an explicit, justified allowlist entry for `export`; never loosen a rule.
+  - Map `@4thtech-io/chain` error codes to 11 §5 copy; never pass chain or contract wording through.
+- **Acceptance:** the proof lines of the M1-9d acceptance, as tool-layer tests: `agentlink_notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`; `agentlink_notarize` on an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS` with no record submitted; `agentlink_acknowledge` `accepted` on a record with terms → `USE_RESPOND_TO_TERMS`; export with the content key creates an approval and writes nothing before it; `agentlink_verify_proof_pack` outside the D-87 folders → `PATH_NOT_ALLOWED` with the file never opened; the name canary returns `signerName` only restricted, with `signerLabel`; schema and behaviour test per `status` value of each tool; RED commit.
 
 #### M1-9e · MCP conformance and tool-surface guard
 - **Status:** done (4thtech/agentlink#143, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -3044,7 +3063,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Submitter and faucet (`apps/submitter`)
 
 #### M1-10a · submitter Worker (testnets)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#286, merged 2026-10-19) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter
 - **Depends on:** M1-4a, M1-3g, M0-8; gap G-4 resolved
 - **Spec:** 07 §7; 03 §4.3; 04 §7 (malicious submitter, gas griefing); 05 §3.2, §3.3

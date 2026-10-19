@@ -172,11 +172,13 @@ Signatures are verified with OpenZeppelin `SignatureChecker.isValidSignatureNow(
    ```
 5. Emit `RecordNotarized(...)`.
 
+**`receiptFlags` layout (D-97; decided by Tali in chat, 2026-10-19).** Receipt type `t` (§3.1: 1 DELIVERED, 2 OPENED, 3 ACCEPTED, 4 REJECTED) sets bit `t − 1` of `receiptFlags` (bit 0 = DELIVERED, bit 1 = OPENED, bit 2 = ACCEPTED, bit 3 = REJECTED), and its block time is stored in `receiptAt[t − 1]`. Bits 4–7 are always 0. A bit is set exactly when its `receiptAt` entry is non-zero, and bits 2 and 3 are never both set. A verifier cross-checks the flags against `receiptAt` and reports any mismatch as `malformed_record` (07 §8).
+
 **acknowledge**
 1. Record exists; `deadline` valid; signature valid for `rc.signer`.
 2. `keccak256(abi.encode(rc.signer, rc.salt)) == recipientCommitment` (only the intended recipient can acknowledge).
 3. Receipt type not yet set; `ACCEPTED` and `REJECTED` are mutually exclusive (so at most **3 receipts** per record). The one-time flag prevents replay.
-4. Set flag and `receiptAt[type]`; emit `ReceiptRecorded`.
+4. Set bit `type − 1` of `receiptFlags` and `receiptAt[type − 1]` (layout above, D-97); emit `ReceiptRecorded`.
 5. **No fee:** receipts are included in the record fee.
 
 **Batches (G-4; decided by the owner in chat, 14 Oct 2026, D-61; wording confirmed at merge).** `notarizeBatch` and `acknowledgeBatch` are all-or-nothing, with one exception: an item that is already on-chain in identical form is skipped.
