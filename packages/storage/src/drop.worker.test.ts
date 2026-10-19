@@ -12,7 +12,11 @@
 import { SELF, env as testEnv } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { encodeBase64url, encodeHex, encodeUtf8, sha256 } from '@4thtech-io/crypto';
-import { signDropAuthorization } from '@4thtech-io/crypto/testing';
+import {
+  MemoryKeyStore,
+  MemoryOwnerKeyStore,
+  signDropAuthorization,
+} from '@4thtech-io/crypto/testing';
 import { captureOutput } from '@4thtech-io/log/testing';
 import { createDropAdapter, type DropAdapter } from './drop.js';
 import { selectionForError } from './select.js';
@@ -68,6 +72,8 @@ function harness(opts: { maxBytes?: number } = {}) {
           lastPubkey = pubkey;
           return authorization;
         },
+        // A raw test key has no epochs: always 0.
+        getPublicBundle: async () => ({ keyEpoch: 0 }),
       },
       fetch: async (request) => {
         const body = new Uint8Array(await request.clone().arrayBuffer());
@@ -330,5 +336,100 @@ describe('drop adapter × drop Worker (Miniflare)', () => {
     await expect(other.delete(obj)).rejects.toMatchObject({ code: 'delete_failed', status: 403 });
     const getUrl = await owner.make().presignGet(obj, new Date(Date.now() + DAY_MS));
     expect((await SELF.fetch(getUrl)).status).toBe(200);
+  });
+});
+
+// M1-1g-g (04 §2.1, 07 §5.4): the drop key rotates with keyEpoch, and an object stays deletable by
+// the drop key it was uploaded under. Signed through the MemoryKeyStore and verified by the Worker.
+describe('drop adapter × drop Worker: key epochs (M1-1g-g)', () => {
+  const PRESENCE = { kind: 'passphrase', secret: encodeUtf8('epoch test owner passphrase') } as const;
+  let seedCounter = 0;
+  function keyStores(): { keys: MemoryKeyStore; owner: MemoryOwnerKeyStore } {
+    seedCounter += 1;
+    const seed = new Uint8Array(32).fill(0x5a);
+    seed[31] = seedCounter;
+    const ownerSeed = new Uint8Array(32).fill(0x6b);
+    ownerSeed[31] = seedCounter;
+    return { keys: new MemoryKeyStore(seed), owner: new MemoryOwnerKeyStore(ownerSeed, PRESENCE) };
+  }
+  function adapterFor(keys: MemoryKeyStore): DropAdapter {
+    const ip = newIp();
+    return createDropAdapter({
+      endpoint: ORIGIN,
+      signer: keys,
+      fetch: async (request) => {
+        const body = new Uint8Array(await request.clone().arrayBuffer());
+        const headers = new Headers(request.headers);
+        headers.set('cf-connecting-ip', ip);
+        return SELF.fetch(
+          new Request(request.url, {
+            method: request.method,
+            headers,
+            redirect: request.redirect,
+            ...(request.method === 'GET' || request.method === 'HEAD' ? {} : { body }),
+          }),
+        );
+      },
+    });
+  }
+  const objectCount = async (): Promise<number> => (await env.DROP_BUCKET.list()).objects.length;
+
+  it('an object uploaded at epoch n is deleted after the rotation to n + 1: the DELETE verifies', async () => {
+    const { keys, owner } = keyStores();
+    const adapter = adapterFor(keys);
+    const obj = await adapter.put(new Uint8Array(700).fill(7), {
+      size: 700,
+      expiresAt: new Date(Date.now() + DAY_MS),
+    });
+    expect(obj.keyEpoch).toBe(0);
+    await owner.epochControl(keys).advanceEpoch(0, await owner.unlock(PRESENCE));
+    expect((await keys.getPublicBundle()).keyEpoch).toBe(1);
+    const before = await objectCount();
+    await adapter.delete(obj);
+    expect(await objectCount()).toBe(before - 1);
+    const getUrl = new URL(obj.locator);
+    expect((await SELF.fetch(getUrl.href)).status).not.toBe(200);
+  });
+
+  it('the same DELETE at the new epoch is refused: only the uploading drop key can delete', async () => {
+    const { keys, owner } = keyStores();
+    const adapter = adapterFor(keys);
+    const obj = await adapter.put(new Uint8Array(700).fill(8), {
+      size: 700,
+      expiresAt: new Date(Date.now() + DAY_MS),
+    });
+    await owner.epochControl(keys).advanceEpoch(0, await owner.unlock(PRESENCE));
+    await expect(adapter.delete({ ...obj, keyEpoch: 1 })).rejects.toMatchObject({
+      code: 'delete_failed',
+      status: 403,
+    });
+    expect((await SELF.fetch(obj.locator)).status).toBe(200);
+  });
+
+  it('a new upload after the rotation is signed at the new epoch and deletes at it', async () => {
+    const { keys, owner } = keyStores();
+    const adapter = adapterFor(keys);
+    await owner.epochControl(keys).advanceEpoch(0, await owner.unlock(PRESENCE));
+    const obj = await adapter.put(new Uint8Array(700).fill(9), {
+      size: 700,
+      expiresAt: new Date(Date.now() + DAY_MS),
+    });
+    expect(obj.keyEpoch).toBe(1);
+    await adapter.delete(obj);
+    expect((await SELF.fetch(obj.locator)).status).not.toBe(200);
+  });
+
+  it('an epoch above the current one is refused before anything reaches the drop', async () => {
+    const { keys } = keyStores();
+    const adapter = adapterFor(keys);
+    const obj = await adapter.put(new Uint8Array(700).fill(10), {
+      size: 700,
+      expiresAt: new Date(Date.now() + DAY_MS),
+    });
+    await expect(adapter.delete({ ...obj, keyEpoch: 1 })).rejects.toMatchObject({
+      code: 'credentials_unavailable',
+      message: 'the drop key is unavailable',
+    });
+    expect((await SELF.fetch(obj.locator)).status).toBe(200);
   });
 });

@@ -8,7 +8,10 @@ import { encodeHex, sha256 } from '@4thtech-io/crypto';
 /** A payload or file entry, editable in a test. */
 type JsonObject = Record<string, unknown>;
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createLogger } from '@4thtech-io/log';
+import type { CoreContext } from '../context.js';
 import { rowKeyOf } from '../store/store.js';
+import { deleteFileObject } from './records.js';
 import type { Sealed } from '../store/schema.js';
 import { FakeClock, passphrase, seed } from '../testing/fixtures.js';
 import {
@@ -412,5 +415,48 @@ describe('saving: names and the inbox folder (04 §4 "Downloads", I-5)', () => {
       code: 'inbox_unavailable',
     });
     expect(b.inbox.created).toHaveLength(0);
+  });
+});
+
+// M1-1g-g: the delete path a retention trigger uses (M1-7f-2) reads the sealed record; own storage
+// has no key epochs.
+describe('deleteFileObject: the stored object of a sender files row (M1-1g-g)', () => {
+  const ctxOf = (agent: FileAgent): CoreContext => ({
+    keyStore: agent.keyStore,
+    store: agent.store,
+    cipher: agent.cipher,
+    now: clock.now,
+    log: createLogger({ name: 'core', level: 'error', sink: () => undefined }),
+  });
+
+  it('own storage: deletes the object the row names', async () => {
+    await sendOne(fileBytes(50_000));
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0]!;
+    expect(own.objects.size).toBe(1);
+    await deleteFileObject(ctxOf(a), a.platform, row);
+    expect(own.objects.size).toBe(0);
+    expect(own.deleted).toHaveLength(1);
+  });
+
+  it.each([
+    ['a locator that is not a string', '{"kind":"s3","locator":7}'],
+    ['an unknown kind', '{"kind":"ftp","locator":"x"}'],
+    ['not JSON', 'not json'],
+    ['a key epoch that is not an integer', '{"kind":"drop","locator":"x","keyEpoch":"0"}'],
+  ])('a row with %s is refused with the fixed error', async (_, text) => {
+    const envelopeId = await sendOne(fileBytes(50_000));
+    const sealed = await a.cipher.seal(
+      { table: 'files', column: 'locator', rowKey: rowKeyOf([envelopeId, 0]) },
+      text,
+    );
+    await a.store.transaction((tx) =>
+      tx.update('files', { envelope_id: envelopeId, idx: 0 }, { locator: sealed }),
+    );
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0]!;
+    await expect(deleteFileObject(ctxOf(a), a.platform, row)).rejects.toMatchObject({
+      code: 'storage_failed',
+      message: 'The file could not be deleted.',
+    });
+    expect(own.deleted).toHaveLength(0);
   });
 });

@@ -8,8 +8,10 @@ import {
   decodeUtf8,
   encodeBase64url,
   encodeHex,
+  dropRequestEpoch,
   sha256,
   type DropAuthRequest,
+  type EpochOptions,
 } from '@4thtech-io/crypto';
 import { captureOutput } from '@4thtech-io/log/testing';
 import {
@@ -59,13 +61,24 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
 function fakeDrop(script?: Script) {
   const requests: Seen[] = [];
   const signed: DropAuthRequest[] = [];
+  /** The options each signed request was signed with, in order (M1-1g-g). */
+  const options: (EpochOptions | undefined)[] = [];
+  /** The signing epoch of each signed request, as the KeyStore chose it (dropRequestEpoch). */
+  const epochs: number[] = [];
   const objects = new Map<string, Uint8Array>();
   let objectExpiry = 0;
+  const state = { epoch: 0 };
   const signer: DropSigner = {
-    async signDropRequest(request, createdAt) {
+    async signDropRequest(request, createdAt, opts?: EpochOptions) {
       expect(createdAt).toBe(NOW_S);
+      // The KeyStore's own epoch checks (M1-1g-f): POST never names an epoch, none above current.
+      epochs.push(dropRequestEpoch(request, opts, state.epoch));
       signed.push(request);
+      options.push(opts);
       return SIGNATURE;
+    },
+    async getPublicBundle() {
+      return { keyEpoch: state.epoch };
     },
   };
   const fetch = async (request: Request): Promise<Response> => {
@@ -101,7 +114,7 @@ function fakeDrop(script?: Script) {
     if (request.method === 'DELETE') return new Response(null, { status: 204 });
     return json(404, { error: 'not_found' });
   };
-  return { requests, signed, objects, signer, fetch };
+  return { requests, signed, options, epochs, state, objects, signer, fetch };
 }
 
 function setup(script?: Script, overrides: Partial<DropAdapterConfig> = {}) {
@@ -340,7 +353,7 @@ describe('drop adapter: put, presignGet and delete', () => {
     const drop = fakeDrop();
     const adapter = createDropAdapter({
       endpoint: ORIGIN,
-      signer: { signDropRequest: async () => SIGNATURE },
+      signer: { signDropRequest: async () => SIGNATURE, getPublicBundle: async () => ({ keyEpoch: 0 }) },
       fetch: drop.fetch,
       now: () => at,
     });
@@ -548,6 +561,7 @@ describe('drop adapter: typed errors (07 §5.4 Limits, IR-D48-1 F10)', () => {
         signDropRequest: async () => {
           throw new Error(`keystore locked ${ECHO_SECRET}`);
         },
+        getPublicBundle: async () => ({ keyEpoch: 0 }),
       },
     });
     const error = await codeOf(adapter.put(ciphertext(10), { size: 10, expiresAt: inADay }));
@@ -661,5 +675,141 @@ describe('drop adapter: log canary (I-7, 04 §4)', () => {
     ]) {
       expect(all).not.toContain(needle);
     }
+  });
+});
+
+describe('drop adapter: the drop key epoch of an object (M1-1g-g; 04 §2.1, 07 §5.4)', () => {
+  it('records the epoch the upload was signed under; POST never carries an epoch', async () => {
+    const { drop, adapter } = setup();
+    drop.state.epoch = 4;
+    const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
+    expect(obj.keyEpoch).toBe(4);
+    expect(drop.signed.map((r) => r.method)).toEqual(['POST', 'POST']);
+    expect(drop.options).toEqual([undefined, undefined]);
+    expect(drop.epochs).toEqual([4, 4]);
+  });
+
+  it('an object uploaded at epoch n is deleted at epoch n after a rotation to n + 1', async () => {
+    const { drop, adapter } = setup();
+    drop.state.epoch = 2;
+    const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
+    drop.state.epoch = 3;
+    await adapter.delete(obj);
+    expect(drop.signed.at(-1)?.method).toBe('DELETE');
+    expect(drop.options.at(-1)).toEqual({ epoch: 2 });
+    expect(drop.epochs.at(-1)).toBe(2);
+    expect(drop.requests.at(-1)?.method).toBe('DELETE');
+  });
+
+  it('a delete at the current epoch names it too', async () => {
+    const { drop, adapter } = setup();
+    const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
+    await adapter.delete(obj);
+    expect(drop.options.at(-1)).toEqual({ epoch: 0 });
+  });
+
+  it('the cleanup DELETE of a failed upload uses the upload epoch', async () => {
+    const { drop, adapter } = setup((req) =>
+      req.url.endsWith('/commit') ? json(500, { error: 'boom' }) : undefined,
+    );
+    drop.state.epoch = 1;
+    await codeOf(adapter.put(ciphertext(64), { size: 64, expiresAt: inADay }));
+    expect(drop.signed.at(-1)?.method).toBe('DELETE');
+    expect(drop.options.at(-1)).toEqual({ epoch: 1 });
+  });
+
+  it('an epoch that moves during an upload fails it before the commit and deletes at the upload epoch', async () => {
+    const { drop, adapter } = setup((req) => {
+      if (req.method === 'PUT') drop.state.epoch = 1;
+      return undefined;
+    });
+    const error = await codeOf(adapter.put(ciphertext(64), { size: 64, expiresAt: inADay }));
+    expect(error).toMatchObject({ code: 'upload_failed' });
+    expect(drop.requests.some((r) => r.url.endsWith('/commit'))).toBe(false);
+    expect(drop.signed.at(-1)?.method).toBe('DELETE');
+    expect(drop.options.at(-1)).toEqual({ epoch: 0 });
+  });
+
+  it('an epoch that moves while the upload is signed sends nothing', async () => {
+    const drop = fakeDrop();
+    let reads = 0;
+    const adapter = createDropAdapter({
+      endpoint: ORIGIN,
+      signer: {
+        signDropRequest: drop.signer.signDropRequest.bind(drop.signer),
+        async getPublicBundle() {
+          reads += 1;
+          return { keyEpoch: reads === 1 ? 0 : 1 };
+        },
+      },
+      fetch: drop.fetch,
+      now: () => NOW,
+    });
+    const error = await codeOf(adapter.put(ciphertext(64), { size: 64, expiresAt: inADay }));
+    expect(error).toMatchObject({ code: 'upload_failed' });
+    expect(drop.requests).toHaveLength(0);
+  });
+
+  it('an epoch above the current one is refused with the fixed error, nothing sent, no secret in it', async () => {
+    const { drop, adapter } = setup();
+    const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
+    const before = drop.requests.length;
+    const error = await codeOf(adapter.delete({ ...obj, keyEpoch: 1 }));
+    expect(error).toMatchObject({ code: 'credentials_unavailable' });
+    expect((error as Error).message).toBe('the drop key is unavailable');
+    expect((error as Error).message).not.toContain(OBJECT_ID);
+    expect((error as Error).cause).toBeUndefined();
+    expect(drop.requests.length).toBe(before);
+  });
+
+  it.each([
+    ['negative', -1],
+    ['fractional', 1.5],
+    ['a string', '0'],
+    ['NaN', Number.NaN],
+    ['above the largest key epoch', 2 ** 32],
+  ])('refuses a recorded epoch that is %s before anything is signed', async (_, keyEpoch) => {
+    const { drop, adapter } = setup();
+    const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
+    const signedBefore = drop.signed.length;
+    const error = await codeOf(
+      adapter.delete({ ...obj, keyEpoch } as unknown as StoredObject),
+    );
+    expect(error).toMatchObject({ code: 'invalid_argument' });
+    expect(drop.signed.length).toBe(signedBefore);
+  });
+
+  it('an object recorded before epochs were kept is deleted at the current epoch', async () => {
+    const { drop, adapter } = setup();
+    const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
+    const { keyEpoch: _omit, ...legacy } = obj;
+    await adapter.delete(legacy);
+    expect(drop.options.at(-1)).toBeUndefined();
+  });
+
+  it('refuses a signer without an epoch lookup', () => {
+    expect(() =>
+      createDropAdapter({
+        endpoint: ORIGIN,
+        signer: { signDropRequest: async () => SIGNATURE } as unknown as DropSigner,
+        fetch: fakeDrop().fetch,
+      }),
+    ).toThrow(expect.objectContaining({ code: 'invalid_config' }) as Error);
+  });
+
+  it('a malformed epoch from the signer fails the upload with the fixed error, nothing sent', async () => {
+    const drop = fakeDrop();
+    const adapter = createDropAdapter({
+      endpoint: ORIGIN,
+      signer: {
+        signDropRequest: drop.signer.signDropRequest.bind(drop.signer),
+        getPublicBundle: async () => ({ keyEpoch: -1 }),
+      },
+      fetch: drop.fetch,
+      now: () => NOW,
+    });
+    const error = await codeOf(adapter.put(ciphertext(64), { size: 64, expiresAt: inADay }));
+    expect(error).toMatchObject({ code: 'credentials_unavailable' });
+    expect(drop.requests).toHaveLength(0);
   });
 });

@@ -100,7 +100,10 @@ describe('resolveStorage: no silent fallback, and never the drop under own', () 
     const factory = () => {
       built += 1;
       return createDropAdapter({
-        signer: { signDropRequest: async () => 'Nostr x' },
+        signer: {
+          signDropRequest: async () => 'Nostr x',
+          getPublicBundle: async () => ({ keyEpoch: 0 }),
+        },
         fetch: async (req) => {
           requests.push(req.method);
           return new Response(null, { status: 500 });
