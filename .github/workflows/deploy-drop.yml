@@ -5,6 +5,12 @@
 # tools/release/deploy-drop.test.mjs (structure, read-back checks on fixtures) and
 # apps/drop/test/smoke-config.test.ts (wrangler.toml).
 #
+# Every wrangler call runs in apps/drop and passes `--config wrangler.toml` explicitly. Wrangler looks
+# for its config next to a positional script path, not in the working directory, so the prebuilt
+# `wrangler deploy <bundle>/index.js --no-bundle` found none and ignored [env.*] (first run, M1-27b-b).
+# The positional bundle path overrides `main`; names, bindings, vars, limits, observability and routes
+# come from the selected [env.<name>] section.
+#
 # JOBS
 #   ci-green           waits for this commit's ci.yml and security.yml gates (as release.yml).
 #   guard              main of 4thtech/agentlink only, and only once apps/drop/wrangler.toml exists.
@@ -163,7 +169,7 @@ jobs:
           set -euo pipefail
           out="$RUNNER_TEMP/drop-bundle"
           rm -rf "$out"
-          pnpm exec wrangler deploy --dry-run --env production --outdir "$out"
+          pnpm exec wrangler deploy --dry-run --env production --config wrangler.toml --outdir "$out"
           if [ ! -f "$out/index.js" ]; then
             echo "::error::The bundle has no index.js."
             exit 1
@@ -300,7 +306,7 @@ jobs:
         run: |
           set -euo pipefail
           version=""
-          if status="$(pnpm exec wrangler deployments status --env staging --json)"; then
+          if status="$(pnpm exec wrangler deployments status --env staging --config wrangler.toml --json)"; then
             json="$(printf '%s\n' "$status" | awk 'f || /^\{/ { f = 1; print }')"
             version="$(jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' <<<"$json" || true)"
           fi
@@ -321,7 +327,7 @@ jobs:
           set -euo pipefail
           report="$RUNNER_TEMP/wrangler-staging.ndjson"
           echo "deployed=true" >> "$GITHUB_OUTPUT"
-          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env staging
+          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env staging --config wrangler.toml
           url="$(jq -r 'select(.type == "deploy") | .targets[]?' "$report" | grep -E '^https://[a-z0-9.-]+\.workers\.dev$' | head -n 1 || true)"
           if [ -z "$url" ]; then url="${DROP_STAGING_URL:-}"; fi
           if ! [[ "$url" =~ ^https://[a-z0-9.-]+$ ]]; then
@@ -570,7 +576,7 @@ jobs:
         run: |
           set -euo pipefail
           version=""
-          if status="$(pnpm exec wrangler deployments status --env production --json)"; then
+          if status="$(pnpm exec wrangler deployments status --env production --config wrangler.toml --json)"; then
             json="$(printf '%s\n' "$status" | awk 'f || /^\{/ { f = 1; print }')"
             version="$(jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' <<<"$json" || true)"
           fi
@@ -594,7 +600,7 @@ jobs:
           report="$RUNNER_TEMP/wrangler-production.ndjson"
           # Set first: a deploy that fails half-way still counts as deployed (rollback, freeze).
           echo "deployed=true" >> "$GITHUB_OUTPUT"
-          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env production
+          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env production --config wrangler.toml
           version="$(jq -r 'select(.type == "deploy") | .version_id // empty' "$report" | head -n 1)"
           if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
           echo "Production version ${version:-unknown}"
@@ -707,8 +713,8 @@ jobs:
             echo "result=no-target" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          pnpm exec wrangler rollback "$PREVIOUS" --env production --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes
-          live="$(pnpm exec wrangler deployments status --env production --json \
+          pnpm exec wrangler rollback "$PREVIOUS" --env production --config wrangler.toml --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes
+          live="$(pnpm exec wrangler deployments status --env production --config wrangler.toml --json \
             | awk 'f || /^\{/ { f = 1; print }' \
             | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' || true)"
           if [ "$live" != "$PREVIOUS" ]; then
@@ -833,7 +839,7 @@ jobs:
             exit 1
           fi
           live() {
-            pnpm exec wrangler deployments status --env staging --json \
+            pnpm exec wrangler deployments status --env staging --config wrangler.toml --json \
               | awk 'f || /^\{/ { f = 1; print }' \
               | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty'
           }
@@ -845,11 +851,11 @@ jobs:
             done
             return 1
           }
-          pnpm exec wrangler rollback "$PREVIOUS" --env staging --message "Rollback rehearsal (back)" --yes
+          pnpm exec wrangler rollback "$PREVIOUS" --env staging --config wrangler.toml --message "Rollback rehearsal (back)" --yes
           [ "$(live)" = "$PREVIOUS" ] || { echo "::error::Staging does not serve the previous version after the rollback."; exit 1; }
           healthy || { echo "::error::Staging is unhealthy after the rollback."; exit 1; }
           echo "Rolled back to $PREVIOUS: live and healthy."
-          pnpm exec wrangler rollback "$CURRENT" --env staging --message "Rollback rehearsal (forward)" --yes
+          pnpm exec wrangler rollback "$CURRENT" --env staging --config wrangler.toml --message "Rollback rehearsal (forward)" --yes
           [ "$(live)" = "$CURRENT" ] || { echo "::error::Staging does not serve the current version after rolling forward."; exit 1; }
           healthy || { echo "::error::Staging is unhealthy after rolling forward."; exit 1; }
           echo "Rolled forward to $CURRENT: live and healthy."
