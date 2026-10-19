@@ -116,6 +116,39 @@ export async function planDeposit(
   });
 }
 
+const sameStep = (a: DepositStep, b: DepositStep): boolean =>
+  a.purpose === b.purpose &&
+  String(a.to).toLowerCase() === String(b.to).toLowerCase() &&
+  String(a.data).toLowerCase() === String(b.data).toLowerCase() &&
+  a.value === b.value;
+
+/**
+ * The steps must be exactly what buildDeposit makes for this request, for some current allowance:
+ * the token, the amount, every approve value, the order and the native value are all bound.
+ * Anything else is ChainError `invalid_call`, before anything is sent.
+ */
+function checkSteps(
+  config: ChainConfig,
+  request: { readonly token: FeeTokenSymbol; readonly amount: bigint },
+  steps: readonly DepositStep[],
+): void {
+  let shapes: DepositStep[][];
+  try {
+    const build = (currentAllowance: bigint) =>
+      buildDeposit(config, { token: request.token, amount: request.amount, currentAllowance });
+    // Exact allowance (deposit only), none (approve, deposit), another (reset, approve, deposit).
+    shapes = [build(request.amount), build(0n), build(request.amount === 1n ? 2n : 1n)];
+  } catch {
+    throw new ChainError('invalid_call');
+  }
+  const ok = shapes.some(
+    (shape) =>
+      shape.length === steps.length &&
+      shape.every((want, i) => sameStep(want, steps[i] as DepositStep)),
+  );
+  if (!ok) throw new ChainError('invalid_call');
+}
+
 /** One step as a direct-mode call; anything not built by buildDeposit is refused. */
 function stepCall(config: ChainConfig, step: DepositStep) {
   const vault = config.contracts.vault.toLowerCase();
@@ -179,12 +212,11 @@ export interface DepositResult {
 export async function sendDeposit(
   state: ChainState,
   direct: DirectMode,
+  request: { readonly token: FeeTokenSymbol; readonly amount: bigint },
   steps: readonly DepositStep[],
   options: SendDepositOptions = {},
 ): Promise<DepositResult> {
-  if (steps.length < 1 || steps.length > 3 || steps.at(-1)?.purpose !== 'deposit') {
-    throw new ChainError('invalid_call');
-  }
+  checkSteps(state.config, request, steps);
   const calls = steps.map((s) => stepCall(state.config, s));
   const txHashes: Hex[] = [];
   for (const call of calls) {

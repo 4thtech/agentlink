@@ -73,6 +73,8 @@ export interface ChainState {
   /** The vault's `minDeposit(token)` (the gasless top-up floor, 05 §2.2). */
   minDeposit(token: Hex): Promise<bigint>;
   creditsOf(payer: Hex, token: Hex): Promise<bigint>;
+  /** An ERC-20 fee token's `balanceOf(owner)`. */
+  tokenBalance(token: Hex, owner: Hex): Promise<bigint>;
 }
 
 /** The functions the direct path may send, per contract. */
@@ -137,17 +139,27 @@ export function createChainState(reader: {
     config,
 
     async getRecord(recordId: Hex, blockNumber?: bigint) {
-      const raw = await read<{
-        signer: string;
-        recordStructHash: string;
-        receiptAt: readonly bigint[];
-      }>({
-        address: notary,
-        abi: NOTARY_CLIENT_ABI as Abi,
-        functionName: 'getRecord',
-        args: [recordId],
-        ...(blockNumber === undefined ? {} : { blockNumber }),
-      });
+      let raw: { signer: string; recordStructHash: string; receiptAt: readonly bigint[] };
+      try {
+        raw = await read({
+          address: notary,
+          abi: NOTARY_CLIENT_ABI as Abi,
+          functionName: 'getRecord',
+          args: [recordId],
+          ...(blockNumber === undefined ? {} : { blockNumber }),
+        });
+      } catch (error) {
+        // The deployed Notary reverts `RecordNotFound()` for an unknown ID: that, and only that
+        // revert, means "absent". Any other failure stays a failure, so nothing is decided on it.
+        if (
+          error instanceof ChainError &&
+          error.code === 'call_reverted' &&
+          error.revertName === 'RecordNotFound'
+        ) {
+          return null;
+        }
+        throw error;
+      }
       if (raw.signer.toLowerCase() === ZERO_ADDRESS) return null;
       return Object.freeze({
         signer: raw.signer.toLowerCase() as Hex,
@@ -232,6 +244,14 @@ export function createChainState(reader: {
         abi: FEE_VAULT_CLIENT_ABI as Abi,
         functionName: 'minDeposit',
         args: [token],
+      }),
+
+    tokenBalance: (token: Hex, owner: Hex) =>
+      read<bigint>({
+        address: token,
+        abi: erc20Abi as Abi,
+        functionName: 'balanceOf',
+        args: [owner],
       }),
 
     creditsOf: (payer: Hex, token: Hex) =>

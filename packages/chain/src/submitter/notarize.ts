@@ -9,8 +9,11 @@
 //   contract's own simulation now refuses it (that refusal is the result), or neither (a false
 //   answer: the next submitter);
 // - success is `getRecord` showing our record (its struct hash) or our receipt type.
-// After every submitter, direct mode (when configured) sends `notarizeDirect` or `acknowledge` from
-// the agent's own account, simulated first.
+// After every submitter, direct mode (when configured) sends from the agent's own account,
+// simulated first: the same one-item `notarizeBatch` when its credits cover the fee, otherwise
+// `notarizeDirect`, which pays now (an exact `approve(maxFee)` first for an ERC-20 fee token, reset
+// to 0 first when another allowance is set; `maxFee` as the value for the native coin);
+// `acknowledge` for a receipt.
 //
 // This module signs nothing and never builds a replacement. `replacementAllowed` is the 04 §5 test
 // a caller must pass before it signs one (new nonce, fresh salt, new deadline).
@@ -31,12 +34,15 @@ import {
   pollChain,
   pollPlan,
   sendDirect,
+  waitForTx,
   type DirectMode,
+  type DirectSend,
   type DirectSendOptions,
   type PollOptions,
 } from '../clients/direct.js';
 import { ChainError } from '../clients/errors.js';
 import type { ChainState, ContractTx, StoredRecord } from '../clients/state.js';
+import { offeredTokenAt } from '../fees/tokens.js';
 import { ChainInputError, computeRecordId, type Hex } from '../ids/index.js';
 import type { ChainSelection } from '../select/pick.js';
 import { MAX_SUBMITTER_URLS, type SubmitterClient } from './client.js';
@@ -86,6 +92,8 @@ export type ProofOutcome =
       readonly id: string;
       readonly recordId: Hex;
       readonly error: string;
+      /** For a paid item: the one re-selection after the refusal (07 §6.3). */
+      readonly selection?: ChainSelection;
     }
   /** The record ID holds another record, or the receipt's conflicting type is set. */
   | { readonly status: 'conflict'; readonly id: string; readonly recordId: Hex };
@@ -111,6 +119,13 @@ interface Item {
   readonly batch: ContractTx;
   /** The direct-mode call from `from`, or undefined where direct mode cannot send it. */
   direct(from: Hex): Omit<ContractTx, 'from'> | undefined;
+  /** A record the signer can pay for now with `notarizeDirect` (05 §3.2). */
+  readonly payNow?: {
+    readonly signer: Hex;
+    readonly feeToken: Hex;
+    readonly maxFee: bigint;
+    readonly call: Omit<ContractTx, 'from' | 'value'>;
+  };
   send(sub: SubmitterClient): Promise<SubmitResponse>;
 }
 
@@ -188,17 +203,32 @@ function recordItem(state: ChainState, value: unknown, sig: unknown): Item {
       functionName: 'notarizeBatch',
       args: [[tuple], [signature]],
     },
-    // notarizeDirect requires msg.sender == r.signer (05 §3.2); it charges the signer's credits.
+    // With credits, direct mode sends the same one-item batch from the agent's own account: it
+    // charges the signer's credits. Only the signer's own account is used, never another's gas.
     direct: (from) =>
       from === record.signer
         ? {
             contract: 'notary',
             to: notary as Hex,
             value: 0n,
-            functionName: 'notarizeDirect',
-            args: [tuple],
+            functionName: 'notarizeBatch',
+            args: [[tuple], [signature]],
           }
         : undefined,
+    // Without credits, notarizeDirect pays now: only the signer may send it; it deposits exactly
+    // maxFee of an ERC-20 fee token through the signer's allowance to the vault, or the native
+    // value sent, then charges the fee (the rest stays as the signer's credits).
+    payNow: {
+      signer: record.signer as Hex,
+      feeToken: record.feeToken as Hex,
+      maxFee: BigInt(record.maxFee),
+      call: {
+        contract: 'notary',
+        to: notary as Hex,
+        functionName: 'notarizeDirect',
+        args: [tuple],
+      },
+    },
     send: (sub) => sub.notarize(state.config.chainId, [{ record, signature }]),
   };
 }
@@ -274,16 +304,63 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
         const s = await seenNow();
         return s === 'match' ? recorded('chain') : conflict();
       }
-      if (item.paid) options.selector?.clear();
-      if (error === 'InsufficientCredits' && item.paid) {
-        const selection = options.reselect ? await options.reselect() : undefined;
-        return Object.freeze({
-          status: 'needs_credits',
-          ...base,
-          ...(selection === undefined ? {} : { selection }),
-        });
+      if (!item.paid) return Object.freeze({ status: 'failed', ...base, error });
+      // A refusal of a paid item: never pay from the cached detection; select again once.
+      options.selector?.clear();
+      const selection = options.reselect ? await options.reselect() : undefined;
+      const extra = selection === undefined ? {} : { selection };
+      if (error === 'InsufficientCredits') {
+        return Object.freeze({ status: 'needs_credits', ...base, ...extra });
       }
-      return Object.freeze({ status: 'failed', ...base, error });
+      return Object.freeze({ status: 'failed', ...base, error, ...extra });
+    };
+
+    const direct = options.direct;
+    const from = direct?.signer.address.toLowerCase() as Hex | undefined;
+    const canPayNow =
+      direct !== undefined && item.payNow !== undefined && from === item.payNow.signer;
+
+    /** One direct call, then its receipt on-chain; `not_included` when the wait ran out. */
+    const sendAndWait = async (call: Omit<ContractTx, 'from'>): Promise<DirectSend> => {
+      const sent = await sendDirect(state, direct as DirectMode, call, options.directOptions);
+      if (!sent.ok) return sent;
+      const st = await waitForTx(state, sent.txHash, options);
+      if (st === 'success') return sent;
+      return { ok: false, error: st === 'reverted' ? 'reverted' : 'not_included' };
+    };
+
+    /** notarizeDirect from the signer: approve exactly maxFee first, or attach the native value. */
+    const payNow = async (): Promise<DirectSend> => {
+      const p = item.payNow as NonNullable<Item['payNow']>;
+      const offered = offeredTokenAt(state.config, p.feeToken);
+      if (offered === undefined) return { ok: false, error: 'fee_token_not_offered' };
+      const vault = state.config.contracts.vault as Hex;
+      const pay = (value: bigint) =>
+        sendDirect(state, direct as DirectMode, { ...p.call, value }, options.directOptions);
+      if (offered.token.address === null) return pay(p.maxFee);
+      const token = offered.token.address as Hex;
+      if ((await state.tokenBalance(token, p.signer)) < p.maxFee) {
+        return { ok: false, error: 'InsufficientCredits' };
+      }
+      const current = await state.allowance(token, p.signer, vault);
+      if (current !== p.maxFee) {
+        const approve = (value: bigint) =>
+          sendAndWait({
+            contract: 'erc20',
+            to: token,
+            value: 0n,
+            functionName: 'approve',
+            args: [vault, value],
+          });
+        // Tokens in the USDT style refuse a change between two nonzero allowances.
+        if (current !== 0n) {
+          const reset = await approve(0n);
+          if (!reset.ok) return reset;
+        }
+        const set = await approve(p.maxFee);
+        if (!set.ok) return set;
+      }
+      return pay(0n);
     };
 
     /** Polls the chain until the item shows up (or conflicts); undefined when the wait ran out. */
@@ -300,13 +377,15 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
 
     // 2. Our own simulation, before any submitter sees the item.
     const sim = await state.simulate(item.batch);
-    if (!sim.ok) {
+    // Without credits, no submitter can charge the item; direct mode may still pay now.
+    const payNowFirst = !sim.ok && sim.error === 'InsufficientCredits' && canPayNow;
+    if (!sim.ok && !payNowFirst) {
       const out = await refused(sim.error);
       if (out) return out;
     }
 
     // 3. Submitters, in order. Their answers only decide what to read next.
-    for (const sub of submitters) {
+    for (const sub of payNowFirst ? [] : submitters) {
       let answer: SubmitResponse;
       try {
         answer = await item.send(sub);
@@ -336,19 +415,18 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
     }
 
     // 4. Direct mode: the agent's own account, simulated first, only with enough native gas.
-    const call = options.direct
-      ? item.direct(options.direct.signer.address.toLowerCase() as Hex)
-      : undefined;
-    if (options.direct && call) {
-      let sent;
+    const call = direct && from ? item.direct(from) : undefined;
+    if (direct && call) {
+      let sent: DirectSend;
       try {
-        sent = await sendDirect(state, options.direct, call, options.directOptions);
+        sent = await sendDirect(state, direct, call, options.directOptions);
+        if (!sent.ok && sent.error === 'InsufficientCredits' && canPayNow) sent = await payNow();
       } catch (error) {
         if (!(error instanceof ChainError) || error.code === 'signer_mismatch') throw error;
         return pending();
       }
       if (!sent.ok) {
-        if (sent.error === 'no_gas') return pending();
+        if (sent.error === 'no_gas' || sent.error === 'not_included') return pending();
         return (await refused(sent.error)) ?? pending();
       }
       const s = await landed();

@@ -1259,7 +1259,7 @@ describe('deposits: allowance read first, USDT re-approve, minDeposit, re-select
   it.each([
     [
       'another amount',
-      (_p: DepositStep[]) =>
+      (): DepositStep[] =>
         buildDeposit(config, { token: 'USDC', amount: 6n, currentAllowance: 0n }),
     ],
     [
