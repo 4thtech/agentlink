@@ -339,7 +339,9 @@ class Ledger implements ChainState {
   broadcast = async (raw: Hex): Promise<void> => {
     this.broadcasts.push(raw);
     const tx = parseTransaction(raw);
-    const from = (await recoverTransactionAddress({ serializedTransaction: raw })).toLowerCase();
+    const from = (
+      await recoverTransactionAddress({ serializedTransaction: raw as never })
+    ).toLowerCase();
     this.nonces.set(from, (this.nonces.get(from) ?? 0) + 1);
     if (this.dropBroadcasts) return;
     const to = (tx.to ?? '').toLowerCase() as Hex;

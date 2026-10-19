@@ -126,7 +126,11 @@ describe('createChainState', () => {
           error: {
             code: 3,
             message: 'execution reverted',
-            data: encodeErrorResult({ abi: NOTARY_CLIENT_ABI, errorName: 'InsufficientCredits' }),
+            data: encodeErrorResult({
+              abi: NOTARY_CLIENT_ABI,
+              errorName: 'InsufficientCredits',
+              args: [PAYER, PAYER, 5n, 0n],
+            }),
           },
         };
       }
