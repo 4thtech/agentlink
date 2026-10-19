@@ -13,7 +13,16 @@ export {
   type ChainReader,
   type CreditBalance,
 } from './credits.js';
-export { buildDeposit, type DepositRequest, type DepositStep } from './deposit.js';
+export {
+  buildDeposit,
+  checkGaslessTopUp,
+  planDeposit,
+  sendDeposit,
+  type DepositRequest,
+  type DepositResult,
+  type DepositStep,
+  type SendDepositOptions,
+} from './deposit.js';
 export {
   MAX_LOG_BLOCK_SPAN,
   filterCreditEvents,

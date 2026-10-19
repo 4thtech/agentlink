@@ -102,3 +102,18 @@ export function createChainSelector(options: ChainSelectorOptions = {}): ChainSe
     },
   });
 }
+
+/**
+ * After a paid action, a deposit or a refusal for missing credits (IR-M1-26-1; 07 §6.3): drops the
+ * cached detections, then selects exactly once from fresh reads. Never pay from a cached funded
+ * detection after credits changed.
+ */
+export function selectAgain(
+  selector: Pick<ChainSelector, 'select' | 'clear'>,
+  chains: readonly ChainReader[],
+  payer: Hex,
+  options: SelectOptions,
+): Promise<ChainSelection> {
+  selector.clear();
+  return selector.select(chains, payer, options);
+}

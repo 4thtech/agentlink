@@ -1,6 +1,6 @@
 // @4thtech-io/chain: chain clients and OCC v2 bindings. M1-4a: registry, read clients, typed-data
-// builders and IDs. M1-4b: quotes in USD, credits, the deposit helper and credit events. Submission
-// lands with M1-4c.
+// builders and IDs. M1-4b: quotes in USD, credits, the deposit helper and credit events. M1-4c:
+// submission with failover, direct mode, inclusion tracking and deposits.
 export const packageName = '@4thtech-io/chain';
 
 export * from './config/index.js';

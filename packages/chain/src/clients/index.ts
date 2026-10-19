@@ -30,3 +30,28 @@ export {
   type NotaryReader,
 } from './calls.js';
 export { ChainError, type ChainErrorCode } from './errors.js';
+export {
+  checkDirectCall,
+  createChainState,
+  type BlockInfo,
+  type ChainState,
+  type ContractName,
+  type ContractTx,
+  type FeeLevels,
+  type StoredRecord,
+  type TxSimulation,
+} from './state.js';
+export {
+  createBroadcaster,
+  pollChain,
+  sendDirect,
+  waitForTx,
+  type Broadcast,
+  type BroadcasterOptions,
+  type DirectMode,
+  type DirectSend,
+  type DirectSendOptions,
+  type DirectSigner,
+  type DirectTransaction,
+  type PollOptions,
+} from './direct.js';

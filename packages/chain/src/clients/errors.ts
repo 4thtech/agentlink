@@ -30,6 +30,14 @@ export type ChainErrorCode =
   | 'rpc_error'
   /** The chain answered, but the answer is impossible (a quote whose parts do not add up). */
   | 'bad_answer'
+  /** Direct mode: the signed bytes are not the transaction that was built, or not from the signer. */
+  | 'signer_mismatch'
+  /** Direct mode: the account cannot pay the gas for the call. Nothing was signed. */
+  | 'no_gas'
+  /** A sent transaction reverted on-chain. */
+  | 'tx_reverted'
+  /** A sent transaction was not included within the wait. */
+  | 'tx_not_included'
   /** Anything else. */
   | 'rpc_failed';
 
@@ -41,6 +49,10 @@ const MESSAGES: Record<ChainErrorCode, string> = {
   rpc_unavailable: 'The chain could not be reached.',
   rpc_error: 'The chain returned an error.',
   bad_answer: 'The chain returned an answer that does not add up.',
+  signer_mismatch: 'The signed transaction does not match the contract call.',
+  no_gas: 'The account cannot pay the chain fee for this contract call.',
+  tx_reverted: 'The contract refused the transaction.',
+  tx_not_included: 'The transaction was not included on the chain in time.',
   rpc_failed: 'The chain request failed.',
 };
 

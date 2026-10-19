@@ -41,3 +41,12 @@ export {
   type SubmitterClientOptions,
   type SubmitterErrorCode,
 } from './client.js';
+export {
+  createProofSubmitter,
+  readInclusion,
+  replacementAllowed,
+  type ProofOutcome,
+  type ProofSubmitter,
+  type ProofSubmitterOptions,
+  type ProofVia,
+} from './notarize.js';
