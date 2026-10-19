@@ -251,10 +251,23 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
         return run.terminal.confirm(question);
       },
     };
+    // A slow machine (a loaded CI runner): signing and storing the card takes real time. The test
+    // must not depend on how fast this machine is, only on when the lifetime starts.
+    const card = firstCard(bob, 'bob');
+    const slowCard: FirstAgentCard = {
+      ...card,
+      identity: {
+        get: () => card.identity.get(),
+        init: async (input) => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return card.identity.init(input);
+        },
+      },
+    };
     await addAgentWith(
       keychain,
       terminal,
-      { backend: 'keychain', env: {}, card: firstCard(bob, 'bob') },
+      { backend: 'keychain', env: {}, card: slowCard },
       { ttlMs: 50 },
     );
     expect(run.questions).toHaveLength(1);
