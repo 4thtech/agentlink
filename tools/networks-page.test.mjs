@@ -52,10 +52,29 @@ describe('networks-and-contracts page', () => {
     }
   });
 
-  it('links each address to its block explorer, and claims no mainnet or Chiado deployment', () => {
+  it('links each address to its block explorer, per network', () => {
     expect(page).toMatch(/sepolia\.basescan\.org\/address\/0x/);
-    expect(page).toMatch(/Gnosis Chiado[^\n]*planned/);
+    expect(page).toMatch(/gnosis-chiado\.blockscout\.com\/address\/0x/);
+    for (const { chainId, body } of records) {
+      const host = chainId === '10200' ? 'gnosis-chiado.blockscout.com' : 'sepolia.basescan.org';
+      for (const key of ['notary', 'vault', 'manager']) {
+        const address = `0x${field(body, key)}`;
+        expect(page).toContain(`https://${host}/address/${address}`);
+      }
+    }
+  });
+
+  it('shows Chiado as live with its deploy transactions and a pending smoke test', () => {
+    expect(page).toMatch(/\| Gnosis Chiado[^\n]*Live/);
+    expect(page).not.toMatch(/\| Gnosis Chiado[^\n]*planned/i);
+    expect(page).toMatch(/smoke test pending/i);
+    const hashes = page.match(/gnosis-chiado\.blockscout\.com\/tx\/0x[0-9a-f]{64}\b/g) ?? [];
+    expect(new Set(hashes).size).toBe(3);
+  });
+
+  it('claims no mainnet deployment', () => {
+    expect(page).toMatch(/Base \(mainnet\)[^\n]*Not deployed/);
+    expect(page).toMatch(/Gnosis \(mainnet\)[^\n]*Not deployed/);
     expect(page).toMatch(/not deployed/i);
-    expect(page).not.toMatch(/gnosis-chiado\.blockscout\.com\/address\/0x/);
   });
 });

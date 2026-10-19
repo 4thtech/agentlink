@@ -13,7 +13,7 @@
 // - `occNotaryClientAbi` and `occFeeVaultClientAbi` are what client code binds to: the `client`
 //   functions of tags.ts plus every event and error (the inherited OpenZeppelin ones included) for
 //   decoding. The full interface ABIs are exported for decoding and review, not for calls.
-// - Addresses: Base Sepolia (84532) only, a testnet in development (05 §9). No mainnet entry exists
+// - Addresses: Base Sepolia (84532) and Gnosis Chiado (10200), testnets in development (05 §9). No mainnet entry exists
 //   and the check refuses one.
 // - The EIP-712 types (domain, Record, Receipt) are not here: they live in @4thtech-io/crypto, and
 //   @4thtech-io/chain tests that they match the Notary's structs (AUDIT-FABLE-OCC19-1 L-2).
@@ -162,7 +162,7 @@ function toDeployment(record: SafeRecord): Deployment {
   };
 }
 
-/** Deployments keyed by chain ID: Base Sepolia (84532) only, a testnet. */
+/** Deployments keyed by chain ID: Base Sepolia (84532) and Gnosis Chiado (10200), testnets. */
 export const deployments: Readonly<Record<string, Deployment>> = deepFreeze(
   Object.fromEntries(
     Object.entries(deploymentRecords).map(([id, record]) => [id, toDeployment(record)]),

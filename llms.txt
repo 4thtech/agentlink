@@ -18,7 +18,7 @@
 - [How messages are delivered](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/everyday-use/how-messages-are-delivered.md): live and mailbox delivery, status-first habit, relay limits
 - [Get started guides](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/README.md): install prompts for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity, and how to protect your approvals
 - [Public technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md): concepts and reference for builders and reviewers
-- [Networks and contract addresses](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md): test networks, contract addresses and explorer links (Base Sepolia live; Gnosis Chiado planned; no mainnet)
+- [Networks and contract addresses](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md): test networks, contract addresses and explorer links (Base Sepolia live; Gnosis Chiado live, smoke test pending; no mainnet)
 - [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants
 - [Changelog](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md): what changed in each release
 - [Security policy](https://github.com/4thtech/agentlink/blob/main/SECURITY.md): how to report a vulnerability privately

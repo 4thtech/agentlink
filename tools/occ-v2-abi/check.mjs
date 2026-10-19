@@ -28,8 +28,8 @@ export const PACKAGE_DIR = join(root, 'packages', 'occ-v2-abi');
 export const PACKAGE_NAME = '@4thtech-io/occ-v2-abi';
 export const REPOSITORY = '4thtech/occ-v2-contracts';
 
-/** The only chain the bundle may carry addresses for until a decision adds one (05 §9, D-63). */
-export const ALLOWED_CHAIN_IDS = [84532];
+/** The only chains the bundle may carry addresses for (Base Sepolia, Gnosis Chiado) until a decision adds one (05 §9, D-63). */
+export const ALLOWED_CHAIN_IDS = [84532, 10200];
 
 /** Mainnet chain IDs that must never appear (testnet only until M3-2c): a non-exhaustive guard. */
 export const MAINNET_CHAIN_IDS = [
@@ -85,7 +85,7 @@ export function checkAddressPath(path) {
   const id = Number(path.slice('addresses/'.length, -'.json'.length));
   if (!ALLOWED_CHAIN_IDS.includes(id)) {
     problems.push(
-      `${path}: only Base Sepolia (84532) is allowed; another chain needs a decision and a reviewed change here`,
+      `${path}: only Base Sepolia (84532) and Gnosis Chiado (10200) are allowed; another chain needs a decision and a reviewed change here`,
     );
   }
   if (MAINNET_CHAIN_IDS.includes(id)) {
@@ -222,7 +222,9 @@ function main() {
     process.exit(1);
   }
   const { tag } = readPin(PACKAGE_DIR);
-  console.log(`occ-v2-abi: ${tag} matches its pinned manifest; Base Sepolia (84532) only. OK.`);
+  console.log(
+    `occ-v2-abi: ${tag} matches its pinned manifest; Base Sepolia (84532) and Gnosis Chiado (10200) only. OK.`,
+  );
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

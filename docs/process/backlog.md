@@ -1684,6 +1684,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `deployer-holds-no-role` and the M1-3g post-deploy checks pass on Chiado; the stage fits Chiado's block gas limit and per-transaction gas cap.
   - The native-xDAI fee configuration reads back as configured; Chiado addresses published in the next prerelease.
 
+#### M1-3j-b · enable Chiado in automatic selection after smoke test and faucet (new, M1-3j review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain (`NOT_AUTO_SELECTED` in clients/registry.ts, faucet allowlist), apps/submitter (faucet config), apps/cli (default proof chains)
+- **Depends on:** M1-3j (Chiado deployed, `@4thtech-io/occ-v2-abi` v0.1.0-testnet.3 imported), the Chiado smoke test, M1-10b-b, M1-10c
+- **Spec:** 07 §6.3; 05 §9; D-40, D-46
+- **Invariants:** I-3
+- **Scope:**
+  - Chiado is in the address package and the chain registry, but automatic selection and the default CLI proof platform skip it until this card: an unfunded payer with equal fees would otherwise be routed to a chain the faucet does not serve and where no gasless top-up exists.
+  - After the Chiado smoke test passes and the faucet serves Chiado: remove 10200 from `NOT_AUTO_SELECTED`, add it to `FAUCET_CHAIN_IDS`, configure the Chiado faucet. The owner accepts the routing change.
+- **Acceptance:** tests first: with Chiado enabled, an unfunded payer gets the documented tie-break and a top-up path that works on that chain; the networks page says Chiado is used by default.
+
 #### M1-3k · contracts: Fable pre-audit fixes (FA-4, FA-5, FA-8) (new, AUDIT-FABLE-OCCv2-1)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · test/**, .gas-snapshot, contracts CI; agentlink · `release-and-deployment.md` §4.4 (runbook line)

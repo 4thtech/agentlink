@@ -5,7 +5,13 @@ export {
   type RpcUrlCheck,
   type RpcUrlRefusal,
 } from './rpc-url.js';
-export { chainRegistry, getChainConfig, selectChain, type SelectChainOptions } from './registry.js';
+export {
+  autoSelectableChains,
+  chainRegistry,
+  getChainConfig,
+  selectChain,
+  type SelectChainOptions,
+} from './registry.js';
 export {
   DEFAULT_RPC_RETRY_COUNT,
   DEFAULT_RPC_RETRY_DELAY_MS,

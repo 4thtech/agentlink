@@ -14,6 +14,7 @@ import {
   MAX_USER_RPC_URLS,
   NOTARY_CLIENT_ABI,
   RPC_READ_METHODS,
+  autoSelectableChains,
   chainRegistry,
   checkRpcUrl,
   createReadClient,
@@ -91,9 +92,9 @@ describe('checkRpcUrl (04 §4 raw-string rule, applied to RPC URLs)', () => {
 // --- registry (07 §6.1) ------------------------------------------------------------------------
 
 describe('chain registry: network entry + pinned OCC v2 contracts', () => {
-  it('lists the chains that have both an entry and a deployment: Base Sepolia only today', () => {
+  it('lists the chains that have both an entry and a deployment: Base Sepolia and Gnosis Chiado', () => {
     const chains = chainRegistry();
-    expect(chains.map((c) => c.chainId)).toEqual([84532]);
+    expect(chains.map((c) => c.chainId)).toEqual([84532, 10200]);
     expect(chains.every((c) => c.testnet)).toBe(true);
   });
 
@@ -110,6 +111,22 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
     ]);
   });
 
+  it('composes Gnosis Chiado with the native fee asset and the same contracts as Base Sepolia', () => {
+    const c = getChainConfig(10200) as ChainConfig;
+    expect(c.key).toBe('gnosis-chiado');
+    expect(c.testnet).toBe(true);
+    expect(c.contracts).toEqual((getChainConfig(84532) as ChainConfig).contracts);
+    expect(c.feeTokens.map((t) => [t.symbol, t.address, t.decimals])).toEqual([
+      ['NATIVE', null, 18],
+    ]);
+  });
+
+  it('keeps Chiado out of automatic selection until its smoke test and faucet are in place (M1-3j-b)', () => {
+    expect(autoSelectableChains().map((c) => c.chainId)).toEqual([84532]);
+    expect(selectChain().chainId).toBe(84532);
+    expect(getChainConfig(10200)).toBeDefined(); // data and an explicit override stay available
+  });
+
   it('advertises no EIP-3009 deposit while the vault refuses it (M1-3c; FA M-1)', () => {
     const c = getChainConfig(84532) as ChainConfig;
     expect(loadOccV2Contracts(84532)?.depositWithAuthorization).toBe(false);
@@ -117,7 +134,6 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
   });
 
   it('knows no chain without a deployment, and no mainnet', () => {
-    expect(getChainConfig(10200)).toBeUndefined(); // Chiado: entry shipped, not deployed yet
     for (const id of [1, 8453, 100, 42161, 10, 137, 0, -1]) {
       expect(getChainConfig(id)).toBeUndefined();
     }
@@ -200,7 +216,8 @@ describe('selectChain: automatic, testnet only', () => {
 
   it('honours an Advanced override only for a supported chain', () => {
     expect(selectChain({ chainId: 84532 }).chainId).toBe(84532);
-    for (const chainId of [10200, 8453, 1, 100]) {
+    expect(selectChain({ chainId: 10200 }).chainId).toBe(10200);
+    for (const chainId of [8453, 1, 100]) {
       expect(() => selectChain({ chainId })).toThrow(
         expect.objectContaining({ code: 'unsupported_chain' }),
       );

@@ -68,7 +68,7 @@ Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0; curre
 
 ## Protocol OCC v2
 
-OCC v2 (4thTech On-Chain Communication, version 2) is the open protocol under AgentLink. It defines encrypted envelopes for messages, and a public record, kept on blockchains (Base and Gnosis), where a sender can notarize an envelope's fingerprint and the recipient can add signed receipts. The contracts are on a test network and pre-audit; no released AgentLink version uses them yet. Networks and addresses: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md (Base Sepolia live, Gnosis Chiado planned, no mainnet).
+OCC v2 (4thTech On-Chain Communication, version 2) is the open protocol under AgentLink. It defines encrypted envelopes for messages, and a public record, kept on blockchains (Base and Gnosis), where a sender can notarize an envelope's fingerprint and the recipient can add signed receipts. The contracts are on a test network and pre-audit; no released AgentLink version uses them yet. Networks and addresses: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md (Base Sepolia and Gnosis Chiado live, no mainnet).
 
 ### What the public record holds
 
@@ -91,7 +91,7 @@ Guarantees by design: no admin function can move or freeze a payer's credits; fe
 
 ### Networks and current state
 
-Mainnets for the beta: Base and Gnosis. Testnets: Base Sepolia and Gnosis Chiado. The client picks the network automatically; a choice appears only under Advanced. Mainnet comes only after an external audit (M3). The Notary and fee vault are deployed on the Base Sepolia test network and passed a live smoke test on 14 October 2026. They are pre-audit and unused by any AgentLink release. Gnosis Chiado is planned next. Contract addresses stay private until the ABI package is released.
+Mainnets for the beta: Base and Gnosis. Testnets: Base Sepolia and Gnosis Chiado. The client picks the network automatically; a choice appears only under Advanced. Mainnet comes only after an external audit (M3). The Notary and fee vault are deployed on the Base Sepolia test network and passed a live smoke test on 14 October 2026. They are pre-audit and unused by any AgentLink release. Gnosis Chiado was deployed on 19 October 2026 (smoke test pending). Contract addresses stay private until the ABI package is released.
 
 ### Lineage and licences
 

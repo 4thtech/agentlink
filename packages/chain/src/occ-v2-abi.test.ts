@@ -417,8 +417,8 @@ describe('OCC v2 contract surface', () => {
       manifestSha256: OCC_V2_RELEASE.manifestSha256,
     });
     expect(OCC_V2_ABI_PIN).toEqual({
-      tag: 'v0.1.0-testnet.2',
-      manifestSha256: 'b1a8daa57d51bcbfbecbc91e6c5d2740d76428a4f63bbd5f1043537591188c1b',
+      tag: 'v0.1.0-testnet.3',
+      manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
     });
   });
 
@@ -472,8 +472,9 @@ describe('OCC v2 contract surface', () => {
     expect(encodeHex0x(eip712TypeHash(RECEIPT_TYPES, 'Receipt'))).toBe(RECEIPT_TYPEHASH);
   });
 
-  it('rebuilds addresses/84532.json byte for byte: its SHA-256 equals the manifest entry', () => {
+  it('rebuilds every addresses/<chainId>.json byte for byte: its SHA-256 equals the manifest entry', () => {
     expect(Object.keys(OCC_V2_MANIFEST_FILES).filter((p) => p.startsWith('addresses/'))).toEqual([
+      'addresses/10200.json',
       'addresses/84532.json',
     ]);
     for (const chainId of DEPLOYMENT_CHAIN_IDS) {
@@ -518,11 +519,11 @@ describe('OCC v2 contract surface', () => {
   });
 
   it('loads nothing for a chain without a deployment', () => {
-    for (const id of [1, 8453, 100, 10200, 31337]) expect(loadOccV2Contracts(id)).toBeUndefined();
+    for (const id of [1, 8453, 100, 31337]) expect(loadOccV2Contracts(id)).toBeUndefined();
   });
 });
 
-/** manifest.json `files` of v0.1.0-testnet.2 (its own SHA-256 is pinned as OCC_V2_ABI_PIN). */
+/** manifest.json `files` of v0.1.0-testnet.3 (its own SHA-256 is pinned as OCC_V2_ABI_PIN). */
 const MANIFEST_FILES = {
   'abi/IOCCErrors.json': 'e072b05a6601e4cee38d6eaf514cce3805e14bafe7f50b68718a67e373b2caa0',
   'abi/IOCCFeeVault.json': '28134918472b6fa86c141435bf99429193ed4f0ec54d7dfdf5a211aff720d82f',
@@ -530,5 +531,6 @@ const MANIFEST_FILES = {
   'abi/IOCCNotary.json': 'f8f6adc5fb822aa7933b21ff7432e7b09cbb1521c2cdc29efbd064211e3be521',
   'abi/OpenZeppelinInherited.json':
     '22a6c5b849406ce930a66118c7d33ebf3db43f8090eaa82cb28b63e7e7b3fb3b',
+  'addresses/10200.json': '57915ade5f3538d0c4c21a494794ddebffe816a376ef2439e43d4d4dbb406d7a',
   'addresses/84532.json': 'e7a090c22b21e94419c56200ac05b655471be6b3b6f958bf4ddbda4ae2e96732',
 };

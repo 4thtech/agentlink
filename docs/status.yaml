@@ -349,8 +349,11 @@ areas:
       - name: "ABI package"
         state: done
         prs: [273, "contracts#19"]
-        summary: "The contracts release v0.1.0-testnet.2 exports the interface ABIs, the Base Sepolia addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83)."
-      - name: "Gnosis Chiado deployment, pre-audit fixes"
+        summary: "The contracts release v0.1.0-testnet.3 exports the interface ABIs, the Base Sepolia and Gnosis Chiado addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83)."
+      - name: "Gnosis Chiado deployment"
+        state: in-progress
+        summary: "Deployed on the Gnosis Chiado testnet on 19 Oct 2026 at the same addresses as Base Sepolia; the live smoke test is pending (it needs test xDAI), and automatic selection does not use Chiado until then (M1-3j-b)."
+      - name: "Pre-audit fixes"
         state: planned
         summary: "Follow-ups for M1b; mainnet follows the external audit (M3)."
   - id: design
