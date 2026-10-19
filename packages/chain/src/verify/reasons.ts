@@ -22,6 +22,8 @@ export const PROOF_PACK_FAILURES = Object.freeze([
   'commitment_mismatch',
   'record_mismatch',
   'signature_invalid',
+  'card_invalid',
+  'card_expired',
   'recipient_mismatch',
   'receipt_not_on_chain',
   'receipt_mismatch',
@@ -29,13 +31,17 @@ export const PROOF_PACK_FAILURES = Object.freeze([
 export type ProofPackFailure = (typeof PROOF_PACK_FAILURES)[number];
 
 /**
- * Why a disclosed content key proves no content (07 §8 steps 1 to 6, then the D-86 kind check). The
- * record and its receipts still verify on their own.
+ * Why a disclosed content key proves no content (07 §8 steps 1 to 6, then the D-86 kind check), or
+ * why it is not attributed to the record signer (M1-4d-b): `sender_mismatch` when the signer's card
+ * names another sender, `sender_not_bound` when the pack carries no card. The record and its
+ * receipts still verify on their own.
  */
 export const PROOF_CONTENT_FAILURES = Object.freeze([
   'envelope_invalid',
   'envelope_hash_mismatch',
   'envelope_signature_invalid',
+  'sender_mismatch',
+  'sender_not_bound',
   'key_commitment_mismatch',
   'decrypt_failed',
   'payload_invalid',
@@ -62,11 +68,17 @@ const MESSAGES: Readonly<Record<ProofPackFailure | ProofContentFailure, string>>
   commitment_mismatch: 'The recipient in the proof does not match the record.',
   record_mismatch: 'The record details in the proof do not match the recorded ones.',
   signature_invalid: 'The signature on the record is not valid for its signer.',
+  card_invalid: 'The agent profile in the proof is not signed by its owner.',
+  card_expired: 'The agent profile had expired when the record was made.',
   recipient_mismatch: 'The disclosed recipient does not match the record.',
   receipt_not_on_chain: 'The proof lists a receipt that was never recorded.',
   receipt_mismatch: 'A receipt time in the proof does not match the recorded one.',
   envelope_invalid: 'The included message is not in the expected format.',
   envelope_signature_invalid: 'The included message is not signed by its sender.',
+  sender_mismatch:
+    'The included message was sent by someone other than the agent that made the record.',
+  sender_not_bound:
+    'The included message opens, but nothing in the proof shows that the agent that made the record sent it.',
   key_commitment_mismatch: 'The shared content key is not the key this message was sealed with.',
   decrypt_failed: 'The included message could not be opened with the shared key.',
   payload_invalid: 'The opened message is not in the expected format.',

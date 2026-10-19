@@ -8,8 +8,11 @@
 //   errors), and compares signer, kind, envelope hash, recipient commitment and struct hash;
 // - checks the signature as OpenZeppelin SignatureChecker does: canonical ECDSA recovery first, then
 //   ERC-1271 `isValidSignature` through `eth_call` when the signer has code;
+// - with the signer's agent card, checks `cardSig` (by the card's `ownerEvm`, 04 §2.4) and that the
+//   card had not expired when the record was made (M1-4d-b);
 // - opens the recipient commitment with a disclosed salt, and takes receipts from `RecordState`;
-// - with a disclosed content key, checks the content in the 07 §8 order (content.ts).
+// - with a disclosed content key, checks the content in the 07 §8 order (content.ts), and attributes
+//   it to the signer only when the card binds the envelope's sender to the signer (IR-M1-4d-1 M-1).
 // No log queries (some RPCs prune logs) and no 4thTech service. The result carries fixed codes and
 // values from the chain or from fields the chain has confirmed; nothing is echoed from a refused pack.
 import {
@@ -21,8 +24,14 @@ import {
   occV2Domain,
   recipientCommitment,
   recoverEvmAddress,
+  verifyCardOwnerSig,
 } from '@4thtech-io/crypto';
-import { RECEIPT_TYPE_NAMES, type Payload, type ReceiptTypeName } from '@4thtech-io/types';
+import {
+  RECEIPT_TYPE_NAMES,
+  type AgentCard,
+  type Payload,
+  type ReceiptTypeName,
+} from '@4thtech-io/types';
 import { parseAbi, type Address, type Hex as ViemHex } from 'viem';
 import type { ChainConfig } from '../config/index.js';
 import { notaryReader } from '../clients/calls.js';
@@ -54,17 +63,36 @@ export interface VerifiedReceipt {
   readonly at: string;
 }
 
+/**
+ * The disclosed content. A payload is untrusted content (I-5): show it only inside the untrusted
+ * block (06 §4). `sender` is the envelope's `from` (64 lowercase hex, 04 §3.1), whose signature over
+ * the envelope verified.
+ * - `verified`: the content verifies and the signer's card names `sender` as the agent's key
+ *   (`signerCard.agentNostr`), so the content is attributed to the record signer;
+ * - `unattributed`: the content verifies, but the pack carries no card, so nothing binds `sender` to
+ *   the record signer (`sender_not_bound`); never show the signer as its author;
+ * - `failed`: the pack proves no content (`reason`), including `sender_mismatch`, when the card
+ *   names another key (a recipient that notarized an envelope it received, IR-M1-4d-1 M-1).
+ */
 export type ProofContentResult =
   | { readonly status: 'not_disclosed' }
-  /** The payload is untrusted content (I-5): show it only inside the untrusted block (06 §4). */
-  | { readonly status: 'verified'; readonly payload: Payload }
+  | { readonly status: 'verified'; readonly payload: Payload; readonly sender: string }
+  | {
+      readonly status: 'unattributed';
+      readonly reason: 'sender_not_bound';
+      readonly message: string;
+      readonly payload: Payload;
+      readonly sender: string;
+    }
   | { readonly status: 'failed'; readonly reason: ProofContentFailure; readonly message: string };
 
 /**
  * How far the result can be trusted, the field to show first (IR-M1-4d-1 M-2):
- * - `verified`: the record, its receipts and the disclosed content all verify;
- * - `record_only`: the record and its receipts verify, but no content was disclosed or the
- *   disclosed content failed (`content`); never show this as a full pass;
+ * - `verified`: the record, its receipts and the disclosed content all verify, and the signer's
+ *   card binds the content's sender to the signer (M1-4d-b);
+ * - `record_only`: the record and its receipts verify, but no content was disclosed, the
+ *   disclosed content failed, or it is not attributed to the signer (`content`); never show this
+ *   as a full pass;
  * - `failed`: the pack proves nothing (`reason`).
  */
 export type ProofVerdict = 'verified' | 'record_only' | 'failed';
@@ -84,6 +112,13 @@ export interface ProofPackValid {
   readonly signer: Hex;
   /** `account` for an ECDSA signer, `contract` for an ERC-1271 account. */
   readonly signerType: 'account' | 'contract';
+  /**
+   * The signer's agent card (04 §2.4) when the pack carries one: `cardSig` recovered to its
+   * `ownerEvm`, its `agentEvm` is the signer, and it had not expired when the record was made.
+   * It is the owner's signed statement; the display name and relays it hashes are not checked here.
+   * Null when the pack carries no card.
+   */
+  readonly signerCard: AgentCard | null;
   readonly kind: number;
   /** RFC 3339 UTC: when the Notary stored the record. */
   readonly timestamp: string;
@@ -250,6 +285,8 @@ async function checkSignature(
 }
 
 interface OnChainMatch {
+  /** The record's chain time in seconds, and as RFC 3339 UTC. */
+  readonly seconds: bigint;
   readonly timestamp: string;
   readonly finality: Finality;
   readonly receipts: readonly VerifiedReceipt[];
@@ -289,7 +326,7 @@ function matchState(
     if (!onChain) return 'receipt_not_on_chain';
     if (onChain.at !== claimed.at) return 'receipt_mismatch';
   }
-  return { timestamp, finality, receipts };
+  return { seconds: state.timestamp, timestamp, finality, receipts };
 }
 
 async function verifyParsed(
@@ -323,11 +360,26 @@ async function verifyParsed(
       }
     }
     if (!matched) return invalid(failure);
-    const { timestamp, finality, receipts } = matched;
+    const { seconds, timestamp, finality, receipts } = matched;
 
     // 2. The signer's signature over the EIP-712 digest under this chain's OCC v2 domain.
     const signerType = await checkSignature(chain, signer, hashes.digest, pack.signature);
     if (signerType === null) return invalid('signature_invalid');
+
+    // 2b. The signer's agent card, when the pack carries one (04 §2.4; M1-4d-b). The schema already
+    // holds `cardSig` with the card and the card's `agentEvm` equal to the signer; checked again
+    // here, fail closed. The card is the owner's statement, signed with `ownerEvm`, that `agentNostr`
+    // is this agent's key; it must have been in force when the record was made (`expiresAt` 0 is no
+    // expiry).
+    let signerCard: AgentCard | null = null;
+    const card = pack.signer.agentCard;
+    if (card !== undefined) {
+      if (card.agentEvm !== signer || !verifyCardOwnerSig(card, pack.signer.cardSig)) {
+        return invalid('card_invalid');
+      }
+      if (card.expiresAt !== 0 && BigInt(card.expiresAt) <= seconds) return invalid('card_expired');
+      signerCard = Object.freeze({ ...card });
+    }
 
     // 3. A disclosed recipient must open the commitment (04 §5); a self-note has none to open.
     let recipient: { evm: Hex } | null = null;
@@ -352,17 +404,33 @@ async function verifyParsed(
           pack.disclosure.contentKey,
           record.envelopeHash,
           record.kind,
+          signerCard?.agentNostr ?? null,
         );
       } catch {
         check = { ok: false as const, reason: 'decrypt_failed' as const };
       }
-      content = check.ok
-        ? Object.freeze({ status: 'verified', payload: check.payload })
-        : Object.freeze({
-            status: 'failed',
-            reason: check.reason,
-            message: proofFailureMessage(check.reason),
-          });
+      if (!check.ok) {
+        content = Object.freeze({
+          status: 'failed',
+          reason: check.reason,
+          message: proofFailureMessage(check.reason),
+        });
+      } else if (signerCard === null) {
+        // Opened, but nothing in the pack binds the sender to the signer (IR-M1-4d-1 M-1).
+        content = Object.freeze({
+          status: 'unattributed',
+          reason: 'sender_not_bound',
+          message: proofFailureMessage('sender_not_bound'),
+          payload: check.payload,
+          sender: check.sender,
+        });
+      } else {
+        content = Object.freeze({
+          status: 'verified',
+          payload: check.payload,
+          sender: check.sender,
+        });
+      }
     }
 
     const contentVerified = content.status === 'verified';
@@ -375,6 +443,7 @@ async function verifyParsed(
       recordId,
       signer,
       signerType,
+      signerCard,
       kind: record.kind,
       timestamp,
       finality,
