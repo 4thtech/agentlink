@@ -7,7 +7,7 @@ import { parseJson, type JsonObject, type KeyStore } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { RECORD_KIND, buildRecord, signRecord, verifyProofPack, type Hex } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
-import { defaultPolicy, type Policy } from '@4thtech-io/types';
+import { defaultPolicy, type Policy, type RecordJson } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from '../client.js';
@@ -22,7 +22,14 @@ import {
   passphrase,
   seed,
 } from '../testing/fixtures.js';
-import { pairWith, type TestOwner } from '../testing/envelopes.js';
+import {
+  agentEnc,
+  agentSigner,
+  craft,
+  ownerEnc,
+  pairWith,
+  type TestOwner,
+} from '../testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from '../testing/owner.js';
 import type { TransportFactory } from '../transport.js';
 
@@ -525,11 +532,13 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     expect(a.lines.join('\n')).not.toContain(key);
   });
 
-  it('allowKeyDisclosure deny: POLICY_DENIED; a recipient without the record cannot export', async () => {
+  it('allowKeyDisclosure deny: POLICY_DENIED on the sender side and on the recipient side', async () => {
     const { a, b } = await twoAgents();
-    await setPolicy(a, (p) => {
-      p.proofs.allowKeyDisclosure = 'deny';
-    });
+    for (const agent of [a, b]) {
+      await setPolicy(agent, (p) => {
+        p.proofs.allowKeyDisclosure = 'deny';
+      });
+    }
     const envelopeId = await sendText(a, b);
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
@@ -537,10 +546,10 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
       status: 'rejected',
       code: 'POLICY_DENIED',
     });
-    // The `proof` body carries no Record or signature (04 §3.4): the recipient cannot build a pack.
-    expect(await b.client.exportProofPack({ envelopeId })).toEqual({
+    // D-107: the recipient holds the signed Record and can export, under the same key rule.
+    expect(await b.client.exportProofPack({ envelopeId, includeContentKey: true })).toEqual({
       status: 'rejected',
-      code: 'RECORD_UNAVAILABLE',
+      code: 'POLICY_DENIED',
     });
   });
 });
@@ -780,6 +789,431 @@ describe('the deferred ACCEPTED receipt (07 §2.1 step 4, D-55)', () => {
   });
 });
 
+// --- M1-7g-b: the signed Record in the `proof` body and the recipient-side export (D-107) --------
+
+/** The proofs row status of a body whose chain read failed (04 §3.4, M1-7g-b; white-box). */
+const PENDING = 'proof_pending';
+const logged = (agent: Agent, code: string) => agent.lines.some((l) => l.includes(code));
+const pendingRows = async (agent: Agent) =>
+  (await proofRows(agent)).filter((r) => r.status === PENDING);
+const verify = (pack: unknown) =>
+  verifyProofPack(JSON.stringify(pack), {
+    chains: [{ config: chain.config, client: chain.client }],
+  });
+
+describe('the sender puts the signed Record in the proof body (04 §3.4, D-107)', () => {
+  it('every proof body the core sends carries the Record and signature exactly as submitted', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: Hex };
+    const bodies = await proofBodiesSent(a);
+    expect(bodies).toHaveLength(1);
+    const stored = (await proofRows(a)).find((r) => r.record_id === proof.recordId)!;
+    const item = parseJson(stored.record_json) as { record: unknown; signature: string };
+    expect(bodies[0]).toEqual({
+      envelopeId,
+      chainId: chain.config.chainId,
+      recordId: proof.recordId,
+      salt: expect.stringMatching(/^0x[0-9a-f]{64}$/) as unknown,
+      record: item.record,
+      signature: item.signature,
+    });
+    expect(bodies[0]!.record).toEqual(onChain(proof.recordId)!.record);
+  });
+});
+
+describe('recipient-side export verifies end to end (07 §8, D-107)', () => {
+  it('B exports A’s record: record_only without content, verified with A’s card and both card signatures', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: Hex };
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([expect.objectContaining({ type: 1, signer: b.id })]);
+
+    const exported = await b.client.exportProofPack({ envelopeId });
+    expect(exported.status).toBe('ok');
+    const pack = (exported as { pack: Record<string, unknown> }).pack;
+    const sent = (await proofBodiesSent(a))[0]!;
+    expect(pack).toMatchObject({
+      type: 'agentlink.proof',
+      chainId: chain.config.chainId,
+      notary: chain.config.contracts.notary.toLowerCase(),
+      recordId: proof.recordId,
+      record: sent.record,
+      signature: sent.signature,
+      envelopeHash: (sent.record as RecordJson).envelopeHash,
+      disclosure: null,
+    });
+    // The recipient is left out by default (05 §3.3 privacy note).
+    expect(pack).not.toHaveProperty('recipient');
+    // The signer block: A's card of the envelope's key epoch with both of its signatures (D-102).
+    const own = await a.client.identity.signedCard();
+    expect(pack.signer).toEqual({
+      evm: a.id,
+      agentCard: own.card,
+      cardSig: own.cardSig,
+      cardAgentSig: own.cardAgentSig,
+      cardPop: own.cardPop,
+    });
+    expect(await verify(pack)).toMatchObject({
+      valid: true,
+      verdict: 'record_only',
+      recordId: proof.recordId,
+      signer: a.id,
+    });
+
+    // With the content key (owner-approved): verified, attributed to A through A's card.
+    const pending = await b.client.exportProofPack({ envelopeId, includeContentKey: true });
+    expect(pending.status).toBe('pending_approval');
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    const disclosed = await b.client.exportProofPack({
+      envelopeId,
+      includeContentKey: true,
+      approvalId,
+    });
+    expect(disclosed.status).toBe('ok');
+    const withKey = (disclosed as { pack: Record<string, unknown> }).pack;
+    expect(withKey.envelope).toBeDefined();
+    expect(await verify(withKey)).toMatchObject({
+      valid: true,
+      verdict: 'verified',
+      contentVerified: true,
+    });
+    // The card alone (no proof of possession): record_only.
+    const cardOnly = {
+      ...withKey,
+      signer: { evm: a.id, agentCard: own.card, cardSig: own.cardSig },
+    };
+    expect(await verify(cardOnly)).toMatchObject({ valid: true, verdict: 'record_only' });
+  });
+
+  it('includeRecipient: B’s own address and the salt; the verifier opens the commitment', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    const named = await b.client.exportProofPack({ envelopeId, includeRecipient: true });
+    const pack = (named as { pack: Record<string, unknown> }).pack;
+    const salt = (await proofBodiesSent(a))[0]!.salt;
+    expect(pack.recipient).toEqual({ evm: b.id, salt });
+    expect(await verify(pack)).toMatchObject({ valid: true, recipient: { evm: b.id } });
+  });
+
+  it('a proof of agreement: B’s pack of A’s OFFER record carries B’s approval, valid on the recipient side', async () => {
+    const { a, b } = await twoAgents();
+    const offer = await sendOffer(a, b);
+    const accepted = await b.client.respondToTerms({ envelopeId: offer, decision: 'accept' });
+    const approvalId = (accepted as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    expect(
+      await b.client.respondToTerms({ envelopeId: offer, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok' });
+    const rec = await signedRecordOf(a, b, offer, RECORD_KIND.OFFER);
+    await sendProofEnvelope(a, b, bodyOf(rec, offer));
+    expect(onChain(rec.recordId)!.receiptAt[2]).not.toBe(0n);
+
+    const exported = await b.client.exportProofPack({ envelopeId: offer });
+    expect(exported.status).toBe('ok');
+    const pack = (exported as { pack: Record<string, unknown> }).pack;
+    expect(pack.ownerApproval).not.toBeNull();
+    expect(await verify(pack)).toMatchObject({
+      valid: true,
+      ownerApproval: { status: 'signed', approver: 'recipient', decision: 'accept' },
+    });
+    // The owner may leave it out.
+    const without = await b.client.exportProofPack({
+      envelopeId: offer,
+      includeOwnerApproval: false,
+    });
+    expect((without as { pack: Record<string, unknown> }).pack.ownerApproval).toBeNull();
+  });
+});
+
+describe('the recipient checks the signed Record before storing it (04 §3.4 checks 1–5)', () => {
+  interface Tamper {
+    readonly a: Agent;
+    readonly b: Agent;
+    readonly envelopeId: string;
+    readonly rec: SignedRecord;
+  }
+
+  /** A real Record for a real message, then its `proof` body with `edit` applied, sent to B. */
+  async function tampered(
+    edit: (body: ProofBodyIn, ctx: Tamper) => Promise<void> | void,
+  ): Promise<Tamper> {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const body = bodyOf(rec, envelopeId);
+    const ctx = { a, b, envelopeId, rec };
+    await edit(body, ctx);
+    await sendProofEnvelope(a, b, body);
+    return ctx;
+  }
+
+  async function expectDropped(out: { readonly b: Agent; readonly envelopeId: string }) {
+    expect(await receipts(out.b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toBeUndefined();
+    expect(await pendingRows(out.b)).toEqual([]);
+    expect(logged(out.b, 'proof_mismatch')).toBe(true);
+  }
+
+  it('an untampered body passes, is stored as received and gets DELIVERED', async () => {
+    const out = await tampered(() => undefined);
+    expect(await receipts(out.b)).toEqual([expect.objectContaining({ type: 1 })]);
+    const row = (await proofRows(out.b)).find((r) => r.record_id === out.rec.recordId)!;
+    const stored = parseJson(row.record_json) as { record: unknown; signature: string };
+    expect(stored.record).toEqual(out.rec.record);
+    expect(stored.signature).toBe(out.rec.signature);
+    expect(logged(out.b, 'proof_mismatch')).toBe(false);
+  });
+
+  it.each([
+    ['envelopeHash', (r: RecordJson) => void (r.envelopeHash = `0x${'e1'.repeat(32)}`)],
+    [
+      'recipientCommitment',
+      (r: RecordJson) => void (r.recipientCommitment = `0x${'c2'.repeat(32)}`),
+    ],
+    ['kind', (r: RecordJson) => void (r.kind = RECORD_KIND.FILE)],
+    ['nonce', (r: RecordJson) => void (r.nonce = (BigInt(r.nonce) + 1n).toString())],
+    ['maxFee', (r: RecordJson) => void (r.maxFee = (BigInt(r.maxFee) + 1n).toString())],
+    ['parentRecordId', (r: RecordJson) => void (r.parentRecordId = `0x${'9d'.repeat(32)}`)],
+  ])('a changed record.%s is dropped: no proof, no receipt, proof_mismatch', async (_f, change) => {
+    await expectDropped(
+      await tampered((body) => {
+        change(body.record as RecordJson);
+      }),
+    );
+  });
+
+  it('a struct hash that differs from the on-chain recordStructHash is dropped', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { put: false });
+    // The chain holds a Record with the same signer, nonce, hash, commitment and kind, another deadline.
+    chain.put({ ...rec.built.record, deadline: rec.built.record.deadline + 1 });
+    await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    await expectDropped({ b, envelopeId });
+  });
+
+  it('a recordId that does not derive from signer and nonce is dropped', async () => {
+    await expectDropped(
+      await tampered(async (body, { a, b }) => {
+        const other = await sendText(a, b, 'another message');
+        body.recordId = (await signedRecordOf(a, b, other, RECORD_KIND.MESSAGE)).recordId;
+      }),
+    );
+  });
+
+  it('a record signed by someone other than the contact’s card agentEvm is dropped', async () => {
+    const { a, b } = await twoAgents();
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    const envelopeId = await sendText(a, b);
+    // C's own Record of A's envelope hash, committed to B, forwarded by A as its own.
+    const rec = await signedRecordOf(c, b, envelopeId, RECORD_KIND.MESSAGE, {
+      envelopeHash: await envelopeHashOf(a, envelopeId),
+    });
+    await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    await expectDropped({ b, envelopeId });
+  });
+
+  it('a signature by another key is dropped', async () => {
+    const c = await openAgent(33, ownerC, 'carol');
+    await expectDropped(
+      await tampered(async (body, { rec }) => {
+        body.signature = await signRecord(c.keyStore, rec.built);
+      }),
+    );
+  });
+
+  it('a non-canonical (high-s) ECDSA signature is dropped', async () => {
+    await expectDropped(
+      await tampered((body) => {
+        body.signature = highS(body.signature as string);
+      }),
+    );
+  });
+
+  it('an ERC-1271 signer that does not accept is dropped; one that accepts is stored', async () => {
+    const c = await openAgent(33, ownerC, 'carol');
+    // A's address has code; the signature is not A's ECDSA signature: only the account can accept.
+    const refused = await tampered(async (body, { a, rec }) => {
+      chain.contractAccounts.set(a.id.toLowerCase(), false);
+      body.signature = await signRecord(c.keyStore, rec.built);
+    });
+    await expectDropped(refused);
+
+    const accepted = await tampered(async (body, { a, rec }) => {
+      chain.contractAccounts.set(a.id.toLowerCase(), true);
+      body.signature = await signRecord(c.keyStore, rec.built);
+    });
+    expect(await accepted.b.client.getProof({ envelopeId: accepted.envelopeId })).toMatchObject({
+      recordId: accepted.rec.recordId,
+    });
+  });
+
+  it.each([
+    ['record without signature', (body: ProofBodyIn) => void delete body.signature],
+    ['signature without record', (body: ProofBodyIn) => void delete body.record],
+    [
+      'an unknown key in the body',
+      (body: ProofBodyIn) => void (body.notary = `0x${'9a'.repeat(20)}`),
+    ],
+    [
+      'an unknown key in record',
+      (body: ProofBodyIn) =>
+        void ((body.record as Record<string, unknown>).txHash = `0x${'7e'.repeat(32)}`),
+    ],
+    [
+      'an over-long signature',
+      (body: ProofBodyIn) => void (body.signature = `0x${'e7'.repeat(4097)}`),
+    ],
+  ])(
+    'a malformed body (%s) is refused as a malformed payload: nothing stored',
+    async (_l, change) => {
+      const { a, b } = await twoAgents();
+      const envelopeId = await sendText(a, b);
+      const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+      const body = bodyOf(rec, envelopeId);
+      change(body);
+      const reports = await sendRawProof(a, b, body);
+      expect(reports).toMatchObject([{ outcome: 'dropped' }]);
+      expect(await receipts(b)).toEqual([]);
+      expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+      expect(await pendingRows(b)).toEqual([]);
+    },
+  );
+
+  it('no log line or refusal carries the Record, signature or salt (I-7)', async () => {
+    const out = await tampered((body) => {
+      (body.record as RecordJson).maxFee = '1';
+    });
+    const text = [...out.a.lines, ...out.b.lines].join('\n');
+    expect(logged(out.b, 'proof_mismatch')).toBe(true);
+    expect(text).not.toContain(out.rec.signature.slice(2, 40));
+    expect(text).not.toContain(out.rec.salt.slice(2, 40));
+    expect(text).not.toContain(out.rec.record.nonce);
+    expect(await out.b.client.exportProofPack({ envelopeId: out.envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'NOT_RECORDED',
+    });
+  });
+});
+
+describe('an older sender without the signed Record (04 §3.4, D-107)', () => {
+  it('is accepted as before, receipts work, and recipient export returns RECORD_UNAVAILABLE', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await recordDirectly(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    await sendProofEnvelope(a, b, { envelopeId, recordId: rec.recordId, salt: rec.salt });
+    expect(await receipts(b)).toEqual([expect.objectContaining({ type: 1 })]);
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'ok',
+    });
+    expect(await b.client.exportProofPack({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'RECORD_UNAVAILABLE',
+    });
+  });
+});
+
+describe('a failed chain read keeps the body pending (04 §3.4, M1-7g-b)', () => {
+  it('pending with no receipt; after the read recovers the next sync checks and stores it', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    chain.readsFail = true;
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: Hex };
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+    expect(await pendingRows(b)).toHaveLength(1);
+    expect(logged(b, 'proof_mismatch')).toBe(false);
+
+    // Still failing at the next sync: still pending, nothing signed.
+    await b.client.proofs.processInbound([]);
+    expect(await pendingRows(b)).toHaveLength(1);
+    expect(await receipts(b)).toEqual([]);
+
+    chain.readsFail = false;
+    await b.client.proofs.processInbound([]);
+    expect(await pendingRows(b)).toEqual([]);
+    expect(await b.client.getProof({ envelopeId })).toMatchObject({ recordId: proof.recordId });
+    expect(await receipts(b)).toEqual([expect.objectContaining({ type: 1 })]);
+    expect((await b.client.exportProofPack({ envelopeId })).status).toBe('ok');
+  });
+
+  it('a definite mismatch found after the read recovers drops it as proof_mismatch', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { put: false });
+    chain.put({ ...rec.built.record, deadline: rec.built.record.deadline + 1 });
+    chain.readsFail = true;
+    await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(await pendingRows(b)).toHaveLength(1);
+    expect(logged(b, 'proof_mismatch')).toBe(false);
+    chain.readsFail = false;
+    await b.client.proofs.processInbound([]);
+    expect(await proofRows(b)).toEqual([]);
+    expect(logged(b, 'proof_mismatch')).toBe(true);
+    expect(await receipts(b)).toEqual([]);
+  });
+
+  it('past 7 days a pending body is dropped as proof_unchecked', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    chain.readsFail = true;
+    await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(await pendingRows(b)).toHaveLength(1);
+    clock.t += 7 * 86_400 + 1;
+    await b.client.proofs.processInbound([]);
+    expect(await proofRows(b)).toEqual([]);
+    expect(logged(b, 'proof_unchecked')).toBe(true);
+    chain.readsFail = false;
+    await b.client.proofs.processInbound([]);
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+    expect(await receipts(b)).toEqual([]);
+  });
+
+  it('beyond 256 pending bodies a new one is dropped as proof_unchecked', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    // 256 bodies already pending (white-box rows standing in for 256 real ones).
+    const empty = await b.cipher.seal(
+      { table: 'proofs', column: 'salt', rowKey: JSON.stringify(['filler']) },
+      '',
+    );
+    await b.store.transaction((tx) => {
+      for (let i = 0; i < 256; i += 1) {
+        tx.insert('proofs', {
+          record_id: `pending:filler${String(i)}`,
+          envelope_id: `filler${String(i)}`,
+          chain_id: chain.config.chainId,
+          record_json: '{}',
+          tx_hash: null,
+          status: PENDING,
+          fee_token: null,
+          fee_amount: null,
+          salt: empty,
+          created_at: clock.t,
+        });
+      }
+    });
+    chain.readsFail = true;
+    await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(logged(b, 'proof_unchecked')).toBe(true);
+    expect((await pendingRows(b)).some((r) => r.envelope_id === envelopeId)).toBe(false);
+    chain.readsFail = false;
+    await b.client.proofs.processInbound([]);
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+    expect(await receipts(b)).toEqual([]);
+  });
+});
+
 // --- helpers -------------------------------------------------------------------------------------
 
 async function envelopeHashOf(agent: Agent, envelopeId: string): Promise<string> {
@@ -808,16 +1242,12 @@ async function recordDirectly(from: Agent, to: Agent, envelopeId: string, kind: 
 }
 
 /** `from` sends a `proof` envelope with this body to `to`, which processes it. */
-async function sendProofEnvelope(
-  from: Agent,
-  to: Agent,
-  body: { envelopeId: string; recordId: string; salt: string },
-) {
+async function sendProofEnvelope(from: Agent, to: Agent, body: ProofBodyIn) {
   const { built, row } = await from.client.envelopes.prepare({
     to: { contact: to.id },
     payload: {
       type: 'proof',
-      body: { ...body, chainId: chain.config.chainId },
+      body: { chainId: chain.config.chainId, ...body } as never,
       replyTo: body.envelopeId,
       files: [],
     },
@@ -862,4 +1292,109 @@ async function saltsSent(agent: Agent): Promise<string[]> {
     out.push((parseJson(text) as { body: { salt: string } }).body.salt);
   }
   return out;
+}
+
+/** A `proof` body as a test sends it: the 04 §3.4 fields, possibly tampered. */
+type ProofBodyIn = { envelopeId: string; recordId: string; salt: string } & Record<string, unknown>;
+
+interface SignedRecord {
+  readonly recordId: string;
+  readonly salt: string;
+  readonly record: RecordJson;
+  readonly signature: string;
+  readonly built: ReturnType<typeof buildRecord>;
+}
+
+/**
+ * A Record for `envelopeId` by `from` with a commitment to `to`, signed by `from`, and (unless
+ * `put: false`) put on-chain. `envelopeHash` overrides the hash (a Record of someone else's envelope).
+ */
+async function signedRecordOf(
+  from: Agent,
+  to: Agent,
+  envelopeId: string,
+  kind: number,
+  options: { readonly put?: boolean; readonly envelopeHash?: string } = {},
+): Promise<SignedRecord> {
+  const built = buildRecord({
+    chainId: chain.config.chainId,
+    notary: chain.config.contracts.notary,
+    signer: from.id,
+    envelopeHash: options.envelopeHash ?? (await envelopeHashOf(from, envelopeId)),
+    recipient: to.id,
+    kind: kind as never,
+    feeToken: USDC,
+    maxFee: FEE_UNITS,
+    deadline: clock.t + 3600,
+  });
+  const signature = await signRecord(from.keyStore, built);
+  if (options.put !== false) chain.put(built.record);
+  return {
+    recordId: built.recordId,
+    salt: built.salt!,
+    record: { ...built.record } as RecordJson,
+    signature,
+    built,
+  };
+}
+
+/** The full (M1-7g-b) `proof` body for a signed Record. */
+const bodyOf = (rec: SignedRecord, envelopeId: string): ProofBodyIn => ({
+  envelopeId,
+  recordId: rec.recordId,
+  salt: rec.salt,
+  record: { ...rec.record },
+  signature: rec.signature,
+});
+
+/** The bodies of the `proof` envelopes `agent` sent, from its own store. */
+async function proofBodiesSent(agent: Agent): Promise<ProofBodyIn[]> {
+  const rows = await agent.store.transaction((tx) =>
+    tx.select('envelopes', { direction: 'out', type: 'proof' }),
+  );
+  const out: ProofBodyIn[] = [];
+  for (const row of rows) {
+    const text = await agent.cipher.open(
+      { table: 'envelopes', column: 'payload_json', rowKey: JSON.stringify([row.envelope_id]) },
+      row.payload_json!,
+    );
+    out.push((parseJson(text) as unknown as { body: ProofBodyIn }).body);
+  }
+  return out;
+}
+
+/** The secp256k1 group order. */
+const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+
+/** The same ECDSA signature in its non-canonical high-s form (s → n − s, v flipped). */
+function highS(signature: string): string {
+  const r = signature.slice(2, 66);
+  const s = BigInt(`0x${signature.slice(66, 130)}`);
+  const v = Number.parseInt(signature.slice(130, 132), 16);
+  const flipped = (v === 27 ? 28 : 27).toString(16);
+  return `0x${r}${(SECP256K1_N - s).toString(16).padStart(64, '0')}${flipped}`;
+}
+
+/** A `proof` envelope with this body exactly, built outside the core's payload checks. */
+async function sendRawProof(from: Agent, to: Agent, body: ProofBodyIn) {
+  const envelope = await craft({
+    signer: await agentSigner(from.keyStore),
+    entries: [
+      { pk: await agentEnc(to) },
+      { pk: await ownerEnc(to.owner) },
+      { pk: await ownerEnc(from.owner) },
+      { pk: await agentEnc(from) },
+    ],
+    payload: {
+      type: 'proof',
+      body: { chainId: chain.config.chainId, ...body },
+      replyTo: body.envelopeId,
+      files: [],
+    } as never,
+    createdAt: clock.t,
+  });
+  await to.client.envelopes.receive({ envelope });
+  const reports = await to.client.envelopes.processReceived();
+  await to.client.proofs.processInbound(reports);
+  return reports;
 }

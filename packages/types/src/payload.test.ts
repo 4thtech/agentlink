@@ -39,6 +39,7 @@ import {
   KEY32,
   payloads,
   policySetAction,
+  record,
   RELAYS,
   SHA,
   signed,
@@ -419,6 +420,66 @@ describe('proof body (04 §3.4: {envelopeId, chainId, recordId, salt})', () => {
     ['envelopeId 32 bytes', ['body', 'envelopeId'], KEY32],
   ] as const)('rejects %s', (_l, path, value) => {
     expectReject(payloadSchema, edit(p(), path, value));
+  });
+});
+
+// M1-7g-b (D-107; 04 §3.4): the body also carries the signed Record and its signature, together or
+// not at all; unknown keys stay refused, in the body and in `record`.
+describe('proof body with the signed Record (04 §3.4, D-107)', () => {
+  const signedBody = () => ({
+    ...payloads().proof,
+    body: { ...payloads().proof.body, record: record(), signature: CARD_SIG },
+  });
+
+  it('accepts the body with record and signature, and still without both (an older sender)', () => {
+    expectRoundTrip(payloadSchema, signedBody());
+    expectRoundTrip(payloadSchema, payloads().proof);
+  });
+
+  it('accepts an ERC-1271 signature of any even length up to 4 096 bytes', () => {
+    expectRoundTrip(payloadSchema, edit(signedBody(), ['body', 'signature'], hex0x(4096, 'e7')));
+    expectRoundTrip(payloadSchema, edit(signedBody(), ['body', 'signature'], hex0x(1, 'e7')));
+  });
+
+  it.each([
+    ['record without signature', ['body', 'signature'], DELETE],
+    ['signature without record', ['body', 'record'], DELETE],
+    ['unknown key in record', ['body', 'record', 'txHash'], B32],
+    ['missing record field', ['body', 'record', 'nonce'], DELETE],
+    ['record signer uppercase', ['body', 'record', 'signer'], `0x${'AB'.repeat(20)}`],
+    ['record kind 7', ['body', 'record', 'kind'], 7],
+    ['record maxFee number', ['body', 'record', 'maxFee'], 100000],
+    ['record nonce 79 digits', ['body', 'record', 'nonce'], '1'.repeat(79)],
+    ['record envelopeHash bare hex', ['body', 'record', 'envelopeHash'], B32.slice(2)],
+    ['record null', ['body', 'record'], null],
+    ['signature over 4 096 bytes', ['body', 'signature'], hex0x(4097, 'e7')],
+    ['signature empty', ['body', 'signature'], '0x'],
+    ['signature odd length', ['body', 'signature'], `${CARD_SIG}0`],
+    ['signature uppercase', ['body', 'signature'], CARD_SIG.toUpperCase()],
+    ['signature bare hex', ['body', 'signature'], CARD_SIG.slice(2)],
+    ['signature base64url', ['body', 'signature'], KEY32],
+    ['unknown key next to them', ['body', 'notary'], hex0x(20, '9a')],
+  ] as const)('rejects %s', (_l, path, value) => {
+    expectReject(payloadSchema, edit(signedBody(), path, value));
+  });
+
+  it('the largest allowed body fits the 17 136-byte payload limit (04 §3.1.1)', () => {
+    const max78 = (2n ** 256n - 1n).toString();
+    expect(max78).toHaveLength(78);
+    const largest = {
+      ...signedBody(),
+      body: {
+        ...signedBody().body,
+        record: { ...record(), maxFee: max78, nonce: max78, deadline: 2 ** 53 - 1 },
+        signature: hex0x(4096, 'e7'),
+        chainId: 2 ** 53 - 1,
+      },
+    };
+    expectAccept(payloadSchema, largest);
+    // JCS of an ASCII-only object has the length of its JSON text; key order does not change it.
+    const size = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
+    expect(size(largest.body)).toBeLessThan(9_300);
+    expect(size(largest)).toBeLessThanOrEqual(17_136);
   });
 });
 
