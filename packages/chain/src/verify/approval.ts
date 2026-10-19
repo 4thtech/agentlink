@@ -17,6 +17,12 @@
 // 5. where the signer's card is in the pack, the owner key it names must agree: it is the
 //    approval's `owner` when the signer approved, and the scope's `counterparty.ownerKey` when the
 //    recipient did.
+// 6. a signer-side scope does not name its record (a firm offer answers nothing), so it is bound to
+//    this record only through the disclosed content: when the content opened, its terms must hash
+//    to the scope's `termsHash`, and an accept must answer the scope's `answers.envelopeId`;
+//    otherwise the approval is refused. Without opened content it is reported with
+//    `recordBound: false`, never as an approval of this record. A recipient-side scope names the
+//    record's envelope hash (step 4), so it is `recordBound: true`.
 // The time checks of 04 §2.5.1 (expiry, nonce) applied once, when the core used the approval;
 // they are not repeated here. `ownerBound` says whether the pack shows whose owner key signed: only
 // the signer's card can, so a recipient's approval is never bound by the pack alone.
@@ -33,7 +39,12 @@ import {
   taggedHash,
   verifyTermsHash,
 } from '@4thtech-io/crypto';
-import { RECORD_KINDS, type AgentCard, type CommitmentDecision } from '@4thtech-io/types';
+import {
+  RECORD_KINDS,
+  type AgentCard,
+  type CommitmentDecision,
+  type Payload,
+} from '@4thtech-io/types';
 import type { ParsedProofPack } from './parse.js';
 
 export type OwnerApprovalResult =
@@ -56,6 +67,13 @@ export type OwnerApprovalResult =
       readonly ownerKey: string;
       /** True only when the signer's card in the pack names this owner key. */
       readonly ownerBound: boolean;
+      /**
+       * True when the pack shows that the approval is for this record: the recipient's scope names
+       * the record's envelope, or the signer's disclosed content carries the approved terms (and,
+       * for an accept, answers the approved envelope). False: the approval is genuine but may
+       * belong to another record of the same signer; never present it as approving this record.
+       */
+      readonly recordBound: boolean;
     };
 
 const NONE: OwnerApprovalResult = Object.freeze({ status: 'none' });
@@ -78,13 +96,15 @@ const RECIPIENT_KINDS: Readonly<Partial<Record<CommitmentDecision, readonly numb
 const bare = (key: string): string => (key.startsWith('0x') ? key.slice(2) : key);
 
 /**
- * Verifies the pack's `ownerApproval` against its record (already matched to the chain) and the
- * signer's card (already checked, or null). Returns the report, or null when the approval is not
- * valid for this record. Never throws.
+ * Verifies the pack's `ownerApproval` against its record (already matched to the chain), the
+ * signer's card (already checked, or null) and the disclosed payload when the content opened (07 §8
+ * steps 1 to 6 and the kind check passed), else null. Returns the report, or null when the approval
+ * is not valid for this record. Never throws.
  */
 export function verifyOwnerApproval(
   pack: ParsedProofPack,
   signerCard: AgentCard | null,
+  payload: Payload | null,
 ): OwnerApprovalResult | null {
   const approval = pack.ownerApproval;
   if (approval === null) return NONE;
@@ -109,6 +129,7 @@ export function verifyOwnerApproval(
     const record = pack.record;
     const cardOwner = signerCard === null ? null : bare(signerCard.ownerNostr);
     let approver: 'signer' | 'recipient';
+    let recordBound: boolean;
     if (scope.agentId === record.signer) {
       approver = 'signer';
       if (!(SIGNER_KINDS[scope.decision] ?? []).includes(record.kind)) return null;
@@ -118,6 +139,18 @@ export function verifyOwnerApproval(
       }
       // 5. The signer's card names the owner that signed.
       if (cardOwner !== null && cardOwner !== body.owner) return null;
+      // 6. Bound to this record only through its disclosed content.
+      recordBound = false;
+      if (payload !== null) {
+        const expected = scope.decision === 'offer' ? 'offer' : 'accept';
+        if (payload.type !== expected) return null;
+        const terms = (payload.body as { terms?: unknown }).terms;
+        if (!verifyTermsHash(terms, scope.termsHash)) return null;
+        if (scope.decision === 'accept') {
+          if (scope.answers === null || payload.replyTo !== scope.answers.envelopeId) return null;
+        }
+        recordBound = true;
+      }
     } else if (scope.counterparty.agentId === record.signer) {
       approver = 'recipient';
       if (!(RECIPIENT_KINDS[scope.decision] ?? []).includes(record.kind)) return null;
@@ -128,6 +161,7 @@ export function verifyOwnerApproval(
       if (pack.recipient !== undefined && pack.recipient.evm !== scope.agentId) return null;
       // 5. The scope names the signer's owner as the card does.
       if (cardOwner !== null && cardOwner !== scope.counterparty.ownerKey) return null;
+      recordBound = true;
     } else {
       return null;
     }
@@ -139,6 +173,7 @@ export function verifyOwnerApproval(
       version: scope.version,
       ownerKey: body.owner,
       ownerBound: approver === 'signer' && cardOwner !== null,
+      recordBound,
     });
   } catch {
     return null;

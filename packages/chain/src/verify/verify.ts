@@ -513,10 +513,6 @@ async function verifyParsed(
       recipient = Object.freeze({ evm: pack.recipient.evm as Hex });
     }
 
-    // 3b. The owner approval, against this record and the signer's card (approval.ts; M1-4d-c).
-    const ownerApproval = verifyOwnerApproval(pack, signerCard);
-    if (ownerApproval === null) return invalid('owner_approval_invalid');
-
     // 4. Receipts came from RecordState (matchState): each one the pack lists is there, on time,
     // and the flags agree with the times (D-97). The `txHash` the pack names for each is checked
     // with one transaction-receipt read; a mismatch is a non-fatal finding (receipts.ts).
@@ -576,6 +572,13 @@ async function verifyParsed(
         });
       }
     }
+
+    // 6. The owner approval, against this record, the signer's card and the opened content
+    // (approval.ts; M1-4d-c): a signer-side approval is bound to this record only through it.
+    const opened =
+      content.status === 'verified' || content.status === 'unattributed' ? content.payload : null;
+    const ownerApproval = verifyOwnerApproval(pack, signerCard, opened);
+    if (ownerApproval === null) return invalid('owner_approval_invalid');
 
     const contentVerified = isAttributed(content);
     return Object.freeze({
