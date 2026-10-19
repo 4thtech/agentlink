@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { nodeProofPacks } from './proofs.js';
+import { nodeProofPacks, nodeProofs } from './proofs.js';
 
 let home: string;
 const FOLDERS = { exportFolder: '~/AgentLink/Proofs', inboxFolder: '~/AgentLink/Inbox' };
@@ -145,5 +145,13 @@ describe('savePack', () => {
         reason: 'folder',
       });
     }
+  });
+});
+
+describe('nodeProofs: the default chain set (M1-3j-b)', () => {
+  it('does not route automatic selection to Gnosis Chiado (10200) before its smoke test and faucet', () => {
+    const proofs = nodeProofs();
+    const ids = proofs?.platform.chains.map((c) => c.config.chainId) ?? [];
+    expect(ids).toEqual([84532]);
   });
 });

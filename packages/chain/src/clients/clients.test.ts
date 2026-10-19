@@ -14,6 +14,7 @@ import {
   MAX_USER_RPC_URLS,
   NOTARY_CLIENT_ABI,
   RPC_READ_METHODS,
+  autoSelectableChains,
   chainRegistry,
   checkRpcUrl,
   createReadClient,
@@ -118,6 +119,12 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
     expect(c.feeTokens.map((t) => [t.symbol, t.address, t.decimals])).toEqual([
       ['NATIVE', null, 18],
     ]);
+  });
+
+  it('keeps Chiado out of automatic selection until its smoke test and faucet are in place (M1-3j-b)', () => {
+    expect(autoSelectableChains().map((c) => c.chainId)).toEqual([84532]);
+    expect(selectChain().chainId).toBe(84532);
+    expect(getChainConfig(10200)).toBeDefined(); // data and an explicit override stay available
   });
 
   it('advertises no EIP-3009 deposit while the vault refuses it (M1-3c; FA M-1)', () => {
