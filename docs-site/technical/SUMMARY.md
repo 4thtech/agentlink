@@ -32,6 +32,7 @@
 * [Crypto suites](reference/crypto-suites.md)
 * [Proof pack format](reference/proof-pack-format.md)
 * [Contracts](reference/contracts.md)
+* [Networks and contract addresses](reference/networks-and-contracts.md)
 * [Test vectors](reference/test-vectors.md)
 
 ## Project

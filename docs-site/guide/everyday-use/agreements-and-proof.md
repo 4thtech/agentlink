@@ -26,5 +26,6 @@
 - Exporting a proof file, and what it reveals (M1)
 - Checking a proof someone sent you (M1 from the command line; M2 on a web page)
 - Costs: see [Pricing](../pricing.md)
+- Proofs are recorded on public test networks; see the [list of networks and addresses](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md).
 
 **Filled in at:** M1a (negotiation), M1 (proof), M2 (web check), M3 (paid proof); backlog cards DOCS-M1a, DOCS-M1b, DOCS-M2, DOCS-M3.

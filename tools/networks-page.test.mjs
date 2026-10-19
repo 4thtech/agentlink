@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const pagePath = join(root, 'docs-site/technical/reference/networks-and-contracts.md');
-const generated = readFileSync(join(root, 'packages/occ-v2-abi/src/addresses.generated.ts'), 'utf8');
+const generated = readFileSync(
+  join(root, 'packages/occ-v2-abi/src/addresses.generated.ts'),
+  'utf8',
+);
 
 const records = [...generated.matchAll(/'(\d+)': \{([\s\S]*?)\n {2}\},/g)].map((m) => ({
   chainId: m[1],
@@ -15,7 +18,9 @@ const records = [...generated.matchAll(/'(\d+)': \{([\s\S]*?)\n {2}\},/g)].map((
 }));
 const field = (body, key) => new RegExp(`\\b${key}: '([^']*)'`).exec(body)?.[1];
 const packageAddresses = records.flatMap(({ body }) =>
-  [...body.matchAll(/\b(?:notary|vault|manager|hex): '([0-9a-fA-F]{40})'/g)].map((m) => `0x${m[1]}`),
+  [...body.matchAll(/\b(?:notary|vault|manager|hex): '([0-9a-fA-F]{40})'/g)].map(
+    (m) => `0x${m[1]}`,
+  ),
 );
 
 describe('networks-and-contracts page', () => {

@@ -184,6 +184,7 @@ Technical terms (OCC v2, MCP, envelope, HPKE, Nostr, relay, notary, submitter, t
 
 - Public user docs: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md
 - Technical docs: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
+- Networks and contract addresses (test networks; Base Sepolia live, Gnosis Chiado planned, no mainnet): https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md
 - Pricing page: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/pricing.md and the fee specification https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md
 - Project README (status and roadmap): https://github.com/4thtech/agentlink/blob/main/README.md
 - Changelog: https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md

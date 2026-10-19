@@ -68,7 +68,7 @@ Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0; curre
 
 ## Protocol OCC v2
 
-OCC v2 (4thTech On-Chain Communication, version 2) is the open protocol under AgentLink. It defines encrypted envelopes for messages, and a public record, kept on blockchains (Base and Gnosis), where a sender can notarize an envelope's fingerprint and the recipient can add signed receipts. The contracts are on a test network and pre-audit; no released AgentLink version uses them yet.
+OCC v2 (4thTech On-Chain Communication, version 2) is the open protocol under AgentLink. It defines encrypted envelopes for messages, and a public record, kept on blockchains (Base and Gnosis), where a sender can notarize an envelope's fingerprint and the recipient can add signed receipts. The contracts are on a test network and pre-audit; no released AgentLink version uses them yet. Networks and addresses: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md (Base Sepolia live, Gnosis Chiado planned, no mainnet).
 
 ### What the public record holds
 
