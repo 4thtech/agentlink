@@ -1112,7 +1112,9 @@ describe('verifyProofPack: disclosed content key, in the 07 §8 order (G-46, D-6
         reason: c.reason,
         message: proofFailureMessage(c.reason as never),
       });
-      expect(result.receipts).toEqual([{ type: 'DELIVERED', at: iso(DELIVERED_AT) }]);
+      expect(result.receipts).toEqual([
+        { type: 'DELIVERED', at: iso(DELIVERED_AT), tx: { status: 'not_checked' } },
+      ]);
       expectNoEcho(result, 'Hello from', MESSAGE_CEK_HEX, b64(MESSAGE_CEK_HEX));
     });
   }
@@ -1831,6 +1833,16 @@ describe('verifyProofPack: receipt txHash check (M1-4d-c; a transaction receipt 
     expectNoEcho(result);
   });
 
+  it('an answer that is not a transaction receipt is not checked (the RPC, not the pack)', async () => {
+    for (const answer of ['nonsense', { status: '0x2', logs: [] }, { status: '0x1' }]) {
+      const f = await eoaFixture();
+      const { reader } = chainWith(f, { txReceipts: new Map([[TX_HASH, answer]]) });
+      const result = await verify(f.pack, [reader]);
+      expect(result.valid && result.receipts[0]?.tx).toEqual({ status: 'not_checked' });
+      expect(result.valid && result.notices).toEqual([]);
+    }
+  });
+
   it('a chain receipt the pack does not list is not checked and is not read', async () => {
     const f = await eoaFixture();
     f.state.receiptFlags = 0b0011;
@@ -1849,7 +1861,7 @@ describe('verifyProofPack: receipt txHash check (M1-4d-c; a transaction receipt 
   const MISMATCH_NOTICE = {
     code: 'receipt_tx_mismatch',
     message:
-      'A receipt in the proof points to a record on the proof network that does not show it. The receipt itself is on the proof network.',
+      "The proof's link for a receipt does not lead to that receipt. The receipt itself is on the proof network.",
   };
   const mismatches: { name: string; receipt: (recordId: string) => unknown }[] = [
     { name: 'a reverted transaction', receipt: (id) => txReceipt([recordedLog(id)], '0x0') },
@@ -1897,7 +1909,6 @@ describe('verifyProofPack: receipt txHash check (M1-4d-c; a transaction receipt 
           { address: NOTARY(), topics: [], data: '0x' },
         ]),
     },
-    { name: 'an answer that is not a receipt object', receipt: () => 'nonsense' },
   ];
   for (const c of mismatches) {
     it(`${c.name}: mismatch, reported with a non-fatal code, the verdict unchanged`, async () => {
@@ -2040,7 +2051,10 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
     };
   }
 
-  const approvalOf = (action: { context: { scope: { agentId: string } } }, sig: string) => ({
+  const approvalOf = <A extends { context: { scope: { agentId: string } } }>(
+    action: A,
+    sig: string,
+  ) => ({
     signed: { body: decideBody(action, action.context.scope.agentId), sig },
     action,
   });
