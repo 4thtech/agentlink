@@ -829,6 +829,17 @@ describe('verifyProofPack: 65-byte smart-account signatures (IR-M1-4d-1 L-2)', (
     expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
   });
 
+  it('an EOA signature in its high-s twin is refused (canonical form on the ECDSA path)', async () => {
+    const f = await eoaFixture();
+    const sig = f.pack.signature as string;
+    const n = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+    const high = (n - BigInt(`0x${sig.slice(66, 130)}`)).toString(16).padStart(64, '0');
+    const v = sig.endsWith('1b') ? '1c' : '1b';
+    f.pack.signature = `${sig.slice(0, 66)}${high}${v}`;
+    const { reader } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
+  });
+
   it('still refuses a 65-byte signature that is not lowercase hex', async () => {
     const f = erc1271Fixture(SAFE_STYLE.replace('0a', '0A'));
     const { reader, fetchFn } = chainWith(f);
@@ -843,6 +854,28 @@ describe('verifyProofPack: finality (IR-M1-4d-1 M-3)', () => {
     const { reader, calls } = chainWith(f, { finalizedRecords: new Map() });
     const result = await verify(f.pack, [reader]);
     expect(result.valid && result.finality).toBe('latest');
+    expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
+  });
+
+  it('a receipt newer than the finalized block verifies at latest (IR-M1-4d-2 R2-M-1)', async () => {
+    const f = await eoaFixture();
+    const finalState = { ...f.state, receiptAt: [0n, 0n, 0n, 0n] as const };
+    const { reader, calls } = chainWith(f, {
+      finalizedRecords: new Map([[f.recordId, finalState]]),
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.finality).toBe('latest');
+    expect(result.valid && result.receipts).toEqual([{ type: 'DELIVERED', at: iso(DELIVERED_AT) }]);
+    expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
+  });
+
+  it('a receipt missing at both blocks still fails receipt_not_on_chain', async () => {
+    const f = await eoaFixture();
+    const bare = { ...f.state, receiptAt: [0n, 0n, 0n, 0n] as const };
+    const { reader, calls } = chainFor(base(), {
+      records: new Map([[f.recordId, bare]]),
+    });
+    expectFailure(await verify(f.pack, [reader]), 'receipt_not_on_chain');
     expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
   });
 

@@ -200,20 +200,13 @@ const exists = (state: RecordState): boolean =>
   state.signer.toLowerCase() !== ZERO_ADDRESS && state.timestamp !== 0n;
 
 /**
- * The record at the `finalized` block where the chain answers that tag (07 §6.1 `finalizedTag`), so a
- * reorg cannot remove it; otherwise, or while it is not finalized yet, at `latest`, and the result
- * says which (IR-M1-4d-1 M-3).
+ * The blocks to read the record at, in order (IR-M1-4d-1 M-3, IR-M1-4d-2 R2-M-1): `finalized` where
+ * the chain answers that tag (07 §6.1 `finalizedTag`), so a reorg cannot remove what it shows; then
+ * `latest`, for a record or a receipt that is not final yet. The first block at which the pack
+ * matches the chain wins, and the result reports which one.
  */
-async function readRecord(
-  chain: VerifyChain,
-  recordId: Hex,
-): Promise<{ state: RecordState; finality: Finality }> {
-  if (chain.config.finalizedTag) {
-    const state = await readRecordAt(chain, recordId, 'finalized');
-    if (exists(state)) return { state, finality: 'finalized' };
-  }
-  return { state: await readRecordAt(chain, recordId, 'latest'), finality: 'latest' };
-}
+const blockTags = (chain: VerifyChain): readonly Finality[] =>
+  chain.config.finalizedTag ? ['finalized', 'latest'] : ['latest'];
 
 /**
  * OpenZeppelin `SignatureChecker.isValidSignatureNow` (05 §3.2): a canonical 65-byte ECDSA signature
@@ -256,6 +249,49 @@ async function checkSignature(
   return typeof word === 'string' && word.toLowerCase() === ERC1271_MAGIC_WORD ? 'contract' : null;
 }
 
+interface OnChainMatch {
+  readonly timestamp: string;
+  readonly finality: Finality;
+  readonly receipts: readonly VerifiedReceipt[];
+}
+
+/**
+ * Compares the pack with the record state read at one block: existence, the record fields, and the
+ * receipts (05 §3.3: every one the pack lists must be stored, at the same second). Returns the
+ * failure code, or the chain's timestamp and receipts.
+ */
+function matchState(
+  state: RecordState,
+  pack: ParsedProofPack,
+  structHash: string,
+  finality: Finality,
+): OnChainMatch | ProofPackFailure {
+  const record = pack.record;
+  if (!exists(state)) return 'record_not_found';
+  const timestamp = iso(state.timestamp);
+  if (timestamp === null || state.receiptAt.some((at) => at > MAX_TIMESTAMP)) {
+    return 'malformed_record';
+  }
+  if (state.signer.toLowerCase() !== record.signer) return 'signer_mismatch';
+  if (state.kind !== record.kind) return 'kind_mismatch';
+  if (state.envelopeHash.toLowerCase() !== record.envelopeHash) return 'envelope_hash_mismatch';
+  if (state.recipientCommitment.toLowerCase() !== record.recipientCommitment) {
+    return 'commitment_mismatch';
+  }
+  if (state.recordStructHash.toLowerCase() !== structHash) return 'record_mismatch';
+  const receipts: VerifiedReceipt[] = [];
+  RECEIPT_TYPE_NAMES.forEach((type, i) => {
+    const at = state.receiptAt[i] ?? 0n;
+    if (at > 0n) receipts.push(Object.freeze({ type, at: iso(at) as string }));
+  });
+  for (const claimed of pack.receipts) {
+    const onChain = receipts.find((r) => r.type === claimed.type);
+    if (!onChain) return 'receipt_not_on_chain';
+    if (onChain.at !== claimed.at) return 'receipt_mismatch';
+  }
+  return { timestamp, finality, receipts };
+}
+
 async function verifyParsed(
   pack: ParsedProofPack,
   chains: readonly VerifyChain[],
@@ -274,21 +310,20 @@ async function verifyParsed(
 
   try {
     // 1. The record as the chain holds it (05 §3.3: every field is checkable from getRecord alone).
-    const { state, finality } = await readRecord(chain, recordId);
-    if (!exists(state)) return invalid('record_not_found');
-    const timestamp = iso(state.timestamp);
-    if (timestamp === null || state.receiptAt.some((at) => at > MAX_TIMESTAMP)) {
-      return invalid('malformed_record');
+    // A mismatch at `finalized` may only mean the record or a receipt is newer than that block:
+    // read again at `latest`, and fail only when the pack does not match there either.
+    let matched: OnChainMatch | undefined;
+    let failure: ProofPackFailure = 'record_not_found';
+    for (const tag of blockTags(chain)) {
+      const result = matchState(await readRecordAt(chain, recordId, tag), pack, structHash, tag);
+      if (typeof result === 'string') failure = result;
+      else {
+        matched = result;
+        break;
+      }
     }
-    if (state.signer.toLowerCase() !== signer) return invalid('signer_mismatch');
-    if (state.kind !== record.kind) return invalid('kind_mismatch');
-    if (state.envelopeHash.toLowerCase() !== record.envelopeHash) {
-      return invalid('envelope_hash_mismatch');
-    }
-    if (state.recipientCommitment.toLowerCase() !== record.recipientCommitment) {
-      return invalid('commitment_mismatch');
-    }
-    if (state.recordStructHash.toLowerCase() !== structHash) return invalid('record_mismatch');
+    if (!matched) return invalid(failure);
+    const { timestamp, finality, receipts } = matched;
 
     // 2. The signer's signature over the EIP-712 digest under this chain's OCC v2 domain.
     const signerType = await checkSignature(chain, signer, hashes.digest, pack.signature);
@@ -305,17 +340,7 @@ async function verifyParsed(
       recipient = Object.freeze({ evm: pack.recipient.evm as Hex });
     }
 
-    // 4. Receipts come from RecordState; each one the pack lists must be there, at the same time.
-    const receipts: VerifiedReceipt[] = [];
-    RECEIPT_TYPE_NAMES.forEach((type, i) => {
-      const at = state.receiptAt[i] ?? 0n;
-      if (at > 0n) receipts.push(Object.freeze({ type, at: iso(at) as string }));
-    });
-    for (const claimed of pack.receipts) {
-      const onChain = receipts.find((r) => r.type === claimed.type);
-      if (!onChain) return invalid('receipt_not_on_chain');
-      if (onChain.at !== claimed.at) return invalid('receipt_mismatch');
-    }
+    // 4. Receipts came from RecordState (matchState): each one the pack lists is there, on time.
 
     // 5. Content, only with a disclosed key, in the 07 §8 order.
     let content: ProofContentResult = Object.freeze({ status: 'not_disclosed' });

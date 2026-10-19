@@ -136,7 +136,9 @@ def decode(path, value):
         if not re.fullmatch(r"0x([0-9a-f]{2})+", value):
             raise ValueError("not canonical hex")
         raw = bytes.fromhex(value[2:])
-        if len(raw) == 65 or path in EOA_ONLY:
+        # 04 §2.4.1: only signatures checked by ECDSA recovery (EOA_ONLY) must be canonical; a Record,
+        # Receipt or proof-pack signature may be an ERC-1271 one of any form, 65 bytes included.
+        if path in EOA_ONLY:
             r, s, v_byte = int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:64], "big"), raw[64:]
             if len(raw) != 65 or not 1 <= r < N or not 1 <= s <= N // 2 or v_byte not in (b"\x1b", b"\x1c"):
                 raise ValueError("not a canonical ECDSA signature")
@@ -260,7 +262,7 @@ def build():
     case("decode-proof-pack-signature-erc1271", "as an ERC-1271 signature of another length (0x + even hex)", "ProofPack.signature", "0x" + (v.sha256(b"encodings/erc1271") * 3).hex(), True)
     case("reject-proof-pack-signature-odd-hex", "with an odd number of hex digits", "ProofPack.signature", e[:-1], False)
     case("reject-proof-pack-signature-empty", "empty after 0x", "ProofPack.signature", "0x", False)
-    case("reject-proof-pack-signature-high-s", "as a 65-byte signature with a high s", "ProofPack.signature", "0x" + (r + s_high + b"\x1c").hex(), False)
+    case("decode-proof-pack-signature-erc1271-high-s", "as a 65-byte ERC-1271 signature in a non-canonical form (a high s): only ECDSA recovery needs the canonical form", "ProofPack.signature", "0x" + (r + s_high + b"\x1c").hex(), True)
     for case_id, value in [("zero", "0"), ("max", str(2**256 - 1))]:
         case(f"decode-uint256-{case_id}", f"= {case_id}", "Record.maxFee", value, True)
     for case_id, value, why in [
