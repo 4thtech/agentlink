@@ -35,7 +35,13 @@ describe('AgentLinkClient.create', () => {
   it('exposes no owner operation that takes presence: owner flows pass an unlocked session', () => {
     // I-4, D-54: presence is collected by the owner surface, never by the core or an MCP tool.
     const proto = Object.getOwnPropertyNames(AgentLinkClient.prototype);
-    expect(proto.some((name) => /unlock|presence|export/i.test(name))).toBe(false);
+    // The one approved exception: 07 §2 names `client.exportProofPack` (M1-7g). It exports a proof
+    // pack, never a key; the content key in it needs the owner's approval (06 §3).
+    const EXPORT_ALLOWED: readonly string[] = ['exportProofPack'];
+    expect(
+      proto.some((name) => !EXPORT_ALLOWED.includes(name) && /unlock|presence|export/i.test(name)),
+    ).toBe(false);
+    expect(proto.filter((name) => /export/i.test(name))).toEqual(['exportProofPack']);
   });
 
   it('close() closes the transport once and is safe to call again', async () => {

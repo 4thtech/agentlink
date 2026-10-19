@@ -138,6 +138,11 @@ export interface SyncDeps {
   readonly ownerActions: OwnerActions;
   readonly inbox: InboxService;
   readonly acks: DeliveryAcks;
+  /**
+   * M1-7g (07 §2.1 step 4): checks each new `proof` envelope on-chain and signs the receipts the
+   * policy and an approved accept allow. Runs after processing; never throws.
+   */
+  readonly proofs?: { processInbound(reports: readonly InboundReport[]): Promise<number> };
 }
 
 /**
@@ -294,6 +299,7 @@ export class SyncService {
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([contactId, dropped]) => ({ contactId, dropped }));
     const acksSent = await this.#deps.acks.sendFor(reports);
+    await this.#deps.proofs?.processInbound(reports);
     const newIds = reports
       .filter((r) => r.outcome === 'ok' && r.contactId !== undefined && r.envelopeId !== undefined)
       .map((r) => r.envelopeId as string);
@@ -367,6 +373,7 @@ export class SyncService {
         try {
           reports = await this.#deps.envelopes.processReceived();
           await this.#deps.acks.sendFor(reports);
+          await this.#deps.proofs?.processInbound(reports);
         } catch {
           // Rows stay `received` for the next run or pass (07 §3.2); fixed message only (I-7).
           log.warn('live processing failed', {});

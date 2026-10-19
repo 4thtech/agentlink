@@ -193,7 +193,11 @@ export const TABLES = {
     },
     primaryKey: ['envelope_id', 'idx'],
   },
-  // 07 §3, §3.5. One signed Record per row.
+  // 07 §3, §3.5. One signed Record per row. M1-7g, without a schema change: `status` also marks
+  // a record a contact made for this agent (`received`: the checked on-chain view, salt `enc`), a
+  // signed Receipt kept for resending (`receipt_*`, keyed `<recordId>:<receiptType>` as the
+  // submitter item ID, 07 §7, with an empty sealed salt) and a `proof` envelope waiting for its
+  // message (`awaiting`, keyed `await:<envelope id>`, bounded in number and age).
   proofs: {
     columns: {
       record_id: id,
