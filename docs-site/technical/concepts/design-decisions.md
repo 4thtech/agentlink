@@ -113,11 +113,11 @@ Until agent-card proof-of-possession is built (its own card, M1-4d-d), a proof p
 
 **Availability.** In effect in the verifier (card M1-4d-b, merged). Proof of possession is specified next and built in card M1-4d-d.
 
-### Proof of possession for the sender's card (M1-4d-d, proposed)
+### Proof of possession for the sender's card (M1-4d-d, D-102)
 
-A pack will confirm its sender only when both of the agent's keys have signed its card: the agent's EVM key (`cardAgentSig`, the same signature the agent already gives when it pairs) and its message key (`cardPop`, a BIP-340 signature over the card hash under the tag `agentlink/card-pop/v1`). Each signature fits only the card it was made for. A pack with a card but without these signatures stays `record_only` (`card_pop_missing`); a forged signature, or one taken from another card, makes the pack fail with `card_pop_invalid`; a pack with both, whose content checks out, is `verified`. A signer that is a smart-contract account is not confirmed through a card in this version. Only the agent itself can attach the signatures, for its own cards.
+A pack confirms its sender only when both of the agent's keys have signed its card: the agent's EVM key (`cardAgentSig`, the same signature the agent already gives when it pairs) and its message key (`cardPop`, a BIP-340 signature over the card hash under the tag `agentlink/card-pop/v1`). Both are made once per card (at setup, when another agent is added, and with every card update), never per pack, and each fits only the card it was made for. They travel with the card in the pairing messages and in card updates, so a recipient can export a pack for the sender's record that still confirms the sender. A pack with a card but without these signatures stays `record_only` (`card_pop_missing`); a forged signature, or one taken from another card, makes the pack fail with `card_pop_invalid`; a pack with both, whose content checks out, is `verified`. A signer that is a smart-contract account is not confirmed through a card in this version; that comes later (card M1-4d-e).
 
-**Availability.** Proposed specification (07 §8, 04 §2.9), owner confirms at merge; in development (card M1-4d-d).
+**Availability.** Decided design (07 §8, 04 §2.9), in development (card M1-4d-d).
 
 ### A smart-contract signer that no longer confirms (M1-4d-c, D-96)
 

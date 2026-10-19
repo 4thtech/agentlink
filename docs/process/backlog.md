@@ -1834,16 +1834,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Give an ERC-1271 refusal at verification time its own non-fatal code, `signer_no_longer_confirms`, distinct from `signature_invalid`, with the verdict unchanged and the fixed wording of 07 §8 (D-96, decided).
   - Cross-check `receiptFlags` with `receiptAt` per the 05 §3.3 layout (type `t` is bit `t − 1`); any mismatch is `malformed_record` (D-97, decided; 07 §8).
 
-#### M1-4d-d · chain: agent-card proof-of-possession in proof packs (new, D-95)
+#### M1-4d-d · chain: agent-card proof-of-possession in proof packs (new, D-95; decided, D-102)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain/src/verify, packages/types (pack schema), docs/foundation/07 §8
-- **Depends on:** M1-4d-b (done); the spec change to 07 §8 and 04 §2.9 (`cardAgentSig` and `cardPop` over the card, proposed in the owner-decisions-2026-10-19-b docs PR)
+- **Depends on:** M1-4d-b (done); the spec change to 07 §8 and 04 §2.9, §3.4.1, §3.6 (`cardAgentSig` and `cardPop` over the card, D-102)
 - **Spec:** 07 §8; 04 §2.4, §2.9, §3.1.1; 02 J5
 - **Invariants:** I-5
 - **Scope:**
   - Let a pack carry proof that the card's agent key took part, so a card alone no longer attributes the sender. Until this lands, the interim rule of D-95 holds: a proof whose sender attribution relies on a card reports `record_only`, not `verified`, in neutral wording.
-  - Pack schema: optional `signer.cardAgentSig` (`0x` ECDSA) and `signer.cardPop` (BIP-340, bare hex 128), together and only with `agentCard` (07 §8). Verifier: the 07 §8 proof-of-possession rules (`card_pop_missing` replaces `sender_attribution_pending`; `card_pop_invalid` refuses the pack; contract-account signers stay `record_only`). Core: make and store both signatures with each own card (04 §2.9) and attach them in `exportProofPack` (M1-7g) for the card of the envelope's key epoch. Vectors: a `card-pop` suite in M1-1h.
-- **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only` (`card_pop_missing`); a pack with a valid proof becomes `verified`; a forged `cardPop` or `cardAgentSig`, and one replayed from another card (another key epoch, owner or display name), are refused with `card_pop_invalid`; one signature without the other is `malformed_pack`; a contract-account signer with both stays `record_only` (RED commit).
+  - Pack schema: optional `signer.cardAgentSig` (`0x` ECDSA) and `signer.cardPop` (BIP-340, bare hex 128), together and only with `agentCard` (07 §8). Verifier: the 07 §8 proof-of-possession rules (`card_pop_missing` replaces `sender_attribution_pending`; `card_pop_invalid` refuses the pack; contract-account signers stay `record_only`). Core: make and store both signatures with each own card, at `init`, `owner add-agent` and every `card-update` (04 §2.9); send `cardPop` in `handshake` and `handshake-ack`, and both in `card-update`; verify and store a contact's; attach them in `exportProofPack` (M1-7g) for the card of the envelope's key epoch, own or contact's. Vectors: a `card-pop` suite in M1-1h.
+- **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only` (`card_pop_missing`); a pack with a valid proof becomes `verified`; a forged `cardPop` or `cardAgentSig`, and one replayed from another card (another key epoch, owner or display name), are refused with `card_pop_invalid`; one signature without the other is `malformed_pack`; a contract-account signer with both stays `record_only`; a recipient-exported pack with the sender's received signatures becomes `verified`; a `card-update` or `handshake` whose `cardPop` does not verify is dropped, and one without it from an older peer is accepted (RED commit).
+
+#### M1-4d-e · chain: card confirmation for contract-account signers (new, D-102 follow-up)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** later (not M1)
+- **Repo/path:** agentlink · packages/chain/src/verify; docs/foundation/04 §2.9, 07 §8
+- **Depends on:** M1-4d-d
+- **Spec:** 07 §8; 04 §2.9; 05 §3.2; D-96, D-102
+- **Invariants:** I-5
+- **Scope:** decide and specify how a record signer with code (ERC-1271) can be confirmed through a card (for example `cardAgentSig` checked by `isValidSignature`, and what happens when the account no longer confirms it, D-96); until then such signers stay `record_only` (D-102). Spec change first, in its own docs PR.
+- **Acceptance:** to be set with the spec; RED commit.
 
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
 - **Status:** done (4thtech/agentlink#284, merged 2026-10-19) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
