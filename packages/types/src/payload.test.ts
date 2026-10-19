@@ -428,7 +428,7 @@ describe('proof body (04 §3.4: {envelopeId, chainId, recordId, salt})', () => {
 describe('proof body with the signed Record (04 §3.4, D-107)', () => {
   const signedBody = () => ({
     ...payloads().proof,
-    body: { ...payloads().proof.body, record: record(), signature: CARD_SIG },
+    body: { ...(payloads().proof!.body as object), record: record(), signature: CARD_SIG },
   });
 
   it('accepts the body with record and signature, and still without both (an older sender)', () => {

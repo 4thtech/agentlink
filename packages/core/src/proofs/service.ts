@@ -18,6 +18,14 @@
 // and the deferred ACCEPTED of an approved accept (07 §2.1 step 4). OPENED only on request;
 // ACCEPTED / REJECTED without terms are commitments (`commitments.accept`, D-31) and exclusive.
 //
+// Signed Record in the body (M1-7g-b, D-107): the sender's `proof` body also carries the Record and
+// its signature exactly as submitted. The recipient runs the 04 §3.4 checks 1–5 on them with the
+// existing checks; any mismatch drops the whole body (`proof_mismatch`). A chain read that fails is
+// never a pass: the body stays pending and is checked again at later syncs (at most 256 bodies, 7
+// days each, then `proof_unchecked`). A passing body's Record and signature are stored as received,
+// and the recipient can export its own pack from them; an older sender's body carries neither
+// (RECORD_UNAVAILABLE on export).
+//
 // Export (`exportProofPack`, 07 §8): the signer block is the card of the envelope's key epoch with
 // its proof of possession (`proofSigner`, D-102); the content key only with an owner approval
 // (`proofs.allowKeyDisclosure` is never `allow`), and then always with the envelope; the owner's
@@ -32,6 +40,8 @@ import {
   decodeBase64url,
   encodeBase64url,
   encodeHex0x,
+  hashRecord,
+  occV2Domain,
   parseJson,
   recipientCommitment,
   wipe,
@@ -55,6 +65,7 @@ import {
   type ApprovalFee,
   type Payload,
   type ReceiptTypeName,
+  type RecordJson,
 } from '@4thtech-io/types';
 import { feeContextFromQuote, type ApprovalService, type PendingApproval } from '../approvals.js';
 import {
@@ -130,9 +141,19 @@ const AWAITING = 'awaiting';
 /** At most this many proof envelopes wait for their message, each at most this long. */
 const MAX_AWAITING = 256;
 const AWAITING_SECONDS = 7 * 86_400;
+/**
+ * A `proof` envelope whose chain read failed (an RPC error or timeout, not an answer; 04 §3.4,
+ * M1-7g-b): kept, keyed `pending:<proof envelope id>`, never a pass and never a mismatch, and checked
+ * again from the existing checks on at each later inbox sync until the read answers.
+ */
+const PENDING = 'proof_pending';
+const PENDING_PREFIX = 'pending:';
+/** At most this many bodies are pending, each at most this long after it was received. */
+const MAX_PENDING = 256;
+const PENDING_SECONDS = 7 * 86_400;
 /** Rows that are a record: own or received (not a stored receipt or a waiting proof). */
 const isRecordRow = (r: Row<'proofs'>): boolean =>
-  !RECEIPT_STATUSES.includes(r.status) && r.status !== AWAITING;
+  !RECEIPT_STATUSES.includes(r.status) && r.status !== AWAITING && r.status !== PENDING;
 const receiptItemId = (recordId: string, code: number): string => `${recordId}:${String(code)}`;
 
 /** Fixed refusal codes (06 §1 rule 3). */
@@ -279,7 +300,11 @@ interface SignedItem {
   readonly signature: string;
 }
 
-/** The stored on-chain view of a record a contact made for us. */
+/**
+ * The stored on-chain view of a record a contact made for us and, from a sender at M1-7g-b on, the
+ * signed Record and signature exactly as received in the `proof` body after they passed the 04 §3.4
+ * checks (D-107). An older sender's body leaves both out.
+ */
 interface ReceivedItem {
   readonly received: {
     readonly signer: string;
@@ -287,7 +312,19 @@ interface ReceivedItem {
     readonly kind: number;
     readonly recipientCommitment: string;
   };
+  readonly record?: RecordJson;
+  readonly signature?: string;
 }
+
+/** The outcome of the recipient's checks of a `proof` body (04 §3.4). */
+type RecordCheck =
+  | { readonly status: 'ok'; readonly received: ReceivedItem['received'] }
+  /** A definite mismatch: the whole body is dropped (`proof_mismatch`). */
+  | { readonly status: 'mismatch' }
+  /** A chain read failed: neither a pass nor a mismatch; the body stays pending. */
+  | { readonly status: 'unavailable' };
+const MISMATCH: RecordCheck = Object.freeze({ status: 'mismatch' });
+const UNAVAILABLE: RecordCheck = Object.freeze({ status: 'unavailable' });
 
 class Abort extends Error {}
 
@@ -660,6 +697,9 @@ export class ProofService implements RecordLookup {
         return;
       }
       const salt = await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
+      // D-107: the signed Record and its signature, exactly as submitted, so the recipient can
+      // export a pack too. Only inside this end-to-end encrypted envelope (I-2, I-3).
+      const item = parseJson(row.record_json) as unknown as SignedItem;
       const { built, row: envRow } = await envelopes.prepare({
         to: { contact: contactId },
         payload: {
@@ -669,6 +709,8 @@ export class ProofService implements RecordLookup {
             chainId: row.chain_id,
             recordId: row.record_id,
             salt,
+            record: item.record as never,
+            signature: item.signature,
           },
           replyTo: row.envelope_id,
           files: [],
@@ -848,6 +890,14 @@ export class ProofService implements RecordLookup {
   async processInbound(reports: readonly InboundReport[]): Promise<number> {
     if (this.#platform === undefined) return 0;
     let signed = 0;
+    // Bodies kept pending by an earlier pass (a failed chain read): expired ones go first, the rest
+    // are checked again after this pass's new envelopes (04 §3.4, M1-7g-b).
+    let pending: readonly Row<'proofs'>[] = [];
+    try {
+      pending = await this.#pendingAfterExpiry();
+    } catch {
+      this.#ctx.log.warn('pending proof envelopes not read', { code: 'proof_inbound_error' });
+    }
     for (const report of reports) {
       if (report.outcome !== 'ok' || report.envelopeId === undefined) continue;
       if (report.contactId === undefined) continue;
@@ -858,7 +908,82 @@ export class ProofService implements RecordLookup {
         this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
+    for (const row of pending) {
+      try {
+        signed += await this.#recheck(row);
+      } catch {
+        this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
+      }
+    }
     return signed;
+  }
+
+  /** Drops pending bodies older than PENDING_SECONDS (`proof_unchecked`); returns the rest. */
+  async #pendingAfterExpiry(): Promise<readonly Row<'proofs'>[]> {
+    const now = nowOf(this.#ctx);
+    const { expired, rest } = await this.#ctx.store.transaction((tx) => {
+      const old = tx.select('proofs', {
+        status: PENDING,
+        created_at: { lt: now - PENDING_SECONDS },
+      });
+      for (const r of old) tx.delete('proofs', { record_id: r.record_id, status: PENDING });
+      return { expired: old.length, rest: tx.select('proofs', { status: PENDING }) };
+    });
+    for (let i = 0; i < expired; i += 1) {
+      // Fixed code only: nothing from the body or the chain (I-5, I-7).
+      this.#ctx.log.warn('proof envelope dropped unchecked (proof_unchecked)', {
+        code: 'proof_unchecked',
+      });
+    }
+    return rest;
+  }
+
+  /** One pending body, checked again from the existing checks on (04 §3.4). */
+  async #recheck(row: Row<'proofs'>): Promise<number> {
+    const proofEnvelopeId = row.record_id.slice(PENDING_PREFIX.length);
+    const envelope = await this.#envelope(proofEnvelopeId);
+    if (envelope?.contact_id == null || !row.record_id.startsWith(PENDING_PREFIX)) {
+      // The proof envelope is gone (pruned or removed with its contact): nothing left to check.
+      await this.#ctx.store.transaction((tx) =>
+        tx.delete('proofs', { record_id: row.record_id, status: PENDING }),
+      );
+      return 0;
+    }
+    return this.#inbound(proofEnvelopeId, envelope.contact_id);
+  }
+
+  /**
+   * Keeps a body whose chain read failed (never a pass, never a mismatch), bounded like the wait for
+   * a `proof` that arrives before its message: past MAX_PENDING it is dropped as `proof_unchecked`.
+   */
+  async #pend(proofEnvelopeId: string, envelopeId: string, chainId: number): Promise<void> {
+    const now = nowOf(this.#ctx);
+    const key = `${PENDING_PREFIX}${proofEnvelopeId}`;
+    const empty = await seal(this.#ctx, 'proofs', 'salt', [key], '');
+    const kept = await this.#ctx.store.transaction((tx) => {
+      if (tx.get('proofs', { record_id: key }) !== undefined) return 'kept';
+      if (tx.count('proofs', { status: PENDING }) >= MAX_PENDING) return 'full';
+      tx.insert('proofs', {
+        record_id: key,
+        envelope_id: envelopeId,
+        chain_id: chainId,
+        record_json: '{}',
+        tx_hash: null,
+        status: PENDING,
+        fee_token: null,
+        fee_amount: null,
+        salt: empty,
+        created_at: now,
+      });
+      return 'new';
+    });
+    if (kept === 'new') {
+      this.#ctx.log.info('proof envelope pending a chain read', { code: 'proof_pending' });
+    } else if (kept === 'full') {
+      this.#ctx.log.warn('proof envelope dropped unchecked (proof_unchecked)', {
+        code: 'proof_unchecked',
+      });
+    }
   }
 
   /** The proof envelopes that waited for this message (L5): each is checked once, now. */
@@ -915,17 +1040,58 @@ export class ProofService implements RecordLookup {
       await this.#await(proofEnvelopeId, envelopeId, chainId);
       return 0;
     }
-    const checked = await this.#checkRecord(contactId, envelopeId, chainId, recordId, salt);
-    if (checked === undefined) {
-      // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
-      this.#ctx.log.warn('proof envelope does not match the chain', { code: 'proof_mismatch' });
+    const signedItem =
+      body.data.record === undefined || body.data.signature === undefined
+        ? undefined
+        : { record: body.data.record, signature: body.data.signature };
+    const pendingKey = `${PENDING_PREFIX}${proofEnvelopeId}`;
+    const check = await this.#checkRecord(
+      contactId,
+      envelopeId,
+      chainId,
+      recordId,
+      salt,
+      signedItem,
+    );
+    if (check.status === 'unavailable') {
+      await this.#pend(proofEnvelopeId, envelopeId, chainId);
       return 0;
     }
+    if (check.status === 'mismatch') {
+      await this.#ctx.store.transaction((tx) =>
+        tx.delete('proofs', { record_id: pendingKey, status: PENDING }),
+      );
+      // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
+      this.#ctx.log.warn('proof envelope does not match the chain (proof_mismatch)', {
+        code: 'proof_mismatch',
+      });
+      return 0;
+    }
+    const checked = check.received;
     const sealedSalt = await seal(this.#ctx, 'proofs', 'salt', [recordId], salt);
     const now = nowOf(this.#ctx);
-    const item: ReceivedItem = { received: checked };
+    // The Record and signature exactly as received, after every check passed (04 §3.4, D-107).
+    const item: ReceivedItem =
+      signedItem === undefined ? { received: checked } : { received: checked, ...signedItem };
     await this.#ctx.store.transaction((tx) => {
-      if (tx.get('proofs', { record_id: recordId }) !== undefined) return;
+      tx.delete('proofs', { record_id: pendingKey, status: PENDING });
+      const existing = tx.get('proofs', { record_id: recordId });
+      if (existing !== undefined) {
+        // An older sender's body stored first: a later body with the checked Record completes it.
+        if (
+          signedItem !== undefined &&
+          existing.status === 'received' &&
+          existing.envelope_id === envelopeId &&
+          this.#receivedItem(existing)?.record === undefined
+        ) {
+          tx.update(
+            'proofs',
+            { record_id: recordId, status: 'received', record_json: existing.record_json },
+            { record_json: canonicalize(item as never) },
+          );
+        }
+        return;
+      }
       tx.insert('proofs', {
         record_id: recordId,
         envelope_id: envelopeId,
@@ -953,9 +1119,12 @@ export class ProofService implements RecordLookup {
   }
 
   /**
-   * The 05 §3.3 / 04 §3.4 recipient check, on-chain, before any receipt: the record exists, its
-   * signer is the contact, its envelope hash is the stored envelope's (from that contact, to us),
-   * its kind is the 05 §3.1 kind of the payload held, and its commitment opens to this agent.
+   * The 05 §3.3 / 04 §3.4 recipient check before any receipt: the record exists on-chain, its signer
+   * is the contact, its envelope hash is the stored envelope's (from that contact, to us), its kind
+   * is the 05 §3.1 kind of the payload held, and its commitment opens to this agent. With a signed
+   * Record in the body (D-107), checks 1–5 of 04 §3.4 as well: the local ones before any read, so a
+   * definite mismatch never waits on the chain. Only a read that fails is `unavailable`; anything
+   * else that does not match is `mismatch`.
    */
   async #checkRecord(
     contactId: string,
@@ -963,9 +1132,10 @@ export class ProofService implements RecordLookup {
     chainId: number,
     recordId: string,
     salt: string,
-  ): Promise<ReceivedItem['received'] | undefined> {
+    signedItem: { readonly record: RecordJson; readonly signature: string } | undefined,
+  ): Promise<RecordCheck> {
     const chain = this.#chain(chainId);
-    if (chain === undefined) return undefined;
+    if (chain === undefined) return MISMATCH;
     const target = await this.#envelope(envelopeId);
     if (
       target === undefined ||
@@ -973,42 +1143,135 @@ export class ProofService implements RecordLookup {
       target.state !== 'ok' ||
       target.contact_id !== contactId
     ) {
-      return undefined;
+      return MISMATCH;
     }
     const payload = await this.#payload(target);
-    if (payload === undefined) return undefined;
+    if (payload === undefined) return MISMATCH;
     const kind = this.#kit.recordKindForPayload(payload);
-    if (kind === null) return undefined;
+    if (kind === null) return MISMATCH;
     const self = await this.#self();
+    const contact = contactId.toLowerCase();
+    const heldHash = target.envelope_hash.toLowerCase();
+    let mine: string;
+    try {
+      mine = encodeHex0x(recipientCommitment(self.agentId, salt));
+    } catch {
+      return MISMATCH;
+    }
+    const notary = chain.config.contracts.notary.toLowerCase();
+    let structHash: string | undefined;
+    if (signedItem !== undefined) {
+      const r = signedItem.record;
+      // 1. The held envelope's hash, and a commitment that opens to this agent with this salt.
+      if (r.envelopeHash !== heldHash || r.recipientCommitment !== mine) return MISMATCH;
+      // 2. recordId = keccak256(abi.encode(chainId, notary, signer, nonce)) (05 §3.3).
+      try {
+        const derived = this.#kit.computeRecordId(chainId, notary, r.signer, BigInt(r.nonce));
+        if (derived.toLowerCase() !== recordId) return MISMATCH;
+      } catch {
+        return MISMATCH;
+      }
+      // 3 (the part that needs no read). The kind mapping of the envelope held (05 §3.1).
+      if (r.kind !== kind) return MISMATCH;
+      // 4. The signer is the agentEvm of the contact's card for the envelope's key epoch.
+      if (r.signer !== contact) return MISMATCH;
+      try {
+        const card = await this.#deps.contacts.proofSigner(target.from_key);
+        if (card !== undefined && card.agentCard.agentEvm.toLowerCase() !== r.signer) {
+          return MISMATCH;
+        }
+      } catch {
+        return MISMATCH;
+      }
+      try {
+        structHash = encodeHex0x(hashRecord(occV2Domain(chainId, notary), r).structHash);
+      } catch {
+        return MISMATCH;
+      }
+    }
     let state: {
       signer: string;
       timestamp: bigint;
       kind: number;
       envelopeHash: string;
       recipientCommitment: string;
+      recordStructHash: string;
     };
     try {
       state = (await this.#kit
         .notaryReader(chain.client, chain.config)
         .read.getRecord([recordId as Hex])) as unknown as typeof state;
     } catch {
-      return undefined; // a failed read signs nothing
+      // A read that fails is never a pass and never a mismatch (04 §3.4, M1-7g-b).
+      return UNAVAILABLE;
     }
     const signer = String(state.signer).toLowerCase();
-    if (signer === ZERO_ADDRESS || state.timestamp === 0n) return undefined;
-    if (signer !== contactId.toLowerCase()) return undefined;
-    if (Number(state.kind) !== kind) return undefined;
+    if (signer === ZERO_ADDRESS || state.timestamp === 0n) return MISMATCH;
+    if (signer !== contact) return MISMATCH;
+    if (Number(state.kind) !== kind) return MISMATCH;
     const envelopeHash = String(state.envelopeHash).toLowerCase();
-    if (envelopeHash !== target.envelope_hash.toLowerCase()) return undefined;
+    if (envelopeHash !== heldHash) return MISMATCH;
     const commitment = String(state.recipientCommitment).toLowerCase();
-    let mine: string;
-    try {
-      mine = encodeHex0x(recipientCommitment(self.agentId, salt));
-    } catch {
-      return undefined;
+    if (commitment !== mine) return MISMATCH;
+    if (signedItem !== undefined) {
+      const r = signedItem.record;
+      // 3. The struct hash, signer and kind the chain holds.
+      if (String(state.recordStructHash).toLowerCase() !== structHash) return MISMATCH;
+      if (signer !== r.signer || Number(state.kind) !== r.kind) return MISMATCH;
+      // 5. The signature, as the Notary's SignatureChecker judges it, now.
+      const sig = await this.#checkSignature(chain, recordId, signedItem, self.agentId, salt);
+      if (sig === 'unavailable') return UNAVAILABLE;
+      if (sig !== 'ok') return MISMATCH;
     }
-    if (commitment !== mine) return undefined;
-    return { signer, envelopeHash, kind, recipientCommitment: commitment };
+    return {
+      status: 'ok',
+      received: { signer, envelopeHash, kind, recipientCommitment: commitment },
+    };
+  }
+
+  /**
+   * 04 §3.4 check 5 through the chain package's own verifier, over the pack this body would make:
+   * canonical ECDSA recovery for a signer without code, ERC-1271 `isValidSignature` for one with code.
+   * Unlike a pack's verification (D-96), an account that does not accept the signature at the time
+   * of this check is a mismatch. A read the verifier could not make is `unavailable`.
+   */
+  async #checkSignature(
+    chain: ProofChain,
+    recordId: string,
+    signedItem: { readonly record: RecordJson; readonly signature: string },
+    self: string,
+    salt: string,
+  ): Promise<RecordCheck['status']> {
+    const candidate = {
+      type: 'agentlink.proof',
+      version: 1,
+      chainId: chain.config.chainId,
+      notary: chain.config.contracts.notary.toLowerCase(),
+      recordId,
+      record: signedItem.record,
+      signature: signedItem.signature,
+      signer: { evm: signedItem.record.signer },
+      envelopeHash: signedItem.record.envelopeHash,
+      recipient: { evm: self, salt },
+      receipts: [],
+      disclosure: null,
+      ownerApproval: null,
+      exportedAt: iso(nowOf(this.#ctx)),
+    };
+    let result: Awaited<ReturnType<ProofKit['verifyProofPack']>>;
+    try {
+      result = await this.#kit.verifyProofPack(candidate, {
+        chains: [{ config: chain.config, client: chain.client }],
+      });
+    } catch {
+      return 'mismatch';
+    }
+    if (!result.valid) return result.reason === 'chain_unavailable' ? 'unavailable' : 'mismatch';
+    if (result.notices.some((n) => n.code === 'signer_no_longer_confirms')) return 'mismatch';
+    if (result.recordId.toLowerCase() !== recordId || result.signer !== signedItem.record.signer) {
+      return 'mismatch';
+    }
+    return 'ok';
   }
 
   /**
@@ -1260,8 +1523,12 @@ export class ProofService implements RecordLookup {
   }
 
   #received(row: Row<'proofs'>): ReceivedItem['received'] | undefined {
+    return this.#receivedItem(row)?.received;
+  }
+
+  #receivedItem(row: Row<'proofs'>): ReceivedItem | undefined {
     try {
-      return (parseJson(row.record_json) as unknown as ReceivedItem).received;
+      return parseJson(row.record_json) as unknown as ReceivedItem;
     } catch {
       return undefined;
     }
@@ -1394,14 +1661,26 @@ export class ProofService implements RecordLookup {
     if (this.#platform === undefined) return rejected('PROOFS_UNAVAILABLE');
     const row = await this.#find(input);
     if (row === undefined) return rejected('NOT_RECORDED');
-    // The `proof` body carries no Record or signature (04 §3.4): a recipient cannot build the pack.
-    if (row.status === 'received') return rejected('RECORD_UNAVAILABLE');
-    if (!ON_CHAIN.includes(row.status)) return rejected('NOT_RECORDED');
+    // Recipient side (07 §8, D-107): only from the signed Record and signature that arrived in the
+    // `proof` body and passed the 04 §3.4 checks, never from the chain read alone. An older sender's
+    // body carried neither: RECORD_UNAVAILABLE.
+    const received = row.status === 'received';
+    let item: SignedItem;
+    if (received) {
+      const stored = this.#receivedItem(row);
+      if (stored?.record === undefined || stored.signature === undefined) {
+        return rejected('RECORD_UNAVAILABLE');
+      }
+      item = { record: stored.record as SignedItem['record'], signature: stored.signature };
+    } else {
+      if (!ON_CHAIN.includes(row.status)) return rejected('NOT_RECORDED');
+      item = parseJson(row.record_json) as unknown as SignedItem;
+    }
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
     const envelopeRow = await this.#envelope(row.envelope_id);
     if (envelopeRow?.envelope_json == null) return rejected('ENVELOPE_NOT_FOUND');
-    const item = parseJson(row.record_json) as unknown as SignedItem;
+    if (envelopeRow.direction !== (received ? 'in' : 'out')) return rejected('RECORD_UNAVAILABLE');
 
     let contentKey: string | undefined;
     if (input.includeContentKey === true) {
@@ -1432,12 +1711,14 @@ export class ProofService implements RecordLookup {
     const signer = (await this.#deps.contacts.proofSigner(envelopeRow.from_key)) ?? {
       evm: item.record.signer,
     };
+    // The record's recipient: the contact on the sender side, this agent on the recipient side.
+    const recipientEvm = received ? (await this.#self()).agentId : envelopeRow.contact_id;
     const salt =
-      envelopeRow.contact_id === null || input.includeRecipient !== true
+      recipientEvm === null || input.includeRecipient !== true
         ? ''
         : await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
     const ownerApproval =
-      input.includeOwnerApproval === false ? null : await this.#ownerApproval(row);
+      input.includeOwnerApproval === false ? null : await this.#ownerApproval(row, received);
     const base = {
       type: 'agentlink.proof',
       version: 1,
@@ -1451,9 +1732,7 @@ export class ProofService implements RecordLookup {
       ...(contentKey === undefined
         ? {}
         : { envelope: parseJson(envelopeRow.envelope_json) as unknown }),
-      ...(envelopeRow.contact_id === null || salt === ''
-        ? {}
-        : { recipient: { evm: envelopeRow.contact_id, salt } }),
+      ...(recipientEvm === null || salt === '' ? {} : { recipient: { evm: recipientEvm, salt } }),
       // Receipts are read by the verifier from the chain; a pack lists only those with a known
       // transaction hash (07 §8), which the submitter outcome does not carry yet.
       receipts: [],
@@ -1507,11 +1786,21 @@ export class ProofService implements RecordLookup {
   /**
    * The exporting side's approval of the commitment this envelope carried out (07 §8, D-55): the
    * owner's signed `approval.decide` with its action, or a standing-rule grant with the policy hash.
-   * Null when the envelope ran under no commitment or the stored decision is not a single decide.
+   * On the sender side, the commitment whose envelope part is this envelope; on the recipient side
+   * (D-107), the one whose ACCEPTED or REJECTED receipt part is on this record. Null when there is no
+   * such commitment or the stored decision is not a single decide.
    */
-  async #ownerApproval(row: Row<'proofs'>): Promise<unknown> {
+  async #ownerApproval(row: Row<'proofs'>, received: boolean): Promise<unknown> {
     const part = await this.#ctx.store.transaction(
-      (tx) => tx.select('commitment_parts', { part: 'envelope', item_ref: row.envelope_id })[0],
+      (tx) =>
+        (received
+          ? tx.select('commitment_parts', {
+              part: 'receipt',
+              item_ref: {
+                in: [receiptItemId(row.record_id, 3), receiptItemId(row.record_id, 4)],
+              },
+            })
+          : tx.select('commitment_parts', { part: 'envelope', item_ref: row.envelope_id }))[0],
     );
     if (part === undefined) return null;
     const approval = await this.#ctx.store.transaction((tx) =>
