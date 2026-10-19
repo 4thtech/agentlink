@@ -28,7 +28,7 @@ An incident; a failed health check or smoke test; a verification mismatch ([RB-1
    - **Workers and static sites:** automatic in `deploy-production` after a failed health check. Otherwise redeploy the previous release through the pipeline once the owner clears the freeze for the fix.
    - **npm `latest`:** automatic in `publish-latest` after a failed health check; after a failed smoke test, `rollback-latest` waits for the owner's click. Manual moves and `npm deprecate` are owner actions with 2FA. Never unpublish.
    - **Contracts and their configuration:** owner only, through the Safe and its delays.
-   - **Durable Object migrations** are forward-only: a forward fix, decided by the owner.
+   - **Durable Object migrations and binding changes** are forward-only: Cloudflare refuses to roll back to a version whose Durable Object or binding a later deploy changed. The drop's rollback step then reports "rollback impossible across a binding/storage change; the new version stays live; owner action required". The fix is a forward fix through the pipeline, decided by the owner. The staging rollback rehearsal does not cover this case.
 5. Fix through the normal process (expedited review, never skipped). The owner clears the freeze to land the fix; auto-merge stays off on every other PR until the incident is closed.
 
 ## Verify
@@ -38,6 +38,7 @@ An incident; a failed health check or smoke test; a verification mismatch ([RB-1
 
 ## If it fails
 - **`gh variable set` refused** (permission or a deny rule): tell the owner immediately; he sets it. Do not route around the refusal ([RB-14](permission-denied.md)).
+- **The CI `freeze` job failed** with "Setting DEPLOY_FREEZE failed" (for example HTTP 403 "Resource not accessible by personal access token"): the freeze is NOT set. Set it now (step 1) and tell the owner: the token behind the `DEPLOY_FREEZE_TOKEN` secret needs Variables: read and write on `4thtech/agentlink`.
 - **A secret leaked:** follow `audit-rules.md` §10.3; rotation is an owner action.
 - **Never** clear the freeze, re-enable auto-merge on other PRs, or deploy "to fix it quickly".
 

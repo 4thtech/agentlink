@@ -589,8 +589,11 @@ describe('production health check (M1-27b-c)', () => {
   const copies = block('HEALTH-CHECK');
   const script = copies[0] ?? '';
   const run = (fake) =>
-    runScripted(script, scriptedTools(fake), { DROP_PRODUCTION_ORIGIN: 'https://drop.example.test' });
-  const pairs = (health, upload, times) => Array.from({ length: times }, () => [health, upload]).flat();
+    runScripted(script, scriptedTools(fake), {
+      DROP_PRODUCTION_ORIGIN: 'https://drop.example.test',
+    });
+  const pairs = (health, upload, times) =>
+    Array.from({ length: times }, () => [health, upload]).flat();
 
   it('appears once, in the production health check step, with a step timeout', () => {
     expect(copies.length).toBe(1);
@@ -603,7 +606,12 @@ describe('production health check (M1-27b-c)', () => {
   });
 
   it('is healthy for /v1/health 200 {"ok":true} and an unsigned upload 401', () => {
-    const result = run({ curl: [['200', 0], ['401', 0]] });
+    const result = run({
+      curl: [
+        ['200', 0],
+        ['401', 0],
+      ],
+    });
     expect(result.ok, result.output).toBe(true);
     expect(result.curlCalls).toBe(2);
   });
@@ -632,7 +640,17 @@ describe('production health check (M1-27b-c)', () => {
   });
 
   it('still fails fast (10 attempts) for real HTTP answers that are not the healthy pair', () => {
-    for (const curl of [[['503', 0]], [['200', 0], ['503', 0]], [['404', 0], ['401', 0]]]) {
+    for (const curl of [
+      [['503', 0]],
+      [
+        ['200', 0],
+        ['503', 0],
+      ],
+      [
+        ['404', 0],
+        ['401', 0],
+      ],
+    ]) {
       const result = run({ curl });
       expect(result.ok).toBe(false);
       expect(result.curlCalls).toBe(20);
@@ -641,7 +659,13 @@ describe('production health check (M1-27b-c)', () => {
   });
 
   it('refuses a 200 whose body is not {"ok":true}', () => {
-    const result = run({ curl: [['200', 0], ['401', 0]], body: '{"ok":false}' });
+    const result = run({
+      curl: [
+        ['200', 0],
+        ['401', 0],
+      ],
+      body: '{"ok":false}',
+    });
     expect(result.ok).toBe(false);
     expect(result.curlCalls).toBe(20);
   });
