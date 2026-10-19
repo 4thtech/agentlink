@@ -9,7 +9,9 @@
 import { encodeHex0x, recordStructHash, type OccReceipt, type OccRecord } from '@4thtech-io/crypto';
 import {
   decodeFunctionData,
+  encodeFunctionData,
   erc20Abi,
+  getAddress,
   keccak256,
   parseTransaction,
   recoverTransactionAddress,
@@ -20,6 +22,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ChainError,
   FEE_VAULT_CLIENT_ABI,
+  encodeFeeVaultCall,
   NOTARY_CLIENT_ABI,
   getChainConfig,
   sendDirect,
@@ -31,7 +34,13 @@ import {
   type TxSimulation,
 } from '../clients/index.js';
 import type { ChainConfig } from '../config/index.js';
-import { buildDeposit, checkGaslessTopUp, planDeposit, sendDeposit } from '../fees/index.js';
+import {
+  buildDeposit,
+  checkGaslessTopUp,
+  planDeposit,
+  sendDeposit,
+  type DepositStep,
+} from '../fees/index.js';
 import { ChainInputError, computeRecordId, type Hex } from '../ids/index.js';
 import { selectAgain, type ChainSelection } from '../select/index.js';
 import { buildReceipt, buildRecord, RECORD_KIND } from '../typed-data/index.js';
@@ -217,6 +226,11 @@ class Ledger implements ChainState {
     return Promise.resolve(5_000_000n);
   }
 
+  tokenBalance(token: Hex, owner: Hex): Promise<bigint> {
+    this.guard();
+    return Promise.resolve(this.tokenBalances.get(key2(token, owner)) ?? 0n);
+  }
+
   creditsOf(payer: Hex, token: Hex): Promise<bigint> {
     this.guard();
     return Promise.resolve(this.credits.get(key2(payer, token)) ?? 0n);
@@ -227,27 +241,53 @@ class Ledger implements ChainState {
     const fail = (error: string) => ({ ok: false as const, error });
     const a = tx.args as unknown[];
     switch (tx.functionName) {
-      case 'notarizeBatch':
       case 'notarizeDirect': {
-        const list =
-          tx.functionName === 'notarizeBatch'
-            ? (a[0] as Record<string, unknown>[])
-            : [a[0] as Record<string, unknown>];
+        // Pays now (the deployed Notary): only the signer may send it; for an ERC-20 fee token it
+        // pulls exactly maxFee from the signer through its allowance to the vault, for the native
+        // coin it deposits msg.value; then it charges the fee from the signer's credits.
+        const rec = recordJson(a[0] as Record<string, unknown>);
+        if (tx.from.toLowerCase() !== rec.signer) return fail('NotSigner');
+        if (BigInt(rec.deadline) < this.now()) return fail('Expired');
+        const id = computeRecordId(this.config.chainId, NOTARY, rec.signer, BigInt(rec.nonce));
+        if (this.records.has(id)) return fail('RecordExists');
+        const native = rec.feeToken === ZERO_ADDRESS;
+        const amount = native ? tx.value : BigInt(rec.maxFee);
+        const ak = `${key2(rec.feeToken, rec.signer)}|${VAULT}`;
+        const bk = key2(rec.feeToken, rec.signer);
+        if (!native) {
+          if (tx.value !== 0n) return fail('TransferFailed');
+          if ((this.allowances.get(ak) ?? 0n) < amount) return fail('reverted');
+          if ((this.tokenBalances.get(bk) ?? 0n) < amount) return fail('reverted');
+        }
+        const ck = key2(rec.signer, rec.feeToken);
+        if (BigInt(rec.maxFee) < FEE) return fail('FeeAboveMax');
+        if ((this.credits.get(ck) ?? 0n) + amount < FEE) return fail('InsufficientCredits');
+        if (commit) {
+          if (!native) {
+            this.allowances.set(ak, (this.allowances.get(ak) ?? 0n) - amount);
+            this.tokenBalances.set(bk, (this.tokenBalances.get(bk) ?? 0n) - amount);
+          }
+          this.credits.set(ck, (this.credits.get(ck) ?? 0n) + amount - FEE);
+          this.put(id, rec);
+        }
+        return { ok: true };
+      }
+      case 'notarizeBatch': {
+        // Charges the record signer's existing credits, whoever sends it (05 §3.3).
+        const list = a[0] as Record<string, unknown>[];
         const spend = new Map<string, bigint>();
         const writes: { id: string; rec: OccRecord }[] = [];
         for (const raw of list) {
           const rec = recordJson(raw);
-          const id = computeRecordId(CHAIN_ID, NOTARY, rec.signer, BigInt(rec.nonce));
+          const id = computeRecordId(this.config.chainId, NOTARY, rec.signer, BigInt(rec.nonce));
           const existing = this.records.get(id);
           const mine = encodeHex0x(recordStructHash(rec)) as Hex;
-          if (tx.functionName === 'notarizeDirect' && tx.from.toLowerCase() !== rec.signer) {
-            return fail('NotSigner');
-          }
           if (existing) {
-            if (tx.functionName === 'notarizeBatch' && existing.structHash === mine) continue;
+            if (existing.structHash === mine) continue;
             return fail('RecordExists');
           }
           if (BigInt(rec.deadline) < this.now()) return fail('Expired');
+          if (BigInt(rec.maxFee) < FEE) return fail('FeeAboveMax');
           const k = key2(rec.signer, rec.feeToken);
           const used = (spend.get(k) ?? 0n) + FEE;
           if ((this.credits.get(k) ?? 0n) < used) return fail('InsufficientCredits');
@@ -522,16 +562,20 @@ async function signDigest(digest: Hex, key: ViemHex): Promise<Hex> {
   return (await sign({ hash: digest, privateKey: key, to: 'hex' })) as Hex;
 }
 
-async function signedRecord(ledger: Ledger, deadline?: number) {
+async function signedRecord(
+  ledger: Ledger,
+  deadline?: number,
+  fee: { token: Hex; maxFee: bigint } = { token: USDC, maxFee: 500_000n },
+) {
   const built = buildRecord({
-    chainId: CHAIN_ID,
+    chainId: ledger.config.chainId,
     notary: NOTARY,
     signer: AGENT,
     envelopeHash: hash32('11'),
     recipient: RECIPIENT,
     kind: RECORD_KIND.MESSAGE,
-    feeToken: USDC,
-    maxFee: 500_000n,
+    feeToken: fee.token,
+    maxFee: fee.maxFee,
     deadline: deadline ?? Number(ledger.now()) + 3_600,
   });
   return {
@@ -564,6 +608,17 @@ function directSigner(account = AGENT_ACCOUNT): DirectSigner & { signed: number 
     },
   };
   return s;
+}
+
+/** A Chiado-like config: the same contracts, native xDAI as the only fee token. */
+function gnosisConfig(): ChainConfig {
+  const source = (config.feeTokens[0] as ChainConfig['feeTokens'][number]).source;
+  return {
+    ...config,
+    key: 'gnosis-chiado',
+    chainId: 10200,
+    feeTokens: [{ symbol: 'NATIVE', address: null, decimals: 18, source }],
+  };
 }
 
 function funded(ledger: Ledger, credits = 1_000_000n): Ledger {
@@ -754,6 +809,24 @@ describe('notarize: missing credits clear the selection cache and select again o
     expect(selector.clear).toHaveBeenCalledTimes(1);
   });
 
+  it('a reverted simulation (Expired) clears the cache and selects again once', async () => {
+    const ledger = funded(new Ledger());
+    const selector = { clear: vi.fn() };
+    const fresh: ChainSelection = { status: 'unavailable', unavailable: [] };
+    const reselect = vi.fn(() => Promise.resolve(fresh));
+    const { built, item } = await signedRecord(ledger, Number(ledger.now()) - 10);
+    const out = await submitterFor(ledger, [], { selector, reselect }).notarize(item);
+    expect(out).toEqual({
+      status: 'failed',
+      id: built.recordId,
+      recordId: built.recordId,
+      error: 'Expired',
+      selection: fresh,
+    });
+    expect(selector.clear).toHaveBeenCalledTimes(1);
+    expect(reselect).toHaveBeenCalledTimes(1);
+  });
+
   it('clears the selection cache after every paid action', async () => {
     const ledger = funded(new Ledger());
     const selector = { clear: vi.fn() };
@@ -781,7 +854,19 @@ describe('notarize: missing credits clear the selection cache and select again o
 // --- direct mode -------------------------------------------------------------------------------
 
 describe('direct mode: the agent pays gas itself, simulated before sending', () => {
-  it('every submitter fails: notarizeDirect from the signer, confirmed on-chain', async () => {
+  /** The decoded calls the agent broadcast, in order. */
+  function sentCalls(ledger: Ledger) {
+    return ledger.broadcasts.map((raw) => {
+      const tx = parseTransaction(raw);
+      const to = (tx.to ?? '').toLowerCase();
+      const abi =
+        to === NOTARY ? NOTARY_CLIENT_ABI : to === VAULT ? FEE_VAULT_CLIENT_ABI : erc20Abi;
+      const { functionName, args } = decodeFunctionData({ abi, data: tx.data as Hex });
+      return { to, functionName, args: [...(args ?? [])] as unknown[], value: tx.value ?? 0n };
+    });
+  }
+
+  it('every submitter fails, credits cover the fee: notarizeBatch from the agent, confirmed on-chain', async () => {
     const ledger = funded(new Ledger());
     ledger.native.set(AGENT, 10n ** 17n);
     const signer = directSigner();
@@ -793,11 +878,83 @@ describe('direct mode: the agent pays gas itself, simulated before sending', () 
     }).notarize(item);
     expect(out).toMatchObject({ status: 'recorded', via: 'direct', recordId: built.recordId });
     expect(signer.signed).toBe(1);
-    const sims = ledger.simulations.map((s) => s.functionName);
-    expect(sims).toContain('notarizeDirect');
-    // Simulated before it was sent.
-    expect(ledger.broadcasts).toHaveLength(1);
+    expect(sentCalls(ledger).map((c) => c.functionName)).toEqual(['notarizeBatch']);
+    expect(sentCalls(ledger)[0]?.value).toBe(0n);
+    // Simulated from the agent's own account before it was sent.
+    expect(
+      ledger.simulations.some((s) => s.functionName === 'notarizeBatch' && s.from === AGENT),
+    ).toBe(true);
+    expect(await ledger.creditsOf(AGENT, USDC)).toBe(1_000_000n - FEE);
     expect(selector.clear).toHaveBeenCalled();
+  });
+
+  it('USDC without credits: approve exactly maxFee, then notarizeDirect pays now', async () => {
+    const ledger = new Ledger();
+    ledger.native.set(AGENT, 10n ** 17n);
+    ledger.tokenBalances.set(key2(USDC, AGENT), 10_000_000n);
+    const selector = { clear: vi.fn() };
+    const subs = [fakeSubmitter(ledger, 'honest')];
+    const { built, item } = await signedRecord(ledger);
+    const out = await submitterFor(ledger, subs, {
+      direct: { signer: directSigner(), broadcast: ledger.broadcast },
+      selector,
+    }).notarize(item);
+    expect(out).toMatchObject({ status: 'recorded', via: 'direct', recordId: built.recordId });
+    const calls = sentCalls(ledger);
+    expect(calls.map((c) => c.functionName)).toEqual(['approve', 'notarizeDirect']);
+    expect(calls[0]?.to).toBe(USDC);
+    expect(calls[0]?.args).toEqual([getAddress(VAULT), 500_000n]);
+    expect(calls[1]?.value).toBe(0n);
+    // The leftover of maxFee stays as the agent's credits; no allowance is left behind.
+    expect(await ledger.creditsOf(AGENT, USDC)).toBe(500_000n - FEE);
+    expect(await ledger.allowance(USDC, AGENT, VAULT)).toBe(0n);
+    // Submitters cannot charge credits that do not exist: none was asked.
+    expect(subs[0]?.sent).toHaveLength(0);
+    expect(selector.clear).toHaveBeenCalled();
+  });
+
+  it('USDC without credits and a leftover allowance (USDT style): reset to 0, approve, notarizeDirect', async () => {
+    const ledger = new Ledger();
+    ledger.usdtStyle = true;
+    ledger.native.set(AGENT, 10n ** 17n);
+    ledger.tokenBalances.set(key2(USDC, AGENT), 10_000_000n);
+    ledger.allowances.set(`${key2(USDC, AGENT)}|${VAULT}`, 3n);
+    const { item } = await signedRecord(ledger);
+    const out = await submitterFor(ledger, [], {
+      direct: { signer: directSigner(), broadcast: ledger.broadcast },
+    }).notarize(item);
+    expect(out.status).toBe('recorded');
+    const calls = sentCalls(ledger);
+    expect(calls.map((c) => c.functionName)).toEqual(['approve', 'approve', 'notarizeDirect']);
+    expect(calls.map((c) => c.args[1] ?? null).slice(0, 2)).toEqual([0n, 500_000n]);
+  });
+
+  it('USDC without credits and without enough tokens: needs_credits, nothing sent', async () => {
+    const ledger = new Ledger();
+    ledger.native.set(AGENT, 10n ** 17n);
+    ledger.tokenBalances.set(key2(USDC, AGENT), 499_999n);
+    const { item } = await signedRecord(ledger);
+    const out = await submitterFor(ledger, [], {
+      direct: { signer: directSigner(), broadcast: ledger.broadcast },
+    }).notarize(item);
+    expect(out.status).toBe('needs_credits');
+    expect(ledger.broadcasts).toHaveLength(0);
+  });
+
+  it('native fee token without credits: notarizeDirect carries maxFee as its value', async () => {
+    const gnosis = gnosisConfig();
+    const ledger = new Ledger(gnosis);
+    ledger.native.set(AGENT, 10n ** 18n);
+    const maxFee = 2n * 10n ** 16n;
+    const { built, item } = await signedRecord(ledger, undefined, { token: ZERO_ADDRESS, maxFee });
+    const out = await submitterFor(ledger, [], {
+      direct: { signer: directSigner(), broadcast: ledger.broadcast },
+    }).notarize(item);
+    expect(out).toMatchObject({ status: 'recorded', via: 'direct', recordId: built.recordId });
+    const calls = sentCalls(ledger);
+    expect(calls.map((c) => c.functionName)).toEqual(['notarizeDirect']);
+    expect(calls[0]?.value).toBe(maxFee);
+    expect(await ledger.creditsOf(AGENT, ZERO_ADDRESS)).toBe(maxFee - FEE);
   });
 
   it('no submitters at all: direct mode alone works', async () => {
@@ -861,8 +1018,8 @@ describe('direct mode: the agent pays gas itself, simulated before sending', () 
           contract: 'notary',
           to: NOTARY,
           value: 0n,
-          functionName: 'notarizeDirect',
-          args: [recordTuple(item.record)],
+          functionName: 'notarizeBatch',
+          args: [[recordTuple(item.record)], [item.signature]],
         },
       ),
     ).rejects.toMatchObject({ code: 'signer_mismatch' });
@@ -881,8 +1038,8 @@ describe('direct mode: the agent pays gas itself, simulated before sending', () 
         contract: 'notary',
         to: NOTARY,
         value: 0n,
-        functionName: 'notarizeDirect',
-        args: [recordTuple(item.record)],
+        functionName: 'notarizeBatch',
+        args: [[recordTuple(item.record)], [item.signature]],
       },
     );
     expect(out).toEqual({ ok: false, error: 'InsufficientCredits' });
@@ -1046,6 +1203,7 @@ describe('deposits: allowance read first, USDT re-approve, minDeposit, re-select
     const out = await sendDeposit(
       ledger,
       { signer: directSigner(), broadcast: ledger.broadcast },
+      { token: 'USDC', amount: 2_000_000n },
       plan,
       { selector, reselect, pollMs: 1, waitMs: 5, sleep: noSleep },
     );
@@ -1065,12 +1223,18 @@ describe('deposits: allowance read first, USDT re-approve, minDeposit, re-select
     const reselect = vi.fn();
     const naive = buildDeposit(config, { token: 'USDC', amount: 2_000_000n });
     await expect(
-      sendDeposit(ledger, { signer: directSigner(), broadcast: ledger.broadcast }, naive, {
-        reselect,
-        pollMs: 1,
-        waitMs: 5,
-        sleep: noSleep,
-      }),
+      sendDeposit(
+        ledger,
+        { signer: directSigner(), broadcast: ledger.broadcast },
+        { token: 'USDC', amount: 2_000_000n },
+        naive,
+        {
+          reselect,
+          pollMs: 1,
+          waitMs: 5,
+          sleep: noSleep,
+        },
+      ),
     ).rejects.toBeInstanceOf(ChainError);
     expect(reselect).not.toHaveBeenCalled();
   });
@@ -1081,24 +1245,80 @@ describe('deposits: allowance read first, USDT re-approve, minDeposit, re-select
     const plan = buildDeposit(config, { token: 'USDC', amount: 5n, currentAllowance: 0n });
     const tampered = plan.map((s) => (s.purpose === 'approve' ? { ...s, to: RECIPIENT } : s));
     await expect(
-      sendDeposit(ledger, { signer: directSigner(), broadcast: ledger.broadcast }, tampered, {
-        pollMs: 1,
-        waitMs: 5,
-        sleep: noSleep,
-      }),
+      sendDeposit(
+        ledger,
+        { signer: directSigner(), broadcast: ledger.broadcast },
+        { token: 'USDC', amount: 5n },
+        tampered,
+        { pollMs: 1, waitMs: 5, sleep: noSleep },
+      ),
     ).rejects.toMatchObject({ code: 'invalid_call' });
     expect(ledger.broadcasts).toHaveLength(0);
   });
+
+  it.each([
+    [
+      'another amount',
+      (_p: DepositStep[]) =>
+        buildDeposit(config, { token: 'USDC', amount: 6n, currentAllowance: 0n }),
+    ],
+    [
+      'a deposit with native value',
+      (p: DepositStep[]) => p.map((s) => (s.purpose === 'deposit' ? { ...s, value: 5n } : s)),
+    ],
+    [
+      'an approve of another amount',
+      (p: DepositStep[]) => [
+        {
+          ...(p[0] as DepositStep),
+          data: encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [VAULT, 7n] }),
+        },
+        p[1] as DepositStep,
+      ],
+    ],
+    ['the deposit first', (p: DepositStep[]) => [...p].reverse()],
+    ['no deposit', (p: DepositStep[]) => p.slice(0, 1)],
+    [
+      'a deposit of another token',
+      (p: DepositStep[]) => [
+        p[0] as DepositStep,
+        {
+          ...(p[1] as DepositStep),
+          data: encodeFeeVaultCall({ functionName: 'deposit', args: [RECIPIENT, 5n] }),
+        },
+      ],
+    ],
+  ] as const)(
+    'sendDeposit refuses steps that do not match the request: %s',
+    async (_name, change) => {
+      const ledger = new Ledger();
+      ledger.native.set(AGENT, 10n ** 17n);
+      ledger.tokenBalances.set(key2(USDC, AGENT), 10_000_000n);
+      const plan = buildDeposit(config, { token: 'USDC', amount: 5n, currentAllowance: 0n });
+      await expect(
+        sendDeposit(
+          ledger,
+          { signer: directSigner(), broadcast: ledger.broadcast },
+          { token: 'USDC', amount: 5n },
+          change(plan),
+          { pollMs: 1, waitMs: 5, sleep: noSleep },
+        ),
+      ).rejects.toMatchObject({ code: 'invalid_call' });
+      expect(ledger.broadcasts).toHaveLength(0);
+    },
+  );
 
   it('sendDeposit without native gas signs and sends nothing', async () => {
     const ledger = new Ledger();
     const plan = buildDeposit(config, { token: 'USDC', amount: 5n, currentAllowance: 0n });
     await expect(
-      sendDeposit(ledger, { signer: directSigner(), broadcast: ledger.broadcast }, plan, {
-        pollMs: 1,
-        waitMs: 5,
-        sleep: noSleep,
-      }),
+      sendDeposit(
+        ledger,
+        { signer: directSigner(), broadcast: ledger.broadcast },
+        { token: 'USDC', amount: 5n },
+        plan,
+        { pollMs: 1, waitMs: 5, sleep: noSleep },
+      ),
     ).rejects.toMatchObject({ code: 'no_gas' });
     expect(ledger.broadcasts).toHaveLength(0);
   });

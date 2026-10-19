@@ -90,6 +90,26 @@ describe('createChainState', () => {
     expect(last?.params[1]).toBe('0x42');
   });
 
+  it('getRecord: the Notary reverts RecordNotFound for an unknown ID; that reads as null', async () => {
+    let error: string | null = 'RecordNotFound';
+    const { state } = stateWith((req) => {
+      if (req.method !== 'eth_call') throw new Error(`unexpected ${req.method}`);
+      if (error === null) return { result: recordState(filled('22')) };
+      return {
+        error: {
+          code: 3,
+          message: 'execution reverted',
+          data: encodeErrorResult({ abi: NOTARY_CLIENT_ABI, errorName: error as never }),
+        },
+      };
+    });
+    expect(await state.getRecord(hash32('aa'))).toBeNull();
+    expect(await state.getRecord(hash32('aa'), 9n)).toBeNull();
+    // Any other revert is not "absent": it fails, so nothing is decided from it.
+    error = 'EnforcedPause';
+    await expect(state.getRecord(hash32('aa'))).rejects.toBeInstanceOf(ChainError);
+  });
+
   it('block: reads the finalized tag and a number', async () => {
     const { state, seen } = stateWith((req) => {
       if (req.method === 'eth_getBlockByNumber') {
