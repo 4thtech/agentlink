@@ -21,6 +21,7 @@ import {
   type OccReceipt,
   type OccRecord,
 } from '@4thtech-io/crypto';
+import * as chainKit from '@4thtech-io/chain';
 import {
   computeRecordId,
   createProofSubmitter,
@@ -134,12 +135,17 @@ export class FakeNotary implements ChainState {
     return Promise.resolve(
       s === undefined
         ? null
-        : { signer: s.record.signer as Hex, recordStructHash: s.structHash, receiptAt: [...s.receiptAt] },
+        : {
+            signer: s.record.signer as Hex,
+            recordStructHash: s.structHash,
+            receiptAt: [...s.receiptAt],
+          },
     );
   }
 
   block(tag: 'latest' | 'finalized' | bigint): Promise<BlockInfo> {
-    const number = typeof tag === 'bigint' ? tag : tag === 'finalized' ? this.head - 20n : this.head;
+    const number =
+      typeof tag === 'bigint' ? tag : tag === 'finalized' ? this.head - 20n : this.head;
     return Promise.resolve({ number, timestamp: BigInt(this.#now()) });
   }
 
@@ -193,7 +199,9 @@ export class FakeNotary implements ChainState {
 
   #checkRecord(record: OccRecord, signature: string): string | null {
     const domain = occV2Domain(this.config.chainId, this.config.contracts.notary);
-    if (!recovers(hashTypedData(recordTypedData(domain, record)).digest, signature, record.signer)) {
+    if (
+      !recovers(hashTypedData(recordTypedData(domain, record)).digest, signature, record.signer)
+    ) {
       return 'InvalidSignature';
     }
     if (record.deadline < this.#now()) return 'Expired';
@@ -338,7 +346,7 @@ export class FakeNotary implements ChainState {
       state: this,
       submitter: this.proofSubmitter(),
     };
-    return { chains: [chain] };
+    return { kit: chainKit, chains: [chain] };
   }
 }
 

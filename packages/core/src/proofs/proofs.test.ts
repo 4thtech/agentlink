@@ -5,13 +5,7 @@
 // selector and verifier, so every chain decision runs the code that runs against a testnet.
 import { parseJson, type JsonObject, type KeyStore } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
-import {
-  RECORD_KIND,
-  buildRecord,
-  signRecord,
-  verifyProofPack,
-  type Hex,
-} from '@4thtech-io/chain';
+import { RECORD_KIND, buildRecord, signRecord, verifyProofPack, type Hex } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
@@ -85,7 +79,17 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     name,
     relays: RELAYS,
   });
-  return { client, store, cipher, keyStore, owner, id: client.agentId, mark, lines, policyVersion: 0 };
+  return {
+    client,
+    store,
+    cipher,
+    keyStore,
+    owner,
+    id: client.agentId,
+    mark,
+    lines,
+    policyVersion: 0,
+  };
 }
 
 const delivered = new WeakMap<Agent, Set<string>>();
@@ -221,7 +225,7 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     const view = await a.client.getProof({ envelopeId });
     expect(view?.receipts.map((r) => r.type)).toEqual(['DELIVERED', 'OPENED']);
 
-    const exported = await a.client.exportProofPack({ envelopeId });
+    const exported = await a.client.proofs.exportProofPack({ envelopeId });
     expect(exported.status).toBe('ok');
     const pack = (exported as { pack: Record<string, unknown> }).pack;
     expect(pack).toMatchObject({
@@ -245,10 +249,9 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
       chains: [{ config: chain.config, client: chain.client }],
     });
     expect(result).toMatchObject({ valid: true, verdict: 'record_only', recordId });
-    expect((result as { receipts: { type: string }[] }).receipts.map((r) => r.type)).toEqual([
-      'DELIVERED',
-      'OPENED',
-    ]);
+    expect(
+      (result as unknown as { receipts: { type: string }[] }).receipts.map((r) => r.type),
+    ).toEqual(['DELIVERED', 'OPENED']);
   });
 
   it('autoDelivered off: the proof is checked and stored, and no receipt is signed', async () => {
@@ -271,7 +274,10 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     const envelopeId = await sendText(a, b);
     const first = await a.client.notarize({ envelopeId });
     const second = await a.client.notarize({ envelopeId });
-    expect(second).toMatchObject({ status: 'ok', recordId: (first as { recordId: string }).recordId });
+    expect(second).toMatchObject({
+      status: 'ok',
+      recordId: (first as { recordId: string }).recordId,
+    });
     expect(chain.calls.notarize).toBe(1);
     expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
     expect(await ledger(a)).toHaveLength(1);
@@ -335,11 +341,23 @@ describe('no receipt on a record that does not match (tampered proof envelope, 0
     const otherRecord = await recordDirectly(a, b, other, RECORD_KIND.MESSAGE);
 
     // Wrong salt: the commitment does not open to B.
-    await sendProofEnvelope(a, b, { envelopeId, recordId: real.recordId, salt: `0x${'77'.repeat(32)}` });
+    await sendProofEnvelope(a, b, {
+      envelopeId,
+      recordId: real.recordId,
+      salt: `0x${'77'.repeat(32)}`,
+    });
     // The record of another envelope, named for this one.
-    await sendProofEnvelope(a, b, { envelopeId, recordId: otherRecord.recordId, salt: otherRecord.salt });
+    await sendProofEnvelope(a, b, {
+      envelopeId,
+      recordId: otherRecord.recordId,
+      salt: otherRecord.salt,
+    });
     // A record ID with no record.
-    await sendProofEnvelope(a, b, { envelopeId, recordId: `0x${'ab'.repeat(32)}`, salt: real.salt });
+    await sendProofEnvelope(a, b, {
+      envelopeId,
+      recordId: `0x${'ab'.repeat(32)}`,
+      salt: real.salt,
+    });
     expect(await receipts(b)).toEqual([]);
     expect(chain.calls.acknowledge).toBe(0);
     expect(await b.client.getProof({ envelopeId })).toBeUndefined();
@@ -437,9 +455,10 @@ describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', (
       status: 'rejected',
     });
     await approve(b, approvalId);
-    expect(
-      await b.client.acknowledge({ envelopeId, type: 'accepted', approvalId }),
-    ).toMatchObject({ status: 'ok', receipt: 'ACCEPTED' });
+    expect(await b.client.acknowledge({ envelopeId, type: 'accepted', approvalId })).toMatchObject({
+      status: 'ok',
+      receipt: 'ACCEPTED',
+    });
     expect((await receipts(b)).map((r) => r.type).sort()).toEqual([1, 3]);
     // REJECTED is exclusive with ACCEPTED.
     expect(await b.client.acknowledge({ envelopeId, type: 'rejected' })).toEqual({
@@ -465,13 +484,13 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
 
-    const pending = await a.client.exportProofPack({ envelopeId, includeContentKey: true });
+    const pending = await a.client.proofs.exportProofPack({ envelopeId, includeContentKey: true });
     expect(pending.status).toBe('pending_approval');
     expect(JSON.stringify(pending)).not.toContain('contentKey');
     const approvalId = (pending as { approvalId: string }).approvalId;
     await approve(a, approvalId);
 
-    const exported = await a.client.exportProofPack({
+    const exported = await a.client.proofs.exportProofPack({
       envelopeId,
       includeContentKey: true,
       approvalId,
@@ -486,7 +505,7 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     expect(result).toMatchObject({ valid: true, verdict: 'verified', contentVerified: true });
 
     // The approval was for one export.
-    const again = await a.client.exportProofPack({
+    const again = await a.client.proofs.exportProofPack({
       envelopeId,
       includeContentKey: true,
       approvalId,
@@ -505,12 +524,12 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     const envelopeId = await sendText(a, b);
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
-    expect(await a.client.exportProofPack({ envelopeId, includeContentKey: true })).toEqual({
+    expect(await a.client.proofs.exportProofPack({ envelopeId, includeContentKey: true })).toEqual({
       status: 'rejected',
       code: 'POLICY_DENIED',
     });
     // The `proof` body carries no Record or signature (04 §3.4): the recipient cannot build a pack.
-    expect(await b.client.exportProofPack({ envelopeId })).toEqual({
+    expect(await b.client.proofs.exportProofPack({ envelopeId })).toEqual({
       status: 'rejected',
       code: 'RECORD_UNAVAILABLE',
     });
@@ -615,6 +634,20 @@ describe('the deferred ACCEPTED receipt (07 §2.1 step 4, D-55)', () => {
     const before = chain.calls.acknowledge;
     await sendProofEnvelope(a, b, { envelopeId: offer, recordId: rec.recordId, salt: rec.salt });
     expect(chain.calls.acknowledge).toBe(before);
+    expect((await receipts(b)).filter((r) => r.type === 3)).toHaveLength(1);
+  });
+
+  it('an offer recorded before the accept: the approved accept signs its ACCEPTED at once', async () => {
+    const { a, b } = await twoAgents();
+    const { envelopeId: offer, recordId } = await offerRecorded(a, b);
+    const accepted = await b.client.respondToTerms({ envelopeId: offer, decision: 'accept' });
+    expect(onChain(recordId)!.receiptAt[2]).toBe(0n);
+    const approvalId = (accepted as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    expect(
+      await b.client.respondToTerms({ envelopeId: offer, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok' });
+    expect(onChain(recordId)!.receiptAt[2]).not.toBe(0n);
     expect((await receipts(b)).filter((r) => r.type === 3)).toHaveLength(1);
   });
 

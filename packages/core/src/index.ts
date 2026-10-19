@@ -284,6 +284,26 @@ export {
   type TermsRejected,
   type TermsSent,
 } from './terms-flow.js';
+// Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
+// package's Record builder only (04 §5, D-61).
+export type { ProofChain, ProofKit, ProofsPlatform } from './proofs/platform.js';
+export {
+  RECEIPT_DEADLINE_SECONDS,
+  RECORD_DEADLINE_SECONDS,
+  type AcknowledgeInput,
+  type AcknowledgeResult,
+  type ExportProofPackInput,
+  type ExportProofPackResult,
+  type NotarizeInput,
+  type NotarizeResult,
+  type ProofCode,
+  type ProofFee,
+  type ProofRejected,
+  type ProofService,
+  type ProofServiceDeps,
+  type ProofView,
+  type ResubmitSummary,
+} from './proofs/service.js';
 export {
   TERMS_PAYLOAD_TYPES,
   TermsInbound,
