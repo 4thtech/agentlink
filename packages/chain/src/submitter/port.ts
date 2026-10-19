@@ -75,7 +75,10 @@ export interface SubmitterChain {
   hasCode(address: Hex): Promise<boolean>;
   simulateItem(item: SubmitItem): Promise<ItemSimulation>;
   simulateBatch(items: readonly SubmitItem[]): Promise<BatchSimulation>;
+  /** The gas wallet's next nonce, counting transactions still in the mempool (`pending`). */
   pendingNonce(): Promise<number>;
+  /** The gas wallet's next nonce, counting mined transactions only (`latest`; M1-10a-b). */
+  latestNonce(): Promise<number>;
   /** Signs and sends one batch transaction with exactly these items; returns its hash. */
   send(items: readonly SubmitItem[], options: SendOptions): Promise<Hex>;
   inclusion(txHash: Hex): Promise<TxInclusion>;
@@ -257,6 +260,12 @@ export function createSubmitterChain(
     }
   };
 
+  const nonceAt = async (tag: 'pending' | 'latest'): Promise<number> => {
+    const n = quantity(await call('eth_getTransactionCount', [gasAddress, tag]));
+    if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new ChainError('bad_answer');
+    return Number(n);
+  };
+
   const failedOrPaused = (name: string): ItemSimulation =>
     name === 'EnforcedPause'
       ? { outcome: 'paused' }
@@ -304,11 +313,9 @@ export function createSubmitterChain(
         : { ok: false, error: gas, paused: gas === 'EnforcedPause' };
     },
 
-    async pendingNonce() {
-      const n = quantity(await call('eth_getTransactionCount', [gasAddress, 'pending']));
-      if (n > BigInt(Number.MAX_SAFE_INTEGER)) throw new ChainError('bad_answer');
-      return Number(n);
-    },
+    pendingNonce: () => nonceAt('pending'),
+
+    latestNonce: () => nonceAt('latest'),
 
     async send(items, { gasLimit, nonce, feePercent = 100 }) {
       if (!Number.isSafeInteger(feePercent) || feePercent < 100 || feePercent > 1_000) {
