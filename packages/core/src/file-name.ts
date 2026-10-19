@@ -96,3 +96,18 @@ export function sanitizeFileName(raw: unknown): string {
   }
   return name === '' ? FALLBACK_FILE_NAME : name;
 }
+
+/**
+ * `name` with ` (n)` before its extension, within MAX_FILE_NAME_BYTES (the stem is cut on a
+ * code-point boundary), for a save that must not overwrite (M1-7f). `n` 0 returns `name`.
+ */
+export function withNameSuffix(name: string, n: number): string {
+  if (n === 0) return name;
+  const dot = name.lastIndexOf('.');
+  const hasExt = dot > 0 && name.length - dot <= 16;
+  const stem = hasExt ? name.slice(0, dot) : name;
+  const tail = ` (${String(n)})${hasExt ? name.slice(dot) : ''}`;
+  const room = MAX_FILE_NAME_BYTES - utf8Length(tail);
+  // trimEnd, not a regex: linear on any input (CodeQL js/polynomial-redos).
+  return `${truncateUtf8(stem, room).trimEnd()}${tail}`;
+}

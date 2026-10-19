@@ -3,7 +3,10 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
+    // M1-7f: web streams (ReadableStream) and TextEncoder for files, as @4thtech-io/storage uses them;
+    // the core still runs in Node, Workers and browsers alike and imports no Node built-in.
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/testing"],

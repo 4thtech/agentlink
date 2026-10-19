@@ -23,6 +23,7 @@ import {
   type Policy,
 } from '@4thtech-io/types';
 import { evaluateCommitment, type CommitmentFacts } from './commitments.js';
+import { isInsideFolder } from './path-guard.js';
 import { CoreError } from './errors.js';
 
 /** A policy document as the engine reads it (06 §3 JSON form). */
@@ -332,45 +333,6 @@ export type FileSendEvaluation =
   | { readonly decision: 'allow'; readonly storage: FileStorage }
   | { readonly decision: 'deny'; readonly reason: FileSendRefusal };
 
-const WINDOWS_ABS = /^[A-Za-z]:\\/;
-
-/** Splits a clean absolute path into segments, or undefined (relative, `.`, `..`, empty, NUL). */
-function pathSegments(path: string): { root: string; parts: string[] } | undefined {
-  let root: string;
-  let rest: string;
-  let sep: string;
-  if (path.startsWith('/')) {
-    root = '/';
-    rest = path.slice(1);
-    sep = '/';
-  } else if (WINDOWS_ABS.test(path)) {
-    root = path.slice(0, 3).toLowerCase();
-    rest = path.slice(3);
-    sep = '\\';
-  } else {
-    return undefined;
-  }
-  if (rest.endsWith(sep)) rest = rest.slice(0, -1);
-  const parts = rest === '' ? [] : rest.split(sep);
-  if (parts.some((p) => p === '' || p === '.' || p === '..' || p.includes('\u0000'))) {
-    return undefined;
-  }
-  return { root, parts };
-}
-
-/**
- * True when `realpath` is strictly inside `folder`, both already resolved with realpath (04 §4).
- * Compares whole segments, so `/a/bc` is not inside `/a/b`, and refuses anything that is not a
- * clean absolute path. The folder itself is not inside itself.
- */
-export function isInsideFolder(realpath: string, folder: string): boolean {
-  const p = pathSegments(realpath);
-  const f = pathSegments(folder);
-  if (p === undefined || f === undefined || p.root !== f.root) return false;
-  if (p.parts.length <= f.parts.length) return false;
-  return f.parts.every((seg, i) => p.parts[i] === seg);
-}
-
 function storageFor(
   policy: PolicyDocument,
   sizeBytes: number,
@@ -412,7 +374,9 @@ export function evaluateFileSend(
   const folders: unknown = context?.allowedFolderRealpaths;
   if (!Array.isArray(folders)) throw contextInvalid();
   const inside = folders.some(
-    (f: unknown) => typeof f === 'string' && isInsideFolder(action.realpath, f),
+    // The unified helper (path-guard.ts): a file strictly below the folder, never the folder itself.
+    (f: unknown) =>
+      typeof f === 'string' && isInsideFolder(action.realpath, f, { self: 'outside' }),
   );
   if (!inside) return { decision: 'deny', reason: 'outside_folder' };
   return storageFor(effective.policy, action.sizeBytes, context);

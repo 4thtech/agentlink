@@ -62,7 +62,15 @@ export type CoreErrorCode =
   | 'invite_too_large'
   | 'invite_expired'
   | 'invite_options_invalid'
-  | 'safety_code_unavailable';
+  | 'safety_code_unavailable'
+  // Files (04 §4, 06 §2.3, 07 §5; M1-7f)
+  | 'files_unavailable'
+  | 'files_invalid'
+  | 'file_changed'
+  | 'storage_unavailable'
+  | 'storage_failed'
+  | 'file_download_failed'
+  | 'inbox_unavailable';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

@@ -23,6 +23,8 @@ import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
+import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
+import type { FilesPlatform } from './files/platform.js';
 import { InboxService } from './inbox.js';
 import { policyLimits } from './policy-engine.js';
 import { RevocationService } from './revocation.js';
@@ -83,6 +85,12 @@ export interface AgentLinkClientOptions {
    * there as `drop` and any other URL as `own` (06 §2.2 `FileInfo.delivery`). Default: none.
    */
   readonly dropOrigins?: readonly string[];
+  /**
+   * The files platform (M1-7f; files/platform.ts): allowed-folder realpaths, own storage, the drop's
+   * SSRF-safe fetch, the SSRF-safe download and the inbox folder. Without it, a send with files and
+   * `fetchFile` fail with `files_unavailable`; messages work as before.
+   */
+  readonly files?: FilesPlatform;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -118,6 +126,7 @@ export class AgentLinkClient {
   readonly terms: TermsService;
   readonly #send: SendService;
   readonly #sync: SyncService;
+  readonly #files: FileFetcher;
   readonly #ctx: CoreContext;
 
   private constructor(
@@ -129,6 +138,7 @@ export class AgentLinkClient {
     deliveryAcks: boolean,
     records: RecordLookup | undefined,
     dropOrigins: readonly string[],
+    files: FilesPlatform | undefined,
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
@@ -166,7 +176,9 @@ export class AgentLinkClient {
       ownerActions: this.ownerActions,
       idempotency: this.idempotency,
       outbox: this.outbox,
+      ...(files === undefined ? {} : { files }),
     });
+    this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.terms = new TermsService(ctx, {
       identity: this.identity,
@@ -233,6 +245,16 @@ export class AgentLinkClient {
    */
   sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     return this.#send.send(input);
+  }
+
+  /**
+   * Fetches one file of a received message into the inbox folder (06 §2.3 `agentlink_fetch_file`;
+   * 04 §4; M1-7f): the size cap first, the SSRF-safe download capped at the exact ALF1 length, both
+   * hashes verified before the file gets its (sanitised, never overwriting) name (D-84). Never
+   * executes anything.
+   */
+  fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
+    return this.#files.fetch(input);
   }
 
   /**
@@ -324,6 +346,7 @@ export class AgentLinkClient {
       options.deliveryAcks === true,
       options.records,
       options.dropOrigins ?? [],
+      options.files,
     );
   }
 }

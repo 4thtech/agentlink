@@ -2294,7 +2294,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Threat note:** assets: the use-once approval and the agent's view of it. Abuse cases: (a) an edited row reading as approved and steering the agent; (b) the read leaking the owner signature or sealed action text into a tool result; (c) the read claiming or applying the approval. Stopped by: re-verification of the stored signed objects against the recomputed digest before the cache is read, fail-closed `unknown`; a minimal typed result; no write path. Residual: a same-user process can delete a row or void it (G-1); both only take authority away.
 
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#278: send and fetch; the rest moved to M1-7f-2) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b, M1-6b, M1-6c, M1-1g-e, M1-15; gaps G-27 (D-85) and G-44 resolved
 - **Spec:** 04 §4; 03 §4.2; 06 §2.3; 07 §5.6; 02 F-30–F-34; D-18, D-48
@@ -2312,6 +2312,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-8d-1 / IR-M1-15-1, 2026-10-17): two `isInsideFolder` helpers have different semantics (policy engine: a folder is not inside itself; path guard: it is). Unify them into one shared helper when wiring files here. Locations: `packages/core/src/path-guard.ts` (`isInsideFolder(path, folder, flavor)`, a folder is inside itself) and `packages/core/src/policy-engine.ts` (`isInsideFolder(realpath, folder)`, a folder is not inside itself). Acceptance: one exported helper, the self-inclusion rule explicit in its name or option, both call sites and `path-guard.test.ts` / `policy-files-proofs.test.ts` cover it. Source: review low, 2026-10-18.
 - Review note (IR-M1-7i-1 L3, 2026-10-17): derive `ruleEligible` and `counterparty` from the contact book and test it.
 - Review note (IR-M1-6c-1, 2026-10-18): a drop object's `locator` is its signed GET URL, a bearer secret like any presigned URL (I-7). Store it encrypted at rest with the file key; send it only inside end-to-end-encrypted payloads or owner copies, never to any 4thTech service other than the drop itself; never log it. Also (IR-M1-6c-1 L2): `planInline` returns an all-stored plan even when that plan cannot fit; check the all-stored payload size before any upload so a send that can never fit is refused before anything reaches storage.
+
+#### M1-7f-2 · core: files refresh-link, retention and crypto-shredding (IR-M1-7f-1 L2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core
+- **Depends on:** M1-7f (#278)
+- **Spec:** 04 §4 (delivery, retention and crypto-shredding, encrypted drop); 07 §3 (`files`), §3.3, §5.4; 06 §2.3; D-18, D-48, D-53
+- **Invariants:** I-2, I-5, I-7, I-9
+- **Scope (the parts of M1-7f left after #278):**
+  - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`) and the sender's answer from its sealed `files` row; expired links on the recipient side lead into it.
+  - Retention per `files.deleteAfter` (`expiry` | `receipt`): delete the object (the drop with a DELETE signed by the drop key, D-48, G-44) and discard the file key on both sides; the receiver's key lives today only in its sealed payload, so retention needs a receiver-side record or a payload redaction.
+  - The card's 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
+  - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
+- **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
+- **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7g · core: proofs and receipts
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2737,7 +2751,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-9j-1 F03, 06 §8 terminal output rule) A pending request whose stored action carries an ANSI/OSC canary (cursor movement, screen clear, an OSC 8 link, C1 controls, bidi and zero-width characters) in its message text, file name and contact name, plus a CR overwrite (`approve\rdeny`), an ESC sequence split exactly at the 2 000-code-point cut, NEL U+0085 and C1 CSI U+009B, a 10 000-character single line, a 500-line value and a base letter with 50 combining marks, prints, in `approve <id>` and in `approve` with no ID, with every such sequence removed (no ESC, CR or C1 left), inside the marked untrusted region, cut after sanitizing to the 06 §8 limits (2 000 code points, 40 lines, 200-code-point lines wrapped, 60 lines per region, 2 combining marks per base character), and with the who, cost and consequence lines unchanged and after it; the signed digest is the one recomputed from the displayed action (IR-M1-9j-1 F06).
 
 #### M1-9m · CLI: policy and safety-code check (†) (new, split from M1-9a and M1-9b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
+- **Status:** in review (part 1: `policy show`, `policy allow-folder`, `policy remove-folder`); the rest is M1-9m-b · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/{policy,verify-contact}.ts`)
 - **Depends on:** M1-9b, M1-7d, M1-7c-b; M1-20 for the `commitments` keys
 - **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
@@ -2746,6 +2760,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `policy show | set` † (including the `commitments` limits and `autoAcceptDirection`, M1-20); turning on selling auto-accept (`autoAcceptMinUSD`) first prints the sell warning (06 §3) and needs an explicit `y`.
   - `contacts --verify <id>` † (an interactive terminal with no harness marker): shows the safety code; "They match" signs `contact.check`; "Remember for this contact" binds the pair (04 §2.5).
 - **Acceptance:** piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; RED commit.
+- **Notes (part 1, 2026-10-19):** file sending (M1-9d-1) needs an allowed folder, so the folder commands land first: `policy show` (no owner code), `policy allow-folder <path>` † and `policy remove-folder <path>` † sign one `policy.set` from the current verified policy with only `files.allowedFolders` changed (version + 1). Allowed folders: a full path (`~/` expands), an existing folder, no symbolic link anywhere in it (its realpath must equal the path; the refusal names the real path), not the root, the home folder or a folder above it, not hidden, not under a protected root (04 §4); the canonical realpath is stored. Refused while the policy fails closed (G-6), never rebuilt from the defaults. The TTY owner prompt has one try per run (a wrong code changes nothing); the localhost page's wrong-code backoff (M1-11a) is not in this path. The 06 §8 usage line names the two subcommands (proposed, owner confirms at merge).
+
+#### M1-9m-b · CLI: `policy set` and `contacts --verify` (†) (new, split from M1-9m)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/commands/owner/{policy,verify-contact}.ts`)
+- **Depends on:** M1-9m (part 1), M1-7c-b; M1-20 for the `commitments` keys
+- **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
+- **Invariants:** I-4, I-5
+- **Scope:** the rest of M1-9m: `policy set <key> <value>` † (including the `commitments` limits and `autoAcceptDirection`, M1-20; turning on selling auto-accept first prints the sell warning, 06 §3, and needs an explicit `y`), and `contacts --verify <id>` † as in the M1-9m scope.
+- **Acceptance:** as M1-9m: piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; RED commit.
+- **Review lows carried here (IR-M1-9m-1):**
+  - L2: `policy allow-folder` accepts a folder that contains protected folders (for example `~/Library`, which holds `~/Library/Keychains`). Today only the per-file check at send time (04 §4 protected roots, M1-15, M1-9d-1) keeps such files out. Decide whether to refuse a folder that contains a protected root, or to warn before the owner code.
+  - L3: recovering from a fail-closed policy (G-6: `mark_mismatch`, `rolled_back`, `tampered`). `policy` refuses while the policy fails closed and never rebuilds it from the defaults; give the owner a deliberate recovery path (show the problem, then sign a complete policy above the mark after an explicit confirmation), with `doctor` naming it.
 
 #### M1-9n · CLI: `relays set` (†) (new, split from M1-9b, D-73 (5))
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
