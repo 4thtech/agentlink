@@ -47,6 +47,7 @@ import {
   signedApprovalOpSchema,
   signedPolicySetSchema,
 } from './owner-action.js';
+import { recordSchema, recordSignatureSchema } from './proof.js';
 import { termsNoteSchema, termsSchema } from './terms.js';
 
 const envelopeId = base64url(BYTE_LENGTHS.id);
@@ -196,13 +197,24 @@ export const handshakeAckBodySchema = z.strictObject({
 /**
  * `proof` (04 §3.4). `recordId` and `salt` are on-chain bytes32, so `0x` + lowercase hex on this path
  * as in the proof pack and the Record (04 §2.4.1). `envelopeId` is base64url.
+ *
+ * From M1-7g-b (D-107) the body also carries the signed Record: `record` (the 05 §3.1 JSON form, the
+ * proof pack's `record`) and `signature` (the Record-signature form, 1 to 4 096 bytes, the pack's
+ * `signature`). They come together or not at all; a sender before M1-7g-b sends neither. Unknown
+ * keys stay refused, in the body and in `record`.
  */
-export const proofBodySchema = z.strictObject({
-  envelopeId,
-  chainId: uint53.refine((n) => n > 0, 'chainId must be positive'),
-  recordId: bytes32Hex,
-  salt: bytes32Hex,
-});
+export const proofBodySchema = z
+  .strictObject({
+    envelopeId,
+    chainId: uint53.refine((n) => n > 0, 'chainId must be positive'),
+    recordId: bytes32Hex,
+    salt: bytes32Hex,
+    record: recordSchema.exactOptional(),
+    signature: recordSignatureSchema.exactOptional(),
+  })
+  .refine((b) => (b.record === undefined) === (b.signature === undefined), {
+    message: 'record and signature come together',
+  });
 
 /**
  * `card-update` (04 §3.4.1): the handshake shapes. `cardAgentSig` and `cardPop` (the new card's proof

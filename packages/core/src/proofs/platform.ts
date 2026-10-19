@@ -38,6 +38,9 @@ export type ProofKit = Pick<
   | 'notaryReader'
   | 'createChainSelector'
   | 'recordKindForPayload'
+  // The recipient's checks of a signed Record in a `proof` body (04 §3.4 checks 2 and 5; M1-7g-b).
+  | 'computeRecordId'
+  | 'verifyProofPack'
 >;
 
 export interface ProofsPlatform {

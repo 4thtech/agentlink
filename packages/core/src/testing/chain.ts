@@ -99,6 +99,16 @@ export class FakeNotary implements ChainState {
   readonly receiptSignatures: string[] = [];
   /** Refuse every item at the submitter (it can only censor, 04 §7). */
   censor = false;
+  /**
+   * The read client cannot reach the chain (an RPC outage, M1-7g-b): `getRecord`, `getCode` and
+   * `isValidSignature` reads reject. The submitter and the chain-state port are not affected.
+   */
+  readsFail = false;
+  /**
+   * Contract accounts (ERC-1271, 05 §3.2): an address listed here has code, and its
+   * `isValidSignature` accepts every signature when the value is true and none when it is false.
+   */
+  readonly contractAccounts = new Map<string, boolean>();
   readonly #now: () => number;
 
   constructor(now: () => number) {
@@ -282,9 +292,19 @@ export class FakeNotary implements ChainState {
   // --- the read client -----------------------------------------------------------------------------
 
   readonly client: ReadClient = {
-    readContract: (call: { functionName: string; args?: readonly unknown[] }) => {
+    readContract: (call: { functionName: string; address?: string; args?: readonly unknown[] }) => {
       const args = call.args ?? [];
+      if (
+        this.readsFail &&
+        (call.functionName === 'getRecord' || call.functionName === 'isValidSignature')
+      ) {
+        return Promise.reject(new Error('fake chain: unavailable'));
+      }
       switch (call.functionName) {
+        case 'isValidSignature': {
+          const accepts = this.contractAccounts.get(String(call.address).toLowerCase()) === true;
+          return Promise.resolve(accepts ? `0x1626ba7e${'0'.repeat(56)}` : `0x${'0'.repeat(64)}`);
+        }
         case 'getRecord': {
           const s = this.records.get(String(args[0]).toLowerCase());
           if (s === undefined) {
@@ -327,7 +347,12 @@ export class FakeNotary implements ChainState {
           return Promise.reject(new Error('fake chain: unexpected read'));
       }
     },
-    getCode: () => Promise.resolve(undefined),
+    getCode: (call: { address: string }) => {
+      if (this.readsFail) return Promise.reject(new Error('fake chain: unavailable'));
+      return Promise.resolve(
+        this.contractAccounts.has(String(call.address).toLowerCase()) ? '0x6001' : undefined,
+      );
+    },
   } as unknown as ReadClient;
 
   /** The proof submitter over this chain, with instant polls. */
