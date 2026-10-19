@@ -1021,14 +1021,20 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'claimed' });
     b.spy.mode = 'ack';
     clock.t += 600; // past the outbox retry delay (07 §4.2)
-    const again = ok(
-      await b.client.respondToTerms({
-        envelopeId: offer.envelopeId,
-        decision: 'accept',
-        approvalId: p.approvalId,
-      }),
-    );
-    expect(again.envelopeId).toBe(first.envelopeId);
+    const published = b.spy.published.length;
+    // The repeat republishes the stored envelope and reports the approval as used: the first call
+    // already reported `ok` for it (04 §3.4.2).
+    const again = await b.client.respondToTerms({
+      envelopeId: offer.envelopeId,
+      decision: 'accept',
+      approvalId: p.approvalId,
+    });
+    expect(again).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_USED',
+      envelopeId: first.envelopeId,
+    });
+    expect(b.spy.published.length).toBeGreaterThan(published);
     expect(await outRows(b, 'accept')).toHaveLength(1);
     expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'done' });
   });
