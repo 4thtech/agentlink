@@ -40,11 +40,14 @@ let clock: FakeClock;
 class RelaySpy {
   readonly published: NostrEvent[] = [];
   mode: 'ack' | 'none' = 'ack';
+  /** While set, every publish waits for it (holds a call between its claim and its publish). */
+  gate: Promise<void> | undefined;
   readonly factory: TransportFactory = (deps) => ({
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
-    publish: (event, relays) => {
+    publish: async (event, relays) => {
       this.published.push(event);
+      if (this.gate !== undefined) await this.gate;
       const acked = this.mode === 'ack' ? [...relays] : [];
       return Promise.resolve({
         results: relays.map((relay) => ({
@@ -930,6 +933,77 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     }
   });
 
+  it('retries with one approvalId under different clientRequestIds: one ok, every other call APPROVAL_USED (04 §3.4.2)', async () => {
+    const { b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    const call = (clientRequestId: string) =>
+      b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'accept',
+        approvalId: p.approvalId,
+        clientRequestId,
+      });
+    // Hold the first call after its claim, inside its publish: the part is `claimed`.
+    let open!: () => void;
+    b.spy.gate = new Promise<void>((resolve) => (open = resolve));
+    const first = call('r1');
+    for (let i = 0; i < 200 && b.spy.published.length === 0; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+    }
+    expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'claimed' });
+    // Two more requests with the same approval while the first is still publishing.
+    const others = await Promise.all([call('r2'), call('r3')]);
+    open();
+    b.spy.gate = undefined;
+    const results = [await first, ...others];
+    const accepts = await outRows(b, 'accept');
+    expect(accepts).toHaveLength(1);
+    const envelopeId = accepts[0]!.envelope_id;
+    expect(results.filter((r) => r.status === 'ok')).toHaveLength(1);
+    expect(ok(results[0]!).envelopeId).toBe(envelopeId);
+    for (const r of results.slice(1)) {
+      expect(r).toMatchObject({ status: 'rejected', code: 'APPROVAL_USED', envelopeId });
+    }
+    // Each request keeps its own result: a repeat of the first is its ok, of another its refusal.
+    expect(await call('r1')).toEqual(results[0]);
+    expect(await call('r2')).toEqual(results[1]);
+    expect(await outRows(b, 'accept')).toHaveLength(1);
+  });
+
+  it('a repeat call after an accept still waiting for relay acks is APPROVAL_USED, not a second ok (04 §3.4.2)', async () => {
+    const { b, offer } = await offered();
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    await approve(b, p.approvalId);
+    b.spy.mode = 'none';
+    const call = {
+      envelopeId: offer.envelopeId,
+      decision: 'accept' as const,
+      approvalId: p.approvalId,
+    };
+    const first = ok(await b.client.respondToTerms({ ...call, clientRequestId: 'w1' }));
+    expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'claimed' });
+    const again = await b.client.respondToTerms({ ...call, clientRequestId: 'w2' });
+    expect(again).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_USED',
+      envelopeId: first.envelopeId,
+    });
+    const bare = await b.client.respondToTerms(call);
+    expect(bare).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_USED',
+      envelopeId: first.envelopeId,
+    });
+    // The idempotent repeat of the first request still returns its original result.
+    expect(await b.client.respondToTerms({ ...call, clientRequestId: 'w1' })).toEqual(first);
+    expect(await outRows(b, 'accept')).toHaveLength(1);
+  });
+
   it('a fault between the claim and the publish: the retry republishes the same signed envelope', async () => {
     const { b, offer } = await offered();
     const p = pending(
@@ -947,14 +1021,20 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'claimed' });
     b.spy.mode = 'ack';
     clock.t += 600; // past the outbox retry delay (07 §4.2)
-    const again = ok(
-      await b.client.respondToTerms({
-        envelopeId: offer.envelopeId,
-        decision: 'accept',
-        approvalId: p.approvalId,
-      }),
-    );
-    expect(again.envelopeId).toBe(first.envelopeId);
+    const published = b.spy.published.length;
+    // The repeat republishes the stored envelope and reports the approval as used: the first call
+    // already reported `ok` for it (04 §3.4.2).
+    const again = await b.client.respondToTerms({
+      envelopeId: offer.envelopeId,
+      decision: 'accept',
+      approvalId: p.approvalId,
+    });
+    expect(again).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_USED',
+      envelopeId: first.envelopeId,
+    });
+    expect(b.spy.published.length).toBeGreaterThan(published);
     expect(await outRows(b, 'accept')).toHaveLength(1);
     expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'done' });
   });

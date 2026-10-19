@@ -1468,21 +1468,25 @@ export class TermsService {
         ...(rc === undefined ? {} : { receipt: rc }),
       };
     };
-    // Already sent: a repeat call never sends or signs a part twice (04 §3.4.2).
-    if (envelopePart?.state === 'done') {
+    // The state of the original response, for a call that did not claim the part (04 §3.4.2).
+    const used = (envelopeId: string | null | undefined): RespondOutcome => {
       const rc = receipt();
       return rejected('APPROVAL_USED', {
-        ...(envelopePart.item_ref === null ? {} : { envelopeId: envelopePart.item_ref }),
+        ...(envelopeId === null || envelopeId === undefined ? {} : { envelopeId }),
         ...(rc === undefined ? {} : { receipt: rc }),
       });
-    }
-    // Claimed but not yet published (a crash between the claim and the publish, or a concurrent
-    // retry): republish the same signed envelope, never a new one.
+    };
+    // Already sent: a repeat call never sends or signs a part twice (04 §3.4.2).
+    if (envelopePart?.state === 'done') return used(envelopePart.item_ref);
+    // Claimed by an earlier or a concurrent call, its delivery not yet confirmed: only the call
+    // whose claim committed reports `ok` (a takeover of that same request is resumed from its
+    // stored effects). This call republishes the same signed envelope, never a new one, and reports
+    // the approval as used (04 §3.4.2; 07 §2.1).
     if (envelopePart?.state === 'claimed' && envelopePart.item_ref !== null) {
       const id = envelopePart.item_ref;
       await this.#publish(id);
       await this.#markEnvelopeDone(approvalId, id);
-      return ok(id);
+      return used(id);
     }
     const policy = await this.#policy();
     const facts: CommitmentFacts = {
@@ -1610,16 +1614,17 @@ export class TermsService {
     if (sent.kind === 'stale') return 'stale';
     if (sent.kind === 'denied') return rejected('POLICY_DENIED');
     if (sent.kind !== 'sent') {
-      // A concurrent retry claimed it, or another scope already sent the accept: run nothing.
+      // A concurrent retry claimed it, or another scope already sent the accept: run nothing new.
+      // The claim belongs to the other call, which reports `ok`; this one reports the approval as
+      // used (04 §3.4.2).
       const now2 = await this.#ctx.store.transaction((tx) =>
         tx.get('commitment_parts', { approval_id: approvalId, part: 'envelope' }),
       );
       if (now2?.state === 'claimed' && now2.item_ref !== null) {
         await this.#publish(now2.item_ref);
         await this.#markEnvelopeDone(approvalId, now2.item_ref);
-        return ok(now2.item_ref);
       }
-      return rejected('APPROVAL_USED', now2?.item_ref ? { envelopeId: now2.item_ref } : {});
+      return used(now2?.item_ref);
     }
     await this.#markEnvelopeDone(approvalId, sent.envelopeId);
     return ok(sent.envelopeId);
