@@ -27,6 +27,7 @@ import {
   verifyCardPossession,
   type Envelope,
   type JsonValue,
+  type JsonObject,
   type KeyStore,
   type NostrEvent,
   type OccRecord,
@@ -41,6 +42,7 @@ import {
   type VerifyChain,
 } from '@4thtech-io/chain';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
+import { defaultPolicy } from '@4thtech-io/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
@@ -67,6 +69,7 @@ import {
   type TestAgent,
   type TestOwner,
 } from './testing/envelopes.js';
+import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import type { TransportFactory } from './transport.js';
 
 const clock = new FakeClock();
@@ -100,9 +103,11 @@ class RelaySpy {
 
 interface Agent extends TestAgent {
   readonly spy: RelaySpy;
+  readonly mark: MemoryPolicyMark;
 }
 
 async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promise<Agent> {
+  const mark = new MemoryPolicyMark();
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
   const keyStore: KeyStore = new MemoryKeyStore(seed(n));
@@ -114,6 +119,8 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promi
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
     transport: spy.factory,
+    // A readable policy (the defaults: contacts.allowed "paired"), D-106.
+    policyMark: mark,
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -122,7 +129,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promi
     relays: RELAYS,
   });
   const testOwner = owner as unknown as TestOwner;
-  return { client, store, cipher, keyStore, owner: testOwner, id: client.agentId, spy };
+  return { client, store, cipher, keyStore, owner: testOwner, id: client.agentId, spy, mark };
 }
 
 async function deliver(to: TestAgent, envelope: unknown): Promise<InboundReport[]> {
@@ -405,6 +412,48 @@ describe('card-update sender (04 §2.6, §2.9, §3.4.1)', () => {
     expect(await deliver(b, again)).toMatchObject([{ outcome: 'dropped' }]);
     const row = await b.store.transaction((tx) => tx.get('contacts', { contact_id: a.id }));
     expect(row?.key_epoch).toBe(2);
+  });
+});
+
+describe('card-updates follow contacts.allowed (D-106)', () => {
+  async function allowOnly(x: Agent, owner: MemoryOwnerKeyStore, ids: string[]) {
+    const policy = defaultPolicy();
+    (policy.contacts as { allowed: unknown }).allowed = [...ids].sort();
+    const signed = await signWith(owner, {
+      v: 1,
+      agent: x.id,
+      owner: await ownerHex(owner),
+      op: 'policy.set',
+      params: { version: 1, policy: policy as unknown as JsonObject },
+      nonce: newNonce(),
+      issuedAt: clock.t,
+      expiresAt: clock.t + 600,
+    });
+    expect(await x.client.ownerActions.apply(JSON.stringify(signed))).toMatchObject({
+      status: 'applied',
+    });
+  }
+
+  it('a contact outside the allowed list gets no card-update; one inside does', async () => {
+    await allowOnly(a, ownerA, [b.id]);
+    await rotate(a);
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 1, failed: 0 });
+    expect((await sentCardUpdates(a)).map((s) => s.row.contact_id)).toEqual([b.id]);
+  });
+
+  it('an unreadable policy sends none (fail closed)', async () => {
+    a.mark.failRead = true;
+    await rotate(a);
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 0 });
+    expect(await sentCardUpdates(a)).toHaveLength(0);
+  });
+
+  it('a policy that fails closed (mark above any stored policy) sends none', async () => {
+    a.mark.value = 5;
+    await rotate(a);
+    expect((await a.client.ownerActions.loadPolicy()).mode).toBe('fail_closed');
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 0 });
+    expect(await sentCardUpdates(a)).toHaveLength(0);
   });
 });
 
