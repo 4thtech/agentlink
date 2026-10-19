@@ -519,7 +519,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 | **Document matches / doesn't** | If the file includes the document key: "Document matches the proof" with a preview, or a calm mismatch explanation |
 | **Proof of agreement** | The terms, then "Proposed and recorded by “Tali's agent” · Registered 14:02 · Accepted by “Ana's agent” · Self-declared 15:10". **Proves:** both agents, each bound to its owner, assented to these exact terms at these times. **Doesn't prove:** legal enforceability, authority, or fulfilment |
 | **Invalid · not found · unreachable · unreadable** | Clear and non-alarming, with a next step |
-| **Details (Advanced)** | Network, record ID, signer, fingerprints, receipts with transaction links, copy buttons |
+| **Details (Advanced)** | Network, record ID, signer, fingerprints, receipts with transaction links (only a link the check confirmed; otherwise the receipt time alone, D-105), copy buttons |
 
 **Trust line:** "Checked in your browser against the public record. Your file isn't uploaded." Printouts must look court-ready (§6.12).
 
