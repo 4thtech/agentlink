@@ -11,7 +11,7 @@ _Updated 2026-10-19 by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| M1b waves — orchestrator | @talirezun (agents) | in-progress | merged #286 #288–#298 #300; review/merge: #299 #301 #302 #303 | 2026-10-19 |
+| M1b waves — orchestrator | @talirezun (agents) | in-progress | merged #286 #288–#309; open #310 #311; drop live in prod; Chiado contracts live | 2026-10-19 |
 | M1 gate two-machine test — Tali | @talirezun | J1/J4/J8/J9 passed 17/17 (2026-10-18); J2/J3/J5 after M1b | auto-sync dogfood | 2026-10-18 |
 
 ## Waiting on a decision

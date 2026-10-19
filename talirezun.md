@@ -1,34 +1,35 @@
 # @talirezun — sync
-**Headline:** M1b waves: chain proofs, deposits, faucet, card signatures merged; drop service awaiting production approval
+**Headline:** Encrypted drop live in production; Chiado testnet contracts deployed; proof tools, receipts and card signatures merged
 _Updated 2026-10-19 · claude-code / claude-haiku-5-5 · orchestrator_
 
 ## Now
 - **Merged today (2026-10-19):**
-  - decisions D-88..D-102 (#289, #292);
-  - drop deploy fix (#291);
-  - submitter engine (#293);
-  - drop key epoch checks (#294);
-  - deposits + notarize (#295);
-  - backlog sweep (#296);
-  - proof verification of agent cards (#297);
-  - testnet faucet code (#298);
-  - agent card signatures (#300).
+  - owner decisions D-88..D-107;
+  - submitter engine;
+  - drop key epochs;
+  - deposits + notarize;
+  - card proof-of-possession (verifier, producer, card updates, history);
+  - receipt and owner-approval verification;
+  - proofs, receipts and export in core;
+  - policy recover;
+  - proof tools for agents;
+  - testnet faucet code;
+  - networks and contract addresses page;
+  - drop service live at drop.agentlink.4thtech.io;
+  - Gnosis Chiado contracts deployed (same addresses as Base Sepolia; smoke test pending test xDAI).
 
 ## In flight
 | PR | Work | Status |
 |---|---|---|
-| #299 | policy recover | owner decision pending |
-| #301 | receipt/approval verification | owner decision pending |
-| #302 | test flake fix | open |
-| #303 | docs status pass | open |
+| #310 | ABI v0.1.0-testnet.3 + networks page (Chiado) | open |
+| #311 | deploy-drop hardening | open |
 
 ## Next
-1. Drop production deploy + rollback rehearsal.
-2. M1-7g proofs/receipts.
-3. M1-9d-2 proof tools.
-4. M1-9h `agentlink verify`.
-5. M1-10c submitter deploy.
-6. M1-3j Chiado (contracts).
+1. M1-9h `agentlink verify`.
+2. M1-7g-b recipient export.
+3. M1-10c submitter deploy.
+4. Chiado smoke test.
+5. Release 0.1.2.
 
 ## Owner to-dos
 - Cloudflare drop setup (M1-28).
