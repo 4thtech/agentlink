@@ -1,7 +1,8 @@
 // M1-1g-e (IR-M1-6c-1): the drop-request signer behind KeyStore.signDropRequest (04 §2.1 drop key,
 // §4; 07 §5.4 signature format). Every KeyStore backend calls signDropRequest(secretKey, …) with the
-// drop key it derived for the current epoch; it is exported only from the restricted
-// @4thtech-io/crypto/keystore entry.
+// drop key it derived for the current epoch, or for the retained epoch a DELETE names
+// (dropRequestEpoch, M1-1g-f); it is exported only from the restricted @4thtech-io/crypto/keystore
+// entry.
 //
 // The signer is deliberately narrow, so a drop key can only ever sign a request the drop accepts:
 // - the event is built here by dropAuthEvent, so kind 27235, the empty content and the `domain` tag
@@ -23,6 +24,8 @@ import {
 import { decodeBase64url, decodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { parseJson } from './jcs.js';
+import { MAX_KEY_EPOCH } from './keys.js';
+import { KeyStoreError } from './keystore-api.js';
 import { signNostrEvent, type UnsignedNostrEvent } from './nostr-event.js';
 
 /** The one message every refused drop request gets. It names no input (I-7). */
@@ -123,6 +126,39 @@ export function dropRequestSnapshot(request: unknown, createdAt: unknown): DropA
   return snapshot;
 }
 
+/**
+ * The drop-key epoch for a checked request (M1-1g-f, IR-M1-1g-e-1; 04 §2.1, 07 §5.4). Without an
+ * epoch it is `currentEpoch`. Only a DELETE may name one, so that an object uploaded under an older
+ * epoch (its locator records it) stays deletable after a rotation; a POST always signs with the
+ * current epoch. The options are read once. A POST with an epoch, a malformed epoch or options other
+ * than `{epoch}` get the fixed refusal; an epoch above the current one is `epoch_unavailable`.
+ * Public inputs only: backends call it before they read a seed.
+ */
+export function dropRequestEpoch(
+  snapshot: DropAuthRequest,
+  options: unknown,
+  currentEpoch: number,
+): number {
+  if (options === undefined) return currentEpoch;
+  if (typeof options !== 'object' || options === null) throw refused();
+  let epoch: unknown;
+  try {
+    if (Object.keys(options).some((key) => key !== 'epoch')) throw refused();
+    epoch = (options as { readonly epoch?: unknown }).epoch;
+  } catch {
+    throw refused();
+  }
+  if (epoch === undefined) return currentEpoch;
+  if (snapshot.method !== 'DELETE') throw refused();
+  if (typeof epoch !== 'number' || !Number.isInteger(epoch) || epoch < 0 || epoch > MAX_KEY_EPOCH) {
+    throw refused();
+  }
+  if (epoch > currentEpoch) {
+    throw new KeyStoreError('epoch_unavailable', 'keystore: that key epoch is not available');
+  }
+  return epoch;
+}
+
 function dropRequestEvent(request: unknown, createdAt: number): UnsignedNostrEvent {
   const snapshot = dropRequestSnapshot(request, createdAt);
   try {
@@ -133,7 +169,8 @@ function dropRequestEvent(request: unknown, createdAt: number): UnsignedNostrEve
 }
 
 /**
- * Signs a drop request with `dropSecretKey` (the 32-byte BIP-340 drop key of the current epoch) and
+ * Signs a drop request with `dropSecretKey` (the 32-byte BIP-340 drop key of the epoch the backend
+ * chose with dropRequestEpoch) and
  * returns the `Authorization` header value, `Nostr <base64url(JSON event)>`. KeyStore backends only:
  * the key is the caller's to derive and wipe. Refuses anything but a drop request (see above).
  */

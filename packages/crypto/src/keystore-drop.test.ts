@@ -436,15 +436,18 @@ describe('KeyStore.signDropRequest: the epoch of a DELETE (M1-1g-f, 04 §2.1)', 
     store = await advanced();
     expect(decode(await store.signDropRequest(DELETE, TS)).pubkey).toBe(dropHex(SEED, 1));
     expect(decode(await store.signDropRequest(UPLOAD, TS, {})).pubkey).toBe(dropHex(SEED, 1));
-    expect(decode(await store.signDropRequest(UPLOAD, TS, { epoch: undefined })).pubkey).toBe(
-      dropHex(SEED, 1),
-    );
+    expect(
+      decode(await store.signDropRequest(UPLOAD, TS, { epoch: undefined } as never)).pubkey,
+    ).toBe(dropHex(SEED, 1));
   });
 
   const refusedVariants: [string, () => Promise<unknown>][] = [
     ['a POST with an older epoch', () => store.signDropRequest(UPLOAD, TS, { epoch: 0 })],
     ['a POST with the current epoch', () => store.signDropRequest(UPLOAD, TS, { epoch: 1 })],
-    ['a POST with an epoch above the current one', () => store.signDropRequest(UPLOAD, TS, { epoch: 2 })],
+    [
+      'a POST with an epoch above the current one',
+      () => store.signDropRequest(UPLOAD, TS, { epoch: 2 }),
+    ],
     ['a negative epoch', () => store.signDropRequest(DELETE, TS, { epoch: -1 })],
     ['a fractional epoch', () => store.signDropRequest(DELETE, TS, { epoch: 0.5 })],
     ['a NaN epoch', () => store.signDropRequest(DELETE, TS, { epoch: Number.NaN })],

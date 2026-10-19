@@ -60,7 +60,11 @@ import {
   type OwnerSession,
   type UnlockOptions,
 } from './keystore-api.js';
-import { dropRequestSnapshot, signDropRequest as signDropRequestWithKey } from './keystore-drop.js';
+import {
+  dropRequestEpoch,
+  dropRequestSnapshot,
+  signDropRequest as signDropRequestWithKey,
+} from './keystore-drop.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
 import {
   NOSTR_KIND_AUTH,
@@ -406,11 +410,17 @@ export class MemoryKeyStore implements KeyStore {
     );
   }
 
-  signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string> {
-    // The drop key of the current epoch (04 §2.1); the request is checked before the seed is used.
+  signDropRequest(
+    request: DropAuthRequest,
+    createdAt: number,
+    options?: EpochOptions,
+  ): Promise<string> {
+    // The drop key of the current epoch, or of the retained epoch a DELETE names (04 §2.1,
+    // M1-1g-f); the request and the epoch are checked before the seed is used.
     return Promise.resolve().then(() => {
       const snapshot = dropRequestSnapshot(request, createdAt);
-      return withSecret(this.#open(), KEY_LABELS.drop, this.#keyEpoch, (secretKey) =>
+      const epoch = dropRequestEpoch(snapshot, options, this.#keyEpoch);
+      return withSecret(this.#open(), KEY_LABELS.drop, epoch, (secretKey) =>
         signDropRequestWithKey(secretKey, snapshot, createdAt),
       );
     });

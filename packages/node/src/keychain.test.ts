@@ -441,9 +441,11 @@ describe.each([
     return encodeHex(key.publicKey);
   };
   const pubkeyOf = (authorization: string): string =>
-    (JSON.parse(decodeUtf8(decodeBase64url(authorization.slice('Nostr '.length)))) as {
-      pubkey: string;
-    }).pubkey;
+    (
+      JSON.parse(decodeUtf8(decodeBase64url(authorization.slice('Nostr '.length)))) as {
+        pubkey: string;
+      }
+    ).pubkey;
   let keychain: FakeKeychain;
   let store: KeyStore;
 
@@ -473,7 +475,7 @@ describe.each([
   it('without an epoch (or with epoch undefined) it signs with the current epoch', async () => {
     expect(pubkeyOf(await store.signDropRequest(DELETE, TS))).toBe(dropHex(SEED_A, 1));
     expect(pubkeyOf(await store.signDropRequest(UPLOAD, TS, {}))).toBe(dropHex(SEED_A, 1));
-    expect(pubkeyOf(await store.signDropRequest(UPLOAD, TS, { epoch: undefined }))).toBe(
+    expect(pubkeyOf(await store.signDropRequest(UPLOAD, TS, { epoch: undefined } as never))).toBe(
       dropHex(SEED_A, 1),
     );
   });

@@ -1,7 +1,8 @@
 // M1-8a: the agent KeyStore backed by the OS keychain (04 §2.2, §3.1.1; 07 §9). The seed is read
 // from the keychain for each operation, checked against the agent ID (04 §2.9), used and wiped
 // (04 §8.3, best effort): the store holds no seed between calls. Signing and encryption use the
-// current epoch; only lookups and decryption take one. Owner keys are never here (04 §2.5).
+// current epoch; only lookups, decryption and a drop DELETE (M1-1g-f) take one. Owner keys are never
+// here (04 §2.5).
 import {
   CryptoInputError,
   KEY_LABELS,
@@ -10,6 +11,7 @@ import {
   MAX_KEY_EPOCH,
   decodeHex,
   decodeHex0x,
+  dropRequestEpoch,
   dropRequestSnapshot,
   encodeHex,
   equalBytes,
@@ -322,12 +324,19 @@ export class KeychainKeyStore implements KeyStore {
     );
   }
 
-  async signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string> {
-    // Checked before the seed is read: a refused request never touches the keychain (M1-1g-e).
+  async signDropRequest(
+    request: DropAuthRequest,
+    createdAt: number,
+    options?: EpochOptions,
+  ): Promise<string> {
+    // Checked before the seed is read: a refused request or epoch never touches the keychain
+    // (M1-1g-e, M1-1g-f).
     const snapshot = dropRequestSnapshot(request, createdAt);
-    // The drop key of the current epoch (04 §2.1), never the Nostr or EVM identity key.
+    const epoch = dropRequestEpoch(snapshot, options, this.#keyEpoch);
+    // The drop key of the current epoch, or of the retained epoch a DELETE names (04 §2.1), never
+    // the Nostr or EVM identity key.
     return this.#withSeed((seed) =>
-      withSecret(seed, KEY_LABELS.drop, this.#keyEpoch, (secretKey) =>
+      withSecret(seed, KEY_LABELS.drop, epoch, (secretKey) =>
         signDropRequest(secretKey, snapshot, createdAt),
       ),
     );
@@ -435,8 +444,8 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
     unwrapCek: (wrapped: WrappedCek, envelopeId: Uint8Array, options?: EpochOptions) =>
       store.unwrapCek(wrapped, envelopeId, options),
     sign712: (typedData: TypedData) => store.sign712(typedData),
-    signDropRequest: (request: DropAuthRequest, createdAt: number) =>
-      store.signDropRequest(request, createdAt),
+    signDropRequest: (request: DropAuthRequest, createdAt: number, options?: EpochOptions) =>
+      store.signDropRequest(request, createdAt, options),
     close: () => store.close(),
   });
 }

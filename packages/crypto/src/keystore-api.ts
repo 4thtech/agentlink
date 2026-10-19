@@ -11,8 +11,9 @@
 // - No method returns a private key or a seed. Signing, NIP-44 key agreement and the CEK unwrap
 //   happen inside; callers get public keys, signatures, ciphertext, the plaintext they asked for, or
 //   (unwrapCek) the one content key they wipe after use.
-// - Signing and encryption always use the current key epoch. Only the decrypting methods and the
-//   public-key lookup take an epoch; an epoch above the current one is `epoch_unavailable`.
+// - Signing and encryption always use the current key epoch. Only the decrypting methods, the
+//   public-key lookup and signDropRequest (DELETE only, M1-1g-f) take an epoch; an epoch above the
+//   current one is `epoch_unavailable`.
 // - No method signs an untagged digest, and none opens HPKE under a caller-chosen info.
 // - Owner signatures exist only on an OwnerSession, and the only way to get one is
 //   OwnerKeyStore.unlock(presence). A session is short-lived, and lock, close and expiry wipe its
@@ -67,7 +68,8 @@ export class KeyStoreError extends Error {
 /**
  * The key epoch for a decrypting method or the public-key lookup (04 §2.6, §3.1.1). Defaults to the
  * current epoch. Older epochs stay usable so history remains readable after rotation; an epoch above
- * the current one is refused (`epoch_unavailable`). Signing methods never take one.
+ * the current one is refused (`epoch_unavailable`). Signing methods never take one, except
+ * signDropRequest for a DELETE (M1-1g-f).
  */
 export interface EpochOptions {
   readonly epoch?: number;
@@ -137,8 +139,19 @@ export interface KeyStore extends EnvelopeKeys {
    * is never a general Nostr signer. It signs only POST and DELETE to an https URL in serialised
    * form, over the drop's signed JSON body (`v: 1`, a nonce and `ts`), with `createdAt` equal to
    * the body's `ts`; anything else is CryptoInputError `invalid_argument` with one fixed message.
+   *
+   * `options.epoch` (M1-1g-f; 04 §2.1) is the one epoch a signing method takes: a DELETE may sign
+   * with the drop key of a retained older epoch, the one its object was uploaded under (the locator
+   * records it), so the object stays deletable after a rotation. It is accepted only with DELETE
+   * (a POST always signs with the current epoch) and never above the current epoch
+   * (`epoch_unavailable`); a POST with an epoch or a malformed epoch gets the same fixed refusal.
+   * Every check happens before a key is read.
    */
-  signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string>;
+  signDropRequest(
+    request: DropAuthRequest,
+    createdAt: number,
+    options?: EpochOptions,
+  ): Promise<string>;
 
   /** Wipes what the store holds in memory; every later call fails with `keystore_closed`. */
   close(): Promise<void>;
