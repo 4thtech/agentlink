@@ -55,6 +55,10 @@ export class FakeChain implements SubmitterChain {
   batchExtraGas = 0n;
   /** Make every simulation throw, as a chain read without revert data does (infrastructure). */
   readFails = false;
+  /** Make only `simulateBatch` throw (the batch estimate fails, per-item reads work). */
+  batchReadFails = false;
+  /** Make the nonce reads throw (`pendingNonce`, `latestNonce`). */
+  nonceReadFails = false;
   /** Make `send` throw (an RPC failure). */
   sendFails = false;
   balance = 10n ** 17n;
@@ -91,7 +95,8 @@ export class FakeChain implements SubmitterChain {
   }
 
   simulateBatch(items: readonly SubmitItem[]): Promise<BatchSimulation> {
-    if (this.readFails) return Promise.reject(new Error('The chain returned an error.'));
+    if (this.readFails || this.batchReadFails)
+      return Promise.reject(new Error('The chain returned an error.'));
     if (this.paused) return Promise.resolve({ ok: false, error: 'EnforcedPause', paused: true });
     for (const item of items) {
       const error = this.simulationErrors.get(item.id);
@@ -108,8 +113,17 @@ export class FakeChain implements SubmitterChain {
     return Promise.resolve({ ok: true, gas });
   }
 
+  /** The next nonce counting transactions still in the mempool (`pending`). */
   pendingNonce(): Promise<number> {
+    if (this.nonceReadFails) return Promise.reject(new Error('The chain could not be reached.'));
     return Promise.resolve(this.nonce);
+  }
+
+  /** The next nonce counting mined transactions only (`latest`): the lowest one never mined. */
+  latestNonce(): Promise<number> {
+    if (this.nonceReadFails) return Promise.reject(new Error('The chain could not be reached.'));
+    const pending = this.sent.filter((t) => this.pendingItems.has(t.hash)).map((t) => t.nonce);
+    return Promise.resolve(pending.length > 0 ? Math.min(...pending) : this.nonce);
   }
 
   async send(
@@ -132,6 +146,8 @@ export class FakeChain implements SubmitterChain {
       feePercent: options.feePercent ?? 100,
     });
     this.nonce = Math.max(this.nonce, options.nonce + 1);
+    // A transaction at the same nonce replaces any still pending there.
+    for (const t of this.sent) if (t.nonce === options.nonce) this.pendingItems.delete(t.hash);
     this.pendingItems.set(hash, [...items]);
     return hash;
   }
