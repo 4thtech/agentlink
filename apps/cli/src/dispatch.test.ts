@@ -53,6 +53,8 @@ describe('--help (06 §8)', () => {
       'contacts',
       'requests',
       'policy',
+      'credits',
+      'verify',
       'approve',
       'deny',
       'cancel',
@@ -82,6 +84,9 @@ describe('--help (06 §8)', () => {
       // M1-9m-b (D-100).
       'agentlink policy recover [--agent <name>]',
       'agentlink policy set <key> <value>',
+      // M1-9h.
+      'agentlink credits [--topup] [--agent <name>]',
+      'agentlink verify <proof.json> [--agent <name>]',
       'agentlink approve <approvalId> [--agent <name>]',
       'agentlink approve [--agent <name>]',
       'agentlink deny <approvalId> [--agent <name>]',
@@ -91,11 +96,9 @@ describe('--help (06 §8)', () => {
     ]) {
       expect(help).toContain(usage);
     }
-    // M1b and later, and the file KeyStore (M1-8f, off the M1a path): not listed.
+    // Later cards, and the file KeyStore (M1-8f, off the M1a path): not listed.
     for (const absent of [
       'agentlink ui',
-      'credits',
-      'verify <proof',
       'storage',
       'backup',
       'relays',
@@ -106,8 +109,8 @@ describe('--help (06 §8)', () => {
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
     // M1-9m: three more `policy` lines (show, allow-folder, remove-folder next to set); M1-9m-b:
-    // recover.
-    expect(commandLines).toHaveLength(23);
+    // recover; M1-9h: credits and verify.
+    expect(commandLines).toHaveLength(25);
   });
 
   it('prints help for no arguments, --help, -h and help', async () => {
