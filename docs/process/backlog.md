@@ -1284,7 +1284,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Tests first: after an advance, a DELETE signed with `{epoch: n}` verifies with `verifyDropAuthorization` and carries the epoch-n drop key; a POST with an epoch, an epoch above the current one and a malformed epoch are refused before any key is read; MemoryKeyStore and the keychain KeyStore and facade behave the same.
 
 #### M1-1g-g · storage and core: thread the upload epoch to the drop DELETE (new, M1-1g-f follow-up)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#313, merged 2026-10-19; upload epoch recorded and used for drop deletes, D-108; the delete-on-receipt caller and the shared KeyStore conformance move to M1-1g-h) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage (drop adapter `DropSigner`, `drop.ts`), packages/core (delete-on-receipt record), packages/node (conformance zones); docs/foundation/07 §5.4
 - **Depends on:** M1-1g-f
 - **Spec:** 04 §2.1; 07 §5.4
@@ -1295,6 +1295,18 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - When a file-backed agent KeyStore lands, it must call `dropRequestEpoch` and run the shared epoch conformance cases. Consider one shared conformance suite for all KeyStore backends, with the deps-check zones for packages/node it needs.
 - **Acceptance:**
   - Tests first: after an epoch advance, delete-on-receipt for an object uploaded under an older epoch is accepted by the drop; an unretained epoch is refused with the fixed error; the shared conformance cases run against every KeyStore backend that exists.
+
+#### M1-1g-h · core: delete-on-receipt caller for `deleteFileObject`; shared KeyStore conformance (new, M1-1g-g follow-up)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (files, receipts), packages/crypto and packages/node (KeyStore conformance)
+- **Depends on:** M1-1g-g, M1-7g
+- **Spec:** 04 §2.1; 07 §5.4 (Upload epoch, D-108)
+- **Invariants:** I-1, I-3, I-7
+- **Scope:**
+  - Call `deleteFileObject` when a `deleteAfter: receipt` file gets its receipt, passing the recorded upload epoch.
+  - One shared KeyStore conformance suite (epoch and drop-request cases) run against every KeyStore backend, with the deps-check zones packages/node needs.
+- **Acceptance:**
+  - Tests first: after an epoch advance, a receipt deletes the object uploaded under the older epoch; every KeyStore backend passes the shared suite.
 
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
 - **Status:** done (4thtech/agentlink#55, merged 2026-10-14; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1857,7 +1869,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** a recipient that notarizes a received envelope under its own signer and discloses the key is not shown as the author; a forged or mismatched card is refused with a fixed code.
 
 #### M1-4d-c · chain: proof-pack follow-ups (new, IR-M1-4d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (not blocking M1-9h)
+- **Status:** done (4thtech/agentlink#301, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (not blocking M1-9h)
 - **Repo/path:** agentlink · packages/chain/src/verify
 - **Depends on:** M1-4d
 - **Spec:** 07 §8; 04 §3.4 (proof of agreement); 05 §3.2
@@ -1906,7 +1918,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** to be set with the spec; RED commit.
 
 #### M1-4d-f · core: card-update sender with both card signatures; proofSigner for earlier key epochs (new, M1-4d-d-b review)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#305, merged 2026-10-19) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (identity, card-update sender), packages/crypto (KeyStore)
 - **Depends on:** M1-4d-d (#297, #300)
 - **Spec:** 04 §2.9, §3.4.1, §3.6; 07 §8; D-102
@@ -1931,7 +1943,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Split (IR-M1-26-1): the CLI and MCP output snapshots and the proof-pack check move to M1-26-b.
 
 #### M1-26-b · cli/core: wire automatic chain selection into the tools (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#312, merged 2026-10-19; network fields under Advanced, D-108; `selectPayingChain` in the paid tools moves to M1-26-c) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli, packages/core
 - **Depends on:** M1-26, M1-4d, M1-7g
 - **Spec:** D-40; 02 F-51; 06 §2.1 (`credits`, `agentAddress`, `topUpUrl`), §2.4 (`chain?`, `needs_credits`); 07 §6.3, §8; 11 §5
@@ -1942,6 +1954,29 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-9d-2) Resolve here the structured chain fields that M1-9d-2 returns as 06 §2.1 and §2.4 define them: `credits[].chain`, ProofStatus `chain` (notarize, get_proof, `proof` on send and the terms tools) and `chain` in `agentlink_verify_proof_pack`. Summaries already name no network; decide whether these fields move under Advanced or stay as spec'd, and update 06 with the decision.
 - **Acceptance:**
   - Snapshot tests of CLI and MCP default outputs contain no chain prompt and no chain name outside Advanced; a proof pack verifies with no chain configured.
+
+#### M1-26-c · cli/core: paid tools and `agentlink_status` use `selectPayingChain` (new, M1-26-b follow-up)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/tools/**`), packages/core
+- **Depends on:** M1-26-b; M1-26-d for the top-up link
+- **Spec:** D-40, D-108; 06 §2.1 (`credits`, `topUpUrl`), §2.4 (`chain?`, `needs_credits`); 07 §6.3
+- **Invariants:** —
+- **Scope:**
+  - `agentlink_notarize`, the terms tools and `agentlink_status` pick the paying chain with `selectPayingChain`; `needs_credits` carries the top-up link built from the route; the `chain?` override stays the only one, under Advanced.
+- **Acceptance:**
+  - Tests first: with credits on one shipped chain only, a paid call uses that chain without any chain input; `agentlink_status` `prices` and `credits` follow the same selection; no chain name outside `advanced`.
+
+#### M1-26-d · owner decision: top-up link format (new, DECISION NEEDED)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/foundation/08 §1
+- **Depends on:** —
+- **Spec:** 08 §1; 06 §2.1 (`topUpUrl`), §2.4 (`needs_credits`)
+- **Invariants:** —
+- **Scope:**
+  - The owner decides the format of the top-up link (08 §1) that `needs_credits` and `agentlink_status` `topUpUrl` carry: which page, and which of amount and agent address it names.
+  - Record the decision in 00 and update 08 §1; M1-26-c builds on it.
+- **Acceptance:**
+  - A decision-log entry and 08 §1 updated.
 
 #### M1-5a · transport-nostr: gift wrap / unwrap
 - **Status:** done (4thtech/agentlink#45, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2449,7 +2484,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7g · core: proofs and receipts
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#306, merged 2026-10-19); recipient export is M1-7g-b (done); follow-ups in M1-7g-c · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b, M1-7e, M1-7i, M1-20, M1-21, M1-32, M1-4b, M1-4c, M1-4d, M1-26, M1-1l; gap G-13 (D-86) resolved
 - **Spec:** 03 §4.3; 04 §3.4 (`proof`; `terms` and proof of agreement), §5; 05 §3.1, §3.3; 06 §2.4, §3 (`commitments`); 07 §6.2, §6.3, §8; 02 F-40, F-42, F-43, F-47, F-51, J2, J3, J8; D-31, D-32
@@ -2469,7 +2504,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Fresh salts (04 §5, D-61): two Records for the same recipient, and a replacement Record for the same envelope, have different CSPRNG salts; no salt-derivation API exists.
 
 #### M1-7g-b · core: recipient-side proof-pack export (new, D-107)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#315, merged 2026-10-19); follow-ups in M1-7g-c · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types (`proof` body schema), packages/core (proofs)
 - **Depends on:** M1-7g, M1-4d-f, M1-4d-c
 - **Release gate:** M1-7g-b must merge before the next npm release that ships M1-7g. A released receiver with M1-7g's strict `proof` body parser would refuse bodies carrying the new fields.
@@ -2487,6 +2522,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An older sender's body (no `record`, no `signature`) is accepted as before, receipts work, and recipient export returns `RECORD_UNAVAILABLE`.
   - A chain read that fails keeps the body pending with no receipt; after the read recovers, the next sync re-checks it and stores it (or drops it on a definite mismatch); past 256 pending bodies or 7 days it is dropped as `proof_unchecked`.
   - No log line, error or tool result carries the Record, signature or salt (I-7); the largest allowed body fits the payload limit.
+
+#### M1-7g-c · core: proof and receipt follow-ups (new, M1-7g and M1-7g-b reviews)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (proofs, receipts, inbox), packages/node (logger)
+- **Depends on:** M1-7g-b
+- **Spec:** 04 §3.4; 06 §2.4; 07 §3.2, §8
+- **Invariants:** I-3, I-5, I-7
+- **Scope:**
+  - Flag the contact when a `proof` body does not match the on-chain record (04 §3.4).
+  - A per-contact share of the 256-entry pending pool, so one contact cannot fill it.
+  - A logger allowlist for the fixed codes, so only listed codes reach the logs.
+  - The core signs the `ACCEPTED` receipt for `confirm`.
+- **Acceptance:**
+  - Tests first: a mismatching `proof` body flags its contact; one contact cannot take more than its share of the pending pool; an unlisted code is not logged; `confirm` produces a signed `ACCEPTED` receipt.
 
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
 - **Status:** done (4thtech/agentlink#106, merged 2026-10-15; follow-ups in M1-7h-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2905,7 +2954,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Notes (part 1, 2026-10-19):** file sending (M1-9d-1) needs an allowed folder, so the folder commands land first: `policy show` (no owner code), `policy allow-folder <path>` † and `policy remove-folder <path>` † sign one `policy.set` from the current verified policy with only `files.allowedFolders` changed (version + 1). Allowed folders: a full path (`~/` expands), an existing folder, no symbolic link anywhere in it (its realpath must equal the path; the refusal names the real path), not the root, the home folder or a folder above it, not hidden, not under a protected root (04 §4); the canonical realpath is stored. Refused while the policy fails closed (G-6), never rebuilt from the defaults. The TTY owner prompt has one try per run (a wrong code changes nothing); the localhost page's wrong-code backoff (M1-11a) is not in this path. The 06 §8 usage line names the two subcommands (proposed, owner confirms at merge).
 
 #### M1-9m-b · CLI: `policy set` and `contacts --verify` (†) (new, split from M1-9m)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#299, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/{policy,verify-contact}.ts`)
 - **Depends on:** M1-9m (part 1), M1-7c-b; M1-20 for the `commitments` keys
 - **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
@@ -3079,7 +3128,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split (2026-10-19):** M1-9d-1 (`agentlink_send` `path`, `agentlink_fetch_file`, `agentlink_status` `storage`) is in review; M1-9d-2 (`notarize`, `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, the proof-pack tools, receipts, `credits`, `agentAddress`, `topUpUrl`, `prices`) follows. M1-9d-1 notes: `expiresInDays` on send is not exposed yet (the core uses `files.defaultExpiryDays`); a send with `path` and no `text` or `body` carries an empty text; the `needs_setup` next steps name no local settings link, because neither `agentlink policy` (M1-9m) nor the settings page has landed, so owners cannot yet allow a folder; the drop fetch is the global fetch held to the drop's https origin with redirects off (an SSRF-safe non-GET fetch in `@4thtech-io/node` would be the stricter form). Map any chain wording at the tool layer in M1-9d-2; add `aws4fetch` to the CLI when own S3 storage is wired.
 
 #### M1-9d-2 · MCP server: proof tools (new, split from M1-9d, D-101)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#308, merged 2026-10-19) · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/**`)
 - **Depends on:** M1-9d-1 (done); M1-4d-c (D-96 code and wording); D-95 (interim `record_only`); M1-26 (done); M1-10a (done); M1-9o, M1-9p, M1-9q (copy templates; file and proof templates through M1-9g)
 - **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`notarize`), §2.2a (receipts and `notarize`), §2.4, §9; 07 §8; 04 §3.4.2; 12 §4.3; D-53, D-55, D-87, D-95, D-96; G-25, G-43
@@ -3138,7 +3187,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (PR #199 review L1/L2, 2026-10-17): on a denied approval the terms tools reuse the "terms, contact or decision changed" next step: make it say the owner declined, and tell the agent to use a new `clientRequestId` after expiry (a repeat returns `approval_state` again). The reused send text says "message" for terms. Also move `restartDesktop` from `INIT_TEXT` into the strings catalog (one space after "Warning"), and use "profile" for "card" in user-facing copy (11 §5; PR #201 review L1).
 
 #### M1-9h · CLI: local UI, credits and verify commands; passkey and recovery kit in `init` (new, split from M1-9a)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done in part (4thtech/agentlink#314, merged 2026-10-19: `agentlink verify` and `agentlink credits`, exit codes and folders per D-108); `agentlink ui` and the `init` passkey and recovery kit are left for M1-9i; polish in M1-9h-b · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli
 - **Depends on:** M1-9a, M1-8d, M1-8e, M1-1k, M1-4d, M1-26, M1-4d-b
 - **Spec:** 06 §7, §8; 02 F-51, J1, J3, J5; 04 §2.2, §2.3; 07 §6.3; D-39, D-40
@@ -3152,6 +3201,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Snapshot tests of default outputs pass the vocabulary lint and contain no chain prompt; `verify` reports a tampered pack's specific reason.
   - `init` with the passkey option on a virtual authenticator completes; the recovery kit offered by `init` restores on a clean machine (with M1-9i).
+
+#### M1-9h-b · CLI: verify and credits polish (new, M1-9h review)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/commands/{verify,credits}.ts`, `src/tools/**`)
+- **Depends on:** M1-9h
+- **Spec:** 06 §2.4, §8 (D-108); 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - `agentlink credits` prints no "( each)" when no fee is known.
+  - A fallback line for a failure reason that has no wording yet, instead of an empty reason.
+  - One verifier source shared by `agentlink verify` and `agentlink_verify_proof_pack`, so both give the same verdict and reason for the same pack.
+- **Acceptance:**
+  - Tests first: credits output with no fee has no empty parentheses; an unmapped reason prints the fallback; the same pack fixtures give the same verdict through the CLI and the MCP tool.
 
 ### Submitter and faucet (`apps/submitter`)
 
@@ -3306,6 +3368,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-6c-1) A 100 MB round trip through the drop adapter (`@4thtech-io/storage`, M1-6c) against the deployed staging drop: upload, commit, download, hash check, delete.
 - **Acceptance:**
   - A cancelled or timed-out deploy leaves the previous version serving (rehearsed on staging); `cpu_ms` is set to the measured need plus margin; the pre-deploy check fails the job when the lifecycle rule is missing; `actionlint` runs as a required check. The 100 MB staging round trip passes in the deploy smoke.
+
+#### M1-27b-d · drop: deploy-drop lows (new, M1-27b-c review)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/deploy-drop.yml`, `docs/process/release-and-deployment.md`
+- **Depends on:** M1-27b-c (4thtech/agentlink#311)
+- **Spec:** `release-and-deployment.md` §4.5
+- **Invariants:** I-7
+- **Scope:**
+  - Make the docs and the workflow agree on which no-answer codes get the long first-deploy TLS window.
+  - Narrow the rollback-refusal match so only the intended refusal stops a rollback.
+- **Acceptance:**
+  - The docs list exactly the codes the workflow treats as the long window; a case shows an unrelated error does not match the rollback refusal.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
