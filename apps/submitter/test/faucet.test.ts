@@ -136,12 +136,16 @@ describe('POST /v1/faucet: claims', () => {
     expect(faucet.calls.slice(before)).toEqual([{ agent, usdCents: 100, outcome: 'sent' }]);
   });
 
-  it('accepts a checksummed address and credits it in lowercase', async () => {
-    const agent = newAgent();
-    const mixed = `0x${agent.slice(2).toUpperCase()}`;
+  it('accepts an EIP-55 address and credits it in lowercase; refuses a bad checksum', async () => {
+    // The first example address of EIP-55.
+    const mixed = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed';
+    secrets.add(mixed.slice(2).toLowerCase());
+    secrets.add(mixed.slice(2));
+    const badSum = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAeD';
+    expect((await claim({ chainId: CHAIN_ID, agent: badSum }, newIp())).status).toBe(400);
     const res = await claim({ chainId: CHAIN_ID, agent: mixed }, newIp());
     expect(res.status).toBe(200);
-    expect(faucet.calls.at(-1)?.agent).toBe(agent);
+    expect(faucet.calls.at(-1)?.agent).toBe(mixed.toLowerCase());
   });
 
   it('rejects a repeat claim for the same agent inside the window, from any IP', async () => {

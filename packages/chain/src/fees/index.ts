@@ -24,4 +24,15 @@ export {
   type RawLog,
 } from './events.js';
 export { NATIVE_TOKEN_ADDRESS, offeredTokens, type OfferedToken } from './tokens.js';
+export {
+  FAUCET_CHAIN_IDS,
+  FAUCET_MAX_USD_CENTS,
+  buildDepositFor,
+  createFaucetChain,
+  isFaucetChain,
+  type DepositForRequest,
+  type FaucetChain,
+  type FaucetChainOptions,
+  type FaucetCredit,
+} from './faucet.js';
 export { tokenUnitsToUsd } from './usd.js';

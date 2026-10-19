@@ -4,7 +4,7 @@
 
 interface DurableObjectStorage {
   get<T = unknown>(key: string): Promise<T | undefined>;
-  list<T = unknown>(options?: { prefix?: string }): Promise<Map<string, T>>;
+  list<T = unknown>(options?: { prefix?: string; limit?: number }): Promise<Map<string, T>>;
   put(key: string, value: unknown): Promise<void>;
   put(entries: Record<string, unknown>): Promise<void>;
   delete(key: string): Promise<boolean>;
