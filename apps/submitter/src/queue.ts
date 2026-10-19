@@ -39,6 +39,8 @@ export interface QueueEnv {
 export interface QueueDeps {
   /** The chain port for a served chain, or null when its gas key or RPC is not configured. */
   portFor(env: unknown, chainId: number): SubmitterChain | null;
+  /** The alarm interval in ms; POLL_MS when absent. The Miniflare tests set it far ahead. */
+  readonly pollMs?: number;
 }
 
 export type SubmitAnswer =
@@ -71,6 +73,7 @@ export type SubmitterQueueClass = new (
 ) => SubmitterQueueApi & { alarm(): Promise<void> };
 
 export function createQueueClass(deps: QueueDeps): SubmitterQueueClass {
+  const pollMs = deps.pollMs ?? POLL_MS;
   return class SubmitterQueue extends DurableObject<QueueEnv> implements SubmitterQueueApi {
     private state: QueueState = emptyQueueState();
     private chainId: number | null = null;
@@ -134,7 +137,7 @@ export function createQueueClass(deps: QueueDeps): SubmitterQueueClass {
         await this.ctx.storage.delete(deletes.slice(i, i + 100));
       }
       if (queueDepth(this.state) > 0 && (await this.ctx.storage.getAlarm()) === null) {
-        await this.ctx.storage.setAlarm(Date.now() + POLL_MS);
+        await this.ctx.storage.setAlarm(Date.now() + pollMs);
       }
     }
 
@@ -193,7 +196,7 @@ export function createQueueClass(deps: QueueDeps): SubmitterQueueClass {
       const more = await pollQueue(port, config.settings, this.state, nowSeconds()).finally(() =>
         this.persist(),
       );
-      if (more) await this.ctx.storage.setAlarm(Date.now() + POLL_MS);
+      if (more) await this.ctx.storage.setAlarm(Date.now() + pollMs);
     }
   };
 }

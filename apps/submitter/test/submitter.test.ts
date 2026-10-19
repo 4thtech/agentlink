@@ -16,6 +16,7 @@ import {
   type Hex,
 } from '@4thtech-io/chain';
 import type { SubmitterEnv } from '../src/worker.js';
+import { POLL_MS } from '../src/queue.js';
 import { FakeChain, fakeChains } from './fake-chain.js';
 
 const env = testEnv as SubmitterEnv;
@@ -321,6 +322,28 @@ describe('GET /v1/status/:txHash', () => {
     };
     expect(done.state).toBe('included');
     expect(done.items[0]).toMatchObject({ id: r.recordId, status: 'recorded', txHash });
+  });
+
+  // The queue Durable Object is one instance per chain for the whole file, and earlier tests leave
+  // items in it (held, or sent to a FakeChain a later test replaced), so its alarm stays armed. If
+  // that alarm fired on the wall clock, a poll could start between a test's `includeAll()` and its
+  // `runDurableObjectAlarm()`, which then finds no alarm and answers false (merge-queue flake). The
+  // test Worker therefore schedules the alarm far ahead: it runs only when a test runs it.
+  it('polls only when a test runs the alarm, not on the wall clock', async () => {
+    const r = record(newSigner());
+    const { items } = await notarize([r]);
+    const txHash = items[0]?.txHash as string;
+    chain.includeAll();
+    await new Promise((resolve) => setTimeout(resolve, POLL_MS + 500));
+    const before = (await (await SELF.fetch(`${HOST}/v1/status/${txHash}`)).json()) as {
+      state: string;
+    };
+    expect(before.state).toBe('pending');
+    expect(await runDurableObjectAlarm(queueStub())).toBe(true);
+    const after = (await (await SELF.fetch(`${HOST}/v1/status/${txHash}`)).json()) as {
+      state: string;
+    };
+    expect(after.state).toBe('included');
   });
 
   it('answers 404 for an unknown transaction and 400 for a malformed hash', async () => {

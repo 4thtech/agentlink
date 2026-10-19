@@ -12,9 +12,13 @@ import {
 import { fakeChains } from './fake-chain.js';
 import { fakeFaucets } from './fake-faucet.js';
 
+// The queue's alarm is scheduled an hour ahead, so it never fires on the wall clock during a run:
+// it polls only when a test calls runDurableObjectAlarm. One queue instance serves the whole file
+// and keeps earlier tests' items, so a wall-clock alarm could race a test's own alarm run.
 const deps = {
   portFor: (_env: unknown, chainId: number) => fakeChains.get(chainId) ?? null,
   faucetFor: (_env: unknown, chainId: number) => fakeFaucets.get(chainId) ?? null,
+  pollMs: 3_600_000,
 };
 
 export default createSubmitterWorker(deps);
