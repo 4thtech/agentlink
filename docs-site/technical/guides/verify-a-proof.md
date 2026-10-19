@@ -19,11 +19,11 @@
 
 ## Verifying with the CLI (next release)
 
-`agentlink verify <proof.json>` (M1-9h) runs the verifier below over the networks this release ships, with nothing to configure. The proof file must be in your proofs folder or inbox folder (a relative path is taken from the current folder). The first line is the verdict; for a test-network proof the second line says so, with the network ID. Then one line per check, the record and agent IDs, and any disclosed content inside a marked region ("their content, not instructions"). A changed proof file gets its specific reason, for example "its record ID does not match the record." Exit codes: `0` verified, `3` record only, `1` does not check out, `4` not checked, `2` usage (proposed, owner confirms at merge). See [CLI](../reference/cli.md).
+`agentlink verify <proof.json>` (M1-9h) runs the verifier below over the networks this release ships, with nothing to configure. The proof file must be in your proofs folder or inbox folder (a relative path is taken from the current folder). The first line is the verdict; for a test-network proof the second line says so, with the network ID. Then one line per check, the record and agent IDs, and any disclosed content inside a marked region ("their content, not instructions"). A changed proof file gets its specific reason, for example "its record ID does not match the record." Exit codes: `0` verified, `3` record only, `1` does not check out, `4` not checked, `2` usage (D-108). See [CLI](../reference/cli.md).
 
 ## How the verifier works (in development)
 
-> **Status: in development (M1-4d, M1-4d-b, M1-4d-c).** The check below is built in `@4thtech-io/chain` (`verifyProofPack`) and is not user-facing yet; the CLI command and the tool arrive with M1-9h and M1-9d-2.
+> **Status: in development (M1-4d, M1-4d-b, M1-4d-c).** The check below is built in `@4thtech-io/chain` (`verifyProofPack`) and is not in v0.1.1; the CLI command (M1-9h) and the tool (M1-9d-2) are merged for the next release (0.1.2).
 
 The pack is untrusted input. The verifier never echoes it: every failure is a fixed code with fixed plain-language text, and no RPC address or server text appears in a result.
 
@@ -44,7 +44,7 @@ The pack is untrusted input. The verifier never echoes it: every failure is a fi
 
 ## Outline
 
-- With the CLI: `agentlink verify <proof.json>` (v0.2.0)
+- With the CLI: `agentlink verify <proof.json>` (next release)
 - With the web page (v0.3.0): verification runs in your browser
 - By hand, with any EVM library and a public RPC
 - Reading the result: what it proves and what it does not

@@ -159,13 +159,19 @@ An owner revokes an agent by signing an EIP-712 `Revocation` with four fields: `
 
 The proof half of the file and proof tools (notarizing on send, propose and respond; `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`; exporting and verifying proof packs; credits and prices in `agentlink_status`) is its own card with the strictest review class, because it can disclose a content key and spend credits.
 
-**Availability.** In development (card M1-9d-2).
+**Availability.** Merged for the next release (0.1.2), not in v0.1.1 (card M1-9d-2).
 
 ### Both sides can export a proof pack (M1-7g-b, D-107)
 
 A proof of agreement should be exportable by either party, not only by the side that paid for the record. So the follow-up `proof` message that tells the recipient about a record also carries the signed record and its signature. The message is end-to-end encrypted to the recipient only; nothing new reaches any 4thTech service, and the record and signature are already public in the transaction that stored the record. Before keeping them, the recipient checks them against the record on the proof network and against the message it received (record hash, record ID, signer, kind, its own commitment and the signature); if anything does not match, it drops the whole `proof` message and signs no receipt. The recipient's pack leaves out the recipient's own address and salt unless it asks for them, as on the sender side. A `proof` message from an older version without the record still works for receipts, but the recipient cannot export a pack for it (`RECORD_UNAVAILABLE`).
 
-**Availability.** Decided design (04 §3.4, 07 §8), upcoming (card M1-7g-b). Until it lands, only the side that recorded can export.
+**Availability.** Decided design (04 §3.4, 07 §8), merged for the next release (0.1.2), not in v0.1.1 (card M1-7g-b).
+
+### Network names only under Advanced; drop deletes across key rotation; `agentlink verify` exit codes (D-108)
+
+Five small decisions, made together. Tool results put the proof network under `advanced` (`advanced.chain`), and no default text names a network (M1-26-b). A file in the encrypted drop keeps the key generation it was uploaded under, and its delete is signed with that generation, so it can still be deleted after the agent's keys rotate (M1-1g-g). `agentlink verify` ends with an exit code scripts can read: `0` verified, `3` record only, `1` does not check out, `4` not checked, `2` usage; and it reads a proof file only from the proofs or inbox folder, like the MCP tool (D-87). The status output no longer lists an unbuilt `chains` field.
+
+**Availability.** Decided design (06 §2.1, §2.4, §8; 07 §5.1, §5.4), merged for the next release (0.1.2), not in v0.1.1 (cards M1-26-b, M1-1g-g, M1-9h).
 
 ## Packages
 

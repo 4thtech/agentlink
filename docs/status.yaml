@@ -151,8 +151,8 @@ areas:
         summary: "Large files upload to your own S3-compatible storage in parts and are encrypted on the fly as they upload and decrypted as they download, with a quarantine step before a streamed download is released (D-84); an interrupted upload is always cancelled and leftovers can be cleaned up (M1-6b). Tested against MinIO on every pull request and Cloudflare R2 every day (M1-6a-2). In development: no tool uses it yet."
       - name: "Encrypted drop as the default and storage choice"
         state: done
-        prs: [268]
-        summary: "The 4thTech encrypted drop as the default storage and the choice between it and your own storage (M1-6c)."
+        prs: [268, 313]
+        summary: "The 4thTech encrypted drop as the default storage and the choice between it and your own storage (M1-6c). Merged for the next release (0.1.2): a file in the drop can still be deleted after the agent's keys rotate, because the key generation it was uploaded under is kept with it (M1-1g-g, D-108)."
   - id: chain
     title: "Chain client (@4thtech-io/chain)"
     intro: "In development; not wired into the MCP tools yet."
@@ -167,16 +167,16 @@ areas:
         summary: "The client quotes a proof or a registration from the fee vault itself and shows it in USD, with the AgentLink fee and any app fee separate; reads the agent's prepaid credits on every supported chain; and prepares a direct top-up. Only stablecoin fee tokens are priced or shown, and credit history counts only real events from the fee vault. No endpoint address can be read from the client object, and a client is built only over the address-checked fetch (M1-4b). Submission and proof checks follow (M1-4c, M1-4d)."
       - name: "Automatic chain selection"
         state: done
-        prs: [284]
-        summary: "Merged, not user-facing yet. The client checks the agent's credits on every supported network at once and picks where a proof is paid with no question to the user: the default network when it has enough credits, otherwise the cheapest one that does, otherwise a \"credits needed\" answer naming where to add them and how much is missing. A network that does not answer in time is skipped, never chosen, and only test networks are used in this release (M1-26). Wiring into the CLI and MCP tools follows (M1-26-b)."
+        prs: [284, 312]
+        summary: "Merged, not user-facing yet. The client checks the agent's credits on every supported network at once and picks where a proof is paid with no question to the user: the default network when it has enough credits, otherwise the cheapest one that does, otherwise a \"credits needed\" answer naming where to add them and how much is missing. A network that does not answer in time is skipped, never chosen, and only test networks are used in this release (M1-26). Merged for the next release (0.1.2), not in v0.1.1: no default CLI or tool output names a network; it appears only under Advanced (M1-26-b, D-108). The paid tools choosing the network on their own follows (M1-26-c)."
       - name: "Proof submission and deposits"
         state: done
         prs: [295]
         summary: "Merged, not user-facing yet. The client sends signed proofs through a list of submitters with failover, or directly from the agent's own account when no submitter gets them on-chain, and always reads the result from the chain rather than trusting a submitter's answer. It can also add credits for the agent (reading the current allowance first) and then selects the network again from fresh reads (M1-4c). Wiring into the CLI and MCP tools follows (M1-26-b)."
       - name: "Proof verification and who sent a message"
         state: done
-        prs: [290, 297]
-        summary: "Merged, not user-facing yet. Checking a proof pack confirms the record on the chain and, when the agent profile carries the agent's own signatures over it, who sent the message; without them the proof shows the record but not the sender, and a forged signature makes the proof fail (M1-4d-b, M1-4d-d). The verify command and tool follow."
+        prs: [290, 297, 314]
+        summary: "Merged, not user-facing yet. Checking a proof pack confirms the record on the chain and, when the agent profile carries the agent's own signatures over it, who sent the message; without them the proof shows the record but not the sender, and a forged signature makes the proof fail (M1-4d-b, M1-4d-d). Merged for the next release (0.1.2), not in v0.1.1: `agentlink verify` checks a proof pack from the proofs or inbox folder and ends with an exit code scripts can read, and `agentlink credits` shows the agent's credits (M1-9h, D-108)."
   - id: core
     title: "Core (@4thtech-io/core)"
     intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
@@ -248,7 +248,11 @@ areas:
       - name: "Agent profile signatures"
         state: done
         prs: [300]
-        summary: "Agents sign their own profile with both of their keys when they set up and rotate keys, and exchange and check those signatures when they pair; a forged signature is ignored, and an agent on an older version without them still pairs (M1-4d-d-b). Carrying the signatures in profile updates, and proofs that use them, are upcoming (M1-4d-f)."
+        summary: "Agents sign their own profile with both of their keys when they set up and rotate keys, and exchange and check those signatures when they pair; a forged signature is ignored, and an agent on an older version without them still pairs (M1-4d-d-b). Carrying the signatures in profile updates is merged too (M1-4d-f)."
+      - name: "Proofs, receipts and proof packs"
+        state: done
+        prs: [306, 315]
+        summary: "Merged for the next release (0.1.2), not in v0.1.1: notarizing a sent message, receipts and exporting a proof pack (M1-7g). The recipient can export a proof pack too, from the signed record the sender passes along end to end encrypted and that the recipient checks against the chain first (M1-7g-b, D-107). Proof runs on test networks only."
   - id: node
     title: "Node runtime (@4thtech-io/node)"
     intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
