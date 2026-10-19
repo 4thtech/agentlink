@@ -153,7 +153,16 @@ function platform(inbox: MemoryInbox, download: boolean): FilesPlatform {
 }
 
 const SMALL = fileBytes(3_000, 'SMALL-INLINE-9d1');
-const BIG = fileBytes(2 * 1024 * 1024 + 17, 'BIG-DROP-9d1');
+// The smallest size class that still forces the drop: well above the 12 255-byte inline limit
+// (06 §2.3, D-85). A 2 MiB file took 23.6 s on CI run 39188866293 (3.4 s locally) and timed out.
+const BIG = fileBytes(64 * 1024 + 17, 'BIG-DROP-9d1');
+
+/**
+ * Per-test timeout for the drop round trips. Measured: under 1 s locally with BIG at 64 KiB; the
+ * 2 MiB version needed 23.6 s on CI run 39188866293, about 7 times its local time, so 60 s leaves
+ * a wide margin for a loaded runner without hiding a hang.
+ */
+const DROP_TEST_TIMEOUT_MS = 60_000;
 
 let alice: Agent;
 let bob: Agent;
@@ -199,68 +208,91 @@ beforeAll(async () => {
   );
 });
 
-describe('agentlink_send with path and agentlink_fetch_file through the encrypted drop', () => {
-  it('a small file goes inline, a larger one through the drop; bob saves both into his inbox', async () => {
-    const small = await call(aliceMcp, 'agentlink_send', {
-      to: 'Bob',
-      text: 'the notes',
-      path: `${WORK}/notes.txt`,
-    });
-    expect(small.structured).toMatchObject({
-      status: 'ok',
-      file: {
-        name: 'notes.txt',
-        size: SMALL.length,
-        plaintextSha256: encodeHex(sha256(SMALL)),
-        delivery: 'inline',
-        expiresAt: null,
-      },
-    });
+interface Sent {
+  readonly envelopeId: string;
+}
 
-    const big = await call(aliceMcp, 'agentlink_send', { to: 'Bob', path: `${WORK}/report.bin` });
-    expect(big.structured).toMatchObject({
-      status: 'ok',
-      file: {
-        name: 'report.bin',
-        size: BIG.length,
-        plaintextSha256: encodeHex(sha256(BIG)),
-        delivery: 'drop',
-      },
-    });
-    expect(typeof (big.structured['file'] as Record<string, unknown>)['expiresAt']).toBe('string');
-    expect(aliceOpener.opens).toBe(2);
-    expect(seen.length).toBeGreaterThan(0);
-
-    const inbox = await call(bobMcp, 'agentlink_inbox', {});
-    const messages = inbox.structured['messages'] as {
-      envelopeId: string;
-      files: { delivery: string }[];
-    }[];
-    // Both may carry the same second, so they are matched by envelopeId, not by order.
-    const byId = new Map(messages.map((m) => [m.envelopeId, m.files.map((f) => f.delivery)]));
-    expect(byId.get(small.structured['envelopeId'] as string)).toEqual(['inline']);
-    expect(byId.get(big.structured['envelopeId'] as string)).toEqual(['drop']);
-
-    for (const [sent, bytes, name] of [
-      [small, SMALL, 'notes.txt'],
-      [big, BIG, 'report.bin'],
-    ] as const) {
-      const fetched = await call(bobMcp, 'agentlink_fetch_file', {
-        envelopeId: sent.structured['envelopeId'],
-      });
-      expect(fetched.structured).toMatchObject({
-        status: 'ok',
-        savedTo: `${INBOX}/${name}`,
-        name,
-        size: bytes.length,
-        integrity: 'verified',
-      });
-      // The file name is the sender's text: only inside the untrusted block, never the summary.
-      expect(fetched.structured['summary']).not.toContain(name);
-      expect(fetched.text).toContain('<untrusted_content');
-      expect(bobInbox.entries.get(name)).toEqual(bytes);
-    }
+/** Bob's inbox shows the message with this delivery; bob saves the file and gets exact bytes. */
+async function receive(
+  sent: Sent,
+  delivery: string,
+  bytes: Uint8Array,
+  name: string,
+): Promise<void> {
+  const inbox = await call(bobMcp, 'agentlink_inbox', {});
+  const messages = inbox.structured['messages'] as {
+    envelopeId: string;
+    files: { delivery: string }[];
+  }[];
+  const message = messages.find((m) => m.envelopeId === sent.envelopeId);
+  expect(message?.files.map((f) => f.delivery)).toEqual([delivery]);
+  const fetched = await call(bobMcp, 'agentlink_fetch_file', { envelopeId: sent.envelopeId });
+  expect(fetched.structured).toMatchObject({
+    status: 'ok',
+    savedTo: `${INBOX}/${name}`,
+    name,
+    size: bytes.length,
+    integrity: 'verified',
   });
+  // The file name is the sender's text: only inside the untrusted block, never the summary.
+  expect(fetched.structured['summary']).not.toContain(name);
+  expect(fetched.text).toContain('<untrusted_content');
+  expect(bobInbox.entries.get(name)).toEqual(bytes);
+}
+
+describe('agentlink_send with path and agentlink_fetch_file through the encrypted drop', () => {
+  it(
+    'a small file goes inline; bob saves it into his inbox',
+    async () => {
+      const opens = aliceOpener.opens;
+      const small = await call(aliceMcp, 'agentlink_send', {
+        to: 'Bob',
+        text: 'the notes',
+        path: `${WORK}/notes.txt`,
+      });
+      expect(small.structured).toMatchObject({
+        status: 'ok',
+        file: {
+          name: 'notes.txt',
+          size: SMALL.length,
+          plaintextSha256: encodeHex(sha256(SMALL)),
+          delivery: 'inline',
+          expiresAt: null,
+        },
+      });
+      expect(aliceOpener.opens).toBe(opens + 1);
+      await receive(small.structured as unknown as Sent, 'inline', SMALL, 'notes.txt');
+    },
+    DROP_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'a file above the inline limit goes through the drop; bob saves it into his inbox',
+    async () => {
+      const opens = aliceOpener.opens;
+      const before = seen.length;
+      const big = await call(aliceMcp, 'agentlink_send', {
+        to: 'Bob',
+        path: `${WORK}/report.bin`,
+      });
+      expect(big.structured).toMatchObject({
+        status: 'ok',
+        file: {
+          name: 'report.bin',
+          size: BIG.length,
+          plaintextSha256: encodeHex(sha256(BIG)),
+          delivery: 'drop',
+        },
+      });
+      expect(typeof (big.structured['file'] as Record<string, unknown>)['expiresAt']).toBe(
+        'string',
+      );
+      expect(aliceOpener.opens).toBe(opens + 1);
+      expect(seen.length).toBeGreaterThan(before);
+      await receive(big.structured as unknown as Sent, 'drop', BIG, 'report.bin');
+    },
+    DROP_TEST_TIMEOUT_MS,
+  );
 
   it('no tool result or log line carries a drop URL, the drop host or a file key', async () => {
     const payloads = await bob.store.transaction((tx) =>

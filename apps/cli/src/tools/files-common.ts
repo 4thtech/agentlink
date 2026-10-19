@@ -29,8 +29,9 @@ export const FILE_TEXT = Object.freeze({
   fileTooLargeNextStep: 'Send a smaller file. Only the user can change their size limit for files.',
   payloadTooLarge: "These files don't fit in one message, so nothing was sent.",
   payloadTooLargeNextStep: 'Send fewer or smaller files in this message, or send them one by one.',
-  storageUnavailable: 'The encrypted file service is busy or unavailable, so nothing was sent.',
-  storageUnavailableNextStep: 'Try again in a few minutes.',
+  storageUnavailable: "File storage isn't available right now, so nothing was sent.",
+  storageUnavailableNextStep:
+    'Try again later. If it keeps failing, the user can run `agentlink doctor` in their own terminal.',
   storageFailed: "The file couldn't be stored, so nothing was sent.",
   storageFailedNextStep:
     'Try again later. If it keeps failing, the user can run `agentlink doctor` in their own terminal.',

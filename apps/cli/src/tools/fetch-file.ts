@@ -49,8 +49,7 @@ export const FETCH_FILE_TEXT = Object.freeze({
   inboxNextStep:
     'Tell the user their AgentLink inbox folder is missing, hidden or protected. Only they can choose another one.',
   download: "The file couldn't be downloaded, so nothing was saved.",
-  downloadNextStep:
-    'Try again in a few minutes. If it keeps failing, ask the sender to send it again.',
+  downloadNextStep: 'Try again later. If it keeps failing, ask the sender to send it again.',
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>

@@ -2323,6 +2323,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The card's 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
   - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
 - **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
+- **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7g · core: proofs and receipts
