@@ -557,6 +557,35 @@ describe('policy allow-folder <path> †', () => {
     expect(result.text).not.toContain('\u001b');
   });
 
+  it('`.` and `..` get their own message, not the link one (IR-M1-9m-1 L1)', async () => {
+    for (const typed of [`${join(home, 'Other')}/../Work`, `${join(home, 'Work')}/./sub`]) {
+      const result = await run(['policy', 'allow-folder', typed]);
+      expect(result.code).toBe(1);
+      expect(result.err.join('\n')).toMatch(/without `\.` or `\.\.`/);
+      expect(result.err.join('\n')).not.toMatch(/goes through a link/);
+    }
+    expect(codeEntries).toEqual([]);
+  });
+
+  it('a different spelling of the folder (case) is named as such, not as a link (IR-M1-9m-1 L1)', async (ctx) => {
+    let caseInsensitive = false;
+    try {
+      caseInsensitive = statSync(join(home, 'WORK')).isDirectory();
+    } catch {
+      // A case-sensitive volume: the other spelling doesn't exist.
+    }
+    if (!caseInsensitive) {
+      ctx.skip();
+      return;
+    }
+    const result = await run(['policy', 'allow-folder', join(home, 'WORK')]);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toMatch(/spelled differently/);
+    expect(result.err.join('\n')).toContain(join(home, 'Work'));
+    expect(result.err.join('\n')).not.toMatch(/goes through a link/);
+    expect(codeEntries).toEqual([]);
+  });
+
   it('a symbolic link is refused with the folder’s real path to use instead', async () => {
     const result = await run(['policy', 'allow-folder', join(home, 'WorkLink')]);
     expect(result.code).toBe(1);
@@ -597,6 +626,33 @@ describe('policy remove-folder <path> †', () => {
     expect(summaries[2]).toContain(join(home, 'Work'));
     expect(await folders()).toEqual([join(home, 'Other')]);
     expect(await version()).toBe(4);
+  });
+
+  it('removes every stored entry that names the folder, and the summary lists them all (IR-M1-9m-1 L4)', async () => {
+    // A policy signed elsewhere may hold the folder both as `~/Work` and as its realpath (06 §3).
+    const policy = defaultPolicy();
+    policy.contacts.acceptInvites = 'auto';
+    policy.files.allowedFolders = ['~/Work', join(home, 'Work'), join(home, 'Other')];
+    const keys = await alice.owner.getPublicKeys();
+    const applied = await alice.client.ownerActions.apply(
+      await sign(alice, {
+        v: 1,
+        agent: alice.client.agentId,
+        owner: encodeHex(keys.ownerNostr),
+        op: 'policy.set',
+        params: { version: 2, policy: policy as unknown as JsonObject },
+        nonce: encodeBase64url(randomBytes(16)),
+        issuedAt: NOW,
+        expiresAt: NOW + 600,
+      }),
+    );
+    expect(applied.status).toBe('applied');
+    const removed = await run(['policy', 'remove-folder', join(home, 'Work')]);
+    expect(removed.code).toBe(0);
+    expect(summaries[0]).toContain('~/Work');
+    expect(summaries[0]).toContain(join(home, 'Work'));
+    expect(await folders()).toEqual([join(home, 'Other')]);
+    expect(await version()).toBe(3);
   });
 
   it('works for a folder that no longer exists', async () => {

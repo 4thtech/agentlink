@@ -2768,6 +2768,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-4, I-5
 - **Scope:** the rest of M1-9m: `policy set <key> <value>` † (including the `commitments` limits and `autoAcceptDirection`, M1-20; turning on selling auto-accept first prints the sell warning, 06 §3, and needs an explicit `y`), and `contacts --verify <id>` † as in the M1-9m scope.
 - **Acceptance:** as M1-9m: piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; RED commit.
+- **Review lows carried here (IR-M1-9m-1):**
+  - L2: `policy allow-folder` accepts a folder that contains protected folders (for example `~/Library`, which holds `~/Library/Keychains`). Today only the per-file check at send time (04 §4 protected roots, M1-15, M1-9d-1) keeps such files out. Decide whether to refuse a folder that contains a protected root, or to warn before the owner code.
+  - L3: recovering from a fail-closed policy (G-6: `mark_mismatch`, `rolled_back`, `tampered`). `policy` refuses while the policy fails closed and never rebuilds it from the defaults; give the owner a deliberate recovery path (show the problem, then sign a complete policy above the mark after an explicit confirmation), with `doctor` naming it.
 
 #### M1-9n · CLI: `relays set` (†) (new, split from M1-9b, D-73 (5))
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

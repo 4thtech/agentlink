@@ -24,7 +24,7 @@
 // - The owner code is never an argument, a variable or a pipe (deps.ts). A wrong code is refused by
 //   the owner store (`presence_rejected`): nothing is signed, nothing changes, and the next run asks
 //   again. There is one try per run.
-import { realpath, stat } from 'node:fs/promises';
+import { lstat, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import process from 'node:process';
 import {
@@ -80,6 +80,9 @@ export const POLICY_TEXT = Object.freeze({
     "That folder's name has characters AgentLink can't show safely. Rename the folder, then try again.",
   missing: "That folder doesn't exist. Check the path, then try again.",
   notFolder: "That isn't a folder. Allow the folder that holds the file.",
+  dotSegments: 'Use the folder’s path without `.` or `..` in it.',
+  spelling: (real: string): string =>
+    `That folder is spelled differently on disk (for example in upper or lower case). Use its exact path: ${real}`,
   link: (real: string): string =>
     `That path goes through a link. Use the folder's real path instead: ${real}`,
   tooBroad:
@@ -97,7 +100,8 @@ export const POLICY_TEXT = Object.freeze({
     "Type your owner code only at the prompt below. It isn't a shell command, and never paste it into a chat.",
   allowSummary: (folder: string): string =>
     `Allow your AI to send files from ${folder} and its subfolders to your contacts. Hidden files are never sent.`,
-  removeSummary: (folder: string): string => `Stop your AI from sending files from ${folder}.`,
+  removeSummary: (folders: readonly string[]): string =>
+    `Stop your AI from sending files from ${folders.join(', ')}.`,
   allowed: 'OK       Allowed. Your AI can now send files from this folder.',
   removed: 'OK       Removed. Your AI can no longer send files from this folder.',
   wrongCode: "That owner code didn't work. Nothing was changed. Run the command again to retry.",
@@ -145,6 +149,10 @@ function lexical(typed: string, home: string, flavor: PathFlavor): Checked {
     return refuse(POLICY_TEXT.notShowable);
   }
   let path = expandHome(typed, home, flavor);
+  // `.` and `..` get their own message (parseAbsolutePath refuses them too, as malformed).
+  if (path.split(flavor === 'posix' ? '/' : /[\\/]/).some((s) => s === '.' || s === '..')) {
+    return refuse(POLICY_TEXT.dotSegments);
+  }
   const sep = flavor === 'posix' ? /[/]$/ : /[\\/]$/;
   if (path.length > 1 && sep.test(path) && parseAbsolutePath(path.slice(0, -1), flavor)) {
     path = path.slice(0, -1);
@@ -155,6 +163,24 @@ function lexical(typed: string, home: string, flavor: PathFlavor): Checked {
 
 const segmentsOf = (path: string, flavor: PathFlavor): readonly string[] =>
   parseAbsolutePath(path, flavor)?.segments ?? [];
+
+/** True when the path itself or any folder on the way to it is a symbolic link. */
+async function hasLink(path: string, flavor: PathFlavor): Promise<boolean> {
+  const parsed = parseAbsolutePath(path, flavor);
+  if (parsed === undefined) return false;
+  const sep = flavor === 'posix' ? '/' : '\\';
+  const start = flavor === 'posix' ? '' : parsed.root;
+  let prefix = start;
+  for (const segment of parsed.segments) {
+    prefix = `${prefix}${sep}${segment}`;
+    try {
+      if ((await lstat(prefix)).isSymbolicLink()) return true;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 
 /** The checks of 04 §4 for a folder the owner allows (see the header). */
 async function checkFolder(typed: string, home: string, flavor: PathFlavor): Promise<Checked> {
@@ -174,8 +200,12 @@ async function checkFolder(typed: string, home: string, flavor: PathFlavor): Pro
   }
   if (real !== path) {
     // The real path is local data the owner can use; shown only when it is safe to show.
-    const showable = sanitizeTerminalText(real) === real;
-    return refuse(showable ? POLICY_TEXT.link(real) : POLICY_TEXT.notShowable);
+    if (sanitizeTerminalText(real) !== real) return refuse(POLICY_TEXT.notShowable);
+    // A link somewhere in the path, or only a different spelling of the same folder (a
+    // case-insensitive volume, another Unicode form). Either way the real path is what is stored.
+    return refuse(
+      (await hasLink(path, flavor)) ? POLICY_TEXT.link(real) : POLICY_TEXT.spelling(real),
+    );
   }
   const homes = [home];
   try {
@@ -363,8 +393,8 @@ async function removeFolder(
     output.printError(POLICY_TEXT.notAllowed);
     return EXIT_FAILED;
   }
-  // The stored entry is what the owner sees: it passed the 06 §3 path rule when it was signed.
-  const shown = terminalOneLine(removed[0]);
+  // Every stored entry that matches is removed, and all of them are shown (IR-M1-9m-1 L4). The stored entry is what the owner sees: it passed the 06 §3 path rule when it was signed.
+  const shown = removed.map((entry) => terminalOneLine(entry));
   return setFolders(
     deps,
     agent,
