@@ -4,7 +4,14 @@
 //
 // I-5: the result carries counts and contact names under the 06 §2.1 rule only (the core's
 // `display`): never message text, subjects, file names, terms or a self-declared name. Unknown
-// senders appear only as the `requests` count. No `credits` or `prices` until M1-9d.
+// senders appear only as the `requests` count.
+//
+// Credits and prices (M1-9d-2; 06 §2.1, D-53, D-45, G-43): where the runtime has the proof platform,
+// `credits` (per supported chain and fee token, base units and USD), `prices` (the notarize fee in
+// USD with the AgentLink part `protocolUsd` and the app part `integratorUsd` separately; 0 for
+// official clients), `agentAddress` (the agent ID) and `topUpUrl`. They are read within a short
+// budget by the platform; when no chain answers they are left out and status still answers. The
+// summary stays the session-start line: no credit, token or network name in it (11 §5.1).
 //
 // Open offers (M1-22): received offers still waiting for an answer, even ones already read in an
 // earlier session, are counted by contact (`openOffers`, `offers`) from the core's store read, so a
@@ -14,6 +21,7 @@ import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import { copy } from './strings/index.js';
 import { activeContacts, contactRef, renderRef, type ContactRef } from './contacts.js';
 import type { Counts, ToolContext } from './context.js';
+import { topUpUrl } from './proofs-common.js';
 import { fail, ok, type HandlerOutput } from './result.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 
@@ -32,6 +40,8 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
       noOwnerCard(context.agentName).nextStep,
     );
 
+  // Credits are read in parallel with the catch-up, within the platform's own budget.
+  const accountRead = accountFields(context, self.agentId);
   let counts: Counts;
   try {
     counts = await client.catchUp(STATUS_CATCH_UP_BUDGET_MS);
@@ -71,6 +81,7 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
 
   const pendingApprovals = await client.pendingApprovals();
   const storage = { mode: await client.storageMode() };
+  const account = await accountRead;
 
   logger.info('status', {
     contacts: contacts.length,
@@ -89,7 +100,44 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     openOffers,
     offers,
     storage,
+    ...account,
   });
+}
+
+/** 06 §2.1 `credits`, `prices`, `agentAddress`, `topUpUrl` (M1-9d-2); empty without proofs. */
+async function accountFields(
+  context: ToolContext,
+  agentId: string,
+): Promise<Record<string, unknown>> {
+  const proofs = context.client.proofs;
+  if (proofs === undefined) return {};
+  const url = topUpUrl(agentId);
+  const base = { agentAddress: agentId, ...(url === undefined ? {} : { topUpUrl: url }) };
+  let account;
+  try {
+    account = await proofs.account(agentId);
+  } catch {
+    // The error could carry an RPC URL (I-7): never logged or returned.
+    context.logger.info('status credits unavailable');
+    return base;
+  }
+  if (account === undefined) return base;
+  return {
+    ...base,
+    credits: account.credits.map((c) => ({
+      chain: c.chain,
+      token: c.token,
+      amount: c.amount,
+      usd: c.usd,
+    })),
+    prices: account.prices.map((p) => ({
+      action: p.action,
+      usd: p.usd,
+      protocolUsd: p.protocolUsd,
+      integratorUsd: p.integratorUsd,
+      payFrom: 'credits',
+    })),
+  };
 }
 
 const fill = (template: string, slots: Readonly<Record<string, string>>): string =>

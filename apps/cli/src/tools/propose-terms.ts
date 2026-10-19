@@ -43,6 +43,7 @@ interface ProposeInput {
   terms: Record<string, unknown>;
   revises?: string;
   note?: string;
+  notarize?: boolean;
   approvalId?: string;
   clientRequestId?: string;
 }
@@ -54,7 +55,7 @@ export async function proposeTermsHandler(
   const { client, logger } = context;
   const terms = client.terms;
   if (terms === undefined) return notAvailable();
-  const { to, revises, note, approvalId, clientRequestId } = input as ProposeInput;
+  const { to, revises, note, notarize, approvalId, clientRequestId } = input as ProposeInput;
 
   if ((await client.self()) === undefined) {
     return fail(
@@ -75,6 +76,8 @@ export async function proposeTermsHandler(
     terms: (input as ProposeInput).terms,
     ...(revises === undefined ? {} : { revises }),
     ...(note === undefined ? {} : { note }),
+    // M1-9d-2: a firm offer (06 §2.2a); the core decides it under one commitment scope.
+    ...(notarize === undefined ? {} : { notarize }),
     ...(approvalId === undefined ? {} : { approvalId }),
     ...(clientRequestId === undefined ? {} : { clientRequestId }),
   };

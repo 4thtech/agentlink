@@ -312,6 +312,17 @@ function inboxOps(folder: string): TempFileOps {
 
 /** Resolves `files.inboxFolder` for one save (see the header); creates it (0700) when missing. */
 async function resolveInbox(folder: string, home: string): Promise<InboxFolder> {
+  const real = await resolveOwnFolder(folder, home);
+  return { realpath: real, ops: inboxOps(real) };
+}
+
+/**
+ * Resolves a folder the user's rules name for AgentLink to write into (`files.inboxFolder`,
+ * `proofs.exportFolder`, M1-9d-2): a full path (`~/` expands), not hidden, outside the protected
+ * roots before and after realpath, a directory; created (0700) when missing. Returns its realpath;
+ * throws a fixed error otherwise.
+ */
+export async function resolveOwnFolder(folder: string, home: string): Promise<string> {
   if (typeof folder !== 'string') throw inboxUnavailable();
   const abs = expandHome(folder, home, FLAVOR);
   if (parseAbsolutePath(abs, FLAVOR) === undefined || hiddenSegment(abs)) throw inboxUnavailable();
@@ -329,7 +340,7 @@ async function resolveInbox(folder: string, home: string): Promise<InboxFolder> 
   }
   const info = await stat(real).catch(() => undefined);
   if (info === undefined || !info.isDirectory()) throw inboxUnavailable();
-  return { realpath: real, ops: inboxOps(real) };
+  return real;
 }
 
 /** The core's FilesPlatform in Node (see the header). */

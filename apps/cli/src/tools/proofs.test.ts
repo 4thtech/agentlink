@@ -278,8 +278,7 @@ function fake(options: FakeOptions = {}): { client: ToolClient; calls: Calls } {
           }) as never,
         );
       },
-      senderOf: () =>
-        Promise.resolve({ id: B, display: contact().display as ContactDisplayName }),
+      senderOf: () => Promise.resolve({ id: B, display: contact().display as ContactDisplayName }),
     },
     ...(options.proofs === false ? {} : { proofs }),
   };
@@ -480,7 +479,10 @@ describe('agentlink_notarize (06 §2.4)', () => {
   });
 
   it('needs_setup without an identity; not available without the proof platform', async () => {
-    expect((await call('agentlink_notarize', { envelopeId: ENVELOPE }, fake({ self: false }).client)).structured.status).toBe('needs_setup');
+    expect(
+      (await call('agentlink_notarize', { envelopeId: ENVELOPE }, fake({ self: false }).client))
+        .structured.status,
+    ).toBe('needs_setup');
     expect(
       (await call('agentlink_notarize', { envelopeId: ENVELOPE }, fake({ proofs: false }).client))
         .structured,
@@ -554,7 +556,11 @@ describe('agentlink_acknowledge (06 §2.4)', () => {
     };
     for (const [code, status] of Object.entries(expected)) {
       const { client } = fake({ acknowledge: () => ({ status: 'rejected', code }) as never });
-      const r = await call('agentlink_acknowledge', { envelopeId: ENVELOPE, type: 'opened' }, client);
+      const r = await call(
+        'agentlink_acknowledge',
+        { envelopeId: ENVELOPE, type: 'opened' },
+        client,
+      );
       expect(r.structured, code).toMatchObject({ status, code });
     }
   });
@@ -611,10 +617,14 @@ describe('agentlink_get_proof (06 §2.4)', () => {
 
   it('not_found; exactly one of envelopeId and recordId', async () => {
     const { client } = fake({ get: () => undefined });
-    expect((await call('agentlink_get_proof', { envelopeId: ENVELOPE }, client)).structured.status).toBe(
-      'not_found',
+    expect(
+      (await call('agentlink_get_proof', { envelopeId: ENVELOPE }, client)).structured.status,
+    ).toBe('not_found');
+    const both = await call(
+      'agentlink_get_proof',
+      { envelopeId: ENVELOPE, recordId: RECORD },
+      client,
     );
-    const both = await call('agentlink_get_proof', { envelopeId: ENVELOPE, recordId: RECORD }, client);
     expect(both.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
     const none = await call('agentlink_get_proof', {}, client);
     expect(none.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
@@ -667,7 +677,12 @@ describe('agentlink_export_proof_pack (06 §2.4, 07 §8)', () => {
 
     const again = await call(
       'agentlink_export_proof_pack',
-      { envelopeId: ENVELOPE, includeContentKey: true, includeRecipient: true, approvalId: APPROVAL },
+      {
+        envelopeId: ENVELOPE,
+        includeContentKey: true,
+        includeRecipient: true,
+        approvalId: APPROVAL,
+      },
       client,
     );
     expect(again.structured.status).toBe('ok');
@@ -756,10 +771,18 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
 
   it('json: verified directly; above the size cap → PACK_TOO_LARGE without verifying', async () => {
     const { client, calls } = fake();
-    const ok = await call('agentlink_verify_proof_pack', { json: { type: 'agentlink.proof' } }, client);
+    const ok = await call(
+      'agentlink_verify_proof_pack',
+      { json: { type: 'agentlink.proof' } },
+      client,
+    );
     expect(ok.structured.status).toBe('ok');
     expect(calls.verified).toEqual([{ type: 'agentlink.proof' }]);
-    const big = await call('agentlink_verify_proof_pack', { json: { pad: 'x'.repeat(300_000) } }, client);
+    const big = await call(
+      'agentlink_verify_proof_pack',
+      { json: { pad: 'x'.repeat(300_000) } },
+      client,
+    );
     expect(big.structured).toMatchObject({ status: 'rejected', code: 'PACK_TOO_LARGE' });
     expect(calls.verified).toHaveLength(1);
   });
@@ -810,8 +833,10 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
     expect(r.structured.summary).not.toMatch(/\bvalid proof\b|verified/i);
   });
 
-  it("the D-96 notice adds its fixed sentence; the verdict is unchanged", async () => {
-    const { client } = fake({ verify: () => validPack({ notices: ['signer_no_longer_confirms'] }) });
+  it('the D-96 notice adds its fixed sentence; the verdict is unchanged', async () => {
+    const { client } = fake({
+      verify: () => validPack({ notices: ['signer_no_longer_confirms'] }),
+    });
     const r = await call('agentlink_verify_proof_pack', { path: 'p.json' }, client);
     expect(r.structured.summary).toContain(
       "The signer's account no longer confirms this record. The proof network checked it when the record was made.",
@@ -841,10 +866,14 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
       expect(r.structured, reason).toMatchObject({ status: 'ok', valid: false, verdict: 'failed' });
       expect(r.structured.summary, reason).not.toMatch(/contract|chain|blockchain/i);
     }
-    const down = fake({ verify: () => ({ valid: false, verdict: 'failed', reason: 'chain_unavailable' }) });
+    const down = fake({
+      verify: () => ({ valid: false, verdict: 'failed', reason: 'chain_unavailable' }),
+    });
     const r = await call('agentlink_verify_proof_pack', { json: {} }, down.client);
     expect(r.structured).toMatchObject({ status: 'error', code: 'NETWORK' });
-    const bad = fake({ verify: () => ({ valid: false, verdict: 'failed', reason: 'malformed_pack' }) });
+    const bad = fake({
+      verify: () => ({ valid: false, verdict: 'failed', reason: 'malformed_pack' }),
+    });
     const r2 = await call('agentlink_verify_proof_pack', { json: {} }, bad.client);
     expect(r2.structured).toMatchObject({ status: 'rejected', code: 'PACK_INVALID' });
   });
@@ -906,7 +935,11 @@ describe('notarize on agentlink_send (06 §2.2: the proofs policy as for agentli
       }),
     });
     const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
-    expect(r.structured).toMatchObject({ status: 'needs_credits', envelopeId: ENVELOPE, agentAddress: A });
+    expect(r.structured).toMatchObject({
+      status: 'needs_credits',
+      envelopeId: ENVELOPE,
+      agentAddress: A,
+    });
   });
 
   it('approvalId with notarize but no clientRequestId: refused before anything is sent', async () => {
@@ -975,7 +1008,13 @@ describe('agentlink_status credits, prices, agent address and top-up link (06 §
         { chain: 'gnosis-chiado', token: 'xDAI', amount: '0', usd: '0' },
       ],
       prices: [
-        { action: 'notarize', usd: '0.10', protocolUsd: '0.10', integratorUsd: '0', payFrom: 'credits' },
+        {
+          action: 'notarize',
+          usd: '0.10',
+          protocolUsd: '0.10',
+          integratorUsd: '0',
+          payFrom: 'credits',
+        },
       ],
     });
     expect((r.structured['topUpUrl'] as string).startsWith(`${PAY_ORIGIN}/`)).toBe(true);

@@ -3,16 +3,22 @@
 // (src/mcp/) and the mirroring CLI commands use, so a command and its tool cannot drift.
 //
 // Every M1a tool has its handler: invites (M1-9o), send and inbox (M1-9p), terms (M1-9q); the file
-// tools of M1b (M1-9d-1): `path` on send and agentlink_fetch_file. A tool
+// tools of M1b (M1-9d-1): `path` on send and agentlink_fetch_file; the proof tools (M1-9d-2):
+// `notarize` on send and the terms tools, agentlink_notarize, agentlink_acknowledge,
+// agentlink_get_proof, agentlink_export_proof_pack, agentlink_verify_proof_pack. A tool
 // whose card has not landed would answer the fixed "not available yet" error (06 §1 rule 3).
 import type { McpToolName } from '@4thtech-io/types';
 import { acceptInviteHandler } from './accept-invite.js';
+import { acknowledgeHandler } from './acknowledge.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
+import { exportProofPackHandler } from './export-proof-pack.js';
 import { fetchFileHandler } from './fetch-file.js';
 import { getApprovalHandler } from './get-approval.js';
+import { getProofHandler } from './get-proof.js';
 import { inboxHandler } from './inbox.js';
 import { matchesSchema } from './input.js';
+import { notarizeHandler } from './notarize.js';
 import { proposeTermsHandler } from './propose-terms.js';
 import { respondToTermsHandler } from './respond-to-terms.js';
 import { listContactsHandler } from './list-contacts.js';
@@ -30,6 +36,7 @@ import {
 import { sendHandler } from './send.js';
 import { statusHandler } from './status.js';
 import { TOOL_TEXT } from './text.js';
+import { verifyProofPackHandler } from './verify-proof-pack.js';
 
 export type ToolHandler = (input: unknown, context: ToolContext) => Promise<HandlerOutput>;
 
@@ -47,6 +54,11 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_inbox: inboxHandler,
   agentlink_fetch_file: fetchFileHandler,
   agentlink_get_approval: getApprovalHandler,
+  agentlink_notarize: notarizeHandler,
+  agentlink_acknowledge: acknowledgeHandler,
+  agentlink_get_proof: getProofHandler,
+  agentlink_export_proof_pack: exportProofPackHandler,
+  agentlink_verify_proof_pack: verifyProofPackHandler,
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -105,6 +117,13 @@ export {
   type InboxPageQuery,
   type InboundPageItem,
   type NeedsSetupContext,
+  type AccountView,
+  type PackCheck,
+  type PackFolders,
+  type PackReadOutcome,
+  type PackSaveOutcome,
+  type ProofPlatformTools,
+  type ProofTools,
   type OutboundPageItem,
   type PageFile,
   type PageItem,

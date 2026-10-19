@@ -47,6 +47,7 @@ interface RespondInput {
   decision: 'accept' | 'reject' | 'counter';
   terms?: Record<string, unknown>;
   note?: string;
+  notarize?: boolean;
   approvalId?: string;
   clientRequestId?: string;
 }
@@ -58,7 +59,8 @@ export async function respondToTermsHandler(
   input: unknown,
   context: ToolContext,
 ): Promise<HandlerOutput> {
-  const { envelopeId, decision, terms, note, approvalId, clientRequestId } = input as RespondInput;
+  const { envelopeId, decision, terms, note, notarize, approvalId, clientRequestId } =
+    input as RespondInput;
   // 1. 06 §2.2a: never terms with accept or reject; a counter needs them; no note with accept.
   if ((decision === 'counter') !== (terms !== undefined)) return invalidArgument();
   if (decision === 'accept' && note !== undefined) return invalidArgument();
@@ -79,6 +81,8 @@ export async function respondToTermsHandler(
     decision,
     ...(terms === undefined ? {} : { terms }),
     ...(note === undefined ? {} : { note }),
+    // M1-9d-2: the record and its receipt under the same commitment scope (06 §2.2a).
+    ...(notarize === undefined ? {} : { notarize }),
     ...(approvalId === undefined ? {} : { approvalId }),
     ...(clientRequestId === undefined ? {} : { clientRequestId }),
   };

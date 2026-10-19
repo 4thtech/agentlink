@@ -6,7 +6,16 @@
 //   whose device and inode match, and the 256 KiB cap; fixed codes only, never the path or bytes.
 // - `savePack` (agentlink_export_proof_pack): a new 0600 file in the export folder, never
 //   overwriting, never following a link; a hidden or protected folder is refused.
-import { lstat, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -65,9 +74,15 @@ describe('readPack (D-87)', () => {
   });
 
   it('a link inside the folder that escapes it is refused', async () => {
-    await symlink(path.join(home, 'outside.json'), path.join(home, 'AgentLink', 'Proofs', 'l.json'));
+    await symlink(
+      path.join(home, 'outside.json'),
+      path.join(home, 'AgentLink', 'Proofs', 'l.json'),
+    );
     const { reader } = packs();
-    expect(await reader.readPack('l.json', FOLDERS)).toEqual({ ok: false, code: 'PATH_NOT_ALLOWED' });
+    expect(await reader.readPack('l.json', FOLDERS)).toEqual({
+      ok: false,
+      code: 'PATH_NOT_ALLOWED',
+    });
   });
 
   it('a hidden file, a folder and a missing file are refused with the same fixed code', async () => {
@@ -82,7 +97,10 @@ describe('readPack (D-87)', () => {
   it('above 256 KiB: PACK_TOO_LARGE, never the bytes', async () => {
     await writeFile(path.join(home, 'AgentLink', 'Proofs', 'big.json'), 'x'.repeat(256 * 1024 + 1));
     const { reader } = packs();
-    expect(await reader.readPack('big.json', FOLDERS)).toEqual({ ok: false, code: 'PACK_TOO_LARGE' });
+    expect(await reader.readPack('big.json', FOLDERS)).toEqual({
+      ok: false,
+      code: 'PACK_TOO_LARGE',
+    });
   });
 
   it('a folder in the rules that is malformed or missing allows nothing', async () => {

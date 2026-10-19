@@ -16,6 +16,15 @@
 //    the file once. The result's `file` carries name, size, hash, delivery and expiry only: never a
 //    link, a locator or a key (IR-D48-1 F15f).
 //
+// 6. With `notarize` (M1-9d-2; 06 §2.2 "the proofs policy applies as for agentlink_notarize"): the
+//    message is sent first (free, and not a commitment), then core `notarize` records it under
+//    policy `proofs.*`, exactly as agentlink_notarize does. The result is the send's fields plus
+//    `proof` (a ProofStatus); a proof that is not `ok` gives the result its status (pending_approval,
+//    needs_credits, submitted, …) with a summary that says the message was sent. Its approval is the
+//    agentlink_notarize one, so the nextStep finishes through agentlink_notarize with the envelopeId.
+//    A repeat with `approvalId` must carry the same `clientRequestId`, so the core returns the kept
+//    send instead of sending again; without one it is refused before anything is sent.
+//
 // I-5, I-7: the message text, the body, the path and the `to` query are agent-written (steerable)
 // text: none of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
 // 06 §2.1 rule only. Core errors become fixed text by their code; any other failure is INTERNAL.
@@ -37,6 +46,7 @@ import {
   ok,
   type HandlerOutput,
 } from './result.js';
+import { notarizeOutput, proofThrown } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 
@@ -64,7 +74,17 @@ export const SEND_TEXT = Object.freeze({
   tooLargeNextStep: 'Send a shorter message, or split it into several.',
   replyNotFound: "The message this replies to wasn't found, so nothing was sent.",
   replyNotFoundNextStep: 'Check the replyTo envelopeId, or send without replyTo.',
+  // M1-9d-2: `notarize` (06 §2.2).
+  notarizeRetry:
+    'An approvalId with notarize needs the clientRequestId of the first call, so nothing was sent.',
+  notarizeRetryNextStep:
+    'To finish adding proof to a message already sent, call agentlink_notarize with its envelopeId and the approvalId.',
+  proofApproval: "Adding proof to this message needs the owner's approval.",
+  proofApprovalTail:
+    'The message is already sent: to finish, call agentlink_notarize with envelopeId {envelopeId} and this approvalId.',
 });
+
+const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -107,7 +127,7 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
 
 export async function sendHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
-  const { to, text, body, type, replyTo, clientRequestId, path } = input;
+  const { to, text, body, type, replyTo, clientRequestId, path, notarize, approvalId } = input;
   // 1. D-55: before anything else, so a negotiation never even resolves a contact.
   if (isPlainObject(body) && Object.hasOwn(body, 'terms')) return useTermsTools();
   // 2. The schema checked each field's type; here only their combination.
@@ -119,14 +139,28 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     return invalidArgument();
   }
 
+  // 6. A repeat with an approval must name the first call's request, so nothing is sent twice.
+  const withProof = notarize === true;
+  if (withProof && typeof approvalId === 'string' && typeof clientRequestId !== 'string') {
+    return fail(
+      'error',
+      SEND_TEXT.notarizeRetry,
+      SEND_TEXT.notarizeRetryNextStep,
+      'INVALID_ARGUMENT',
+    );
+  }
+
   const { client, logger } = context;
-  if ((await client.self()) === undefined) {
+  const self = await client.self();
+  if (self === undefined) {
     return fail(
       'needs_setup',
       noOwnerCard(context.agentName).summary,
       noOwnerCard(context.agentName).nextStep,
     );
   }
+  // Without the proof platform nothing is sent: the user asked for a message with proof.
+  if (withProof && client.proofs === undefined) return notAvailable();
 
   // 3. The contact.
   const resolved = resolveContact(to, await client.contacts());
@@ -179,19 +213,23 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
         sentAt: result.sentAt,
       };
       const summary = copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
-      if (attached === undefined) return ok(summary, fields);
-      const sent = result.files?.find((f) => f.index === 0);
-      if (sent === undefined) return internalError();
-      return ok(summary, {
-        ...fields,
-        file: {
-          name: attached.name,
-          size: attached.size,
-          plaintextSha256: await attached.plaintextSha256(),
-          delivery: sent.delivery,
-          expiresAt: sent.expiresAt === null ? null : isoSeconds(sent.expiresAt),
-        },
-      });
+      let sentFields: Record<string, unknown> = fields;
+      if (attached !== undefined) {
+        const sent = result.files?.find((f) => f.index === 0);
+        if (sent === undefined) return internalError();
+        sentFields = {
+          ...fields,
+          file: {
+            name: attached.name,
+            size: attached.size,
+            plaintextSha256: await attached.plaintextSha256(),
+            delivery: sent.delivery,
+            expiresAt: sent.expiresAt === null ? null : isoSeconds(sent.expiresAt),
+          },
+        };
+      }
+      if (!withProof) return ok(summary, sentFields);
+      return withProofOf(result.envelopeId, summary, sentFields, approvalId, self.agentId, context);
     }
     case 'needs_setup':
       logger.info('file send needs setup', { reason: result.reason });
@@ -237,4 +275,66 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     default:
       return internalError();
   }
+}
+
+/** ProofStatus statuses (06 §2.4): any other tool status shows as `error` inside `proof`. */
+const PROOF_STATUSES: ReadonlySet<string> = new Set([
+  'ok',
+  'pending_approval',
+  'needs_credits',
+  'submitted',
+  'error',
+]);
+
+/** 6. Records the sent message (06 §2.2 `notarize`) and folds the proof into the send result. */
+async function withProofOf(
+  envelopeId: string,
+  sentSummary: string,
+  sentFields: Readonly<Record<string, unknown>>,
+  approvalId: unknown,
+  agentId: string,
+  context: ToolContext,
+): Promise<HandlerOutput> {
+  const proofs = context.client.proofs;
+  if (proofs === undefined || !ENVELOPE_ID.test(envelopeId)) return internalError();
+  let proofOut: HandlerOutput;
+  try {
+    const result = await proofs.notarize({
+      envelopeId,
+      ...(typeof approvalId === 'string' ? { approvalId } : {}),
+    });
+    proofOut = notarizeOutput(result, context, agentId, {
+      approvalSummary: SEND_TEXT.proofApproval,
+      approvalNextStepTail: SEND_TEXT.proofApprovalTail.replace('{envelopeId}', envelopeId),
+    });
+  } catch (error) {
+    proofOut = proofThrown(error);
+  }
+  const { status, summary, nextStep, code, approvalId: pending, url, ...rest } = proofOut.result;
+  const { chain, recordId, fee, receipts, agentAddress, topUpUrl } = rest as Record<
+    string,
+    unknown
+  >;
+  const proof = {
+    status: PROOF_STATUSES.has(status) ? status : 'error',
+    ...(chain === undefined ? {} : { chain }),
+    ...(recordId === undefined ? {} : { recordId }),
+    ...(fee === undefined ? {} : { fee }),
+    receipts: Array.isArray(receipts) ? receipts : [],
+  };
+  context.logger.info('message proof', { status });
+  return {
+    result: {
+      ...sentFields,
+      status,
+      summary: `${sentSummary} ${summary}`,
+      ...(nextStep === undefined ? {} : { nextStep }),
+      ...(code === undefined ? {} : { code }),
+      ...(pending === undefined ? {} : { approvalId: pending }),
+      ...(url === undefined ? {} : { url }),
+      ...(agentAddress === undefined ? {} : { agentAddress }),
+      ...(topUpUrl === undefined ? {} : { topUpUrl }),
+      proof,
+    },
+  };
 }

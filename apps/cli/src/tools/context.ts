@@ -8,20 +8,27 @@
 import {
   CoreError,
   evaluate,
+  type AcknowledgeInput,
+  type AcknowledgeResult,
   type AgentLinkClient,
   type ApprovalResume,
   type ApprovalState,
   type ApprovalUse,
   type ContactView,
   type CreatedInvite,
+  type ExportProofPackInput,
+  type ExportProofPackResult,
   type FetchFileInput,
   type FetchFileResult,
   type InboxSender,
+  type NotarizeInput,
+  type NotarizeResult,
   type OpenApproval,
   type OpenOffer,
   type OutgoingFile,
   type PendingContact,
   type PolicyDecision,
+  type ProofView,
   type ProposeTermsInput,
   type ProposeTermsResult,
   type RespondToTermsInput,
@@ -29,7 +36,7 @@ import {
   type SendMessageInput,
   type SendMessageResult,
 } from '@4thtech-io/core';
-import type { ContactDisplayName } from '@4thtech-io/types';
+import type { ContactDisplayName, ReceiptTypeName } from '@4thtech-io/types';
 import {
   agentFingerprint,
   decodeHex0x,
@@ -247,6 +254,111 @@ export interface FileTools {
   fetch(input: FetchFileInput): Promise<FetchFileResult>;
 }
 
+/** The two folders a proof pack `path` may name (06 §2.4, D-87): policy paths, `~/` allowed. */
+export interface PackFolders {
+  readonly exportFolder: string;
+  readonly inboxFolder: string;
+}
+
+/** A proof pack file read for `agentlink_verify_proof_pack` `path` (D-87). Fixed codes only. */
+export type PackReadOutcome =
+  | { readonly ok: true; readonly bytes: Uint8Array }
+  | { readonly ok: false; readonly code: 'PATH_NOT_ALLOWED' | 'PACK_TOO_LARGE' | 'PACK_INVALID' };
+
+/** A pack saved into `proofs.exportFolder`. `rules`: the policy fails closed (06 §3). */
+export type PackSaveOutcome =
+  | { readonly ok: true; readonly savedTo: string }
+  | { readonly ok: false; readonly reason: 'rules' | 'folder' };
+
+/**
+ * A proof pack's verification (07 §8; the chain package's `verifyProofPack`), as the handler needs
+ * it. Every hex value is checked by the verifier against the chain; the disclosed content is
+ * untrusted (I-5) and goes only into the untrusted block.
+ */
+export type PackCheck =
+  | {
+      readonly valid: false;
+      readonly verdict: 'failed';
+      /** The chain package's fixed failure code (snake_case). */
+      readonly reason: string;
+    }
+  | {
+      readonly valid: true;
+      /** D-95: `record_only` is never shown as a full pass. */
+      readonly verdict: 'verified' | 'record_only';
+      /** The shipped chain's config key (Advanced detail; never in a summary). */
+      readonly chain: string;
+      readonly recordId: string;
+      readonly signer: string;
+      /** The owner keys of the signer's card, when the pack carries a valid one. */
+      readonly signerCard: {
+        readonly ownerEvm: string;
+        readonly ownerNostr: string;
+        readonly ownerEnc: string;
+      } | null;
+      readonly timestamp: string;
+      readonly envelopeHash: string;
+      readonly receipts: readonly { readonly type: ReceiptTypeName; readonly at: string }[];
+      readonly contentVerified: boolean;
+      /** Untrusted (I-5): the disclosed payload, when it opened; only for the untrusted block. */
+      readonly content: unknown;
+      /** Non-fatal finding codes (`signer_no_longer_confirms`, `receipt_tx_mismatch`). */
+      readonly notices: readonly string[];
+    };
+
+/** The agent's credits and the price list (06 §2.1 `credits`, `prices`; D-45, G-43). */
+export interface AccountView {
+  readonly credits: readonly {
+    readonly chain: string;
+    readonly token: string;
+    /** Base units, decimal. */
+    readonly amount: string;
+    readonly usd: string;
+  }[];
+  readonly prices: readonly {
+    readonly action: 'notarize';
+    readonly usd: string;
+    readonly protocolUsd: string;
+    readonly integratorUsd: string;
+  }[];
+}
+
+/**
+ * The proof calls (M1-9d-2; 06 §2.4). The core (M1-7g) does notarize, receipts and the pack; the
+ * platform (src/runtime/proofs.ts in Node) reads and writes pack files and runs the verifier and the
+ * credit reads against the shipped chains. Nothing here changes a policy, decides an approval or
+ * exports an agent key (I-4).
+ */
+export interface ProofTools {
+  notarize(input: NotarizeInput): Promise<NotarizeResult>;
+  acknowledge(input: AcknowledgeInput): Promise<AcknowledgeResult>;
+  get(input: {
+    readonly envelopeId?: string;
+    readonly recordId?: string;
+  }): Promise<ProofView | undefined>;
+  /** Core `exportProofPack`: the content key only with the owner's approval (06 §3). */
+  exportPack(input: ExportProofPackInput): Promise<ExportProofPackResult>;
+  /** Writes the pack JSON into `proofs.exportFolder` under a new name; never overwrites. */
+  savePack(recordId: string, json: string): Promise<PackSaveOutcome>;
+  /** D-87: a pack file inside `proofs.exportFolder` or `files.inboxFolder` only. */
+  readPack(path: string): Promise<PackReadOutcome>;
+  /** The 07 §8 verifier against the shipped chains (their known Notary only). */
+  verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck>;
+  /** Credits and prices within a short budget; undefined when no chain answered. */
+  account(agentId: string): Promise<AccountView | undefined>;
+  /** The Advanced `chain?` override: a shipped chain's key to its ID; undefined if unsupported. */
+  chainIdOf(key: string): number | undefined;
+}
+
+/** The platform half of the proof tools (src/runtime/proofs.ts in Node). */
+export interface ProofPlatformTools {
+  readPack(path: string, folders: PackFolders): Promise<PackReadOutcome>;
+  savePack(exportFolder: string, recordId: string, json: string): Promise<PackSaveOutcome>;
+  verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck>;
+  account(agentId: string): Promise<AccountView | undefined>;
+  chainIdOf(key: string): number | undefined;
+}
+
 /** The core surface the handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
@@ -295,6 +407,11 @@ export interface ToolClient {
    * `agentlink_fetch_file` then answer "not available".
    */
   readonly files?: FileTools;
+  /**
+   * Proofs (M1-9d-2). Absent where the runtime has no proof platform: the proof tools then answer
+   * "not available", and status carries no credits.
+   */
+  readonly proofs?: ProofTools;
 }
 
 export interface ToolContext {
@@ -352,6 +469,8 @@ const short = (digest: Uint8Array): string => formatFingerprint(digest, 'short')
 export interface CoreToolClientOptions {
   /** The platform's allowed-folder check for `path` arguments; without it there are no file tools. */
   readonly files?: FileOpener;
+  /** The proof platform (pack files, verifier, credits); without it there are no proof tools. */
+  readonly proofs?: ProofPlatformTools;
 }
 
 /** Builds the handlers' read surface from a core client (pure: no Node, no store access). */
@@ -397,6 +516,7 @@ export function coreToolClient(
     invites: coreInviteTools(client),
     terms: coreTermsTools(client),
     ...(options.files === undefined ? {} : { files: coreFileTools(client, options.files) }),
+    ...(options.proofs === undefined ? {} : { proofs: coreProofTools(client, options.proofs) }),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'
@@ -415,6 +535,38 @@ function coreFileTools(client: AgentLinkClient, opener: FileOpener): FileTools {
       return opener.attach(path, folders);
     },
     fetch: (input) => client.fetchFile(input),
+  });
+}
+
+function coreProofTools(client: AgentLinkClient, platform: ProofPlatformTools): ProofTools {
+  /** The verified policy's folders, or undefined while it fails closed (06 §3). */
+  const folders = async (): Promise<PackFolders | undefined> => {
+    const effective = await client.ownerActions.loadPolicy();
+    if (effective.mode === 'fail_closed') return undefined;
+    return {
+      exportFolder: effective.policy.proofs.exportFolder,
+      inboxFolder: effective.policy.files.inboxFolder,
+    };
+  };
+  return Object.freeze<ProofTools>({
+    notarize: (input) => client.notarize(input),
+    acknowledge: (input) => client.acknowledge(input),
+    get: (input) => client.getProof(input),
+    exportPack: (input) => client.exportProofPack(input),
+    async savePack(recordId, json) {
+      const current = await folders();
+      if (current === undefined) return { ok: false, reason: 'rules' };
+      return platform.savePack(current.exportFolder, recordId, json);
+    },
+    async readPack(path) {
+      // Under fail-closed no folder is allowed (D-87 folders come from the verified policy only).
+      const current = await folders();
+      if (current === undefined) return { ok: false, code: 'PATH_NOT_ALLOWED' };
+      return platform.readPack(path, current);
+    },
+    verify: (pack) => platform.verify(pack),
+    account: (agentId) => platform.account(agentId),
+    chainIdOf: (key) => platform.chainIdOf(key),
   });
 }
 
