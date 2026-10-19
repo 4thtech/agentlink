@@ -292,7 +292,10 @@ interface MockChain {
   revertWith: { name: string; args?: readonly unknown[] } | null;
   estimate: bigint;
   balance: bigint;
+  /** The gas wallet's next nonce counting the mempool (`pending`). */
   nonce: number;
+  /** The gas wallet's next nonce counting mined transactions only (`latest`). */
+  minedNonce: number;
   sent: { raw: Hex; hash: Hex }[];
   receipts: Map<string, unknown>;
   methods: string[];
@@ -309,6 +312,7 @@ function newChain(): MockChain {
     estimate: 150_000n,
     balance: 5n * 10n ** 17n,
     nonce: 7,
+    minedNonce: 7,
     sent: [],
     receipts: new Map(),
     methods: [],
@@ -349,8 +353,11 @@ function mockFetch(chain: MockChain) {
         return reply(chain.code.get(String(p[0]).toLowerCase()) ?? '0x');
       case 'eth_getBalance':
         return reply(`0x${chain.balance.toString(16)}`);
-      case 'eth_getTransactionCount':
-        return reply(`0x${chain.nonce.toString(16)}`);
+      case 'eth_getTransactionCount': {
+        const n = p[1] === 'latest' ? chain.minedNonce : p[1] === 'pending' ? chain.nonce : -1;
+        if (n < 0) return replyError({ code: -32602, message: 'unexpected block tag' });
+        return reply(`0x${n.toString(16)}`);
+      }
       case 'eth_maxPriorityFeePerGas':
         return reply('0x3b9aca00');
       case 'eth_getBlockByNumber':
@@ -511,6 +518,16 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
       receiptAt: [5n, 0n, 0n, 0n],
     });
     expect(await p.simulateItem(item)).toEqual({ outcome: 'skipped' });
+  });
+
+  it('reads the pending and the latest nonce of the gas wallet apart (M1-10a-b)', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    // A transaction at nonce 7 is still in the mempool, never mined.
+    chain.nonce = 8;
+    chain.minedNonce = 7;
+    expect(await p.pendingNonce()).toBe(8);
+    expect(await p.latestNonce()).toBe(7);
   });
 
   it('sends exactly the given items from the gas key, with the given gas limit and nonce', async () => {

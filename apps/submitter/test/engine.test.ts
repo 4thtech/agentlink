@@ -213,7 +213,7 @@ describe('after an on-chain revert (G-4, D-61, D-62)', () => {
     expect(byId.get(c.id)).toMatchObject({ status: 'recorded', txHash: second?.hash });
   });
 
-  it('fails an item that fails twice in a shared batch and never retries it again', async () => {
+  it('fails an item that fails twice and never retries it again; the other signer still lands', async () => {
     const t = setup();
     const a = fakeRecordItem(A);
     const b = fakeRecordItem(B);
@@ -221,16 +221,61 @@ describe('after an on-chain revert (G-4, D-61, D-62)', () => {
     t.chain.failAtInclusion.add(a.id); // passes simulation, reverts at inclusion, every time
     t.chain.includeAll();
     await t.poll();
-    expect(t.chain.sent).toHaveLength(2);
-    expect(t.chain.sent[1]?.ids).toEqual([a.id, b.id]);
+    // No identifiable cause: the one resubmission is split per signer (M1-10a-b).
+    expect(t.chain.sent.slice(1).map((tx) => tx.ids)).toEqual([[a.id], [b.id]]);
     t.chain.includeAll();
     await t.poll();
     await t.poll(NOW + 100);
-    expect(t.chain.sent).toHaveLength(2);
-    const last = txStatus(t.state, 84532, t.chain.sent[1]?.hash as `0x${string}`);
-    expect(last?.state).toBe('reverted');
-    expect(last?.items.map((i) => i.status)).toEqual(['failed', 'failed']);
+    expect(t.chain.sent).toHaveLength(3);
+    const again = txStatus(t.state, 84532, t.chain.sent[1]?.hash as `0x${string}`);
+    expect(again?.state).toBe('reverted');
+    expect(again?.items[0]).toMatchObject({ id: a.id, status: 'failed', error: 'reverted' });
+    const other = txStatus(t.state, 84532, t.chain.sent[2]?.hash as `0x${string}`);
+    expect(other?.items[0]).toMatchObject({ id: b.id, status: 'recorded' });
     expect(queueDepth(t.state)).toBe(0);
+  });
+
+  it('M1-10a-b: a shared revert with no identifiable cause resubmits each signer apart, so one diverging signer costs the others nothing', async () => {
+    const t = setup();
+    const a1 = fakeRecordItem(A);
+    const b = fakeRecordItem(B);
+    const a2 = fakeRecordItem(A);
+    const c = fakeRecordItem(C);
+    await t.submit([a1, b, a2, c]);
+    expect(t.chain.sent).toHaveLength(1);
+    // B diverges at inclusion only, on every transaction that carries it.
+    t.chain.failAtInclusion.add(b.id);
+    t.chain.includeAll();
+    await t.poll(NOW + 10);
+    const resent = t.chain.sent.slice(1);
+    expect(resent.map((tx) => tx.signers)).toEqual([[A, A], [B], [C]]);
+    expect(resent.map((tx) => tx.ids)).toEqual([[a1.id, a2.id], [b.id], [c.id]]);
+    t.chain.includeAll();
+    await t.poll(NOW + 20);
+    await t.poll(NOW + 30);
+    expect(t.chain.sent).toHaveLength(4);
+    const byId = new Map<string, unknown>();
+    for (const tx of resent) {
+      for (const item of txStatus(t.state, 84532, tx.hash)?.items ?? []) byId.set(item.id, item);
+    }
+    expect(byId.get(a1.id)).toMatchObject({ status: 'recorded' });
+    expect(byId.get(a2.id)).toMatchObject({ status: 'recorded' });
+    expect(byId.get(c.id)).toMatchObject({ status: 'recorded' });
+    expect(byId.get(b.id)).toMatchObject({ status: 'failed', error: 'reverted' });
+    expect(queueDepth(t.state)).toBe(0);
+  });
+
+  it('M1-10a-b: with an identified cause the rest are still resubmitted together, once', async () => {
+    const t = setup();
+    const a = fakeRecordItem(A);
+    const b = fakeRecordItem(B);
+    const c = fakeRecordItem(C);
+    await t.submit([a, b, c]);
+    t.chain.failAtInclusion.add(b.id);
+    t.chain.simulationErrors.set(b.id, 'InsufficientCredits');
+    t.chain.includeAll();
+    await t.poll(NOW + 10);
+    expect(t.chain.sent.slice(1).map((tx) => tx.ids)).toEqual([[a.id, c.id]]);
   });
 
   it('M-1: a solo transaction that reverts while its item still passes simulation is not resent; the signer is refused for a while', async () => {
@@ -468,7 +513,7 @@ describe('per-item gas ceiling (IR-M1-10a-1 H-1)', () => {
 });
 
 describe('infrastructure errors (IR-M1-10a-1 L-1)', () => {
-  it('a chain read without revert data fails nothing for the item’s fault and cools no signer off', async () => {
+  it('M1-10a-b: an RPC failure while re-simulating after a revert keeps the items in flight, retried next round, with no cool-off', async () => {
     const t = setup();
     const a = fakeRecordItem(A);
     const b = fakeRecordItem(B);
@@ -477,12 +522,65 @@ describe('infrastructure errors (IR-M1-10a-1 L-1)', () => {
     t.chain.readFails = true; // the re-simulation after the revert cannot be read
     t.chain.includeAll();
     await t.poll(NOW + 10);
+    await t.poll(NOW + 20); // still unreadable: nothing is failed, nothing is sent
+    expect(t.chain.sent).toHaveLength(1);
     const status = txStatus(t.state, 84532, t.chain.sent[0]?.hash as `0x${string}`);
-    expect(status?.items.map((i) => i.error)).toEqual(['unavailable', 'unavailable']);
+    expect(status?.items.map((i) => i.status)).toEqual(['held', 'held']);
+    expect(status?.items.map((i) => i.error)).toEqual([undefined, undefined]);
+    expect(queueDepth(t.state)).toBe(2);
+    // A client asking again while they are in flight sends nothing new.
+    const again = await t.submit([a, b], NOW + 25);
+    expect(again.map((r) => r.status)).toEqual(['held', 'held']);
+    expect(t.chain.sent).toHaveLength(1);
+    // The chain answers again and the divergence is gone: both go out once, still together
+    // (neither signer was put in the solo cooling-off).
     t.chain.readFails = false;
-    // Neither signer was put in the solo cooling-off: they still batch together.
-    await t.submit([fakeRecordItem(A), fakeRecordItem(B)], NOW + 20);
-    expect(t.chain.sent.at(-1)?.signers).toEqual([A, B]);
+    t.chain.failAtInclusion.delete(a.id);
+    await t.poll(NOW + 30);
+    expect(t.chain.sent).toHaveLength(2);
+    expect(t.chain.sent[1]?.ids).toEqual([a.id, b.id]);
+    t.chain.includeAll();
+    await t.poll(NOW + 40);
+    await t.poll(NOW + 50);
+    expect(t.chain.sent).toHaveLength(2);
+    const landed = txStatus(t.state, 84532, t.chain.sent[1]?.hash as `0x${string}`);
+    expect(landed?.items.map((i) => i.status)).toEqual(['recorded', 'recorded']);
+  });
+
+  it('M1-10a-b: an RPC failure on the resubmission’s batch simulation keeps the items in flight', async () => {
+    const t = setup();
+    const a = fakeRecordItem(A);
+    const b = fakeRecordItem(B);
+    const c = fakeRecordItem(C);
+    await t.submit([a, b, c]);
+    t.chain.failAtInclusion.add(b.id);
+    t.chain.simulationErrors.set(b.id, 'InsufficientCredits');
+    t.chain.batchReadFails = true; // per-item reads work, the batch estimate does not
+    t.chain.includeAll();
+    await t.poll(NOW + 10);
+    expect(t.chain.sent).toHaveLength(1);
+    const status = txStatus(t.state, 84532, t.chain.sent[0]?.hash as `0x${string}`);
+    const byId = new Map(status?.items.map((i) => [i.id, i]));
+    expect(byId.get(b.id)).toMatchObject({ status: 'failed', error: 'InsufficientCredits' });
+    expect(byId.get(a.id)?.status).toBe('held');
+    expect(byId.get(c.id)?.status).toBe('held');
+    t.chain.batchReadFails = false;
+    await t.poll(NOW + 20);
+    expect(t.chain.sent.slice(1).map((tx) => tx.ids)).toEqual([[a.id, c.id]]);
+  });
+
+  it('a pending held item whose re-simulation cannot be read stays held (no cool-off)', async () => {
+    const t = setup();
+    t.chain.paused = true;
+    const a = fakeRecordItem(A);
+    await t.submit([a]);
+    t.chain.paused = false;
+    t.chain.readFails = true;
+    await t.poll(NOW + 10);
+    expect(queueDepth(t.state)).toBe(1);
+    t.chain.readFails = false;
+    await t.poll(NOW + 20);
+    expect(t.chain.sent.map((tx) => tx.ids)).toEqual([[a.id]]);
   });
 });
 
@@ -537,6 +635,67 @@ describe('stuck and dropped transactions (IR-M1-10a-1 M-2)', () => {
     // A later item gets the next nonce: nothing is blocked.
     await t.submit([fakeRecordItem(B)], NOW + 220);
     expect(t.chain.sent.at(-1)?.nonce).toBe((first?.nonce ?? 0) + 1);
+  });
+
+  it('M1-10a-b: giving up reconciles against the latest nonce, so a transaction still in some mempool leaves no gap', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 1 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    await t.submit([a]);
+    const first = t.chain.sent[0];
+    await t.poll(NOW + 100); // one replacement
+    expect(t.chain.sent).toHaveLength(2);
+    // Never mined, yet still in a node's mempool: the pending nonce stays one above it.
+    expect(await t.chain.pendingNonce()).toBe((first?.nonce ?? 0) + 1);
+    expect(await t.chain.latestNonce()).toBe(first?.nonce);
+    await t.poll(NOW + 200); // gives up, re-queues, re-simulates and sends again
+    expect(txStatus(t.state, 84532, first?.hash as `0x${string}`)?.state).toBe('dropped');
+    expect(t.chain.sent).toHaveLength(3);
+    const resent = t.chain.sent[2];
+    expect(resent?.ids).toEqual([a.id]);
+    // The pending nonce would skip it and leave a gap that blocks every later send.
+    expect(resent?.nonce).toBe(first?.nonce);
+    t.chain.includeAll();
+    await t.poll(NOW + 210);
+    expect(txStatus(t.state, 84532, resent?.hash as `0x${string}`)?.items[0]?.status).toBe(
+      'recorded',
+    );
+    await t.submit([fakeRecordItem(B)], NOW + 220);
+    expect(t.chain.sent.at(-1)?.nonce).toBe((first?.nonce ?? 0) + 1);
+  });
+
+  it('M1-10a-b: after giving up one of two transactions in flight, no new send reuses the other one’s nonce', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 0 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    const b = fakeRecordItem(B, NOW + 100_000);
+    await t.submit([a]);
+    await t.submit([b], NOW + 50);
+    const [txA, txB] = t.chain.sent;
+    expect([txA?.nonce, txB?.nonce]).toEqual([7, 8]);
+    await t.poll(NOW + 100); // a is given up and resent at the latest nonce; b is still in flight
+    const resent = t.chain.sent[2];
+    expect(resent?.ids).toEqual([a.id]);
+    expect(resent?.nonce).toBe(7);
+    await t.submit([fakeRecordItem(C)], NOW + 110);
+    const fresh = t.chain.sent[3];
+    expect(fresh?.nonce).toBe(9);
+    // Every transaction of distinct items has a nonce of its own.
+    const live = [resent, txB, fresh].map((tx) => tx?.nonce);
+    expect(new Set(live).size).toBe(3);
+    t.chain.includeAll();
+    await t.poll(NOW + 120);
+    expect(queueDepth(t.state)).toBe(0);
+  });
+
+  it('M1-10a-b: when the latest nonce cannot be read on giving up, the given-up nonce is used again', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 0 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    await t.submit([a]);
+    const first = t.chain.sent[0];
+    t.chain.nonceReadFails = true;
+    await t.poll(NOW + 100);
+    expect(t.chain.sent).toHaveLength(2);
+    expect(t.chain.sent[1]?.ids).toEqual([a.id]);
+    expect(t.chain.sent[1]?.nonce).toBe(first?.nonce);
   });
 
   it('reports an item of a dropped transaction that landed after all as skipped, without resending it', async () => {

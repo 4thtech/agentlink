@@ -21,11 +21,20 @@
 //   the inclusion disagree: the items are `failed` without a resend, and the signer is refused for
 //   `soloAfterRevertSeconds` (IR-M1-10a-1 M-1). In a shared batch the rest are resubmitted once; an
 //   item that reverts twice is `failed` and never retried. In `one-per-batch` mode the code-bearing
-//   item is taken as the cause.
+//   item is taken as the cause. A shared revert with no identifiable cause (every item still passes
+//   simulation) is resubmitted split per signer, each signer's items in a transaction of their own,
+//   so one diverging signer cannot cost the others their single resubmission (M1-10a-b).
+// - A chain read that fails (no answer, no revert data) is infrastructure, not the item's fault: no
+//   signer cools off. A new request's items are `failed` with `unavailable`; an item already queued
+//   (re-simulated after a revert, resubmitted, or held) stays in flight as `held` and is tried again
+//   next round, without using up its resubmission (M1-10a-b).
 // - A transaction with no receipt after `stuckAfterSeconds` is replaced at the same nonce with
 //   raised fees, at most `maxReplacements` times. If none is included after that, it is `dropped`:
 //   its items are queued again (a fresh simulation shows any that landed as `skipped`) and the next
-//   nonce is read from the chain, so a lost nonce cannot block later sends (IR-M1-10a-1 M-2).
+//   nonce is the chain's `latest` one (mined transactions only), so neither a lost nonce nor a
+//   forgotten transaction still in some node's mempool leaves a gap that blocks later sends
+//   (IR-M1-10a-1 M-2, M1-10a-b). If that read fails, the given-up nonce is used again. A send never
+//   takes a nonce that a transaction still in flight holds: it skips to the next free one.
 // - Nonces are serialised per chain: the engine holds one lock per state object.
 import type {
   Hex,
@@ -171,6 +180,15 @@ function update(
 
 const inFlight = (s: SubmitStatus): boolean => s === 'submitted' || s === 'held';
 
+/**
+ * A chain read failed (infrastructure): a queued item stays in flight and is tried next round; a
+ * new request's item is `failed` with `unavailable`. No cool-off either way.
+ */
+function unreadable(state: QueueState, entry: ItemState, now: number, queued: boolean): void {
+  if (queued) update(state, entry, 'held', now, { txHash: null, error: null });
+  else update(state, entry, 'failed', now, { txHash: null, error: 'unavailable' });
+}
+
 function chunk<T>(list: readonly T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
@@ -226,12 +244,26 @@ function applySimulation(
   return false;
 }
 
+/**
+ * The first nonce at or above `from` that no transaction still in flight holds. After a give-up the
+ * `latest` nonce can lie below transactions this queue still has pending (M1-10a-b): a new send
+ * must never take one of theirs, or it would replace (or be refused by) a live transaction.
+ */
+function freeNonce(state: QueueState, from: number): number {
+  const held = new Set<number>();
+  for (const tx of state.txs.values()) if (tx.state === 'pending') held.add(tx.nonce);
+  let n = from;
+  while (held.has(n)) n += 1;
+  return n;
+}
+
 async function sendGroup(
   port: SubmitterChain,
   settings: EngineSettings,
   state: QueueState,
   group: ItemState[],
   now: number,
+  queued: boolean,
   depth = 0,
 ): Promise<void> {
   const items = group.map((e) => e.item);
@@ -240,7 +272,7 @@ async function sendGroup(
     sim = await port.simulateBatch(items);
   } catch {
     // The chain could not be read: infrastructure, not the items' fault (no cool-off).
-    for (const e of group) update(state, e, 'failed', now, { txHash: null, error: 'unavailable' });
+    for (const e of group) unreadable(state, e, now, queued);
     return;
   }
   const ceiling = group.reduce((sum, e) => sum + e.gas, 0n);
@@ -259,15 +291,15 @@ async function sendGroup(
       try {
         if (applySimulation(state, settings, e, await port.simulateItem(e.item), now)) keep.push(e);
       } catch {
-        update(state, e, 'failed', now, { txHash: null, error: 'unavailable' });
+        unreadable(state, e, now, queued);
       }
     }
     if (keep.length === 0) return;
     if (depth === 0 && keep.length < group.length) {
-      await sendGroup(port, settings, state, keep, now, 1);
+      await sendGroup(port, settings, state, keep, now, queued, 1);
     } else if (depth < 2 && keep.length > 1) {
       // Each passes alone but not together: send each item apart.
-      for (const e of keep) await sendGroup(port, settings, state, [e], now, 2);
+      for (const e of keep) await sendGroup(port, settings, state, [e], now, queued, 2);
     } else {
       for (const e of keep) update(state, e, 'failed', now, { txHash: null, error: sim.error });
     }
@@ -281,7 +313,7 @@ async function sendGroup(
   let nonce: number;
   let hash: Hex;
   try {
-    nonce = state.nonce ?? (await port.pendingNonce());
+    nonce = freeNonce(state, state.nonce ?? (await port.pendingNonce()));
     hash = await port.send(items, { gasLimit, nonce });
   } catch {
     // The nonce may or may not be used: read it from the chain next time.
@@ -317,9 +349,10 @@ async function dispatch(
   state: QueueState,
   entries: ItemState[],
   now: number,
+  queued: boolean,
 ): Promise<void> {
   for (const group of plan(settings, state, entries, now)) {
-    await sendGroup(port, settings, state, group, now);
+    await sendGroup(port, settings, state, group, now, queued);
   }
 }
 
@@ -391,7 +424,7 @@ export function submitItems(
       setItem(state, entry);
       if (!held) toSend.push(entry);
     }
-    await dispatch(port, settings, state, toSend, now);
+    await dispatch(port, settings, state, toSend, now, false);
     return items.map((item) => {
       const known = out.get(item.id);
       if (known) return known;
@@ -426,6 +459,9 @@ async function handleRevert(
   };
   const solo = new Set(entries.map((e) => e.item.signer)).size === 1;
   let candidates = entries;
+  // Whether the revert has an identifiable cause: the one-per-batch code-bearing item, or an item
+  // that now fails simulation.
+  let causeFound = false;
   if (tx.codeBearingId !== null && entries.length > 1) {
     // One-per-batch mode (FA-1): the code-bearing item is taken as the cause.
     const cause = entries.find((e) => e.item.id === tx.codeBearingId);
@@ -433,6 +469,7 @@ async function handleRevert(
       update(state, cause, 'failed', now, { error: 'reverted' });
       coolOff(cause.item.signer);
       candidates = entries.filter((e) => e !== cause);
+      causeFound = true;
     }
   }
   const resend: ItemState[] = [];
@@ -441,8 +478,9 @@ async function handleRevert(
     try {
       sim = await port.simulateItem(e.item);
     } catch {
-      // Infrastructure, not the item: no cool-off.
-      update(state, e, 'failed', now, { error: 'unavailable' });
+      // Infrastructure, not the item: it stays in flight (held, tried again next round) without
+      // using up its resubmission, and no signer cools off (M1-10a-b).
+      unreadable(state, e, now, true);
       continue;
     }
     if (sim.outcome === 'paused') {
@@ -453,6 +491,7 @@ async function handleRevert(
     } else if (sim.outcome === 'failed') {
       update(state, e, 'failed', now, { error: sim.error });
       coolOff(e.item.signer);
+      causeFound = true;
     } else if (solo) {
       // M-1: its own transaction reverted, yet it still passes simulation. Simulation and
       // inclusion disagree for this signer: no resend, and its items are refused for a while.
@@ -465,7 +504,21 @@ async function handleRevert(
       else if (applySimulation(state, settings, e, sim, now)) resend.push(e);
     }
   }
-  await dispatch(port, settings, state, resend, now);
+  if (causeFound) {
+    await dispatch(port, settings, state, resend, now, true);
+    return;
+  }
+  // No identifiable cause: one signer's items diverged between simulation and inclusion. Resubmit
+  // each signer's items apart, so that signer's second revert costs no one else (M1-10a-b).
+  const bySigner = new Map<string, ItemState[]>();
+  for (const e of resend) {
+    bySigner.set(e.item.signer, [...(bySigner.get(e.item.signer) ?? []), e]);
+  }
+  for (const group of bySigner.values()) {
+    for (const part of chunk(group, settings.maxBatch)) {
+      await sendGroup(port, settings, state, part, now, true);
+    }
+  }
 }
 
 /** M-2: replaces a transaction stuck without a receipt, or gives it up and queues its items again. */
@@ -502,10 +555,18 @@ async function handleStuck(
     }
     return;
   }
-  // Given up: queue the items again; a fresh simulation shows any that landed after all.
+  // Given up: queue the items again; a fresh simulation shows any that landed after all. The next
+  // nonce is the `latest` one (mined only): the `pending` one would count a transaction that some
+  // node still holds but that is never mined, and skip its nonce (M1-10a-b).
   tx.state = 'dropped';
   state.changed.txs.add(tx.hash);
-  state.nonce = null;
+  try {
+    state.nonce = await port.latestNonce();
+  } catch {
+    // Nothing at or above this nonce was mined (no receipt): it is free unless it lands meanwhile,
+    // and then the send fails and the nonce is read again.
+    state.nonce = tx.nonce;
+  }
   state.changed.meta = true;
   for (const e of entries) update(state, e, 'held', now, { txHash: null });
 }
@@ -599,7 +660,7 @@ export function pollQueue(
       if (sim.outcome === 'paused') continue;
       if (applySimulation(state, settings, e, sim, now)) ready.push(e);
     }
-    await dispatch(port, settings, state, ready, now);
+    await dispatch(port, settings, state, ready, now, true);
     return queueDepth(state) > 0;
   });
 }
