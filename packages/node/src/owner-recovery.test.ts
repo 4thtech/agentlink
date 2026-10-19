@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AgentLinkClient, type ApprovalChannel } from '@4thtech-io/core';
 import { encodeUtf8, equalBytes, verifyAgentCard, type KeyStore } from '@4thtech-io/crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';
 import { addAgentToOwner } from './index.js';
@@ -243,20 +243,42 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
     await removeAgent(alice);
     const bob = await initAgent('bob');
     const run = ownerTyping([code], true);
-    // A slow owner: the answer comes after a whole session lifetime has passed.
-    const terminal: OwnerTerminal = {
-      ...run.terminal,
-      confirm: async (question) => {
-        await new Promise((resolve) => setTimeout(resolve, 150));
-        return run.terminal.confirm(question);
-      },
-    };
-    await addAgentWith(
-      keychain,
-      terminal,
-      { backend: 'keychain', env: {}, card: firstCard(bob, 'bob') },
-      { ttlMs: 50 },
-    );
+    // The session's clock (wall and monotonic) is frozen and moves only when the test moves it, so
+    // the result never depends on how fast this machine is (a loaded CI runner once took longer
+    // than a 50 ms lifetime just to sign and store the card). Timers stay real; the lifetime is
+    // long enough that the session's own expiry timer never fires during the test.
+    const ttlMs = 60_000;
+    vi.useFakeTimers({ toFake: ['Date', 'performance'] });
+    try {
+      // A slow owner: the answer comes after two whole session lifetimes have passed.
+      const terminal: OwnerTerminal = {
+        ...run.terminal,
+        confirm: async (question) => {
+          vi.advanceTimersByTime(2 * ttlMs);
+          return run.terminal.confirm(question);
+        },
+      };
+      // A slow machine: signing and storing the card takes real time, but no session time.
+      const card = firstCard(bob, 'bob');
+      const slowCard: FirstAgentCard = {
+        ...card,
+        identity: {
+          get: () => card.identity.get(),
+          init: async (input) => {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            return card.identity.init(input);
+          },
+        },
+      };
+      await addAgentWith(
+        keychain,
+        terminal,
+        { backend: 'keychain', env: {}, card: slowCard },
+        { ttlMs },
+      );
+    } finally {
+      vi.useRealTimers();
+    }
     expect(run.questions).toHaveLength(1);
     expect(await bob.client.identity.get()).toBeDefined();
   });
