@@ -14,9 +14,12 @@ import {
   type ApprovalUse,
   type ContactView,
   type CreatedInvite,
+  type FetchFileInput,
+  type FetchFileResult,
   type InboxSender,
   type OpenApproval,
   type OpenOffer,
+  type OutgoingFile,
   type PendingContact,
   type PolicyDecision,
   type ProposeTermsInput,
@@ -194,6 +197,56 @@ export interface TermsTools {
   ): Promise<{ readonly id: string; readonly display: ContactDisplayName } | undefined>;
 }
 
+/**
+ * A file a `path` argument names, checked by the platform under the 04 §4 allowed-folder rule
+ * (realpath on both sides, not hidden, outside the protected roots, a regular file) and NOT opened:
+ * the core opens it once, through `file.open()`, after its own checks (M1-7f), and the platform
+ * checks the path again when it opens it (M1-15 `openAllowedFile`).
+ */
+export interface AttachedFile {
+  /** For the core's `sendMessage({files})`. Its realpath stays on this device. */
+  readonly file: OutgoingFile;
+  /** The name the contact sees: the realpath's last segment. Agent-chosen text (I-5). */
+  readonly name: string;
+  /** Plaintext bytes. */
+  readonly size: number;
+  /**
+   * The plaintext SHA-256, 64 lowercase hex: hashed during the core's one read or, for an
+   * idempotent repeat (the core reads nothing), read once more through the same checked open.
+   */
+  plaintextSha256(): Promise<string>;
+}
+
+/** Why a `path` cannot be attached. Fixed reasons only: never the path or its resolved form. */
+export type AttachRefusal =
+  /** No `files.allowedFolders` entry exists (`needs_setup`, 06 §2.3). */
+  | 'no_folder'
+  /** Outside every allowed folder, also through a symbolic link (`needs_setup`, 06 §2.3). */
+  | 'outside_folder'
+  /** Not a full path, `.` or `..` segments, hidden, protected, or not a regular file. */
+  | 'not_allowed'
+  | 'not_found';
+
+export type AttachOutcome =
+  | { readonly ok: true; readonly file: AttachedFile }
+  | { readonly ok: false; readonly reason: AttachRefusal };
+
+/**
+ * The platform half of attaching a file (src/runtime/files.ts in Node): resolves and checks `path`
+ * against `allowedFolders` without opening the file.
+ */
+export interface FileOpener {
+  attach(path: string, allowedFolders: readonly string[]): Promise<AttachOutcome>;
+}
+
+/** The file calls of `agentlink_send` with `path` and `agentlink_fetch_file` (M1-9d-1; 06 §2.3). */
+export interface FileTools {
+  /** Checks `path` against the policy's `files.allowedFolders` (none under fail-closed, 06 §3). */
+  attach(path: string): Promise<AttachOutcome>;
+  /** Core `fetchFile` (M1-7f): size cap, SSRF-safe download, both hashes, quarantine (D-84). */
+  fetch(input: FetchFileInput): Promise<FetchFileResult>;
+}
+
 /** The core surface the handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
@@ -237,6 +290,11 @@ export interface ToolClient {
   readonly invites?: InviteTools;
   /** Terms (M1-9q). Absent in a double that does not need them: the tools then answer "not available". */
   readonly terms?: TermsTools;
+  /**
+   * Files (M1-9d-1). Absent where the runtime has no file platform: `agentlink_send` with `path` and
+   * `agentlink_fetch_file` then answer "not available".
+   */
+  readonly files?: FileTools;
 }
 
 export interface ToolContext {
@@ -290,8 +348,17 @@ export type HandlerEnvironment = ToolContext | NeedsSetupContext;
 
 const short = (digest: Uint8Array): string => formatFingerprint(digest, 'short');
 
+/** What the runtime adds to the core client (M1-9d-1). */
+export interface CoreToolClientOptions {
+  /** The platform's allowed-folder check for `path` arguments; without it there are no file tools. */
+  readonly files?: FileOpener;
+}
+
 /** Builds the handlers' read surface from a core client (pure: no Node, no store access). */
-export function coreToolClient(client: AgentLinkClient): ToolClient {
+export function coreToolClient(
+  client: AgentLinkClient,
+  options: CoreToolClientOptions = {},
+): ToolClient {
   return Object.freeze<ToolClient>({
     async self() {
       const identity = await client.identity.get();
@@ -329,12 +396,25 @@ export function coreToolClient(client: AgentLinkClient): ToolClient {
     openOffers: () => client.terms.openOffers(),
     invites: coreInviteTools(client),
     terms: coreTermsTools(client),
+    ...(options.files === undefined ? {} : { files: coreFileTools(client, options.files) }),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'
         ? 'own'
         : 'drop';
     },
+  });
+}
+
+function coreFileTools(client: AgentLinkClient, opener: FileOpener): FileTools {
+  return Object.freeze<FileTools>({
+    async attach(path) {
+      // 06 §3: under fail-closed no folder is allowed (`files.allowedFolders` treated as empty).
+      const effective = await client.ownerActions.loadPolicy();
+      const folders = effective.mode === 'fail_closed' ? [] : effective.policy.files.allowedFolders;
+      return opener.attach(path, folders);
+    },
+    fetch: (input) => client.fetchFile(input),
   });
 }
 

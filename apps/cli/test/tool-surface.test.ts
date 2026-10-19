@@ -91,6 +91,33 @@ const DENIED_TEXT =
 const DENIED_ARG =
   /private|secret|seed|passphrase|password|token|credential|accesskey|apikey|signature|signed|polic|path|file|hook|decide|approve\b|approved\b|owner/i;
 
+/**
+ * Explicit per-tool exceptions to DENIED_ARG (M1-9d-1; the M1-9e note above). Each names one tool
+ * and one argument, with why it does not read arbitrary files (I-4, 06 §1 rule 4). Nothing else is
+ * exempt, and the rules themselves are unchanged.
+ */
+const ARG_ALLOWLIST: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+  agentlink_send: {
+    // 06 §2.2, §2.3: one file, resolved with realpath and sent only from inside an owner-allowed
+    // folder (`files.allowedFolders`); hidden and protected paths refused; outside → needs_setup,
+    // the file never opened (04 §4; test/files-mcp.test.ts).
+    path: 'attaches one file from an owner-allowed folder only (04 §4)',
+  },
+  agentlink_fetch_file: {
+    // 06 §2.3: an index into the received message's files[], not a path; the file is saved only
+    // into `files.inboxFolder` under a sanitised, never-overwriting name (D-84).
+    fileIndex: 'an index into a received message, not a path',
+  },
+};
+
+/**
+ * Words the file tools' titles and descriptions must not use (M1-9d-1; 11 §5, D-40): storage and
+ * network internals a user never needs to see.
+ */
+const FILE_JARGON =
+  /\b(chains?|presigned|locators?|s3|r2|buckets?|ciphertext|alf1|nostr|relays?|url)\b/i;
+const FILE_TOOLS: ReadonlySet<string> = new Set(['agentlink_send', 'agentlink_fetch_file']);
+
 function argNames(schema: unknown, out: string[] = []): string[] {
   if (Array.isArray(schema)) {
     for (const item of schema) argNames(item, out);
@@ -139,7 +166,18 @@ export function auditSurface(
       }
     }
     for (const arg of argNames(tool.inputSchema)) {
-      if (DENIED_ARG.test(arg)) bad.push(`${name}: argument "${arg}" is a denied kind (I-4)`);
+      if (DENIED_ARG.test(arg) && ARG_ALLOWLIST[name]?.[arg] === undefined) {
+        bad.push(`${name}: argument "${arg}" is a denied kind (I-4)`);
+      }
+    }
+    if (FILE_TOOLS.has(name)) {
+      for (const [where, text] of [
+        ['title', tool.title ?? ''],
+        ['description', tool.description ?? ''],
+      ] as const) {
+        const word = FILE_JARGON.exec(text)?.[0];
+        if (word !== undefined) bad.push(`${name}: ${where} uses jargon "${word}" (11 §5)`);
+      }
     }
     const inputProps = (tool.inputSchema['properties'] ?? {}) as Record<string, unknown>;
     // Every tool's `status` enum lists pending_approval (the common result shape), so the tools
@@ -201,18 +239,41 @@ describe('tool-surface snapshot', () => {
 });
 
 describe('06 §2.0 table (D-53, D-55)', () => {
-  it('lists the 15 tools, 9 in M1a and 6 pending until M1-9d', () => {
+  it('lists the 15 tools, 9 in M1a and 6 in M1b', () => {
     expect(table).toHaveLength(15);
     expect(table.filter((r) => r.phase === 'M1a')).toHaveLength(9);
     expect(table.filter((r) => r.phase === 'M1b')).toHaveLength(6);
   });
 
-  it('the registry is exactly the M1a rows; the M1b rows stay pending', () => {
+  // M1-9d is split (M1-9d-1: files; M1-9d-2: the proof tools). Each M1b tool is registered against
+  // the table here when its card lands; the rest stay pending.
+  const REGISTERED_M1B: readonly string[] = ['agentlink_fetch_file'];
+
+  it('the registry is the M1a rows plus the landed M1b rows; the other M1b rows stay pending', () => {
     const m1a = table.filter((r) => r.phase === 'M1a').map((r) => r.name);
-    expect(surface.map((t) => t.name).sort()).toEqual([...m1a].sort());
-    // M1-9d adds the six M1b tools; then this test registers them against the table too.
-    const pending = table.filter((r) => r.phase === 'M1b').map((r) => r.name);
+    for (const name of REGISTERED_M1B) {
+      expect(table.find((r) => r.name === name)?.phase).toBe('M1b');
+    }
+    expect(surface.map((t) => t.name).sort()).toEqual([...m1a, ...REGISTERED_M1B].sort());
+    const pending = table
+      .filter((r) => r.phase === 'M1b' && !REGISTERED_M1B.includes(r.name))
+      .map((r) => r.name);
+    expect(pending).toHaveLength(5);
     for (const name of pending) expect(surface.map((t) => t.name)).not.toContain(name);
+  });
+
+  it('agentlink_fetch_file carries idempotentHint false (06 §2.0) and no path argument', () => {
+    const tool = surface.find((t) => t.name === 'agentlink_fetch_file');
+    expect(tool?.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    });
+    expect(Object.keys(tool?.inputSchema['properties'] ?? {}).sort()).toEqual([
+      'envelopeId',
+      'fileIndex',
+    ]);
   });
 
   it('no tool name is duplicated', () => {
@@ -305,6 +366,18 @@ describe('auditSurface catches bad surfaces (local demonstration, kept as a test
       description: 'Install hooks into your harness.',
     });
     expect(audit(hook).join('\n')).toMatch(/description offers a denied capability/);
+  });
+  it('a path argument on a tool without an allowlist entry, and file jargon', () => {
+    const tools = fixture({
+      name: 'agentlink_status',
+      inputSchema: { type: 'object', properties: { path: { type: 'string' } } },
+    });
+    expect(audit(tools).join('\n')).toMatch(/agentlink_status: argument "path"/);
+    const send = surface.find((t) => t.name === 'agentlink_send')!;
+    const jargon = surface.map((t) =>
+      t === send ? { ...t, description: `${t.description ?? ''} Uploads to a presigned URL.` } : t,
+    );
+    expect(audit(jargon).join('\n')).toMatch(/agentlink_send: description uses jargon/);
   });
   it('banned vocabulary in a description and in the instructions', () => {
     expect(
