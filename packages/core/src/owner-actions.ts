@@ -27,6 +27,7 @@ import {
   policySchema,
   signedOwnerActionSchema,
   type OwnerActionOp,
+  type Policy,
   type SignedOwnerAction,
 } from '@4thtech-io/types';
 import { isCommitmentAction } from './commitments.js';
@@ -46,7 +47,11 @@ import {
   type OwnerActionRefusal,
   type OwnerActionVerdict,
 } from './owner-action.js';
-import { POLICY_DEFAULTS_EFFECTIVE, type EffectivePolicy } from './policy-engine.js';
+import {
+  POLICY_DEFAULTS_EFFECTIVE,
+  type EffectivePolicy,
+  type PolicyProblem,
+} from './policy-engine.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -78,6 +83,19 @@ export type OwnerActionOutcome =
       readonly items?: readonly ItemRefusalReport[];
       /** True when the refused object's nonce was recorded, so it can never apply later. */
       readonly nonceBurnt: boolean;
+    };
+
+/** What `agentlink policy recover` may show and sign (D-100; OwnerActions.policyRecovery). */
+export type PolicyRecovery =
+  | { readonly status: 'valid' }
+  | { readonly status: 'unavailable'; readonly problem: PolicyProblem }
+  | {
+      readonly status: 'fail_closed';
+      readonly problem: PolicyProblem;
+      /** The version a recovering `policy.set` signs: above the mark and the stored row. */
+      readonly nextVersion: number;
+      /** Only for `rolled_back` and `mark_mismatch`: the stored policy, its signature verified. */
+      readonly stored?: { readonly policy: Policy; readonly version: number };
     };
 
 /** What a stored approval allows when its `approvalId` is presented with a call (04 §2.5.1). */
@@ -619,8 +637,54 @@ export class OwnerActions {
    * policy.
    */
   async loadPolicy(): Promise<EffectivePolicy> {
-    const failClosed = (problem: Extract<EffectivePolicy, { mode: 'fail_closed' }>['problem']) =>
-      ({ mode: 'fail_closed', problem }) as const;
+    return (await this.#inspectPolicy()).effective;
+  }
+
+  /**
+   * What `agentlink policy recover` (D-100; 06 §3, §8) may show and sign. Read-only: it signs and
+   * applies nothing; authority still comes only from a new owner-signed `policy.set` (I-4).
+   * - `valid`: the policy loads (signed, or the defaults); there is nothing to recover.
+   * - `unavailable`: the mark, the store or the own identity can't be read, so no version can be
+   *   chosen and nothing can be recovered now.
+   * - `fail_closed`: the kind of failure and the version a new `policy.set` needs: above the mark
+   *   and above the stored row's version (apply refuses anything not newer than both). `stored` is
+   *   the stored policy only when it parses and its signature verifies (`rolled_back`,
+   *   `mark_mismatch`); otherwise the owner reviews the defaults.
+   */
+  async policyRecovery(): Promise<PolicyRecovery> {
+    const inspected = await this.#inspectPolicy();
+    const { effective } = inspected;
+    if (effective.mode !== 'fail_closed') return { status: 'valid' };
+    const { problem } = effective;
+    if (
+      inspected.mark === undefined ||
+      inspected.rowVersion === undefined ||
+      problem === 'identity_unavailable'
+    ) {
+      return { status: 'unavailable', problem };
+    }
+    const nextVersion = Math.max(inspected.mark, inspected.rowVersion) + 1;
+    if (!Number.isSafeInteger(nextVersion)) return { status: 'unavailable', problem };
+    const { verified } = inspected;
+    if ((problem === 'rolled_back' || problem === 'mark_mismatch') && verified !== undefined) {
+      return { status: 'fail_closed', problem, nextVersion, stored: verified };
+    }
+    return { status: 'fail_closed', problem, nextVersion };
+  }
+
+  /**
+   * The G-6 loader, with what recovery needs next to its result: the mark, the stored row's version
+   * (0 without a row; absent when the store can't be read) and the stored policy when its signed
+   * object verifies and the policy parses.
+   */
+  async #inspectPolicy(): Promise<{
+    readonly effective: EffectivePolicy;
+    readonly mark?: number;
+    readonly rowVersion?: number;
+    readonly verified?: { readonly policy: Policy; readonly version: number };
+  }> {
+    const failClosed = (problem: PolicyProblem) =>
+      ({ effective: { mode: 'fail_closed', problem } }) as const;
     const mark = await this.#readMark();
     if (mark === undefined) return failClosed('mark_unavailable');
     let row: Row<'policies'> | undefined;
@@ -628,9 +692,14 @@ export class OwnerActions {
     try {
       row = await this.#ctx.store.transaction((tx) => tx.get('policies', { slot: SINGLETON_SLOT }));
     } catch {
-      return failClosed('unreadable');
+      return { ...failClosed('unreadable'), mark };
     }
-    if (row === undefined) return mark === 0 ? POLICY_DEFAULTS_EFFECTIVE : failClosed('missing');
+    if (row === undefined) {
+      return mark === 0
+        ? { effective: POLICY_DEFAULTS_EFFECTIVE, mark, rowVersion: 0 }
+        : { ...failClosed('missing'), mark, rowVersion: 0 };
+    }
+    const at = { mark, rowVersion: row.version };
 
     let text: string;
     let hash: string;
@@ -638,14 +707,14 @@ export class OwnerActions {
       text = await open(this.#ctx, 'policies', 'signed_json', [SINGLETON_SLOT], row.signed_json);
       hash = await open(this.#ctx, 'policies', 'policy_hash', [SINGLETON_SLOT], row.policy_hash);
     } catch {
-      return failClosed('unreadable');
+      return { ...failClosed('unreadable'), ...at };
     }
     try {
       self = await this.#self();
     } catch {
-      return failClosed('identity_unavailable');
+      return { ...failClosed('identity_unavailable'), ...at };
     }
-    if ('refusal' in self) return failClosed('identity_unavailable');
+    if ('refusal' in self) return { ...failClosed('identity_unavailable'), ...at };
 
     const verified = verifyStoredOwnerAction(text, self);
     if (!verified.ok) {
@@ -653,23 +722,25 @@ export class OwnerActions {
         case 'agent_mismatch':
         case 'owner_mismatch':
         case 'signature_invalid':
-          return failClosed(verified.reason);
+          return { ...failClosed(verified.reason), ...at };
         default:
-          return failClosed('invalid');
+          return { ...failClosed('invalid'), ...at };
       }
     }
     const { body } = verified.signed;
-    if (body.op !== 'policy.set') return failClosed('invalid');
+    if (body.op !== 'policy.set') return { ...failClosed('invalid'), ...at };
     // Belt and braces: the strict schema already checked it as part of the object.
-    if (!policySchema.safeParse(body.params.policy).success) return failClosed('invalid');
+    const parsed = policySchema.safeParse(body.params.policy);
+    if (!parsed.success) return { ...failClosed('invalid'), ...at };
     const version = body.params.version;
-    if (version < mark) return failClosed('rolled_back');
-    if (version !== mark) return failClosed('mark_mismatch');
+    const stored = { ...at, verified: { policy: parsed.data, version } };
+    if (version < mark) return { ...failClosed('rolled_back'), ...stored };
+    if (version !== mark) return { ...failClosed('mark_mismatch'), ...stored };
     // Columns derived from the signed object are caches; one that disagrees is a tampered row.
     if (row.version !== version || hash !== computeActionDigest(body.params.policy)) {
-      return failClosed('tampered');
+      return { ...failClosed('tampered'), ...stored };
     }
-    return { mode: 'signed', policy: body.params.policy, version };
+    return { effective: { mode: 'signed', policy: body.params.policy, version }, ...stored };
   }
 
   /**

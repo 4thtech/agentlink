@@ -1,4 +1,4 @@
-// `agentlink policy show | allow-folder <path> | remove-folder <path>` † (M1-9m; 04 §2.5, §4
+// `agentlink policy show | allow-folder <path> | remove-folder <path> | recover` † (M1-9m, M1-9m-b; 04 §2.5, §4
 // "Allowed folders"; 06 §3 `files.allowedFolders`, §8; 11 §5: the policy is "your rules").
 //
 // The owner's folders for sending files. Without one, `agentlink_send` with a path returns
@@ -19,6 +19,17 @@
 //   What is stored is that canonical realpath, never `~` and never a link. The core resolves it with
 //   realpath again on every use (files/outgoing.ts), so a folder replaced by a link later still
 //   only allows what its realpath allows.
+// - D-99: a folder that CONTAINS a protected folder (for example `~/Library`, which holds
+//   `~/Library/Keychains`) is refused too, before any owner code; the refusal names the protected
+//   folder and asks for a narrower one. Each protected folder is compared in its lexical form and
+//   its realpath (a `~/.ssh` that links elsewhere is found where it really is), ignoring case
+//   (macOS and Windows volumes). Whether it exists doesn't matter: fail closed.
+// - `policy recover` (D-100; 06 §3 G-6, §8): the deliberate way back from rules that fail closed.
+//   It prints only the kind of failure; the owner then reviews, in full, the stored rules when they
+//   parse and their signature verifies (`rolled_back`, `mark_mismatch`), otherwise the 06 §3
+//   defaults; after an explicit `y` and the owner code it signs that complete policy at the version
+//   the core needs (the mark + 1, or above the stored version when that is higher). It is refused
+//   while the rules are valid, and nothing is ever rebuilt without that review.
 // - The path is shown to the owner exactly as signed: one that terminal sanitizing would change
 //   (control, bidi, zero-width characters) is refused, so what the owner reads is what is signed.
 // - The owner code is never an argument, a variable or a pipe (deps.ts). A wrong code is refused by
@@ -35,6 +46,7 @@ import {
   segmentsBelow,
   type EffectivePolicy,
   type PathFlavor,
+  type PolicyProblem,
 } from '@4thtech-io/core';
 import {
   KeyStoreError,
@@ -46,6 +58,7 @@ import {
 import {
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_BOUNDS,
+  defaultPolicy,
   policySchema,
   type Policy,
 } from '@4thtech-io/types';
@@ -91,8 +104,10 @@ export const POLICY_TEXT = Object.freeze({
   protectedFolder:
     "Files in this folder can never be sent (it holds keys or AgentLink's own data). Choose another folder.",
   tooMany: `You can allow at most ${String(POLICY_BOUNDS.allowedFolders.max)} folders. Remove one first with \`agentlink policy remove-folder <path>\`.`,
+  containsProtected: (shown: string): string =>
+    `That folder contains ${shown}, which holds keys or AgentLink's own data, so it can't be allowed. Choose a narrower folder inside it that doesn't contain ${shown}.`,
   rulesUnreadable:
-    "AgentLink can't read your rules right now, so it uses its strictest settings and no folder is allowed. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+    "AgentLink can't use your rules right now, so it uses its strictest settings and no folder is allowed. Nothing was changed. To review and confirm your rules again, run `agentlink policy recover` in your own terminal.",
   alreadyAllowed: 'OK       That folder is already allowed. Nothing was changed.',
   notAllowed:
     "That folder isn't one of your allowed folders. Run `agentlink policy show` to see them.",
@@ -120,7 +135,161 @@ export const POLICY_TEXT = Object.freeze({
     `Largest file: ${String(send)} MB to send, ${String(receive)} MB to receive`,
   invites: (auto: boolean): string =>
     auto ? 'New contacts: accepted automatically' : 'New contacts: wait for your approval',
+
+  // recover (D-100)
+  nothingToRecover:
+    'Your rules are in use, so there is nothing to recover. Nothing was changed. Run `agentlink policy show` to see them.',
+  cannotRecover:
+    "AgentLink can't recover your rules right now: it can't read what it needs on this computer. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+  whatHappened: (kind: string): string =>
+    `Your rules can't be used, so AgentLink uses its strictest settings. What happened: ${kind}`,
+  reviewStored:
+    'Below are your saved rules, still signed by you. Review them in full. If you confirm, AgentLink uses them again.',
+  reviewDefaults:
+    "Your saved rules can't be trusted, so they aren't shown. Below are AgentLink's default rules. Review them in full. If you confirm, they replace your saved rules; allow your folders again afterwards.",
+  confirmQuestion: 'Use these rules? Type y and press Enter to continue, or anything else to stop.',
+  notConfirmedAnswer: 'Nothing was changed.',
+  recoverSummary: (version: number): string =>
+    `Sign the rules you just reviewed as your rules (version ${String(version)}), so AgentLink stops using its strictest settings.`,
+  recovered: (version: number): string =>
+    `OK       Your rules are in use again (version ${String(version)}).`,
 });
+
+/** The kind of failure, in words (D-100: the command shows only this, never the stored data). */
+const PROBLEM_TEXT: Readonly<Record<PolicyProblem, string>> = Object.freeze({
+  rolled_back: 'an older version of your rules was put back.',
+  mark_mismatch: "your saved rules don't match the version AgentLink last confirmed.",
+  tampered: 'your saved rules were changed outside AgentLink.',
+  missing: 'your saved rules are missing.',
+  unreadable: "your saved rules can't be read.",
+  invalid: "your saved rules aren't in a form this version of AgentLink accepts.",
+  signature_invalid: "your saved rules aren't signed by you.",
+  agent_mismatch: 'your saved rules belong to another agent.',
+  owner_mismatch: "your saved rules aren't signed by you.",
+  mark_unavailable: "AgentLink can't read the version it last confirmed.",
+  identity_unavailable: "AgentLink can't read this agent's profile.",
+});
+
+type Leaf = string | number | boolean | null | readonly unknown[];
+
+/** One rule of the review: its path in the 06 §3 document, its label (11 §5) and how it reads. */
+export interface PolicyReviewRow {
+  readonly path: string;
+  readonly label: string;
+  readonly read?: (value: Leaf) => string;
+}
+
+const usd = (value: Leaf): string => (value === null ? 'not set' : `$${String(value)}`);
+const yesNo = (value: Leaf): string => (value === true ? 'yes' : 'no');
+const mb = (value: Leaf): string => `${String(value)} MB`;
+const RULE_WORDS: Readonly<Record<string, string>> = Object.freeze({
+  allow: 'allowed',
+  approval: 'wait for your approval',
+  deny: 'never',
+  auto: 'accepted automatically',
+});
+const rule = (value: Leaf): string => RULE_WORDS[String(value)] ?? String(value);
+const list =
+  (none: string) =>
+  (value: Leaf): string =>
+    Array.isArray(value) && value.length > 0
+      ? value.map((item) => `\n    ${typeof item === 'string' ? item : contactRule(item)}`).join('')
+      : none;
+
+function contactRule(item: unknown): string {
+  const { contact, proofs } = item as {
+    contact: string;
+    proofs: { notarize?: string; perActionMaxUSD?: string };
+  };
+  const parts: string[] = [];
+  if (proofs.notarize !== undefined) parts.push(`add proof: ${rule(proofs.notarize)}`);
+  if (proofs.perActionMaxUSD !== undefined) {
+    parts.push(`each proof at most ${usd(proofs.perActionMaxUSD)}`);
+  }
+  return `${contact}: ${parts.join(', ')}`;
+}
+
+/** Every rule of the 06 §3 document, in order: the review shows the policy in full (D-100). */
+export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
+  { path: 'contacts.acceptInvites', label: 'New contacts', read: rule },
+  {
+    path: 'contacts.unknownSenders',
+    label: 'Requests from unknown senders',
+    read: (v) => (v === 'drop' ? 'dropped' : 'kept for you to review'),
+  },
+  {
+    path: 'contacts.allowed',
+    label: 'Who can message your agent',
+    read: (v) => (v === 'paired' ? 'your contacts' : list('nobody')(v)),
+  },
+  { path: 'contacts.rateLimitPerContactPerHour', label: 'Messages per contact per hour, at most' },
+  {
+    path: 'files.allowedFolders',
+    label: 'Folders your AI can send files from',
+    read: list('none'),
+  },
+  { path: 'files.inboxFolder', label: 'Received files are saved in' },
+  { path: 'files.maxSendSizeMB', label: 'Largest file to send', read: mb },
+  { path: 'files.maxReceiveSizeMB', label: 'Largest file to receive', read: mb },
+  { path: 'files.storage', label: 'Where sent files are stored' },
+  { path: 'files.defaultExpiryDays', label: 'Sent files are kept for, in days' },
+  {
+    path: 'files.deleteAfter',
+    label: 'Sent files are deleted after',
+    read: (v) => (v === 'receipt' ? 'the contact received them' : 'they expire'),
+  },
+  { path: 'files.ownerArchive', label: 'Keep a copy of sent files for you', read: yesNo },
+  { path: 'envelopes.maxEnvelopeKB', label: 'Largest message', read: (v) => `${String(v)} KB` },
+  { path: 'proofs.notarize', label: 'Adding proof', read: rule },
+  { path: 'proofs.dailyBudgetUSD', label: 'Spent on proofs in 24 hours, at most', read: usd },
+  { path: 'proofs.perActionMaxUSD', label: 'Each proof, at most', read: usd },
+  {
+    path: 'proofs.allowKeyDisclosure',
+    label: "Including a message's content in a proof file",
+    read: rule,
+  },
+  { path: 'proofs.exportFolder', label: 'Proof files are saved in' },
+  { path: 'proofs.defaultChain', label: 'Proof network (Advanced)' },
+  { path: 'receipts.autoDelivered', label: 'Tell the sender a message arrived', read: yesNo },
+  { path: 'receipts.autoOpened', label: 'Tell the sender a message was opened', read: yesNo },
+  { path: 'commitments.accept', label: 'Accepting terms', read: rule },
+  {
+    path: 'commitments.autoAcceptContacts',
+    label: 'Contacts whose terms can be accepted automatically',
+    read: list('none'),
+  },
+  { path: 'commitments.autoAcceptMaxUSD', label: 'Terms accepted automatically up to', read: usd },
+  {
+    path: 'commitments.autoAcceptDirection',
+    label: 'Terms accepted automatically only when you are',
+    read: (v) => (v === 'sell' ? 'selling' : 'buying'),
+  },
+  { path: 'commitments.autoAcceptMinUSD', label: 'Selling accepted automatically from', read: usd },
+  { path: 'contactRules', label: 'Rules for single contacts', read: list('none') },
+]);
+
+const leafAt = (policy: Policy, path: string): Leaf =>
+  path
+    .split('.')
+    .reduce<unknown>((at, key) => (at as Record<string, unknown>)[key], policy) as Leaf;
+
+/**
+ * The policy in full, one line per rule, or undefined when a value would read differently on the
+ * terminal than it is signed (06 §8: what the owner reads is what is signed). Values are owner-signed
+ * and passed the 06 §3 strict form; they are shown whole, never cut short.
+ */
+function reviewLines(policy: Policy): readonly string[] | undefined {
+  const lines: string[] = [];
+  for (const row of POLICY_REVIEW_ROWS) {
+    const value = leafAt(policy, row.path);
+    const text = row.read === undefined ? String(value) : row.read(value);
+    for (const part of text.split('\n')) {
+      if (sanitizeTerminalText(part) !== part) return undefined;
+    }
+    lines.push(`  ${row.label}: ${text}`);
+  }
+  return lines;
+}
 
 /**
  * A wrong owner code (`presence_rejected`). By name and code as well as by class: the owner store
@@ -221,8 +390,47 @@ async function checkFolder(typed: string, home: string, flavor: PathFlavor): Pro
   if (roots.some((r) => segmentsBelow(real, r, flavor, { caseInsensitive: true }) !== undefined)) {
     return refuse(POLICY_TEXT.protectedFolder);
   }
+  // D-99: a folder that holds a protected folder, in either of its forms.
+  for (const root of await protectedForms(roots, home, flavor)) {
+    const holds = root.forms.some(
+      (form) => segmentsBelow(form, real, flavor, { caseInsensitive: true }) !== undefined,
+    );
+    if (holds) {
+      return refuse(
+        sanitizeTerminalText(root.shown) === root.shown
+          ? POLICY_TEXT.containsProtected(root.shown)
+          : POLICY_TEXT.protectedFolder,
+      );
+    }
+  }
   if (segmentsOf(real, flavor).some((s) => s.startsWith('.'))) return refuse(POLICY_TEXT.hidden);
   return { ok: true, path: real };
+}
+
+/**
+ * Each protected folder (04 §4) as the owner reads it (`~/…` under the home folder) and the forms
+ * it is compared in: as written, and its realpath when it resolves (D-99).
+ */
+async function protectedForms(
+  roots: readonly string[],
+  home: string,
+  flavor: PathFlavor,
+): Promise<readonly { readonly shown: string; readonly forms: readonly string[] }[]> {
+  const sep = flavor === 'posix' ? '/' : '\\';
+  const out: { shown: string; forms: string[] }[] = [];
+  for (const root of roots) {
+    const forms = [root];
+    try {
+      const real = await realpath(root);
+      if (real !== root) forms.push(real);
+    } catch {
+      // It doesn't exist (yet): the folder that would hold it is refused all the same.
+    }
+    const below = segmentsBelow(root, home, flavor);
+    const shown = below === undefined ? root : ['~', ...below].join(sep);
+    out.push({ shown, forms });
+  }
+  return out;
 }
 
 /** The current verified rules, or undefined when they can't be read (G-6 fail closed). */
@@ -278,6 +486,25 @@ async function setFolders(
     output.printError(POLICY_TEXT.notShowable);
     return EXIT_FAILED;
   }
+  const signed = await signAndApply(deps, agent, output, policy, (rules.version ?? 0) + 1, summary);
+  if (signed !== EXIT_OK) return signed;
+  output.print(done);
+  return EXIT_OK;
+}
+
+/**
+ * Signs one complete `policy.set` at `version` (one owner-code entry at @4thtech-io/node's own TTY
+ * prompt, which shows `summary`), has the core verify and apply it, and prints any failure. EXIT_OK
+ * only when it was applied and the mark was raised to it.
+ */
+async function signAndApply(
+  deps: OwnerCommandDeps,
+  agent: OwnerAgent,
+  output: Output,
+  policy: Policy,
+  version: number,
+  summary: string,
+): Promise<number> {
   const owner = await ownerContext(agent);
   if (owner === undefined) {
     output.printError(OWNER_TEXT.noIdentity);
@@ -289,7 +516,7 @@ async function setFolders(
     agent: owner.agent,
     owner: encodeHex(owner.owner.ownerNostr),
     op: 'policy.set',
-    params: { version: (rules.version ?? 0) + 1, policy: policy as unknown as JsonObject },
+    params: { version, policy: policy as unknown as JsonObject },
     nonce: encodeBase64url(randomBytes(16)),
     issuedAt,
     expiresAt: issuedAt + POLICY_SET_LIFETIME_SECONDS,
@@ -322,7 +549,59 @@ async function setFolders(
     output.printError(POLICY_TEXT.notConfirmed);
     return EXIT_FAILED;
   }
-  output.print(done);
+  return EXIT_OK;
+}
+
+/**
+ * `policy recover` † (D-100). Only while the rules fail closed: prints the kind of failure, shows
+ * the stored rules (rolled_back, mark_mismatch, signature verified) or the 06 §3 defaults in full,
+ * asks for an explicit `y`, then one owner-code entry signs that complete policy.
+ */
+async function recover(deps: OwnerCommandDeps, agent: OwnerAgent, output: Output): Promise<number> {
+  const view = await agent.client.ownerActions.policyRecovery();
+  if (view.status === 'valid') {
+    output.printError(POLICY_TEXT.nothingToRecover);
+    return EXIT_FAILED;
+  }
+  if (view.status === 'unavailable') {
+    output.printError(POLICY_TEXT.whatHappened(PROBLEM_TEXT[view.problem]));
+    output.printError(POLICY_TEXT.cannotRecover);
+    return EXIT_FAILED;
+  }
+  // A deep, plain copy of what is reviewed: exactly this document is signed.
+  const policy = JSON.parse(
+    JSON.stringify(view.stored === undefined ? defaultPolicy() : view.stored.policy),
+  ) as Policy;
+  const lines = reviewLines(policy);
+  if (lines === undefined || !policySchema.safeParse(policy).success) {
+    output.printError(POLICY_TEXT.notShowable);
+    return EXIT_FAILED;
+  }
+  output.print(
+    [
+      POLICY_TEXT.whatHappened(PROBLEM_TEXT[view.problem]),
+      '',
+      view.stored === undefined ? POLICY_TEXT.reviewDefaults : POLICY_TEXT.reviewStored,
+      '',
+      ...lines,
+      '',
+    ].join('\n'),
+  );
+  const answer = await deps.ask(POLICY_TEXT.confirmQuestion);
+  if (answer.trim().toLowerCase() !== 'y') {
+    output.printError(POLICY_TEXT.notConfirmedAnswer);
+    return EXIT_FAILED;
+  }
+  const signed = await signAndApply(
+    deps,
+    agent,
+    output,
+    policy,
+    view.nextVersion,
+    POLICY_TEXT.recoverSummary(view.nextVersion),
+  );
+  if (signed !== EXIT_OK) return signed;
+  output.print(POLICY_TEXT.recovered(view.nextVersion));
   return EXIT_OK;
 }
 
@@ -420,7 +699,7 @@ async function runPolicy(
     return EXIT_FAILED;
   }
   const known =
-    (sub === 'show' && arg === undefined) ||
+    ((sub === 'show' || sub === 'recover') && arg === undefined) ||
     ((sub === 'allow-folder' || sub === 'remove-folder') && arg !== undefined);
   if (!known) return badArguments(output);
 
@@ -431,6 +710,7 @@ async function runPolicy(
   const { agent } = opened;
   try {
     if (sub === 'show') return await show(agent, output);
+    if (sub === 'recover') return await recover(deps, agent, output);
     if (sub === 'allow-folder') {
       return await allowFolder(deps, agent, output, arg as string, home, flavor);
     }
