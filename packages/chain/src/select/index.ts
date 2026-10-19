@@ -15,6 +15,7 @@ export {
 } from './detect.js';
 export {
   KNOWN_MAINNET_CHAIN_IDS,
+  chainFamily,
   isSelectableChain,
   pickChain,
   type ChainFunding,
@@ -60,8 +61,9 @@ export interface ChainSelector {
 }
 
 /**
- * A selector that reuses a detection for a short time per payer, action and chain set. A
- * detection with an unavailable chain is not reused, so the next attempt asks that chain again.
+ * A selector that reuses a detection for a short time per payer, action and chain set, and only
+ * when it gave a funded selection: `needs_credits` and `unavailable` always read again, as does a
+ * detection with an unavailable chain. The paid path calls `clear()` after spending (M1-4c).
  */
 export function createChainSelector(options: ChainSelectorOptions = {}): ChainSelector {
   const ttl = options.ttlMs ?? DEFAULT_DETECT_CACHE_MS;
@@ -77,17 +79,23 @@ export function createChainSelector(options: ChainSelectorOptions = {}): ChainSe
       const ids = chains.map((c) => c.config.chainId).sort((a, b) => a - b);
       const key = [who, opts.feeType, (opts.appId ?? '').toLowerCase(), ids.join(',')].join('|');
       const hit = cache.get(key);
-      if (hit && now() - hit.at <= ttl) return pickChain(hit.detection, opts);
+      if (hit && now() - hit.at <= ttl) {
+        const cached = pickChain(hit.detection, opts);
+        // Only a funded selection is reused: credits added outside this client (a top-up link,
+        // the faucet) must show on the next attempt, so anything else reads again.
+        if (cached.status === 'ok') return cached;
+      }
       cache.delete(key);
       const detection = await detectFunding(chains, who, opts);
-      if (ttl > 0 && detection.unavailable.length === 0) {
+      const selection = pickChain(detection, opts);
+      if (ttl > 0 && selection.status === 'ok' && detection.unavailable.length === 0) {
         if (cache.size >= MAX_CACHE_ENTRIES) {
           const oldest = cache.keys().next().value;
           if (oldest !== undefined) cache.delete(oldest);
         }
         cache.set(key, { at: now(), detection });
       }
-      return pickChain(detection, opts);
+      return selection;
     },
     clear() {
       cache.clear();

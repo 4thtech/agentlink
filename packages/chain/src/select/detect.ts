@@ -1,6 +1,6 @@
 // Detection for chain selection (07 §6.3 step 1, D-40): for one payer and one action, read on every
 // selectable chain in parallel the fee quote, `creditsOf` and, where a gasless top-up exists, the
-// stablecoin balance. Each chain has a short time budget; a chain that fails or does not answer
+// stablecoin balance and the vault's `minDeposit`. Each chain has a short time budget; a chain that fails or does not answer
 // in time is listed as unavailable (chain ID only, no error text: it could name an RPC URL) and
 // skipped for this attempt. A mainnet entry is never queried, so its RPC never sees the address.
 import { erc20Abi } from 'viem';
@@ -52,7 +52,7 @@ async function detectOn(
   const opts = await Promise.all(
     offeredTokens(config).map(async ({ token, vaultAddress }) => {
       const topUp = token.eip3009 === true && token.address !== null;
-      const [quote, credits, topUpBalance] = await Promise.all([
+      const [quote, credits, topUpBalance, minDeposit] = await Promise.all([
         quoteFee(client, config, {
           feeType: options.feeType,
           token: token.symbol,
@@ -67,8 +67,9 @@ async function detectOn(
               args: [payer],
             })
           : Promise.resolve(null),
+        topUp ? vault.read.minDeposit([vaultAddress]) : Promise.resolve(null),
       ]);
-      return Object.freeze({ quote, credits, topUpBalance });
+      return Object.freeze({ quote, credits, topUpBalance, minDeposit });
     }),
   );
   return Object.freeze({ config, options: Object.freeze(opts) });

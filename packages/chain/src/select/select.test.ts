@@ -100,6 +100,8 @@ interface Row {
   credits?: bigint;
   /** Stablecoin balance in micro-dollars; counted only where the gasless top-up exists. */
   balance?: bigint;
+  /** The vault's minDeposit in micro-dollars (gasless top-up only). */
+  minDeposit?: bigint;
 }
 
 function scale(config: ChainConfig, token: FeeTokenSymbol, micros: bigint): bigint {
@@ -117,6 +119,9 @@ function funding(rows: Row[], unavailable: number[] = []): FundingDetection {
           quote: quoteOf(r.config, token, r.fee),
           credits: scale(r.config, token, r.credits ?? 0n),
           topUpBalance: r.balance === undefined ? null : scale(r.config, token, r.balance),
+          ...(r.minDeposit === undefined
+            ? {}
+            : { minDeposit: scale(r.config, token, r.minDeposit) }),
         },
       ],
     };
@@ -174,6 +179,38 @@ describe('pickChain: the 07 §6.3 order, no user choice (D-40)', () => {
         { config: third(), fee: 10n * CENT, credits: 50n * CENT },
       ],
       want: { status: 'ok', chainId: 11155420, reason: 'cheapest', payFrom: 'credits' },
+    },
+    {
+      name: 'policy default `base` (a network family) picks Base Sepolia on testnet',
+      rows: () => [
+        { config: base(), fee: 10n * CENT, credits: 100n * CENT },
+        { config: chiado(), fee: 1n * CENT, credits: 100n * CENT },
+      ],
+      defaultChain: 'base',
+      want: { status: 'ok', chainId: 84532, reason: 'default', payFrom: 'credits' },
+    },
+    {
+      name: 'policy default `gnosis` (a network family) picks Gnosis Chiado on testnet',
+      rows: () => [
+        { config: base(), fee: 1n * CENT, credits: 100n * CENT },
+        { config: chiado(), fee: 10n * CENT, credits: 100n * CENT },
+      ],
+      defaultChain: 'gnosis',
+      want: { status: 'ok', chainId: 10200, reason: 'default', payFrom: 'credits' },
+    },
+    {
+      name: 'gasless top-up: a balance below the vault minDeposit does not fund',
+      rows: () => [
+        { config: baseTopUp(), fee: 10n * CENT, balance: 300n * CENT, minDeposit: 500n * CENT },
+      ],
+      want: { status: 'needs_credits', chainId: 84532 },
+    },
+    {
+      name: 'gasless top-up: a balance covering the minDeposit funds',
+      rows: () => [
+        { config: baseTopUp(), fee: 10n * CENT, balance: 500n * CENT, minDeposit: 500n * CENT },
+      ],
+      want: { status: 'ok', chainId: 84532, reason: 'cheapest', payFrom: 'top_up' },
     },
     {
       name: 'stablecoin balance only, no gasless top-up yet: not funded',
@@ -243,11 +280,40 @@ describe('pickChain: the 07 §6.3 order, no user choice (D-40)', () => {
         chainId: 84532,
         chain: 'base-sepolia',
         token: 'USDC',
-        usd: '0.1',
+        usd: '0.07',
+        feeUsd: '0.1',
         agentAddress: PAYER,
       },
       unavailable: [],
     });
+  });
+
+  it('the top-up amount is the shortfall, at least the vault minDeposit where gasless', () => {
+    const plain = pickChain(funding([{ config: base(), fee: 10n * CENT, credits: 4n * CENT }]));
+    expect(plain).toMatchObject({ topUp: { usd: '0.06', feeUsd: '0.1' } });
+    const withMin = pickChain(
+      funding([
+        {
+          config: baseTopUp(),
+          fee: 10n * CENT,
+          credits: 4n * CENT,
+          balance: 0n,
+          minDeposit: 500n * CENT,
+        },
+      ]),
+    );
+    expect(withMin).toMatchObject({ topUp: { usd: '5', feeUsd: '0.1' } });
+  });
+
+  it('a non-family default key is ignored (no prefix match)', () => {
+    const got = pickChain(
+      funding([
+        { config: base(), fee: 10n * CENT, credits: 100n * CENT },
+        { config: chiado(), fee: 1n * CENT, credits: 100n * CENT },
+      ]),
+      { defaultChain: 'bas' },
+    );
+    expect(got).toMatchObject({ status: 'ok', chainId: 10200, reason: 'cheapest' });
   });
 
   it('the override (Advanced or tool chain?) forces a supported chain', () => {
@@ -389,6 +455,7 @@ interface FakeChain {
   fee?: (token: string) => bigint;
   credits?: (payer: string, token: string) => bigint;
   balance?: (token: string, owner: string) => bigint;
+  minDeposit?: (token: string) => bigint;
   fail?: boolean;
   hang?: boolean;
 }
@@ -429,6 +496,8 @@ function fakeFetch(config: ChainConfig, fake: FakeChain) {
       if (functionName === 'quote') {
         const p = fake.fee?.((a[1] as string).toLowerCase()) ?? 0n;
         result = [p, 0n, p];
+      } else if (functionName === 'minDeposit') {
+        result = fake.minDeposit?.((a[0] as string).toLowerCase()) ?? 0n;
       } else if (functionName === 'creditsOf') {
         result =
           fake.credits?.((a[0] as string).toLowerCase(), (a[1] as string).toLowerCase()) ?? 0n;
@@ -489,9 +558,14 @@ describe('detectFunding: credits, quotes and top-up balances on every chain, in 
 
   it('reads the stablecoin balance where the gasless top-up exists', async () => {
     const c = baseTopUp();
-    const b = reader(c, { fee: USDC_FEE, balance: () => 7_000_000n });
+    const b = reader(c, {
+      fee: USDC_FEE,
+      balance: () => 7_000_000n,
+      minDeposit: () => 5_000_000n,
+    });
     const d = await detectFunding([b.reader], PAYER, { feeType: 'NOTARIZE' });
     expect(d.chains[0]?.options[0]?.topUpBalance).toBe(7_000_000n);
+    expect(d.chains[0]?.options[0]?.minDeposit).toBe(5_000_000n);
     expect(b.calls.find((x) => x.fn === 'balanceOf')?.args).toEqual([
       expect.stringMatching(new RegExp(`^${PAYER}$`, 'i')),
     ]);
@@ -542,6 +616,7 @@ describe('detectFunding: credits, quotes and top-up balances on every chain, in 
         chain: 'gnosis-chiado',
         token: 'NATIVE',
         usd: '0.02',
+        feeUsd: '0.02',
         agentAddress: PAYER,
       },
       unavailable: [],
@@ -592,6 +667,33 @@ describe('createChainSelector: a short detection cache', () => {
     selector.clear();
     await selector.select([b.reader], PAYER, { feeType: 'NOTARIZE' });
     expect(b.fetchFn.mock.calls.length).toBeGreaterThan(m);
+  });
+
+  it('never reuses a needs_credits result: credits added elsewhere show on the next attempt', async () => {
+    let credits = 0n;
+    const b = reader(base(), { fee: USDC_FEE, credits: () => credits });
+    const selector = createChainSelector({ now: () => 1_000 });
+    const first = await selector.select([b.reader], PAYER, { feeType: 'NOTARIZE' });
+    expect(first.status).toBe('needs_credits');
+    const n = b.fetchFn.mock.calls.length;
+    credits = 10n ** 9n; // topped up through the link or the faucet, outside this client
+    const second = await selector.select([b.reader], PAYER, { feeType: 'NOTARIZE' });
+    expect(b.fetchFn.mock.calls.length).toBeGreaterThan(n);
+    expect(second).toMatchObject({ status: 'ok', chainId: 84532 });
+  });
+
+  it('a cached funded detection is not reused for an override that it cannot fund', async () => {
+    const b = reader(base(), { fee: USDC_FEE, credits: () => 10n ** 9n });
+    const c = reader(chiado(), { fee: XDAI_FEE });
+    const selector = createChainSelector({ now: () => 1_000 });
+    await selector.select([b.reader, c.reader], PAYER, { feeType: 'NOTARIZE' });
+    const n = c.fetchFn.mock.calls.length;
+    const forced = await selector.select([b.reader, c.reader], PAYER, {
+      feeType: 'NOTARIZE',
+      chainId: 10200,
+    });
+    expect(forced).toMatchObject({ status: 'needs_credits', topUp: { chainId: 10200 } });
+    expect(c.fetchFn.mock.calls.length).toBeGreaterThan(n);
   });
 
   it('does not cache a chain that was unavailable', async () => {

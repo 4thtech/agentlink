@@ -6,7 +6,7 @@
 // (no chain, network fee or account words in the default UI) and builds the top-up link.
 import { ChainConfigError, type ChainConfig, type FeeTokenSymbol } from '../config/index.js';
 import type { Hex } from '../ids/index.js';
-import type { FeeQuote } from '../fees/index.js';
+import { tokenUnitsToUsd, type FeeQuote } from '../fees/index.js';
 
 /** How a funded chain pays: existing credits, or a gasless top-up from a stablecoin balance (F-46). */
 export type PayFrom = 'credits' | 'top_up';
@@ -22,6 +22,11 @@ export interface FundingOption {
    * (the token or the deployed vault lacks EIP-3009), so the balance cannot become credits.
    */
   readonly topUpBalance: bigint | null;
+  /**
+   * The vault's `minDeposit(token)` for a gasless top-up, base units; `null` where no gasless
+   * top-up exists (12 §4.1). Absent in a hand-built detection: treated as `null`.
+   */
+  readonly minDeposit?: bigint | null;
 }
 
 /** One chain that answered in time. */
@@ -40,7 +45,11 @@ export interface FundingDetection {
 }
 
 export interface PickOptions {
-  /** Policy `proofs.defaultChain` (06 §3): a chain key. An unknown key is ignored. */
+  /**
+   * Policy `proofs.defaultChain` (06 §3): a network family (`base`, `gnosis`) or an exact chain
+   * key. The family matches its testnet in this release (`base` → `base-sepolia`). An unknown
+   * value is ignored.
+   */
   readonly defaultChain?: string;
   /** The Advanced or tool `chain?` override (06 §2.4); never asked of the user. */
   readonly chainId?: number;
@@ -51,8 +60,13 @@ export interface TopUpRoute {
   readonly chainId: number;
   readonly chain: string;
   readonly token: FeeTokenSymbol;
-  /** The fee for this action in USD (the minimum that makes the chain funded). */
+  /**
+   * The amount to add in USD, rounded up: the shortfall (fee − credits in that token) or, where a
+   * gasless top-up exists, at least the vault's `minDeposit`.
+   */
   readonly usd: string;
+  /** The fee for this action in USD. */
+  readonly feeUsd: string;
   /** The payer's address, lowercase. */
   readonly agentAddress: Hex;
 }
@@ -108,12 +122,30 @@ interface Ranked {
 
 const KIND_RANK = { credits: 0, top_up: 1, none: 2 } as const;
 
+/** Testnet suffixes of shipped chain keys: `<family>-<testnet>`. */
+const TESTNET_SUFFIX = /-(sepolia|chiado|holesky|amoy)$/;
+
+/** The network family of a chain key: `base-sepolia` → `base`, `gnosis-chiado` → `gnosis`. */
+export function chainFamily(key: string): string {
+  return key.replace(TESTNET_SUFFIX, '');
+}
+
+function gasless(config: ChainConfig, option: FundingOption): boolean {
+  const fee = config.feeTokens.find((t) => t.symbol === option.quote.token);
+  return fee?.eip3009 === true && option.topUpBalance !== null;
+}
+
+/** Base units to add before the action is funded: the shortfall, at least `minDeposit` when gasless. */
+function topUpUnits(config: ChainConfig, option: FundingOption): bigint {
+  const short = option.quote.total > option.credits ? option.quote.total - option.credits : 0n;
+  const min = gasless(config, option) ? (option.minDeposit ?? 0n) : 0n;
+  return short > min ? short : min;
+}
+
 function payFromOf(config: ChainConfig, option: FundingOption): PayFrom | null {
-  const { total, token } = option.quote;
-  if (option.credits >= total) return 'credits';
-  const fee = config.feeTokens.find((t) => t.symbol === token);
-  if (fee?.eip3009 === true && option.topUpBalance !== null) {
-    if (option.credits + option.topUpBalance >= total) return 'top_up';
+  if (option.credits >= option.quote.total) return 'credits';
+  if (gasless(config, option) && (option.topUpBalance as bigint) >= topUpUnits(config, option)) {
+    return 'top_up';
   }
   return null;
 }
@@ -173,7 +205,13 @@ export function pickChain(detection: FundingDetection, options: PickOptions = {}
         chainId: r.config.chainId,
         chain: r.config.key,
         token: r.option.quote.token,
-        usd: r.option.quote.usd,
+        usd:
+          tokenUnitsToUsd(
+            topUpUnits(r.config, r.option),
+            r.config.feeTokens.find((t) => t.symbol === r.option.quote.token)?.decimals ?? 6,
+            'up',
+          ) ?? r.option.quote.usd,
+        feeUsd: r.option.quote.usd,
         agentAddress: detection.payer,
       }),
       unavailable,
@@ -199,7 +237,11 @@ export function pickChain(detection: FundingDetection, options: PickOptions = {}
   const all = chains.flatMap(rank);
   if (options.defaultChain !== undefined) {
     const funded = best(
-      all.filter((r) => r.config.key === options.defaultChain),
+      all.filter(
+        (r) =>
+          r.config.key === options.defaultChain ||
+          chainFamily(r.config.key) === options.defaultChain,
+      ),
       true,
     );
     if (funded) return ok(funded, 'default');
