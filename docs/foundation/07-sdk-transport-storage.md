@@ -853,6 +853,15 @@ Encodings follow 04 §2.4.1, and a verifier rejects a pack in any other form. `r
 - **Optional counterparty check.** With the disclosed CEK, a verifier that also holds the counterparty's card (out of band; the pack carries only the signer's card) may recompute that party's entry (04 §3.3, wrap check). This confirms that the counterparty's entry carried the same CEK. It is optional, and the pack format does not change for it.
 - **Export.** `exportProofPack` (M1-7g) always includes `envelope` when it discloses a key.
 
+**Recipient-side export (D-107; decided by Tali in chat, 2026-10-19; card M1-7g-b).** Either side of a record can export its pack (02 J8 step 6). The recipient builds it from the signed Record and signature that arrived in the `proof` body and passed the receive checks (04 §3.4); it never builds one from the chain read alone, which lacks the Record fields that only `recordStructHash` commits.
+- **Fields.** `record` and `signature` exactly as stored; `recordId` and `chainId` from the body; `envelopeHash` = `record.envelopeHash`; `notary` = the recipient's own configured Notary for `chainId`, never a value from the body.
+- **Signer.** The contact's card for the envelope's key epoch, with its `cardSig`, and with `cardAgentSig` and `cardPop` as received in `handshake`, `handshake-ack` or `card-update` (D-102, M1-4d-f); without them, the card alone (`card_pop_missing` at verification); without a stored card for that epoch, `{evm}` only.
+- **Recipient.** Left out by default. Only with `includeRecipient: true` does the pack carry `recipient: {evm, salt}` with the recipient's own agent address and the salt, the same default and option as on the sender side (M1-7g). Including it links the recipient's agent address to the record for whoever receives the pack (05 §3.3, privacy note).
+- **Content key.** As on the sender side: only with `proofs.allowKeyDisclosure` and the owner's approval (06 §3), and then always with `envelope` and the 32-byte CEK, which the recipient unwraps from its own entry (04 §3.3).
+- **Owner approval.** By default the exporting side's own signed approval (04 §3.4, D-55), which here is the recipient's: the verifier applies the recipient-side scope rules (M1-4d-c, 04 §3.4.2). The owner may leave it out.
+- **Receipts.** The recipient's own receipts for the record, listed only with a transaction hash it holds; the verifier reads every receipt from the chain in any case.
+- **Unavailable.** A received proof without a stored Record and signature (an older sender, 04 §3.4), or a stored pair that does not form a valid pack, returns `rejected` with code `RECORD_UNAVAILABLE` and builds nothing.
+
 **Interim sender-attribution rule (D-95).** Until agent-card proof-of-possession lands (its own S2 card, M1-4d-d, specified above), a pack whose sender attribution relies on a card reports `record_only`, not `verified`. The record, its signature and its receipts are still verified on their own. The result says in neutral words that the record exists and that the sender is not confirmed by the pack; it makes no claim about who the sender is.
 
 ---

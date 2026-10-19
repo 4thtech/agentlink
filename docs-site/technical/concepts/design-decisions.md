@@ -143,6 +143,12 @@ The proof half of the file and proof tools (notarizing on send, propose and resp
 
 **Availability.** In development (card M1-9d-2).
 
+### Both sides can export a proof pack (M1-7g-b, D-107)
+
+A proof of agreement should be exportable by either party, not only by the side that paid for the record. So the follow-up `proof` message that tells the recipient about a record also carries the signed record and its signature. The message is end-to-end encrypted to the recipient only; nothing new reaches any 4thTech service, and the record and signature are already public in the transaction that stored the record. Before keeping them, the recipient checks them against the record on the proof network and against the message it received (record hash, record ID, signer, kind, its own commitment and the signature); if anything does not match, it drops the whole `proof` message and signs no receipt. The recipient's pack leaves out the recipient's own address and salt unless it asks for them, as on the sender side. A `proof` message from an older version without the record still works for receipts, but the recipient cannot export a pack for it (`RECORD_UNAVAILABLE`).
+
+**Availability.** Decided design (04 §3.4, 07 §8), upcoming (card M1-7g-b). Until it lands, only the side that recorded can export.
+
 ## Packages
 
 ### The internal package scope `@4thtech-io` (OPS-REL-2)

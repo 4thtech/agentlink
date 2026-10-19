@@ -2456,6 +2456,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Replacing a signed item (04 §5, §3.4.2): an earlier Record that lands just before its deadline while the submitter reports `failed` gets no replacement, the part becomes `done` with it and the budget is charged once; a replacement is signed only after the `finalized` block is past the deadline and shows no record, and a failed chain read signs nothing; a Record approved outside a commitment is not replaced after that approval's `expiresAt` (`pending_approval`); a commitment part never has two live items, and none is replaced after the scope's `expiresAt`.
   - Fresh salts (04 §5, D-61): two Records for the same recipient, and a replacement Record for the same envelope, have different CSPRNG salts; no salt-derivation API exists.
 
+#### M1-7g-b · core: recipient-side proof-pack export (new, D-107)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/types (`proof` body schema), packages/core (proofs)
+- **Depends on:** M1-7g, M1-4d-f, M1-4d-c
+- **Spec:** 04 §3.4 (`proof`, signed Record in the body), §2.4.1; 05 §3.1, §3.3; 07 §8 (recipient-side export); 02 J8 step 6, F-43; D-107
+- **Invariants:** I-2, I-3, I-5, I-6, I-7, I-10
+- **Scope:**
+  - Types: extend the strict `proof` body schema with `record` (the 05 §3.1 Record JSON form) and `signature` (Record-signature form, at most 4 096 bytes), present together or not at all; unknown keys still refused.
+  - Sender: every `proof` body the core sends carries the signed Record and its signature exactly as submitted.
+  - Recipient: the 04 §3.4 receive checks 1–5, in order, after the existing checks; any failure drops the whole body (no stored proof, no receipt, contact flagged, fixed log code `proof_mismatch`); a failed chain read waits, never passes; a body that passes stores the Record and signature as received.
+  - `exportProofPack` on the recipient side (07 §8): fields, signer card with both signatures, `recipient` only with `includeRecipient`, content key only under `proofs.allowKeyDisclosure` approval, the recipient's own `ownerApproval` by default; `RECORD_UNAVAILABLE` for a received proof without a stored Record.
+- **Acceptance (tests first; a `RED (expected):` commit before the fix):**
+  - Recipient export verifies end to end: notarize on A, `proof` to B, B exports, `verifyProofPack` returns `verified` with A's card and both card signatures, and `record_only` with the card alone; with an `ACCEPT` record and B's `ACCEPTED` receipt, B's pack is a proof of agreement whose `ownerApproval` passes the recipient-side rules.
+  - Default export carries no `recipient`; with `includeRecipient: true` it carries B's address and the salt, and the verifier opens the commitment.
+  - Tampered bodies are dropped and sign no receipt, one test each: a changed Record field (each of `envelopeHash`, `recipientCommitment`, `kind`, `nonce`, `maxFee`, `parentRecordId`), a struct hash that differs from `recordStructHash`, a `recordId` that does not derive from signer and nonce, a signer other than the contact's card `agentEvm`, a signature by another key, a non-canonical ECDSA signature, an ERC-1271 signer that does not accept, `record` without `signature` or the reverse, an unknown key, an over-long signature; a failed chain read stores nothing.
+  - An older sender's body (no `record`, no `signature`) is accepted as before, receipts work, and recipient export returns `RECORD_UNAVAILABLE`.
+  - No log line, error or tool result carries the Record, signature or salt (I-7); the largest allowed body fits the payload limit.
+
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
 - **Status:** done (4thtech/agentlink#106, merged 2026-10-15; follow-ups in M1-7h-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
