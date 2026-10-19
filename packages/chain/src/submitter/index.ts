@@ -29,6 +29,7 @@ export {
   type BatchSimulation,
   type ItemSimulation,
   type SubmitterChain,
+  type SendOptions,
   type SubmitterChainOptions,
   type TxInclusion,
 } from './port.js';

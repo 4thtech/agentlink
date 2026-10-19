@@ -38,8 +38,26 @@ export interface SubmitterEnv {
 
 export type WorkerDeps = QueueDeps;
 
-/** Largest request body; 20 items with long ERC-1271 signatures stay below it. */
-export const MAX_BODY_BYTES = 64 * 1024;
+/**
+ * Largest request body (IR-M1-10a-1 L-4): 20 items, each with a signature of the full 2 048 bytes
+ * (4 098 hex characters) and a Record in JSON form (under 1 KiB), stay below it.
+ */
+export const MAX_BODY_BYTES = 128 * 1024;
+
+/** How long one isolate reuses a chain's gas balance for `/v1/health` (an RPC read each). */
+const BALANCE_CACHE_MS = 10_000;
+const balances = new Map<number, { readonly at: number; readonly wei: string | null }>();
+
+async function gasBalanceOf(port: SubmitterChain): Promise<string | null> {
+  const cached = balances.get(port.chainId);
+  if (cached && Date.now() - cached.at < BALANCE_CACHE_MS) return cached.wei;
+  const wei = await port.gasBalance().then(
+    (value) => value.toString(10),
+    () => null,
+  );
+  balances.set(port.chainId, { at: Date.now(), wei });
+  return wei;
+}
 
 const HEADERS: Readonly<Record<string, string>> = {
   'content-type': 'application/json',
@@ -96,6 +114,28 @@ async function readBody(request: Request): Promise<string | null> {
   return new TextDecoder('utf-8', { fatal: true }).decode(all);
 }
 
+/**
+ * Charges the caller's IP bucket (`prefix` `i`: items; `r`: status and health reads); returns a 429
+ * when it is over its hourly limit, else null.
+ */
+async function takeIp(
+  c: Ctx,
+  config: SubmitterConfig,
+  request: Request,
+  prefix: 'i' | 'r',
+  n: number,
+  limit: number,
+): Promise<Response | null> {
+  const now = Math.floor(Date.now() / 1000);
+  const bucket = ipBucket(request.headers.get('cf-connecting-ip'));
+  const ipKey = encodeHex(hmacSha256(config.ipKey, encodeUtf8(bucket)));
+  const stub = c.env.SUBMITTER_LIMITS.get(c.env.SUBMITTER_LIMITS.idFromName(`${prefix}:${ipKey}`));
+  const taken = await stub.take(n, limit, 3600, now);
+  if (taken.ok) return null;
+  count(c, 'rate_limited');
+  return refuse(429, 'rate_limited', { 'retry-after': String(taken.retryAfter) });
+}
+
 async function submit(c: Ctx, config: SubmitterConfig, kind: SubmitKind, request: Request) {
   count(c, kind === 'notarize' ? 'request_notarize' : 'request_receipt');
   let text: string | null;
@@ -125,15 +165,15 @@ async function submit(c: Ctx, config: SubmitterConfig, kind: SubmitKind, request
   }
 
   // Per-IP limit (07 §7, FA-3): every item counts, including replays of items already on-chain.
-  const now = Math.floor(Date.now() / 1000);
-  const bucket = ipBucket(request.headers.get('cf-connecting-ip'));
-  const ipKey = encodeHex(hmacSha256(config.ipKey, encodeUtf8(bucket)));
-  const ipLimit = c.env.SUBMITTER_LIMITS.get(c.env.SUBMITTER_LIMITS.idFromName(`i:${ipKey}`));
-  const taken = await ipLimit.take(parsed.items.length, config.limits.ipItemsPerHour, 3600, now);
-  if (!taken.ok) {
-    count(c, 'rate_limited');
-    return refuse(429, 'rate_limited', { 'retry-after': String(taken.retryAfter) });
-  }
+  const limited = await takeIp(
+    c,
+    config,
+    request,
+    'i',
+    parsed.items.length,
+    config.limits.ipItemsPerHour,
+  );
+  if (limited) return limited;
 
   const answer = await queueOf(c.env, parsed.chainId).submit(parsed.chainId, parsed.items);
   if (!answer.ok) {
@@ -151,8 +191,15 @@ async function submit(c: Ctx, config: SubmitterConfig, kind: SubmitKind, request
   return json(200, { chainId: parsed.chainId, items: answer.items });
 }
 
-async function status(c: Ctx, config: SubmitterConfig, txHash: string): Promise<Response> {
+async function status(
+  c: Ctx,
+  config: SubmitterConfig,
+  request: Request,
+  txHash: string,
+): Promise<Response> {
   count(c, 'request_status');
+  const limited = await takeIp(c, config, request, 'r', 1, config.limits.ipReadsPerHour);
+  if (limited) return limited;
   if (!isTxHash(txHash)) return refuse(400, 'bad_request');
   for (const chainId of config.chains) {
     const found = await queueOf(c.env, chainId).status(txHash as Hex);
@@ -161,18 +208,15 @@ async function status(c: Ctx, config: SubmitterConfig, txHash: string): Promise<
   return refuse(404, 'not_found');
 }
 
-async function health(c: Ctx, config: SubmitterConfig | null): Promise<Response> {
+async function health(c: Ctx, config: SubmitterConfig | null, request: Request): Promise<Response> {
   count(c, 'request_health');
   if (!config) return json(200, { ok: false, chains: [] });
+  const limited = await takeIp(c, config, request, 'r', 1, config.limits.ipReadsPerHour);
+  if (limited) return limited;
   const chains = await Promise.all(
     config.chains.map(async (chainId) => {
       const port: SubmitterChain | null = c.deps.portFor(c.env, chainId);
-      const gasBalance = port
-        ? await port.gasBalance().then(
-            (wei) => wei.toString(10),
-            () => null,
-          )
-        : null;
+      const gasBalance = port ? await gasBalanceOf(port) : null;
       const queueDepth = await queueOf(c.env, chainId).depth();
       return { chainId, available: port !== null && gasBalance !== null, gasBalance, queueDepth };
     }),
@@ -187,7 +231,7 @@ async function route(c: Ctx, request: Request): Promise<Response> {
   const config = readConfig(c.env);
 
   if (path === '/v1/health') {
-    return method === 'GET' ? health(c, config) : refuse(405, 'method_not_allowed');
+    return method === 'GET' ? health(c, config, request) : refuse(405, 'method_not_allowed');
   }
   if (path === '/v1/deposit-authorization') {
     // 07 §7: present but disabled until M3-4b (gasless top-ups need M1-3c first).
@@ -202,7 +246,7 @@ async function route(c: Ctx, request: Request): Promise<Response> {
   }
   if (statusMatch) {
     return method === 'GET'
-      ? status(c, config, statusMatch[1] ?? '')
+      ? status(c, config, request, statusMatch[1] ?? '')
       : refuse(405, 'method_not_allowed');
   }
   if (method !== 'POST') return refuse(405, 'method_not_allowed');

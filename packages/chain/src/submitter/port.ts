@@ -30,7 +30,8 @@ import type { SubmitItem } from './wire.js';
 
 /** One item's simulation (05 §3.3 submitter rule). */
 export type ItemSimulation =
-  | { readonly outcome: 'ok' }
+  /** `gas`: the item's own simulated gas (`eth_estimateGas` of a one-item batch). */
+  | { readonly outcome: 'ok'; readonly gas: bigint }
   /** Already on-chain in identical form (FA-3): reported `skipped`, never transmitted. */
   | { readonly outcome: 'skipped' }
   /** The Notary is paused: the item is held, not failed. */
@@ -51,6 +52,16 @@ export type TxInclusion =
       readonly outcomes: ReadonlyMap<string, 'recorded' | 'skipped'>;
     };
 
+export interface SendOptions {
+  readonly gasLimit: bigint;
+  readonly nonce: number;
+  /**
+   * Fee level in percent of the current market fee (default 100). A replacement of a stuck
+   * transaction at the same nonce sends a higher level; the configured ceiling still applies.
+   */
+  readonly feePercent?: number;
+}
+
 /** What the submitter engine needs from one chain. Items in one call share a type. */
 export interface SubmitterChain {
   readonly chainId: number;
@@ -66,10 +77,7 @@ export interface SubmitterChain {
   simulateBatch(items: readonly SubmitItem[]): Promise<BatchSimulation>;
   pendingNonce(): Promise<number>;
   /** Signs and sends one batch transaction with exactly these items; returns its hash. */
-  send(
-    items: readonly SubmitItem[],
-    options: { readonly gasLimit: bigint; readonly nonce: number },
-  ): Promise<Hex>;
+  send(items: readonly SubmitItem[], options: SendOptions): Promise<Hex>;
   inclusion(txHash: Hex): Promise<TxInclusion>;
   gasBalance(): Promise<bigint>;
 }
@@ -201,13 +209,21 @@ export function createSubmitterChain(
     }
   };
 
-  /** `eth_call` to the Notary from the gas address: undefined on success, else the revert name. */
-  const tryCall = async (data: Hex): Promise<string | undefined> => {
+  /**
+   * `eth_estimateGas` of a Notary call from the gas address: the gas on success, else the revert
+   * name. An RPC error without revert data is the infrastructure's (a provider limit, a node
+   * fault), not the item's: it throws, so no item fails and no signer cools off for it.
+   */
+  const estimate = async (data: Hex): Promise<bigint | string> => {
     try {
-      await call('eth_call', [{ from: gasAddress, to: notary, data }, 'latest']);
-      return undefined;
+      return quantity(
+        await call('eth_estimateGas', [{ from: gasAddress, to: notary, data, value: '0x0' }]),
+      );
     } catch (error) {
-      if (error instanceof RpcAnswerError) return revertName(error.data);
+      if (error instanceof RpcAnswerError) {
+        if (error.data === undefined) throw new ChainError('rpc_error');
+        return revertName(error.data);
+      }
       throw error;
     }
   };
@@ -270,28 +286,22 @@ export function createSubmitterChain(
             ? { outcome: 'skipped' }
             : { outcome: 'failed', error: 'RecordExists' };
         }
-        const name = await tryCall(batchCalldata([item]));
-        return name === undefined ? { outcome: 'ok' } : failedOrPaused(name);
+        const gas = await estimate(batchCalldata([item]));
+        return typeof gas === 'bigint' ? { outcome: 'ok', gas } : failedOrPaused(gas);
       }
-      const name = await tryCall(batchCalldata([item]));
-      if (name !== undefined) return failedOrPaused(name);
+      const gas = await estimate(batchCalldata([item]));
+      if (typeof gas === 'string') return failedOrPaused(gas);
       // The checks passed; the type already set means the batch would skip it (05 §3.3).
       const stored = await getRecord(item.recordId);
       const at = stored.receiptAt[item.receipt.receiptType - 1] ?? 0n;
-      return at !== 0n ? { outcome: 'skipped' } : { outcome: 'ok' };
+      return at !== 0n ? { outcome: 'skipped' } : { outcome: 'ok', gas };
     },
 
     async simulateBatch(items) {
-      try {
-        const gas = await call('eth_estimateGas', [
-          { from: gasAddress, to: notary, data: batchCalldata(items), value: '0x0' },
-        ]);
-        return { ok: true, gas: quantity(gas) };
-      } catch (error) {
-        if (!(error instanceof RpcAnswerError)) throw error;
-        const name = revertName(error.data);
-        return { ok: false, error: name, paused: name === 'EnforcedPause' };
-      }
+      const gas = await estimate(batchCalldata(items));
+      return typeof gas === 'bigint'
+        ? { ok: true, gas }
+        : { ok: false, error: gas, paused: gas === 'EnforcedPause' };
     },
 
     async pendingNonce() {
@@ -300,7 +310,10 @@ export function createSubmitterChain(
       return Number(n);
     },
 
-    async send(items, { gasLimit, nonce }) {
+    async send(items, { gasLimit, nonce, feePercent = 100 }) {
+      if (!Number.isSafeInteger(feePercent) || feePercent < 100 || feePercent > 1_000) {
+        throw new ChainError('invalid_call');
+      }
       const data = batchCalldata(items);
       if (!chainChecked) {
         // EIP-155 binds the signature to chainId anyway; this refuses a misconfigured RPC early.
@@ -314,8 +327,9 @@ export function createSubmitterChain(
       } | null;
       if (block === null || typeof block !== 'object') throw new ChainError('bad_answer');
       const baseFee = quantity(block.baseFeePerGas);
-      let priority = quantity(await call('eth_maxPriorityFeePerGas', []));
-      let maxFee = 2n * baseFee + priority;
+      const pct = BigInt(feePercent);
+      let priority = (quantity(await call('eth_maxPriorityFeePerGas', [])) * pct) / 100n;
+      let maxFee = (2n * baseFee * pct) / 100n + priority;
       if (options.maxFeePerGasWei !== undefined && maxFee > options.maxFeePerGasWei) {
         maxFee = options.maxFeePerGasWei;
         if (priority > maxFee) priority = maxFee;

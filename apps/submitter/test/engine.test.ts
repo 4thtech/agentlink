@@ -12,7 +12,14 @@ import {
   type EngineSettings,
   type QueueState,
 } from '../src/engine.js';
-import { FakeChain, fakeBatchGas, fakeRecordItem, signerAddress } from './fake-chain.js';
+import {
+  FAKE_ITEM_GAS,
+  FakeChain,
+  fakeBatchGas,
+  fakeRecordItem,
+  signerAddress,
+} from './fake-chain.js';
+import { replacementFeePercent } from '../src/engine.js';
 
 const NOTARY = `0x${'4'.repeat(40)}` as const;
 const NOW = 1_900_000_000;
@@ -23,6 +30,9 @@ const settings = (over: Partial<EngineSettings> = {}): EngineSettings => ({
   codeSignerMode: 'solo',
   maxBatch: 20,
   retentionSeconds: 86_400,
+  maxItemGas: 700_000n,
+  stuckAfterSeconds: 180,
+  maxReplacements: 3,
   ...over,
 });
 
@@ -203,22 +213,44 @@ describe('after an on-chain revert (G-4, D-61, D-62)', () => {
     expect(byId.get(c.id)).toMatchObject({ status: 'recorded', txHash: second?.hash });
   });
 
-  it('fails an item that fails twice and never retries it again', async () => {
+  it('fails an item that fails twice in a shared batch and never retries it again', async () => {
     const t = setup();
     const a = fakeRecordItem(A);
-    await t.submit([a]);
+    const b = fakeRecordItem(B);
+    await t.submit([a, b]);
     t.chain.failAtInclusion.add(a.id); // passes simulation, reverts at inclusion, every time
     t.chain.includeAll();
     await t.poll();
     expect(t.chain.sent).toHaveLength(2);
+    expect(t.chain.sent[1]?.ids).toEqual([a.id, b.id]);
     t.chain.includeAll();
     await t.poll();
     await t.poll(NOW + 100);
     expect(t.chain.sent).toHaveLength(2);
     const last = txStatus(t.state, 84532, t.chain.sent[1]?.hash as `0x${string}`);
     expect(last?.state).toBe('reverted');
-    expect(last?.items[0]).toMatchObject({ status: 'failed' });
+    expect(last?.items.map((i) => i.status)).toEqual(['failed', 'failed']);
     expect(queueDepth(t.state)).toBe(0);
+  });
+
+  it('M-1: a solo transaction that reverts while its item still passes simulation is not resent; the signer is refused for a while', async () => {
+    const t = setup({ soloAfterRevertSeconds: 600 });
+    t.chain.code.add(S);
+    const s = fakeRecordItem(S);
+    await t.submit([s]);
+    t.chain.failAtInclusion.add(s.id); // the account answers differently at inclusion only
+    t.chain.includeAll();
+    await t.poll(NOW + 10);
+    expect(t.chain.sent).toHaveLength(1);
+    const status = txStatus(t.state, 84532, t.chain.sent[0]?.hash as `0x${string}`);
+    expect(status?.items[0]).toMatchObject({ status: 'failed', error: 'reverted' });
+    // Its new items are refused without any chain request or send, until the period ends.
+    const [refused] = await t.submit([fakeRecordItem(S)], NOW + 20);
+    expect(refused).toMatchObject({ status: 'failed', error: 'signer_refused' });
+    expect(t.chain.sent).toHaveLength(1);
+    await t.poll(NOW + 10 + 601);
+    const [later] = await t.submit([fakeRecordItem(S)], NOW + 10 + 602);
+    expect(later?.status).toBe('submitted');
   });
 
   it('sends a signer that caused a revert alone for soloAfterRevertSeconds', async () => {
@@ -387,5 +419,136 @@ describe('nonces', () => {
     t.chain.nonce = 12;
     await t.submit([fakeRecordItem(B)]);
     expect(t.chain.sent[0]?.nonce).toBe(12);
+  });
+});
+
+describe('per-item gas ceiling (IR-M1-10a-1 H-1)', () => {
+  it('refuses before sending an item whose own simulation burns more than maxItemGas', async () => {
+    const t = setup({ maxItemGas: 700_000n });
+    t.chain.code.add(S);
+    const burner = fakeRecordItem(S); // isValidSignature burns gas, then succeeds
+    t.chain.itemGas.set(burner.id, 3_000_000n);
+    const ok = fakeRecordItem(A);
+    const results = await t.submit([burner, ok]);
+    expect(results[0]).toMatchObject({ status: 'failed', error: 'gas_too_high' });
+    expect(t.chain.sent).toHaveLength(1);
+    expect(t.chain.sent[0]?.ids).toEqual([ok.id]);
+  });
+
+  it('never sets a batch gas limit above the sum of its items’ own gas plus the margin', async () => {
+    const t = setup();
+    const items = [fakeRecordItem(A), fakeRecordItem(B), fakeRecordItem(C)];
+    await t.submit(items);
+    const tx = t.chain.sent[0];
+    expect(tx?.gasLimit).toBeLessThanOrEqual(FAKE_ITEM_GAS * 3n + 25_000n);
+    expect(tx?.gasLimit).toBe(fakeBatchGas(3) + 25_000n);
+  });
+
+  it('splits a batch whose simulated gas is above the sum of its items’ own gas', async () => {
+    const t = setup();
+    t.chain.batchExtraGas = 500_000n;
+    const items = [fakeRecordItem(A), fakeRecordItem(B), fakeRecordItem(C)];
+    const results = await t.submit(items);
+    expect(results.every((r) => r.status === 'submitted')).toBe(true);
+    expect(t.chain.sent.map((tx) => tx.ids.length)).toEqual([1, 1, 1]);
+    for (const tx of t.chain.sent) expect(tx.gasLimit).toBe(tx.simulatedGas + 25_000n);
+  });
+
+  it('checks the ceiling again when a held item is re-simulated', async () => {
+    const t = setup();
+    t.chain.paused = true;
+    const item = fakeRecordItem(A, NOW + 5_000);
+    await t.submit([item]);
+    t.chain.paused = false;
+    t.chain.itemGas.set(item.id, 900_000n);
+    await t.poll(NOW + 10);
+    expect(t.chain.sent).toHaveLength(0);
+    expect(queueDepth(t.state)).toBe(0);
+  });
+});
+
+describe('infrastructure errors (IR-M1-10a-1 L-1)', () => {
+  it('a chain read without revert data fails nothing for the item’s fault and cools no signer off', async () => {
+    const t = setup();
+    const a = fakeRecordItem(A);
+    const b = fakeRecordItem(B);
+    await t.submit([a, b]);
+    t.chain.failAtInclusion.add(a.id);
+    t.chain.readFails = true; // the re-simulation after the revert cannot be read
+    t.chain.includeAll();
+    await t.poll(NOW + 10);
+    const status = txStatus(t.state, 84532, t.chain.sent[0]?.hash as `0x${string}`);
+    expect(status?.items.map((i) => i.error)).toEqual(['unavailable', 'unavailable']);
+    t.chain.readFails = false;
+    // Neither signer was put in the solo cooling-off: they still batch together.
+    await t.submit([fakeRecordItem(A), fakeRecordItem(B)], NOW + 20);
+    expect(t.chain.sent.at(-1)?.signers).toEqual([A, B]);
+  });
+});
+
+describe('stuck and dropped transactions (IR-M1-10a-1 M-2)', () => {
+  it('replaces a stuck transaction at the same nonce with raised fees, at most maxReplacements times', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 2 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    await t.submit([a]);
+    const first = t.chain.sent[0];
+    await t.poll(NOW + 50); // not stuck yet
+    expect(t.chain.sent).toHaveLength(1);
+    await t.poll(NOW + 100);
+    await t.poll(NOW + 200);
+    expect(t.chain.sent).toHaveLength(3);
+    expect(t.chain.sent.map((tx) => tx.nonce)).toEqual([first?.nonce, first?.nonce, first?.nonce]);
+    expect(t.chain.sent.map((tx) => tx.feePercent)).toEqual([
+      100,
+      replacementFeePercent(1),
+      replacementFeePercent(2),
+    ]);
+    expect(replacementFeePercent(1)).toBeGreaterThanOrEqual(110);
+    expect(t.chain.sent.every((tx) => tx.gasLimit === first?.gasLimit)).toBe(true);
+    // The second replacement lands: the original hash reports it.
+    t.chain.include(t.chain.sent[2]?.hash as `0x${string}`);
+    await t.poll(NOW + 210);
+    const status = txStatus(t.state, 84532, first?.hash as `0x${string}`);
+    expect(status?.state).toBe('included');
+    expect(status?.items[0]).toMatchObject({ status: 'recorded', txHash: t.chain.sent[2]?.hash });
+  });
+
+  it('gives up a transaction never included, queues its items again and reads the nonce from the chain', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 1 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    await t.submit([a]);
+    const first = t.chain.sent[0];
+    await t.poll(NOW + 100); // one replacement
+    expect(t.chain.sent).toHaveLength(2);
+    t.chain.dropPending(); // the nodes forget both; the pending nonce falls back
+    await t.poll(NOW + 200); // gives up, re-queues, re-simulates and sends again
+    const status = txStatus(t.state, 84532, first?.hash as `0x${string}`);
+    expect(status?.state).toBe('dropped');
+    expect(t.chain.sent).toHaveLength(3);
+    const resent = t.chain.sent[2];
+    expect(resent?.ids).toEqual([a.id]);
+    expect(resent?.nonce).toBe(first?.nonce); // the lost nonce is used again, not skipped
+    expect(resent?.feePercent).toBe(100);
+    t.chain.includeAll();
+    await t.poll(NOW + 210);
+    expect(txStatus(t.state, 84532, resent?.hash as `0x${string}`)?.items[0]?.status).toBe(
+      'recorded',
+    );
+    // A later item gets the next nonce: nothing is blocked.
+    await t.submit([fakeRecordItem(B)], NOW + 220);
+    expect(t.chain.sent.at(-1)?.nonce).toBe((first?.nonce ?? 0) + 1);
+  });
+
+  it('reports an item of a dropped transaction that landed after all as skipped, without resending it', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 0 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    await t.submit([a]);
+    t.chain.dropPending();
+    t.chain.onChain.add(a.id); // it was mined somewhere we did not see
+    await t.poll(NOW + 100);
+    expect(t.chain.sent).toHaveLength(1);
+    expect(txStatus(t.state, 84532, t.chain.sent[0]?.hash as `0x${string}`)?.items[0]?.status).toBe(
+      'skipped',
+    );
   });
 });

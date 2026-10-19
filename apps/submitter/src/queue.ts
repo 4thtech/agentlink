@@ -56,6 +56,7 @@ interface Meta {
   chainId: number | null;
   nonce: number | null;
   soloUntil: [string, number][];
+  refusedUntil?: [string, number][];
 }
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
@@ -74,6 +75,9 @@ export function createQueueClass(deps: QueueDeps) {
           this.chainId = meta.chainId;
           state.nonce = meta.nonce;
           for (const [signer, until] of meta.soloUntil) state.soloUntil.set(signer, until);
+          for (const [signer, until] of meta.refusedUntil ?? []) {
+            state.refusedUntil.set(signer, until);
+          }
         }
         for (const [key, entry] of await ctx.storage.list<ItemState>({ prefix: 'i:' })) {
           state.items.set(key.slice(2), entry);
@@ -104,6 +108,7 @@ export function createQueueClass(deps: QueueDeps) {
           chainId: this.chainId,
           nonce: this.state.nonce,
           soloUntil: [...this.state.soloUntil.entries()],
+          refusedUntil: [...this.state.refusedUntil.entries()],
         } satisfies Meta;
       }
       changed.items.clear();

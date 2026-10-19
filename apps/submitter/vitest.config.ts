@@ -37,6 +37,7 @@ export default defineConfig({
                 SUBMITTER_IP_KEY: TEST_IP_KEY,
                 SUBMITTER_IP_ITEMS_PER_HOUR: '12',
                 SUBMITTER_SIGNER_ITEMS_PER_HOUR: '3',
+                SUBMITTER_IP_READS_PER_HOUR: '30',
               },
             },
           }),

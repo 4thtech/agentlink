@@ -297,6 +297,8 @@ interface MockChain {
   receipts: Map<string, unknown>;
   methods: string[];
   failNetwork: boolean;
+  /** Answer eth_estimateGas and eth_call with a JSON-RPC error that carries no revert data. */
+  noDataError: boolean;
 }
 
 function newChain(): MockChain {
@@ -311,6 +313,7 @@ function newChain(): MockChain {
     receipts: new Map(),
     methods: [],
     failNetwork: false,
+    noDataError: false,
   };
 }
 
@@ -353,6 +356,7 @@ function mockFetch(chain: MockChain) {
       case 'eth_getBlockByNumber':
         return reply({ number: '0x10', baseFeePerGas: '0x77359400', timestamp: '0x1' });
       case 'eth_estimateGas':
+        if (chain.noDataError) return replyError({ code: -32005, message: 'limit exceeded' });
         if (chain.revertWith) return replyError(revertError(chain));
         return reply(`0x${chain.estimate.toString(16)}`);
       case 'eth_call': {
@@ -450,7 +454,7 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
     const chain = newChain();
     const p = port(chain);
     const item = await recordItem();
-    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok' });
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok', gas: 150_000n });
     const { recordStructHash } = await import('@4thtech-io/crypto');
     const { encodeHex0x } = await import('@4thtech-io/crypto');
     if (item.type !== 'record') throw new Error('unreachable');
@@ -500,7 +504,7 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
       structHash: hash32('77'),
       receiptAt: [0n, 0n, 0n, 0n],
     });
-    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok' });
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok', gas: 150_000n });
     chain.records.set(recordId, {
       signer: AGENT,
       structHash: hash32('77'),
@@ -582,6 +586,42 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
     expect(included.outcomes.get(b.id)).toBe('skipped');
     chain.receipts.set(txHash, { status: '0x0', logs: [] });
     expect(await p.inclusion(txHash)).toEqual({ state: 'reverted' });
+  });
+
+  it('treats an RPC error without revert data as the infrastructure’s, not a failed item', async () => {
+    const chain = newChain();
+    chain.noDataError = true;
+    const p = port(chain);
+    const item = await recordItem();
+    await expect(p.simulateItem(item)).rejects.toMatchObject({ code: 'rpc_error' });
+    await expect(p.simulateBatch([item])).rejects.toMatchObject({ code: 'rpc_error' });
+  });
+
+  it('raises fees for a replacement (feePercent) and keeps them under the configured ceiling', async () => {
+    const item = await recordItem();
+    const feesOf = async (feePercent: number, ceiling?: bigint) => {
+      const chain = newChain();
+      const p = createSubmitterChain(config, {
+        fetchFn: mockFetch(chain) as unknown as typeof fetch,
+        gasKey: GAS_KEY,
+        rpcUrls: [RPC_URL],
+        ...(ceiling === undefined ? {} : { maxFeePerGasWei: ceiling }),
+      });
+      await p.send([item], { gasLimit: 200_000n, nonce: 3, feePercent });
+      const tx = parseTransaction((chain.sent[0] as { raw: Hex }).raw as ViemHex);
+      expect(tx.nonce).toBe(3);
+      return { max: tx.maxFeePerGas ?? 0n, tip: tx.maxPriorityFeePerGas ?? 0n };
+    };
+    const base = await feesOf(100);
+    const bumped = await feesOf(125);
+    expect(bumped.max).toBe((base.max * 125n) / 100n);
+    expect(bumped.tip).toBe((base.tip * 125n) / 100n);
+    const capped = await feesOf(125, 3_000_000_000n);
+    expect(capped.max).toBe(3_000_000_000n);
+    const chain = newChain();
+    await expect(
+      port(chain).send([item], { gasLimit: 1n, nonce: 1, feePercent: 50 }),
+    ).rejects.toThrow();
   });
 
   it('reads the gas balance and sends only allowlisted RPC methods', async () => {

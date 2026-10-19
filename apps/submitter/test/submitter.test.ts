@@ -185,7 +185,7 @@ describe('POST /v1/notarize', () => {
         400,
         'unsupported_chain',
       ],
-      [`{"pad":"${'x'.repeat(70_000)}"}`, 413, 'too_large'],
+      [`{"pad":"${'x'.repeat(140_000)}"}`, 413, 'too_large'],
     ];
     for (const [body, status, error] of cases) {
       const res = await post('/v1/notarize', body, ip);
@@ -239,6 +239,34 @@ describe('POST /v1/notarize', () => {
     const first = nonces[0] ?? -1;
     expect(nonces).toEqual([first, first + 1, first + 2, first + 3, first + 4]);
     expect(new Set(chain.sent.map((tx) => tx.hash)).size).toBe(5);
+  });
+
+  it('accepts 20 items with full-length (2048-byte) signatures within the body cap', async () => {
+    const signer = newSigner();
+    const records = Array.from({ length: 20 }, () => ({
+      ...record(signer),
+      signature: `0x${'ab'.repeat(2048)}` as Hex,
+    }));
+    const res = await post(
+      '/v1/notarize',
+      {
+        chainId: CHAIN_ID,
+        records: records.map((r) => ({ record: r.record, signature: r.signature })),
+      },
+      newIp(),
+    );
+    // Read and parsed in full: the per-IP item limit (12 in these tests) is checked only after a
+    // successful parse, so 429 here means the body cap and the strict parser accepted it.
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: 'rate_limited' });
+  });
+
+  it('refuses before sending an item whose ERC-1271 check burns gas (H-1)', async () => {
+    const r = record(newSigner());
+    chain.itemGas.set(r.recordId, 5_000_000n);
+    const { items } = await notarize([r]);
+    expect(items[0]).toMatchObject({ status: 'failed', error: 'gas_too_high' });
+    expect(chain.sent).toHaveLength(0);
   });
 
   it('holds items while the Notary is paused', async () => {
@@ -298,6 +326,22 @@ describe('GET /v1/status/:txHash', () => {
   it('answers 404 for an unknown transaction and 400 for a malformed hash', async () => {
     expect((await SELF.fetch(`${HOST}/v1/status/0x${'ab'.repeat(32)}`)).status).toBe(404);
     expect((await SELF.fetch(`${HOST}/v1/status/0x12`)).status).toBe(400);
+  });
+});
+
+describe('read limits (IR-M1-10a-1 L-2)', () => {
+  it('limits /v1/status and /v1/health per IP', async () => {
+    const ip = newIp();
+    const read = (path: string) =>
+      SELF.fetch(`${HOST}${path}`, { headers: { 'cf-connecting-ip': ip } });
+    for (let i = 0; i < 15; i += 1) {
+      expect((await read('/v1/health')).status).toBe(200);
+      expect((await read(`/v1/status/0x${'cd'.repeat(32)}`)).status).toBe(404);
+    }
+    const blocked = await read('/v1/health');
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: 'rate_limited' });
+    expect((await read(`/v1/status/0x${'cd'.repeat(32)}`)).status).toBe(429);
   });
 });
 

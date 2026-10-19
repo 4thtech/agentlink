@@ -24,7 +24,12 @@ export interface SentTx {
   readonly nonce: number;
   /** The simulated gas the engine was given for exactly these items. */
   readonly simulatedGas: bigint;
+  /** The fee level the engine asked for (100 = market; more for a replacement). */
+  readonly feePercent: number;
 }
+
+/** An item's own simulated gas unless a test sets another (`itemGas`). */
+export const FAKE_ITEM_GAS = 160_000n;
 
 /** Simulated gas for a batch of n items (05 §3.4 shape: a base plus a per-item part). */
 export const fakeBatchGas = (n: number): bigint => 60_000n + 95_000n * BigInt(n);
@@ -44,6 +49,12 @@ export class FakeChain implements SubmitterChain {
   /** Item IDs that pass simulation but make an including transaction revert. */
   readonly failAtInclusion = new Set<string>();
   paused = false;
+  /** Item ID -> its own simulated gas (default FAKE_ITEM_GAS). */
+  readonly itemGas = new Map<string, bigint>();
+  /** Gas a batch needs on top of its parts (interaction between items). */
+  batchExtraGas = 0n;
+  /** Make every simulation throw, as a chain read without revert data does (infrastructure). */
+  readFails = false;
   /** Make `send` throw (an RPC failure). */
   sendFails = false;
   balance = 10n ** 17n;
@@ -71,14 +82,16 @@ export class FakeChain implements SubmitterChain {
   }
 
   simulateItem(item: SubmitItem): Promise<ItemSimulation> {
+    if (this.readFails) return Promise.reject(new Error('The chain returned an error.'));
     if (this.onChain.has(item.id)) return Promise.resolve({ outcome: 'skipped' });
     if (this.paused) return Promise.resolve({ outcome: 'paused' });
     const error = this.simulationErrors.get(item.id);
     if (error !== undefined) return Promise.resolve({ outcome: 'failed', error });
-    return Promise.resolve({ outcome: 'ok' });
+    return Promise.resolve({ outcome: 'ok', gas: this.itemGas.get(item.id) ?? FAKE_ITEM_GAS });
   }
 
   simulateBatch(items: readonly SubmitItem[]): Promise<BatchSimulation> {
+    if (this.readFails) return Promise.reject(new Error('The chain returned an error.'));
     if (this.paused) return Promise.resolve({ ok: false, error: 'EnforcedPause', paused: true });
     for (const item of items) {
       const error = this.simulationErrors.get(item.id);
@@ -86,7 +99,11 @@ export class FakeChain implements SubmitterChain {
         return Promise.resolve({ ok: false, error, paused: false });
       }
     }
-    const gas = fakeBatchGas(items.length);
+    const extra = items.reduce(
+      (sum, i) => sum + ((this.itemGas.get(i.id) ?? FAKE_ITEM_GAS) - FAKE_ITEM_GAS),
+      0n,
+    );
+    const gas = fakeBatchGas(items.length) + extra + this.batchExtraGas;
     this.simulated.set(items.map((i) => i.id).join(','), gas);
     return Promise.resolve({ ok: true, gas });
   }
@@ -97,7 +114,7 @@ export class FakeChain implements SubmitterChain {
 
   async send(
     items: readonly SubmitItem[],
-    options: { readonly gasLimit: bigint; readonly nonce: number },
+    options: { readonly gasLimit: bigint; readonly nonce: number; readonly feePercent?: number },
   ): Promise<Hex> {
     // Yield, so concurrent callers interleave here as they would around a real RPC request.
     await new Promise((resolve) => setTimeout(resolve, 1));
@@ -112,6 +129,7 @@ export class FakeChain implements SubmitterChain {
       gasLimit: options.gasLimit,
       nonce: options.nonce,
       simulatedGas: this.simulated.get(ids.join(',')) ?? -1n,
+      feePercent: options.feePercent ?? 100,
     });
     this.nonce = Math.max(this.nonce, options.nonce + 1);
     this.pendingItems.set(hash, [...items]);
@@ -119,6 +137,21 @@ export class FakeChain implements SubmitterChain {
   }
 
   private readonly pendingItems = new Map<string, SubmitItem[]>();
+
+  /** Pending transactions (not yet included or dropped). */
+  pendingHashes(): Hex[] {
+    return [...this.pendingItems.keys()] as Hex[];
+  }
+
+  /**
+   * The nodes forget every pending transaction (evicted from the mempool): they will never be
+   * included, and the pending nonce falls back to the lowest forgotten one.
+   */
+  dropPending(): void {
+    const nonces = this.sent.filter((t) => this.pendingItems.has(t.hash)).map((t) => t.nonce);
+    if (nonces.length > 0) this.nonce = Math.min(...nonces);
+    this.pendingItems.clear();
+  }
 
   /** Includes every sent, not yet included transaction, in order (a block). */
   includeAll(): void {

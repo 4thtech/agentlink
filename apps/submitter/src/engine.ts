@@ -3,19 +3,29 @@
 // Object (queue.ts) holds the state, serialises calls and persists what changed.
 //
 // Rules:
-// - Before sending: the item's deadline; the EOA signature, locally (a signer with code is checked
-//   by the Notary); each item simulated alone. An item already on-chain in identical form is
-//   `skipped` and never transmitted (FA-3). Any other failure is `failed` with the contract error.
-//   A pause holds the item (`held`) until unpause or its deadline (`Expired`).
+// - Before sending: the item's deadline; a signer refused after a solo revert (below); the EOA
+//   signature, locally (a signer with code is checked by the Notary); each item simulated alone. An
+//   item already on-chain in identical form is `skipped` and never transmitted (FA-3). An item whose
+//   own simulated gas is above `maxItemGas` is `failed` with `gas_too_high` (IR-M1-10a-1 H-1: an
+//   ERC-1271 account that burns gas in isValidSignature). Any other failure is `failed` with the
+//   contract error. A pause holds the item (`held`) until unpause or its deadline (`Expired`).
 // - The signer limit is charged only for items new at simulation (FA-3); the per-IP limit is the
 //   Worker's, before this.
 // - Batches: a code-bearing signer (ERC-1271, EIP-7702) is solo from its first item (FA-1, default),
 //   or at most one such item per batch (`one-per-batch`). A signer that caused an on-chain revert is
-//   solo for `soloAfterRevertSeconds` (D-62). The batch is simulated again; every transaction's gas
-//   limit is that simulated gas plus the fixed margin (FA-1).
+//   solo for `soloAfterRevertSeconds` (D-62). The batch is simulated again; its gas limit is that
+//   simulated gas plus the fixed margin (FA-1), and a batch whose simulated gas is above the sum of
+//   its items' own simulated gas is split, so a limit never exceeds that sum plus the margin.
 // - After an on-chain revert: every item is simulated again; the failing ones are `failed` and their
-//   signers cool off; the rest are resubmitted once. An item that reverts twice is `failed` and never
-//   retried. In `one-per-batch` mode the code-bearing item is taken as the cause.
+//   signers cool off. In a solo transaction whose items still pass simulation, the simulation and
+//   the inclusion disagree: the items are `failed` without a resend, and the signer is refused for
+//   `soloAfterRevertSeconds` (IR-M1-10a-1 M-1). In a shared batch the rest are resubmitted once; an
+//   item that reverts twice is `failed` and never retried. In `one-per-batch` mode the code-bearing
+//   item is taken as the cause.
+// - A transaction with no receipt after `stuckAfterSeconds` is replaced at the same nonce with
+//   raised fees, at most `maxReplacements` times. If none is included after that, it is `dropped`:
+//   its items are queued again (a fresh simulation shows any that landed as `skipped`) and the next
+//   nonce is read from the chain, so a lost nonce cannot block later sends (IR-M1-10a-1 M-2).
 // - Nonces are serialised per chain: the engine holds one lock per state object.
 import type {
   Hex,
@@ -29,12 +39,18 @@ import type {
 export interface EngineSettings {
   /** Added to every transaction's simulated gas (FA-1). */
   readonly gasMargin: bigint;
+  /** The most simulated gas one item may use alone (H-1). */
+  readonly maxItemGas: bigint;
   readonly soloAfterRevertSeconds: number;
   readonly codeSignerMode: 'solo' | 'one-per-batch';
   /** Most items in one transaction, 1 to 20. */
   readonly maxBatch: number;
   /** How long finished items and transactions stay readable through `/v1/status`. */
   readonly retentionSeconds: number;
+  /** A transaction with no receipt after this long is replaced with raised fees. */
+  readonly stuckAfterSeconds: number;
+  /** Fee-raised replacements per transaction before it counts as dropped. */
+  readonly maxReplacements: number;
 }
 
 export interface EngineHooks {
@@ -52,19 +68,27 @@ export interface ItemState {
   status: SubmitStatus;
   txHash?: Hex;
   error?: string;
+  /** The item's own simulated gas (its latest simulation). */
+  gas: bigint;
   /** On-chain reverts of transactions that carried this item (one resubmission allowed). */
   reverts: number;
   updatedAt: number;
 }
 
 export interface TxState {
+  /** The first transaction sent at this nonce; the key of the transaction. */
   readonly hash: Hex;
+  /** Every transaction signed at this nonce for these items: the first, then its replacements. */
+  readonly hashes: Hex[];
   readonly nonce: number;
   readonly ids: readonly string[];
+  readonly gasLimit: bigint;
   /** One-per-batch mode: the code-bearing item of a mixed batch, the cause if it reverts. */
   readonly codeBearingId: string | null;
-  state: 'pending' | 'included' | 'reverted';
+  state: 'pending' | 'included' | 'reverted' | 'dropped';
   readonly sentAt: number;
+  lastSentAt: number;
+  replacements: number;
 }
 
 export interface QueueState {
@@ -74,6 +98,8 @@ export interface QueueState {
   readonly txs: Map<string, TxState>;
   /** Signer -> unix seconds until which its items go solo (D-62). */
   readonly soloUntil: Map<string, number>;
+  /** Signer -> unix seconds until which its items are refused (M-1). */
+  readonly refusedUntil: Map<string, number>;
   /** What changed since the owner last persisted (not persisted itself). */
   readonly changed: { readonly items: Set<string>; readonly txs: Set<string>; meta: boolean };
 }
@@ -84,9 +110,13 @@ export function emptyQueueState(): QueueState {
     items: new Map(),
     txs: new Map(),
     soloUntil: new Map(),
+    refusedUntil: new Map(),
     changed: { items: new Set(), txs: new Set(), meta: false },
   };
 }
+
+/** Fee level of the n-th replacement, in percent: +25 % compounded (each one over the 10 % rule). */
+export const replacementFeePercent = (n: number): number => Math.ceil(100 * 1.25 ** n);
 
 const locks = new WeakMap<QueueState, Promise<unknown>>();
 
@@ -174,6 +204,28 @@ function plan(settings: EngineSettings, state: QueueState, entries: ItemState[],
   return batches;
 }
 
+/** Applies a fresh one-item simulation to an entry; returns true when it may be sent. */
+function applySimulation(
+  state: QueueState,
+  settings: EngineSettings,
+  entry: ItemState,
+  sim: Awaited<ReturnType<SubmitterChain['simulateItem']>>,
+  now: number,
+): boolean {
+  if (sim.outcome === 'ok') {
+    if (sim.gas > settings.maxItemGas) {
+      update(state, entry, 'failed', now, { txHash: null, error: 'gas_too_high' });
+      return false;
+    }
+    entry.gas = sim.gas;
+    return true;
+  }
+  if (sim.outcome === 'skipped') update(state, entry, 'skipped', now, { txHash: null });
+  else if (sim.outcome === 'paused') update(state, entry, 'held', now, { txHash: null });
+  else update(state, entry, 'failed', now, { txHash: null, error: sim.error });
+  return false;
+}
+
 async function sendGroup(
   port: SubmitterChain,
   settings: EngineSettings,
@@ -183,7 +235,19 @@ async function sendGroup(
   depth = 0,
 ): Promise<void> {
   const items = group.map((e) => e.item);
-  const sim = await port.simulateBatch(items);
+  let sim;
+  try {
+    sim = await port.simulateBatch(items);
+  } catch {
+    // The chain could not be read: infrastructure, not the items' fault (no cool-off).
+    for (const e of group) update(state, e, 'failed', now, { txHash: null, error: 'unavailable' });
+    return;
+  }
+  const ceiling = group.reduce((sum, e) => sum + e.gas, 0n);
+  if (sim.ok && sim.gas > ceiling && group.length > 1) {
+    // Together they need more than the sum of their own simulations: never pay for that.
+    sim = { ok: false as const, error: 'gas_too_high', paused: false };
+  }
   if (!sim.ok) {
     if (sim.paused) {
       for (const e of group) update(state, e, 'held', now, { txHash: null });
@@ -192,24 +256,25 @@ async function sendGroup(
     // State changed since the per-item simulation: find the failing items again.
     const keep: ItemState[] = [];
     for (const e of group) {
-      const s = await port.simulateItem(e.item);
-      if (s.outcome === 'ok') keep.push(e);
-      else if (s.outcome === 'skipped') update(state, e, 'skipped', now, { txHash: null });
-      else if (s.outcome === 'paused') update(state, e, 'held', now, { txHash: null });
-      else update(state, e, 'failed', now, { txHash: null, error: s.error });
+      try {
+        if (applySimulation(state, settings, e, await port.simulateItem(e.item), now)) keep.push(e);
+      } catch {
+        update(state, e, 'failed', now, { txHash: null, error: 'unavailable' });
+      }
     }
     if (keep.length === 0) return;
     if (depth === 0 && keep.length < group.length) {
       await sendGroup(port, settings, state, keep, now, 1);
     } else if (depth < 2 && keep.length > 1) {
-      // Each passes alone but not together: send each signer's items apart.
-      const bySigner = new Map<string, ItemState[]>();
-      for (const e of keep)
-        bySigner.set(e.item.signer, [...(bySigner.get(e.item.signer) ?? []), e]);
-      for (const part of bySigner.values()) await sendGroup(port, settings, state, part, now, 2);
+      // Each passes alone but not together: send each item apart.
+      for (const e of keep) await sendGroup(port, settings, state, [e], now, 2);
     } else {
       for (const e of keep) update(state, e, 'failed', now, { txHash: null, error: sim.error });
     }
+    return;
+  }
+  if (group.length === 1 && sim.gas > settings.maxItemGas) {
+    update(state, group[0] as ItemState, 'failed', now, { txHash: null, error: 'gas_too_high' });
     return;
   }
   const gasLimit = sim.gas + settings.gasMargin;
@@ -231,12 +296,16 @@ async function sendGroup(
   const code = group.find((e) => e.codeBearing);
   state.txs.set(hash, {
     hash,
+    hashes: [hash],
     nonce,
     ids: items.map((i) => i.id),
+    gasLimit,
     codeBearingId:
       settings.codeSignerMode === 'one-per-batch' && code && signers.size > 1 ? code.item.id : null,
     state: 'pending',
     sentAt: now,
+    lastSentAt: now,
+    replacements: 0,
   });
   state.changed.txs.add(hash);
   for (const e of group) update(state, e, 'submitted', now, { txHash: hash, error: null });
@@ -273,7 +342,9 @@ export function submitItems(
       const existing = state.items.get(item.id);
       if (existing && inFlight(existing.status)) out.set(item.id, resultOf(existing));
       else if (item.deadline < now) out.set(item.id, plain(item, 'failed', 'Expired'));
-      else fresh.push(item);
+      else if ((state.refusedUntil.get(item.signer) ?? 0) > now) {
+        out.set(item.id, plain(item, 'failed', 'signer_refused'));
+      } else fresh.push(item);
     }
     const signers = [...new Set(fresh.map((i) => i.signer))];
     const codes = await Promise.all(signers.map((s) => port.hasCode(s)));
@@ -284,19 +355,27 @@ export function submitItems(
       return false;
     });
     const sims = await Promise.all(checked.map((item) => port.simulateItem(item)));
-    const accepted: { item: SubmitItem; held: boolean }[] = [];
+    const accepted: { item: SubmitItem; held: boolean; gas: bigint }[] = [];
     checked.forEach((item, i) => {
       const sim = sims[i];
       if (!sim) return;
       if (sim.outcome === 'skipped') out.set(item.id, plain(item, 'skipped'));
       else if (sim.outcome === 'failed') out.set(item.id, plain(item, 'failed', sim.error));
-      else accepted.push({ item, held: sim.outcome === 'paused' });
+      else if (sim.outcome === 'ok' && sim.gas > settings.maxItemGas) {
+        out.set(item.id, plain(item, 'failed', 'gas_too_high'));
+      } else {
+        accepted.push({
+          item,
+          held: sim.outcome === 'paused',
+          gas: sim.outcome === 'ok' ? sim.gas : settings.maxItemGas,
+        });
+      }
     });
     const counts = new Map<string, number>();
     for (const { item } of accepted) counts.set(item.signer, (counts.get(item.signer) ?? 0) + 1);
     const refused = counts.size > 0 ? await hooks.chargeSigners(counts, now) : new Set<string>();
     const toSend: ItemState[] = [];
-    for (const { item, held } of accepted) {
+    for (const { item, held, gas } of accepted) {
       if (refused.has(item.signer)) {
         out.set(item.id, plain(item, 'failed', 'rate_limited'));
         continue;
@@ -305,6 +384,7 @@ export function submitItems(
         item,
         codeBearing: hasCode.get(item.signer) === true,
         status: held ? 'held' : 'submitted',
+        gas,
         reverts: 0,
         updatedAt: now,
       };
@@ -321,6 +401,16 @@ export function submitItems(
   });
 }
 
+/** The items a transaction still carries (submitted in one of its hashes). */
+function carried(state: QueueState, tx: TxState): ItemState[] {
+  return tx.ids
+    .map((id) => state.items.get(id))
+    .filter(
+      (e): e is ItemState =>
+        !!e && e.status === 'submitted' && e.txHash !== undefined && tx.hashes.includes(e.txHash),
+    );
+}
+
 async function handleRevert(
   port: SubmitterChain,
   settings: EngineSettings,
@@ -328,13 +418,13 @@ async function handleRevert(
   tx: TxState,
   now: number,
 ): Promise<void> {
-  const entries = tx.ids
-    .map((id) => state.items.get(id))
-    .filter((e): e is ItemState => !!e && e.txHash === tx.hash && e.status === 'submitted');
+  const entries = carried(state, tx);
+  const until = now + settings.soloAfterRevertSeconds;
   const coolOff = (signer: string) => {
-    state.soloUntil.set(signer, now + settings.soloAfterRevertSeconds);
+    state.soloUntil.set(signer, until);
     state.changed.meta = true;
   };
+  const solo = new Set(entries.map((e) => e.item.signer)).size === 1;
   let candidates = entries;
   if (tx.codeBearingId !== null && entries.length > 1) {
     // One-per-batch mode (FA-1): the code-bearing item is taken as the cause.
@@ -347,7 +437,14 @@ async function handleRevert(
   }
   const resend: ItemState[] = [];
   for (const e of candidates) {
-    const sim = await port.simulateItem(e.item);
+    let sim;
+    try {
+      sim = await port.simulateItem(e.item);
+    } catch {
+      // Infrastructure, not the item: no cool-off.
+      update(state, e, 'failed', now, { error: 'unavailable' });
+      continue;
+    }
     if (sim.outcome === 'paused') {
       // A pause is not an item failure, and does not use up the retry.
       update(state, e, 'held', now, { txHash: null });
@@ -356,18 +453,66 @@ async function handleRevert(
     } else if (sim.outcome === 'failed') {
       update(state, e, 'failed', now, { error: sim.error });
       coolOff(e.item.signer);
+    } else if (solo) {
+      // M-1: its own transaction reverted, yet it still passes simulation. Simulation and
+      // inclusion disagree for this signer: no resend, and its items are refused for a while.
+      update(state, e, 'failed', now, { error: 'reverted' });
+      state.refusedUntil.set(e.item.signer, until);
+      coolOff(e.item.signer);
     } else {
       e.reverts += 1;
       if (e.reverts >= 2) update(state, e, 'failed', now, { error: 'reverted' });
-      else resend.push(e);
+      else if (applySimulation(state, settings, e, sim, now)) resend.push(e);
     }
   }
   await dispatch(port, settings, state, resend, now);
 }
 
+/** M-2: replaces a transaction stuck without a receipt, or gives it up and queues its items again. */
+async function handleStuck(
+  port: SubmitterChain,
+  settings: EngineSettings,
+  state: QueueState,
+  tx: TxState,
+  now: number,
+): Promise<void> {
+  const entries = carried(state, tx);
+  if (entries.length === 0) {
+    tx.state = 'dropped';
+    state.changed.txs.add(tx.hash);
+    return;
+  }
+  if (tx.replacements < settings.maxReplacements) {
+    tx.replacements += 1;
+    tx.lastSentAt = now;
+    state.changed.txs.add(tx.hash);
+    try {
+      const hash = await port.send(
+        entries.map((e) => e.item),
+        {
+          gasLimit: tx.gasLimit,
+          nonce: tx.nonce,
+          feePercent: replacementFeePercent(tx.replacements),
+        },
+      );
+      tx.hashes.push(hash);
+      for (const e of entries) update(state, e, 'submitted', now, { txHash: hash });
+    } catch {
+      // Refused (for example underpriced) or unreachable: this try is used up all the same.
+    }
+    return;
+  }
+  // Given up: queue the items again; a fresh simulation shows any that landed after all.
+  tx.state = 'dropped';
+  state.changed.txs.add(tx.hash);
+  state.nonce = null;
+  state.changed.meta = true;
+  for (const e of entries) update(state, e, 'held', now, { txHash: null });
+}
+
 /**
- * One round of upkeep (the queue's alarm): inclusion of sent transactions, held items, expiry and
- * retention. Returns true while anything is still in flight.
+ * One round of upkeep (the queue's alarm): inclusion of sent transactions, stuck transactions,
+ * held items, expiry and retention. Returns true while anything is still in flight.
  */
 export function pollQueue(
   port: SubmitterChain,
@@ -389,33 +534,51 @@ export function pollQueue(
         state.changed.txs.add(hash);
       }
     }
-    for (const [signer, until] of state.soloUntil) {
-      if (until <= now) {
-        state.soloUntil.delete(signer);
-        state.changed.meta = true;
+    for (const map of [state.soloUntil, state.refusedUntil]) {
+      for (const [signer, until] of map) {
+        if (until <= now) {
+          map.delete(signer);
+          state.changed.meta = true;
+        }
       }
     }
 
     for (const tx of [...state.txs.values()]) {
       if (tx.state !== 'pending') continue;
-      let inclusion;
-      try {
-        inclusion = await port.inclusion(tx.hash);
-      } catch {
-        continue; // try again next round
+      let found: { hash: Hex; inclusion: Awaited<ReturnType<SubmitterChain['inclusion']>> } | null =
+        null;
+      let readFailed = false;
+      for (const hash of tx.hashes) {
+        try {
+          const inclusion = await port.inclusion(hash);
+          if (inclusion.state !== 'pending') {
+            found = { hash, inclusion };
+            break;
+          }
+        } catch {
+          readFailed = true; // try again next round
+        }
       }
-      if (inclusion.state === 'pending') continue;
-      tx.state = inclusion.state;
-      state.changed.txs.add(tx.hash);
+      if (!found) {
+        if (!readFailed && now - tx.lastSentAt >= settings.stuckAfterSeconds) {
+          await handleStuck(port, settings, state, tx, now);
+        }
+        continue;
+      }
+      const { hash, inclusion } = found;
+      // The included one (first or a replacement) is what the items show.
+      for (const e of carried(state, tx)) update(state, e, 'submitted', now, { txHash: hash });
       if (inclusion.state === 'included') {
-        for (const id of tx.ids) {
-          const e = state.items.get(id);
-          if (!e || e.txHash !== tx.hash || e.status !== 'submitted') continue;
-          const outcome = inclusion.outcomes.get(id);
+        tx.state = 'included';
+        state.changed.txs.add(tx.hash);
+        for (const e of carried(state, tx)) {
+          const outcome = inclusion.outcomes.get(e.item.id);
           if (outcome) update(state, e, outcome, now);
           else update(state, e, 'failed', now, { error: 'not_included' });
         }
       } else {
+        tx.state = 'reverted';
+        state.changed.txs.add(tx.hash);
         await handleRevert(port, settings, state, tx, now);
       }
     }
@@ -433,18 +596,25 @@ export function pollQueue(
       } catch {
         continue;
       }
-      if (sim.outcome === 'ok') ready.push(e);
-      else if (sim.outcome === 'skipped') update(state, e, 'skipped', now);
-      else if (sim.outcome === 'failed') update(state, e, 'failed', now, { error: sim.error });
+      if (sim.outcome === 'paused') continue;
+      if (applySimulation(state, settings, e, sim, now)) ready.push(e);
     }
     await dispatch(port, settings, state, ready, now);
     return queueDepth(state) > 0;
   });
 }
 
-/** The status of one transaction this queue sent, or null. */
+/** The status of a transaction this queue sent (by its first hash or a replacement's), or null. */
 export function txStatus(state: QueueState, chainId: number, txHash: Hex): StatusResponse | null {
-  const tx = state.txs.get(txHash);
+  let tx = state.txs.get(txHash);
+  if (!tx) {
+    for (const candidate of state.txs.values()) {
+      if (candidate.hashes.includes(txHash)) {
+        tx = candidate;
+        break;
+      }
+    }
+  }
   if (!tx) return null;
   const items = tx.ids
     .map((id) => state.items.get(id))

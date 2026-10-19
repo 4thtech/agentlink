@@ -5,9 +5,9 @@
 //   SUBMITTER_GAS_KEY_<chainId>   the gas key, 0x + 64 lowercase hex (a hot key, low balance)
 //   SUBMITTER_RPC_URLS_<chainId>  optional: comma-separated RPC URLs; default: the shipped ones
 // A chain without its gas key is unavailable (503, health `available: false`); nothing else is
-// affected. The key is read only here, handed to the port and never logged or returned.
+// affected. SUBMITTER_MAX_FEE_PER_GAS_WEI (a var) caps every transaction's fee. The key is read only here, handed to the port and never logged or returned.
 import { createSubmitterChain, getChainConfig, type SubmitterChain } from '@4thtech-io/chain';
-import { SubmitterLimits, createQueueClass, createSubmitterWorker } from './worker.js';
+import { SubmitterLimits, createQueueClass, createSubmitterWorker, readConfig } from './worker.js';
 
 export const packageName = '@4thtech-io/submitter';
 export * from './worker.js';
@@ -21,12 +21,14 @@ function portFor(env: unknown, chainId: number): SubmitterChain | null {
   const gasKey = vars[`SUBMITTER_GAS_KEY_${String(chainId)}`];
   const rpcRaw = vars[`SUBMITTER_RPC_URLS_${String(chainId)}`];
   const config = getChainConfig(chainId);
+  const maxFee = readConfig(vars)?.maxFeePerGasWei ?? null;
   let port: SubmitterChain | null = null;
   if (config && typeof gasKey === 'string') {
     try {
       port = createSubmitterChain(config, {
         fetchFn: (input: string, init: never) => fetch(input, init),
         gasKey,
+        ...(maxFee === null ? {} : { maxFeePerGasWei: maxFee }),
         ...(typeof rpcRaw === 'string' && rpcRaw !== '' ? { rpcUrls: rpcRaw.split(',') } : {}),
       });
     } catch {

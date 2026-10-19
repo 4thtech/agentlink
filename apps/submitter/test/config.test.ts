@@ -17,6 +17,11 @@ describe('readConfig', () => {
     expect(DEFAULTS.gasMargin).toBeLessThanOrEqual(50_000n);
     expect(config?.settings.maxBatch).toBe(20);
     expect(config?.ipKey).toHaveLength(32);
+    expect(config?.settings.maxItemGas).toBe(700_000n);
+    expect(config?.settings.stuckAfterSeconds).toBe(180);
+    expect(config?.settings.maxReplacements).toBe(3);
+    expect(config?.limits.ipReadsPerHour).toBe(600);
+    expect(config?.maxFeePerGasWei).toBeNull();
   });
 
   it('takes bounded overrides', () => {
@@ -29,14 +34,29 @@ describe('readConfig', () => {
       SUBMITTER_MAX_BATCH: '5',
       SUBMITTER_IP_ITEMS_PER_HOUR: '12',
       SUBMITTER_SIGNER_ITEMS_PER_HOUR: '3',
+      SUBMITTER_IP_READS_PER_HOUR: '30',
+      SUBMITTER_MAX_ITEM_GAS: '400000',
+      SUBMITTER_STUCK_AFTER_SECONDS: '60',
+      SUBMITTER_MAX_REPLACEMENTS: '2',
+      SUBMITTER_MAX_FEE_PER_GAS_WEI: '50000000000',
     });
+    expect(config?.maxFeePerGasWei).toBe(50_000_000_000n);
     expect(config?.settings).toMatchObject({
       gasMargin: 40_000n,
       soloAfterRevertSeconds: 600,
       codeSignerMode: 'one-per-batch',
       maxBatch: 5,
     });
-    expect(config?.limits).toEqual({ ipItemsPerHour: 12, signerItemsPerHour: 3 });
+    expect(config?.settings).toMatchObject({
+      maxItemGas: 400_000n,
+      stuckAfterSeconds: 60,
+      maxReplacements: 2,
+    });
+    expect(config?.limits).toEqual({
+      ipItemsPerHour: 12,
+      signerItemsPerHour: 3,
+      ipReadsPerHour: 30,
+    });
   });
 
   it('fails closed on anything invalid', () => {
@@ -54,6 +74,11 @@ describe('readConfig', () => {
       { ...base, SUBMITTER_MAX_BATCH: '21' },
       { ...base, SUBMITTER_SOLO_AFTER_REVERT_SECONDS: '0' },
       { ...base, SUBMITTER_SIGNER_ITEMS_PER_HOUR: '1.5' },
+      { ...base, SUBMITTER_MAX_ITEM_GAS: '50000000' },
+      { ...base, SUBMITTER_MAX_REPLACEMENTS: '11' },
+      { ...base, SUBMITTER_STUCK_AFTER_SECONDS: '5' },
+      { ...base, SUBMITTER_MAX_FEE_PER_GAS_WEI: '0' },
+      { ...base, SUBMITTER_MAX_FEE_PER_GAS_WEI: '1e9' },
     ];
     for (const env of bad) expect(readConfig(env), JSON.stringify(env)).toBeNull();
   });

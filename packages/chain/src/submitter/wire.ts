@@ -80,11 +80,15 @@ export interface SubmitResponse {
   readonly items: readonly SubmitItemResult[];
 }
 
-/** `GET /v1/status/:txHash`. `items` show each item's current status and transaction. */
+/**
+ * `GET /v1/status/:txHash`. `items` show each item's current status and transaction. `dropped`:
+ * neither the transaction nor its fee-bumped replacements were included in time; its items were
+ * queued again (they show their new transaction).
+ */
 export interface StatusResponse {
   readonly chainId: number;
   readonly txHash: Hex;
-  readonly state: 'pending' | 'included' | 'reverted';
+  readonly state: 'pending' | 'included' | 'reverted' | 'dropped';
   readonly items: readonly SubmitItemResult[];
 }
 
@@ -295,7 +299,7 @@ export function parseStatusResponse(value: unknown): StatusResponse {
   if (typeof o.txHash !== 'string' || !TX_HASH.test(o.txHash)) {
     fail('invalid_submitter_answer', 'txHash');
   }
-  if (o.state !== 'pending' && o.state !== 'included' && o.state !== 'reverted') {
+  if (!['pending', 'included', 'reverted', 'dropped'].includes(o.state as string)) {
     fail('invalid_submitter_answer', 'state');
   }
   return Object.freeze({
