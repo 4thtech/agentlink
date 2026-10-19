@@ -37,6 +37,7 @@ import {
 } from './index.js';
 
 const ZERO32 = `0x${'0'.repeat(64)}`;
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 const iso = (seconds: number): string =>
   new Date(seconds * 1000).toISOString().replace('.000Z', 'Z');
@@ -369,7 +370,9 @@ async function eoaFixture(options: FixtureOptions = {}): Promise<Fixture> {
     envelopeHash: envHash,
     envelope,
     disclosure: {
-      contentKey: b64(envelope === TWO_WRAP_ENVELOPE ? TWO_WRAP_COMMITTED_CEK_HEX : MESSAGE_CEK_HEX),
+      contentKey: b64(
+        envelope === TWO_WRAP_ENVELOPE ? TWO_WRAP_COMMITTED_CEK_HEX : MESSAGE_CEK_HEX,
+      ),
     },
     ownerApproval: null,
     exportedAt: '2025-10-10T00:00:00Z',
@@ -421,7 +424,18 @@ function erc1271Fixture(signature = `0x${'ab'.repeat(80)}`): Fixture {
 }
 
 function chainWith(f: Fixture, extra: FakeChain = {}) {
-  return chainFor(base(), { records: new Map([[f.recordId, f.state]]), ...extra });
+  // The vector Record's domain names its own Notary: play Base Sepolia with that Notary shipped.
+  const config = f.pack.notary === VECTOR_NOTARY ? vectorChain() : base();
+  return chainFor(config, { records: new Map([[f.recordId, f.state]]), ...extra });
+}
+
+/** Base Sepolia with the record-message vector's Notary as the shipped one (the vector's domain). */
+function vectorChain(): ChainConfig {
+  const b = base();
+  return Object.freeze({
+    ...b,
+    contracts: Object.freeze({ ...b.contracts, notary: VECTOR_NOTARY }),
+  });
 }
 
 async function verify(pack: unknown, chains: VerifyChain[]): Promise<ProofPackResult> {
@@ -601,35 +615,35 @@ describe('verifyProofPack: each tamper fails with its own fixed code', () => {
     {
       name: 'digest: a signed field changed (maxFee)',
       mutate: (f) => {
-        (f.pack.record as OccRecord).maxFee = '1';
+        (f.pack.record as Mutable<OccRecord>).maxFee = '1';
       },
       reason: 'record_mismatch',
     },
     {
       name: 'digest: parentRecordId changed',
       mutate: (f) => {
-        (f.pack.record as OccRecord).parentRecordId = `0x${'01'.repeat(32)}`;
+        (f.pack.record as Mutable<OccRecord>).parentRecordId = `0x${'01'.repeat(32)}`;
       },
       reason: 'record_mismatch',
     },
     {
       name: 'kind: the record claims another kind than the chain',
       mutate: (f) => {
-        (f.pack.record as OccRecord).kind = 2;
+        (f.pack.record as Mutable<OccRecord>).kind = 2;
       },
       reason: 'kind_mismatch',
     },
     {
       name: 'kind: outside the fixed kinds (D-86)',
       mutate: (f) => {
-        (f.pack.record as OccRecord).kind = 7;
+        (f.pack.record as Mutable<OccRecord>).kind = 7;
       },
       reason: 'invalid_kind',
     },
     {
       name: 'envelope hash: pack and record name another hash than the chain',
       mutate: (f) => {
-        (f.pack.record as OccRecord).envelopeHash = `0x${'0e'.repeat(32)}`;
+        (f.pack.record as Mutable<OccRecord>).envelopeHash = `0x${'0e'.repeat(32)}`;
         f.pack.envelopeHash = `0x${'0e'.repeat(32)}`;
         delete f.pack.envelope;
         f.pack.disclosure = null;
@@ -667,7 +681,7 @@ describe('verifyProofPack: each tamper fails with its own fixed code', () => {
     {
       name: 'record ID: the signer changed (and the pack signer with it)',
       mutate: (f) => {
-        (f.pack.record as OccRecord).signer = OTHER.address.toLowerCase();
+        (f.pack.record as Mutable<OccRecord>).signer = OTHER.address.toLowerCase();
         f.pack.signer = { evm: OTHER.address.toLowerCase() };
       },
       reason: 'record_id_mismatch',
@@ -789,7 +803,7 @@ describe('verifyProofPack: disclosed content key, in the 07 §8 order (G-46, D-6
     {
       name: 'step 2: an envelope that does not hash to the recorded value',
       mutate: (f) => {
-        const env = clone(MESSAGE_ENVELOPE);
+        const env = clone(MESSAGE_ENVELOPE) as Mutable<Envelope>;
         env.createdAt += 1;
         f.pack.envelope = env;
       },
@@ -798,7 +812,7 @@ describe('verifyProofPack: disclosed content key, in the 07 §8 order (G-46, D-6
     {
       name: 'step 3: an envelope whose sig does not verify (sig is outside the hash)',
       mutate: (f) => {
-        const env = clone(MESSAGE_ENVELOPE);
+        const env = clone(MESSAGE_ENVELOPE) as Mutable<Envelope>;
         env.sig = `${env.sig.slice(0, 126)}${env.sig.endsWith('80') ? '81' : '80'}`;
         f.pack.envelope = env;
       },
