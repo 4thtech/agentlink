@@ -66,13 +66,13 @@ When a message with files arrives, the receiving agent moves each file key out o
 
 `agentlink policy allow-folder` refuses a folder that contains a protected folder, for example `~/Library`, which holds `~/Library/Keychains`. The refusal names the protected folder and suggests choosing a narrower folder. It happens before the owner code is asked, so nothing changes. Before this, only the per-file check at send time kept such files out.
 
-**Availability.** Decided design, in development (card M1-9m-b).
+**Availability.** Merged for the next release (card M1-9m-b).
 
 ### Recovering rules that can't be read (D-100)
 
-When the agent's signed rules (policy) can't be trusted (rolled back, out of step with the stored version mark, or tampered with), AgentLink fails closed and never falls back to the defaults on its own. `agentlink policy recover` is the owner's deliberate way back. It shows only the kind of failure. If the stored rules still parse and their signature checks out (a rollback or a version mismatch), the owner reviews those rules in full; otherwise the owner reviews the built-in defaults in full. After an explicit `y` and the owner code, it signs a complete new policy at the next version. `agentlink doctor` names the command when it is needed.
+When the agent's signed rules (policy) can't be trusted (rolled back, out of step with the stored version mark, or tampered with), AgentLink fails closed and never falls back to the defaults on its own. `agentlink policy recover` is the owner's deliberate way back. It shows only the kind of failure. If the stored rules still parse and their signature checks out (a rollback or a version mismatch), the owner reviews those rules in full; otherwise the owner reviews the built-in defaults in full. After an explicit `y` and the owner code, it signs a complete new policy at a version above both the stored version mark and the stored rules' own version (D-103, amending D-100), so the recovered rules can't land at or below a version that is already ahead. `agentlink doctor` names the command when it is needed.
 
-**Availability.** Decided design, in development (card M1-9m-b).
+**Availability.** Merged for the next release (card M1-9m-b).
 
 ## Proof
 
@@ -129,13 +129,25 @@ When an agent's keys change, it sends its new card (with both of its signatures)
 
 The verifier asks a smart-contract account (ERC-1271) at verification time whether it accepts the record's signature. The account may have changed its rules since the proof network checked the signature when it stored the record. If it no longer accepts it, the pack does not fail: the result carries the non-fatal code `signer_no_longer_confirms` next to an unchanged verdict, with the text "The signer's account no longer confirms this record. The proof network checked it when the record was made."
 
-**Availability.** Decided design, in development (card M1-4d-c).
+**Availability.** Built in the verifier (card M1-4d-c); not user-facing until the `verify` command and tool land.
 
 ### Receipt flags (D-97)
 
 The record keeps one bit per receipt type: type `t` sets bit `t − 1` (DELIVERED bit 0, OPENED bit 1, ACCEPTED bit 2, REJECTED bit 3), next to the receipt's time in `receiptAt[t − 1]`. The verifier checks that the bits and the times agree, that no other bit is set and that ACCEPTED and REJECTED are not both set; any mismatch is `malformed_record`.
 
-**Availability.** Decided design, in development (card M1-4d-c).
+**Availability.** Built in the verifier (card M1-4d-c); not user-facing until the `verify` command and tool land.
+
+### Checking the owner's approval in a proof pack (M1-4d-c, D-104)
+
+A proof pack can carry the owner's signed approval for the agreement. The verifier checks, in order and failing closed: the owner's signature under the owner-action tag; that the signed digest is the digest of the exact action; that the terms fingerprint is the fingerprint of the stored terms; that the approval concerns this record (by the recipient, its scope names the record's message; by the signer, the disclosed content must carry the approved terms and, for an accept, answer the approved message); and that the owner key matches the signer's card when the pack carries one. Any failure fails the pack with `owner_approval_invalid`. An approval by the signer without disclosed content is reported as not tied to this record and is never shown as approving it. A standing rule is reported by its fingerprint and not checked, since the rules themselves are not in the pack.
+
+**Availability.** Built in the verifier (card M1-4d-c); not user-facing until the `verify` command and tool land.
+
+### A receipt link that doesn't match is a warning (M1-4d-c, D-105)
+
+A receipt stands on the record the proof network stores. The transaction hash a pack lists for a receipt is only a link: the verifier confirms it when that transaction carries the proof contract's `ReceiptRecorded` event for this record, receipt type, signer and time. A hash that doesn't confirm gives the non-fatal code `receipt_tx_mismatch` next to an unchanged verdict, and is never shown as a link; a hash the network doesn't show, or a failed read, is reported as not checked.
+
+**Availability.** Built in the verifier (card M1-4d-c); not user-facing until the `verify` command and tool land.
 
 ### Revoking an agent (D-81)
 
