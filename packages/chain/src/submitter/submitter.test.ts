@@ -141,11 +141,17 @@ describe('parseSubmitRequest', () => {
       { chainId: CHAIN_ID, records: [good], extra: 1 },
       { chainId: '84532', records: [good] },
       { chainId: CHAIN_ID, records: [{ ...good, extra: true }] },
-      { chainId: CHAIN_ID, records: [{ record: built.record, signature: signature.toUpperCase() }] },
+      {
+        chainId: CHAIN_ID,
+        records: [{ record: built.record, signature: signature.toUpperCase() }],
+      },
       { chainId: CHAIN_ID, records: [{ record: built.record, signature: signature.slice(2) }] },
       { chainId: CHAIN_ID, records: [{ record: built.record, signature: `${signature}0` }] },
       { chainId: CHAIN_ID, records: [{ record: { ...built.record, maxFee: 1000 }, signature }] },
-      { chainId: CHAIN_ID, records: [{ record: { ...built.record, signer: AGENT.toUpperCase() }, signature }] },
+      {
+        chainId: CHAIN_ID,
+        records: [{ record: { ...built.record, signer: AGENT.toUpperCase() }, signature }],
+      },
       { chainId: CHAIN_ID, records: [good, good] },
       { chainId: CHAIN_ID, records: new Array(SUBMITTER_MAX_ITEMS + 1).fill(good) },
       { chainId: CHAIN_ID, receipts: [good] },
@@ -416,7 +422,11 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
   });
 
   it('refuses an RPC URL that breaks the 04 §4 rule, without echoing it', () => {
-    for (const url of ['http://rpc.provider-one.io', 'https://127.0.0.1/x', 'https://localhost/x']) {
+    for (const url of [
+      'http://rpc.provider-one.io',
+      'https://127.0.0.1/x',
+      'https://localhost/x',
+    ]) {
       let thrown: unknown;
       try {
         port(newChain(), { rpcUrls: [url] });
@@ -468,7 +478,11 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
     expect(await p.simulateItem(item)).toEqual({ outcome: 'failed', error: 'InvalidSignature' });
     chain.revertWith = { name: 'EnforcedPause' };
     expect(await p.simulateItem(item)).toEqual({ outcome: 'paused' });
-    expect(await p.simulateBatch([item])).toEqual({ ok: false, error: 'EnforcedPause', paused: true });
+    expect(await p.simulateBatch([item])).toEqual({
+      ok: false,
+      error: 'EnforcedPause',
+      paused: true,
+    });
   });
 
   it('simulates a receipt whose type is already set as skipped', async () => {
@@ -481,9 +495,17 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
       { chainId: CHAIN_ID, receipts: [{ receipt: built.receipt, signature }] },
       notaryFor,
     ).items[0] as SubmitItem;
-    chain.records.set(recordId, { signer: AGENT, structHash: hash32('77'), receiptAt: [0n, 0n, 0n, 0n] });
+    chain.records.set(recordId, {
+      signer: AGENT,
+      structHash: hash32('77'),
+      receiptAt: [0n, 0n, 0n, 0n],
+    });
     expect(await p.simulateItem(item)).toEqual({ outcome: 'ok' });
-    chain.records.set(recordId, { signer: AGENT, structHash: hash32('77'), receiptAt: [5n, 0n, 0n, 0n] });
+    chain.records.set(recordId, {
+      signer: AGENT,
+      structHash: hash32('77'),
+      receiptAt: [5n, 0n, 0n, 0n],
+    });
     expect(await p.simulateItem(item)).toEqual({ outcome: 'skipped' });
   });
 
@@ -524,7 +546,7 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
       const topics = encodeEventTopics({ abi: NOTARY_CLIENT_ABI, eventName, args } as never);
       const event = NOTARY_CLIENT_ABI.find(
         (e) => e.type === 'event' && e.name === eventName,
-      ) as { inputs: { name: string; type: string; indexed?: boolean }[] };
+      ) as unknown as { inputs: { name: string; type: string; indexed?: boolean }[] };
       const data = encodeAbiParameters(
         event.inputs.filter((i) => !i.indexed),
         event.inputs.filter((i) => !i.indexed).map((i) => args[i.name]) as never,
@@ -617,9 +639,13 @@ describe('createSubmitterClient', () => {
   const B = 'https://submitter-b.example-host.io/base';
 
   it('refuses a plain fetch and a URL that breaks the 04 §4 rule', () => {
-    expect(() => createSubmitterClient({ urls: [A], fetchFn: (async () => json(200, {})) as typeof fetch })).toThrow();
+    expect(() =>
+      createSubmitterClient({ urls: [A], fetchFn: (async () => json(200, {})) as typeof fetch }),
+    ).toThrow();
     const fetchFn = clientFetch(() => json(200, {})) as unknown as typeof fetch;
-    expect(() => createSubmitterClient({ urls: ['http://submitter-a.example-host.io'], fetchFn })).toThrow();
+    expect(() =>
+      createSubmitterClient({ urls: ['http://submitter-a.example-host.io'], fetchFn }),
+    ).toThrow();
     expect(() => createSubmitterClient({ urls: [], fetchFn })).toThrow();
   });
 
@@ -634,10 +660,20 @@ describe('createSubmitterClient', () => {
       expect(body).toEqual({ chainId: CHAIN_ID, records: [{ record: built.record, signature }] });
       return json(200, {
         chainId: CHAIN_ID,
-        items: [{ id: built.recordId, recordId: built.recordId, status: 'submitted', txHash: hash32('55') }],
+        items: [
+          {
+            id: built.recordId,
+            recordId: built.recordId,
+            status: 'submitted',
+            txHash: hash32('55'),
+          },
+        ],
       });
     });
-    const client = createSubmitterClient({ urls: [A], fetchFn: fetchFn as unknown as typeof fetch });
+    const client = createSubmitterClient({
+      urls: [A],
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
     const res = await client.notarize(CHAIN_ID, [{ record: built.record, signature }]);
     expect(res.items[0]?.status).toBe('submitted');
   });
@@ -664,7 +700,10 @@ describe('createSubmitterClient', () => {
         seen.push(url);
         return url.startsWith(A) ? first() : json(200, answer);
       });
-      const client = createSubmitterClient({ urls: [A, B], fetchFn: fetchFn as unknown as typeof fetch });
+      const client = createSubmitterClient({
+        urls: [A, B],
+        fetchFn: fetchFn as unknown as typeof fetch,
+      });
       const res = await client.notarize(CHAIN_ID, [{ record: built.record, signature }]);
       expect(res.items[0]?.status).toBe('skipped');
       expect(seen).toEqual([`${A}/v1/notarize`, `${B}/v1/notarize`]);
@@ -678,8 +717,13 @@ describe('createSubmitterClient', () => {
       seen.push(url);
       return json(400, { error: 'bad_request' });
     });
-    const client = createSubmitterClient({ urls: [A, B], fetchFn: fetchFn as unknown as typeof fetch });
-    const err = await client.notarize(CHAIN_ID, [{ record: built.record, signature }]).catch((e: unknown) => e);
+    const client = createSubmitterClient({
+      urls: [A, B],
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    const err = await client
+      .notarize(CHAIN_ID, [{ record: built.record, signature }])
+      .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(SubmitterError);
     expect((err as SubmitterError).code).toBe('refused');
     expect((err as Error).message).not.toContain('example-host');
@@ -688,7 +732,10 @@ describe('createSubmitterClient', () => {
 
   it('reports `unavailable` when every submitter fails, with no URL in the error', async () => {
     const fetchFn = clientFetch(() => json(502, {}));
-    const client = createSubmitterClient({ urls: [A, B], fetchFn: fetchFn as unknown as typeof fetch });
+    const client = createSubmitterClient({
+      urls: [A, B],
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
     const err = await client.status(hash32('55')).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(SubmitterError);
     expect((err as SubmitterError).code).toBe('unavailable');
@@ -704,7 +751,10 @@ describe('createSubmitterClient', () => {
       expect(url).toBe(`${A}/v1/status/${hash32('55')}`);
       return json(200, { chainId: CHAIN_ID, txHash: hash32('55'), state: 'pending', items: [] });
     });
-    const client = createSubmitterClient({ urls: [A], fetchFn: fetchFn as unknown as typeof fetch });
+    const client = createSubmitterClient({
+      urls: [A],
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
     expect((await client.status(hash32('55'))).state).toBe('pending');
     expect((await client.health()).ok).toBe(true);
     await expect(client.status('0x12' as Hex)).rejects.toThrow();

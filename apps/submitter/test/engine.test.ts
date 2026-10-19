@@ -247,9 +247,17 @@ describe('code-bearing signers (FA-1)', () => {
   it('solo mode: a code-bearing signer is solo from its first item, with no prior revert', async () => {
     const t = setup();
     t.chain.code.add(S);
-    const results = await t.submit([fakeRecordItem(A), fakeRecordItem(S), fakeRecordItem(B), fakeRecordItem(S)]);
+    const results = await t.submit([
+      fakeRecordItem(A),
+      fakeRecordItem(S),
+      fakeRecordItem(B),
+      fakeRecordItem(S),
+    ]);
     expect(results.every((r) => r.status === 'submitted')).toBe(true);
-    expect(t.chain.sent.map((tx) => tx.signers)).toEqual([[A, B], [S, S]]);
+    expect(t.chain.sent.map((tx) => tx.signers)).toEqual([
+      [A, B],
+      [S, S],
+    ]);
   });
 
   it('solo mode: an ERC-1271 answer that changes at inclusion reverts no other signer’s item', async () => {
@@ -269,10 +277,9 @@ describe('code-bearing signers (FA-1)', () => {
     expect(reverted).toHaveLength(1);
     expect(reverted[0]?.signers).toEqual([S]);
     const other = t.chain.sent.find((tx) => tx.ids.includes(a.id));
-    expect(txStatus(t.state, 84532, other?.hash as `0x${string}`)?.items.map((i) => i.status)).toEqual([
-      'recorded',
-      'recorded',
-    ]);
+    expect(
+      txStatus(t.state, 84532, other?.hash as `0x${string}`)?.items.map((i) => i.status),
+    ).toEqual(['recorded', 'recorded']);
   });
 
   it('one-per-batch mode: at most one code-bearing item per batch', async () => {
@@ -368,7 +375,7 @@ describe('nonces', () => {
     await Promise.all(
       [A, B, C, S, signerAddress(9)].map((signer) => t.submit([fakeRecordItem(signer)])),
     );
-    expect(t.chain.sent.map((tx) => tx.nonce).sort()).toEqual([7, 8, 9, 10, 11]);
+    expect(t.chain.sent.map((tx) => tx.nonce).sort((a, b) => a - b)).toEqual([7, 8, 9, 10, 11]);
   });
 
   it('reads the nonce again after a failed send and reports the items failed (unavailable)', async () => {

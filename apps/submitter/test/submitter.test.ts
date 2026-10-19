@@ -8,7 +8,13 @@
 // signatures the tests used (07 §7: no request logging; never signatures with IPs).
 import { SELF, env as testEnv, runDurableObjectAlarm } from 'cloudflare:test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { RECORD_KIND, buildReceipt, buildRecord, getChainConfig, type Hex } from '@4thtech-io/chain';
+import {
+  RECORD_KIND,
+  buildReceipt,
+  buildRecord,
+  getChainConfig,
+  type Hex,
+} from '@4thtech-io/chain';
 import type { SubmitterEnv } from '../src/worker.js';
 import { FakeChain, fakeChains } from './fake-chain.js';
 
@@ -124,7 +130,8 @@ async function notarize(
   return { status: res.status, items: (body.items ?? []) as Item[], body };
 }
 
-const queueStub = () => env.SUBMITTER_QUEUE.get(env.SUBMITTER_QUEUE.idFromName(`chain:${String(CHAIN_ID)}`));
+const queueStub = () =>
+  env.SUBMITTER_QUEUE.get(env.SUBMITTER_QUEUE.idFromName(`chain:${String(CHAIN_ID)}`));
 
 describe('GET /v1/health', () => {
   it('reports per-chain gas balance and queue depth', async () => {
@@ -132,7 +139,9 @@ describe('GET /v1/health', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       ok: true,
-      chains: [{ chainId: CHAIN_ID, available: true, gasBalance: String(10n ** 17n), queueDepth: 0 }],
+      chains: [
+        { chainId: CHAIN_ID, available: true, gasBalance: String(10n ** 17n), queueDepth: 0 },
+      ],
     });
   });
 });
@@ -171,7 +180,11 @@ describe('POST /v1/notarize', () => {
     const cases: [unknown, number, string][] = [
       ['{not json', 400, 'bad_request'],
       [{ chainId: CHAIN_ID, records: [] }, 400, 'bad_request'],
-      [{ chainId: 1, records: [{ record: r.record, signature: r.signature }] }, 400, 'unsupported_chain'],
+      [
+        { chainId: 1, records: [{ record: r.record, signature: r.signature }] },
+        400,
+        'unsupported_chain',
+      ],
       [`{"pad":"${'x'.repeat(70_000)}"}`, 413, 'too_large'],
     ];
     for (const [body, status, error] of cases) {
@@ -218,11 +231,13 @@ describe('POST /v1/notarize', () => {
   });
 
   it('serialises transaction nonces across concurrent requests', async () => {
-    const results = await Promise.all(
-      [0, 1, 2, 3, 4].map(() => notarize([record(newSigner())])),
-    );
+    const results = await Promise.all([0, 1, 2, 3, 4].map(() => notarize([record(newSigner())])));
     for (const { items } of results) expect(items[0]?.status).toBe('submitted');
-    expect(chain.sent.map((tx) => tx.nonce).sort((a, b) => a - b)).toEqual([7, 8, 9, 10, 11]);
+    // The queue keeps its own next nonce across tests (Durable Object storage), so the run starts
+    // wherever the previous test left it: five distinct, consecutive nonces.
+    const nonces = chain.sent.map((tx) => tx.nonce).sort((a, b) => a - b);
+    const first = nonces[0] ?? -1;
+    expect(nonces).toEqual([first, first + 1, first + 2, first + 3, first + 4]);
     expect(new Set(chain.sent.map((tx) => tx.hash)).size).toBe(5);
   });
 

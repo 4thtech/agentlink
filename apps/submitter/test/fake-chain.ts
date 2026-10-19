@@ -130,7 +130,10 @@ export class FakeChain implements SubmitterChain {
     const items = this.pendingItems.get(hash);
     if (!items) return;
     this.pendingItems.delete(hash);
-    if (this.paused || items.some((i) => this.failAtInclusion.has(i.id) && !this.onChain.has(i.id))) {
+    if (
+      this.paused ||
+      items.some((i) => this.failAtInclusion.has(i.id) && !this.onChain.has(i.id))
+    ) {
       this.results.set(hash, { state: 'reverted' });
       return;
     }

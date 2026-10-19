@@ -24,7 +24,7 @@ Integrators use `@4thtech-io/core` with their own `KeyStore` and `Store` and pas
 
 ## Chain client (`@4thtech-io/chain`)
 
-**In development (M1-4a, M1-4b); not user-facing yet.** It builds on the contract interface package ([Contracts](contracts.md#interface-package)). Nothing here asks the user for a chain, a wallet or gas: chains are picked automatically.
+**In development (M1-4a, M1-4b, M1-10a); not user-facing yet.** It builds on the contract interface package ([Contracts](contracts.md#interface-package)). Nothing here asks the user for a chain, a wallet or gas: chains are picked automatically.
 
 - **Supported chains.** The client knows a chain only when it ships a network entry for it and the pinned contracts release has a deployment there: Base Sepolia today. The two must agree on the chain and the fee tokens, or the client refuses that chain. Nothing is fetched at runtime.
 - **RPC endpoints.** Several public endpoints per chain; users can add up to 5 of their own, which are tried first. An endpoint must be `https://` with a public host name (no IP address, no `localhost` or local name) and no user info, query or fragment. An owner's own endpoint may carry its provider key in the path, so endpoint addresses are treated as secrets and never logged or returned; errors carry fixed codes only, and no property of the client object (its transport included, or a client made with `extend`) holds an endpoint address. In Node, private and loopback addresses are refused at resolve time and each request connects to the checked address. Each request has a timeout and a few retries before the next endpoint; requests never follow redirects, and only read methods are sent.
@@ -35,6 +35,7 @@ Integrators use `@4thtech-io/core` with their own `KeyStore` and `Store` and pas
 - **Credits.** The client reads the agent's prepaid credits for every fee token on every supported chain in parallel; a chain that does not answer is listed as unavailable. Choosing which chain pays comes with automatic chain selection (M1-26).
 - **Top-up helper.** For a direct top-up the client prepares the calls (an approval of exactly the amount, then the deposit; one call for xDAI on Gnosis). It sends nothing yet (M1-4c).
 - **Credit history.** Only events from the configured fee vault count, and empty (zero-amount) deposits, sweeps and withdrawals are ignored.
+- **Submitter (in development, M1-10a).** The same package holds both sides of the submitter API: strict parsers for its requests and answers, the submitter Worker's chain access (simulation of each item, the batch transaction signed with the Worker's own key for that chain, and inclusion read from the receipt), and a client that tries up to 5 submitters in order and moves on when one fails. Only signed records and receipts are sent; a submitter never sees a key or a message. Its answers are not trusted: the client confirms every status by reading the chain (M1-4c).
 
 ## Outline (filled in at release)
 
