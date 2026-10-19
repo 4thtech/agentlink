@@ -663,6 +663,29 @@ describe('stuck and dropped transactions (IR-M1-10a-1 M-2)', () => {
     expect(t.chain.sent.at(-1)?.nonce).toBe((first?.nonce ?? 0) + 1);
   });
 
+  it('M1-10a-b: after giving up one of two transactions in flight, no new send reuses the other one’s nonce', async () => {
+    const t = setup({ stuckAfterSeconds: 100, maxReplacements: 0 });
+    const a = fakeRecordItem(A, NOW + 100_000);
+    const b = fakeRecordItem(B, NOW + 100_000);
+    await t.submit([a]);
+    await t.submit([b], NOW + 50);
+    const [txA, txB] = t.chain.sent;
+    expect([txA?.nonce, txB?.nonce]).toEqual([7, 8]);
+    await t.poll(NOW + 100); // a is given up and resent at the latest nonce; b is still in flight
+    const resent = t.chain.sent[2];
+    expect(resent?.ids).toEqual([a.id]);
+    expect(resent?.nonce).toBe(7);
+    await t.submit([fakeRecordItem(C)], NOW + 110);
+    const fresh = t.chain.sent[3];
+    expect(fresh?.nonce).toBe(9);
+    // Every transaction of distinct items has a nonce of its own.
+    const live = [resent, txB, fresh].map((tx) => tx?.nonce);
+    expect(new Set(live).size).toBe(3);
+    t.chain.includeAll();
+    await t.poll(NOW + 120);
+    expect(queueDepth(t.state)).toBe(0);
+  });
+
   it('M1-10a-b: when the latest nonce cannot be read on giving up, the given-up nonce is used again', async () => {
     const t = setup({ stuckAfterSeconds: 100, maxReplacements: 0 });
     const a = fakeRecordItem(A, NOW + 100_000);
