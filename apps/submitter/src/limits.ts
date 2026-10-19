@@ -14,6 +14,8 @@ export const METRICS = [
   'request_receipt',
   'request_status',
   'request_health',
+  'request_faucet',
+  'faucet_credited',
   'item_submitted',
   'item_held',
   'item_skipped',
