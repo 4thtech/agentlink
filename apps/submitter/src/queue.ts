@@ -61,7 +61,16 @@ interface Meta {
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
-export function createQueueClass(deps: QueueDeps) {
+/**
+ * The queue class as other modules see it. Declared, because a declaration file cannot name an
+ * anonymous class with private members (TS4094); at run time it is a Durable Object class.
+ */
+export type SubmitterQueueClass = new (
+  ctx: DurableObjectState,
+  env: QueueEnv,
+) => SubmitterQueueApi & { alarm(): Promise<void> };
+
+export function createQueueClass(deps: QueueDeps): SubmitterQueueClass {
   return class SubmitterQueue extends DurableObject<QueueEnv> implements SubmitterQueueApi {
     private state: QueueState = emptyQueueState();
     private chainId: number | null = null;

@@ -738,7 +738,7 @@ describe('createSubmitterClient', () => {
       const seen: string[] = [];
       const fetchFn = clientFetch((url) => {
         seen.push(url);
-        return url.startsWith(A) ? first() : json(200, answer);
+        return new URL(url).origin === new URL(A).origin ? first() : json(200, answer);
       });
       const client = createSubmitterClient({
         urls: [A, B],

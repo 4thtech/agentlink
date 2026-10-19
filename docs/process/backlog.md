@@ -3029,6 +3029,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Testnet integration with M1-4c; captured logs contain no IPs or signatures; `/v1/health` reports gas balances and queue depth.
 - Review note (IR-M1-7i-1 L1/L2/L5, 2026-10-17): before wiring the budget ledger: use the finalized block timestamp in `releaseProofReservation`, keep `markBroken` in its own transaction (07 §3.5), optional `charged_usd <= reserved_usd` check.
 
+#### M1-10a-b · submitter follow-ups (IR-M1-10a-2 lows) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
+- **Repo/path:** agentlink · apps/submitter/src/engine.ts
+- **Depends on:** M1-10a
+- **Spec:** 07 §7 (Implementation); 05 §3.3
+- **Invariants:** I-3
+- **Scope:**
+  - Shared revert with no identifiable cause: resubmit split per signer (each signer's items apart), not as one batch again, so one diverging signer cannot cost the others their single resubmission.
+  - Giving up a stuck transaction: reconcile against the `latest` nonce (`eth_getTransactionCount(…, "latest")`), not the `pending` one, so a forgotten transaction still in some node's mempool does not leave a gap or a skipped nonce.
+  - An RPC failure while re-simulating after a revert keeps the item in flight (retried next round) instead of failing it for good; still no cool-off.
+- **Acceptance:**
+  - Tests first (local red run) for each item, with the in-memory chain (engine) and, for the nonce, the mock RPC.
+
 #### M1-10b · testnet credits faucet
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter (faucet route)
