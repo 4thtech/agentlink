@@ -962,7 +962,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 ### Crypto (`@4thtech-io/crypto`)
 
 #### M1-1h · Independent test vectors for all protocol suites
-- **Status:** in-progress (vectors merged in 4thtech/agentlink#25; the G-2 follow-up vectors, including `envelope-sig`, are outstanding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (vectors merged in 4thtech/agentlink#25, with follow-ups #35 and #104; the G-2 `envelope-sig` cases are in `aead-envelope`; `test-vectors/pending-suites.json` is now empty) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generators/
 - **Depends on:** M0-9; M1-1l (G-46, D-66) before the `aead-envelope`, `envelope-sig` and `hpke` suites freeze (the other suites do not wait)
 - **Spec:** 04 §2.1, §2.3, §2.4, §2.4.1, §2.5.1, §2.8, §3.1, §3.3, §3.6, §4, §5, §8.2; 05 §3.1, §4, §8; `development-process.md` §9.1
@@ -1038,7 +1038,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - Review note (M1-1h-e (parked, 2026-10-17), 2026-10-17): the Python 3.15 upgrade of the vector generators is parked: `coincurve` has no `cp315` wheel yet. Re-check when it ships (see the Python upgrade item under M1-13a and the closed Renovate PRs #154 and #156).
 
 #### M1-1i · Independent test vectors for the proof-layer suites (new, split from M1-1h)
-- **Status:** in-progress (partial scope, owner-orchestrator decision 2026-10-17: STREAM and revoke moved to M1-1i-b) (partial; #212 merged the eip712-proof and prf-wrap vectors as pending) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#212 merged the eip712-proof and prf-wrap vectors as pending on 2026-10-17; STREAM and revoke vectors moved to M1-1i-b, #230; `test-vectors/pending-suites.json` is now empty) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1h (its generators, rules and pinned packages are merged; its open G-2 follow-up suite `envelope-sig` is unrelated to the proof layer and does not block this card)
 - **Spec:** 04 §2.3, §5; 05 §3.1, §4, §8; `development-process.md` §9.1
@@ -1054,7 +1054,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - Review note (IR-M1-1i-1 L1/L2/L3, 2026-10-17): record the Registration domain interpretation (Registry as `verifyingContract` under `{OCC, "2"}`) in the open spec points, since a different choice on the contracts side changes every Registration digest; record what remains for the parity job (M1-3d) so the card is not closed early; uint64 deadlines above 2^53-1 are out of JSON scope by design.
 
 #### M1-1i-b · Independent test vectors: STREAM and revoke (new, split from M1-1i on 2026-10-17)
-- **Status:** in-progress (vectors in review) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#230, merged 2026-10-18) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
 - **Depends on:** M1-1i (G-26 resolved by D-80; G-20 resolved by D-81)
 - **Spec:** 04 §4; 05 §4; `development-process.md` §9.1
@@ -1103,7 +1103,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - The derivation vectors cover `agentlink/v1/drop`; the drop public key never appears in the public bundle or agent card (test).
 
 #### M1-1c · crypto: HPKE CEK wrapping, payload AEAD, envelope hash and signature helpers
-- **Status:** in-progress (code merged in 4thtech/agentlink#38; recompute vectors follow under M1-1c, see Acceptance) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** done (code merged in 4thtech/agentlink#38; the recompute cases and harness are committed and `test-vectors/pending-suites.json` is now empty) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1b
 - **Spec:** 04 §3.1, §3.3; 03 §4.1
@@ -1122,7 +1122,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Changing any covered field (incl. recipient order or `createdAt`) changes the hash and fails verification; wrong-recipient open and tampered `ct`/AAD fail.
 
 #### M1-1d · crypto: STREAM file encryption (ALF1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#257, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1a, M1-1i-b (G-26 resolved by D-80)
 - **Spec:** 04 §4 (object layout, nonce, AAD, chunk size); 07 §5.2 (streaming); 03 §4.2
@@ -1149,7 +1149,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - `AgentCard` EIP-712 vectors from M1-1h pass in all runtimes.
 
 #### M1-1j · crypto: EIP-712 proof types and commitment helpers (new, split from M1-1e)
-- **Status:** in-progress (revoke struct defined by D-81, 05 §4; its vectors come from M1-1i-b) (#221 merged the Record, Receipt and Registration typed data, the recipient commitment and the EIP-3009 typed data; the revoke struct is left) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#221 merged the Record, Receipt and Registration typed data, the recipient commitment and the EIP-3009 typed data on 2026-10-17; #258 the Revocation struct, D-81, on 2026-10-18) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto
 - **Depends on:** M1-1e, M1-1i
 - **Spec:** 04 §5; 05 §3.1, §4, §8
@@ -1294,7 +1294,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - A concurrent advance fails the compare-and-set and changes nothing; a crash at each step leaves a state that either finishes or refuses to send, never one that sends under a key no contact knows. The epoch + 1 preview returns public keys only, and signing and decryption at that epoch stay `epoch_unavailable`.
 
 #### M1-1g-e · crypto: KeyStore drop-request signer (new, IR-M1-6c-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#274, merged 2026-10-18) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore), packages/node (backends with M1-8a, M1-8f)
 - **Depends on:** M1-1g, M1-27a
 - **Spec:** 04 §2.1 (drop key), §4 (encrypted drop); 07 §5.4 (signature format)
@@ -1590,7 +1590,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The suppression sits at the narrowest scope that keeps Slither clean; no new finding appears.
 
 #### M1-3f · contracts: ABI release artifacts and `@4thtech-io/occ-v2-abi` (private, in-repo)
-- **Status:** in review (contracts export: 4thtech/occ-v2-contracts#19, release `v0.1.0-testnet.2`, audited AUDIT-FABLE-OCC19-1 PASS; agentlink import: #273, replacing #271) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** done (contracts export: 4thtech/occ-v2-contracts#19, release `v0.1.0-testnet.2`, audited AUDIT-FABLE-OCC19-1 PASS; agentlink import: 4thtech/agentlink#273, merged 2026-10-18, replacing #271) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · release workflow; agentlink · packages/occ-v2-abi
 - **Depends on:** M1-3d, M0-2e (G-10 resolved by D-83)
 - **Spec:** 05 §9; D-19; `development-process.md` §9.1–§9.3; `release-and-deployment.md` §2
@@ -1763,7 +1763,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Every Record gets a fresh 32-byte CSPRNG salt; the builder takes no salt from its caller and exposes no salt derivation (04 §5, D-61).
 
 #### M1-4b · chain: quotes, USD display, credits
-- **Status:** in review (#279, 2026-10-19; redo of #277) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches packages/node, IR-M1-4b-1 L-5) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#279, merged 2026-10-19; redo of #277) · **Size:** M · **Tier:** Opus · **Security:** S2 (touches packages/node, IR-M1-4b-1 L-5) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a (G-30 resolved by D-46)
 - **Spec:** 07 §6.2; 06 §2.1 (`agentlink_status` `credits` and `prices`, D-53), §2.4; 02 F-45, F-47; 03 §4.4; 12 §4–§5; D-46
@@ -1977,7 +1977,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split (orchestrator, 2026-10-17):** M0-2g (R2 test token) is not done, and the MinIO job touches `.github/**`. This card ships the interface and both adapters with unit tests against an in-memory fake endpoint (no network), handled as S2 (`packages/*`). The MinIO and R2 integration tests move to M1-6a-2. The endpoint check is the 04 §4 raw-string grammar; the DNS-level check comes from the SSRF-safe fetch (M1-15) that the caller injects.
 
 #### M1-6a-2 · storage: MinIO and R2 integration tests (new, split from M1-6a)
-- **Status:** in review (PR pending; M0-2g done: bucket `agentlink-r2-test`, environment `r2-test`) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#248, merged 2026-10-18; M0-2g done: bucket `agentlink-r2-test`, environment `r2-test`) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive: `.github/**`) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage (integration tests), .github/workflows
 - **Depends on:** M1-6a; M0-2g (R2 bucket and bucket-scoped test token) for the R2 job
 - **Spec:** 07 §5.2; 04 §4 (delivery, expiry); `ci-cd.md`; `audit-rules.md` §2 (sensitive paths)
@@ -1991,7 +1991,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The log canary run in CI shows no URL query strings or keys.
 
 #### M1-6b · storage: streaming encryption and multipart upload
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#254 multipart and lifecycle, #260 streaming encrypt upload and decrypt download; merged 2026-10-18) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-6a, M1-1d
 - **Spec:** 07 §5.2 (multipart > 64 MB, streaming, lifecycle); 10 M1-6; 04 §4
@@ -2019,7 +2019,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
 
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#268, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-6a, M1-6b, M1-1g, M1-27a (or its API stub, `development-process.md` §6.2)
 - **Spec:** 07 §5.1, §5.4, §5.6; 04 §4 (encrypted drop); 06 §2.3, §3 (`files.storage`); 02 F-31; D-48
@@ -2294,7 +2294,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Threat note:** assets: the use-once approval and the agent's view of it. Abuse cases: (a) an edited row reading as approved and steering the agent; (b) the read leaking the owner signature or sealed action text into a tool result; (c) the read claiming or applying the approval. Stopped by: re-verification of the stored signed objects against the recomputed digest before the cache is read, fail-closed `unknown`; a minimal typed result; no write path. Residual: a same-user process can delete a row or void it (G-1); both only take authority away.
 
 #### M1-7f · core: files (send, fetch, refresh link, crypto-shredding)
-- **Status:** in review (4thtech/agentlink#278: send and fetch; the rest moved to M1-7f-2) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#278, merged 2026-10-18: send and fetch; the rest moved to M1-7f-2) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7b, M1-6b, M1-6c, M1-1g-e, M1-15; gaps G-27 (D-85) and G-44 resolved
 - **Spec:** 04 §4; 03 §4.2; 06 §2.3; 07 §5.6; 02 F-30–F-34; D-18, D-48
@@ -2591,7 +2591,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Approving without presence fails; the M1-8c same-user script test also passes against the running server.
 
 #### M1-8e · node: OwnerKeyStore localhost passkey (PRF) path (new, split from M1-8c)
-- **Status:** in-review (4thtech/agentlink#247; keychain account `owner-passkey`, one passkey per OS user, registration as its own owner operation, UP/UV and rpIdHash checks: proposed, owner confirms at merge; the file-KeyStore `owner.alkp` lands with M1-8f) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#247, merged 2026-10-18; keychain account `owner-passkey`, one passkey per OS user, registration as its own owner operation, UP/UV and rpIdHash checks: proposed, owner confirms at merge; the file-KeyStore `owner.alkp` lands with M1-8f) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-8c, M1-8d, M1-1k; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2, §2.3, §2.5; 08 §1; D-16
@@ -2752,7 +2752,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-9j-1 F03, 06 §8 terminal output rule) A pending request whose stored action carries an ANSI/OSC canary (cursor movement, screen clear, an OSC 8 link, C1 controls, bidi and zero-width characters) in its message text, file name and contact name, plus a CR overwrite (`approve\rdeny`), an ESC sequence split exactly at the 2 000-code-point cut, NEL U+0085 and C1 CSI U+009B, a 10 000-character single line, a 500-line value and a base letter with 50 combining marks, prints, in `approve <id>` and in `approve` with no ID, with every such sequence removed (no ESC, CR or C1 left), inside the marked untrusted region, cut after sanitizing to the 06 §8 limits (2 000 code points, 40 lines, 200-code-point lines wrapped, 60 lines per region, 2 combining marks per base character), and with the who, cost and consequence lines unchanged and after it; the signed digest is the one recomputed from the displayed action (IR-M1-9j-1 F06).
 
 #### M1-9m · CLI: policy and safety-code check (†) (new, split from M1-9a and M1-9b)
-- **Status:** in review (part 1: `policy show`, `policy allow-folder`, `policy remove-folder`); the rest is M1-9m-b · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
+- **Status:** in-progress (part 1 done: `policy show`, `policy allow-folder`, `policy remove-folder`, 4thtech/agentlink#282, merged 2026-10-19); the rest is M1-9m-b · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/{policy,verify-contact}.ts`)
 - **Depends on:** M1-9b, M1-7d, M1-7c-b; M1-20 for the `commitments` keys
 - **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
@@ -2914,7 +2914,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-9s-1 L1/L2, 2026-10-17): guard post-handler cursor writes against `close()` and test the race; fix the `subscribe` line in the 07 §4.1 sketch.
 
 #### M1-9d · MCP server: file and proof tools
-- **Status:** in progress (M1-9d-1 in review; M1-9d-2 backlog) · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (M1-9d-1 done, 4thtech/agentlink#281, merged 2026-10-19; M1-9d-2 backlog) · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli
 - **Depends on:** M1-9c, M1-7f, M1-7g, M1-15; gaps G-25 (D-87) and G-43 resolved
 - **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`path`, `notarize`), §2.2a (receipts and `notarize`), §2.3, §2.4, §9; 04 §3.4.2, §4; 02 J2, J3, J8; D-53, D-55
@@ -3056,7 +3056,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Encrypted drop (`apps/drop`) (new, D-48)
 
 #### M1-27a · drop: Worker, R2 and signed-upload protocol (new, D-48)
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#218, merged 2026-10-18; deploy blocked on M1-28) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/drop
 - **Depends on:** M1-1a, M1-1g, M0-8, M0-9, M0-2g; M1-28 (buckets and lifecycle rule) before staging
 - **Spec:** 07 §5.4; 04 §4 (encrypted drop), §7 (drop rows); 03 §2, §5; 08 §6; D-48
@@ -3079,7 +3079,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-D48-1 F10, F15d) Tests: a global-cap hit returns the typed retryable error and no object is stored; a file with N recipients above the download limit is still fetched by all N; the CORS preflight answers only the documented origins and methods.
 
 #### M1-27b · drop: deploy pipeline and hostname (new, D-48)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (code: 4thtech/agentlink#255, merged 2026-10-18; deploy blocked on M1-28) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · .github/workflows/deploy-drop.yml, apps/drop/wrangler config; `docs/process/release-and-deployment.md`
 - **Depends on:** M1-27a, M1-28, M0-2g; gap G-40 resolved
 - **Spec:** `release-and-deployment.md` §1.1, §2, §4.5, §5, §6, §8; 08 §6; D-25, D-28, D-48
@@ -3130,7 +3130,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Local approval UI (`apps/cli` local UI)
 
 #### M1-11a · local UI: owner setup and approvals
-- **Status:** in review (4thtech/agentlink#256; "Remember for this contact" deferred to G-32, CLI wiring to M1-9h) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#256, merged 2026-10-18; "Remember for this contact" deferred to G-32, CLI wiring to M1-9h) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (local UI bundle)
 - **Depends on:** M1-8d, M1-8e, M1-2e; gap G-32 resolved
 - **Spec:** 08 §1; 11 §6.2 (first run, approval), §6.2.1 (review together); 02 J4; 04 §2.5, §2.5.2 (D-68)
@@ -3150,7 +3150,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
 
 #### M1-11a-b · local UI: wiring and remember-contact follow-ups (new, follow-up from #256)
-- **Status:** in review (wiring; "Remember for this contact" still waits for G-32) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#267, merged 2026-10-18; wiring; "Remember for this contact" still waits for G-32) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (local UI bundle), packages/mcp
 - **Depends on:** M1-11a, M1-9h; G-32 for the last item
 - **Spec:** 08 §1; 11 §6.2, §8; 06 §3
@@ -3516,7 +3516,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (PR #202 review L1/L2/L4, 2026-10-17): `--invite=URL` echoes the link in the "unknown option" error; the hand-off box omits `--agentlink`, `--opencode`, `--oc-model`, `--cc-via` and `--manual`; manual-mode outcomes count as verified in the check table (documented).
 
 #### M1-23-e · Dogfood: auto-sync two-Mac mode, agents local, ssh only for files (new, live finding 2026-10-17)
-- **Status:** in progress · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#241, merged 2026-10-17) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17 section 10)
 - **Depends on:** M1-23-d
 - **Why:** macOS denies the login keychain in SSH sessions (`User interaction is not allowed`; `agentlink doctor`: no system keychain), so `--two-mac` cannot run Mac B's agent over ssh.
@@ -3591,7 +3591,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-5: give the confirmation a real reference: `owner init` should tell the owner to note the owner fingerprint next to the code, and the M1b recovery kit (M1-9h/M1-9i) should print it.
 
 #### M1-9z · CLI: change the owner code (new, live finding 2026-10-17)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key wrap, I-1, I-4) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#244, merged 2026-10-18) · **Size:** S · **Tier:** Opus · **Security:** S2 (owner key wrap, I-1, I-4) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node (`owner-change-code.ts`, `owner-keystore.ts`), apps/cli (`owner change-code`), docs-site `protect-your-approvals.md`
 - **Depends on:** M1-9b, M1-9x
 - **Spec:** 04 §2.8 ("Changing the owner code", proposed, owner confirms at merge), §2.5; 06 §8; 07 §9.3, §9.4
@@ -3616,7 +3616,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests with an injected version; default level hides info lines, `AGENTLINK_LOG` shows them; docs prerequisites and troubleshooting name 22.14.
 
 #### M1-9za · cli: contacts rename and remove (owner) (new, live finding 2026-10-17)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#245, merged 2026-10-18) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types (`owner-action.ts`, `constants.ts`), packages/core (`owner-actions.ts`, `owner-action.ts`, `names.ts`), packages/node (`owner-allowlist.ts`), apps/cli (`commands/owner/contacts-manage.ts`, `commands/contacts.ts`, `dispatch.ts`, `tools/text.ts`); docs-site contacts and troubleshooting
 - **Depends on:** M1-9b, M1-7d, M1-9l
 - **Spec:** 04 §2.5, §2.5.1 (`contact.rename`, `contact.remove`, proposed, owner confirms at merge); 06 §2.1 rule 1, §8; 07 §3 (`removed`), §3.4; 02 F-14; 11 §5.2 (Rename is an owner action)
@@ -3628,7 +3628,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit; rename resolves the ambiguity (send by name works after it); remove makes the contact unreachable and its later Talk is dropped, never a request; refused under an AI environment; tool surface unchanged; docs-site contacts and troubleshooting pages.
 
 #### M1-9zb · cli: invite approval shows who is inviting (new, live finding 2026-10-17)
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#243, merged 2026-10-18) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`commands/owner/render.ts`, `strings.ts`), tools/dogfood (`--oc-model` default), docs/runbooks/dogfood-m1a.md
 - **Depends on:** M1-9o
 - **Spec:** 06 §2.1 (restrictName), 11 §5 (copy); I-5
