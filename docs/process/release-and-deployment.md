@@ -24,6 +24,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 
 Rules:
 - Testnet and production MUST NOT share keys, Safes, API tokens or Worker secrets. This holds for the contract deployer keys again: the testnet deployer key is for testnets only, and mainnet uses a separate key from the owner's Trezor hardware wallet (D-71 (1), which supersedes the D-64 exception). Neither holds a role on any chain. While production serves testnets, its Workers still have their own keys, separate from staging's.
+- **Beta (D-88).** There is no separate beta environment. Staging serves CI and smoke tests only; production is the beta (testnets in M1–M2, mainnets from M3). One Cloudflare account; Wrangler environments `staging` and the default (production); Workers named `agentlink-<name>-staging` and `agentlink-<name>`.
 - Staging uses the same build pipeline and, for Workers and static sites, the same artifacts as production; only configuration differs.
 - Agents merge only through GitHub auto-merge behind the GitHub-enforced gates (`audit-rules.md` §3). Production deploys only through CI: services automatically once staging is green, npm `latest` after the owner's approval click (D-52). Agents never approve a deployment, never deploy from a workstation and never hold production secrets.
 - Switching the client defaults from testnets to mainnets is an S2 PR that needs the owner's "merge" in chat (D-51, D-52), an independent review and the M3 gate (`audit-rules.md` §7); `@denisjazbec`'s review is recommended.
@@ -65,7 +66,7 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 |---|---|---|---|---|
 | `@4thtech-io/agentlink` (CLI + MCP stdio; the `@4thtech-io/*` libraries bundled in, OPS-REL-1; npm org `4thtech-io`, because the `@4thtech` scope was not available, owner decision 2026-10-16) | public `apps/cli` | `release.yml` (§4.1) | npm `next` (automatic) | Owner's click (`npm-publish`, D-52); a release that changes crypto also needs the owner's "merge" and an independent review (D-51) |
 | `@4thtech-io/types`, `crypto`, `chain`, `transport-nostr`, `storage`, `core`, `node`, `ui` | public `packages/*` | Not published: `"private": true`, bundled into `@4thtech-io/agentlink` (owner decision, 2026-10-16, OPS-REL-1). Publishing one later is a decision plus its own trusted publishers | — | — |
-| Claude Desktop extension bundle (06 §7) | public `apps/cli` | DECISION NEEDED: build, signing and distribution | — | Owner |
+| Claude Desktop extension bundle (06 §7) | public `apps/cli` | OPTIONAL convenience package for one harness (D-91); the product stays harness-agnostic and every MCP harness uses the same `npx -y @4thtech-io/agentlink` server. Built by `release.yml` from the same commit as the npm release, pinned to that version, self-contained (Claude Desktop runtime; per-platform native modules), no secrets; attached to the GitHub release with its SHA-256 and a build provenance attestation; signed when the current format supports it (beta: a 4thTech key, self-signed allowed). Production gate: the npm `latest` click (D-52). Directory listing: M3 | — | Owner |
 | `@4thtech-io/occ-v2-abi` (ABIs + addresses) | contracts release artifacts | Private in-repo workspace package, bundled into the CLI (D-83, `development-process.md` §9.2) | Not published | None: it ships inside the CLI release |
 | `OCCFeeVault`, `OCCNotary` (M1), `OCCRegistry` (M2) proxies and implementations | private `src/`, `script/` | §4.2 testnet (CI, private repo), §4.3 mainnet (by hand) | Testnets | Mainnet: owner by hand after an independent review, with a second person witnessing; `@denisjazbec`'s review recommended |
 | Contract upgrades and config changes | private repo + Safe | §4.4 (by hand) | Testnet Safe | Owner + Safe signers |
@@ -274,7 +275,7 @@ This section and §4.6 are the **contract** for the Cloudflare deploy workflows.
 | Read-backs | After each deploy, in both environments: the Worker's live settings (`/workers/scripts/<name>/script-settings`: Logpush, observability, invocation logs and traces off, no Tail Workers) and the bucket's lifecycle rule (`/r2/buckets/<bucket>/lifecycle`: an enabled whole-bucket rule deleting objects at an age of at most 604 800 s). `wrangler.toml` also sets observability, logs, traces and Logpush off and source-map upload off. |
 | Rollback | Any failure or cancellation after the production deploy started: `wrangler rollback` to the version recorded before the deploy, then a check that this version is live (`wrangler deployments status`) and a health re-check; `freeze` sets `DEPLOY_FREEZE`. With no recorded version (first deploy), the freeze alone. Rehearsal: dispatch the workflow with `rehearse-rollback` (staging: back to the previous version, check it, forward again; needs two staging deploys). |
 | Rate limiting | A Cloudflare WAF rate-limiting rule on the zone, in front of the drop host (IR-M1-27a-1 M-2), so floods never reach the Worker's Durable Objects. Proposed values (owner confirms when creating it): requests with hostname `drop.agentlink.4thtech.io`, counted per IP, 100 requests per 10 seconds, action Block for 10 seconds (the Free plan's period and duration). The Worker's own per-IP and per-key limits (07 §5.4) stay the second line. Staging on `workers.dev` has no zone rule; it relies on the Worker's limits. |
-| G-40 (open) | Assumption until G-40 is resolved: `staging` serves only testing and CI, and `production` (`drop.agentlink.4thtech.io`) is the beta drop that the M1–M2 testnet clients use, as §1 states for services. If G-40 decides otherwise, only the client default and this row change. |
+| G-40 (D-88) | `staging` serves only testing and CI, and `production` (`drop.agentlink.4thtech.io`) is the beta drop that the M1–M2 testnet clients use, as §1 states for services. One Cloudflare account; Wrangler environments `staging` and the default (production). |
 
 ### 4.6 Static sites (landing, console, verify, invite, pay)
 
@@ -408,7 +409,7 @@ Every automatic rollback sets `DEPLOY_FREEZE`; the owner clears it after the inc
 | Notary after freeze | None | Records are permanent; a new deployment needs a spec change |
 | Contract configuration | Manual: schedule the reverse change | Delays apply; lowering caps is immediate |
 | Cloud-agent template | Revert the template repo to the previous tag | User instances are theirs; notify users |
-| Claude Desktop extension | Republish the previous bundle | Depends on distribution (§2) |
+| Claude Desktop extension | Republish the previous bundle as the GitHub release asset | Its SHA-256 and attestation are republished with it (§2, D-91) |
 | Public docs (GitBook, synced from `docs-site/`) | Revert the PR on `main`; Git Sync republishes the previous pages | OCC v1 pages on `wiki.4thtech.io`: owner reverts in GitBook |
 
 ---
