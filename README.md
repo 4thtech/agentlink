@@ -99,6 +99,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 
 - **User guide** ([`docs-site/guide`](docs-site/guide/README.md)): set up, pair, approvals, FAQ. **Technical docs** ([`docs-site/technical`](docs-site/technical/README.md)): concepts, guides, reference. Both are published on GitBook from this repository.
 - [`knowledge/`](knowledge/README.md) and [`llms.txt`](llms.txt): compact public knowledge base for AI assistants.
+- [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks, contract addresses and explorer links (Base Sepolia live; Gnosis Chiado planned; no mainnet).
 - [`docs/`](docs/README.md): specifications, decisions and process. [`CHANGELOG.md`](CHANGELOG.md): releases.
 
 ## Contributing
