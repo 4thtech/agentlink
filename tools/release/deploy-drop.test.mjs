@@ -503,3 +503,242 @@ describe('head-of-main check', () => {
     expect(run('not-a-sha').ok).toBe(false);
   });
 });
+
+// M1-27b-c: the first production deploy (run 39276990603, 2026-10-19). The health check met a
+// TLS handshake failure for its whole 2.5-minute window while Cloudflare provisioned the new Custom
+// Domain's certificate; the rollback was refused across a Durable Object / binding change; the
+// freeze job's token could not set the repository variable.
+
+/**
+ * Fake `curl`, `sleep`, `pnpm` and `gh` driven by scripts (no network, no waiting).
+ * curl: one [httpCode, exitCode] per call, the last one repeating; `-o` gets `body`.
+ */
+function scriptedTools({
+  curl = [['200', 0]],
+  body = '{"ok":true}',
+  rollback = { output: 'Rolled back', exit: 0 },
+  live = '',
+  gh = { output: '', exit: 0 },
+} = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'drop-scripted-'));
+  const bin = join(dir, 'bin');
+  mkdirSync(bin);
+  const q = (value) => JSON.stringify(String(value));
+  const versions = live ? [{ version_id: live, percentage: 100 }] : [];
+  writeFileSync(join(dir, 'body.json'), body);
+  writeFileSync(join(dir, 'curl.txt'), curl.map(([code, exit]) => `${code} ${exit}\n`).join(''));
+  writeFileSync(join(dir, 'calls'), '');
+  writeFileSync(
+    join(bin, 'curl'),
+    [
+      '#!/usr/bin/env bash',
+      'out=""',
+      'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then out="$2"; shift; fi; shift; done',
+      `calls=${q(join(dir, 'calls'))}`,
+      'echo x >> "$calls"',
+      'n="$(wc -l < "$calls" | tr -d " ")"',
+      `script=${q(join(dir, 'curl.txt'))}`,
+      'total="$(wc -l < "$script" | tr -d " ")"',
+      'if [ "$n" -gt "$total" ]; then n="$total"; fi',
+      'line="$(sed -n "${n}p" "$script")"',
+      'code="${line%% *}"; rc="${line##* }"',
+      `if [ -n "$out" ] && [ "$out" != /dev/null ]; then cp ${q(join(dir, 'body.json'))} "$out"; fi`,
+      'printf "%s" "$code"',
+      'exit "$rc"',
+    ].join('\n'),
+  );
+  writeFileSync(join(bin, 'sleep'), '#!/usr/bin/env bash\nexit 0\n');
+  writeFileSync(
+    join(bin, 'pnpm'),
+    [
+      '#!/usr/bin/env bash',
+      'case " $* " in',
+      `  *" rollback "*) printf '%s\\n' ${q(rollback.output)}; exit ${rollback.exit} ;;`,
+      `  *" deployments status "*) printf '%s\\n' ${q(JSON.stringify({ versions }))}; exit 0 ;;`,
+      'esac',
+      'exit 99',
+    ].join('\n'),
+  );
+  writeFileSync(
+    join(bin, 'gh'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' ${q(gh.output)} >&2\nexit ${gh.exit}\n`,
+  );
+  for (const tool of ['curl', 'sleep', 'pnpm', 'gh']) chmodSync(join(bin, tool), 0o755);
+  const output = join(dir, 'github-output');
+  const summary = join(dir, 'step-summary');
+  writeFileSync(output, '');
+  writeFileSync(summary, '');
+  return { dir, bin, output, summary };
+}
+
+function runScripted(script, fakes, env) {
+  const result = runWithFakes(script, fakes, {
+    RUNNER_TEMP: fakes.dir,
+    GITHUB_OUTPUT: fakes.output,
+    GITHUB_STEP_SUMMARY: fakes.summary,
+    ...env,
+  });
+  return {
+    ...result,
+    curlCalls: readFileSync(join(fakes.dir, 'calls'), 'utf8').split('\n').filter(Boolean).length,
+    summary: readFileSync(fakes.summary, 'utf8'),
+  };
+}
+
+describe('production health check (M1-27b-c)', () => {
+  const copies = block('HEALTH-CHECK');
+  const script = copies[0] ?? '';
+  const run = (fake) =>
+    runScripted(script, scriptedTools(fake), { DROP_PRODUCTION_ORIGIN: 'https://drop.example.test' });
+  const pairs = (health, upload, times) => Array.from({ length: times }, () => [health, upload]).flat();
+
+  it('appears once, in the production health check step, with a step timeout', () => {
+    expect(copies.length).toBe(1);
+    const production = job('deploy-production');
+    const step = production.slice(
+      production.indexOf('id: health\n'),
+      production.indexOf('HEALTH-CHECK-BEGIN'),
+    );
+    expect(step).toMatch(/timeout-minutes: (1[6-9]|20)\n/);
+  });
+
+  it('is healthy for /v1/health 200 {"ok":true} and an unsigned upload 401', () => {
+    const result = run({ curl: [['200', 0], ['401', 0]] });
+    expect(result.ok, result.output).toBe(true);
+    expect(result.curlCalls).toBe(2);
+  });
+
+  it('keeps waiting past 10 attempts while there is no TLS or connection yet (HTTP 000)', () => {
+    const waiting = [
+      ...pairs(['000', 35], ['000', 35], 12),
+      ...pairs(['000', 6], ['000', 6], 4),
+      ...pairs(['000', 7], ['000', 7], 4),
+    ];
+    const result = run({ curl: [...waiting, ['200', 0], ['401', 0]] });
+    expect(result.ok, result.output).toBe(true);
+    expect(result.curlCalls).toBe(42);
+    expect(result.output).toMatch(/no TLS or connection yet/);
+  });
+
+  it('gives up after a bounded TLS window, naming the certificate', () => {
+    const result = run({ curl: [['000', 35]] });
+    expect(result.ok).toBe(false);
+    expect(result.curlCalls).toBeGreaterThan(40);
+    expect(result.curlCalls).toBeLessThanOrEqual(120);
+    expect(result.output).toMatch(
+      /::error::The production health check failed: no TLS or connection/,
+    );
+    expect(result.output).toMatch(/certificate/);
+  });
+
+  it('still fails fast (10 attempts) for real HTTP answers that are not the healthy pair', () => {
+    for (const curl of [[['503', 0]], [['200', 0], ['503', 0]], [['404', 0], ['401', 0]]]) {
+      const result = run({ curl });
+      expect(result.ok).toBe(false);
+      expect(result.curlCalls).toBe(20);
+      expect(result.output).toMatch(/::error::The production health check failed/);
+    }
+  });
+
+  it('refuses a 200 whose body is not {"ok":true}', () => {
+    const result = run({ curl: [['200', 0], ['401', 0]], body: '{"ok":false}' });
+    expect(result.ok).toBe(false);
+    expect(result.curlCalls).toBe(20);
+  });
+});
+
+describe('production rollback (M1-27b-c)', () => {
+  const copies = block('ROLLBACK');
+  const script = copies[0] ?? '';
+  const PREVIOUS = '0123abcd-0000-4000-8000-000000000001';
+  const run = (fake, env = {}) =>
+    runScripted(script, scriptedTools(fake), {
+      PREVIOUS,
+      RUN_ID: '1',
+      DROP_PRODUCTION_ORIGIN: 'https://drop.example.test',
+      CLOUDFLARE_API_TOKEN: 'test-token-value',
+      ...env,
+    });
+
+  it('appears once, in the rollback step', () => {
+    expect(copies.length).toBe(1);
+    const production = job('deploy-production');
+    expect(production.slice(production.indexOf('id: rollback'))).toMatch(/ROLLBACK-BEGIN/);
+  });
+
+  it('rolls back, checks the live version and health', () => {
+    const result = run({ live: PREVIOUS, curl: [['200', 0]] });
+    expect(result.ok, result.output).toBe(true);
+    expect(result.github).toContain('result=rolled-back');
+  });
+
+  it('reports a rollback refused across a binding or storage change, and fails for the freeze', () => {
+    const refused =
+      'Invalid deployment: the version 0123abcd cannot be deployed because it has a resource that was modified: the version depends on DropState';
+    const result = run({ rollback: { output: refused, exit: 1 }, live: 'other' });
+    expect(result.ok).toBe(false);
+    expect(result.github).toContain('result=impossible-binding-change');
+    expect(result.output).toMatch(
+      /::error::Rollback impossible across a binding\/storage change[^\n]*new version stays live[^\n]*owner action required/,
+    );
+    expect(result.summary).toMatch(/Rollback impossible across a binding\/storage change/);
+    expect(result.output).not.toContain('test-token-value');
+  });
+
+  it('reports any other rollback failure as failed, not as impossible', () => {
+    const result = run({ rollback: { output: 'Authentication error', exit: 1 } });
+    expect(result.ok).toBe(false);
+    expect(result.github).toContain('result=rollback-failed');
+    expect(result.github).not.toContain('impossible');
+  });
+
+  it('fails when the recorded version is not live afterwards, or there is no target', () => {
+    expect(run({ live: 'other' }).github).toContain('result=rollback-not-live');
+    const none = run({}, { PREVIOUS: '' });
+    expect(none.ok).toBe(false);
+    expect(none.github).toContain('result=no-target');
+  });
+});
+
+describe('freeze (M1-27b-c)', () => {
+  const copies = block('FREEZE');
+  const script = copies[0] ?? '';
+  const run = (fake, env = {}) =>
+    runScripted(script, scriptedTools(fake), {
+      GH_TOKEN: 'test-token-value',
+      REPOSITORY: '4thtech/agentlink',
+      ...env,
+    });
+
+  it('appears once, in the freeze job, with the same token as before', () => {
+    expect(copies.length).toBe(1);
+    expect(job('freeze')).toMatch(/FREEZE-BEGIN/);
+    expect(job('freeze')).toMatch(/GH_TOKEN: \$\{\{ secrets\.DEPLOY_FREEZE_TOKEN \}\}/);
+  });
+
+  it('sets DEPLOY_FREEZE and fails the run on purpose, with a summary line', () => {
+    const result = run({});
+    expect(result.ok).toBe(false);
+    expect(result.output).toMatch(/::error::[^\n]*DEPLOY_FREEZE is set/);
+    expect(result.summary).toMatch(/DEPLOY_FREEZE is set/);
+  });
+
+  it('fails loudly, naming the owner fix, when the token cannot set the variable', () => {
+    const result = run({
+      gh: { output: 'HTTP 403: Resource not accessible by personal access token', exit: 1 },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.output).toMatch(
+      /::error::Setting DEPLOY_FREEZE failed[^\n]*DEPLOY_FREEZE_TOKEN[^\n]*Variables: read and write on 4thtech\/agentlink/,
+    );
+    expect(result.output).toMatch(/HTTP 403/);
+    expect(result.summary).toMatch(/DEPLOY_FREEZE is NOT set[\s\S]*Variables: read and write/);
+    expect(result.output).not.toContain('test-token-value');
+  });
+
+  it('fails when the token is not configured', () => {
+    const result = run({}, { GH_TOKEN: '' });
+    expect(result.ok).toBe(false);
+    expect(result.output).toMatch(/DEPLOY_FREEZE_TOKEN is not configured/);
+  });
+});
