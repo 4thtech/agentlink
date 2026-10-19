@@ -981,7 +981,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
     - `eip712`: `cardAgentSig` by the agent key over the same `AgentCard` digest as `cardSig`; it recovers `agentEvm`; a signature by the owner key in its place is rejected.
     - `fingerprint` (new suite): owner fingerprint from `ownerEvm`, `ownerNostr`, `ownerEnc`, and agent fingerprint from the agent ID, each as the 32-byte digest, the short form (`7F3A·19C2`) and the long form.
     - owner actions: `contact.check` signing vector, and reject vectors for a `pairingDigest` with `0x` or in upper case.
-  - G-7/G-32 vectors (06 §3, 04 §2.5.1; added once the branch `docs/G-7-G-32` merges):
+  - G-7/G-32 vectors (06 §3, 04 §2.5.1; merged in #26; D-90):
     - `policy.set` signing vectors: the 06 §3 defaults in the policy JSON form, and one policy with two `contactRules` (JCS key order inside the rules, the sorted list).
     - Reject vectors (schema): a USD limit as a JSON number (`5`) and as `"5.0000001"`; an unsorted `autoAcceptContacts` or `contactRules`; a duplicate contact; a `ContactRule` with `proofs: {}`; a missing policy key.
     - Encoding suite: the USD amount row of 04 §2.4.1, with accept cases (`"0"`, `"0.1"`, `"5"`, `"999999999.999999"`) and reject cases (`"0.10"`, `"5.0"`, `"5."`, `"05"`, `"1.0000001"`, `"1000000000"`, a JSON number), on a policy path, `maxFeeUsd` and `fee.usd`.
@@ -1367,7 +1367,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-2b · types: policy, approvals, owner actions, proof pack, tool results
 - **Status:** done (4thtech/agentlink#31, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types
-- **Depends on:** M1-2a; gaps G-7, G-32 resolved (branch `docs/G-7-G-32`, pending owner)
+- **Depends on:** M1-2a; gaps G-7, G-32 resolved (D-90)
 - **Spec:** 06 §1 rule 3, §2 (`ProofStatus`), §2.5, §3 (incl. the policy JSON form and per-contact rules); 04 §2.4.1, §2.5, §2.5.1 (lifetimes, skew and nonces), §3.4.1 (approval TTL); 07 §8; 03 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
@@ -1416,7 +1416,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 #### M1-2d · types: G-24 relay schema changes (new)
 - **Status:** done (4thtech/agentlink#71, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/types, tools/vectors, test-vectors
-- **Depends on:** M1-2a; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner)
+- **Depends on:** M1-2a; gap G-24 resolved (D-65)
 - **Spec:** 04 §3.4 (`relays` 2–16), §3.4.1 (`handshake-ack` `relays`), §3.6; 07 §4.3
 - **Invariants:** I-5
 - **Scope:**
@@ -1502,14 +1502,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-3c · contracts: vault EIP-3009 `depositWithAuthorization`
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol
-- **Depends on:** M1-3b, M1-14; gap G-17 resolved
+- **Depends on:** M1-3b, M1-14; gap G-17 resolved (D-89)
 - **Spec:** 05 §2.5; 03 §4.4; 07 §7
 - **Invariants:** I-6, I-10
 - **Scope:**
-  - Calls the token's `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); credits `from` by measured delta; requires `value ≥ minDeposit[token]` and an allowed token; EIP-3009 capability handling per G-17.
+  - Calls the token's `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); credits `from` by measured delta; requires `value ≥ minDeposit[token]` and an allowed token; EIP-3009 capability is an off-chain flag (G-17, D-89, 05 §2.5): the vault keeps none, but measures its balance before and after the call and reverts `DepositMismatch()` unless the increase equals `value`.
 - **Acceptance:**
   - Mock EIP-3009 token tests plus a fork test against Base Sepolia Circle USDC.
   - A front-run of the same authorization cannot redirect funds; a replayed nonce reverts; below minimum reverts `BelowMinDeposit()`.
+  - A token whose call succeeds without moving funds reverts `DepositMismatch()` (D-89).
 
 #### M1-3d · contracts: OCCNotary (records, receipts, freeze)
 - **Status:** done (private repo, 4thtech/occ-v2-contracts#4, merged 2026-10-14) · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -1651,7 +1652,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 05 §9, §9.1; `release-and-deployment.md` §4.2; D-46, D-63
 - **Invariants:** I-6
 - **Scope:**
-  - Owner decision (D-63 (1)): Gnosis Chiado later at the same CREATE3 addresses as Base Sepolia. Proposed (D-63 (2)): the M1-3g script runs unchanged with the same testnet deployer key, campaign label and salts, and the Chiado per-chain config (native xDAI per D-46; stablecoins as verified by M1-14).
+  - Owner decision, "go for the Gnosis Chiado testnet deployment" (D-92, Tali, in chat, 2026-10-19). This records the decision only; the work (the Chiado per-chain config PR, fork dry-run, audit of the deploy diff, then the owner's "go" for the manual run) is separate. Owner decision (D-63 (1)): Gnosis Chiado later at the same CREATE3 addresses as Base Sepolia. Proposed (D-63 (2)): the M1-3g script runs unchanged with the same testnet deployer key, campaign label and salts, and the Chiado per-chain config (native xDAI per D-46; stablecoins as verified by M1-14).
   - Fork dry-run first; the predictions must equal the campaign's address file, which equals the published Base Sepolia addresses; otherwise the run fails closed (05 §9.1).
   - Proposed: deploy soon after Base Sepolia, to shorten the squat window (05 §9.1 control 3). D-71 (1) (15 Oct 2026): the key is a repository secret with process-only protection; the run is a manual `workflow_dispatch` and broadcasts only after the owner's explicit "go"; the workflow refuses mainnet chain IDs (with a test); agents never approve or broadcast on their own.
   - Hard prerequisite of M2-4a (Registry stage on both testnets) and M3-2c (mainnet), so two-chain zero-config selection (D-40), the native-xDAI fee path (D-46) and the Gnosis gas limits run on a live testnet before mainnet. Not an M1-GATE blocker (gate residual in M1-3g, proposed).
@@ -1819,6 +1820,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Expose the verified envelope `from` as the content's sender; with `signer.agentCard` present, verify `cardSig` (owner) and require `agentCard.agentEvm` = the record signer and `agentCard.agentNostr` = `from`; a mismatch makes the content not verified with its own code.
   - Without a card, the result says the sender is not bound to the signer; `verdict` stays `record_only`.
+  - Interim rule (D-95): until agent-card proof-of-possession lands (M1-4d-d), a proof whose sender attribution relies on a card reports `record_only`, not `verified`, with neutral wording (the record exists; the sender is not confirmed).
 - **Acceptance:** a recipient that notarizes a received envelope under its own signer and discloses the key is not shown as the author; a forged or mismatched card is refused with a fixed code.
 
 #### M1-4d-c · chain: proof-pack follow-ups (new, IR-M1-4d-1)
@@ -1831,6 +1833,16 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Check each receipt `txHash` (a transaction receipt read, no log query) or report it as not checked.
   - Give an ERC-1271 refusal at verification time its own code (the account may have changed since the Notary checked it at inclusion), distinct from `signature_invalid`; owner decides how it renders.
   - Optional: cross-check `receiptFlags` with `receiptAt` once 05 §3.3 states the bit layout.
+
+#### M1-4d-d · chain: agent-card proof-of-possession in proof packs (new, D-95)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain/src/verify, packages/types (pack schema), docs/foundation/07 §8
+- **Depends on:** M1-4d-b; a spec change to 07 §8 and 04 §2.9 (an agent key signature over the pack's binding), taken first in its own docs PR
+- **Spec:** 07 §8; 04 §2.4, §2.9, §3.1.1; 02 J5
+- **Invariants:** I-5
+- **Scope:**
+  - Let a pack carry proof that the card's agent key took part, so a card alone no longer attributes the sender. Until this lands, the interim rule of D-95 holds: a proof whose sender attribution relies on a card reports `record_only`, not `verified`, in neutral wording.
+- **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only`; a pack with a valid proof becomes `verified`; a forged or replayed proof is refused with a fixed code (RED commit).
 
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -1876,7 +1888,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-5b · transport-nostr: relay pool, publish, NIP-11, NIP-42, outbox
 - **Status:** done (4thtech/agentlink#59, merged 2026-10-14; IR-M1-5b-1 follow-ups in M1-5b-b and M1-5b-c) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr
-- **Depends on:** M1-5a; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner); gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
+- **Depends on:** M1-5a; gap G-24 resolved (D-65); gap G-9 resolved (branch `docs/G-9-store-schema`, pending owner)
 - **Spec:** 07 §4.2 (relays, reliability, size, NIP-42), §4.3 (relay routing and owner copies, G-24), §3.2 (`outbox`); 04 §3.5; 06 §6
 - **Invariants:** I-3, I-7
 - **Scope:**
@@ -2431,7 +2443,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-7j · core: relay changes and the owner card-update (G-24) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (D-73 (5): it serves the owner surfaces and `relays set`, M1-9n; neither J8 nor J9 needs it)
 - **Repo/path:** agentlink · packages/core
-- **Depends on:** M1-7a, M1-7h, M1-5b; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner)
+- **Depends on:** M1-7a, M1-7h, M1-5b; gap G-24 resolved (D-65)
 - **Spec:** 07 §3 (relay columns), §4.3; 04 §2.6, §3.4.1 (owner `card-update`); D-39, D-40
 - **Invariants:** I-4, I-9
 - **Scope:**
@@ -2813,7 +2825,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/relays.ts`)
 - **Depends on:** M1-9b, M1-7j
-- **Spec:** 06 §8 (†); 07 §3, §4.3; 04 §2.6; G-24
+- **Spec:** 06 §8 (†); 07 §3, §4.3; 04 §2.6; G-24 (resolved, D-65)
 - **Invariants:** I-4
 - **Scope:** `relays set <url>…` † (Advanced only, G-24): the relay-change entry point of M1-7j; prints the 30-day overlap and is refused while one is running.
 - **Acceptance:** fails with piped stdin and no code; refused during an overlap; a same-list rotation is allowed (RED commit).
@@ -2990,13 +3002,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9f · Claude Desktop one-click extension bundle
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli/desktop-extension
-- **Depends on:** M1-9c, M1-16; DECISION NEEDED: build, signing and distribution (`release-and-deployment.md` §2)
+- **Depends on:** M1-9c, M1-16; build, signing and distribution decided (D-91, `release-and-deployment.md` §2)
 - **Spec:** 02 F-01; 06 §7
 - **Invariants:** I-1
 - **Scope:**
-  - Bundle in the current Claude Desktop extension format (verified at build time), pinned to a published package version with provenance, no bundled secrets; signed if the format supports it.
+  - An OPTIONAL convenience package for one harness (D-91): the product stays harness-agnostic, and every MCP harness, Claude Desktop included, can use the same `npx -y @4thtech-io/agentlink` server (06 §7). Bundle in the current Claude Desktop extension format (verified at build time), built by `release.yml` from the npm release, pinned to that version, self-contained (per-platform native modules), no bundled secrets; attached to the GitHub release with its SHA-256 and a build provenance attestation; signed when the format supports it (beta: a 4thTech key, self-signed allowed). Directory listing: M3. If native builds slip past the M1 gate, M1 ships without it and `agentlink init` / the JSON config remain.
 - **Acceptance:**
-  - A fresh Claude Desktop installs the bundle and `agentlink_status` returns `ok`; bundle hash published with the GitHub release.
+  - A fresh Claude Desktop installs the bundle and `agentlink_status` returns `ok`; bundle hash published with the GitHub release; an install smoke test on macOS and Windows (D-91).
 
 #### M1-9g · Tool summaries aligned with the D1 copy sheet
 - **Status:** done (4thtech/agentlink#102, merged 2026-10-15; the copy sheet; the tool summaries follow M1-9c) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -3042,9 +3054,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - after an on-chain revert, one resubmission without the failing items;
     - a signer that caused a revert is submitted alone for `soloAfterRevertSeconds` (default 3 600, 05 §3.3);
     - per-item status `recorded`, `skipped` or `failed`.
-  - Pre-audit AUDIT-FABLE-OCCv2-1 rules (07 §7; proposed, owner confirms at merge; must hold before the submitter serves public beta traffic):
-    - FA-1: an item whose signer has code at simulation time (ERC-1271, including an EIP-7702 delegation) is submitted solo, in a transaction with no other signer's items (default); the optional mode puts at most one such item in a batch and, after a revert, resubmits the rest once without it. The cooling-off applies from a code-bearing signer's first item; the after-revert cooling-off still applies to every signer; per-IP limits stay.
+  - Pre-audit AUDIT-FABLE-OCCv2-1 rules (07 §7; accepted, D-93 and D-94; must hold before the submitter serves public beta traffic):
+    - FA-1: an item whose signer has code at simulation time (ERC-1271, including an EIP-7702 delegation) is submitted solo, in a transaction with no other signer's items (default); the optional mode puts at most one such item in a batch and, after a revert, resubmits the rest once without it. Contract and multi-signer (code-bearing) signers are solo from their first item (D-93); the cooling-off applies from a code-bearing signer's first item; the after-revert cooling-off still applies to every signer; per-IP limits stay.
     - FA-1: every transaction's gas limit is its simulated gas plus a fixed margin (setting).
+    - FA-3 defaults (D-94, 07 §7): 600 items per IP per hour; 120 new items per signer per hour; 24 h retention; 25,000 gas margin; `maxItemGas` 700,000 (an item above it fails before any charge or send; to be lowered after M3-1a).
     - FA-3: an item already on-chain in identical form at simulation time is reported `skipped` with the existing `recordId` and not transmitted; such items count against the per-IP limit, not the signer's.
   - Per-signer and per-IP rate limits and per-chain transaction-nonce serialisation in Durable Objects; gas keys only from Worker secrets.
   - The submitter uses viem only through `@4thtech-io/chain` (M0-10 policy: `apps/submitter` is not in the viem zone); needs from chain (simulation, signature checks, gas-key wallet) are added to `@4thtech-io/chain`, not by widening the zone.
@@ -3071,7 +3084,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 05 §9 (faucet); 03 §4.4; 10 M1-10; `release-and-deployment.md` §4.5
 - **Invariants:** I-3
 - **Scope:**
-  - Endpoint calling `depositFor(agent, token, amount)` on Base Sepolia and Chiado only (hard-coded testnet chain-ID allowlist); its own key. Chiado is configured only once it is deployed (M1-3j, D-63); never against a predicted Chiado vault address before that.
+  - Endpoint calling `depositFor(agent, token, amount)` on Base Sepolia and Chiado only (hard-coded testnet chain-ID allowlist); its own key. Chiado is configured only once it is deployed (M1-3j, D-63, D-92); never against a predicted Chiado vault address before that.
   - Rate limits per agent address and per IP plus a global daily cap (new identities are free, so per-agent limits alone are not enough).
 - **Acceptance:**
   - A mainnet chain ID is rejected (test); a repeat inside the window is rejected; the global cap holds.
@@ -3079,11 +3092,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-10c · submitter and faucet deploy pipeline (new sub-task)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · .github/workflows/deploy-submitter.yml, apps/submitter/wrangler config
-- **Depends on:** M1-10a, M1-10b, M0-2g; gap G-40 resolved
+- **Depends on:** M1-10a, M1-10b, M0-2g; gap G-40 resolved (D-88)
 - **Spec:** `release-and-deployment.md` §1, §4.5, §5, §8; D-28
 - **Invariants:** I-3, I-7
 - **Scope:**
-  - CI-only `wrangler deploy`; staging on `workers.dev` previews; beta hostname `submit.agentlink.4thtech.io` (testnets) per the environment mapping fixed in G-40.
+  - CI-only `wrangler deploy`; staging on `workers.dev` previews (CI and smoke only); production `submit.agentlink.4thtech.io` serves the testnet beta (D-88): one Cloudflare account, Wrangler `--env staging` and the default (production), Workers `agentlink-submitter-staging` and `agentlink-submitter`, mirroring the drop; gas and faucet keys separate per environment.
   - Gas and faucet keys set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (health + simulated notarize per chain); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
@@ -3185,14 +3198,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-31-1 L-2..L-5, 2026-10-17): add a `LOCALHOST:<port>` Host test; note the start-time IPv4 decision in D-79; set common headers on the 503 stub; fix the stale example in `packages/core/src/approval-channel.ts:30`.
 
 #### M1-11a-b · local UI: wiring and remember-contact follow-ups (new, follow-up from #256)
-- **Status:** done (4thtech/agentlink#267, merged 2026-10-18; wiring; "Remember for this contact" still waits for G-32) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#267, merged 2026-10-18; wiring; "Remember for this contact" is the open item, G-32 resolved by D-90) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (local UI bundle), packages/mcp
-- **Depends on:** M1-11a, M1-9h; G-32 for the last item
+- **Depends on:** M1-11a, M1-9h; G-32 resolved (D-90)
 - **Spec:** 08 §1; 11 §6.2, §8; 06 §3
 - **Invariants:** I-4, I-5
 - **Scope:**
   - Wire the local UI into `agentlink mcp` and put its URL in `pending_approval` results, pinned to the local UI origin (see the M1-9d hand-off above). `agentlink ui` is covered by M1-9h and is not repeated here.
-  - "Remember for this contact" after G-32 (proof approvals only, same presence gesture, signed `policy.set`).
+  - "Remember for this contact" (G-32, D-90; proof approvals only, same presence gesture, signed `policy.set`).
 - **Acceptance:**
   - A `pending_approval` result carries the UI `url`; a test checks the origin pin; "Remember for this contact" adds the contact rule through a `policy.set` whose refusal or success is reported accurately.
 
@@ -3920,7 +3933,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-2d · console: activity, threads, files, proofs, credits view
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/console
-- **Depends on:** M2-2b, M1-7h, M1-4d; gap G-24 resolved (branch `docs/G-24-owner-copy-relays`, pending owner)
+- **Depends on:** M2-2b, M1-7h, M1-4d; gap G-24 resolved (D-65)
 - **Spec:** 08 §2.2 (Activity, Threads, Proofs, Credits); 07 §4.2 (owner copies), §4.3 (relay lists, G-24), §3.6 (`owner_agents`); 04 §3.1.1 (owner read path, where the owner shows a copy); 11 §6.3
 - **Invariants:** I-2, I-5, I-9
 - **Scope:**
@@ -4911,7 +4924,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
    *Was:* 05 §3.2; 07 §7. Whether one failing item reverts `notarizeBatch`/`acknowledgeBatch` was unspecified. The submitter batches across signers, so one item (for example credits spent between simulation and inclusion) could grief the rest. *Blocks:* M1-3d, M1-10a.
 5. **G-5 (M) J1 key storage wording.** RESOLVED by 02 §5 J1 steps 2–3: `init` puts only the agent keys in the OS keychain (step 2); the owner key is created and wrapped in the setup step (step 3, 04 §2.2). *Was:* J1 step 2 stored "owner and agent keys" in the OS keychain, against 04 §2.2. *Blocked:* M1-9a, M1-12b.
 6. **G-6 (H) Policy fail-open.** Resolved for the fallback by branch `docs/m12b-spec-fixes` (pending owner; proposed, owner confirms at merge; review IR-M1-2b-1). The version in an owner-signed object and the KeyStore high-water mark were already in 04 §2.5.1. 06 §3 (last paragraph) now says that once any policy version has been applied, a missing, unsigned, tampered, rolled-back or unparseable policy never falls back to the defaults: every paid action, commitment and owner-gated action needs the owner's approval, unknown senders are queued, no contact rule or auto-accept applies, and the owner is told to confirm the policy again. A `deny` that can no longer be read becomes `approval`, never `allow`. *Was:* 06 §3 (last paragraph): unsigned or tampered policies fell back to defaults, which can be looser than the owner's policy (e.g. `proofs.notarize: deny` → `allow`), and deleting the signed row downgraded policy. *Blocks:* M1-7d.
-7. **G-7 (M) Lifetimes.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).
+7. **G-7 (M) Lifetimes.** **RESOLVED (D-90)** by #26 (confirmed by Tali in chat, 2026-10-19). The values are in 04 §2.5.1 (lifetimes, skew and nonces), 04 §3.4.1 (approval TTL) and 06 §3 (daily budget window).
    - Skew is 300 s and applies to `issuedAt` only; expiry has no skew.
    - Maximum lifetime per op: `approval.decide` until the request's `expiresAt`; `approval.cancel` 7 days, so a cancel from the console still reaches a sleeping agent; `policy.set` and `contact.check` 24 h, since rollback is stopped by `version`; later ops 10 minutes unless their task says otherwise, never above 7 days.
    - Nonces are kept 30 days after they are applied. `agent.revoke` is exempt, because it is idempotent.
@@ -4948,7 +4961,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14; the Workers egress part stays open for M2-3b.
 15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
 16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d.
-17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". *Proposed:* off-chain flag (client + submitter), contract relies on the token call reverting. *Blocks:* M1-3c.
+17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". **RESOLVED (D-89, Tali, in chat, 2026-10-19, option a):** the flag is off-chain (per-chain config, read by the client and the submitter); the contract keeps no flag but requires an allowed token and `value ≥ minDeposit`, measures its balance before and after `receiveWithAuthorization`, and reverts `DepositMismatch()` unless the increase equals `value` (05 §2.5, §7). Contract work: M1-3c, in the private repo.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
 20. **G-20 (M) Revocation typed data.** **RESOLVED (D-81, Tali, in chat, 17 Oct 2026):** 05 §4 `Revocation` struct, owner-signed (EIP-712, OCC v2 chain domain, ERC-1271 accepted); random single-use nonces per owner shared with `Registration` (`usedNonces[ownerEvm][nonce]`); reverts on expiry, reuse or a `keyEpoch` other than the stored one; revoke works while paused. *Was:* 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i-b (vectors), M2-4a.
@@ -4963,7 +4976,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 29. **G-29 (M) Owner-operation payload bodies.** Resolved by PR #10 (D-58, confirmed by the owner at merge): one owner-signed object, `SignedOwnerAction` (04 §2.5.1, BIP-340 by the owner Nostr key over a tagged hash, bound to the agent's EVM address, with nonce and expiry), is produced by the local UI, the CLI and the console; `approval`, `policy` and `revoke` envelopes only carry it. Bodies for `approval-request`, `approval`, `policy`, `revoke`, `card-update` and `handshake-ack` in 04 §3.4.1, with receiver rules and the rule that no MCP tool can create them. Lifetimes stay with G-7, policy fail-closed with G-6. *Was:* 04 §3.4 listed these types without body schemas. *Blocks:* M1-2a, M2-2e.
 30. **G-30 (M) Native-coin price source.** RESOLVED for launch by D-46: fees are stablecoin-only, every fee token is valued 1:1, and 07 §6.2 needs no price endpoint. A USD price source for native coins returns with the `PRICE_UPDATER` work in M4-EPIC (12 §3.4). *Was:* 07 §6.2 "public price endpoint" unspecified (third-party egress, integrity). *Blocked:* M1-4b, M3-3.
 31. **G-31 (L) Linux without Secret Service.** RESOLVED by D-54 (04 §2.8, 07 §9): the OS keychain stays the default; without one, `needs_setup` unless the user opts in, in an interactive terminal, to a passphrase-locked file KeyStore (Argon2id + AES-256-GCM, unlocked by the MCP server from a passphrase file or an environment variable); the owner key is never unlocked non-interactively. Built in M1-8f. *Was:* 04 §2.2; 03 §6 (headless servers, containers, WSL); proposed `needs_setup` by default and a documented, weaker passphrase-wrapped file store as opt-in. *Blocked:* M1-8a.
-32. **G-32 (M) Per-contact policy overrides.** Resolved by branch `docs/G-7-G-32` (pending owner; proposed, owner confirms at merge), in 06 §3 (policy JSON form, per-contact rules) and 11 §8.
+32. **G-32 (M) Per-contact policy overrides.** **RESOLVED (D-90)** by #26 ("Remember for this contact" for proof approvals only; confirmed by Tali in chat, 2026-10-19), in 06 §3 (policy JSON form, per-contact rules) and 11 §8.
    - The policy gains `contactRules`: up to 256 entries `{contact, proofs: {notarize?, perActionMaxUSD?}}`, sorted by agent ID. They are proofs only. The global `deny` and `dailyBudgetUSD` always win, and the rules are read only from the verified policy.
    - "Remember for this contact" is a second signed object, a full `policy.set` (version + 1), made under the same presence gesture as the approval. It is offered only on proof approvals raised by `notarize: approval` or the per-proof limit, and only with Approve.
    - It is removed from the new-contact card: an invite is used once and a contact is paired once, so nothing is left for a rule to remember. A per-owner rule ("connect with this owner's other agents") would widen who connects without asking, and is not proposed.
@@ -4977,7 +4990,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 37. **G-37 (L, process) PR title pattern.** `pr-hygiene.yml` accepts `OPS-<n>` and `M<n>-<n>[a-z]`, but `development-process.md` §12.2 and `audit-rules.md` §7 use `OPS-L<n>` and `M<n>-GATE`. *Blocks:* PRs for OPS-L, gate and design-drop cards (fixed by M0-15; design drops may also use the `DOCS` prefix).
 38. **G-38 (M, decision) D-25 scope.** RESOLVED: D-25 is decided (decision log, 12 Oct 2026): continuous delivery with auto-merge behind `review-gate`, automatic staging deploys, automatic rollback, and one owner approval click for production (`talirezun` required reviewer on `production` and `npm-publish`, "Prevent self-review" off; click superseded by D-52 for services, npm `latest` keeps it). `release-and-deployment.md` and `ci-cd.md` are aligned. Remaining work is owner setup: M0-17 (ruleset with auto-merge), M0-18 (environments), M0-19 (`DEPLOY_FREEZE`).
 39. **G-39 (M) Pause scope.** Resolved by PR #11 (D-59, confirmed by the owner at merge), with G-3; amended 14 Oct 2026 (D-61): receipts are also blocked. Pause blocks charges, deposits, notarization, receipts and registration, and never `withdraw`, `withdrawIntegrator`, `sweep` or Registry `revoke` (05 §5.1). *Was:* 05 §2.5 said pause never blocks payer withdrawals but was silent on `sweep` and `withdrawIntegrator`. *Blocks:* M1-3b.
-40. **G-40 (M, process) Beta hostnames vs environments.** D-28 puts beta services on `*.agentlink.4thtech.io` and staging on `workers.dev`; `release-and-deployment.md` §1 maps testnets to staging and production to mainnets. Which environment (and approval) serves the testnet submitter, faucet and console used by M1/M2 testers is undefined. *Proposed:* a "beta" environment (testnets, beta hostnames, owner-approved promotion). *Blocks:* M1-10c, M2-2h.
+40. **G-40 (M, process) Beta hostnames vs environments.** D-28 puts beta services on `*.agentlink.4thtech.io` and staging on `workers.dev`; `release-and-deployment.md` §1 maps testnets to staging and production to mainnets. Which environment (and approval) serves the testnet submitter, faucet and console used by M1/M2 testers is undefined. **RESOLVED (D-88, Tali, in chat, 2026-10-19, option a):** no separate beta environment. Staging (`workers.dev`) serves CI and smoke tests only. Production (`*.agentlink.4thtech.io`) is the beta: it serves testnets in M1–M2 and mainnets from M3 (release §1), with automatic promotion after staging smoke (D-52). One Cloudflare account; Wrangler environments `staging` and the default (production); Workers `agentlink-<name>-staging` and `agentlink-<name>`. Gas and faucet keys are separate per environment.
 41. **G-41 (L) D-12 propagation.** The decision log now records MIT (D-12); the private internal docs predate it. *Proposed:* align them privately; every public `package.json` and the cloud-agent template carry MIT. *Blocks:* M0-2d (check script), M2-3d (template licence).
 42. **G-42 (H, note) Desktop owner presence as the G-1 mitigation.** D-36; 04 §2.5; 08 §1. D-36's desktop model (a signed app, a native approval window, the owner key in the OS keychain gated by OS biometrics such as Touch ID or Windows Hello) is the intended mitigation for G-1: the OS, not a `localhost` web origin, shows the presence prompt, and keychain access bound to the app's signing identity is meant to stop a tampered installation or another same-user process from unlocking the owner key. It is not yet specified or proven: Linux has no equivalent OS binding, and `npx` installs keep G-1's residual risk. *Proposed:* M2-11a's threat model states exactly which G-1 paths the desktop app closes, per OS; 04 §2.5 is updated when the desktop app ships, and only then is G-1 closed for desktop installs. G-1 stays open until then. *Blocks:* M2-11a, M2-11b, M2-11c, M2-11d.
 43. **G-43 (M) `fee_quote` split.** RESOLVED by 06 §2.4, and since D-53 by 06 §2.1: `agentlink_status` `prices` returns `{action, usd, protocolUsd, integratorUsd, payFrom}` (the former `fee_quote` folded in), and `ProofStatus.fee` carries the same split, as D-45 and 12 §4.3, §5 require. *Was:* `fee_quote` returned only `{chain, token, amount, usd, payFrom}`. *Blocked:* M1-9d.
@@ -5032,13 +5045,12 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | OPS-L6, OPS-L7 | Decide whether PollinationX stays live |
 | OPS-L8 | Rotate every live credential found |
 | M1-3g | Testnet deployer key and testnet Safe; fund with low balances; trigger the private-repo deploy workflow for Base Sepolia (D-63) (no testnet explorer verification: D-11, D-19). Keep its offline backup, never import it into a browser extension or hot wallet, clear any terminal scrollback or history that showed it, and set up the deployer monitoring (proposed). D-71 (1): this key is for testnets only; mainnet uses a separate key from your Trezor hardware wallet |
-| M1-3j | Trigger the Chiado deploy with the same testnet deployer key (D-63). D-71 (1): keep the key as a repository secret of the private repo (GitHub Free, no environment); trigger each run by manual dispatch and give the "go" before broadcast; keep write access to the owner and named engineers; delete the secret when the testnets end |
+| M1-3j | Decided (D-92): go for the Chiado testnet deployment. Trigger the Chiado deploy with the same testnet deployer key (D-63). D-71 (1): keep the key as a repository secret of the private repo (GitHub Free, no environment); trigger each run by manual dispatch and give the "go" before broadcast; keep write access to the owner and named engineers; delete the secret when the testnets end |
 | M1-3f | Decided by D-83 (18 Oct 2026): G-10 (the ABI package is private and in-repo, not published). No owner action left |
 | M1-3k, M3-1a | Decided by D-66: EIP-7702-delegated agent keys, option (a) now and (b) before mainnet (G-47, M1-3l); the ERC-1271 gas bound is required (FA-1). No owner action left |
 | M1-5c, M1-7b follow-ups | Decided by D-71 (15 Oct 2026): G-49 (M1-5f) and G-51 (M1-7b-b). No owner action left |
 | M1-7e-2 | **DECISION NEEDED:** whether an owner-signed revoke from a blocked key is dropped (IR-M1-7e-2-1 D1-F01; see the card)
-| M1-9f | **DECISION NEEDED:** Claude Desktop bundle build, signing and distribution |
-| M1-10c | Set submitter and faucet keys with `wrangler secret put`; fund them; approve promotions; **DECISION NEEDED:** Cloudflare staging account vs environments, environment names, beta environment (G-40) |
+| M1-10c | Set submitter and faucet keys with `wrangler secret put`; fund them; approve promotions. Decided (D-88): one Cloudflare account, environments `staging` and production, no separate beta environment |
 | M1-13a | **DECISION NEEDED:** where e2e runs; provide harness API keys and testnet funds outside PR workflows |
 | M1-17 | Choose audit firms, approve budget, sign engagements, decide scope (`packages/node`, console identity) |
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |

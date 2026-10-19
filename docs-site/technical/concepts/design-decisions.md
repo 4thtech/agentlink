@@ -89,6 +89,12 @@ The pack is untrusted content: every value taken from it is shown as untrusted, 
 
 **Availability.** Decided design, in development (card M1-9d).
 
+### A card alone does not confirm the sender, for now (D-95)
+
+Until agent-card proof-of-possession is built (its own card, M1-4d-d), a proof pack whose sender attribution relies on a card reports `record_only`, not `verified`. The record, its signature and its receipts are still checked on their own. The result says in neutral words that the record exists and that the pack does not confirm the sender.
+
+**Availability.** Decided design, in development (card M1-4d-b).
+
 ### Revoking an agent (D-81)
 
 An owner revokes an agent by signing an EIP-712 `Revocation` with four fields: `agentEvm`, `keyEpoch` (uint32), `nonce` and `deadline`. The contract checks that the signer is the stored owner, that the key epoch matches, and that the nonce is unused. Registration and revocation share one set of single-use random nonces per owner. Revocation also works while the contracts are paused, so an owner can always cut off a compromised agent. Revoking an unknown or already-revoked agent reverts.
@@ -104,6 +110,34 @@ Workspace packages are named `@4thtech-io/*` (`crypto`, `core`, `node`, `types`,
 ### The contracts ABI package stays private (D-83)
 
 `@4thtech-io/occ-v2-abi` is a private workspace package. It is built from the ABI files, per-chain addresses and checksum manifest that the private contracts repository exports with each tagged release, and from the shared test vectors. It is bundled into the CLI and **never published to npm** as a separate package. CI checks the imported files against the release manifest and fails if any Solidity source is present in this repository. The chain client pins the imported release exactly, and dependency updates for it are never merged automatically.
+
+## Contracts and the submitter
+
+### Gasless deposits: the flag is off-chain, the vault checks the amount (G-17, D-89)
+
+Whether a token supports gasless authorization (EIP-3009) is a flag in the per-chain configuration, read by the client and the submitter, which never offer the path for an unflagged token. The vault stores no flag. Its `depositWithAuthorization` requires an allowed token and a deposit at or above the minimum, measures its own balance before and after the token call, and reverts with `DepositMismatch()` unless the increase equals the stated value. A token that accepts the call but moves nothing therefore cannot credit anyone. **Availability.** Decided design; the contract work (M1-3c) is in the private contracts repository.
+
+### Which signers share a transaction, and the submitter defaults (FA-1, FA-3, D-93, D-94)
+
+The submitter sends a signer that has code (a smart-contract account, or an address with an EIP-7702 delegation) alone in its transaction from its first item, so one such signer cannot cause other signers' items to be lost. Its defaults, each a setting: 600 items per IP per hour; 120 new items per signer per hour; 24 hours retention of finished items; a 25,000 gas margin over the simulated gas; and a ceiling of 700,000 gas per item, to be lowered once the audited bound on signature-check gas lands (M3-1a). Items already on-chain are reported as skipped and count against the IP, not the signer. **Availability.** Decided design, in development (card M1-10a).
+
+### Per-contact proof rules and lifetimes are confirmed (G-7, G-32, D-90)
+
+The lifetimes of owner-signed operations and approvals, the rolling 24-hour proof budget, and the per-contact proof rules created by "Remember for this contact" (proof approvals only, never budget, commitments, files or new contacts) are accepted as specified. A global "never" and the daily budget always win over a remembered rule.
+
+## Delivery
+
+### Production is the beta (G-40, D-88)
+
+There is no separate beta environment. Staging (`workers.dev`) serves CI and smoke tests only. Production (`*.agentlink.4thtech.io`) serves the testnet beta in the first milestones and mainnets from M3, with automatic promotion after the staging smoke test. One Cloudflare account hosts both Wrangler environments, and gas and faucet keys are separate per environment.
+
+### The Claude Desktop extension is optional (M1-9f, D-91)
+
+A one-click Claude Desktop extension is an optional convenience package for one harness. The product stays harness-agnostic: every MCP harness, Claude Desktop included, uses the same `npx -y @4thtech-io/agentlink` server. The bundle is built in CI from the npm release and pinned to its version, is self-contained, and is attached to the GitHub release with its SHA-256 and a build provenance attestation. It is signed when the format supports it (self-signed in the beta). A directory listing is planned for M3.
+
+### The Gnosis Chiado testnet deployment (M1-3j, D-92)
+
+The owner decided to go ahead with the Chiado testnet deployment at the same addresses as Base Sepolia. The work is carded separately.
 
 ## Reading further
 
