@@ -1791,6 +1791,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Results are trusted only after reading chain state, never from submitter responses alone.
   - Follow-up (IR-M1-4b-1 L-3): before sending `buildDeposit`'s steps, read the current allowance; for a token that reverts on a nonzero-to-nonzero `approve` (USDT style), approve 0 first. Check the amount against the vault's `minDeposit` where the top-up path needs it (gasless top-up, M1-3c).
   - Follow-up (IR-M1-4b-1 L-2): `ChainError` and `ChainInputError` text says "chain" and "contract"; the tool layer maps their codes to 11 §5 copy (no "chain", "gas" or "transaction").
+  - Follow-up (IR-M1-26-1): after every paid action, and after a refusal for missing credits (`InsufficientCredits` or a reverted simulation), call the chain selector's `clear()` and select again once; never pay from a cached funded detection without that re-read on failure.
 - **Acceptance:**
   - Testnet integration: notarize via submitter and via direct mode; receipts both ways.
   - Fake-submitter tests (wrong tx hash, silent drop, modified record) are detected via chain reads and fail over.
@@ -1840,9 +1841,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - The client ships the supported-chain list (07 §6.1); detects where the agent has credits or stablecoin balance; picks the chain automatically: the default chain if funded, otherwise the cheapest funded one; nothing funded → `needs_credits`. Top-ups route to the cheapest supported chain.
   - Replaces the earlier M1-4b payment-choice order. A user RPC override or chain choice exists only under Advanced (local UI M1-11c, CLI flag); the default UX never asks for a chain.
+- **Acceptance:**
+  - Table-driven tests (fork or mocked RPC) for the selection order: default funded; default empty and two others funded (cheaper wins); credits vs stablecoin balance only; nothing funded → `needs_credits` with a top-up route to the cheapest chain; an RPC failure on one chain neither blocks nor picks it.
+  - Split (IR-M1-26-1): the CLI and MCP output snapshots and the proof-pack check move to M1-26-b.
+
+#### M1-26-b · cli/core: wire automatic chain selection into the tools (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli, packages/core
+- **Depends on:** M1-26, M1-4d, M1-7g
+- **Spec:** D-40; 02 F-51; 06 §2.1 (`credits`, `agentAddress`, `topUpUrl`), §2.4 (`chain?`, `needs_credits`); 07 §6.3, §8; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - The paid tools and `agentlink_status` use `selectPayingChain`; `needs_credits` carries the top-up link built from the route (amount, agent address); the `chain?` override is honoured only under Advanced.
   - Proof packs carry their chain, so `verifyProofPack` resolves the chain from the shipped list without setup.
 - **Acceptance:**
-  - Table-driven tests (fork or mocked RPC) for the selection order: default funded; default empty and two others funded (cheaper wins); credits vs stablecoin balance only; nothing funded → `needs_credits` with a top-up link to the cheapest chain; an RPC failure on one chain neither blocks nor picks it.
   - Snapshot tests of CLI and MCP default outputs contain no chain prompt and no chain name outside Advanced; a proof pack verifies with no chain configured.
 
 #### M1-5a · transport-nostr: gift wrap / unwrap

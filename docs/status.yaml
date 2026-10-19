@@ -165,6 +165,10 @@ areas:
         state: done
         prs: [279]
         summary: "The client quotes a proof or a registration from the fee vault itself and shows it in USD, with the AgentLink fee and any app fee separate; reads the agent's prepaid credits on every supported chain; and prepares a direct top-up. Only stablecoin fee tokens are priced or shown, and credit history counts only real events from the fee vault. No endpoint address can be read from the client object, and a client is built only over the address-checked fetch (M1-4b). Submission and proof checks follow (M1-4c, M1-4d)."
+      - name: "Automatic chain selection"
+        state: in-progress
+        prs: [284]
+        summary: "In development, not user-facing yet. The client checks the agent's credits on every supported network at once and picks where a proof is paid with no question to the user: the default network when it has enough credits, otherwise the cheapest one that does, otherwise a \"credits needed\" answer naming where to add them and how much is missing. A network that does not answer in time is skipped, never chosen, and only test networks are used in this release (M1-26). Wiring into the CLI and MCP tools follows (M1-26-b)."
   - id: core
     title: "Core (@4thtech-io/core)"
     intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."

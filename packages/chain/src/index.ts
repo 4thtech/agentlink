@@ -8,6 +8,7 @@ export { loadOccV2Contracts, type OccV2Contracts } from './occ-v2.js';
 export * from './clients/index.js';
 export * from './typed-data/index.js';
 export * from './fees/index.js';
+export * from './select/index.js';
 export * from './verify/index.js';
 // The salt generator stays internal: only buildRecord draws salts (04 §5, D-61).
 export {
