@@ -357,9 +357,10 @@ describe('agentlink_notarize (06 §2.4)', () => {
     expect(r.structured.status).toBe('needs_credits');
     expect(r.structured['agentAddress']).toBe(A);
     const url = r.structured['topUpUrl'] as string;
-    expect(url.startsWith(`${PAY_ORIGIN}/`)).toBe(true);
-    expect(url).toContain(A);
-    expect(url).not.toMatch(/base|sepolia|usdc|84532/i);
+    // IR-M1-9d-2 M3: 08 §1 gives no link form, so the plain deposit origin: no amount, no
+    // network, no token in the link; the agent address travels as its own field.
+    expect(url).toBe(`${PAY_ORIGIN}/`);
+    expect(r.structured.nextStep).toContain(A);
     expect(r.structured.nextStep).toContain(url);
     expect(r.structured.summary).toContain('$0.10');
     expect(dump(r)).not.toMatch(/wallet|\bgas\b|transaction|USDC|sepolia/i);
@@ -892,6 +893,46 @@ describe('notarize on agentlink_send (06 §2.2: the proofs policy as for agentli
     });
     expect(calls.log).toEqual(['send', 'notarize']);
     expect(calls.notarize).toEqual([{ envelopeId: ENVELOPE }]);
+  });
+
+  // IR-M1-9d-2 M2: once the message went out, a failing proof step never reads as "nothing was
+  // done": the send fields stay, `proof.status` is error with a fixed code.
+  it('a plain error thrown in the proof step after a successful send keeps the send', async () => {
+    const { client } = fake({
+      notarize: () => {
+        throw new Error('boom at https://rpc.example/KEY-CANARY');
+      },
+    });
+    const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+    expect(r.structured).toMatchObject({
+      status: 'error',
+      envelopeId: ENVELOPE,
+      thread: THREAD,
+      proof: { status: 'error' },
+    });
+    expect(r.structured.code).toMatch(/^[A-Z_]+$/);
+    expect(r.structured.code).not.toBe('INTERNAL');
+    expect(r.structured.summary).not.toMatch(/nothing was (done|sent)/i);
+    expect(r.structured.nextStep).toContain('agentlink_notarize');
+    expect(r.structured.nextStep).toContain(ENVELOPE);
+  });
+
+  it('APPROVAL_INVALID and other refusals after a successful send keep the send', async () => {
+    for (const code of ['APPROVAL_INVALID', 'POLICY_DENIED', 'SOMETHING_NEW']) {
+      const { client } = fake({ notarize: () => ({ status: 'rejected', code }) as never });
+      const r = await call(
+        'agentlink_send',
+        { to: B, text: 'hi', notarize: true, approvalId: APPROVAL, clientRequestId: 'req-2' },
+        client,
+      );
+      expect(r.structured, code).toMatchObject({
+        status: 'error',
+        envelopeId: ENVELOPE,
+        proof: { status: 'error' },
+      });
+      expect(r.structured.code, code).not.toBe('INTERNAL');
+      expect(r.structured.summary, code).not.toMatch(/nothing was (done|sent)/i);
+    }
   });
 
   it('without notarize nothing is recorded', async () => {
