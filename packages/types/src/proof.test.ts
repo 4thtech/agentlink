@@ -135,6 +135,16 @@ describe('ProofPack v1 (07 §8)', () => {
     expectRoundTrip(proofPackSchema, { ...proofPack(), signature: `0x${'a8'.repeat(96)}` });
   });
 
+  it("a 65-byte ERC-1271 signature in a non-canonical form is accepted; the EOA check is the verifier's (04 §2.4.1)", () => {
+    // As the Notary's SignatureChecker: such bytes never pass ECDSA recovery, only an account's
+    // isValidSignature. @4thtech-io/chain verifyProofPack refuses them for an EOA signer.
+    expectRoundTrip(proofPackSchema, {
+      ...proofPack(),
+      signature: `0x${'3c'.repeat(32)}${'ff'.repeat(32)}1b`,
+    });
+    expectRoundTrip(proofPackSchema, { ...proofPack(), signature: `0x${'3c'.repeat(64)}00` });
+  });
+
   it.each([
     ['type', ['type'], 'agentlink.proof.v2'],
     ['version 2', ['version'], 2],
@@ -145,8 +155,6 @@ describe('ProofPack v1 (07 §8)', () => {
     ['recordId as base64url', ['recordId'], KEY32],
     ['record with an unknown key', ['record', 'x'], 1],
     ['record kind 9', ['record', 'kind'], 9],
-    ['signature with a high s', ['signature'], `0x${'3c'.repeat(32)}${'ff'.repeat(32)}1b`],
-    ['signature with v = 0', ['signature'], `0x${'3c'.repeat(64)}00`],
     ['signature with an odd number of hex digits', ['signature'], `${CARD_SIG}0`],
     ['signature 0x only', ['signature'], '0x'],
     ['signature uppercase', ['signature'], CARD_SIG.toUpperCase().replace('0X', '0x')],

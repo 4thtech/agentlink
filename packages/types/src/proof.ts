@@ -14,7 +14,6 @@ import {
   base64url,
   bytes32Hex,
   evmAddress,
-  isCanonicalEcdsaSignature,
   isUtcTimestamp,
   sha256Hex,
   uint256Decimal,
@@ -78,22 +77,23 @@ export const receiptStructSchema = z.strictObject({
 export const MAX_ERC1271_SIGNATURE_BYTES = 4096;
 
 /**
- * A Record signature (04 §2.4.1): a 65-byte signature must be canonical ECDSA (low s, v 27 or 28);
- * an ERC-1271 signature of any other length is `0x` + a non-empty, even number of hex digits.
- * Which kind the signer needs is the verifier's check (`isValidSignatureNow`).
+ * A Record, Receipt or proof-pack signature in its JSON form (04 §2.4.1): `0x` + a non-empty, even
+ * number of lowercase hex digits, at most MAX_ERC1271_SIGNATURE_BYTES. The form is not judged here,
+ * as the Notary's SignatureChecker does not judge it: the canonical ECDSA rule (low s, v 27 or 28)
+ * applies where the signature is checked by ECDSA recovery (an EOA signer), and an ERC-1271 account
+ * may accept any bytes, 65 included (a Safe's v of 0, 1 or above 30). The verifier applies both.
  */
 export function isRecordSignature(sig: unknown): sig is string {
   if (typeof sig !== 'string') return false;
   if (sig.length < 4 || sig.length > 2 + 2 * MAX_ERC1271_SIGNATURE_BYTES) return false;
-  if (!/^0x(?:[0-9a-f]{2})+$/.test(sig)) return false;
-  return sig.length === 2 + 2 * BYTE_LENGTHS.eip712Sig ? isCanonicalEcdsaSignature(sig) : true;
+  return /^0x(?:[0-9a-f]{2})+$/.test(sig);
 }
 
 export const recordSignatureSchema = z
   .string()
   .refine(
     isRecordSignature,
-    'must be a canonical 65-byte ECDSA signature or an ERC-1271 signature (0x + even hex)',
+    'must be 0x + an even number of lowercase hex digits (ECDSA or ERC-1271)',
   );
 
 // --- receipts lists ------------------------------------------------------------------------------

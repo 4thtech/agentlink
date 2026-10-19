@@ -84,7 +84,7 @@ const SPEC_PATHS = {
     'handshake.cardAgentSig',
     'ProofPack.signer.cardSig',
   ],
-  // A canonical 65-byte ECDSA signature or an ERC-1271 signature (07 §7, §8).
+  // An ECDSA or ERC-1271 signature, 0x + even hex; the canonical rule is the EOA check's (04 §2.4.1).
   recordSignature: [
     'ProofPack.signature',
     'submitter.records[].signature',
@@ -331,19 +331,36 @@ describe('decodeAtPath: every non-canonical form is rejected, never normalised',
     }
   });
 
-  it.each([...SPEC_PATHS.ecdsa, ...SPEC_PATHS.recordSignature])(
-    '%s: non-canonical ECDSA',
+  it.each([...SPEC_PATHS.ecdsa])('%s: non-canonical ECDSA', (path) => {
+    for (const bad of [
+      ecdsa(1n, 2n, 0), // v 0
+      ecdsa(1n, 2n, 1), // v 1
+      ecdsa(1n, (N >> 1n) + 1n, 27), // high s
+      ecdsa(0n, 2n, 27), // r = 0
+      ecdsa(1n, 0n, 27), // s = 0
+      ecdsa(N, 2n, 27), // r = n
+      upper(LOW_S_SIG),
+      LOW_S_SIG.slice(2),
+    ]) {
+      expect(decodeAtPath(path, bad), bad).toBeNull();
+    }
+  });
+
+  // 04 §2.4.1: a Record, Receipt or proof-pack signature may be an ERC-1271 one in any form, 65 bytes
+  // included; only ECDSA recovery (the EOA path, in the verifier) needs the canonical form, as in the
+  // Notary's SignatureChecker. The JSON form is still strict.
+  it.each([...SPEC_PATHS.recordSignature])(
+    '%s: a 65-byte non-canonical form is a valid ERC-1271 form; the JSON form stays strict',
     (path) => {
-      for (const bad of [
-        ecdsa(1n, 2n, 0), // v 0
+      for (const form of [
+        ecdsa(1n, 2n, 0), // v 0 (a Safe)
         ecdsa(1n, 2n, 1), // v 1
         ecdsa(1n, (N >> 1n) + 1n, 27), // high s
         ecdsa(0n, 2n, 27), // r = 0
-        ecdsa(1n, 0n, 27), // s = 0
-        ecdsa(N, 2n, 27), // r = n
-        upper(LOW_S_SIG),
-        LOW_S_SIG.slice(2),
       ]) {
+        expect(decodeAtPath(path, form), form).not.toBeNull();
+      }
+      for (const bad of [upper(LOW_S_SIG), LOW_S_SIG.slice(2), `${LOW_S_SIG}0`, '0x']) {
         expect(decodeAtPath(path, bad), bad).toBeNull();
       }
     },

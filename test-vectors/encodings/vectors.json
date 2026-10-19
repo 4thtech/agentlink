@@ -2349,15 +2349,15 @@
       }
     },
     {
-      "id": "reject-proof-pack-signature-high-s",
-      "source": "04 \u00a72.4.1: ProofPack.signature as a 65-byte signature with a high s; rejected, never normalised",
+      "id": "decode-proof-pack-signature-erc1271-high-s",
+      "source": "04 \u00a72.4.1: ProofPack.signature as a 65-byte ERC-1271 signature in a non-canonical form (a high s): only ECDSA recovery needs the canonical form",
       "input": {
         "op": "decode",
         "path": "ProofPack.signature",
         "value": "0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c"
       },
       "expected": {
-        "outcome": "reject"
+        "bytes": "7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c"
       }
     },
     {
