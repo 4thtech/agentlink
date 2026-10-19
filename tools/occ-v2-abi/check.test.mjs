@@ -1,7 +1,7 @@
 // M1-3f (D-83): the vendored OCC v2 ABI bundle in packages/occ-v2-abi is exactly the contracts
 // release it pins. Every vendored file matches manifest.json, manifest.json matches the pinned
 // SHA-256, the generated ABI TypeScript is the vendored JSON, and the manifest lists an address file
-// for Base Sepolia (84532) only. The address files are not vendored: the import stores them in a
+// for Base Sepolia (84532) and Gnosis Chiado (10200) only. The address files are not vendored: the import stores them in a
 // scanner-safe generated form (src/addresses.generated.ts, no `0x` + 40-hex literal), and
 // packages/chain/src/occ-v2-abi.test.ts rebuilds the exact file bytes from it and checks them
 // against the manifest's SHA-256.
@@ -64,12 +64,12 @@ describe('occ-v2-abi bundle check', () => {
     expect(checkPackage(PACKAGE_DIR)).toEqual([]);
   });
 
-  it('pins v0.1.0-testnet.2 of 4thtech/occ-v2-contracts at its published manifest hash', () => {
+  it('pins v0.1.0-testnet.3 of 4thtech/occ-v2-contracts at its published manifest hash', () => {
     expect(readPin(PACKAGE_DIR)).toEqual({
       repository: '4thtech/occ-v2-contracts',
-      tag: 'v0.1.0-testnet.2',
-      sourceCommit: 'd46545b60bb324f63fb16a77af445bd50a51317a',
-      manifestSha256: 'b1a8daa57d51bcbfbecbc91e6c5d2740d76428a4f63bbd5f1043537591188c1b',
+      tag: 'v0.1.0-testnet.3',
+      sourceCommit: '26e7d0a8da8c7dda67256ea05bf91a592fcc77f8',
+      manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
     });
   });
 
@@ -120,7 +120,7 @@ describe('occ-v2-abi bundle check', () => {
     expect(checkPackage(dir).join('\n')).toMatch(/v0\.0\.9-old/);
   });
 
-  it('fails when the manifest lists an address file for any chain but Base Sepolia (84532)', () => {
+  it('fails when the manifest lists an address file for any chain but Base Sepolia (84532) and Gnosis Chiado (10200)', () => {
     const dir = copyPackage();
     rehash(dir, { 'addresses/8453.json': 'ab'.repeat(32) });
     const problems = checkPackage(dir).join('\n');

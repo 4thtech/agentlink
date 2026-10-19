@@ -57,9 +57,9 @@ describe('@4thtech-io/occ-v2-abi', () => {
     expect(packageName).toBe('@4thtech-io/occ-v2-abi');
     expect(OCC_V2_RELEASE).toEqual({
       repository: '4thtech/occ-v2-contracts',
-      tag: 'v0.1.0-testnet.2',
-      sourceCommit: 'd46545b60bb324f63fb16a77af445bd50a51317a',
-      manifestSha256: 'b1a8daa57d51bcbfbecbc91e6c5d2740d76428a4f63bbd5f1043537591188c1b',
+      tag: 'v0.1.0-testnet.3',
+      sourceCommit: '26e7d0a8da8c7dda67256ea05bf91a592fcc77f8',
+      manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
       compiler: '0.8.37+commit.f401782d',
     });
   });
@@ -149,9 +149,9 @@ describe('@4thtech-io/occ-v2-abi', () => {
   // The addresses themselves are checked by hash, not spelled out here: the chain test rebuilds the
   // release's addresses/84532.json bytes from them and compares the manifest's SHA-256, so no
   // address literal is needed in a test (the secret scan must stay clean, without allowlists).
-  it('has a deployment for Base Sepolia (84532) only, marked testnet', () => {
-    expect(DEPLOYMENT_CHAIN_IDS).toEqual([84532]);
-    expect(Object.keys(deployments)).toEqual(['84532']);
+  it('has deployments for Gnosis Chiado (10200) and Base Sepolia (84532) only, marked testnet', () => {
+    expect([...DEPLOYMENT_CHAIN_IDS].sort((a, b) => a - b)).toEqual([10200, 84532]);
+    expect(Object.keys(deployments).sort()).toEqual(['10200', '84532']);
     const base = getDeployment(84532);
     expect(base).toMatchObject({
       chainId: 84532,
@@ -179,6 +179,22 @@ describe('@4thtech-io/occ-v2-abi', () => {
     expect(base?.feeTokens[0]?.address).toMatch(evm);
   });
 
+  it('describes Gnosis Chiado: same contract addresses as Base Sepolia, native fee asset', () => {
+    const chiado = getDeployment(10200);
+    const base = getDeployment(84532);
+    expect(chiado).toMatchObject({
+      chainId: 10200,
+      chainKey: 'gnosis-chiado',
+      name: 'Gnosis Chiado',
+      testnet: true,
+      deployedOn: '2026-10-19',
+      deployBlock: 23594957,
+    });
+    expect(chiado?.contracts).toEqual(base?.contracts);
+    expect(chiado?.feeTokens).toHaveLength(1);
+    expect(chiado?.feeTokens[0]).toMatchObject({ decimals: 18, native: true, symbol: 'NATIVE' });
+  });
+
   it('renders the deployment as the exporter writes it: sorted keys, two-space indent, final newline', () => {
     const text = deploymentFileText(84532) ?? '';
     expect(text.endsWith('}\n')).toBe(true);
@@ -199,7 +215,7 @@ describe('@4thtech-io/occ-v2-abi', () => {
   });
 
   it('returns no deployment for any other chain ID', () => {
-    for (const id of [1, 8453, 100, 10200, 31337, 0, -1, 84532.5]) {
+    for (const id of [1, 8453, 100, 31337, 0, -1, 84532.5]) {
       expect(getDeployment(id)).toBeUndefined();
     }
   });
