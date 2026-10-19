@@ -1262,7 +1262,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
 #### M1-1g-f · crypto: drop DELETE signed with an older epoch's drop key (new, IR-M1-1g-e-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#294) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore, `keystore-drop.ts`), packages/node (keychain KeyStore and facade)
 - **Depends on:** M1-1g-e (#274)
 - **Spec:** 04 §2.1 (drop key per `keyEpoch`; an object's locator records the epoch, so older objects stay deletable), §4; 07 §5.4
@@ -1273,6 +1273,19 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - The KeyStore type tests (`EpochTaking`) list `signDropRequest` as the one signing method that takes an epoch, with the reason.
 - **Acceptance:**
   - Tests first: after an advance, a DELETE signed with `{epoch: n}` verifies with `verifyDropAuthorization` and carries the epoch-n drop key; a POST with an epoch, an epoch above the current one and a malformed epoch are refused before any key is read; MemoryKeyStore and the keychain KeyStore and facade behave the same.
+
+#### M1-1g-g · storage and core: thread the upload epoch to the drop DELETE (new, M1-1g-f follow-up)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (drop adapter `DropSigner`, `drop.ts`), packages/core (delete-on-receipt record), packages/node (conformance zones); docs/foundation/07 §5.4
+- **Depends on:** M1-1g-f
+- **Spec:** 04 §2.1; 07 §5.4
+- **Invariants:** I-1, I-3, I-7
+- **Scope:**
+  - The drop adapter records the upload epoch with the object and passes `{epoch}` to `DropSigner` on `DELETE`; the core delete-on-receipt record carries that epoch, so a `deleteAfter: receipt` DELETE after a key rotation is signed with the epoch the object was uploaded under.
+  - 07 §5.4 states that the DELETE carries the upload epoch (docs, same PR).
+  - When a file-backed agent KeyStore lands, it must call `dropRequestEpoch` and run the shared epoch conformance cases. Consider one shared conformance suite for all KeyStore backends, with the deps-check zones for packages/node it needs.
+- **Acceptance:**
+  - Tests first: after an epoch advance, delete-on-receipt for an object uploaded under an older epoch is accepted by the drop; an unretained epoch is refused with the fixed error; the shared conformance cases run against every KeyStore backend that exists.
 
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
 - **Status:** done (4thtech/agentlink#55, merged 2026-10-14; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -1781,7 +1794,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - The product path never builds a read client with a plain `fetch`: it requires `nodeRpcFetch` or an equivalent address-checked fetch, enforced by a lint rule or a factory-only export.
 
 #### M1-4c · chain: submission, direct mode, inclusion tracking
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#295) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a, M1-3g (Base Sepolia addresses); M1-3j for Chiado once deployed (D-63); M1-10a for integration (mock before)
 - **Spec:** 07 §6.2, §7; 03 §4.3; 05 §3.2, §3.3; 04 §5, §7 (malicious submitter)
@@ -1844,6 +1857,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Let a pack carry proof that the card's agent key took part, so a card alone no longer attributes the sender. Until this lands, the interim rule of D-95 holds: a proof whose sender attribution relies on a card reports `record_only`, not `verified`, in neutral wording.
   - Pack schema: optional `signer.cardAgentSig` (`0x` ECDSA) and `signer.cardPop` (BIP-340, bare hex 128), together and only with `agentCard` (07 §8). Verifier: the 07 §8 proof-of-possession rules (`card_pop_missing` replaces `sender_attribution_pending`; `card_pop_invalid` refuses the pack; contract-account signers stay `record_only`). Core: make and store both signatures with each own card, at `init`, `owner add-agent` and every `card-update` (04 §2.9); send `cardPop` in `handshake` and `handshake-ack`, and both in `card-update`; verify and store a contact's; attach them in `exportProofPack` (M1-7g) for the card of the envelope's key epoch, own or contact's. Vectors: a `card-pop` suite in M1-1h.
 - **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only` (`card_pop_missing`); a pack with a valid proof becomes `verified`; a forged `cardPop` or `cardAgentSig`, and one replayed from another card (another key epoch, owner or display name), are refused with `card_pop_invalid`; one signature without the other is `malformed_pack`; a contract-account signer with both stays `record_only`; a recipient-exported pack with the sender's received signatures becomes `verified`; a `card-update` or `handshake` whose `cardPop` does not verify is dropped, and one without it from an older peer is accepted (RED commit).
+
+#### M1-4c-b · crypto and chain: KeyStore `signTransaction` for direct-mode sends (new, M1-4c follow-up)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto (KeyStore interface and backends), packages/chain (direct mode)
+- **Depends on:** M1-4c
+- **Spec:** 04 §2; 07 §6.2
+- **Invariants:** I-1, I-3, I-7
+- **Scope:** add a KeyStore `signTransaction` method so direct-mode sends sign through the KeyStore instead of the injected `DirectSigner`. The same fixed refusals and check-before-key-read rules as the other signing methods apply; no key material leaves the KeyStore.
+- **Acceptance:** tests first: direct-mode notarize and acknowledge sign through the KeyStore on every backend; the `DirectSigner` injection is removed or reduced to a test double; a malformed or out-of-policy transaction is refused before any key is read.
+
+#### M1-4c-c · chain: submitter port `getRecord` treats only `RecordNotFound` as absent (new, M1-4c review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain/src/submitter/port.ts
+- **Depends on:** M1-4c
+- **Spec:** 04 §5; 07 §6.2
+- **Invariants:** I-3
+- **Scope:** the `SubmitterChain` port's `getRecord` treats only the Notary's `RecordNotFound` revert as "absent", as the client's `getRecord` now does; any other revert or read error is an error, never "absent", so no replacement is signed on a failed read.
+- **Acceptance:** tests first: `RecordNotFound` gives absent; another revert, a transport error and an empty result do not.
 
 #### M1-4d-e · chain: card confirmation for contract-account signers (new, D-102 follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** later (not M1)
@@ -3107,7 +3138,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-7i-1 L1/L2/L5, 2026-10-17): before wiring the budget ledger: use the finalized block timestamp in `releaseProofReservation`, keep `markBroken` in its own transaction (07 §3.5), optional `charged_usd <= reserved_usd` check.
 
 #### M1-10a-b · submitter follow-ups (IR-M1-10a-2 lows) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
+- **Status:** in review (4thtech/agentlink#293) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
 - **Repo/path:** agentlink · apps/submitter/src/engine.ts
 - **Depends on:** M1-10a
 - **Spec:** 07 §7 (Implementation); 05 §3.3
@@ -3118,6 +3149,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An RPC failure while re-simulating after a revert keeps the item in flight (retried next round) instead of failing it for good; still no cool-off.
 - **Acceptance:**
   - Tests first (local red run) for each item, with the in-memory chain (engine) and, for the nonce, the mock RPC.
+
+#### M1-10a-c · submitter: bound how long `held` items retry (new, IR-M1-10a-b review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
+- **Repo/path:** agentlink · apps/submitter/src/engine.ts
+- **Depends on:** M1-10a-b
+- **Spec:** 07 §7 (Implementation); 05 §3.3
+- **Invariants:** I-3
+- **Scope:** cap how long a `held` item keeps retrying, using an intake deadline: past the cap the item becomes `failed` with the existing fixed reason, and the queue does not grow without bound.
+- **Acceptance:** tests first (local red run): an item held past the cap is failed; one held within it keeps retrying.
 
 #### M1-10b · testnet credits faucet
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
