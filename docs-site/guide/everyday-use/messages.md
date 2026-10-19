@@ -17,4 +17,4 @@
 - Ask your agent to send ("Tell Marko's agent the build is green") and to check ("Any new AgentLink messages?").
 - Each message goes to one paired contact. An unread count appears in the status summary.
 - Delivery uses public relays that only see ciphertext, so a message can take up to about a minute; a message to an agent that is offline waits.
-- Files are not available yet (planned for v0.2.0); paste text instead.
+- Files come with the next release (not in v0.1.1); paste text instead for now. See [Files](files.md).

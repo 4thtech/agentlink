@@ -2323,6 +2323,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The card's 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
   - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
 - **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
+- **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7g · core: proofs and receipts
@@ -2911,7 +2912,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-9s-1 L1/L2, 2026-10-17): guard post-handler cursor writes against `close()` and test the race; fix the `subscribe` line in the 07 §4.1 sketch.
 
 #### M1-9d · MCP server: file and proof tools
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (M1-9d-1 in review; M1-9d-2 backlog) · **Size:** L · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli
 - **Depends on:** M1-9c, M1-7f, M1-7g, M1-15; gaps G-25 (D-87) and G-43 resolved
 - **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`path`, `notarize`), §2.2a (receipts and `notarize`), §2.3, §2.4, §9; 04 §3.4.2, §4; 02 J2, J3, J8; D-53, D-55
@@ -2931,6 +2932,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `agentlink_fetch_file` and `agentlink_inbox` carry `idempotentHint: false` (06 §2.0).
   - Schema + behaviour test per `status` value of each tool.
   - (IR-D48-1 F15f) A scan of every file-tool result and error in the test run finds no URL from the drop or a connector, and no key material.
+- **Split (2026-10-19):** M1-9d-1 (`agentlink_send` `path`, `agentlink_fetch_file`, `agentlink_status` `storage`) is in review; M1-9d-2 (`notarize`, `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, the proof-pack tools, receipts, `credits`, `agentAddress`, `topUpUrl`, `prices`) follows. M1-9d-1 notes: `expiresInDays` on send is not exposed yet (the core uses `files.defaultExpiryDays`); a send with `path` and no `text` or `body` carries an empty text; the `needs_setup` next steps name no local settings link, because neither `agentlink policy` (M1-9m) nor the settings page has landed, so owners cannot yet allow a folder; the drop fetch is the global fetch held to the drop's https origin with redirects off (an SSRF-safe non-GET fetch in `@4thtech-io/node` would be the stricter form). Map any chain wording at the tool layer in M1-9d-2; add `aws4fetch` to the CLI when own S3 storage is wired.
 
 #### M1-9e · MCP conformance and tool-surface guard
 - **Status:** done (4thtech/agentlink#143, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a

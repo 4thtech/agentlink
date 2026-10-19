@@ -2,21 +2,41 @@
 //
 // 1. A `body` with a `terms` key is refused first with `USE_TERMS_TOOLS` (D-55, 06 §2.0): nothing is
 //    resolved, sent or stored. The schema already refuses `type: offer | accept | reject`.
-// 2. Exactly one of `text` and `body` (`path` arrives with M1-9d).
+// 2. At most one of `text` and `body`, and at least one of `text`, `body` and `path` (M1-9d-1).
 // 3. The `to` argument is resolved to an active contact (ID or shown name; AMBIGUOUS_CONTACT); a
 //    contact whose pairing is not complete gets nothing.
 // 4. Core `sendMessage` (M1-7k) does the rest: policy, envelope, outbox, first publish, and the
 //    `clientRequestId` idempotency (a repeat returns the original result and publishes nothing).
 //    A paired contact may Talk without approval (D-70), so in M1a no send returns
 //    `pending_approval` and an `approvalId` changes nothing (it matters once `notarize` lands, M1-9d).
+// 5. With `path` (M1-9d-1; 06 §2.3, 04 §4): before the core is called, the platform checks the path
+//    with realpath against `files.allowedFolders` without opening it; outside or no folder is
+//    `needs_setup`, a hidden, protected or malformed path `PATH_NOT_ALLOWED`. The core then checks
+//    the realpath again, decides inline or stored (D-85; the drop or own storage, 07 §5.6) and reads
+//    the file once. The result's `file` carries name, size, hash, delivery and expiry only: never a
+//    link, a locator or a key (IR-D48-1 F15f).
 //
-// I-5, I-7: the message text, the body and the `to` query are agent-written (steerable) text: none
-// of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
+// I-5, I-7: the message text, the body, the path and the `to` query are agent-written (steerable)
+// text: none of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
 // 06 §2.1 rule only. Core errors become fixed text by their code; any other failure is INTERNAL.
 import { CoreError, type CoreErrorCode, type SendMessageInput } from '@4thtech-io/core';
 import { contactRef, renderRef, resolveContact } from './contacts.js';
-import type { ToolContext } from './context.js';
-import { fail, internalError, invalidArgument, ok, type HandlerOutput } from './result.js';
+import type { AttachedFile, ToolContext } from './context.js';
+import {
+  attachRefusal,
+  fileErrorOutput,
+  filesNeedsSetup,
+  FILE_TEXT,
+  isoSeconds,
+} from './files-common.js';
+import {
+  fail,
+  internalError,
+  invalidArgument,
+  notAvailable,
+  ok,
+  type HandlerOutput,
+} from './result.js';
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 
@@ -81,17 +101,21 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
     case 'type_not_sendable':
       return invalidArgument();
     default:
-      return undefined;
+      return fileErrorOutput(code);
   }
 }
 
 export async function sendHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
-  const { to, text, body, type, replyTo, clientRequestId } = input;
+  const { to, text, body, type, replyTo, clientRequestId, path } = input;
   // 1. D-55: before anything else, so a negotiation never even resolves a contact.
   if (isPlainObject(body) && Object.hasOwn(body, 'terms')) return useTermsTools();
   // 2. The schema checked each field's type; here only their combination.
-  if (typeof to !== 'string' || (text === undefined) === (body === undefined)) {
+  if (
+    typeof to !== 'string' ||
+    (text !== undefined && body !== undefined) ||
+    (text === undefined && body === undefined && path === undefined)
+  ) {
     return invalidArgument();
   }
 
@@ -110,14 +134,30 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   if (resolved.contact.pairing !== 'complete') return contactNotReady();
   const ref = contactRef(resolved.contact);
 
+  // 5. The file: checked, never opened here (06 §2.3, 04 §4).
+  let attached: AttachedFile | undefined;
+  if (typeof path === 'string') {
+    if (client.files === undefined) return notAvailable();
+    const outcome = await client.files.attach(path);
+    if (!outcome.ok) {
+      logger.info('file send refused', { reason: outcome.reason });
+      return attachRefusal(outcome.reason);
+    }
+    attached = outcome.file;
+  }
+
   // 4. The core send.
+  // A file sent with no text or body travels with an empty text (06 §2.2: `text` then travels as
+  // its message).
+  const message = typeof text === 'string' ? text : body === undefined ? '' : undefined;
   const request: SendMessageInput = {
     to: resolved.contact.id,
-    ...(typeof text === 'string' ? { text } : {}),
+    ...(typeof message === 'string' ? { text: message } : {}),
     ...(isPlainObject(body) ? { body } : {}),
     type: (type ?? 'text') as NonNullable<SendMessageInput['type']>,
     ...(typeof replyTo === 'string' ? { replyTo } : {}),
     ...(typeof clientRequestId === 'string' ? { clientRequestId } : {}),
+    ...(attached === undefined ? {} : { files: [attached.file] }),
   };
   let result;
   try {
@@ -132,13 +172,30 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   switch (result.status) {
     case 'ok': {
       const name = renderRef(ref);
-      logger.info('message sent', { messages: 1 });
-      return ok(copy('chat.status.ok.sent', { contactName: name, contactFirstName: name }), {
+      logger.info('message sent', { messages: 1, files: attached === undefined ? 0 : 1 });
+      const fields = {
         envelopeId: result.envelopeId,
         thread: result.thread,
         sentAt: result.sentAt,
+      };
+      const summary = copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
+      if (attached === undefined) return ok(summary, fields);
+      const sent = result.files?.find((f) => f.index === 0);
+      if (sent === undefined) return internalError();
+      return ok(summary, {
+        ...fields,
+        file: {
+          name: attached.name,
+          size: attached.size,
+          plaintextSha256: await attached.plaintextSha256(),
+          delivery: sent.delivery,
+          expiresAt: sent.expiresAt === null ? null : isoSeconds(sent.expiresAt),
+        },
       });
     }
+    case 'needs_setup':
+      logger.info('file send needs setup', { reason: result.reason });
+      return filesNeedsSetup(result.reason);
     case 'in_progress':
       return fail('error', SEND_TEXT.inProgress, SEND_TEXT.inProgressNextStep, 'IN_PROGRESS');
     case 'rejected':
@@ -158,6 +215,20 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             SEND_TEXT.policyDenied,
             SEND_TEXT.policyDeniedNextStep,
             'POLICY_DENIED',
+          );
+        case 'FILE_TOO_LARGE':
+          return fail(
+            'rejected',
+            FILE_TEXT.fileTooLarge,
+            FILE_TEXT.fileTooLargeNextStep,
+            'FILE_TOO_LARGE',
+          );
+        case 'PAYLOAD_TOO_LARGE':
+          return fail(
+            'rejected',
+            FILE_TEXT.payloadTooLarge,
+            FILE_TEXT.payloadTooLargeNextStep,
+            'PAYLOAD_TOO_LARGE',
           );
         default:
           // A refusal code this version does not know: fixed text, never undefined (IR-M1-9p-1 F03).

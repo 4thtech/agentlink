@@ -7,7 +7,9 @@
 //    (`needs_setup` with the 07 §9.4 copy without a usable keychain), then `openAgentKeyStore`;
 // 3. `openAgentStore` (store, cipher, policy mark);
 // 4. the relay I/O from @4thtech-io/node as the client's transport (07 §4.2);
-// 5. the M1a approval channel over the same store, and `AgentLinkClient.create`.
+// 5. the M1a approval channel over the same store, and `AgentLinkClient.create`;
+// 6. the files platform (M1-9d-1, src/runtime/files.ts): the allowed-folder check of `path`
+//    arguments, the encrypted drop (D-48), the SSRF-safe download and the inbox folder.
 //
 // I-1/I-4: the runtime holds only the agent's KeyStore interface; it never holds an owner key and
 // takes no owner presence. Owner commands (M1-9b) take presence themselves, through @4thtech-io/node.
@@ -39,6 +41,8 @@ import { createLocalApprovalChannel, storeApprovalReader } from '../approval/loc
 import { readAgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
+import { DROP_ORIGIN, nodeFileOpener, nodeFilesPlatform } from './files.js';
+import type { FileOpener } from '../tools/context.js';
 
 /** The Node pieces the runtime is built from. Tests pass doubles; production uses @4thtech-io/node. */
 export interface RuntimeDeps {
@@ -87,6 +91,8 @@ export interface OpenedAgent {
   readonly client: AgentLinkClient;
   /** The M1a approval channel the client was built with (06 §2.5). */
   readonly approvals: ApprovalChannel;
+  /** The allowed-folder check for `path` arguments (M1-9d-1); absent: no file tools. */
+  readonly files?: FileOpener;
   close(): Promise<void>;
 }
 
@@ -109,11 +115,9 @@ const systemClock = (): number => Math.floor(Date.now() / 1000);
 
 /**
  * The https origins of the 4thTech encrypted drop (D-48) that an inbox page shows as `drop` (06 §2.2
- * `FileInfo.delivery`; any other file URL shows as `own`). No drop origin is configured yet (the
- * drop service and its config land with the files cards), so the list is empty: every received
- * file URL shows as `own` until then (M1-9p-b).
+ * `FileInfo.delivery`; any other file URL shows as `own`): the default drop (M1-9d-1).
  */
-export const DROP_ORIGINS: readonly string[] = Object.freeze([]);
+export const DROP_ORIGINS: readonly string[] = Object.freeze([DROP_ORIGIN]);
 
 /** Opens a local agent for a command or an `agentlink mcp` process. */
 export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAgentResult> {
@@ -128,6 +132,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     return { status: 'needs_setup', reason: 'no_agent', message: NO_AGENT_MESSAGE };
   }
   const { config, paths } = found;
+  const home = options.home ?? homedir();
 
   if (config.keyStore === 'keychain') {
     const probe = await deps.probeKeychain();
@@ -170,6 +175,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
       policyMark: agentStore.policyMark,
       transport: deps.transport(),
       dropOrigins: DROP_ORIGINS,
+      files: nodeFilesPlatform({ home }),
     });
   } catch (error) {
     await agentStore.close().catch(() => undefined);
@@ -194,6 +200,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     paths,
     client,
     approvals,
+    files: nodeFileOpener({ home }),
     close: (): Promise<void> => {
       closing ??= (async () => {
         // Relay connections first: an open socket or its idle timer keeps a one-shot process alive.

@@ -22,17 +22,23 @@
 | `agentlink_create_invite` | no | — | v0.1.0 |
 | `agentlink_accept_invite` | no | `contacts.acceptInvites` | v0.1.0 |
 | `agentlink_list_contacts` | yes | — | v0.1.0 |
-| `agentlink_send` | no | `proofs.*` with `notarize` | v0.1.0 (`path` and `notarize` v0.2.0) |
+| `agentlink_send` | no | `proofs.*` with `notarize` | v0.1.0 (`path`: next release; `notarize` v0.2.0) |
 | `agentlink_propose_terms` | no | `commitments.accept` and `proofs.*` with `notarize` (firm offer) | v0.1.0 (`notarize` v0.2.0) |
 | `agentlink_respond_to_terms` | no | `commitments.accept` (one approval per agreement); `proofs.*` with `notarize` | v0.1.0 (receipts and `notarize` v0.2.0) |
 | `agentlink_inbox` | no (marks items read) | — | v0.1.0 |
 | `agentlink_get_approval` | yes | — | v0.1.0 |
-| `agentlink_fetch_file` | no (saves a file) | — | v0.2.0 |
+| `agentlink_fetch_file` | no (saves a file) | — | next release |
 | `agentlink_notarize` | no | `proofs.*` | v0.2.0 |
 | `agentlink_acknowledge` | no | `commitments.accept` (records without terms) | v0.2.0 |
 | `agentlink_get_proof` | yes | — | v0.2.0 |
 | `agentlink_export_proof_pack` | no (writes a file) | `proofs.allowKeyDisclosure` | v0.2.0 |
 | `agentlink_verify_proof_pack` | yes | — | v0.2.0 |
+
+## File tools (next release, M1-9d-1)
+
+- **`agentlink_send` with `path`** (06 §2.2, §2.3): `path` is the full path of one file (`~/` allowed; 1 to 4096 characters, no control character). `text`, `body` or `path` is required; `text` and `body` exclude each other. Before the core is called, the path is resolved with realpath and must be strictly inside a `files.allowedFolders` entry (04 §4); the file is not opened. Results: `needs_setup` with `NO_ALLOWED_FOLDER` or `OUTSIDE_ALLOWED_FOLDER` (also for a link that points outside); `rejected` `PATH_NOT_ALLOWED` (relative, `.` or `..`, hidden, protected, not a regular file); `not_found` `FILE_NOT_FOUND`; `needs_setup` `NEEDS_OWN_STORAGE` (above the drop's size or weekly limit, or `files.storage: own` with none set up); `rejected` `FILE_TOO_LARGE`, `PAYLOAD_TOO_LARGE`, `POLICY_DENIED`; `error` `STORAGE_UNAVAILABLE`, `STORAGE_FAILED`, `FILE_CHANGED`, `FILES_UNAVAILABLE`. On `ok`, `file` is `{name, size, plaintextSha256, delivery: inline | drop | own, expiresAt}`: never a link, a locator or a key.
+- **`agentlink_fetch_file`** (06 §2.3): `{envelopeId, fileIndex? = 0}` (0 to 15). On `ok`: `{savedTo, name, size, integrity: "verified"}`; `name` and the last segment of `savedTo` are the sender's sanitised text, so the text result shows the name only inside the untrusted block. Refusals: `not_found`; `rejected` `FILE_TOO_LARGE`, `INTEGRITY_FAILED`, `LINK_EXPIRED`, `URL_REFUSED`, `POLICY_DENIED`; `error` `INBOX_UNAVAILABLE`, `DOWNLOAD_FAILED`, `FILES_UNAVAILABLE`. Annotations: not read-only (it writes a file), not idempotent (each call saves a new copy), open world.
+- **`agentlink_status`**: `storage.mode` is where files above about 12 KB go under the current rules (`drop` or `own`).
 
 ## Outline (filled in at release)
 

@@ -155,8 +155,11 @@ describe('openAgent (M1-9k)', () => {
     expect(options.approvals).toBe(result.agent.approvals);
     expect(options.policyMark).toBeDefined();
     expect(options.transport).toBeDefined();
-    // No drop origin is configured yet (M1-9p-b): received file URLs show as `own`.
-    expect(options.dropOrigins).toEqual([]);
+    // The 4thTech drop's origin (M1-9d-1): its file links show as `drop`, any other as `own`.
+    expect(options.dropOrigins).toEqual(['https://drop.agentlink.4thtech.io']);
+    // The Node files platform and the allowed-folder check of `path` arguments (M1-9d-1).
+    expect(options.files).toBeDefined();
+    expect(result.agent.files).toBeDefined();
     expect(Object.keys(result.agent.approvals).sort()).toEqual(['request', 'status']);
   });
 

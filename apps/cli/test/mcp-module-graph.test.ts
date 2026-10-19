@@ -180,7 +180,8 @@ describe.each(TARGETS.map((target, index) => ({ target, index, label: target.lab
       expect(run.code).toBe(0);
       const byId = new Map(run.responses.map((r) => [r.id, r.result]));
       expect(byId.get(1)).toHaveProperty('instructions');
-      expect((byId.get(2)?.['tools'] as unknown[]).length).toBe(9);
+      // The nine M1a tools and agentlink_fetch_file (M1-9d-1).
+      expect((byId.get(2)?.['tools'] as unknown[]).length).toBe(10);
       expect(byId.get(3)?.['structuredContent']).toMatchObject({ status: 'needs_setup' });
     }, 60_000);
 
