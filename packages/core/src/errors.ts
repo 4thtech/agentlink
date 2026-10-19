@@ -18,6 +18,8 @@ export type CoreErrorCode =
   | 'card_invalid'
   | 'card_owner_signature_invalid'
   | 'card_agent_signature_invalid'
+  // M1-4d-d (D-102): a present card proof of possession that does not verify, or half of one.
+  | 'card_pop_invalid'
   | 'card_expired'
   | 'name_invalid'
   | 'relays_invalid'

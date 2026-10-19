@@ -32,6 +32,7 @@ export {
   type PreparedCardUpdate,
   type PreparedCompletion,
   type PreparedStage,
+  type ProofPackSigner,
   type StagePairingInput,
   type StagedPairing,
 } from './contacts.js';

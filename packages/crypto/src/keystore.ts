@@ -33,6 +33,8 @@ export { signDigestEcdsa } from './ecdsa.js';
 export { signDropRequest } from './keystore-drop.js';
 export { signTypedData } from './eip712.js';
 export { signAgentCard } from './agent-card.js';
+// M1-4d-d (D-102): `cardPop` with the agent's Nostr secret key, for KeyStore.signCardPop.
+export { signCardPop } from './card-pop.js';
 // M1-1f (04 §2.8): Argon2id, password() normalisation and the generated code, and the ALKS file
 // KeyStore and ALKO owner wrap. They take or return a passphrase, a passphrase-derived kek, a seed
 // or keychain entries, so only KeyStore backends reach them.

@@ -20,10 +20,7 @@
 // values from the chain or from fields the chain has confirmed, and `signerCard`, which the owner
 // signed (checked by `cardSig`, not by the chain); nothing is echoed from a refused pack.
 import {
-  agentCardJcsHash,
-  bip340Verify,
   decodeEcdsaSignature,
-  decodeHex,
   encodeHex0x,
   equalBytes,
   decodeHex0x,
@@ -31,9 +28,9 @@ import {
   occV2Domain,
   recipientCommitment,
   recoverEvmAddress,
-  taggedHash,
-  verifyCardAgentSig,
   verifyCardOwnerSig,
+  // The card's proof of possession (04 §2.9, 07 §8; D-102): cardAgentSig and cardPop; never throws.
+  verifyCardPossession,
 } from '@4thtech-io/crypto';
 import {
   RECEIPT_TYPE_NAMES,
@@ -344,30 +341,6 @@ function matchState(
 
 /** Content attributed to the record signer (07 §8; M1-4d-d). */
 const isAttributed = (content: ProofContentResult): boolean => content.status === 'verified';
-
-/** The domain-separation tag of `cardPop` (04 §2.9, D-102). */
-const CARD_POP_TAG = 'agentlink/card-pop/v1';
-
-/**
- * The card's proof of possession (04 §2.9, 07 §8; D-102): `cardAgentSig` is a canonical ECDSA
- * signature by the card's `agentEvm` over the card's EIP-712 digest, and `cardPop` a BIP-340
- * signature by the card's `agentNostr` over taggedHash("agentlink/card-pop/v1", sha256(JCS(card))).
- * Both cover the whole card, so either one made for another card (epoch, owner, name, key) fails.
- * Never throws: any failure is false.
- */
-function verifyCardPossession(card: AgentCard, cardAgentSig: string, cardPop: string): boolean {
-  try {
-    if (!verifyCardAgentSig(card, cardAgentSig)) return false;
-    const message = taggedHash(CARD_POP_TAG, agentCardJcsHash(card));
-    return bip340Verify(
-      decodeHex0x(card.agentNostr, { length: 32 }),
-      message,
-      decodeHex(cardPop, { length: 64 }),
-    );
-  } catch {
-    return false;
-  }
-}
 
 async function verifyParsed(
   pack: ParsedProofPack,

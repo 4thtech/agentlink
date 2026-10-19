@@ -20,6 +20,7 @@ import {
   decodeBase64url,
   decodeUtf8,
   encodeUtf8,
+  verifyCardPop,
   verifyDropAuthorization,
   verifyNostrEvent,
   wrapCek,
@@ -592,6 +593,7 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
       'nip44Decrypt',
       'nip44Encrypt',
       'sign712',
+      'signCardPop',
       'signDropRequest',
       'signEnvelopeHash',
       'signNostr',
@@ -673,5 +675,62 @@ describe('probeKeychain and backend selection at init (04 §2.8, 07 §9.1)', () 
       ok: true,
       backend: 'file',
     });
+  });
+});
+
+// M1-4d-d (D-102; 04 §2.9): the card's proof of possession, signed only for the own current card.
+describe('KeychainKeyStore.signCardPop (M1-4d-d)', () => {
+  let keychain: FakeKeychain;
+
+  beforeEach(() => {
+    keychain = new FakeKeychain();
+    keychain.put(ID_A, SEED_A);
+  });
+
+  const cardOf = (seed: Uint8Array, epoch: number, owner: Uint8Array = SEED_B) => {
+    const own = derivePublicIdentity(seed, epoch);
+    const o = derivePublicIdentity(owner, 0);
+    return {
+      version: 1,
+      agentEvm: own.agentId,
+      agentNostr: `0x${encodeHex(own.agentNostr)}`,
+      agentEnc: `0x${encodeHex(own.agentEnc)}`,
+      ownerEvm: o.agentId,
+      ownerNostr: `0x${encodeHex(o.agentNostr)}`,
+      ownerEnc: `0x${encodeHex(o.agentEnc)}`,
+      nameHash: `0x${'88'.repeat(32)}`,
+      relaysHash: `0x${'99'.repeat(32)}`,
+      issuedAt: 1_760_000_000,
+      expiresAt: 0,
+      keyEpoch: epoch,
+    };
+  };
+
+  it('signs the own card at the current epoch, through the facade too', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A, { keyEpoch: 2 });
+    const card = cardOf(SEED_A, 2);
+    const pop = await store.signCardPop(card);
+    expect(pop).toMatch(/^[0-9a-f]{128}$/);
+    expect(verifyCardPop(card, pop)).toBe(true);
+    const facade = await openRecordedKeyStore('keychain', ID_A, { keychain }, { keyEpoch: 2 });
+    expect(verifyCardPop(card, await facade.signCardPop(card))).toBe(true);
+  });
+
+  it('refuses another epoch, another agent or a malformed card before reading the keychain', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A, { keyEpoch: 1 });
+    const reads = keychain.reads;
+    for (const card of [cardOf(SEED_A, 0), cardOf(SEED_A, 2), cardOf(SEED_B, 1, SEED_A), {}]) {
+      expect(await codeOf(() => store.signCardPop(card as never))).toBe('invalid_argument');
+    }
+    expect(keychain.reads).toBe(reads);
+  });
+
+  it('refuses a card with this agent and epoch but other message keys', async () => {
+    const store = await KeychainKeyStore.open(keychain, ID_A, { keyEpoch: 1 });
+    const other = derivePublicIdentity(SEED_B, 1);
+    const card = { ...cardOf(SEED_A, 1), agentNostr: `0x${encodeHex(other.agentNostr)}` };
+    expect(await codeOf(() => store.signCardPop(card))).toBe('invalid_argument');
+    await store.close();
+    expect(await codeOf(() => store.signCardPop(cardOf(SEED_A, 1)))).toBe('keystore_closed');
   });
 });

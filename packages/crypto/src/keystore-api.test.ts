@@ -98,9 +98,9 @@ describe('KeyStore (type level)', () => {
     >();
   });
 
-  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, signDropRequest and close (G-2); no hpkeOpen', () => {
+  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, signCardPop, signDropRequest and close (G-2); no hpkeOpen', () => {
     expectTypeOf<MethodNames<KeyStore>>().toEqualTypeOf<
-      EnvelopeKeyName | 'getPublicBundle' | 'sign712' | 'signDropRequest' | 'close'
+      EnvelopeKeyName | 'getPublicBundle' | 'sign712' | 'signCardPop' | 'signDropRequest' | 'close'
     >();
     expectTypeOf<'hpkeOpen'>().not.toExtend<keyof KeyStore>();
   });

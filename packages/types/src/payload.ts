@@ -30,6 +30,7 @@ import {
 import {
   approvalIdSchema,
   base64url,
+  bip340SigHex,
   bytes32Hex,
   base64urlBounded,
   evmAddress,
@@ -170,6 +171,8 @@ export const handshakeBodySchema = z.strictObject({
   codeNonce: base64url(BYTE_LENGTHS.safetyCode),
   codeCommit: codeCommitSchema,
   inviterCardHash: sha256Hex,
+  /** B's card proof of possession, bare 128 hex; optional for peers before M1-4d-d (04 §2.9, D-102). */
+  cardPop: bip340SigHex.exactOptional(),
 });
 
 /**
@@ -186,6 +189,8 @@ export const handshakeAckBodySchema = z.strictObject({
   card: agentCardSchema,
   cardSig: cardSigSchema,
   relays: relayListSchema,
+  /** A's `cardPop` over the invite card (its `cardAgentSig` is in the invite); optional (D-102). */
+  cardPop: bip340SigHex.exactOptional(),
 });
 
 /**
@@ -199,13 +204,22 @@ export const proofBodySchema = z.strictObject({
   salt: bytes32Hex,
 });
 
-/** `card-update` (04 §3.4.1): the handshake shapes. */
-export const cardUpdateBodySchema = z.strictObject({
-  card: agentCardSchema,
-  cardSig: cardSigSchema,
-  name: displayNameSchema,
-  relays: relayListSchema,
-});
+/**
+ * `card-update` (04 §3.4.1): the handshake shapes. `cardAgentSig` and `cardPop` (the new card's proof
+ * of possession, 04 §2.9, D-102) come together or not at all; a peer before M1-4d-d sends neither.
+ */
+export const cardUpdateBodySchema = z
+  .strictObject({
+    card: agentCardSchema,
+    cardSig: cardSigSchema,
+    cardAgentSig: cardAgentSigSchema.exactOptional(),
+    cardPop: bip340SigHex.exactOptional(),
+    name: displayNameSchema,
+    relays: relayListSchema,
+  })
+  .refine((b) => (b.cardAgentSig === undefined) === (b.cardPop === undefined), {
+    message: 'cardAgentSig and cardPop come together',
+  });
 
 export const approvalBodySchema = z.strictObject({ signed: signedApprovalOpSchema });
 export const policyBodySchema = z.strictObject({ signed: signedPolicySetSchema });

@@ -8,7 +8,7 @@ import type { KeyStore } from '@4thtech-io/crypto';
 import { createLogger, type Logger } from '@4thtech-io/log';
 import type { ApprovalChannel } from './approval-channel.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
-import { ContactBook } from './contacts.js';
+import { ContactBook, type ProofPackSigner } from './contacts.js';
 import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -264,6 +264,15 @@ export class AgentLinkClient {
    */
   publisherLease(): PublisherLease {
     return new PublisherLease({ store: this.#ctx.store, now: this.#ctx.now });
+  }
+
+  /**
+   * The proof pack `signer` card for an envelope sent from `from` (07 §8; M1-4d-d, D-102): this
+   * agent's own card or a contact's, with its proof of possession when stored. For
+   * `exportProofPack` (M1-7g). Undefined for an unknown or earlier-epoch key.
+   */
+  proofSigner(from: string): Promise<ProofPackSigner | undefined> {
+    return this.contacts.proofSigner(from);
   }
 
   /**
