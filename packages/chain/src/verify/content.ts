@@ -3,7 +3,8 @@
 //   1. parse the envelope strictly (04 §3.1.1 step 3);
 //   2. recompute envelopeHash; it must equal the pack's field and the on-chain Record's hash (the
 //      caller has already matched those two to each other and to the chain);
-//   3. verify `sig` under `from` with the envelope tag (04 §3.1.1 step 4);
+//   3. verify `sig` under `from` with the envelope tag (04 §3.1.1 step 4); with the signer's verified
+//      card, `from` must be the card's `agentNostr` (M1-4d-b), else `sender_mismatch`;
 //   4. derive `kc` from the 32-byte CEK and compare it with `aead.kc` (04 §3.3);
 //   5. decrypt;
 //   6. apply the payload's strict schema (04 §3.4); then the D-86 kind check (05 §3.1).
@@ -27,20 +28,24 @@ import { recordKindForPayload } from './kind.js';
 import type { ProofContentFailure } from './reasons.js';
 
 export type ContentCheck =
-  | { readonly ok: true; readonly payload: Payload }
+  /** `sender` is the envelope's `from`, whose signature verified (64 lowercase hex, 04 §3.1). */
+  | { readonly ok: true; readonly payload: Payload; readonly sender: string }
   | { readonly ok: false; readonly reason: ProofContentFailure };
 
 const fail = (reason: ProofContentFailure): ContentCheck => ({ ok: false, reason });
 
 /**
  * Checks a disclosed content key against the envelope. `recordedHash` is the envelopeHash that the
- * pack and the on-chain Record agree on; `kind` is the verified Record kind. Never throws.
+ * pack and the on-chain Record agree on; `kind` is the verified Record kind. `cardSender` is the
+ * `agentNostr` of the signer's verified card (`0x` + 64 lowercase hex), or null without a card: the
+ * envelope's sender must be that key before the content key is used. Never throws.
  */
 export async function checkDisclosedContent(
   envelopeValue: unknown,
   contentKey: string,
   recordedHash: string,
   kind: number,
+  cardSender: string | null,
 ): Promise<ContentCheck> {
   let envelope: Envelope;
   try {
@@ -50,6 +55,9 @@ export async function checkDisclosedContent(
   }
   if (encodeHex0x(envelopeHash(envelope)) !== recordedHash) return fail('envelope_hash_mismatch');
   if (!verifyEnvelope(envelope)) return fail('envelope_signature_invalid');
+  // Both sides are strictly parsed lowercase hex (04 §2.4.1): the envelope's `from` without `0x`,
+  // the card's `agentNostr` with it.
+  if (cardSender !== null && cardSender !== `0x${envelope.from}`) return fail('sender_mismatch');
 
   let cek: Uint8Array;
   try {
@@ -75,7 +83,7 @@ export async function checkDisclosedContent(
       return fail('payload_invalid');
     }
     if (recordKindForPayload(payload) !== kind) return fail('kind_mismatch');
-    return { ok: true, payload };
+    return { ok: true, payload, sender: envelope.from };
   } finally {
     wipe(cek);
     if (plaintext) wipe(plaintext);

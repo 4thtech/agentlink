@@ -1832,6 +1832,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Give an ERC-1271 refusal at verification time its own code (the account may have changed since the Notary checked it at inclusion), distinct from `signature_invalid`; owner decides how it renders.
   - Optional: cross-check `receiptFlags` with `receiptAt` once 05 §3.3 states the bit layout.
 
+#### M1-4d-d · agent card proof-of-possession (message-key signature over the card, own tag; 04 §2.4/§2.9, 07 §8) (new, IR-M1-4d-b-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (blocks M1-9h)
+- **Repo/path:** agentlink · docs/foundation (04, 07), packages/types, packages/crypto, packages/core (card issuance, M1-7g export), packages/chain/src/verify
+- **Depends on:** M1-4d-b
+- **Spec:** 04 §2.4, §2.9, §3.1.1 (domain-separation table); 07 §8
+- **Scope:**
+  - Spec: the agent's message (Nostr) key signs its own card (BIP-340 under its own tag, a new row in the 04 §3.1.1 table); the signature travels with the card (invite, `handshake`, `card-update`) and in the proof pack beside `cardSig`.
+  - Types, crypto and card issuance carry and check it; the exporter attaches it for the card it exports.
+  - Verifier: attributes disclosed content to the record signer (`verdict: verified`) only when this signature also verifies; this lifts the M1-4d-b interim rule.
+- **Acceptance:** shared test vectors for the new signature; a pack without it, or with one that does not verify, is never `verified`.
+
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
@@ -2373,6 +2384,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Recipient: on a `proof` envelope, check on-chain that recordId matches the envelope hash and `commitment(self, salt)` before any receipt.
   - Receipts: DELIVERED automatic per `receipts.autoDelivered`; OPENED only on explicit request; ACCEPTED/REJECTED exclusive and only after the `commitments` policy allows it or the owner approves (D-31, M1-20). On records whose envelope carries `terms`, only under a commitment scope (M1-32, 04 §3.4.2), including the deferred `ACCEPTED` receipt signed when the offer's `proof` envelope is processed after the accept (07 §2.1 step 4); `notarize` on an accept is skipped and not charged when the answered offer is already recorded. `getProof`; `exportProofPack` (content key only with `proofs.allowKeyDisclosure` approval, and then always with the envelope and the 32-byte CEK as `contentKey`, 07 §8, G-46; for a proof of agreement, `ownerApproval` with the signed `OwnerAction` and `CommitmentScope`, or the standing-rule policy hash, included by default and left out on the owner's choice, 07 §8, D-55).
   - Proof of agreement (D-32): notarizing the envelope that carries the final `terms`, plus the counterparty's ACCEPTED receipt, yields a pack that states mutual assent, not just a timestamp.
+  - Signer card in `exportProofPack` (M1-4d-b; IR-M1-4d-b-1 L-3): attach the card whose `agentNostr` equals the envelope's `from` (the card of the key epoch the envelope was sent under, not the current one), with its `cardSig` (and the M1-4d-d signature for that epoch once it exists). The verifier refuses a card that had expired at the record's chain time (`card_expired`), so notarizing an old envelope after its send-time card expired fails; surface that before submitting rather than exporting a pack that fails.
 - **Acceptance:**
   - Testnet integration: notarize → automatic DELIVERED → explicit OPENED → export → `verifyProofPack` valid.
   - No receipt is signed when the on-chain record does not match (tampered proof-envelope test); no ACCEPTED/REJECTED receipt is signed under the default policy without an owner-signed approval.
@@ -3015,10 +3027,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9h · CLI: local UI, credits and verify commands; passkey and recovery kit in `init` (new, split from M1-9a)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli
-- **Depends on:** M1-9a, M1-8d, M1-8e, M1-1k, M1-4d, M1-26, M1-4d-b
+- **Depends on:** M1-9a, M1-8d, M1-8e, M1-1k, M1-4d, M1-26, M1-4d-b, M1-4d-d
 - **Spec:** 06 §7, §8; 02 F-51, J1, J3, J5; 04 §2.2, §2.3; 07 §6.3; D-39, D-40
 - **Invariants:** I-1, I-4, I-10
-- **Blocking prerequisites (IR-M1-4d-1; before `verify` is user-facing, J5):** M1-4d-b lands first: (1) the envelope `from` is exposed as the content's sender and bound to the record signer (M-1), so disclosed content is never attributed to the wrong party; (2) `signer.agentCard` and `cardSig` are verified, and the card's `agentEvm` and `agentNostr` bind the signer and `from`. `verify` renders the result's `verdict` first and never shows `record_only` as a full pass.
+- **Blocking prerequisites (IR-M1-4d-1; before `verify` is user-facing, J5):** M1-4d-b lands first: (1) the envelope `from` is exposed as the content's sender and bound to the record signer (M-1), so disclosed content is never attributed to the wrong party; (2) `signer.agentCard` and `cardSig` are verified, and the card's `agentEvm` and `agentNostr` bind the signer and `from`. `verify` renders the result's `verdict` first and never shows `record_only` as a full pass. M1-4d-d (agent card proof-of-possession) also lands before `verify` is user-facing; until then no content is reported as attributed (M1-4d-b interim rule).
 - **Scope:**
   - D-71 (1) (supersedes D-64 (2)): testnet and mainnet contract addresses differ; `agentlink verify` still labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
   - `ui`, `credits [--topup]` (top-up routed to the cheapest supported chain, M1-26), `verify <proof.json>`; `doctor` checks for RPC and storage.
