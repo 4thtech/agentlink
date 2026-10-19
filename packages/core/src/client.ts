@@ -207,6 +207,7 @@ export class AgentLinkClient {
       identity: this.identity,
       envelopes: this.envelopes,
       outbox: this.outbox,
+      ownerActions: this.ownerActions,
     });
     this.#sync = new SyncService(ctx, {
       envelopes: this.envelopes,

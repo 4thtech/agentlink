@@ -661,7 +661,12 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
   if (!verifyCardPop(pending.card, cardPop)) throw cardPopInvalid();
   // M1-4d-f: the current card joins the history (its `cardPop` as stored: the KeyStore has moved).
   const current = await openOwnCard(ctx, row);
-  if (current === undefined) return;
+  if (current === undefined) {
+    ctx.log.warn('pending rotation not finished: the stored card does not match', {
+      keyEpoch: row.key_epoch,
+    });
+    return;
+  }
   const history = [...current.history, current].map(storedOf);
   const sealedCard = await seal(
     ctx,
