@@ -23,6 +23,8 @@ import {
   AGENT_EVM,
   B32,
   BAD_USD_STRINGS,
+  BIP340_SIG,
+  CARD_AGENT_SIG,
   CARD_SIG,
   CONTACT_A,
   CONTACT_B,
@@ -205,6 +207,48 @@ describe('ProofPack v1 (07 §8)', () => {
     ['unknown top-level key', ['note'], 'x'],
   ] as [string, Path, unknown][])('rejects %s', (_l, path, value) => {
     expectReject(proofPackSchema, edit(proofPack(), path, value));
+  });
+
+  describe('signer proof of possession: cardAgentSig and cardPop (M1-4d-d, D-102)', () => {
+    const withPop = (over: Record<string, unknown> = {}) => ({
+      ...proofPack(),
+      signer: {
+        evm: AGENT_EVM,
+        agentCard: agentCard(),
+        cardSig: CARD_SIG,
+        cardAgentSig: CARD_AGENT_SIG,
+        cardPop: BIP340_SIG,
+        ...over,
+      },
+    });
+
+    it('both signatures, together with the card, parse', () => {
+      expectRoundTrip(proofPackSchema, withPop());
+      expectRoundTrip(proofPackSchema, { ...minimalProofPack(), signer: withPop().signer });
+    });
+
+    it.each([
+      ['cardAgentSig without cardPop', { cardPop: undefined }],
+      ['cardPop without cardAgentSig', { cardAgentSig: undefined }],
+      ['both without the card', { agentCard: undefined, cardSig: undefined }],
+      ['cardPop with 0x', { cardPop: `0x${BIP340_SIG}` }],
+      ['cardPop uppercase', { cardPop: BIP340_SIG.toUpperCase() }],
+      ['cardPop of 63 bytes', { cardPop: BIP340_SIG.slice(2) }],
+      ['cardPop of 65 bytes', { cardPop: `${BIP340_SIG}f6` }],
+      ['cardAgentSig bare hex', { cardAgentSig: CARD_AGENT_SIG.slice(2) }],
+      [
+        'cardAgentSig uppercase',
+        { cardAgentSig: CARD_AGENT_SIG.toUpperCase().replace('0X', '0x') },
+      ],
+      ['cardAgentSig of 64 bytes', { cardAgentSig: CARD_AGENT_SIG.slice(0, -2) }],
+      ['cardAgentSig null', { cardAgentSig: null }],
+    ] as [string, Record<string, unknown>][])('rejects %s', (_l, over) => {
+      const pack = withPop(over);
+      const signer = pack.signer as Record<string, unknown>;
+      for (const key of Object.keys(signer)) if (signer[key] === undefined) delete signer[key];
+      expectReject(proofPackSchema, pack);
+      expectReject(proofPackSignerSchema, signer);
+    });
   });
 
   it('rejects an owner approval that is another op or a bare action', () => {
