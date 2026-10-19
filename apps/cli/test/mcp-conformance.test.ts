@@ -38,6 +38,11 @@ const VALID_ARGS: Record<string, Record<string, unknown>> = {
   agentlink_inbox: {},
   agentlink_get_approval: { approvalId: 'apr_AAAAAAAAAAAAAAAAAAAAAA' },
   agentlink_fetch_file: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
+  agentlink_notarize: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
+  agentlink_acknowledge: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA', type: 'opened' },
+  agentlink_get_proof: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
+  agentlink_export_proof_pack: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
+  agentlink_verify_proof_pack: { json: {} },
 };
 
 describe('MCP conformance over stdio (06 §9)', () => {
