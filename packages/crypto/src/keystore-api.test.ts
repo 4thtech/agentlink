@@ -105,9 +105,13 @@ describe('KeyStore (type level)', () => {
     expectTypeOf<'hpkeOpen'>().not.toExtend<keyof KeyStore>();
   });
 
-  it('takes an epoch only on the decrypting methods and the public-key lookup', () => {
+  // signDropRequest is the one signing method that takes an epoch (M1-1g-f, 04 §2.1): a DELETE
+  // signs with the drop key of the epoch its object was uploaded under, so an object stays
+  // deletable after a rotation. The KeyStore accepts it only with DELETE and never above the
+  // current epoch; every other signature uses the current epoch.
+  it('takes an epoch only on the decrypting methods, the public-key lookup and signDropRequest', () => {
     expectTypeOf<EpochTaking<KeyStore>>().toEqualTypeOf<
-      'getPublicBundle' | 'nip44Decrypt' | 'unwrapCek'
+      'getPublicBundle' | 'nip44Decrypt' | 'unwrapCek' | 'signDropRequest'
     >();
     expectTypeOf<Params<KeyStore, 'getPublicBundle'>>().toEqualTypeOf<
       [(EpochOptions | undefined)?]
@@ -122,13 +126,15 @@ interface DropSigner {
 }
 
 describe('KeyStore.signDropRequest (type level, M1-1g-e)', () => {
-  it('is the DropSigner of the drop adapter: request and createdAt in, header text out', () => {
+  it('is the DropSigner of the drop adapter: request, createdAt and an optional epoch in, header text out', () => {
     expectTypeOf<KeyStore>().toExtend<DropSigner>();
-    expectTypeOf<Params<KeyStore, 'signDropRequest'>>().toEqualTypeOf<[DropAuthRequest, number]>();
+    expectTypeOf<Params<KeyStore, 'signDropRequest'>>().toEqualTypeOf<
+      [DropAuthRequest, number, (EpochOptions | undefined)?]
+    >();
     expectTypeOf<Result<KeyStore, 'signDropRequest'>>().toEqualTypeOf<string>();
   });
 
-  it('takes no kind, tag, event or epoch: the KeyStore fixes them', () => {
+  it('takes no kind, tag or event: the KeyStore fixes them', () => {
     expectTypeOf<keyof DropAuthRequest>().toEqualTypeOf<'method' | 'url' | 'body'>();
   });
 
