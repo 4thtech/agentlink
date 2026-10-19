@@ -60,7 +60,21 @@ export type ProofContentResult =
   | { readonly status: 'verified'; readonly payload: Payload }
   | { readonly status: 'failed'; readonly reason: ProofContentFailure; readonly message: string };
 
+/**
+ * How far the result can be trusted, the field to show first (IR-M1-4d-1 M-2):
+ * - `verified`: the record, its receipts and the disclosed content all verify;
+ * - `record_only`: the record and its receipts verify, but no content was disclosed or the
+ *   disclosed content failed (`content`); never show this as a full pass;
+ * - `failed`: the pack proves nothing (`reason`).
+ */
+export type ProofVerdict = 'verified' | 'record_only' | 'failed';
+
+/** The block the record was read at: `finalized` (no reorg can remove it) or `latest`. */
+export type Finality = 'finalized' | 'latest';
+
 export interface ProofPackValid {
+  readonly verdict: 'verified' | 'record_only';
+  /** The record and its receipts verify. Read `verdict` for the content. */
   readonly valid: true;
   readonly chainId: number;
   /** The chain's config key. */
@@ -73,6 +87,8 @@ export interface ProofPackValid {
   readonly kind: number;
   /** RFC 3339 UTC: when the Notary stored the record. */
   readonly timestamp: string;
+  /** `finalized` where the chain answers that tag and the record is final; otherwise `latest`. */
+  readonly finality: Finality;
   readonly envelopeHash: Hex;
   /** The disclosed recipient, once its salt opened the commitment; null when not disclosed. */
   readonly recipient: { readonly evm: Hex } | null;
@@ -83,6 +99,7 @@ export interface ProofPackValid {
 }
 
 export interface ProofPackInvalid {
+  readonly verdict: 'failed';
   readonly valid: false;
   readonly reason: ProofPackFailure;
   readonly message: string;
@@ -102,14 +119,33 @@ const ERC1271_ABI = parseAbi([
   'function isValidSignature(bytes32 hash, bytes signature) view returns (bytes32)',
 ]);
 
+/** ChainError codes that mean the chain could not be asked, not that the account refused. */
+const CHAIN_FAILURES: ReadonlySet<string> = new Set([
+  'rpc_timeout',
+  'rpc_unavailable',
+  'rpc_error',
+  'method_refused',
+]);
+
 const invalid = (reason: ProofPackFailure): ProofPackInvalid =>
-  Object.freeze({ valid: false, reason, message: proofFailureMessage(reason) });
+  Object.freeze({
+    verdict: 'failed',
+    valid: false,
+    reason,
+    message: proofFailureMessage(reason),
+  });
 
 /** A chain answer failed: not a property of the pack. */
 class Unavailable extends Error {}
 
-const iso = (seconds: bigint): string =>
-  new Date(Number(seconds) * 1000).toISOString().replace('.000Z', 'Z');
+/** The latest second an RFC 3339 `YYYY-…Z` timestamp (and a JS Date) can hold: 9999-12-31T23:59:59Z. */
+const MAX_TIMESTAMP = 253_402_300_799n;
+
+/** RFC 3339 UTC, or null for a chain time no such timestamp can hold. */
+const iso = (seconds: bigint): string | null =>
+  seconds > MAX_TIMESTAMP
+    ? null
+    : new Date(Number(seconds) * 1000).toISOString().replace('.000Z', 'Z');
 
 function checkOptions(options: unknown): readonly VerifyChain[] {
   const chains = (options as { chains?: unknown } | null)?.chains;
@@ -144,14 +180,39 @@ interface RecordState {
   readonly receiptAt: readonly bigint[];
 }
 
-async function readRecord(chain: VerifyChain, recordId: Hex): Promise<RecordState> {
+async function readRecordAt(
+  chain: VerifyChain,
+  recordId: Hex,
+  blockTag: 'finalized' | 'latest',
+): Promise<RecordState> {
   try {
-    const state = await notaryReader(chain.client, chain.config).read.getRecord([recordId]);
+    const state = await notaryReader(chain.client, chain.config).read.getRecord([recordId], {
+      blockTag,
+    });
     return state as unknown as RecordState;
   } catch {
     // ChainErrors carry no URL; none of their detail leaves here either.
     throw new Unavailable();
   }
+}
+
+const exists = (state: RecordState): boolean =>
+  state.signer.toLowerCase() !== ZERO_ADDRESS && state.timestamp !== 0n;
+
+/**
+ * The record at the `finalized` block where the chain answers that tag (07 §6.1 `finalizedTag`), so a
+ * reorg cannot remove it; otherwise, or while it is not finalized yet, at `latest`, and the result
+ * says which (IR-M1-4d-1 M-3).
+ */
+async function readRecord(
+  chain: VerifyChain,
+  recordId: Hex,
+): Promise<{ state: RecordState; finality: Finality }> {
+  if (chain.config.finalizedTag) {
+    const state = await readRecordAt(chain, recordId, 'finalized');
+    if (exists(state)) return { state, finality: 'finalized' };
+  }
+  return { state: await readRecordAt(chain, recordId, 'latest'), finality: 'latest' };
 }
 
 /**
@@ -187,14 +248,10 @@ async function checkSignature(
       args: [encodeHex0x(digest) as ViemHex, signature as ViemHex],
     });
   } catch (error) {
-    // A revert or an undecodable answer is a refusal by the account; anything else is the chain's.
-    if (
-      error instanceof ChainError &&
-      (error.code === 'call_reverted' || error.code === 'invalid_call')
-    ) {
-      return null;
-    }
-    throw new Unavailable();
+    // Only a failure to reach or ask the chain is the chain's. A revert, an empty answer or one that
+    // does not decode is a refusal by the account, as in SignatureChecker (IR-M1-4d-1 L-1).
+    if (error instanceof ChainError && CHAIN_FAILURES.has(error.code)) throw new Unavailable();
+    return null;
   }
   return typeof word === 'string' && word.toLowerCase() === ERC1271_MAGIC_WORD ? 'contract' : null;
 }
@@ -217,9 +274,11 @@ async function verifyParsed(
 
   try {
     // 1. The record as the chain holds it (05 §3.3: every field is checkable from getRecord alone).
-    const state = await readRecord(chain, recordId);
-    if (state.signer.toLowerCase() === ZERO_ADDRESS || state.timestamp === 0n) {
-      return invalid('record_not_found');
+    const { state, finality } = await readRecord(chain, recordId);
+    if (!exists(state)) return invalid('record_not_found');
+    const timestamp = iso(state.timestamp);
+    if (timestamp === null || state.receiptAt.some((at) => at > MAX_TIMESTAMP)) {
+      return invalid('malformed_record');
     }
     if (state.signer.toLowerCase() !== signer) return invalid('signer_mismatch');
     if (state.kind !== record.kind) return invalid('kind_mismatch');
@@ -250,7 +309,7 @@ async function verifyParsed(
     const receipts: VerifiedReceipt[] = [];
     RECEIPT_TYPE_NAMES.forEach((type, i) => {
       const at = state.receiptAt[i] ?? 0n;
-      if (at > 0n) receipts.push(Object.freeze({ type, at: iso(at) }));
+      if (at > 0n) receipts.push(Object.freeze({ type, at: iso(at) as string }));
     });
     for (const claimed of pack.receipts) {
       const onChain = receipts.find((r) => r.type === claimed.type);
@@ -281,7 +340,9 @@ async function verifyParsed(
           });
     }
 
+    const contentVerified = content.status === 'verified';
     return Object.freeze({
+      verdict: contentVerified ? 'verified' : 'record_only',
       valid: true,
       chainId: chain.config.chainId,
       chain: chain.config.key,
@@ -290,11 +351,12 @@ async function verifyParsed(
       signer,
       signerType,
       kind: record.kind,
-      timestamp: iso(state.timestamp),
+      timestamp,
+      finality,
       envelopeHash: record.envelopeHash as Hex,
       recipient,
       receipts: Object.freeze(receipts),
-      contentVerified: content.status === 'verified',
+      contentVerified,
       content,
     });
   } catch (error) {

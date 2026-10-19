@@ -216,6 +216,10 @@ interface RecordState {
 interface FakeChain {
   /** getRecord answers by record ID; a missing ID returns the empty struct, as the contract does. */
   records?: Map<string, RecordState>;
+  /** getRecord at the `finalized` tag; default: the same as `records`. */
+  finalizedRecords?: Map<string, RecordState>;
+  /** The ERC-1271 account answers with these raw bytes (an empty or short answer). */
+  erc1271Raw?: string;
   /** eth_getCode by address (lowercase); default empty. */
   code?: Map<string, string>;
   /** The ERC-1271 account's answer for (hash, signature); default: not valid. */
@@ -225,7 +229,7 @@ interface FakeChain {
   down?: boolean;
 }
 
-type RpcCall = { method: string; to?: string; fn?: string };
+type RpcCall = { method: string; to?: string; fn?: string; tag?: string };
 
 const EMPTY_STATE: RecordState = {
   signer: `0x${'0'.repeat(40)}`,
@@ -263,10 +267,13 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
     const to = tx.to.toLowerCase();
     if (to === config.contracts.notary) {
       const { functionName, args } = decodeFunctionData({ abi: NOTARY_CLIENT_ABI, data: tx.data });
-      calls.push({ method: body.method, to, fn: functionName });
+      const tag = String(body.params[1]);
+      calls.push({ method: body.method, to, fn: functionName, tag });
       if (functionName !== 'getRecord') throw new Error(`unexpected ${functionName}`);
       const [recordId] = args as unknown as [string];
-      const state = chain.records?.get(recordId) ?? EMPTY_STATE;
+      const source =
+        tag === 'finalized' ? (chain.finalizedRecords ?? chain.records) : chain.records;
+      const state = source?.get(recordId) ?? EMPTY_STATE;
       return answer(
         encodeFunctionResult({
           abi: NOTARY_CLIENT_ABI,
@@ -287,6 +294,7 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
         { status: 200, headers: { 'content-type': 'application/json' } },
       );
     }
+    if (chain.erc1271Raw !== undefined) return answer(chain.erc1271Raw);
     const [hash, signature] = args as unknown as [string, string];
     const magic = chain.erc1271?.(hash, signature) ?? '0xffffffff';
     return answer(
@@ -448,6 +456,7 @@ async function verify(pack: unknown, chains: VerifyChain[]): Promise<ProofPackRe
 }
 
 function expectFailure(result: ProofPackResult, reason: string): void {
+  expect(result.verdict).toBe('failed');
   expect(result.valid).toBe(false);
   if (result.valid) return;
   expect(result.reason).toBe(reason);
@@ -469,7 +478,9 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
     const f = await eoaFixture();
     const { reader, calls } = chainWith(f);
     const result = await verify(f.pack, [reader]);
+    expect(Object.keys(result)[0]).toBe('verdict');
     expect(result).toEqual({
+      verdict: 'verified',
       valid: true,
       chainId: 84532,
       chain: 'base-sepolia',
@@ -479,6 +490,7 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
       signerType: 'account',
       kind: 1,
       timestamp: iso(NOTARIZED_AT),
+      finality: 'finalized',
       envelopeHash: MESSAGE_ENVELOPE_HASH,
       recipient: { evm: RECIPIENT },
       receipts: [{ type: 'DELIVERED', at: iso(DELIVERED_AT) }],
@@ -493,8 +505,10 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
         },
       },
     });
-    // One getRecord at the configured Notary; an EOA needs no code read.
-    expect(calls).toEqual([{ method: 'eth_call', to: base().contracts.notary, fn: 'getRecord' }]);
+    // One getRecord at the configured Notary, at the finalized block; an EOA needs no code read.
+    expect(calls).toEqual([
+      { method: 'eth_call', to: base().contracts.notary, fn: 'getRecord', tag: 'finalized' },
+    ]);
     expectNoEcho(result);
   });
 
@@ -518,6 +532,8 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
     if (!result.valid) return;
     expect(result.contentVerified).toBe(false);
     expect(result.content).toEqual({ status: 'not_disclosed' });
+    // A record without checked content is never a full pass (IR-M1-4d-1 M-2).
+    expect(result.verdict).toBe('record_only');
   });
 
   it('verifies a self-note (no recipient, no receipts)', async () => {
@@ -772,6 +788,79 @@ describe('verifyProofPack: each tamper fails with its own fixed code', () => {
     const { reader } = chainWith(f);
     expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
   });
+
+  it('an ERC-1271 account that answers with no data or less than a word (L-1)', async () => {
+    for (const raw of ['0x', ERC1271_MAGIC]) {
+      const f = erc1271Fixture();
+      const { reader } = chainWith(f, {
+        code: new Map([[VECTOR_RECORD.signer, '0x6080604052']]),
+        erc1271Raw: raw,
+      });
+      expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
+    }
+  });
+
+  it('a record time no timestamp can hold (uint64 max) is malformed_record (L-1)', async () => {
+    const f = await eoaFixture();
+    f.state.timestamp = 2n ** 64n - 1n;
+    const { reader } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'malformed_record');
+  });
+});
+
+describe('verifyProofPack: 65-byte smart-account signatures (IR-M1-4d-1 L-2)', () => {
+  /** A Safe-style 65-byte signature: v = 0 and a high s, never a canonical ECDSA form. */
+  const SAFE_STYLE = `0x${'0a'.repeat(32)}${'ff'.repeat(32)}00`;
+
+  it('goes to ERC-1271 and verifies when the account accepts it', async () => {
+    const f = erc1271Fixture(SAFE_STYLE);
+    const { reader } = chainWith(f, {
+      code: new Map([[VECTOR_RECORD.signer, '0x6080604052']]),
+      erc1271: (hash, signature) =>
+        hash === VECTOR_DIGEST && signature === SAFE_STYLE ? ERC1271_MAGIC : '0xffffffff',
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.signerType).toBe('contract');
+  });
+
+  it('is refused for a signer with no code (the EOA path requires the canonical form)', async () => {
+    const f = erc1271Fixture(SAFE_STYLE);
+    const { reader } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'signature_invalid');
+  });
+
+  it('still refuses a 65-byte signature that is not lowercase hex', async () => {
+    const f = erc1271Fixture(SAFE_STYLE.replace('0a', '0A'));
+    const { reader, fetchFn } = chainWith(f);
+    expectFailure(await verify(f.pack, [reader]), 'malformed_pack');
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe('verifyProofPack: finality (IR-M1-4d-1 M-3)', () => {
+  it('reports latest for a record that is not finalized yet, after trying finalized first', async () => {
+    const f = await eoaFixture();
+    const { reader, calls } = chainWith(f, { finalizedRecords: new Map() });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.finality).toBe('latest');
+    expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
+  });
+
+  it('reads latest only on a chain without the finalized tag', async () => {
+    const f = await eoaFixture();
+    const config = Object.freeze({ ...base(), finalizedTag: false });
+    const { reader, calls } = chainFor(config, { records: new Map([[f.recordId, f.state]]) });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.finality).toBe('latest');
+    expect(calls.map((c) => c.tag)).toEqual(['latest']);
+  });
+
+  it('a record found at neither block is record_not_found', async () => {
+    const f = await eoaFixture();
+    const { reader, calls } = chainFor(base(), {});
+    expectFailure(await verify(f.pack, [reader]), 'record_not_found');
+    expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
+  });
 });
 
 describe('verifyProofPack: disclosed content key, in the 07 §8 order (G-46, D-66)', () => {
@@ -857,6 +946,7 @@ describe('verifyProofPack: disclosed content key, in the 07 §8 order (G-46, D-6
       expect(result.valid).toBe(true);
       if (!result.valid) return;
       expect(result.contentVerified).toBe(false);
+      expect(result.verdict).toBe('record_only');
       expect(result.content).toEqual({
         status: 'failed',
         reason: c.reason,

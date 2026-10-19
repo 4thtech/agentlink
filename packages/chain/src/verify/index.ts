@@ -10,6 +10,8 @@ export {
 } from './reasons.js';
 export {
   verifyProofPack,
+  type Finality,
+  type ProofVerdict,
   type ProofContentResult,
   type ProofPackInvalid,
   type ProofPackResult,

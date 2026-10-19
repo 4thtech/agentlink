@@ -22,6 +22,11 @@ export type ParseResult =
   | { readonly ok: false; readonly reason: ProofPackFailure };
 
 const KINDS: ReadonlySet<unknown> = new Set(Object.values(RECORD_KINDS));
+/** `0x` + a non-empty, even number of lowercase hex digits (04 §2.4.1, an ERC-1271 signature). */
+const ERC1271_SIGNATURE = /^0x(?:[0-9a-f]{2})+$/;
+const ECDSA_SIGNATURE_BYTES = 65;
+/** A canonical 65-byte form (r = s = 1, v = 27), only to run the schema's other checks. */
+const CANONICAL_STAND_IN = `0x${'0'.repeat(62)}01${'0'.repeat(62)}011b`;
 const refuse = (reason: ProofPackFailure): ParseResult => ({ ok: false, reason });
 
 /** The pack's JSON text, bounded, or a refusal. An object is serialised and then parsed like text. */
@@ -87,7 +92,22 @@ export function parseProofPack(input: unknown): ParseResult {
   }
   const early = precheck(value);
   if (early !== null) return refuse(early);
-  const parsed = proofPackSchema.safeParse(value);
+  // The schema holds every 65-byte signature to the canonical ECDSA form. That rule is for the EOA
+  // path; a smart account (a Safe: v of 0, 1 or above 30) may return any bytes that its
+  // `isValidSignature` accepts, so a 65-byte signature in any other form is checked here for its
+  // JSON form only and then goes to ERC-1271; the EOA path still decodes it canonically
+  // (verify.ts, decodeEcdsaSignature) and refuses it (IR-M1-4d-1 L-2).
+  const signature = (value as Record<string, unknown>).signature;
+  const loose =
+    typeof signature === 'string' &&
+    signature.length === 2 + 2 * ECDSA_SIGNATURE_BYTES &&
+    ERC1271_SIGNATURE.test(signature);
+  const parsed = proofPackSchema.safeParse(
+    loose ? { ...(value as Record<string, unknown>), signature: CANONICAL_STAND_IN } : value,
+  );
   if (!parsed.success) return refuse('malformed_pack');
-  return { ok: true, pack: parsed.data };
+  return {
+    ok: true,
+    pack: loose ? { ...parsed.data, signature: signature as string } : parsed.data,
+  };
 }
