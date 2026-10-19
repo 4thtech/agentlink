@@ -26,6 +26,8 @@ export const TAGS = Object.freeze({
   safetyCommit: 'agentlink/safety-commit/v1',
   /** 04 §3.6.1: pairingDigest = taggedHash(TAGS.safetyCode, T). */
   safetyCode: 'agentlink/safety-code/v1',
+  /** 04 §2.9 (D-102): `cardPop` is BIP-340 by agentNostr over taggedHash(TAGS.cardPop, sha256(JCS(card))). */
+  cardPop: 'agentlink/card-pop/v1',
 } as const);
 
 /** SHA-256 (FIPS 180-4). */

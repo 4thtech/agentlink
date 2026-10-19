@@ -630,6 +630,29 @@ describe('doctor (07 §9.4)', () => {
     expect(removed).toHaveLength(1);
     expect(no.out.join('\n')).not.toContain('Removed');
   });
+
+  it('names `agentlink policy recover` when the rules fail closed (D-100), and only then', async () => {
+    const closed = fakeAgent({
+      ownerActions: {
+        loadPolicy: () => Promise.resolve({ mode: 'fail_closed', problem: 'rolled_back' }),
+      },
+    });
+    const bad = await harness(closed).run(['doctor']);
+    expect(bad.code).toBe(EXIT_FAILED);
+    expect(bad.out.join('\n')).toContain('agentlink policy recover');
+    // Only the fixed hint: never the kind's code or anything from the stored rules.
+    expect(bad.out.join('\n')).not.toContain('rolled_back');
+
+    const fine = fakeAgent({
+      ownerActions: {
+        loadPolicy: () => Promise.resolve({ mode: 'signed', policy: {}, version: 3 }),
+      },
+    });
+    const good = await harness(fine).run(['doctor']);
+    expect(good.code).toBe(EXIT_OK);
+    expect(good.out.join('\n')).not.toContain('policy recover');
+    expect(good.out.join('\n')).toContain('OK       Your rules are in use');
+  });
 });
 
 describe('accept and invite argument checks', () => {

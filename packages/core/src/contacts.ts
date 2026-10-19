@@ -46,6 +46,7 @@ import {
 import type { ContactDisplayName, IdentityLabel, OwnerAlias } from '@4thtech-io/types';
 import {
   agentNostrKey,
+  cardPopInvalid,
   checkReceivedCard,
   ownerFingerprintHex,
   parseStoredCard,
@@ -146,6 +147,11 @@ export interface StagedPairing {
   readonly card: AgentCard;
   readonly cardSig: string;
   readonly cardAgentSig: string | null;
+  /**
+   * The card's `cardPop` (04 §2.9, D-102), verified: from the `handshake` (inviter side) or, for the
+   * invitee, from the `handshake-ack` at completion (the invite carries none). Null without one.
+   */
+  readonly cardPop: string | null;
   /** Self-declared, untrusted (I-5). */
   readonly name: string;
   readonly relays: readonly string[];
@@ -172,10 +178,35 @@ export interface PreparedCompletion {
   readonly apply: (tx: StoreTx) => PairingCompletion;
 }
 
-/** A card-update body (04 §3.4.1): no cardAgentSig is needed. */
+/**
+ * A proof pack's `signer` (07 §8): the record signer (the card's `agentEvm`), its card and `cardSig`,
+ * and the card's proof of possession (`cardAgentSig` and `cardPop`, together or not at all; D-102).
+ */
+export interface ProofPackSigner {
+  readonly evm: string;
+  readonly agentCard: AgentCard;
+  readonly cardSig: string;
+  readonly cardAgentSig?: string;
+  readonly cardPop?: string;
+}
+
+/** The signer block of a stored card: the pair only when both signatures are stored. */
+function signerOf(stored: StoredCard): ProofPackSigner {
+  const base = { evm: stored.card.agentEvm, agentCard: stored.card, cardSig: stored.cardSig };
+  return stored.cardAgentSig !== null && stored.cardPop !== null
+    ? { ...base, cardAgentSig: stored.cardAgentSig, cardPop: stored.cardPop }
+    : base;
+}
+
+/**
+ * A card-update body (04 §3.4.1): no cardAgentSig is needed for acceptance. `cardAgentSig` and
+ * `cardPop` (04 §2.9, D-102) come together or not at all; when present, both must verify.
+ */
 export interface CardUpdateInput {
   readonly card: unknown;
   readonly cardSig: unknown;
+  readonly cardAgentSig?: unknown;
+  readonly cardPop?: unknown;
   readonly name: unknown;
   readonly relays: unknown;
 }
@@ -304,6 +335,41 @@ export class ContactBook {
       return unreadable();
     }
     return card;
+  }
+
+  /**
+   * The proof pack `signer` card for an envelope `from` key (07 §8; 04 §2.9, D-102), for
+   * `exportProofPack` (M1-7g): the own current card, or the stored current card of the contact whose
+   * current message key is `from`, re-verified, with its `cardSig` and, when stored, its
+   * `cardAgentSig` and `cardPop` together, so the pack can verify. A card without the pair (one that
+   * came from a peer before M1-4d-d) is returned alone, and its packs stay `record_only`. Undefined
+   * for any other key, an earlier epoch's key included: only the current card is stored.
+   */
+  async proofSigner(from: string): Promise<ProofPackSigner | undefined> {
+    const ctx = this.#ctx;
+    if (typeof from !== 'string' || !/^[0-9a-f]{64}$/.test(from)) return undefined;
+    const got = await readIdentity(ctx);
+    if (got !== undefined) {
+      const own = await openOwnCard(ctx, got.row);
+      if (own !== undefined && agentNostrKey(own.card) === from) return signerOf(own);
+    }
+    const row = await ctx.store.transaction((tx) =>
+      tx.select('contacts', { agent_nostr: from }).find((r) => r.status !== 'removed'),
+    );
+    if (row === undefined) return undefined;
+    const stored = parseStoredCard(
+      await open(ctx, 'contacts', 'agent_card_json', [row.contact_id], row.agent_card_json),
+    );
+    const { card } = stored;
+    if (
+      card.agentEvm !== row.contact_id ||
+      card.keyEpoch !== row.key_epoch ||
+      agentNostrKey(card) !== row.agent_nostr ||
+      ownerFingerprintHex(card) !== row.owner_fingerprint
+    ) {
+      return unreadable();
+    }
+    return signerOf(stored);
   }
 
   /**
@@ -544,6 +610,7 @@ export class ContactBook {
       card,
       cardSig: checked.cardSig,
       cardAgentSig: checked.cardAgentSig,
+      cardPop: checked.cardPop,
       name: checked.name,
       relays: checked.relays,
       expiresAt: input.expiresAt,
@@ -605,6 +672,7 @@ export class ContactBook {
         card: stored.card,
         cardSig: stored.cardSig,
         cardAgentSig: stored.cardAgentSig,
+        ...(stored.cardPop === null ? {} : { cardPop: stored.cardPop }),
         name,
         relays,
       },
@@ -625,6 +693,7 @@ export class ContactBook {
       card,
       cardSig: checked.cardSig,
       cardAgentSig: checked.cardAgentSig,
+      cardPop: checked.cardPop,
       name: checked.name,
       relays: checked.relays,
       expiresAt: row.expires_at,
@@ -677,6 +746,7 @@ export class ContactBook {
       card,
       cardSig: staged.cardSig,
       cardAgentSig: staged.cardAgentSig,
+      cardPop: staged.cardPop,
     };
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', ckey, storedCardText(signed));
     const sealedName = await seal(ctx, 'contacts', 'name', ckey, staged.name);
@@ -892,8 +962,19 @@ export class ContactBook {
   async prepareCardUpdate(input: CardUpdateInput): Promise<PreparedCardUpdate> {
     const ctx = this.#ctx;
     const now = nowOf(ctx);
+    // 04 §2.9 (D-102): both or neither; a present pair that does not verify drops the whole body.
+    if ((input.cardAgentSig === undefined) !== (input.cardPop === undefined)) {
+      throw cardPopInvalid();
+    }
     const checked = checkReceivedCard(
-      { card: input.card, cardSig: input.cardSig, name: input.name, relays: input.relays },
+      {
+        card: input.card,
+        cardSig: input.cardSig,
+        ...(input.cardAgentSig === undefined ? {} : { cardAgentSig: input.cardAgentSig }),
+        ...(input.cardPop === undefined ? {} : { cardPop: input.cardPop }),
+        name: input.name,
+        relays: input.relays,
+      },
       { requireAgentSig: false, now },
     );
     const { card } = checked;
@@ -902,7 +983,12 @@ export class ContactBook {
     const fingerprint = ownerFingerprintHex(card);
     const ownKeys = await this.#ownKeys();
     const key = [id];
-    const update: StoredCard = { card, cardSig: checked.cardSig, cardAgentSig: null };
+    const update: StoredCard = {
+      card,
+      cardSig: checked.cardSig,
+      cardAgentSig: checked.cardAgentSig,
+      cardPop: checked.cardPop,
+    };
     const sealedCard = await seal(ctx, 'contacts', 'agent_card_json', key, storedCardText(update));
     const name = await seal(ctx, 'contacts', 'name', key, checked.name);
     const relays = await seal(ctx, 'contacts', 'relays', key, canonicalize([...checked.relays]));

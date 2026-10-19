@@ -1011,6 +1011,15 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.
 
+#### M1-1h-f · `card-pop` test-vector suite (new, M1-4d-d follow-up)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · test-vectors, tools/vectors
+- **Depends on:** M1-1h; M1-4d-d (#297, #300)
+- **Spec:** 04 §2.9; 07 §8; D-102
+- **Invariants:** I-5
+- **Scope:** an independent-generator `card-pop` suite (M1-1h rules, written by a session that does not write the TypeScript): valid `cardAgentSig` and `cardPop` pairs, a signature replayed from another card (key epoch, owner, display name), one signature without the other, and malformed encodings. Registered in every runtime the suite declares.
+- **Acceptance:** every case passes in every declared runtime; `check-generators` covers the suite.
+
 #### M1-1h-c · Regenerate the `sign-policy-set` vector for the post-G-32 policy form (new, IR-M1-2b-1)
 - **Status:** done (4thtech/agentlink#35, merged 2026-10-14) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/generate_owner_action.py
@@ -1262,7 +1271,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
 #### M1-1g-f · crypto: drop DELETE signed with an older epoch's drop key (new, IR-M1-1g-e-1)
-- **Status:** in review (4thtech/agentlink#294) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#294, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore, `keystore-drop.ts`), packages/node (keychain KeyStore and facade)
 - **Depends on:** M1-1g-e (#274)
 - **Spec:** 04 §2.1 (drop key per `keyEpoch`; an object's locator records the epoch, so older objects stay deletable), §4; 07 §5.4
@@ -1794,7 +1803,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - The product path never builds a read client with a plain `fetch`: it requires `nodeRpcFetch` or an equivalent address-checked fetch, enforced by a lint rule or a factory-only export.
 
 #### M1-4c · chain: submission, direct mode, inclusion tracking
-- **Status:** in review (4thtech/agentlink#295) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#295, merged 2026-10-19) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
 - **Depends on:** M1-4a, M1-3g (Base Sepolia addresses); M1-3j for Chiado once deployed (D-63); M1-10a for integration (mock before)
 - **Spec:** 07 §6.2, §7; 03 §4.3; 05 §3.2, §3.3; 04 §5, §7 (malicious submitter)
@@ -1848,7 +1857,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Cross-check `receiptFlags` with `receiptAt` per the 05 §3.3 layout (type `t` is bit `t − 1`); any mismatch is `malformed_record` (D-97, decided; 07 §8).
 
 #### M1-4d-d · chain: agent-card proof-of-possession in proof packs (new, D-95; decided, D-102)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done in two parts (verification and the pack schema, 4thtech/agentlink#297; the core signing, the pairing exchange and the signing at `init`, `owner add-agent` and key rotation as M1-4d-d-b, 4thtech/agentlink#300; both merged 2026-10-19). Sending both signatures in `card-update` and attaching them in `exportProofPack` are in M1-4d-f and M1-7g · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain/src/verify, packages/types (pack schema), docs/foundation/07 §8
 - **Depends on:** M1-4d-b (done); the spec change to 07 §8 and 04 §2.9, §3.4.1, §3.6 (`cardAgentSig` and `cardPop` over the card, D-102)
 - **Spec:** 07 §8; 04 §2.4, §2.9, §3.1.1; 02 J5
@@ -1884,6 +1893,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-5
 - **Scope:** decide and specify how a record signer with code (ERC-1271) can be confirmed through a card (for example `cardAgentSig` checked by `isValidSignature`, and what happens when the account no longer confirms it, D-96); until then such signers stay `record_only` (D-102). Spec change first, in its own docs PR.
 - **Acceptance:** to be set with the spec; RED commit.
+
+#### M1-4d-f · core: card-update sender with both card signatures; proofSigner for earlier key epochs (new, M1-4d-d-b review)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (identity, card-update sender), packages/crypto (KeyStore)
+- **Depends on:** M1-4d-d (#297, #300)
+- **Spec:** 04 §2.9, §3.4.1, §3.6; 07 §8; D-102
+- **Invariants:** I-1, I-5
+- **Scope:**
+  - The core `card-update` sender carries both card signatures (`cardAgentSig` and `cardPop`), and a received update's signatures are verified and stored.
+  - A `proofSigner` that signs for earlier key epochs (card history), so the card of an older epoch can still be proven. Dependency for M1-7g (`exportProofPack` attaches the signatures of the envelope's key epoch).
+  - Identity `#addCardPop` ignores the compare-and-set count of its write; check it and handle a lost race.
+- **Acceptance:** tests first (RED commit): an update without the signatures from an older peer is still accepted and a forged one is dropped; a signer for an earlier epoch signs only for retained epochs, never a future one; a lost compare-and-set is reported, not ignored.
 
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
 - **Status:** done (4thtech/agentlink#284, merged 2026-10-19) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3138,7 +3159,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-7i-1 L1/L2/L5, 2026-10-17): before wiring the budget ledger: use the finalized block timestamp in `releaseProofReservation`, keep `markBroken` in its own transaction (07 §3.5), optional `charged_usd <= reserved_usd` check.
 
 #### M1-10a-b · submitter follow-ups (IR-M1-10a-2 lows) (new)
-- **Status:** in review (4thtech/agentlink#293) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
+- **Status:** done (4thtech/agentlink#293, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
 - **Repo/path:** agentlink · apps/submitter/src/engine.ts
 - **Depends on:** M1-10a
 - **Spec:** 07 §7 (Implementation); 05 §3.3
@@ -3160,7 +3181,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (local red run): an item held past the cap is failed; one held within it keeps retrying.
 
 #### M1-10b · testnet credits faucet
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#298, merged 2026-10-19; code only, deployed by M1-10c) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter (faucet route)
 - **Depends on:** M1-10a
 - **Spec:** 05 §9 (faucet); 03 §4.4; 10 M1-10; `release-and-deployment.md` §4.5
@@ -3170,6 +3191,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Rate limits per agent address and per IP plus a global daily cap (new identities are free, so per-agent limits alone are not enough).
 - **Acceptance:**
   - A mainnet chain ID is rejected (test); a repeat inside the window is rejected; the global cap holds.
+
+#### M1-10b-b · faucet hardening (new, M1-10b review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the faucet is deployed)
+- **Repo/path:** agentlink · apps/submitter (faucet route)
+- **Depends on:** M1-10b
+- **Spec:** 05 §9 (faucet); 03 §4.4; `release-and-deployment.md` §4.5
+- **Invariants:** I-3
+- **Scope:**
+  - Charge the claim in storage before, or atomically with, the broadcast, so a storage failure cannot allow a second claim for the same agent and day.
+  - Simulate `depositFor` instead of using a fixed 200k gas limit.
+  - When the answer to a broadcast is lost, a retry returns the earlier transaction, not `already_claimed`.
+  - Faucet key separation across environments (staging and production use different faucet keys); done together with M1-10c.
+- **Acceptance:** tests first (local red run): a storage failure at charge time sends nothing and allows no second claim; a lost broadcast answer is followed by a retry that returns the transaction; the gas limit comes from simulation; the staging and production configs cannot share a faucet key.
 
 #### M1-10c · submitter and faucet deploy pipeline (new sub-task)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

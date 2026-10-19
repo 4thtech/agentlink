@@ -9,7 +9,7 @@
 //   SUBMITTER_RPC_URLS_<chainId> optional: comma-separated RPC URLs (may carry a provider key)
 // Optional var SUBMITTER_MAX_FEE_PER_GAS_WEI: a ceiling on every transaction's maxFeePerGas.
 import { decodeBase64url } from '@4thtech-io/crypto';
-import { getChainConfig } from '@4thtech-io/chain';
+import { FAUCET_MAX_USD_CENTS, getChainConfig, isFaucetChain } from '@4thtech-io/chain';
 import type { EngineSettings } from './engine.js';
 
 export interface Limits {
@@ -164,5 +164,94 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
     }),
     ipKey,
     maxFeePerGasWei,
+  });
+}
+
+/**
+ * The testnet credits faucet (05 §9; SUB-7; M1-10b). Off unless SUBMITTER_FAUCET_CHAINS names
+ * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia until
+ * Chiado is deployed) and a testnet in the shipped config. Anything invalid turns the faucet off
+ * (null) and leaves the rest of the submitter running.
+ *
+ * Vars: SUBMITTER_FAUCET_CHAINS and the bounded overrides below.
+ * Worker secrets (set by the owner with `wrangler secret put`, never in a file; M1-10c):
+ *   SUBMITTER_FAUCET_KEY_<chainId>  the chain's faucet key, 0x + 64 hex, separate from its gas key
+ *                                   and per environment (D-88); it holds testnet funds only
+ * The faucet uses the submitter's RPC URLs, fee ceiling and per-IP bucket key.
+ */
+export interface FaucetConfig {
+  readonly chains: readonly number[];
+  /** What one claim credits, in US cents of the chain's fee token. */
+  readonly usdCents: number;
+  /** One claim per agent per chain within this many seconds. */
+  readonly agentWindowSeconds: number;
+  /** Claims per IP (IPv6 /64) per chain per UTC day. */
+  readonly ipClaimsPerDay: number;
+  /** Claims per chain per UTC day, from everyone (new identities are free, so this is the bound). */
+  readonly dailyCap: number;
+  /** Faucet requests per IP (IPv6 /64) per hour, whatever their outcome. */
+  readonly ipRequestsPerHour: number;
+}
+
+export const FAUCET_DEFAULTS = Object.freeze({
+  /** $1: ten proofs at the beta price (12 §2). */
+  usdCents: 100,
+  agentWindowSeconds: 86_400,
+  ipClaimsPerDay: 3,
+  dailyCap: 200,
+  ipRequestsPerHour: 60,
+});
+
+/** Reads and checks the faucet settings; null when the faucet is off or anything is invalid. */
+export function readFaucetConfig(env: Record<string, unknown>): FaucetConfig | null {
+  const chainsRaw = env.SUBMITTER_FAUCET_CHAINS;
+  if (typeof chainsRaw !== 'string' || chainsRaw === '') return null;
+  const chains: number[] = [];
+  for (const part of chainsRaw.split(',')) {
+    if (!INTEGER.test(part)) return null;
+    const chainId = Number(part);
+    if (!isFaucetChain(chainId) || getChainConfig(chainId)?.testnet !== true) return null;
+    if (chains.includes(chainId)) return null;
+    chains.push(chainId);
+  }
+  const usdCents = intVar(
+    env,
+    'SUBMITTER_FAUCET_USD_CENTS',
+    FAUCET_DEFAULTS.usdCents,
+    1,
+    FAUCET_MAX_USD_CENTS,
+  );
+  const window = intVar(
+    env,
+    'SUBMITTER_FAUCET_AGENT_WINDOW_SECONDS',
+    FAUCET_DEFAULTS.agentWindowSeconds,
+    3_600,
+    30 * 86_400,
+  );
+  const perIp = intVar(
+    env,
+    'SUBMITTER_FAUCET_IP_CLAIMS_PER_DAY',
+    FAUCET_DEFAULTS.ipClaimsPerDay,
+    1,
+    1_000,
+  );
+  const cap = intVar(env, 'SUBMITTER_FAUCET_DAILY_CAP', FAUCET_DEFAULTS.dailyCap, 1, 100_000);
+  const requests = intVar(
+    env,
+    'SUBMITTER_FAUCET_IP_REQUESTS_PER_HOUR',
+    FAUCET_DEFAULTS.ipRequestsPerHour,
+    1,
+    10_000,
+  );
+  if (usdCents === null || window === null || perIp === null || cap === null || requests === null) {
+    return null;
+  }
+  return Object.freeze({
+    chains: Object.freeze(chains),
+    usdCents,
+    agentWindowSeconds: window,
+    ipClaimsPerDay: perIp,
+    dailyCap: cap,
+    ipRequestsPerHour: requests,
   });
 }

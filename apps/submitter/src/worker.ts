@@ -7,6 +7,7 @@
 //   GET  /v1/status/:txHash           a sent transaction and the current status of its items
 //   GET  /v1/health                   per chain: available, gas balance (wei), queue depth
 //   POST /v1/deposit-authorization    present, disabled until M3-4b (501)
+//   POST /v1/faucet                   {chainId, agent}: testnet credits (faucet.ts; M1-10b)
 //
 // Logging (07 §7, I-7): this Worker writes nothing to the console and logs no request, IP, signer,
 // signature or record. It keeps only the aggregate counters of limits.ts (METRICS). Errors are fixed
@@ -21,22 +22,45 @@ import {
   type SubmitterChain,
 } from '@4thtech-io/chain';
 import { encodeHex, encodeUtf8, hmacSha256, parseJson } from '@4thtech-io/crypto';
-import { readConfig, type SubmitterConfig } from './config.js';
+import { readConfig, readFaucetConfig, type SubmitterConfig } from './config.js';
+import {
+  MAX_FAUCET_BODY_BYTES,
+  createFaucetClass,
+  parseFaucetRequest,
+  type FaucetDeps,
+  type SubmitterFaucetApi,
+} from './faucet.js';
 import { ipBucket } from './ip.js';
 import { SubmitterLimits, type Metric } from './limits.js';
 import { createQueueClass, type QueueDeps, type SubmitterQueueApi } from './queue.js';
 
-export { SubmitterLimits, createQueueClass };
+export { SubmitterLimits, createFaucetClass, createQueueClass };
 export { METRICS, type Metric } from './limits.js';
-export { DEFAULTS, readConfig, type Limits, type SubmitterConfig } from './config.js';
+export {
+  DEFAULTS,
+  FAUCET_DEFAULTS,
+  readConfig,
+  readFaucetConfig,
+  type FaucetConfig,
+  type Limits,
+  type SubmitterConfig,
+} from './config.js';
+export {
+  parseFaucetRequest,
+  type ClaimAnswer,
+  type FaucetDeps,
+  type SubmitterFaucetApi,
+} from './faucet.js';
 
 export interface SubmitterEnv {
   readonly SUBMITTER_QUEUE: DurableObjectNamespace<SubmitterQueueApi>;
   readonly SUBMITTER_LIMITS: DurableObjectNamespace<SubmitterLimits>;
+  /** The faucet (M1-10b); without the binding the faucet is unavailable. */
+  readonly SUBMITTER_FAUCET?: DurableObjectNamespace<SubmitterFaucetApi>;
   readonly [name: string]: unknown;
 }
 
-export type WorkerDeps = QueueDeps;
+export type WorkerDeps = QueueDeps & FaucetDeps;
 
 /**
  * Largest request body (IR-M1-10a-1 L-4): 20 items, each with a signature of the full 2 048 bytes
@@ -88,9 +112,9 @@ function count(c: Ctx, metric: Metric, n = 1): void {
 const queueOf = (env: SubmitterEnv, chainId: number) =>
   env.SUBMITTER_QUEUE.get(env.SUBMITTER_QUEUE.idFromName(`chain:${String(chainId)}`));
 
-async function readBody(request: Request): Promise<string | null> {
+async function readBody(request: Request, max = MAX_BODY_BYTES): Promise<string | null> {
   const declared = request.headers.get('content-length');
-  if (declared !== null && Number(declared) > MAX_BODY_BYTES) return null;
+  if (declared !== null && Number(declared) > max) return null;
   if (!request.body) return '';
   const reader = request.body.getReader();
   const parts: Uint8Array[] = [];
@@ -99,7 +123,7 @@ async function readBody(request: Request): Promise<string | null> {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_BODY_BYTES) {
+    if (size > max) {
       await reader.cancel();
       return null;
     }
@@ -114,21 +138,26 @@ async function readBody(request: Request): Promise<string | null> {
   return new TextDecoder('utf-8', { fatal: true }).decode(all);
 }
 
+/** The HMAC of the caller's IP bucket, hex, under a purpose label (never the IP itself). */
+function ipTag(config: SubmitterConfig, request: Request, label: string): string {
+  const bucket = ipBucket(request.headers.get('cf-connecting-ip'));
+  return encodeHex(hmacSha256(config.ipKey, encodeUtf8(`${label}${bucket}`)));
+}
+
 /**
- * Charges the caller's IP bucket (`prefix` `i`: items; `r`: status and health reads); returns a 429
- * when it is over its hourly limit, else null.
+ * Charges the caller's IP bucket (`prefix` `i`: items; `r`: status and health reads; `f`: faucet
+ * requests); returns a 429 when it is over its hourly limit, else null.
  */
 async function takeIp(
   c: Ctx,
   config: SubmitterConfig,
   request: Request,
-  prefix: 'i' | 'r',
+  prefix: 'i' | 'r' | 'f',
   n: number,
   limit: number,
 ): Promise<Response | null> {
   const now = Math.floor(Date.now() / 1000);
-  const bucket = ipBucket(request.headers.get('cf-connecting-ip'));
-  const ipKey = encodeHex(hmacSha256(config.ipKey, encodeUtf8(bucket)));
+  const ipKey = ipTag(config, request, '');
   const stub = c.env.SUBMITTER_LIMITS.get(c.env.SUBMITTER_LIMITS.idFromName(`${prefix}:${ipKey}`));
   const taken = await stub.take(n, limit, 3600, now);
   if (taken.ok) return null;
@@ -224,6 +253,59 @@ async function health(c: Ctx, config: SubmitterConfig | null, request: Request):
   return json(200, { ok: chains.every((x) => x.available), chains });
 }
 
+/** POST /v1/faucet (faucet.ts; 05 §9; SUB-7). */
+async function faucetClaim(
+  c: Ctx,
+  config: SubmitterConfig | null,
+  request: Request,
+): Promise<Response> {
+  count(c, 'request_faucet');
+  const faucetConfig = readFaucetConfig(c.env);
+  const namespace = c.env.SUBMITTER_FAUCET;
+  if (!config || !faucetConfig || !namespace) {
+    count(c, 'unavailable');
+    return refuse(503, 'unavailable');
+  }
+  // Every faucet request counts against its IP's hourly limit, whatever its outcome.
+  const limited = await takeIp(c, config, request, 'f', 1, faucetConfig.ipRequestsPerHour);
+  if (limited) return limited;
+  let text: string | null;
+  try {
+    text = await readBody(request, MAX_FAUCET_BODY_BYTES);
+  } catch {
+    count(c, 'bad_request');
+    return refuse(400, 'bad_request');
+  }
+  if (text === null) {
+    count(c, 'bad_request');
+    return refuse(413, 'too_large');
+  }
+  const parsed = parseFaucetRequest(text);
+  if (!parsed.ok) {
+    count(c, 'bad_request');
+    return refuse(400, parsed.error);
+  }
+  if (
+    !faucetConfig.chains.includes(parsed.chainId) ||
+    c.deps.faucetFor(c.env, parsed.chainId) === null
+  ) {
+    count(c, 'unavailable');
+    return refuse(503, 'unavailable');
+  }
+  const stub = namespace.get(namespace.idFromName(`faucet:${String(parsed.chainId)}`));
+  const answer = await stub.claim(parsed.chainId, parsed.agent, ipTag(config, request, 'faucet:'));
+  if (answer.ok) {
+    count(c, 'faucet_credited');
+    return json(200, { chainId: parsed.chainId, txHash: answer.txHash });
+  }
+  if (answer.error === 'unavailable') {
+    count(c, 'unavailable');
+    return refuse(503, 'unavailable');
+  }
+  count(c, 'rate_limited');
+  return refuse(429, answer.error, { 'retry-after': String(answer.retryAfter) });
+}
+
 async function route(c: Ctx, request: Request): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -236,6 +318,9 @@ async function route(c: Ctx, request: Request): Promise<Response> {
   if (path === '/v1/deposit-authorization') {
     // 07 §7: present but disabled until M3-4b (gasless top-ups need M1-3c first).
     return method === 'POST' ? refuse(501, 'not_available') : refuse(405, 'method_not_allowed');
+  }
+  if (path === '/v1/faucet') {
+    return method === 'POST' ? faucetClaim(c, config, request) : refuse(405, 'method_not_allowed');
   }
   const statusMatch = /^\/v1\/status\/([^/]+)$/.exec(path);
   const known = path === '/v1/notarize' || path === '/v1/receipt' || statusMatch !== null;

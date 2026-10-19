@@ -1,7 +1,7 @@
 // M1-10a: the submitter's settings (07 §7, 05 §3.3; FA-1). Defaults are the spec's; each override is
 // bounded; anything invalid makes readConfig return null, and the Worker fails closed. Runs in Node.
 import { describe, expect, it } from 'vitest';
-import { DEFAULTS, readConfig } from '../src/config.js';
+import { DEFAULTS, FAUCET_DEFAULTS, readConfig, readFaucetConfig } from '../src/config.js';
 
 // A synthetic IP-bucket key (32 bytes of 0x5a, base64url), only to run the parser.
 const IP_KEY = 'WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo';
@@ -81,5 +81,71 @@ describe('readConfig', () => {
       { ...base, SUBMITTER_MAX_FEE_PER_GAS_WEI: '1e9' },
     ];
     for (const env of bad) expect(readConfig(env), JSON.stringify(env)).toBeNull();
+  });
+});
+
+// M1-10b: the faucet's settings (05 §9; SUB-7). Off unless SUBMITTER_FAUCET_CHAINS names chains, and
+// only chains on the hard-coded testnet allowlist of @4thtech-io/chain; anything invalid turns the
+// faucet off (null), never on with a guessed setting.
+describe('readFaucetConfig', () => {
+  it('is off without SUBMITTER_FAUCET_CHAINS', () => {
+    expect(readFaucetConfig({})).toBeNull();
+    expect(readFaucetConfig({ SUBMITTER_FAUCET_CHAINS: '' })).toBeNull();
+  });
+
+  it('uses bounded defaults: one claim per agent per day, a per-IP and a global daily cap', () => {
+    const config = readFaucetConfig({ SUBMITTER_FAUCET_CHAINS: '84532' });
+    expect(config).toEqual({
+      chains: [84532],
+      usdCents: FAUCET_DEFAULTS.usdCents,
+      agentWindowSeconds: 86_400,
+      ipClaimsPerDay: FAUCET_DEFAULTS.ipClaimsPerDay,
+      dailyCap: FAUCET_DEFAULTS.dailyCap,
+      ipRequestsPerHour: FAUCET_DEFAULTS.ipRequestsPerHour,
+    });
+    expect(FAUCET_DEFAULTS.usdCents).toBeLessThanOrEqual(1_000);
+    expect(FAUCET_DEFAULTS.dailyCap).toBeLessThanOrEqual(10_000);
+  });
+
+  it('takes bounded overrides', () => {
+    expect(
+      readFaucetConfig({
+        SUBMITTER_FAUCET_CHAINS: '84532',
+        SUBMITTER_FAUCET_USD_CENTS: '500',
+        SUBMITTER_FAUCET_AGENT_WINDOW_SECONDS: '3600',
+        SUBMITTER_FAUCET_IP_CLAIMS_PER_DAY: '2',
+        SUBMITTER_FAUCET_DAILY_CAP: '12',
+        SUBMITTER_FAUCET_IP_REQUESTS_PER_HOUR: '20',
+      }),
+    ).toEqual({
+      chains: [84532],
+      usdCents: 500,
+      agentWindowSeconds: 3_600,
+      ipClaimsPerDay: 2,
+      dailyCap: 12,
+      ipRequestsPerHour: 20,
+    });
+  });
+
+  it('refuses every mainnet chain ID and Chiado until it is deployed (SUB-7)', () => {
+    for (const chains of ['1', '8453', '100', '42161', '10', '137', '10200', '84532,8453']) {
+      expect(readFaucetConfig({ SUBMITTER_FAUCET_CHAINS: chains }), chains).toBeNull();
+    }
+  });
+
+  it('turns off on anything invalid', () => {
+    const base = { SUBMITTER_FAUCET_CHAINS: '84532' };
+    const bad: Record<string, string>[] = [
+      { SUBMITTER_FAUCET_CHAINS: '84532,84532' },
+      { SUBMITTER_FAUCET_CHAINS: '84532,abc' },
+      { ...base, SUBMITTER_FAUCET_USD_CENTS: '0' },
+      { ...base, SUBMITTER_FAUCET_USD_CENTS: '1001' },
+      { ...base, SUBMITTER_FAUCET_AGENT_WINDOW_SECONDS: '60' },
+      { ...base, SUBMITTER_FAUCET_IP_CLAIMS_PER_DAY: '0' },
+      { ...base, SUBMITTER_FAUCET_DAILY_CAP: '0' },
+      { ...base, SUBMITTER_FAUCET_DAILY_CAP: '100001' },
+      { ...base, SUBMITTER_FAUCET_IP_REQUESTS_PER_HOUR: '1.5' },
+    ];
+    for (const env of bad) expect(readFaucetConfig(env), JSON.stringify(env)).toBeNull();
   });
 });

@@ -123,6 +123,9 @@ export async function cardUpdatePayload(agent: TestAgent): Promise<JsonValue> {
     body: {
       card: signed.card as unknown as JsonValue,
       cardSig: signed.cardSig,
+      // M1-4d-d (D-102): the core sends both card signatures with every card-update.
+      cardAgentSig: signed.cardAgentSig,
+      cardPop: signed.cardPop,
       name: signed.name,
       relays: [...signed.relays],
     },
