@@ -6,9 +6,10 @@
 // - 11 §5.1: user-facing text says "proof", "credits", "agent ID"; never the network's name, a
 //   token, "chain", "contract", "on-chain", "transaction" or "gas". The core's and the chain
 //   package's own wording is never passed through: their results map by code to the text here.
-// - The top-up link (06 §2.1 `topUpUrl`, 02 F-46, 08 §1 `pay.`): the deposit page on its own origin,
-//   given the agent address and the amount in the fragment (never sent to a server by the browser).
-//   It names no chain or token: the page routes to the cheapest supported chain (D-40, F-51).
+// - The top-up link (06 §2.1 `topUpUrl`, 02 F-46, 08 §1 `pay.`): the deposit page on its own
+//   origin. The spec gives no form for the link (open question, IR-M1-9d-2 M3), so it is the plain
+//   origin: no amount, network or token in it. The agent address travels as its own field
+//   (`agentAddress`) and in the nextStep, for the user to paste on the page.
 import { CoreError, type NotarizeResult, type ProofView } from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
 import {
@@ -36,14 +37,9 @@ export function dollars(usd: unknown): string | undefined {
   return `$${whole ?? '0'}.${(frac + '00').slice(0, Math.max(2, frac.replace(/0+$/, '').length))}`;
 }
 
-/**
- * The top-up link (06 §2.1): `https://pay.agentlink.4thtech.io/#agent=<agent ID>[&usd=<amount>]`.
- * Undefined when the agent ID or the amount is not in its exact form (nothing unchecked is inserted).
- */
-export function topUpUrl(agentId: string, usd?: string): string | undefined {
-  if (!AGENT_ID.test(agentId)) return undefined;
-  if (usd !== undefined && !USD.test(usd)) return undefined;
-  return `${TOP_UP_ORIGIN}/#agent=${agentId}${usd === undefined ? '' : `&usd=${usd}`}`;
+/** The top-up link (06 §2.1): the plain deposit origin. Undefined for a malformed agent ID. */
+export function topUpUrl(agentId: string): string | undefined {
+  return AGENT_ID.test(agentId) ? `${TOP_UP_ORIGIN}/` : undefined;
 }
 
 export const PROOF_TEXT = Object.freeze({
@@ -55,7 +51,7 @@ export const PROOF_TEXT = Object.freeze({
   needsCredits: 'Adding proof costs {fee}, and there are not enough credits for it.',
   needsCreditsNoFee: 'There are not enough credits to add proof.',
   needsCreditsNextStep:
-    'Tell the user to add credits here: {url} (messages and files stay free). Then call this tool again.',
+    'Tell the user to add credits for agent ID {agentId} here: {url} (messages and files stay free). Then call this tool again.',
   needsCreditsNoLink:
     'Tell the user to add credits in the AgentLink app (messages and files stay free). Then call this tool again.',
   approval: "Adding proof needs the owner's approval, so nothing was recorded yet.",
@@ -84,7 +80,8 @@ export const PROOF_TEXT = Object.freeze({
   networkNextStep:
     'Try again in a few minutes. If it keeps failing, the user can run `agentlink doctor`.',
   unsupported: "That proof option isn't supported in this version, so nothing was recorded.",
-  unsupportedNextStep: 'Call again without chain: AgentLink picks the proof network automatically.',
+  unsupportedNextStep:
+    'Call again without that override: AgentLink picks where to record the proof automatically.',
   approvalInvalid: "That approval can't be used for this request, so nothing was done.",
   approvalInvalidNextStep:
     'Call the tool again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
@@ -101,17 +98,17 @@ const fill = (template: string, slots: Readonly<Record<string, string>>): string
 /** The `needs_credits` result (06 §1 rule 3, §2.1): agent address and top-up link. */
 export function needsCredits(
   agentId: string,
-  route: { readonly usd?: string; readonly feeUsd?: string } | undefined,
+  route: { readonly feeUsd?: string } | undefined,
   fields: Readonly<Record<string, unknown>> = {},
 ): HandlerOutput {
-  const url = topUpUrl(agentId, route?.usd);
+  const url = topUpUrl(agentId);
   const fee = dollars(route?.feeUsd);
   const summary =
     fee === undefined ? PROOF_TEXT.needsCreditsNoFee : fill(PROOF_TEXT.needsCredits, { fee });
   const nextStep =
     url === undefined
       ? PROOF_TEXT.needsCreditsNoLink
-      : fill(PROOF_TEXT.needsCreditsNextStep, { url });
+      : fill(PROOF_TEXT.needsCreditsNextStep, { url, agentId });
   return fail('needs_credits', summary, nextStep, undefined, {
     ...fields,
     agentAddress: agentId,

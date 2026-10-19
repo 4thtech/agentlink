@@ -1928,6 +1928,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - The paid tools and `agentlink_status` use `selectPayingChain`; `needs_credits` carries the top-up link built from the route (amount, agent address); the `chain?` override is honoured only under Advanced.
   - Proof packs carry their chain, so `verifyProofPack` resolves the chain from the shipped list without setup.
+  - (IR-M1-9d-2) Resolve here the structured chain fields that M1-9d-2 returns as 06 §2.1 and §2.4 define them: `credits[].chain`, ProofStatus `chain` (notarize, get_proof, `proof` on send and the terms tools) and `chain` in `agentlink_verify_proof_pack`. Summaries already name no network; decide whether these fields move under Advanced or stay as spec'd, and update 06 with the decision.
 - **Acceptance:**
   - Snapshot tests of CLI and MCP default outputs contain no chain prompt and no chain name outside Advanced; a proof pack verifies with no chain configured.
 

@@ -82,6 +82,10 @@ export const SEND_TEXT = Object.freeze({
   proofApproval: "Adding proof to this message needs the owner's approval.",
   proofApprovalTail:
     'The message is already sent: to finish, call agentlink_notarize with envelopeId {envelopeId} and this approvalId.',
+  // IR-M1-9d-2 M2: the message went out, only its proof did not.
+  proofFailed: 'Its proof was not added.',
+  proofFailedNextStep:
+    'The message is already sent. To add its proof later, call agentlink_notarize with envelopeId {envelopeId}; if it keeps failing, tell the user.',
 });
 
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
@@ -277,6 +281,14 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   }
 }
 
+/** Proof outcomes after a send that are not failures (IR-M1-9d-2 M2). */
+const PROOF_PENDING: ReadonlySet<string> = new Set([
+  'ok',
+  'pending_approval',
+  'needs_credits',
+  'submitted',
+]);
+
 /** ProofStatus statuses (06 §2.4): any other tool status shows as `error` inside `proof`. */
 const PROOF_STATUSES: ReadonlySet<string> = new Set([
   'ok',
@@ -308,7 +320,29 @@ async function withProofOf(
       approvalNextStepTail: SEND_TEXT.proofApprovalTail.replace('{envelopeId}', envelopeId),
     });
   } catch (error) {
-    proofOut = proofThrown(error);
+    // Every proof-step error after a successful send (IR-M1-9d-2 M2): never INTERNAL, never "nothing
+    // was done"; the error itself is never read (it could carry a URL or a value, I-7).
+    try {
+      proofOut = proofThrown(error);
+    } catch {
+      proofOut = { result: { status: 'error', summary: '', code: 'PROOF_FAILED' } };
+    }
+  }
+  // Anything but a proof in progress or waiting on the user is a failed proof of a sent message:
+  // fixed text, a fixed code (the core's when it is one), the send fields kept.
+  if (!PROOF_PENDING.has(proofOut.result.status)) {
+    const code =
+      typeof proofOut.result.code === 'string' && proofOut.result.code !== 'INTERNAL'
+        ? proofOut.result.code
+        : 'PROOF_FAILED';
+    proofOut = {
+      result: {
+        status: 'error',
+        summary: SEND_TEXT.proofFailed,
+        nextStep: SEND_TEXT.proofFailedNextStep.replace('{envelopeId}', envelopeId),
+        code,
+      },
+    };
   }
   const { status, summary, nextStep, code, approvalId: pending, url, ...rest } = proofOut.result;
   const { chain, recordId, fee, receipts, agentAddress, topUpUrl } = rest as Record<
