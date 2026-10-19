@@ -28,6 +28,8 @@ export type ChainErrorCode =
   | 'rpc_unavailable'
   /** An RPC endpoint answered with a JSON-RPC error. */
   | 'rpc_error'
+  /** The chain answered, but the answer is impossible (a quote whose parts do not add up). */
+  | 'bad_answer'
   /** Anything else. */
   | 'rpc_failed';
 
@@ -38,6 +40,7 @@ const MESSAGES: Record<ChainErrorCode, string> = {
   rpc_timeout: 'The chain did not answer in time.',
   rpc_unavailable: 'The chain could not be reached.',
   rpc_error: 'The chain returned an error.',
+  bad_answer: 'The chain returned an answer that does not add up.',
   rpc_failed: 'The chain request failed.',
 };
 

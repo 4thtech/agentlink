@@ -14,6 +14,7 @@ const BOUNDARY = new Set([
   'no-eval',
   'no-new-func',
   'no-implied-eval',
+  'no-restricted-properties',
 ]);
 
 let eslint;
@@ -409,5 +410,36 @@ describe('IR-M1-9k-1 F01: the crypto test seam in apps/cli/test test files only'
     for (const file of ['apps/cli/src/a.ts', 'apps/cli/src/a.test.ts', 'apps/cli/test/x.ts']) {
       expect(violationFor('apps/cli', '@4thtech-io/crypto/testing', file), file).not.toBeNull();
     }
+  });
+});
+
+// IR-M1-4a-2 R-3 (M1-4b): only the platform's address-checked RPC fetch may carry the brand
+// @4thtech-io/chain createReadClient requires, so production code may not call Symbol.for outside
+// the two files that set and check it. A guard, not a security boundary (the runtime check also
+// refuses the global fetch).
+describe('Symbol.for (the address-checked RPC fetch brand)', () => {
+  const BRAND = "Symbol.for('agentlink.address-checked-rpc-fetch');";
+  it.each([
+    'packages/core/src/a.ts',
+    'packages/chain/src/a.ts',
+    'apps/cli/src/a.ts',
+    'packages/node/src/a.ts',
+  ])('is refused in %s', async (file) => {
+    expect(rules(await lint(file, BRAND))).toEqual(['no-restricted-properties']);
+  });
+  it.each([
+    'packages/node/src/rpc-fetch.ts',
+    'packages/chain/src/clients/checked-fetch.ts',
+    'packages/chain/src/clients/clients.test.ts',
+  ])('is allowed in %s', async (file) => {
+    expect(await lint(file, BRAND)).toEqual([]);
+  });
+  // IR-M1-4b-1 L-1: an alias or a computed member reaches the same function.
+  it.each([
+    "const S = Symbol; S['for']('agentlink.address-checked-rpc-fetch');",
+    "const S = Symbol; S.for('agentlink.address-checked-rpc-fetch');",
+    "Symbol['for']('agentlink.address-checked-rpc-fetch');",
+  ])('refuses the alias or computed form %s', async (code) => {
+    expect(rules(await lint('packages/core/src/a.ts', code))).toEqual(['no-restricted-properties']);
   });
 });
