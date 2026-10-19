@@ -11,7 +11,7 @@ _Updated 2026-10-18 by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| M1b waves — orchestrator | @talirezun (agents) | in-progress | 16 PRs merged 10-18; 0.1.1 released | 2026-10-18 |
+| M1b waves — orchestrator | @talirezun (agents) | in-progress | files e2e + chain/proof engine merged; decisions D-83..D-95 | 2026-10-19 |
 | M1 gate two-machine test — Tali | @talirezun | J1/J4/J8/J9 passed 17/17 (2026-10-18); J2/J3/J5 after M1b | auto-sync dogfood | 2026-10-18 |
 
 ## Waiting on a decision
