@@ -226,20 +226,30 @@ describe('deploy-drop.yml structure', () => {
       let step = index;
       while (step > 0 && !/^ {6}- name:/.test(lines[step])) step -= 1;
       const header = lines.slice(step, index).join('\n');
-      calls.push({ line: line.trim(), inDrop: /\n {8}working-directory: apps\/drop\n/.test(header) });
+      calls.push({
+        line: line.trim(),
+        inDrop: /\n {8}working-directory: apps\/drop\n/.test(header),
+      });
     });
     expect(calls.length).toBeGreaterThanOrEqual(10);
     for (const call of calls) {
-      expect(call.line).toMatch(/^(?:[A-Za-z_]+="[^"]*" )?(?:if [a-z]+="\$\(|live="\$\()?pnpm exec wrangler /);
+      expect(call.line).toMatch(
+        /^(?:[A-Za-z_]+="[^"]*" )?(?:if [a-z]+="\$\(|live="\$\()?pnpm exec wrangler /,
+      );
       expect(call.line).toMatch(/ --env (staging|production) /);
       const config = call.inDrop ? '--config wrangler.toml' : '--config apps/drop/wrangler.toml';
       expect(call.line, call.line).toContain(` ${config}`);
     }
     const deploys = calls.filter((c) => / wrangler deploy .*--no-bundle/.test(c.line));
-    expect(deploys.map((c) => c.line.match(/--env (\w+)/)[1]).sort()).toEqual(['production', 'staging']);
+    expect(deploys.map((c) => c.line.match(/--env (\w+)/)[1]).sort()).toEqual([
+      'production',
+      'staging',
+    ]);
     for (const env of ['staging', 'production']) {
       expect(calls.some((c) => c.line.includes(`deployments status --env ${env} `))).toBe(true);
-      expect(calls.some((c) => c.line.includes(`rollback "$`) && c.line.includes(`--env ${env} `))).toBe(true);
+      expect(
+        calls.some((c) => c.line.includes(`rollback "$`) && c.line.includes(`--env ${env} `)),
+      ).toBe(true);
     }
   });
 });
