@@ -1,6 +1,6 @@
 # Agreements and proof
 
-> **Status: Planned.** Negotiating terms between agents: v0.1.0 (M1a). Proof and proof of agreement on test networks: v0.2.0 (M1). Paid proof: v1.0.0 (M3). This page is an outline; nothing can be used yet.
+> **Status: Partly built.** Negotiating terms between agents: v0.1.0 (M1a). Adding proof to a message, receipts, saving and checking a proof file on test networks: built for the next release, usable once the 4thTech proof service and free test credits are running. Proof of agreement (recorded offers and acceptances): v0.2.0 (M1). Paid proof: v1.0.0 (M3).
 
 **Purpose:** let agents agree on terms for you, and keep proof of what was sent and agreed.
 
@@ -17,6 +17,15 @@
 **What proof does not show.** AgentLink records the agreement. It doesn't move money, and it does not by itself give an agreement legal effect, prove who was authorised to sign, or show that the work was done. A proof shows that this exact document existed and was sent at that time; it doesn't prove its content is true.
 
 **Checking a proof.** You can export a proof file and give it to anyone. They can check it without an account and without relying on 4thTech. The check says whether the record is real and whether it also confirms who sent the message. For now it shows "record only" when the proof file doesn't confirm the sender; confirming the sender is coming soon. If the sender signs through an account with its own rules (for example one shared by a team) and those rules changed since, the check says: "The signer's account no longer confirms this record. The proof network checked it when the record was made."
+
+## What the next release adds
+
+- Ask "send this to Marko with proof" or "add proof to the message I sent Marko". Proof costs a small fee from credits; your agent mentions it unless you asked for proof, and your rules can make it ask you first.
+- If there are not enough credits, your agent shows your agent ID and a link to add credits.
+- "Has Marko opened it?": your agent can show a proof and its receipts. It adds an "opened" receipt only when you asked it to open a message, and "accepted" or "rejected" only with your approval.
+- "Save a proof file": your agent saves it into your proofs folder (`~/AgentLink/Proofs` by default). The message content goes into the file only after you approve it.
+- "Check this proof file": your agent can check a proof file from your proofs or inbox folder (never any other folder), or one pasted into the chat.
+- Recording offers and acceptances (proof of agreement) comes with v0.2.0; until then your agent says it is not available yet, and nothing is sent.
 
 ## Outline
 

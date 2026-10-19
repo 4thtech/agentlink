@@ -18,9 +18,14 @@ const M1A_TABLE: Readonly<Record<string, readonly [boolean, boolean, boolean, bo
   agentlink_get_approval: [true, false, true, false],
 };
 
-/** 06 §2.0, the M1b rows registered so far (M1-9d-1: files; the proof tools land with M1-9d-2). */
+/** 06 §2.0, the M1b rows (M1-9d-1: files; M1-9d-2: the proof tools). */
 const M1B_TABLE: Readonly<Record<string, readonly [boolean, boolean, boolean, boolean]>> = {
   agentlink_fetch_file: [false, false, false, true],
+  agentlink_notarize: [false, false, false, true],
+  agentlink_acknowledge: [false, false, false, true],
+  agentlink_get_proof: [true, false, true, true],
+  agentlink_export_proof_pack: [false, false, false, false],
+  agentlink_verify_proof_pack: [true, false, true, true],
 };
 const TABLE = { ...M1A_TABLE, ...M1B_TABLE };
 
@@ -28,14 +33,25 @@ const TABLE = { ...M1A_TABLE, ...M1B_TABLE };
 const FILE_ARGS: Readonly<Record<string, readonly string[]>> = {
   agentlink_send: ['path'],
   agentlink_fetch_file: ['fileIndex'],
+  // D-87: a pack file inside proofs.exportFolder or files.inboxFolder only.
+  agentlink_verify_proof_pack: ['path'],
+  // 06 §2.4: the message's content key goes into the pack only with the owner's approval
+  // (`proofs.allowKeyDisclosure`, never `allow`); no agent key is ever exported.
+  agentlink_export_proof_pack: ['includeContentKey'],
 };
+
+/**
+ * The one name the danger rule would flag, fixed by the 06 §2.0 table (D-53): it saves a proof pack
+ * of the agent's own record and exports no key (see tool-surface.test.ts NAME_ALLOWLIST).
+ */
+const NAME_EXCEPTIONS: readonly string[] = ['agentlink_export_proof_pack'];
 
 describe('tool surface (06 §2.0, D-53)', () => {
   it('matches the committed snapshot', () => {
     expect(TOOLS).toMatchSnapshot();
   });
 
-  it('registers exactly the nine M1a tools and the landed M1b tools', () => {
+  it('registers exactly the nine M1a tools and the six M1b tools', () => {
     const registered = TOOLS.map((t) => t.name);
     expect([...registered, ...Object.keys(PENDING_M1A_TOOLS)].sort()).toEqual(
       Object.keys(TABLE).sort(),
@@ -105,7 +121,7 @@ describe('tool surface (06 §2.0, D-53)', () => {
     const dangerous =
       /policy|policies|export|key|credential|storage|approve|decide|hook|config|block|ignore|request_accept/i;
     for (const tool of TOOLS) {
-      expect(tool.name).not.toMatch(dangerous);
+      if (!NAME_EXCEPTIONS.includes(tool.name)) expect(tool.name).not.toMatch(dangerous);
       const allowed = FILE_ARGS[tool.name] ?? [];
       const input = Object.keys(tool.inputSchema['properties'] as object)
         .filter((arg) => !allowed.includes(arg))
@@ -129,9 +145,9 @@ describe('tool surface (06 §2.0, D-53)', () => {
     const send = TOOLS.find((t) => t.name === 'agentlink_send')!;
     const props = send.inputSchema['properties'] as Record<string, { enum?: string[] }>;
     expect(props['type']?.enum).toEqual(['text', 'note', 'request', 'delivery']);
-    // M1-9d-1: `path` attaches one file (06 §2.3); `notarize` lands with M1-9d-2.
+    // M1-9d-1: `path` attaches one file (06 §2.3); M1-9d-2: `notarize` (06 §2.2).
     expect(props['path']).toMatchObject({ type: 'string', minLength: 1 });
-    expect(props).not.toHaveProperty('notarize');
+    expect(props['notarize']).toEqual({ type: 'boolean' });
   });
 
   it('is deeply frozen', () => {

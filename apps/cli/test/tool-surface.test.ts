@@ -108,6 +108,24 @@ const ARG_ALLOWLIST: Readonly<Record<string, Readonly<Record<string, string>>>> 
     // into `files.inboxFolder` under a sanitised, never-overwriting name (D-84).
     fileIndex: 'an index into a received message, not a path',
   },
+  agentlink_verify_proof_pack: {
+    // 06 §2.4, G-25, D-87 (owner decision 2026-10-18): a proof pack file strictly inside
+    // `proofs.exportFolder` or `files.inboxFolder` only. A lexical check refuses any other path
+    // before the disk is touched; then realpath, no-follow open, regular file, 256 KiB cap, device
+    // and inode match; fixed codes only (src/runtime/proofs.test.ts). Read-only: writes nothing.
+    path: 'a proof pack inside the export or inbox folder only (D-87)',
+  },
+};
+
+/**
+ * Explicit per-tool exceptions to DENIED_NAME (M1-9d-2; the M1-9e note above). The name is fixed by
+ * the 06 §2.0 table (D-53), frozen at 0.1.0. Nothing else is exempt, and the rule is unchanged.
+ */
+const NAME_ALLOWLIST: Readonly<Record<string, string>> = {
+  // 06 §2.4: saves a proof pack (07 §8) of the agent's own record into `proofs.exportFolder`. It
+  // exports no key: the message's content key goes into the pack only with the owner's approval
+  // (`proofs.allowKeyDisclosure`, never `allow`; 06 §3), and no agent key ever leaves the KeyStore.
+  agentlink_export_proof_pack: 'saves a proof pack; the content key only with owner approval',
 };
 
 /**
@@ -143,7 +161,9 @@ export function auditSurface(
     const row = byName.get(name);
     if (!name.startsWith('agentlink_')) bad.push(`${name}: name lacks the agentlink_ prefix`);
     if (row === undefined) bad.push(`${name}: not a tool of the 06 §2.0 table`);
-    if (DENIED_NAME.test(name)) bad.push(`${name}: name suggests a denied capability (I-4)`);
+    if (DENIED_NAME.test(name) && NAME_ALLOWLIST[name] === undefined) {
+      bad.push(`${name}: name suggests a denied capability (I-4)`);
+    }
     for (const [where, text] of [
       ['title', tool.title ?? ''],
       ['description', tool.description ?? ''],
@@ -247,7 +267,14 @@ describe('06 §2.0 table (D-53, D-55)', () => {
 
   // M1-9d is split (M1-9d-1: files; M1-9d-2: the proof tools). Each M1b tool is registered against
   // the table here when its card lands; the rest stay pending.
-  const REGISTERED_M1B: readonly string[] = ['agentlink_fetch_file'];
+  const REGISTERED_M1B: readonly string[] = [
+    'agentlink_fetch_file',
+    'agentlink_notarize',
+    'agentlink_acknowledge',
+    'agentlink_get_proof',
+    'agentlink_export_proof_pack',
+    'agentlink_verify_proof_pack',
+  ];
 
   it('the registry is the M1a rows plus the landed M1b rows; the other M1b rows stay pending', () => {
     const m1a = table.filter((r) => r.phase === 'M1a').map((r) => r.name);
@@ -258,7 +285,7 @@ describe('06 §2.0 table (D-53, D-55)', () => {
     const pending = table
       .filter((r) => r.phase === 'M1b' && !REGISTERED_M1B.includes(r.name))
       .map((r) => r.name);
-    expect(pending).toHaveLength(5);
+    expect(pending).toHaveLength(0);
     for (const name of pending) expect(surface.map((t) => t.name)).not.toContain(name);
   });
 
@@ -274,6 +301,32 @@ describe('06 §2.0 table (D-53, D-55)', () => {
       'envelopeId',
       'fileIndex',
     ]);
+  });
+
+  it('the registry holds exactly the 15 tools of the table, in its order (D-53, D-55)', () => {
+    expect(surface.map((t) => t.name)).toEqual(table.map((r) => r.name));
+  });
+
+  it('agentlink_verify_proof_pack takes path or json only; no tool asks for a chain by default', () => {
+    const verify = surface.find((t) => t.name === 'agentlink_verify_proof_pack');
+    expect(Object.keys(verify?.inputSchema['properties'] ?? {}).sort()).toEqual(['json', 'path']);
+    for (const tool of surface) {
+      const required = (tool.inputSchema['required'] ?? []) as string[];
+      expect(required, tool.name).not.toContain('chain');
+    }
+  });
+
+  it('agentlink_export_proof_pack leaves the content key and the recipient out by default', () => {
+    const tool = surface.find((t) => t.name === 'agentlink_export_proof_pack');
+    const props = (tool?.inputSchema['properties'] ?? {}) as Record<string, { default?: unknown }>;
+    expect(Object.keys(props).sort()).toEqual([
+      'approvalId',
+      'envelopeId',
+      'includeContentKey',
+      'includeRecipient',
+      'recordId',
+    ]);
+    expect(tool?.inputSchema['required']).toBeUndefined();
   });
 
   it('no tool name is duplicated', () => {
@@ -305,6 +358,21 @@ describe('auditSurface catches bad surfaces (local demonstration, kept as a test
     { ...base, ...patch },
   ];
   const audit = (tools: SurfaceTool[]): string[] => auditSurface(tools, table, SERVER_INSTRUCTIONS);
+
+  it('an export tool other than the allowlisted proof-pack tool', () => {
+    expect(audit(fixture({ name: 'agentlink_export_keys' })).join('\n')).toMatch(
+      /agentlink_export_keys: name suggests a denied capability/,
+    );
+  });
+
+  it('a path argument on agentlink_get_proof (the allowlist is per tool)', () => {
+    const tools = surface.map((t) =>
+      t.name === 'agentlink_get_proof'
+        ? { ...t, inputSchema: { type: 'object', properties: { path: { type: 'string' } } } }
+        : t,
+    );
+    expect(audit(tools).join('\n')).toMatch(/agentlink_get_proof: argument "path"/);
+  });
 
   it('a set_policy tool', () => {
     expect(audit(fixture({ name: 'agentlink_set_policy' })).join('\n')).toMatch(

@@ -771,11 +771,18 @@ describe('arguments the agent may not give (06 §2.2a, D-55)', () => {
       { envelopeId, decision: 'reject', terms: offerTerms('1.00') },
       { envelopeId, decision: 'counter' },
       { envelopeId, decision: 'accept', note: 'ok' },
-      { envelopeId, decision: 'accept', notarize: true },
     ]) {
       const r = await call(bobMcp, 'agentlink_respond_to_terms', args);
       expect(r.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
     }
+    // M1-9d-2: `notarize` reaches the real core, which does not record answers yet: a fixed
+    // refusal, and nothing is sent or signed.
+    const recorded = await call(bobMcp, 'agentlink_respond_to_terms', {
+      envelopeId,
+      decision: 'accept',
+      notarize: true,
+    });
+    expect(recorded.structured).toMatchObject({ status: 'error', code: 'NOTARIZE_UNAVAILABLE' });
     // Core-filled fields are not part of TermsInput.
     const filled = await call(aliceMcp, 'agentlink_propose_terms', {
       to: 'Bob',

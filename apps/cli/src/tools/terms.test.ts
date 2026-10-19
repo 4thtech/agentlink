@@ -260,12 +260,12 @@ describe('agentlink_propose_terms (06 §2.2a)', () => {
     ).toBe('NOT_AVAILABLE');
   });
 
-  it('the schema refuses core-filled fields, notarize and an explicit null', async () => {
+  // M1-9d-2: `notarize` is in the schema now and goes to the core (src/tools/proofs.test.ts).
+  it('the schema refuses core-filled fields and an explicit null', async () => {
     for (const input of [
       { to: B, terms: { ...termsInput, termsHash: HASH } },
       { to: B, terms: { ...termsInput, version: 2 } },
       { to: B, terms: { ...termsInput, price: null } },
-      { to: B, terms: termsInput, notarize: true },
       { to: B, terms: { ...termsInput, deliverables: [] } },
     ]) {
       const client = fake();
@@ -282,7 +282,6 @@ describe('agentlink_respond_to_terms: argument rules before the core (06 §2.2a)
     ['terms with reject', { decision: 'reject', terms: termsInput }],
     ['counter without terms', { decision: 'counter' }],
     ['note with accept', { decision: 'accept', note: CANARY }],
-    ['notarize (M1-9d)', { decision: 'accept', notarize: true }],
     ['an unknown decision', { decision: 'confirm' }],
   ];
   for (const [name, args] of cases) {

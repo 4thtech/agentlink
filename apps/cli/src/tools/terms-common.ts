@@ -24,7 +24,6 @@ import {
   fail,
   internalError,
   invalidArgument,
-  notAvailable,
   pendingApproval,
   type HandlerOutput,
 } from './result.js';
@@ -34,6 +33,11 @@ import { TOOL_TEXT, noOwnerCard } from './text.js';
 import { removeInvisible } from './untrusted.js';
 
 export const TERMS_TEXT = Object.freeze({
+  // M1-9d-2: `notarize` on the terms tools, while the core cannot record offers or answers yet.
+  notarizeUnavailable:
+    "Adding proof to offers and answers isn't available in this version yet, so nothing was sent.",
+  notarizeUnavailableNextStep:
+    'Call again without notarize to send it without proof, or tell the user this comes in a later version.',
   // Refusals (06 §2.2a; 04 §3.4.2). Nothing was sent or recorded in any of them.
   useRespond:
     'That offer is not your own newest unanswered offer to this contact, so nothing was sent.',
@@ -140,8 +144,14 @@ export function termsRefusal(
       // The same wording and code as agentlink_send (06 §1 rule 6).
       return fail('rejected', SEND_TEXT.keyReused, SEND_TEXT.keyReusedNextStep, code);
     case 'NOTARIZE_UNAVAILABLE':
-      // The M1a schemas have no `notarize`; proofs arrive with M1-9d.
-      return notAvailable();
+      // The core does not record offers or answers yet (firm offers, recorded accepts): nothing
+      // was sent or signed (M1-9d-2).
+      return fail(
+        'error',
+        TERMS_TEXT.notarizeUnavailable,
+        TERMS_TEXT.notarizeUnavailableNextStep,
+        code,
+      );
     default:
       // A code this version does not know: fixed text, never undefined (IR-M1-9p-1 F03).
       return internalError();

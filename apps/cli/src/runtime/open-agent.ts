@@ -42,7 +42,8 @@ import { readAgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 import { DROP_ORIGIN, nodeFileOpener, nodeFilesPlatform } from './files.js';
-import type { FileOpener } from '../tools/context.js';
+import { nodeProofs, type NodeProofs } from './proofs.js';
+import type { FileOpener, ProofPlatformTools } from '../tools/context.js';
 
 /** The Node pieces the runtime is built from. Tests pass doubles; production uses @4thtech-io/node. */
 export interface RuntimeDeps {
@@ -55,6 +56,12 @@ export interface RuntimeDeps {
   ) => Promise<AgentStore>;
   readonly transport: () => TransportFactory;
   readonly createClient: typeof AgentLinkClient.create;
+  /**
+   * The proof platform (M1-9d-2, src/runtime/proofs.ts): read clients, chain-state ports and
+   * submitters for the shipped chains, the pack files and the verifier. Absent or undefined: no
+   * proof tools (the core answers PROOFS_UNAVAILABLE).
+   */
+  readonly proofs?: (options: { readonly home: string }) => NodeProofs | undefined;
 }
 
 export const nodeRuntimeDeps: RuntimeDeps = Object.freeze<RuntimeDeps>({
@@ -70,6 +77,7 @@ export const nodeRuntimeDeps: RuntimeDeps = Object.freeze<RuntimeDeps>({
       nip11: nodeNip11Fetcher(),
     }),
   createClient: (options) => AgentLinkClient.create(options),
+  proofs: ({ home }) => nodeProofs({ home }),
 });
 
 export interface OpenAgentOptions {
@@ -93,6 +101,8 @@ export interface OpenedAgent {
   readonly approvals: ApprovalChannel;
   /** The allowed-folder check for `path` arguments (M1-9d-1); absent: no file tools. */
   readonly files?: FileOpener;
+  /** The proof platform's tool half (M1-9d-2); absent: no proof tools. */
+  readonly proofs?: ProofPlatformTools;
   close(): Promise<void>;
 }
 
@@ -159,6 +169,14 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     await keyStore.close().catch(() => undefined);
     throw error;
   }
+  // A chain list that does not compose (a release mismatch) fails closed: no proofs, nothing else.
+  let proofs: NodeProofs | undefined;
+  try {
+    proofs = deps.proofs?.({ home });
+  } catch {
+    logger.warn('proofs unavailable', { code: 'chain_config' });
+    proofs = undefined;
+  }
   const approvals = createLocalApprovalChannel({
     reader: storeApprovalReader(agentStore.store),
     clock,
@@ -176,6 +194,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
       transport: deps.transport(),
       dropOrigins: DROP_ORIGINS,
       files: nodeFilesPlatform({ home }),
+      ...(proofs === undefined ? {} : { proofs: proofs.platform }),
     });
   } catch (error) {
     await agentStore.close().catch(() => undefined);
@@ -201,6 +220,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     client,
     approvals,
     files: nodeFileOpener({ home }),
+    ...(proofs === undefined ? {} : { proofs: proofs.tools }),
     close: (): Promise<void> => {
       closing ??= (async () => {
         // Relay connections first: an open socket or its idle timer keeps a one-shot process alive.
