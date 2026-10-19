@@ -1944,6 +1944,122 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
   /** The firm offer body signed by another key (0x5d…5d). */
   const SIG_OFFER_WRONG_KEY =
     'c254e975d7be6656d34ff31c98aee8ba583b05e4346716d197f99f6a9ddab54c2b50a5b5cedffd3532fd00e5771a7677868963cbb6e534eef680b1697f241d51';
+
+  // Signed offer and accept envelopes by the vector sender key (aead-envelope `sign` secret), sealed
+  // under the vector CEK with a fixed IV outside this package. Their payloads carry the terms below.
+  /** The signer's firm offer: the terms SIG_OFFER approved. */
+  const OFFER_ENVELOPE: Envelope = {
+    v: 1,
+    id: 'T2ZmZXJPZmZlck9mZmVyTw',
+    thread: 'Jqgjx2tXGK5rxsnWiTwjtw',
+    from: 'a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec',
+    createdAt: 1760000300,
+    recipients: [
+      {
+        kid: 'LGGnk30hbYi4K8I9JxRqQA',
+        enc: 'rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ',
+        wk: 'vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q',
+      },
+      {
+        kid: 'eExmdPfwCWg6bBLEtFc46g',
+        enc: 'THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU',
+        wk: '-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD',
+      },
+    ],
+    aead: {
+      alg: 'A256GCM-KC',
+      iv: 'BwcHBwcHBwcHBwcH',
+      kc: 'e1AGRajYlJTvYFtr8byK8T8U1fxuY9UTyIAZC7IVrWI',
+      ct: 'NJwzITZEshvSdna2il6PlYijQMzUltXXvQ5OsuL35-wU3wtoczxT4mD8TORFUud0GMYTE1HTsPUF2ZVl1dUGvwFp6BLWykGqG04amN699yBa5vn_kz1QA08AlmZbBx4MexGaziCdd-Vxa-y7KL3uZZU5FHCGxK5MEXW4iBeXMpieNBDfgFa5ZCedWe2G0Ahc6pd6W0p54vVjzi_k0xGuVSOWpLr5hjY7ucOY5-_UELHQAXBEcxfVbeDB2otDLmleb3C4uEGHIY3XbzuRoMM4SzumHmDbaP2qWJc6MMJMg0q4LN3oSoSvzo5NESiutvFrqFvudZBStNdGmwtNHBsG-W8BZvvoB0kVKjgiqTtYanwBrkyLk3BigCrZLchD9F5WgdU3c_CipcSqWstNO5BN3XCCCxhRNPB_OOACBJU0tVbNAhV4o91IET2BWdtrPLWUlltRlWYkGmjnWBVwkGsTQ_oUVOtvKoDdF2Qj28is9_xTxMpIoMbkvLko45_q5HA4Ui_hEAIrwKif8LVD6_r6FQi4KYR1XmmO0v_AjkftM2j_OvKiTAoR5mwM5zcy1Kq-kFPN5SJHFCuLofRF5Ne5BET7ax8OuMNK5GOXHxnDx4RL4_kYICJUmMqGIBpwYOnQwYj4p40O6PMFUBNm_oSPF4BgxuFPftSd9VwEpZdC3UFobqBBMAGMATLwln-_DUw90XtyFoBwhUK4qfdWhaRCq41yVMsmPoEOQnx92fj1TzwtykGQeMlIgbJyhTDgKKFInQk6XAZdP8k0wBCsXYDhRxGnL8oxh2_oZ7dqxcThHQSh21SSZflIwujUxVvM10bYPpzYbIJNFDIia5PjHdPSOVkamcftJp9GxqVBzzXVEiUsMObO0pnNu4lqXcVXjO42h6kAf2DuuwE',
+    },
+    sig: '75584fe29c3fddec7f1230de8a06f07e15544618776fc3dde60e65c248224409a52208edeb55d01253da44da7e6c227c010ed2e969c15a8ea44532ae73f136fa',
+  };
+  /** Another offer by the same signer, with other terms (subject 'Website design'). */
+  const OTHER_OFFER_ENVELOPE: Envelope = {
+    v: 1,
+    id: 'T3RoZXJPdGhlck90aGVyTw',
+    thread: 'Jqgjx2tXGK5rxsnWiTwjtw',
+    from: 'a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec',
+    createdAt: 1760000300,
+    recipients: [
+      {
+        kid: 'LGGnk30hbYi4K8I9JxRqQA',
+        enc: 'rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ',
+        wk: 'vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q',
+      },
+      {
+        kid: 'eExmdPfwCWg6bBLEtFc46g',
+        enc: 'THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU',
+        wk: '-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD',
+      },
+    ],
+    aead: {
+      alg: 'A256GCM-KC',
+      iv: 'BwcHBwcHBwcHBwcH',
+      kc: 'KnO0xZtRrhG6fevg83ogBR7m0OHPwBLazp3P3jFe3Nc',
+      ct: 'afG1-1E_rEdDTDFKq3vecrtn2burReaNXvXHmkHqtb7vSkGGGMReiE-MZe0ZOtgTEG0EtqqLEHAm6m40mSsEB3Yhf2-gG95AzSnSYB0lgxDCnKTkWK9z5_Be2TUH2LPH9B3WNTSGmZhYGUqWHaiiO1Q3n4Ll4zhZMBK-CwQ5kbwnT7FB_yBjQWwxX0u2HalE3oTALKNOtlG04NbBIl_zeXNtBUc4CydpANhc97gjrYtFfq2wQDdgDiZO6LVF-04VypTW6-1Nuf0mLBsgem2Sf-hBevQTRox9oEM_YyPOKZKtat-pUVts9Ws60XDVR4MJVFL3FKz5-njnp363i7Sjjv6sKhrdFIrv7Thhho5f5Aq252Z_3S5_NDDWWZ3_JIjWGaaSWGoA9Pf5Zth1QuFcCxBvFeVmjiroN6T_lcu_AYNCgoz1dMshm2_3k-Vo6Qt78t16vP-WEEX3lxQL2vaCLh5BxZAmkicwIEKT1eCCsQydu1ZSDx9tfHJ_SGMNUsS5YiqgyxIUGeWUiMG0oyrsl6vdELLr8sUTEAzXzuaKaKuVdaTYzWSxelTJrQkrGbBRUZtK4hmb-Uzm9QRcQcwDJtLRa0dLb7TevdQEsbDqrY3ND0hawN4KbtNBuA8-Jo-IYKtDOqEuC9W4MZPR48RKUcKimL9SfmbRfZG5QeZqW8Sf0XqicwdEM8OoQBajqQOBF-1DBFv9r-ba-jzfHsIVxu_iJ9WdpEjfsRlqS5sVXm8MWunzJNsubgh97W7G-DVJD6o3xjVGUEKb09YJcYF8dQykNVtXKFplOwviUfpvQ7o0tyYDFSnkJn0JHBedBBndctS2abrK02LKZ9MXItMpZNK_4IjdxUezZSep0wnw_u9uFp32smyZtJETGq2bnjh57nSgT-T1-s0D5l0',
+    },
+    sig: '61d8284cf690aece2e5aa1d2a6c14be0eec5bd8ed053b100c5a54b8a6b253bcb9fab5fa296eba2fd7f00b7414e5734eae4aab9c560726c0c45fe84f5f5c0dbbf',
+  };
+  /** The signer's accept of ANSWERED_ID, with the terms SIG_SIGNER_ACCEPT approved. */
+  const ACCEPT_ENVELOPE: Envelope = {
+    v: 1,
+    id: 'QWNjZXB0QWNjZXB0QWNjZQ',
+    thread: 'Jqgjx2tXGK5rxsnWiTwjtw',
+    from: 'a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec',
+    createdAt: 1760000300,
+    recipients: [
+      {
+        kid: 'LGGnk30hbYi4K8I9JxRqQA',
+        enc: 'rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ',
+        wk: 'vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q',
+      },
+      {
+        kid: 'eExmdPfwCWg6bBLEtFc46g',
+        enc: 'THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU',
+        wk: '-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD',
+      },
+    ],
+    aead: {
+      alg: 'A256GCM-KC',
+      iv: 'BwcHBwcHBwcHBwcH',
+      kc: '32VXvbQ9cV1ZsRNKB_kXph-OHhxV3dAOiB_2vu6IwMI',
+      ct: 'Bd6U8MufPaiNCGrAkH2p0JR-dOL6BF-ETkqVtIuV2cLmvh8hYfk2G8TParO3Fd6Cw5KORMbgEXs7SvEBtkvZUQCP2ZLFuMl0VoTeDeG9pi3MzLXj9kJyN5f189-dtBruwx6i94Jl6G7vmsPrB7Js__pWxs8s5TAt54WmV40yR1ZyyrGAEkZyA430YLjhzMbWVnMY3OaiboLx2c8JxImpcboODHj-CgifA_kP3v65JErMEC3oyF9Ip5GfqHUsZsQIqLGkv954dWwkW0VIXW7b5gQvwzs-WmXjpfjdmmviBgDUudsS1jcH0LlO3vHisFuwWdyNbl2nTJ2dUsPp5QyI5qhNIlsgpZ74wRsxF9-RkPCq2l-QYX8rwnnpsJUYjZ3Q-oruM1Hn6lCDhASr-xYiU87POinuT-y-8HDMOq58TXAWyWA-VAxVe58bWobnzC31rKtX0vY5ejDFy-bLzCiUSi1VYBOrYEjn8NPuLFk90zsnxWG4qWpMeJ01F5snwl6pQEr9iyhtClMc40TnFht-M8XaMktE8UrXATMZWO3JvQR6S0kLEtDpPdumI6jt60RogbsAAMfjyqnW06XAiEu_2NKyoghznKO6fWxENOeLnvu9j72ubAkyMP3hjHBXp7bMrLzff4JzDA0dK7sClAOYSPjmssReIO4PNkXomPTZUhli6hty7U5b4TKAARCRFcahfAyBxOxCKvxTprnV1tnUZpuxI0EdKCOuG0QREPuFTk2j0I_wXAFwkJuM06x0zzR5dcbb5IC3ErfZOZuduxqypN0OkNkeSB_P3qJ3udtG4_Lh2ehKZvS4KfbDJafhUanfQstN61jcylw4ZoZxqEvD3ipcwE25K3BohXzXTQJ8bVuXWbNKOaTR3BUXxaU4Yazh8IA0GnItEHO5H8qsm8Hiy-mv8f-20K6Hf8Y9rk8',
+    },
+    sig: '22c99ee4f84b297c41bbec548299b350fdd237195653dbd87f2ec1dc5d2ffbd5576c017cd1f103561d4734c374cda5e9788dc4f7be3681e902e0d9bc89ac985f',
+  };
+  /** The same accept terms, answering another envelope. */
+  const ACCEPT_OTHER_REPLY_ENVELOPE: Envelope = {
+    v: 1,
+    id: 'QmFkQmFkQmFkQmFkQmFkQg',
+    thread: 'Jqgjx2tXGK5rxsnWiTwjtw',
+    from: 'a3e7f43667d462e884d2f8b9e5c8cb3333b9ce3011ad4140c51761b42805b8ec',
+    createdAt: 1760000300,
+    recipients: [
+      {
+        kid: 'LGGnk30hbYi4K8I9JxRqQA',
+        enc: 'rTtSCNB7I8OCjSBc3wgz3sBPKaWuFk0DYD6UC00fCEQ',
+        wk: 'vzBBon0C41a7SelbC0JbWkET43jM9d65kIDvVBk29WE1mCB0uzsT4IwcAwI2fi5Q',
+      },
+      {
+        kid: 'eExmdPfwCWg6bBLEtFc46g',
+        enc: 'THcfW4h_YGbIPNCEOQlugejW-ZC0Dpb8SsjxjAOSuWU',
+        wk: '-DG2iVV68TQkG1dwshC8wrcxz6ReFz3nplx1oY-M9Bo38tLDUz--LYLwOawenNuD',
+      },
+    ],
+    aead: {
+      alg: 'A256GCM-KC',
+      iv: 'BwcHBwcHBwcHBwcH',
+      kc: 'hAMuVwIDV4xtGRzyrQobNKT_puoSxfv8HFIYBiCHjmo',
+      ct: 'eNALDZbCBoDndqXAUAVlwwOa6NM-eN1ZV8ohB59zGSQuTyhoO2VrZrURNZeNhOzNwhxdQTBQv-XlDCGUwQzM247r-UPyghFjKVbLWxpilf6PQNdXCkriXLnullXhYjRkS6pOuoaoX_ACsT2ybn2QrlfgPC2w2btlANPPnzft9Lak5TMzoxYA2OHB4vns_T7cxUJDqusS-ovV7SDmkiALB4NjaJIZOIlaB2dG6sz-3w9xuhCWpPlEeWo1Z9cN8ycoflH4pJ-4NbKVeETHX3NV6MPUlwh4NBm3cngcibauabyp3CiOfp_ON58-ADk0f7wH0JAwVMtrunI06XOjh-DP5GqQ7wkRMaXoolX3v2Q8u-AoMardlgm7xiBJfdF-kCnjWE9jeHnw140LUYyNoIAfgTV_8i8nsGZXQvW-rU3Ng207_MSKElByNrvEXERUkp5HgNGdjkN0e-zOQzZ7pY8Pr64AZAXt60WmWaHF4qSmM-pEaDPrg0QlONn7E4G_s-0yfy5UxMgMnxIOYsWq_zCuDZ26hm2UhBdjYZPG2d9WEgflOhbeh_BsJjUsY6xnusRkFn0Vo23ZnHMhFOORKfP_eAYcdx9zXV1I_a8IDGy1GsqivRQkDFDbJpNH3EzYkjqW697xMxCjAjCBrc8WTZmROeDndpYB0vRP45LsjmT-Cklm_bic8AtVhWV_DxDD-edwVagqiQBV8lyfrPqMNBGMy1cPPIKkZlOzilX2k1YZf9syyRyvkAyjG9K3w_23OzNq62Jum5uFSotDkFDjyZmASsZcAzr4AWfMoUK0L7e8yFdsFYeCsPUo_ay_9NVe4k0w2Umv9cSiCpagjWWS-wI9W0YFAPEsh8hBpTMldPuaypBx9lP5tVBxL55_sIuXyQ-zc1rrDjLZfG3Cp_TMQply2sNMjvvD_rcZd-pgby4',
+    },
+    sig: '42c017039248abe3d4ac07db911e0aa0f312dc1542eb2c1dac58e53d7cde8ee9568fd6a46b9d68982195419fa3cfdc0e18cdc196e6d5b23c46296c082a48d931',
+  };
+  /** The envelope the signer's accept answers. */
+  const ANSWERED_ID = 'UmVwbHlSZXBseVJlcGx5Ug';
+  /** The signer's notarized accept of ANSWERED_ID (scope decision `accept`, approver signer). */
+  const SIG_SIGNER_ACCEPT =
+    'aabcab8379de0c0432418c0c12e2aa831a49e656d0321fcf9b4059b3e65d828c9e1a54d03d85ef84b6967c95351b0f6b693071751fe7fe7610428852c1c82e78';
   const OTHER_EVM = OTHER.address.toLowerCase();
   const ENVELOPE_ID = MESSAGE_ENVELOPE.id;
   const OFFER = 3;
@@ -2034,6 +2150,30 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
     };
   }
 
+  /** The signer's own notarized accept of ANSWERED_ID (an ACCEPT record). */
+  function signerAcceptAction() {
+    const terms = storedTerms(SIGNER_EVM, RECIPIENT);
+    return {
+      tool: 'agentlink_respond_to_terms',
+      args: { envelopeId: ANSWERED_ID, decision: 'accept', notarize: true },
+      context: {
+        triggers: ['commitments.accept'],
+        scope: {
+          ...scopeBase,
+          agentId: SIGNER_EVM,
+          decision: 'accept',
+          counterparty: { agentId: RECIPIENT, ownerKey: '77'.repeat(32) },
+          termsHash: termsHash(terms),
+          answers: { envelopeId: ANSWERED_ID, envelopeHash: `0x${'a1'.repeat(32)}` },
+          notarize: true,
+          maxFeeUsd: '0.1',
+        },
+        terms,
+        fee: { token: FEE_ASSET, amount: '100000', usd: '0.1' },
+      },
+    };
+  }
+
   function decideBody(action: unknown, agent: string) {
     return {
       v: 1,
@@ -2062,17 +2202,19 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
   /** A pack for a record of `kind` with the approval, and no disclosed content. */
   async function packWith(
     approval: unknown,
-    options: FixtureOptions & { ownerNostr?: string } = {},
+    options: FixtureOptions & { ownerNostr?: string; content?: boolean } = {},
   ): Promise<Fixture> {
-    const { ownerNostr, ...rest } = options;
+    const { ownerNostr, content, ...rest } = options;
     let card = rest.card;
     if (ownerNostr !== undefined) {
       const agentCard = cardFor({ ownerNostr });
       card = { agentCard, cardSig: await signCard(agentCard) };
     }
     const f = await eoaFixture({ kind: OFFER, ...rest, ...(card === undefined ? {} : { card }) });
-    delete f.pack.envelope;
-    f.pack.disclosure = null;
+    if (content !== true) {
+      delete f.pack.envelope;
+      f.pack.disclosure = null;
+    }
     f.pack.ownerApproval = approval;
     return f;
   }
@@ -2092,7 +2234,7 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
     expect(result.valid && result.ownerApproval).toEqual({ status: 'standing_rule', policyHash });
   });
 
-  it("the signer's firm offer, approved by the owner its card names: verified and bound", async () => {
+  it("the signer's firm offer without content: owner bound, but not bound to this record", async () => {
     const f = await packWith(approvalOf(offerAction(), SIG_OFFER), {
       ownerNostr: `0x${APPROVING_OWNER}`,
     });
@@ -2107,6 +2249,9 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
       version: 1,
       ownerKey: APPROVING_OWNER,
       ownerBound: true,
+      // Nothing in a firm offer's scope names its record: without the disclosed offer the pack
+      // cannot show that this approval is for this record (04 §3.4.2).
+      recordBound: false,
     });
     // The approval never raises the verdict on its own.
     expect(result.verdict).toBe('record_only');
@@ -2133,7 +2278,69 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
       version: 1,
       ownerKey: APPROVING_OWNER,
       ownerBound: false,
+      // The scope answers this record's envelope hash.
+      recordBound: true,
     });
+  });
+
+  it("the signer's firm offer with its disclosed offer: bound to this record", async () => {
+    const f = await packWith(approvalOf(offerAction(), SIG_OFFER), {
+      ownerNostr: `0x${APPROVING_OWNER}`,
+      envelope: OFFER_ENVELOPE,
+      content: true,
+    });
+    const result = await verifyFixture(f);
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.content.status).toBe('unattributed');
+    expect(result.ownerApproval).toMatchObject({
+      status: 'signed',
+      approver: 'signer',
+      decision: 'offer',
+      ownerBound: true,
+      recordBound: true,
+    });
+  });
+
+  it("the signer's accept with its disclosed accept answering the scope's envelope: bound", async () => {
+    const f = await packWith(approvalOf(signerAcceptAction(), SIG_SIGNER_ACCEPT), {
+      ownerNostr: `0x${APPROVING_OWNER}`,
+      envelope: ACCEPT_ENVELOPE,
+      kind: ACCEPT,
+      content: true,
+    });
+    const result = await verifyFixture(f);
+    expect(result.valid && result.ownerApproval).toMatchObject({
+      status: 'signed',
+      approver: 'signer',
+      decision: 'accept',
+      recordBound: true,
+    });
+  });
+
+  it("the signer's accept without content is not bound to this record", async () => {
+    const f = await packWith(approvalOf(signerAcceptAction(), SIG_SIGNER_ACCEPT), {
+      ownerNostr: `0x${APPROVING_OWNER}`,
+      envelope: ACCEPT_ENVELOPE,
+      kind: ACCEPT,
+    });
+    const result = await verifyFixture(f);
+    expect(result.valid && result.ownerApproval).toMatchObject({
+      status: 'signed',
+      recordBound: false,
+    });
+  });
+
+  it('an approval whose content did not open is not bound to this record', async () => {
+    const f = await packWith(approvalOf(offerAction(), SIG_OFFER), {
+      ownerNostr: `0x${APPROVING_OWNER}`,
+      envelope: OFFER_ENVELOPE,
+      content: true,
+    });
+    f.pack.disclosure = { contentKey: b64(TWO_WRAP_OTHER_CEK_HEX) };
+    const result = await verifyFixture(f);
+    expect(result.valid && result.content.status).toBe('failed');
+    expect(result.valid && result.ownerApproval).toMatchObject({ recordBound: false });
   });
 
   const refusals: {
@@ -2149,6 +2356,25 @@ describe('verifyProofPack: owner approval (M1-4d-c; 07 §8, 04 §2.5.1, §3.4.2)
       build: () =>
         packWith(approvalOf(offerAction(), SIG_OFFER_WRONG_KEY), {
           ownerNostr: `0x${APPROVING_OWNER}`,
+        }),
+    },
+    {
+      name: "the signer's firm offer approval reused on another offer of the same signer",
+      build: () =>
+        packWith(approvalOf(offerAction(), SIG_OFFER), {
+          ownerNostr: `0x${APPROVING_OWNER}`,
+          envelope: OTHER_OFFER_ENVELOPE,
+          content: true,
+        }),
+    },
+    {
+      name: "the signer's accept approval on an accept that answers another envelope",
+      build: () =>
+        packWith(approvalOf(signerAcceptAction(), SIG_SIGNER_ACCEPT), {
+          ownerNostr: `0x${APPROVING_OWNER}`,
+          envelope: ACCEPT_OTHER_REPLY_ENVELOPE,
+          kind: ACCEPT,
+          content: true,
         }),
     },
     {
