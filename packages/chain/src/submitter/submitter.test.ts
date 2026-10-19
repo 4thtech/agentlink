@@ -1,0 +1,712 @@
+// M1-10a: the submitter's chain side (07 §7; 05 §3.2, §3.3; 04 §4, §7). The wire format, the local
+// signature check, the Worker's chain port (simulation, the gas-key wallet, inclusion) and the
+// client with failover. No network: every request goes to an in-memory Notary behind a mock fetch.
+//
+// Keys here are test values built at run time (a repeated byte), never a real secret.
+import { getDeployment } from '@4thtech-io/occ-v2-abi';
+import {
+  decodeFunctionData,
+  encodeAbiParameters,
+  encodeErrorResult,
+  encodeEventTopics,
+  encodeFunctionResult,
+  keccak256,
+  parseTransaction,
+  type Hex as ViemHex,
+} from 'viem';
+import { privateKeyToAccount, sign } from 'viem/accounts';
+import { describe, expect, it, vi } from 'vitest';
+import { getChainConfig } from '../clients/index.js';
+import { NOTARY_CLIENT_ABI } from '../clients/calls.js';
+import type { ChainConfig } from '../config/index.js';
+import { buildReceipt, buildRecord, RECORD_KIND } from '../typed-data/index.js';
+import type { Hex } from '../ids/index.js';
+import {
+  SUBMITTER_MAX_ITEMS,
+  SUBMITTER_RPC_METHODS,
+  SubmitterError,
+  createSubmitterChain,
+  createSubmitterClient,
+  itemSignatureMatches,
+  parseHealthResponse,
+  parseStatusResponse,
+  parseSubmitRequest,
+  parseSubmitResponse,
+  type SubmitItem,
+} from './index.js';
+
+const config = getChainConfig(84532) as ChainConfig;
+if (!getDeployment(84532) || !config) throw new Error('test setup: no Base Sepolia deployment');
+const NOTARY = config.contracts.notary;
+const CHAIN_ID = config.chainId;
+
+// Test keys: repeated bytes, assembled at run time.
+const testKey = (byte: string): ViemHex => `0x${byte.repeat(32)}` as ViemHex;
+const AGENT_KEY = testKey('a1');
+const OTHER_KEY = testKey('b2');
+const GAS_KEY = testKey('c3');
+const AGENT = privateKeyToAccount(AGENT_KEY).address.toLowerCase() as Hex;
+const RECIPIENT = privateKeyToAccount(OTHER_KEY).address.toLowerCase() as Hex;
+const GAS_ADDRESS = privateKeyToAccount(GAS_KEY).address.toLowerCase() as Hex;
+const ZERO_ADDRESS = `0x${'0'.repeat(40)}` as Hex;
+const hash32 = (byte: string): Hex => `0x${byte.repeat(32)}` as Hex;
+const FUTURE = Math.floor(Date.now() / 1000) + 3600;
+
+async function signDigest(digest: Hex, key: ViemHex): Promise<Hex> {
+  return (await sign({ hash: digest, privateKey: key, to: 'hex' })) as Hex;
+}
+
+async function signedRecord(key: ViemHex = AGENT_KEY, signer: Hex = AGENT) {
+  const built = buildRecord({
+    chainId: CHAIN_ID,
+    notary: NOTARY,
+    signer,
+    envelopeHash: hash32('11'),
+    recipient: RECIPIENT,
+    kind: RECORD_KIND.MESSAGE,
+    feeToken: ZERO_ADDRESS,
+    maxFee: 1000n,
+    deadline: FUTURE,
+  });
+  return { built, signature: await signDigest(built.digest, key) };
+}
+
+async function signedReceipt(recordId: Hex) {
+  const built = buildReceipt({
+    chainId: CHAIN_ID,
+    notary: NOTARY,
+    signer: RECIPIENT,
+    recordId,
+    receiptType: 1,
+    salt: hash32('22'),
+    deadline: FUTURE,
+  });
+  return { built, signature: await signDigest(built.digest, OTHER_KEY) };
+}
+
+const notaryFor = (chainId: number): string | undefined =>
+  chainId === CHAIN_ID ? NOTARY : undefined;
+
+async function recordItem(key: ViemHex = AGENT_KEY): Promise<SubmitItem> {
+  const { built, signature } = await signedRecord(key);
+  const req = parseSubmitRequest(
+    'notarize',
+    { chainId: CHAIN_ID, records: [{ record: built.record, signature }] },
+    notaryFor,
+  );
+  return req.items[0] as SubmitItem;
+}
+
+// --- wire format (07 §7, 05 §3.1 JSON form) ------------------------------------------------------
+
+describe('parseSubmitRequest', () => {
+  it('parses a notarize body and computes each record ID as the Notary does', async () => {
+    const { built, signature } = await signedRecord();
+    const req = parseSubmitRequest(
+      'notarize',
+      { chainId: CHAIN_ID, records: [{ record: built.record, signature }] },
+      notaryFor,
+    );
+    expect(req.chainId).toBe(CHAIN_ID);
+    expect(req.items).toHaveLength(1);
+    const item = req.items[0] as SubmitItem;
+    expect(item.type).toBe('record');
+    expect(item.id).toBe(built.recordId);
+    expect(item.recordId).toBe(built.recordId);
+    expect(item.signer).toBe(AGENT);
+    expect(item.signature).toBe(signature);
+  });
+
+  it('parses a receipt body; the item ID is `<recordId>:<type>`', async () => {
+    const { built, signature } = await signedReceipt(hash32('33'));
+    const req = parseSubmitRequest(
+      'receipt',
+      { chainId: CHAIN_ID, receipts: [{ receipt: built.receipt, signature }] },
+      notaryFor,
+    );
+    const item = req.items[0] as SubmitItem;
+    expect(item.type).toBe('receipt');
+    expect(item.id).toBe(`${hash32('33')}:1`);
+    expect(item.signer).toBe(RECIPIENT);
+  });
+
+  it('refuses anything outside the strict form, without echoing input', async () => {
+    const { built, signature } = await signedRecord();
+    const good = { record: built.record, signature };
+    const bodies: unknown[] = [
+      null,
+      [],
+      { chainId: CHAIN_ID },
+      { chainId: CHAIN_ID, records: [] },
+      { chainId: CHAIN_ID, records: [good], extra: 1 },
+      { chainId: '84532', records: [good] },
+      { chainId: CHAIN_ID, records: [{ ...good, extra: true }] },
+      { chainId: CHAIN_ID, records: [{ record: built.record, signature: signature.toUpperCase() }] },
+      { chainId: CHAIN_ID, records: [{ record: built.record, signature: signature.slice(2) }] },
+      { chainId: CHAIN_ID, records: [{ record: built.record, signature: `${signature}0` }] },
+      { chainId: CHAIN_ID, records: [{ record: { ...built.record, maxFee: 1000 }, signature }] },
+      { chainId: CHAIN_ID, records: [{ record: { ...built.record, signer: AGENT.toUpperCase() }, signature }] },
+      { chainId: CHAIN_ID, records: [good, good] },
+      { chainId: CHAIN_ID, records: new Array(SUBMITTER_MAX_ITEMS + 1).fill(good) },
+      { chainId: CHAIN_ID, receipts: [good] },
+    ];
+    for (const body of bodies) {
+      let thrown: unknown;
+      try {
+        parseSubmitRequest('notarize', body, notaryFor);
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown, JSON.stringify(body)?.slice(0, 80)).toBeInstanceOf(Error);
+      const message = (thrown as Error).message;
+      expect(message).not.toContain(signature.slice(2, 40));
+      expect(message).not.toContain(AGENT.slice(2));
+    }
+  });
+
+  it('refuses a chain the caller does not serve', async () => {
+    const { built, signature } = await signedRecord();
+    expect(() =>
+      parseSubmitRequest(
+        'notarize',
+        { chainId: 1, records: [{ record: built.record, signature }] },
+        notaryFor,
+      ),
+    ).toThrow(expect.objectContaining({ code: 'unsupported_chain' }) as Error);
+  });
+
+  it('accepts a long ERC-1271 signature up to 2048 bytes and no longer', async () => {
+    const { built } = await signedRecord();
+    const ok = `0x${'ab'.repeat(2048)}`;
+    const tooLong = `0x${'ab'.repeat(2049)}`;
+    expect(
+      parseSubmitRequest(
+        'notarize',
+        { chainId: CHAIN_ID, records: [{ record: built.record, signature: ok }] },
+        notaryFor,
+      ).items,
+    ).toHaveLength(1);
+    expect(() =>
+      parseSubmitRequest(
+        'notarize',
+        { chainId: CHAIN_ID, records: [{ record: built.record, signature: tooLong }] },
+        notaryFor,
+      ),
+    ).toThrow();
+  });
+});
+
+describe('submitter answers are parsed strictly', () => {
+  const id = hash32('44');
+  it('accepts a well-formed submit, status and health answer', () => {
+    expect(
+      parseSubmitResponse({
+        chainId: CHAIN_ID,
+        items: [{ id, recordId: id, status: 'submitted', txHash: hash32('55') }],
+      }).items[0]?.status,
+    ).toBe('submitted');
+    expect(
+      parseStatusResponse({
+        chainId: CHAIN_ID,
+        txHash: hash32('55'),
+        state: 'reverted',
+        items: [{ id: `${id}:2`, recordId: id, status: 'failed', error: 'InsufficientCredits' }],
+      }).state,
+    ).toBe('reverted');
+    expect(
+      parseHealthResponse({
+        ok: true,
+        chains: [{ chainId: CHAIN_ID, available: true, gasBalance: '12', queueDepth: 0 }],
+      }).chains,
+    ).toHaveLength(1);
+  });
+
+  it('refuses unknown statuses, fields, mismatched IDs and odd error text', () => {
+    const bad: unknown[] = [
+      { chainId: CHAIN_ID, items: [{ id, recordId: id, status: 'done' }] },
+      { chainId: CHAIN_ID, items: [{ id, recordId: id, status: 'recorded', extra: 1 }] },
+      { chainId: CHAIN_ID, items: [{ id, recordId: hash32('66'), status: 'recorded' }] },
+      { chainId: CHAIN_ID, items: [{ id, recordId: id, status: 'failed', error: 'has space' }] },
+      { chainId: CHAIN_ID, items: [{ id, recordId: id, status: 'recorded', txHash: '0x12' }] },
+      { chainId: CHAIN_ID, items: {} },
+    ];
+    for (const value of bad) expect(() => parseSubmitResponse(value)).toThrow();
+  });
+});
+
+// --- local signature check ------------------------------------------------------------------------
+
+describe('itemSignatureMatches (EOA signatures, checked before any chain request)', () => {
+  it('is true for the signer’s own signature on a record and on a receipt', async () => {
+    const item = await recordItem();
+    expect(itemSignatureMatches(CHAIN_ID, NOTARY, item)).toBe(true);
+    const { built, signature } = await signedReceipt(hash32('33'));
+    const receipt = parseSubmitRequest(
+      'receipt',
+      { chainId: CHAIN_ID, receipts: [{ receipt: built.receipt, signature }] },
+      notaryFor,
+    ).items[0] as SubmitItem;
+    expect(itemSignatureMatches(CHAIN_ID, NOTARY, receipt)).toBe(true);
+  });
+
+  it('is false for another key, another domain, a long or a malformed signature', async () => {
+    const { built } = await signedRecord();
+    const other = await signDigest(built.digest, OTHER_KEY);
+    const item = parseSubmitRequest(
+      'notarize',
+      { chainId: CHAIN_ID, records: [{ record: built.record, signature: other }] },
+      notaryFor,
+    ).items[0] as SubmitItem;
+    expect(itemSignatureMatches(CHAIN_ID, NOTARY, item)).toBe(false);
+    const good = await recordItem();
+    expect(itemSignatureMatches(CHAIN_ID, RECIPIENT, good)).toBe(false);
+    expect(itemSignatureMatches(CHAIN_ID + 1, NOTARY, good)).toBe(false);
+    expect(
+      itemSignatureMatches(CHAIN_ID, NOTARY, { ...good, signature: `0x${'ab'.repeat(300)}` }),
+    ).toBe(false);
+    expect(
+      itemSignatureMatches(CHAIN_ID, NOTARY, { ...good, signature: `0x${'00'.repeat(65)}` }),
+    ).toBe(false);
+  });
+});
+
+// --- the Worker's chain port -----------------------------------------------------------------------
+
+const RPC_URL = 'https://rpc.provider-one.io/v1/secret-path-key';
+
+type StoredRecord = {
+  signer: Hex;
+  structHash: Hex;
+  receiptAt: [bigint, bigint, bigint, bigint];
+};
+
+interface MockChain {
+  code: Map<string, Hex>;
+  records: Map<string, StoredRecord>;
+  revertWith: { name: string; args?: readonly unknown[] } | null;
+  estimate: bigint;
+  balance: bigint;
+  nonce: number;
+  sent: { raw: Hex; hash: Hex }[];
+  receipts: Map<string, unknown>;
+  methods: string[];
+  failNetwork: boolean;
+}
+
+function newChain(): MockChain {
+  return {
+    code: new Map(),
+    records: new Map(),
+    revertWith: null,
+    estimate: 150_000n,
+    balance: 5n * 10n ** 17n,
+    nonce: 7,
+    sent: [],
+    receipts: new Map(),
+    methods: [],
+    failNetwork: false,
+  };
+}
+
+const ADDRESS_CHECKED = Symbol.for('agentlink.address-checked-rpc-fetch');
+
+function revertError(chain: MockChain) {
+  const data = encodeErrorResult({
+    abi: NOTARY_CLIENT_ABI,
+    errorName: chain.revertWith?.name as never,
+    args: (chain.revertWith?.args ?? []) as never,
+  });
+  return { code: 3, message: 'execution reverted', data };
+}
+
+function mockFetch(chain: MockChain) {
+  const fn = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+    if (chain.failNetwork) throw new TypeError('network down');
+    const req = JSON.parse(String(init?.body)) as { id: number; method: string; params: unknown[] };
+    chain.methods.push(req.method);
+    const reply = (result: unknown) =>
+      new Response(JSON.stringify({ jsonrpc: '2.0', id: req.id, result }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    const replyError = (error: unknown) =>
+      new Response(JSON.stringify({ jsonrpc: '2.0', id: req.id, error }), {
+        headers: { 'content-type': 'application/json' },
+      });
+    const p = req.params;
+    switch (req.method) {
+      case 'eth_chainId':
+        return reply(`0x${CHAIN_ID.toString(16)}`);
+      case 'eth_getCode':
+        return reply(chain.code.get(String(p[0]).toLowerCase()) ?? '0x');
+      case 'eth_getBalance':
+        return reply(`0x${chain.balance.toString(16)}`);
+      case 'eth_getTransactionCount':
+        return reply(`0x${chain.nonce.toString(16)}`);
+      case 'eth_maxPriorityFeePerGas':
+        return reply('0x3b9aca00');
+      case 'eth_getBlockByNumber':
+        return reply({ number: '0x10', baseFeePerGas: '0x77359400', timestamp: '0x1' });
+      case 'eth_estimateGas':
+        if (chain.revertWith) return replyError(revertError(chain));
+        return reply(`0x${chain.estimate.toString(16)}`);
+      case 'eth_call': {
+        const call = p[0] as { to: string; data: ViemHex; from?: string };
+        const decoded = decodeFunctionData({ abi: NOTARY_CLIENT_ABI, data: call.data });
+        if (decoded.functionName === 'getRecord') {
+          const id = (decoded.args as readonly [Hex])[0];
+          const stored = chain.records.get(id);
+          return reply(
+            encodeFunctionResult({
+              abi: NOTARY_CLIENT_ABI,
+              functionName: 'getRecord',
+              result: {
+                signer: stored?.signer ?? ZERO_ADDRESS,
+                timestamp: stored ? 1n : 0n,
+                kind: stored ? 1 : 0,
+                receiptFlags: 0,
+                envelopeHash: hash32('00'),
+                recipientCommitment: hash32('00'),
+                recordStructHash: stored?.structHash ?? hash32('00'),
+                receiptAt: stored?.receiptAt ?? [0n, 0n, 0n, 0n],
+              } as never,
+            }),
+          );
+        }
+        if (chain.revertWith) return replyError(revertError(chain));
+        return reply('0x');
+      }
+      case 'eth_sendRawTransaction': {
+        const raw = p[0] as ViemHex;
+        const hash = keccak256(raw) as Hex;
+        chain.sent.push({ raw: raw as Hex, hash });
+        return reply(hash);
+      }
+      case 'eth_getTransactionReceipt':
+        return reply(chain.receipts.get(String(p[0])) ?? null);
+      default:
+        return replyError({ code: -32601, message: 'method not found' });
+    }
+  });
+  Object.defineProperty(fn, ADDRESS_CHECKED, { value: true });
+  return fn;
+}
+
+function port(chain: MockChain, overrides: { gasKey?: string; rpcUrls?: string[] } = {}) {
+  return createSubmitterChain(config, {
+    fetchFn: mockFetch(chain) as unknown as typeof fetch,
+    gasKey: overrides.gasKey ?? GAS_KEY,
+    rpcUrls: overrides.rpcUrls ?? [RPC_URL],
+    timeoutMs: 1000,
+  });
+}
+
+describe('createSubmitterChain (the Worker’s chain port)', () => {
+  it('derives the gas address and refuses a malformed gas key without echoing it', () => {
+    expect(port(newChain()).gasAddress).toBe(GAS_ADDRESS);
+    const bad = `${GAS_KEY.slice(0, -2)}zz`;
+    let thrown: unknown;
+    try {
+      port(newChain(), { gasKey: bad });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).not.toContain(bad.slice(2, 30));
+    expect(JSON.stringify(thrown)).not.toContain(bad.slice(2, 30));
+  });
+
+  it('refuses an RPC URL that breaks the 04 §4 rule, without echoing it', () => {
+    for (const url of ['http://rpc.provider-one.io', 'https://127.0.0.1/x', 'https://localhost/x']) {
+      let thrown: unknown;
+      try {
+        port(newChain(), { rpcUrls: [url] });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(Error);
+      expect((thrown as Error).message).not.toContain(url);
+    }
+  });
+
+  it('reads whether a signer has code (ERC-1271 account or EIP-7702 delegation)', async () => {
+    const chain = newChain();
+    chain.code.set(AGENT, `0xef0100${'12'.repeat(20)}` as Hex);
+    const p = port(chain);
+    expect(await p.hasCode(AGENT)).toBe(true);
+    expect(await p.hasCode(RECIPIENT)).toBe(false);
+  });
+
+  it('simulates a new record as ok, an identical stored one as skipped, another as RecordExists', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    const item = await recordItem();
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok' });
+    const { recordStructHash } = await import('@4thtech-io/crypto');
+    const { encodeHex0x } = await import('@4thtech-io/crypto');
+    if (item.type !== 'record') throw new Error('unreachable');
+    chain.records.set(item.recordId, {
+      signer: AGENT,
+      structHash: encodeHex0x(recordStructHash(item.record)) as Hex,
+      receiptAt: [0n, 0n, 0n, 0n],
+    });
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'skipped' });
+    chain.records.set(item.recordId, {
+      signer: AGENT,
+      structHash: hash32('99'),
+      receiptAt: [0n, 0n, 0n, 0n],
+    });
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'failed', error: 'RecordExists' });
+  });
+
+  it('names the contract error of a failing simulation; a pause is not a failure', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    const item = await recordItem();
+    chain.revertWith = { name: 'InsufficientCredits', args: [AGENT, ZERO_ADDRESS, 10n, 1n] };
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'failed', error: 'InsufficientCredits' });
+    chain.revertWith = { name: 'InvalidSignature' };
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'failed', error: 'InvalidSignature' });
+    chain.revertWith = { name: 'EnforcedPause' };
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'paused' });
+    expect(await p.simulateBatch([item])).toEqual({ ok: false, error: 'EnforcedPause', paused: true });
+  });
+
+  it('simulates a receipt whose type is already set as skipped', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    const recordId = hash32('33');
+    const { built, signature } = await signedReceipt(recordId);
+    const item = parseSubmitRequest(
+      'receipt',
+      { chainId: CHAIN_ID, receipts: [{ receipt: built.receipt, signature }] },
+      notaryFor,
+    ).items[0] as SubmitItem;
+    chain.records.set(recordId, { signer: AGENT, structHash: hash32('77'), receiptAt: [0n, 0n, 0n, 0n] });
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok' });
+    chain.records.set(recordId, { signer: AGENT, structHash: hash32('77'), receiptAt: [5n, 0n, 0n, 0n] });
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'skipped' });
+  });
+
+  it('sends exactly the given items from the gas key, with the given gas limit and nonce', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    const a = await recordItem();
+    const b = await recordItem();
+    expect(await p.simulateBatch([a, b])).toEqual({ ok: true, gas: 150_000n });
+    expect(await p.pendingNonce()).toBe(7);
+    const hash = await p.send([a, b], { gasLimit: 175_000n, nonce: 7 });
+    expect(chain.sent).toHaveLength(1);
+    const sent = chain.sent[0] as { raw: Hex; hash: Hex };
+    expect(hash).toBe(sent.hash);
+    const tx = parseTransaction(sent.raw as ViemHex);
+    expect(tx.gas).toBe(175_000n);
+    expect(tx.nonce).toBe(7);
+    expect(tx.chainId).toBe(CHAIN_ID);
+    expect(tx.to?.toLowerCase()).toBe(NOTARY);
+    expect(tx.value ?? 0n).toBe(0n);
+    const call = decodeFunctionData({ abi: NOTARY_CLIENT_ABI, data: tx.data as ViemHex });
+    expect(call.functionName).toBe('notarizeBatch');
+    const [records, sigs] = call.args as unknown as [{ nonce: bigint }[], Hex[]];
+    expect(records.map((r) => r.nonce.toString())).toEqual(
+      [a, b].map((i) => (i.type === 'record' ? i.record.nonce : '')),
+    );
+    expect(sigs).toEqual([a.signature, b.signature]);
+  });
+
+  it('reads inclusion from the receipt: Notary events only, reverted status', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    const a = await recordItem();
+    const b = await recordItem();
+    const txHash = hash32('aa');
+    expect(await p.inclusion(txHash)).toEqual({ state: 'pending' });
+    const log = (eventName: string, args: Record<string, unknown>, address: string) => {
+      const topics = encodeEventTopics({ abi: NOTARY_CLIENT_ABI, eventName, args } as never);
+      const event = NOTARY_CLIENT_ABI.find(
+        (e) => e.type === 'event' && e.name === eventName,
+      ) as { inputs: { name: string; type: string; indexed?: boolean }[] };
+      const data = encodeAbiParameters(
+        event.inputs.filter((i) => !i.indexed),
+        event.inputs.filter((i) => !i.indexed).map((i) => args[i.name]) as never,
+      );
+      return { address, topics, data };
+    };
+    chain.receipts.set(txHash, {
+      status: '0x1',
+      logs: [
+        log(
+          'RecordNotarized',
+          {
+            recordId: a.recordId,
+            signer: AGENT,
+            envelopeHash: hash32('11'),
+            recipientCommitment: hash32('00'),
+            parentRecordId: hash32('00'),
+            appId: hash32('00'),
+            kind: 1,
+            timestamp: 1n,
+          },
+          NOTARY,
+        ),
+        log('RecordSkipped', { recordId: b.recordId }, NOTARY),
+        // A look-alike event from another contract is ignored.
+        log('RecordSkipped', { recordId: a.recordId }, RECIPIENT),
+      ],
+    });
+    const included = await p.inclusion(txHash);
+    expect(included.state).toBe('included');
+    if (included.state !== 'included') throw new Error('unreachable');
+    expect(included.outcomes.get(a.id)).toBe('recorded');
+    expect(included.outcomes.get(b.id)).toBe('skipped');
+    chain.receipts.set(txHash, { status: '0x0', logs: [] });
+    expect(await p.inclusion(txHash)).toEqual({ state: 'reverted' });
+  });
+
+  it('reads the gas balance and sends only allowlisted RPC methods', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    expect(await p.gasBalance()).toBe(5n * 10n ** 17n);
+    const item = await recordItem();
+    await p.simulateItem(item);
+    await p.simulateBatch([item]);
+    await p.send([item], { gasLimit: 200_000n, nonce: 1 });
+    await p.inclusion(hash32('aa'));
+    for (const method of chain.methods) expect(SUBMITTER_RPC_METHODS).toContain(method);
+  });
+
+  it('never puts the RPC URL or the gas key in an error', async () => {
+    const chain = newChain();
+    chain.failNetwork = true;
+    const p = port(chain);
+    const item = await recordItem();
+    for (const call of [
+      () => p.hasCode(AGENT),
+      () => p.simulateItem(item),
+      () => p.send([item], { gasLimit: 1n, nonce: 1 }),
+      () => p.gasBalance(),
+    ]) {
+      let thrown: unknown;
+      try {
+        await call();
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(Error);
+      const text = `${(thrown as Error).message} ${JSON.stringify(thrown)} ${String((thrown as Error).stack)}`;
+      expect(text).not.toContain('secret-path-key');
+      expect(text).not.toContain(GAS_KEY.slice(2, 20));
+    }
+  });
+});
+
+// --- the submitter client (failover; 07 §6.2, §7) -------------------------------------------------
+
+function clientFetch(handler: (url: string, init: RequestInit) => Promise<Response> | Response) {
+  const fn = vi.fn(async (input: string | URL | Request, init?: RequestInit) =>
+    handler(String(input), init ?? {}),
+  );
+  Object.defineProperty(fn, ADDRESS_CHECKED, { value: true });
+  return fn;
+}
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+describe('createSubmitterClient', () => {
+  const A = 'https://submitter-a.example-host.io';
+  const B = 'https://submitter-b.example-host.io/base';
+
+  it('refuses a plain fetch and a URL that breaks the 04 §4 rule', () => {
+    expect(() => createSubmitterClient({ urls: [A], fetchFn: (async () => json(200, {})) as typeof fetch })).toThrow();
+    const fetchFn = clientFetch(() => json(200, {})) as unknown as typeof fetch;
+    expect(() => createSubmitterClient({ urls: ['http://submitter-a.example-host.io'], fetchFn })).toThrow();
+    expect(() => createSubmitterClient({ urls: [], fetchFn })).toThrow();
+  });
+
+  it('posts the signed items as JSON, without redirects or credentials', async () => {
+    const { built, signature } = await signedRecord();
+    const fetchFn = clientFetch((url, init) => {
+      expect(url).toBe(`${A}/v1/notarize`);
+      expect(init.method).toBe('POST');
+      expect(init.redirect).toBe('error');
+      expect(init.credentials).toBe('omit');
+      const body = JSON.parse(String(init.body)) as { chainId: number; records: unknown[] };
+      expect(body).toEqual({ chainId: CHAIN_ID, records: [{ record: built.record, signature }] });
+      return json(200, {
+        chainId: CHAIN_ID,
+        items: [{ id: built.recordId, recordId: built.recordId, status: 'submitted', txHash: hash32('55') }],
+      });
+    });
+    const client = createSubmitterClient({ urls: [A], fetchFn: fetchFn as unknown as typeof fetch });
+    const res = await client.notarize(CHAIN_ID, [{ record: built.record, signature }]);
+    expect(res.items[0]?.status).toBe('submitted');
+  });
+
+  it('fails over on a network error, a 5xx, a 429, an unserved chain or a malformed answer', async () => {
+    const { built, signature } = await signedRecord();
+    const answer = {
+      chainId: CHAIN_ID,
+      items: [{ id: built.recordId, recordId: built.recordId, status: 'skipped' }],
+    };
+    const firsts: (() => Response)[] = [
+      () => {
+        throw new TypeError('down');
+      },
+      () => json(503, { error: 'unavailable' }),
+      () => json(429, { error: 'rate_limited' }),
+      () => json(400, { error: 'unsupported_chain' }),
+      () => json(200, { chainId: CHAIN_ID, items: [{ id: 'x' }] }),
+      () => new Response('not json', { status: 200 }),
+    ];
+    for (const first of firsts) {
+      const seen: string[] = [];
+      const fetchFn = clientFetch((url) => {
+        seen.push(url);
+        return url.startsWith(A) ? first() : json(200, answer);
+      });
+      const client = createSubmitterClient({ urls: [A, B], fetchFn: fetchFn as unknown as typeof fetch });
+      const res = await client.notarize(CHAIN_ID, [{ record: built.record, signature }]);
+      expect(res.items[0]?.status).toBe('skipped');
+      expect(seen).toEqual([`${A}/v1/notarize`, `${B}/v1/notarize`]);
+    }
+  });
+
+  it('stops at a refusal of the request itself (400), with a fixed code and no URL', async () => {
+    const { built, signature } = await signedRecord();
+    const seen: string[] = [];
+    const fetchFn = clientFetch((url) => {
+      seen.push(url);
+      return json(400, { error: 'bad_request' });
+    });
+    const client = createSubmitterClient({ urls: [A, B], fetchFn: fetchFn as unknown as typeof fetch });
+    const err = await client.notarize(CHAIN_ID, [{ record: built.record, signature }]).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubmitterError);
+    expect((err as SubmitterError).code).toBe('refused');
+    expect((err as Error).message).not.toContain('example-host');
+    expect(seen).toHaveLength(1);
+  });
+
+  it('reports `unavailable` when every submitter fails, with no URL in the error', async () => {
+    const fetchFn = clientFetch(() => json(502, {}));
+    const client = createSubmitterClient({ urls: [A, B], fetchFn: fetchFn as unknown as typeof fetch });
+    const err = await client.status(hash32('55')).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(SubmitterError);
+    expect((err as SubmitterError).code).toBe('unavailable');
+    expect(`${(err as Error).message} ${JSON.stringify(err)}`).not.toContain('example-host');
+  });
+
+  it('reads status and health with GET', async () => {
+    const fetchFn = clientFetch((url, init) => {
+      expect(init.method).toBe('GET');
+      if (url.endsWith('/v1/health')) {
+        return json(200, { ok: true, chains: [] });
+      }
+      expect(url).toBe(`${A}/v1/status/${hash32('55')}`);
+      return json(200, { chainId: CHAIN_ID, txHash: hash32('55'), state: 'pending', items: [] });
+    });
+    const client = createSubmitterClient({ urls: [A], fetchFn: fetchFn as unknown as typeof fetch });
+    expect((await client.status(hash32('55'))).state).toBe('pending');
+    expect((await client.health()).ok).toBe(true);
+    await expect(client.status('0x12' as Hex)).rejects.toThrow();
+  });
+});

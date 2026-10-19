@@ -2,7 +2,7 @@
   "name": "@4thtech-io/submitter",
   "version": "0.0.0",
   "private": true,
-  "description": "Submitter Worker.",
+  "description": "Submitter Worker: relays signed OCC v2 records and receipts (07 §7).",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -28,5 +28,12 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@4thtech-io/chain": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
   }
 }
