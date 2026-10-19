@@ -112,6 +112,28 @@ type OwnStatus =
   | 'released';
 const LIVE: readonly OwnStatus[] = ['signed', 'pending', 'needs_credits'];
 const ON_CHAIN: readonly string[] = ['recorded', 'announced'];
+/**
+ * A signed Receipt of this agent, kept so the same bytes are resent until they land (04 §5). Its
+ * `proofs` row is keyed by the submitter item ID `<recordId>:<receiptType>` (07 §7), holds the
+ * signed item in `record_json` and an empty sealed `salt` (the salt lives on the record's row).
+ */
+const RECEIPT_SIGNED = 'receipt_signed';
+const RECEIPT_RECORDED = 'receipt_recorded';
+/** The conflicting ACCEPTED/REJECTED type is on-chain: this receipt can never land. */
+const RECEIPT_CONFLICT = 'receipt_conflict';
+const RECEIPT_STATUSES: readonly string[] = [RECEIPT_SIGNED, RECEIPT_RECORDED, RECEIPT_CONFLICT];
+/**
+ * A `proof` envelope whose message has not arrived yet (IR-M1-7g-1 L5): kept, keyed
+ * `await:<proof envelope id>`, with the message's envelope ID, and checked when that arrives.
+ */
+const AWAITING = 'awaiting';
+/** At most this many proof envelopes wait for their message, each at most this long. */
+const MAX_AWAITING = 256;
+const AWAITING_SECONDS = 7 * 86_400;
+/** Rows that are a record: own or received (not a stored receipt or a waiting proof). */
+const isRecordRow = (r: Row<'proofs'>): boolean =>
+  !RECEIPT_STATUSES.includes(r.status) && r.status !== AWAITING;
+const receiptItemId = (recordId: string, code: number): string => `${recordId}:${String(code)}`;
 
 /** Fixed refusal codes (06 §1 rule 3). */
 export type ProofCode =
@@ -215,6 +237,11 @@ export interface ExportProofPackInput {
   readonly approvalId?: string;
   /** The owner's approval of a commitment (D-55): included by default; the owner may leave it out. */
   readonly includeOwnerApproval?: boolean;
+  /**
+   * Discloses the recipient's address and the salt that opens the commitment (07 §8 "optional
+   * disclosure"; 04 §5: unlinkable unless disclosed). Default false.
+   */
+  readonly includeRecipient?: boolean;
 }
 
 export type ExportProofPackResult =
@@ -686,6 +713,23 @@ export class ProofService implements RecordLookup {
     let resent = 0;
     let replaced = 0;
     let recorded = 0;
+    const receiptRows = await this.#ctx.store.transaction((tx) =>
+      tx.select('proofs', { status: RECEIPT_SIGNED }),
+    );
+    for (const row of receiptRows) {
+      resent += 1;
+      if ((await this.#submitReceipt(row)) === 'recorded') {
+        recorded += 1;
+        continue;
+      }
+      if (await this.#replaceReceipt(row)) {
+        replaced += 1;
+        const after = await this.#ctx.store.transaction((tx) =>
+          tx.get('proofs', { record_id: row.record_id }),
+        );
+        if (after?.status === RECEIPT_RECORDED) recorded += 1;
+      }
+    }
     for (const row of rows) {
       if (row.status === 'recorded') {
         await this.#announce(row);
@@ -809,11 +853,52 @@ export class ProofService implements RecordLookup {
       if (report.contactId === undefined) continue;
       try {
         signed += await this.#inbound(report.envelopeId, report.contactId);
+        signed += await this.#released(report.envelopeId, report.contactId);
       } catch {
         this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
     return signed;
+  }
+
+  /** The proof envelopes that waited for this message (L5): each is checked once, now. */
+  async #released(envelopeId: string, contactId: string): Promise<number> {
+    const now = nowOf(this.#ctx);
+    const waiting = await this.#ctx.store.transaction((tx) => {
+      tx.delete('proofs', { status: AWAITING, created_at: { lt: now - AWAITING_SECONDS } });
+      const rows = tx.select('proofs', { envelope_id: envelopeId, status: AWAITING });
+      for (const r of rows) tx.delete('proofs', { record_id: r.record_id, status: AWAITING });
+      return rows;
+    });
+    let signed = 0;
+    for (const r of waiting) {
+      signed += await this.#inbound(r.record_id.slice('await:'.length), contactId);
+    }
+    return signed;
+  }
+
+  /** Keeps a proof envelope whose message is not here yet; bounded in number and time. */
+  async #await(proofEnvelopeId: string, envelopeId: string, chainId: number): Promise<void> {
+    const now = nowOf(this.#ctx);
+    const key = `await:${proofEnvelopeId}`;
+    const empty = await seal(this.#ctx, 'proofs', 'salt', [key], '');
+    await this.#ctx.store.transaction((tx) => {
+      tx.delete('proofs', { status: AWAITING, created_at: { lt: now - AWAITING_SECONDS } });
+      if (tx.count('proofs', { status: AWAITING }) >= MAX_AWAITING) return;
+      if (tx.get('proofs', { record_id: key }) !== undefined) return;
+      tx.insert('proofs', {
+        record_id: key,
+        envelope_id: envelopeId,
+        chain_id: chainId,
+        record_json: '{}',
+        tx_hash: null,
+        status: AWAITING,
+        fee_token: null,
+        fee_amount: null,
+        salt: empty,
+        created_at: now,
+      });
+    });
   }
 
   async #inbound(proofEnvelopeId: string, contactId: string): Promise<number> {
@@ -825,6 +910,11 @@ export class ProofService implements RecordLookup {
     const body = proofBodySchema.safeParse(payload.body);
     if (!body.success) return 0;
     const { envelopeId, chainId, recordId, salt } = body.data;
+    if ((await this.#envelope(envelopeId)) === undefined) {
+      // The message is not here yet (relays deliver out of order): check it when it arrives.
+      await this.#await(proofEnvelopeId, envelopeId, chainId);
+      return 0;
+    }
     const checked = await this.#checkRecord(contactId, envelopeId, chainId, recordId, salt);
     if (checked === undefined) {
       // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
@@ -922,8 +1012,10 @@ export class ProofService implements RecordLookup {
   }
 
   /**
-   * Signs and submits one receipt on a received record. Stored first (one per record and type;
-   * ACCEPTED and REJECTED exclusive) in the transaction that also runs `claim`, if any.
+   * Signs, stores and submits one receipt on a received record. The signed item is stored (one per
+   * record and type; ACCEPTED and REJECTED exclusive) in the transaction that also runs `claim`, if
+   * any, and only then submitted. A stored one is never signed again: it is resent unchanged until
+   * it lands (04 §5); `resubmitPending` replaces it only when it can never land.
    */
   async #signReceipt(
     row: Row<'proofs'>,
@@ -932,25 +1024,20 @@ export class ProofService implements RecordLookup {
   ): Promise<AcknowledgeResult> {
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
-    const self = await this.#self();
     const code = RECEIPT_CODE[type];
+    const id = receiptItemId(row.record_id, code);
+    const existing = await this.#ctx.store.transaction((tx) => tx.get('proofs', { record_id: id }));
+    if (existing !== undefined) return this.#receiptResult(existing, type);
+    const self = await this.#self();
     const now = nowOf(this.#ctx);
     const salt = await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
-    const built = this.#kit.buildReceipt({
-      chainId: row.chain_id,
-      notary: chain.config.contracts.notary,
-      signer: self.agentId,
-      recordId: row.record_id,
-      receiptType: code,
-      salt,
-      deadline: now + RECEIPT_DEADLINE_SECONDS,
-    });
-    const signature = await this.#kit.signReceipt(this.#ctx.keyStore, built);
-    const item = { receipt: built.receipt, signature };
-    const itemJson = canonicalize(item as never);
+    const itemJson = await this.#buildReceiptItem(row, code, salt, now);
+    const empty = await seal(this.#ctx, 'proofs', 'salt', [id], '');
     const outcome = await this.#ctx.store.transaction((tx) => {
-      if (tx.get('receipts', { record_id: row.record_id, type: code }) !== undefined)
+      if (tx.get('proofs', { record_id: id }) !== undefined) return 'exists';
+      if (tx.get('receipts', { record_id: row.record_id, type: code }) !== undefined) {
         return 'exists';
+      }
       if (code === 3 || code === 4) {
         const other = code === 3 ? 4 : 3;
         if (tx.get('receipts', { record_id: row.record_id, type: other }) !== undefined) {
@@ -965,39 +1052,167 @@ export class ProofService implements RecordLookup {
         tx_hash: null,
         at: now,
       });
+      tx.insert('proofs', {
+        record_id: id,
+        envelope_id: row.envelope_id,
+        chain_id: row.chain_id,
+        record_json: itemJson,
+        tx_hash: null,
+        status: RECEIPT_SIGNED,
+        fee_token: null,
+        fee_amount: null,
+        salt: empty,
+        created_at: now,
+      });
       return 'stored';
     });
     if (outcome === 'conflict') return rejected('RECEIPT_CONFLICT');
     if (outcome === 'refused') return rejected('APPROVAL_INVALID');
-    if (outcome === 'exists') {
-      return {
-        status: 'ok',
-        recordId: row.record_id,
-        receipt: type,
-        onChain: await this.#receiptOnChain(row, code),
-      };
-    }
-    let onChain = false;
-    try {
-      const r = await chain.submitter.acknowledge(item);
-      onChain = r.status === 'recorded';
-      if (r.status === 'conflict') {
-        this.#ctx.log.info('receipt conflicts on-chain', { code: 'receipt_conflict' });
-      }
-    } catch {
-      this.#ctx.log.warn('receipt submit failed', { code: 'submit_error' });
-    }
-    return { status: 'ok', recordId: row.record_id, receipt: type, onChain };
+    const stored = await this.#ctx.store.transaction((tx) => tx.get('proofs', { record_id: id }));
+    if (stored === undefined) return rejected('NOT_RECORDED');
+    return this.#receiptResult(stored, type);
   }
 
-  async #receiptOnChain(row: Row<'proofs'>, code: number): Promise<boolean> {
-    const chain = this.#chain(row.chain_id);
+  /** A signed Receipt as canonical JSON `{receipt, signature}`, through KeyStore.sign712. */
+  async #buildReceiptItem(
+    row: Row<'proofs'>,
+    code: number,
+    salt: string,
+    now: number,
+  ): Promise<string> {
+    const chain = this.#chain(row.chain_id) as ProofChain;
+    const self = await this.#self();
+    const built = this.#kit.buildReceipt({
+      chainId: row.chain_id,
+      notary: chain.config.contracts.notary,
+      signer: self.agentId,
+      recordId: row.record_id,
+      receiptType: code,
+      salt,
+      deadline: now + RECEIPT_DEADLINE_SECONDS,
+    });
+    const signature = await this.#kit.signReceipt(this.#ctx.keyStore, built);
+    return canonicalize({ receipt: built.receipt, signature } as never);
+  }
+
+  /** The result for a stored receipt: submitted again (the same bytes) unless it has landed. */
+  async #receiptResult(stored: Row<'proofs'>, type: ReceiptTypeName): Promise<AcknowledgeResult> {
+    const recordId = stored.record_id.slice(0, stored.record_id.lastIndexOf(':'));
+    if (stored.status === RECEIPT_CONFLICT) return rejected('RECEIPT_CONFLICT');
+    const onChain =
+      stored.status === RECEIPT_RECORDED || (await this.#submitReceipt(stored)) === 'recorded';
+    return { status: 'ok', recordId, receipt: type, onChain };
+  }
+
+  /**
+   * Submits the stored signed Receipt unchanged. On-chain: the row becomes `receipt_recorded` and a
+   * commitment part that holds this item becomes `done` (07 §2.1 step 3, §3.5).
+   */
+  async #submitReceipt(stored: Row<'proofs'>): Promise<ProofOutcome['status'] | 'error'> {
+    const chain = this.#chain(stored.chain_id);
+    if (chain === undefined) return 'error';
+    let status: ProofOutcome['status'];
     try {
-      const stored = await chain?.state.getRecord(row.record_id as Hex);
-      return (stored?.receiptAt[code - 1] ?? 0n) !== 0n;
+      status = (await chain.submitter.acknowledge(parseJson(stored.record_json) as never)).status;
     } catch {
-      return false;
+      this.#ctx.log.warn('receipt submit failed', { code: 'submit_error' });
+      return 'error';
     }
+    const now = nowOf(this.#ctx);
+    if (status === 'recorded') {
+      await this.#ctx.store.transaction((tx) => {
+        tx.update(
+          'proofs',
+          { record_id: stored.record_id, status: RECEIPT_SIGNED },
+          { status: RECEIPT_RECORDED },
+        );
+        tx.update(
+          'commitment_parts',
+          { part: 'receipt', item_ref: stored.record_id, state: 'claimed' },
+          { state: 'done', done_at: now, updated_at: now },
+        );
+      });
+    } else if (status === 'conflict') {
+      this.#ctx.log.info('receipt conflicts on-chain', { code: 'receipt_conflict' });
+      await this.#ctx.store.transaction((tx) =>
+        tx.update(
+          'proofs',
+          { record_id: stored.record_id, status: RECEIPT_SIGNED },
+          { status: RECEIPT_CONFLICT },
+        ),
+      );
+    }
+    return status;
+  }
+
+  /**
+   * One replacement Receipt (04 §5): only after the stored one's deadline, when the finalized block
+   * shows neither its type nor the conflicting one, and, for a commitment part, never after the
+   * scope's `expiresAt`. Same record and type, new deadline; the part's stored item follows.
+   */
+  async #replaceReceipt(stored: Row<'proofs'>): Promise<boolean> {
+    const chain = this.#chain(stored.chain_id);
+    if (chain === undefined) return false;
+    const item = parseJson(stored.record_json) as unknown as {
+      receipt: { recordId: string; receiptType: number; deadline: number };
+    };
+    const now = nowOf(this.#ctx);
+    if (now <= item.receipt.deadline) return false;
+    let allowed: boolean;
+    try {
+      allowed = await this.#kit.replacementAllowed(chain.state, {
+        recordId: item.receipt.recordId,
+        deadline: item.receipt.deadline,
+        receiptType: item.receipt.receiptType,
+      });
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) return false;
+    const part = await this.#ctx.store.transaction(
+      (tx) => tx.select('commitment_parts', { part: 'receipt', item_ref: stored.record_id })[0],
+    );
+    if (part !== undefined) {
+      if (part.state !== 'claimed') return false;
+      const approval = await this.#ctx.store.transaction((tx) =>
+        tx.get('approvals', { approval_id: part.approval_id }),
+      );
+      let expiresAt: unknown;
+      try {
+        expiresAt = (parseJson(approval?.scope_json ?? '') as { expiresAt?: unknown }).expiresAt;
+      } catch {
+        expiresAt = undefined;
+      }
+      if (typeof expiresAt !== 'number' || now > expiresAt) return false;
+    }
+    const record = await this.#ctx.store.transaction((tx) =>
+      tx.get('proofs', { record_id: item.receipt.recordId }),
+    );
+    if (record?.status !== 'received') return false;
+    const salt = await open(this.#ctx, 'proofs', 'salt', [record.record_id], record.salt);
+    const itemJson = await this.#buildReceiptItem(record, item.receipt.receiptType, salt, now);
+    const swapped = await this.#ctx.store.transaction((tx) => {
+      const n = tx.update(
+        'proofs',
+        { record_id: stored.record_id, status: RECEIPT_SIGNED, record_json: stored.record_json },
+        { record_json: itemJson },
+      );
+      if (n !== 1) return false;
+      if (part !== undefined) {
+        tx.update(
+          'commitment_parts',
+          { approval_id: part.approval_id, part: 'receipt', state: 'claimed' },
+          { item_json: itemJson, replacements: part.replacements + 1, updated_at: now },
+        );
+      }
+      return true;
+    });
+    if (!swapped) return false;
+    const fresh = await this.#ctx.store.transaction((tx) =>
+      tx.get('proofs', { record_id: stored.record_id }),
+    );
+    if (fresh !== undefined) await this.#submitReceipt(fresh);
+    return true;
   }
 
   /** The deferred ACCEPTED of an approved accept scope (07 §2.1 step 4; D-55). */
@@ -1017,18 +1232,9 @@ export class ProofService implements RecordLookup {
     const r = await this.#signReceipt(row, 'ACCEPTED', (tx, itemJson) =>
       terms.claimReceiptPartTx(tx, approvalId, itemRef, itemJson, nowOf(this.#ctx)),
     );
-    if (r.status !== 'ok') return 0;
-    if (r.onChain) {
-      const now = nowOf(this.#ctx);
-      await this.#ctx.store.transaction((tx) =>
-        tx.update(
-          'commitment_parts',
-          { approval_id: approvalId, part: 'receipt', state: 'claimed' },
-          { state: 'done', done_at: now, updated_at: now },
-        ),
-      );
-    }
-    return 1;
+    // On-chain, #submitReceipt marked the part done; otherwise resubmitPending republishes the
+    // stored item and marks it done when it lands (07 §2.1 step 3).
+    return r.status === 'ok' ? 1 : 0;
   }
 
   /**
@@ -1173,7 +1379,7 @@ export class ProofService implements RecordLookup {
           : input.envelopeId !== undefined
             ? tx.select('proofs', { envelope_id: input.envelopeId })
             : [];
-      const usable = rows.filter((r) => r.status !== 'replaced');
+      const usable = rows.filter((r) => isRecordRow(r) && r.status !== 'replaced');
       // Prefer an on-chain own record, then any own one, then a received one.
       return (
         usable.find((r) => ON_CHAIN.includes(r.status)) ??
@@ -1227,7 +1433,7 @@ export class ProofService implements RecordLookup {
       evm: item.record.signer,
     };
     const salt =
-      envelopeRow.contact_id === null
+      envelopeRow.contact_id === null || input.includeRecipient !== true
         ? ''
         : await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
     const ownerApproval =
@@ -1455,7 +1661,9 @@ export class ProofService implements RecordLookup {
 
   async #ownRows(envelopeId: string): Promise<Row<'proofs'>[]> {
     return this.#ctx.store.transaction((tx) =>
-      tx.select('proofs', { envelope_id: envelopeId }).filter((r) => r.status !== 'received'),
+      tx
+        .select('proofs', { envelope_id: envelopeId })
+        .filter((r) => isRecordRow(r) && r.status !== 'received'),
     );
   }
 }

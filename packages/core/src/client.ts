@@ -52,6 +52,8 @@ import {
   ProofService,
   type AcknowledgeInput,
   type AcknowledgeResult,
+  type ExportProofPackInput,
+  type ExportProofPackResult,
   type NotarizeInput,
   type NotarizeResult,
   type ProofView,
@@ -140,9 +142,7 @@ export class AgentLinkClient {
    */
   readonly terms: TermsService;
   /**
-   * Notarize, receipts, proof envelopes, replacement and the proof-pack export (M1-7g). The export
-   * is `proofs.exportProofPack`, not a client method: the client exposes no method named export*
-   * (client.test.ts, I-4).
+   * Notarize, receipts, proof envelopes, replacement and the proof-pack export (M1-7g).
    */
   readonly proofs: ProofService;
   readonly #send: SendService;
@@ -361,6 +361,16 @@ export class AgentLinkClient {
     readonly recordId?: string;
   }): Promise<ProofView | undefined> {
     return this.proofs.getProof(input);
+  }
+
+  /**
+   * The 07 §8 proof pack of an own record (07 §2 `exportProofPack`; 06 §2.4). It exports a pack,
+   * never a key: the content key only with the owner's approval (`proofs.allowKeyDisclosure`), and
+   * then with the envelope; the recipient and salt only on request. The client guard test lists it
+   * as the one approved `export*` name.
+   */
+  exportProofPack(input: ExportProofPackInput): Promise<ExportProofPackResult> {
+    return this.proofs.exportProofPack(input);
   }
 
   /**
