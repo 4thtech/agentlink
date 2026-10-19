@@ -222,7 +222,9 @@ function main() {
     process.exit(1);
   }
   const { tag } = readPin(PACKAGE_DIR);
-  console.log(`occ-v2-abi: ${tag} matches its pinned manifest; Base Sepolia (84532) and Gnosis Chiado (10200) only. OK.`);
+  console.log(
+    `occ-v2-abi: ${tag} matches its pinned manifest; Base Sepolia (84532) and Gnosis Chiado (10200) only. OK.`,
+  );
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

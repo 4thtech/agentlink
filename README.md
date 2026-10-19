@@ -45,7 +45,7 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 > - **Core (@4thtech-io/core):** 17 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
 > - **MCP server, CLI and apps:** 4 merged, 5 in progress, 1 planned
-> - **OCC v2 contracts (private repo):** 3 merged, 1 planned
+> - **OCC v2 contracts (private repo):** 3 merged, 1 in progress, 1 planned
 > - **Design:** 1 merged, 1 in progress
 > - **In progress:** M1b is in progress. v0.1.1 (18 Oct 2026) is on npm `latest`. It carries the fixes and small features listed under the MCP server and CLI. In development, merged but not yet usable from the CLI or the MCP tools: STREAM file encryption, the owner-signed Revocation typed data, multipart upload with streaming encryption for your own storage, the localhost approval page (`agentlink mcp` opens it when an approval is needed), the safe fetch and path guard, the files and proof policy rules, the proof hashing, file send and fetch in the core (inline or through the encrypted drop, verified before a file is saved), and the file tools in the MCP server (send a file from an allowed folder, save a received file; M1-9d-1). The encrypted drop Worker is built and has its deploy pipeline, but it is not deployed yet: the owner's Cloudflare steps are pending. The submitter Worker, which records signed proofs on the agent's behalf, is built and tested locally (M1-10a, M1-10a-b), with a testnet faucet for free test credits (M1-10b); neither is deployed yet. The chain client can send proofs, add credits and check who sent a message, but no tool uses it yet. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: deploying the encrypted drop and the submitter, the designed approval page and proof.
 > - **Does not exist yet:** file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, and `agentlink mcp` opens it when an approval is needed), the encrypted drop service (built, not deployed), the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. v0.1.1 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 18 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
@@ -99,7 +99,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 
 - **User guide** ([`docs-site/guide`](docs-site/guide/README.md)): set up, pair, approvals, FAQ. **Technical docs** ([`docs-site/technical`](docs-site/technical/README.md)): concepts, guides, reference. Both are published on GitBook from this repository.
 - [`knowledge/`](knowledge/README.md) and [`llms.txt`](llms.txt): compact public knowledge base for AI assistants.
-- [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks, contract addresses and explorer links (Base Sepolia live; Gnosis Chiado planned; no mainnet).
+- [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks, contract addresses and explorer links (Base Sepolia live; Gnosis Chiado live, smoke test pending; no mainnet).
 - [`docs/`](docs/README.md): specifications, decisions and process. [`CHANGELOG.md`](CHANGELOG.md): releases.
 
 ## Contributing
