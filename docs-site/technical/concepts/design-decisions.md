@@ -119,6 +119,12 @@ A pack confirms its sender only when both of the agent's keys have signed its ca
 
 **Availability.** Decided design (07 §8, 04 §2.9), in development (card M1-4d-d).
 
+### Card updates follow the contact list (M1-4d-f, D-106)
+
+When an agent's keys change, it sends its new card (with both of its signatures) to its contacts in a card update. It sends one only to contacts that the owner's contact list (`contacts.allowed`) permits, the same check every other message gets. While the owner's rules can't be read, it sends none, and catches up once the owner has fixed them. The agent also keeps its own earlier cards, so a proof for a message sent before a key change still names the sender.
+
+**Availability.** Decided design, in development (card M1-4d-f).
+
 ### A smart-contract signer that no longer confirms (M1-4d-c, D-96)
 
 The verifier asks a smart-contract account (ERC-1271) at verification time whether it accepts the record's signature. The account may have changed its rules since the proof network checked the signature when it stored the record. If it no longer accepts it, the pack does not fail: the result carries the non-fatal code `signer_no_longer_confirms` next to an unchanged verdict, with the text "The signer's account no longer confirms this record. The proof network checked it when the record was made."

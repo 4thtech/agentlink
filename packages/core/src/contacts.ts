@@ -339,11 +339,13 @@ export class ContactBook {
 
   /**
    * The proof pack `signer` card for an envelope `from` key (07 §8; 04 §2.9, D-102), for
-   * `exportProofPack` (M1-7g): the own current card, or the stored current card of the contact whose
-   * current message key is `from`, re-verified, with its `cardSig` and, when stored, its
-   * `cardAgentSig` and `cardPop` together, so the pack can verify. A card without the pair (one that
-   * came from a peer before M1-4d-d) is returned alone, and its packs stay `record_only`. Undefined
-   * for any other key, an earlier epoch's key included: only the current card is stored.
+   * `exportProofPack` (M1-7g): the own card of the key epoch whose message key is `from` (the
+   * current card or one of the earlier cards kept with it, M1-4d-f), or the stored current card of
+   * the contact whose current message key is `from`, re-verified, with its `cardSig` and, when
+   * stored, its `cardAgentSig` and `cardPop` together, so the pack can verify. A card without the
+   * pair (one that came from a peer before M1-4d-d) is returned alone, and its packs stay
+   * `record_only`. Undefined for any other key: a contact's earlier epoch, and any own epoch whose
+   * card is not stored (a future epoch, or a rotation not yet committed), never get a card.
    */
   async proofSigner(from: string): Promise<ProofPackSigner | undefined> {
     const ctx = this.#ctx;
@@ -351,7 +353,10 @@ export class ContactBook {
     const got = await readIdentity(ctx);
     if (got !== undefined) {
       const own = await openOwnCard(ctx, got.row);
-      if (own !== undefined && agentNostrKey(own.card) === from) return signerOf(own);
+      if (own !== undefined) {
+        const match = [own, ...own.history].find((c) => agentNostrKey(c.card) === from);
+        if (match !== undefined) return signerOf(match);
+      }
     }
     const row = await ctx.store.transaction((tx) =>
       tx.select('contacts', { agent_nostr: from }).find((r) => r.status !== 'removed'),

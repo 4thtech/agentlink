@@ -56,27 +56,42 @@ export function storedCardText(stored: StoredCard): string {
  * key and reads as null). Anything else is unreadable (fail closed), never trusted.
  */
 export function parseStoredCard(text: string): StoredCard {
-  const unreadable = (): never => {
-    throw new CoreError('store_unreadable', 'A stored agent card could not be read.');
-  };
+  return parseStoredCardValue(parseStoredJson(text));
+}
+
+const storedUnreadable = (): never => {
+  throw new CoreError('store_unreadable', 'A stored agent card could not be read.');
+};
+
+function parseStoredJson(text: string): Record<string, unknown> {
   let value: unknown;
   try {
     value = parseJson(text, { integersOnly: true });
   } catch {
-    return unreadable();
+    return storedUnreadable();
   }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return unreadable();
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return storedUnreadable();
+  }
+  return value as Record<string, unknown>;
+}
+
+/** parseStoredCard on an already parsed JSON object. */
+function parseStoredCardValue(value: unknown): StoredCard {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return storedUnreadable();
+  }
   const { card: rawCard, cardSig, cardAgentSig, cardPop = null } = value as Record<string, unknown>;
   let card: AgentCard;
   try {
     card = parseAgentCard(rawCard);
   } catch {
-    return unreadable();
+    return storedUnreadable();
   }
-  if (typeof cardSig !== 'string' || !verifyCardOwnerSig(card, cardSig)) return unreadable();
-  if (cardAgentSig !== null && !verifyCardAgentSig(card, cardAgentSig)) return unreadable();
+  if (typeof cardSig !== 'string' || !verifyCardOwnerSig(card, cardSig)) return storedUnreadable();
+  if (cardAgentSig !== null && !verifyCardAgentSig(card, cardAgentSig)) return storedUnreadable();
   if (cardPop !== null && (cardAgentSig === null || !verifyCardPop(card, cardPop))) {
-    return unreadable();
+    return storedUnreadable();
   }
   return {
     card,
@@ -84,6 +99,60 @@ export function parseStoredCard(text: string): StoredCard {
     cardAgentSig: cardAgentSig as string | null,
     cardPop: cardPop as string | null,
   };
+}
+
+/**
+ * The agent's own stored card with its earlier cards (M1-4d-f; 04 §2.9, 07 §8): `history` holds one
+ * card per earlier key epoch, oldest first, each with the signatures it had, so a proof pack for an
+ * envelope sent at an earlier epoch can carry that epoch's card. It lives in the same sealed
+ * `identity.agent_card_json` (no schema change); a text without `history` (written before M1-4d-f)
+ * has none.
+ */
+export interface OwnCardRecord {
+  readonly current: StoredCard;
+  readonly history: readonly StoredCard[];
+}
+
+/** The plaintext of the own sealed `agent_card_json`: the stored card, plus `history` when any. */
+export function ownCardText(current: StoredCard, history: readonly StoredCard[]): string {
+  const value: Record<string, JsonValue> = {
+    card: current.card as unknown as JsonValue,
+    cardSig: current.cardSig,
+    cardAgentSig: current.cardAgentSig,
+    cardPop: current.cardPop,
+  };
+  if (history.length > 0) {
+    value.history = history.map((h) => JSON.parse(storedCardText(h)) as JsonValue);
+  }
+  return canonicalize(value);
+}
+
+/**
+ * Reads the own stored card and its history back, every entry checked like parseStoredCard. The
+ * history must name the same agent as the current card, carry its agent signature, and be strictly
+ * increasing in key epoch below the current card's; anything else is unreadable (fail closed).
+ */
+export function parseOwnCardText(text: string): OwnCardRecord {
+  const value = parseStoredJson(text);
+  const current = parseStoredCardValue(value);
+  const raw = value.history ?? [];
+  if (!Array.isArray(raw)) return storedUnreadable();
+  const history: StoredCard[] = [];
+  let previous = -1;
+  for (const entry of raw) {
+    const stored = parseStoredCardValue(entry);
+    if (
+      stored.cardAgentSig === null ||
+      stored.card.agentEvm !== current.card.agentEvm ||
+      stored.card.keyEpoch <= previous ||
+      stored.card.keyEpoch >= current.card.keyEpoch
+    ) {
+      return storedUnreadable();
+    }
+    previous = stored.card.keyEpoch;
+    history.push(stored);
+  }
+  return { current, history };
 }
 
 /** The long owner fingerprint (04 §2.9) of a card, 64 lowercase hex. A hash of public keys only. */

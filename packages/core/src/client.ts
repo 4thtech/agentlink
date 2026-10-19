@@ -23,6 +23,7 @@ import { PublisherLease } from './publisher-lease.js';
 import { SendService, type SendMessageInput, type SendMessageResult } from './send.js';
 import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
+import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
 import { InboxService } from './inbox.js';
@@ -47,6 +48,17 @@ import {
   type RespondToTermsResult,
 } from './terms-flow.js';
 import { TermsInbound } from './terms-store.js';
+import type { ProofsPlatform } from './proofs/platform.js';
+import {
+  ProofService,
+  type AcknowledgeInput,
+  type AcknowledgeResult,
+  type ExportProofPackInput,
+  type ExportProofPackResult,
+  type NotarizeInput,
+  type NotarizeResult,
+  type ProofView,
+} from './proofs/service.js';
 
 export interface AgentLinkClientOptions {
   /** The agent's KeyStore (04 §3.1.1): keychain or file backend (M1-8a, M1-8f), Worker (M2-3a). */
@@ -91,6 +103,12 @@ export interface AgentLinkClientOptions {
    * `fetchFile` fail with `files_unavailable`; messages work as before.
    */
   readonly files?: FilesPlatform;
+  /**
+   * The chains for proofs (M1-7g; 07 §6.2, §6.3): read clients, chain-state ports and submitters,
+   * built by the runtime from the shipped chain list. Without it, the proof calls return
+   * `PROOFS_UNAVAILABLE` and `proof` envelopes are stored but not acted on.
+   */
+  readonly proofs?: ProofsPlatform;
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -119,11 +137,17 @@ export class AgentLinkClient {
   readonly inbox: InboxService;
   /** Delivery acknowledgements (02 F-23; M1-7h): behind the `deliveryAcks` flag. */
   readonly acks: DeliveryAcks;
+  /** The `card-update` sender (M1-4d-f; 04 §3.4.1): the current card to contacts that lack it. */
+  readonly cardUpdates: CardUpdateSender;
   /**
    * Terms and commitments (M1-32; 06 §2.2a, 04 §3.4.2): propose, respond, the negotiations, the
    * commitment card, and the deferred-receipt lookup and part claim for M1-7g.
    */
   readonly terms: TermsService;
+  /**
+   * Notarize, receipts, proof envelopes, replacement and the proof-pack export (M1-7g).
+   */
+  readonly proofs: ProofService;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -139,6 +163,7 @@ export class AgentLinkClient {
     records: RecordLookup | undefined,
     dropOrigins: readonly string[],
     files: FilesPlatform | undefined,
+    proofs: ProofsPlatform | undefined,
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
@@ -180,6 +205,19 @@ export class AgentLinkClient {
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
+    this.proofs = new ProofService(
+      ctx,
+      {
+        identity: this.identity,
+        contacts: this.contacts,
+        envelopes: this.envelopes,
+        outbox: this.outbox,
+        ownerActions: this.ownerActions,
+        approvals: this.approvalService,
+        terms: () => this.terms,
+      },
+      proofs,
+    );
     this.terms = new TermsService(ctx, {
       identity: this.identity,
       contacts: this.contacts,
@@ -188,7 +226,8 @@ export class AgentLinkClient {
       ownerActions: this.ownerActions,
       approvals: this.approvalService,
       idempotency: this.idempotency,
-      ...(records === undefined ? {} : { records }),
+      // The verified records this agent knows (M1-7g); a caller-supplied lookup replaces it.
+      records: records ?? this.proofs,
     });
     this.acks = new DeliveryAcks(
       ctx,
@@ -200,12 +239,19 @@ export class AgentLinkClient {
       },
       deliveryAcks,
     );
+    this.cardUpdates = new CardUpdateSender(ctx, {
+      identity: this.identity,
+      envelopes: this.envelopes,
+      outbox: this.outbox,
+      ownerActions: this.ownerActions,
+    });
     this.#sync = new SyncService(ctx, {
       envelopes: this.envelopes,
       outbox: this.outbox,
       ownerActions: this.ownerActions,
       inbox: this.inbox,
       acks: this.acks,
+      proofs: this.proofs,
     });
   }
 
@@ -214,8 +260,23 @@ export class AgentLinkClient {
    * M1-7h): fetch with the 48 h look-back, dedup, verify once, store, per-contact rate limit, then
    * 04 §3.1.1 steps 5 to 9 (`card-update` first) and, behind the flag, delivery acks.
    */
-  syncInbox(options?: SyncInboxOptions): Promise<SyncInboxResult> {
-    return this.#sync.syncInbox(options);
+  async syncInbox(options?: SyncInboxOptions): Promise<SyncInboxResult> {
+    const result = await this.#sync.syncInbox(options);
+    // M1-4d-f: announce the current card to contacts that lack it (after a rotation, also one made
+    // without a transport). Best effort: it never fails the sync, and the next pass tries again.
+    await this.cardUpdates.sendPending().catch(() => {
+      this.#ctx.log.warn('card updates not sent');
+    });
+    return result;
+  }
+
+  /**
+   * Sends the current card in a `card-update` (with `cardSig`, `cardAgentSig` and `cardPop`) to every
+   * active contact that does not hold it yet (M1-4d-f; 04 §2.6, §2.9, §3.4.1). The owner flow calls
+   * it after a rotation; `syncInbox` also runs it. Idempotent.
+   */
+  sendCardUpdates(): Promise<CardUpdateSendResult> {
+    return this.cardUpdates.sendPending();
   }
 
   /**
@@ -269,7 +330,8 @@ export class AgentLinkClient {
   /**
    * The proof pack `signer` card for an envelope sent from `from` (07 §8; M1-4d-d, D-102): this
    * agent's own card or a contact's, with its proof of possession when stored. For
-   * `exportProofPack` (M1-7g). Undefined for an unknown or earlier-epoch key.
+   * `exportProofPack` (M1-7g). Own cards of earlier key epochs are kept (M1-4d-f); undefined for an
+   * unknown key, a contact's earlier-epoch key, or an own epoch whose card is not stored.
    */
   proofSigner(from: string): Promise<ProofPackSigner | undefined> {
     return this.contacts.proofSigner(from);
@@ -287,8 +349,53 @@ export class AgentLinkClient {
    * Answers an offer, or their accept of our offer (07 §2 `respondToTerms`; 06 §2.2a; M1-32):
    * `accept` is a commitment under one approval per agreement (04 §3.4.2).
    */
-  respondToTerms(input: RespondToTermsInput): Promise<RespondToTermsResult> {
-    return this.terms.respond(input);
+  async respondToTerms(input: RespondToTermsInput): Promise<RespondToTermsResult> {
+    const result = await this.terms.respond(input);
+    // An accept whose offer is already recorded: its ACCEPTED receipt is signed now, under the
+    // same approval (07 §2.1 step 3; D-55). Never fails the call.
+    if (result.status === 'ok') {
+      try {
+        await this.proofs.runDeferredReceipts();
+      } catch {
+        this.#ctx.log.warn('deferred receipt failed', { code: 'deferred_error' });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Records an envelope this agent sent (07 §2 `notarize`; 06 §2.4 `agentlink_notarize`; M1-7g):
+   * kind from the payload, automatic chain selection, policy `proofs.*` and budget, then the
+   * Record and, once on-chain, the `proof` envelope with the salt to the recipient.
+   */
+  notarize(input: NotarizeInput): Promise<NotarizeResult> {
+    return this.proofs.notarize(input);
+  }
+
+  /**
+   * An explicit receipt on a record received (07 §2 `acknowledge`; 06 §2.4): `opened` only when
+   * the user asked; `accepted` / `rejected` are commitments (`commitments.accept`, D-31).
+   */
+  acknowledge(input: AcknowledgeInput): Promise<AcknowledgeResult> {
+    return this.proofs.acknowledge(input);
+  }
+
+  /** The proof of an envelope or record (07 §2 `getProof`; 06 §2.4). Read-only. */
+  getProof(input: {
+    readonly envelopeId?: string;
+    readonly recordId?: string;
+  }): Promise<ProofView | undefined> {
+    return this.proofs.getProof(input);
+  }
+
+  /**
+   * The 07 §8 proof pack of an own record (07 §2 `exportProofPack`; 06 §2.4). It exports a pack,
+   * never a key: the content key only with the owner's approval (`proofs.allowKeyDisclosure`), and
+   * then with the envelope; the recipient and salt only on request. The client guard test lists it
+   * as the one approved `export*` name.
+   */
+  exportProofPack(input: ExportProofPackInput): Promise<ExportProofPackResult> {
+    return this.proofs.exportProofPack(input);
   }
 
   /**
@@ -356,6 +463,7 @@ export class AgentLinkClient {
       options.records,
       options.dropOrigins ?? [],
       options.files,
+      options.proofs,
     );
   }
 }
