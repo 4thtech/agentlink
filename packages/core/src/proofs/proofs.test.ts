@@ -225,7 +225,7 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     const view = await a.client.getProof({ envelopeId });
     expect(view?.receipts.map((r) => r.type)).toEqual(['DELIVERED', 'OPENED']);
 
-    const exported = await a.client.proofs.exportProofPack({ envelopeId });
+    const exported = await a.client.exportProofPack({ envelopeId });
     expect(exported.status).toBe('ok');
     const pack = (exported as { pack: Record<string, unknown> }).pack;
     expect(pack).toMatchObject({
@@ -233,9 +233,18 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
       chainId: 84532,
       recordId,
       disclosure: null,
-      recipient: { evm: b.id },
     });
     expect(pack).not.toHaveProperty('envelope');
+    // 07 §8 "optional disclosure", 04 §5: the recipient and the salt only on an explicit request.
+    expect(pack).not.toHaveProperty('recipient');
+    const named = await a.client.exportProofPack({ envelopeId, includeRecipient: true });
+    const withRecipient = (named as { pack: Record<string, unknown> }).pack;
+    expect(withRecipient.recipient).toMatchObject({ evm: b.id });
+    expect(
+      await verifyProofPack(JSON.stringify(withRecipient), {
+        chains: [{ config: chain.config, client: chain.client }],
+      }),
+    ).toMatchObject({ valid: true, recipient: { evm: b.id } });
     // The signer block is the card of the envelope's key epoch with its proof of possession.
     const own = await a.client.identity.signedCard();
     expect(pack.signer).toEqual({
@@ -484,13 +493,13 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
 
-    const pending = await a.client.proofs.exportProofPack({ envelopeId, includeContentKey: true });
+    const pending = await a.client.exportProofPack({ envelopeId, includeContentKey: true });
     expect(pending.status).toBe('pending_approval');
     expect(JSON.stringify(pending)).not.toContain('contentKey');
     const approvalId = (pending as { approvalId: string }).approvalId;
     await approve(a, approvalId);
 
-    const exported = await a.client.proofs.exportProofPack({
+    const exported = await a.client.exportProofPack({
       envelopeId,
       includeContentKey: true,
       approvalId,
@@ -505,7 +514,7 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     expect(result).toMatchObject({ valid: true, verdict: 'verified', contentVerified: true });
 
     // The approval was for one export.
-    const again = await a.client.proofs.exportProofPack({
+    const again = await a.client.exportProofPack({
       envelopeId,
       includeContentKey: true,
       approvalId,
@@ -524,12 +533,12 @@ describe('key disclosure in the export (07 §8, G-46; 06 §3 allowKeyDisclosure)
     const envelopeId = await sendText(a, b);
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
-    expect(await a.client.proofs.exportProofPack({ envelopeId, includeContentKey: true })).toEqual({
+    expect(await a.client.exportProofPack({ envelopeId, includeContentKey: true })).toEqual({
       status: 'rejected',
       code: 'POLICY_DENIED',
     });
     // The `proof` body carries no Record or signature (04 §3.4): the recipient cannot build a pack.
-    expect(await b.client.proofs.exportProofPack({ envelopeId })).toEqual({
+    expect(await b.client.exportProofPack({ envelopeId })).toEqual({
       status: 'rejected',
       code: 'RECORD_UNAVAILABLE',
     });
@@ -606,6 +615,97 @@ describe('replacing a signed Record (04 §5)', () => {
     expect(await proofRows(a)).toHaveLength(1);
     expect((await ledger(a)).map((e) => e.state)).toEqual(['charged']);
     expect(await a.client.getProof({ envelopeId })).toMatchObject({ recordId: first.recordId });
+  });
+});
+
+describe('signed receipts are stored and resent unchanged (04 §5; IR-M1-7g-1 M1, M2, L5)', () => {
+  it('an OPENED that did not land is resent byte for byte until it lands', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: string };
+    await deliver(a, b);
+    chain.censor = true;
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'ok',
+      onChain: false,
+    });
+    const first = chain.receiptSignatures.at(-1);
+    // A second call does not report it forever as not on-chain: it resends the stored item.
+    chain.censor = false;
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'ok',
+      onChain: true,
+    });
+    expect(chain.receiptSignatures.at(-1)).toBe(first);
+    expect(onChain(proof.recordId)!.receiptAt[1]).not.toBe(0n);
+  });
+
+  it('an approved ACCEPTED that did not land is resent by resubmitPending, not lost with its approval', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: string };
+    await deliver(a, b);
+    const pending = await b.client.acknowledge({ envelopeId, type: 'accepted' });
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    chain.censor = true;
+    await b.client.acknowledge({ envelopeId, type: 'accepted', approvalId });
+    const first = chain.receiptSignatures.at(-1);
+    expect(onChain(proof.recordId)!.receiptAt[2]).toBe(0n);
+    chain.censor = false;
+    expect(await b.client.proofs.resubmitPending()).toMatchObject({ recorded: 1 });
+    expect(onChain(proof.recordId)!.receiptAt[2]).not.toBe(0n);
+    expect(chain.receiptSignatures.at(-1)).toBe(first);
+  });
+
+  it('a receipt is replaced only after its deadline, with nothing on-chain at the finalized block', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: string };
+    chain.censor = true;
+    await deliver(a, b);
+    const first = chain.receiptSignatures.at(-1);
+    await b.client.proofs.resubmitPending();
+    expect(chain.receiptSignatures.at(-1)).toBe(first);
+    clock.t += 3_600 + 60;
+    chain.censor = false;
+    await b.client.proofs.resubmitPending();
+    expect(chain.receiptSignatures.at(-1)).not.toBe(first);
+    expect(onChain(proof.recordId)!.receiptAt[0]).not.toBe(0n);
+  });
+
+  it('a deferred ACCEPTED whose submit failed is republished and its part marked done when it lands', async () => {
+    const { a, b } = await twoAgents();
+    const offer = await sendOffer(a, b);
+    const accepted = await b.client.respondToTerms({ envelopeId: offer, decision: 'accept' });
+    const approvalId = (accepted as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    await b.client.respondToTerms({ envelopeId: offer, decision: 'accept', approvalId });
+    const rec = await recordDirectly(a, b, offer, RECORD_KIND.OFFER);
+    chain.censor = true;
+    await sendProofEnvelope(a, b, { envelopeId: offer, recordId: rec.recordId, salt: rec.salt });
+    const part = () =>
+      b.store.transaction((tx) =>
+        tx.get('commitment_parts', { approval_id: approvalId, part: 'receipt' }),
+      );
+    expect((await part())?.state).toBe('claimed');
+    chain.censor = false;
+    await b.client.proofs.resubmitPending();
+    expect(onChain(rec.recordId)!.receiptAt[2]).not.toBe(0n);
+    expect((await part())?.state).toBe('done');
+  });
+
+  it('a proof envelope that arrives before its message is kept and checked when the message arrives', async () => {
+    const { a, b } = await twoAgents();
+    const sent = await a.client.sendMessage({ to: b.id, text: 'late message' });
+    const envelopeId = (sent as { envelopeId: string }).envelopeId;
+    const rec = await recordDirectly(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    await sendProofEnvelope(a, b, { envelopeId, recordId: rec.recordId, salt: rec.salt });
+    expect(await receipts(b)).toEqual([]);
+    // Now the message itself arrives: the kept proof is checked and DELIVERED signed.
+    await deliver(a, b);
+    expect(onChain(rec.recordId)!.receiptAt[0]).not.toBe(0n);
+    expect(await b.client.getProof({ envelopeId })).toMatchObject({ recordId: rec.recordId });
   });
 });
 

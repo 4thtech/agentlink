@@ -95,6 +95,8 @@ export class FakeNotary implements ChainState {
   head = 5_000n;
   /** Counts of what the submitter was asked to do. */
   readonly calls = { notarize: 0, acknowledge: 0 };
+  /** Every receipt signature a submitter was handed, in order (04 §5: resent unchanged). */
+  readonly receiptSignatures: string[] = [];
   /** Refuse every item at the submitter (it can only censor, 04 §7). */
   censor = false;
   readonly #now: () => number;
@@ -266,6 +268,7 @@ export class FakeNotary implements ChainState {
     },
     acknowledge: (chainId, items): Promise<SubmitResponse> => {
       this.calls.acknowledge += 1;
+      for (const i of items) this.receiptSignatures.push(i.signature);
       if (this.censor) return Promise.reject(new Error('unavailable'));
       return Promise.resolve({
         chainId,
