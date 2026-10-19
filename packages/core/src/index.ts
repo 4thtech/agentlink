@@ -110,6 +110,7 @@ export {
   type ApprovalCheck,
   type ApprovalReading,
   type OwnerActionOutcome,
+  type PolicyRecovery,
   type PolicyVersionMark,
 } from './owner-actions.js';
 export {

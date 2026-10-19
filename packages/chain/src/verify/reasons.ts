@@ -28,6 +28,7 @@ export const PROOF_PACK_FAILURES = Object.freeze([
   'recipient_mismatch',
   'receipt_not_on_chain',
   'receipt_mismatch',
+  'owner_approval_invalid',
 ] as const);
 export type ProofPackFailure = (typeof PROOF_PACK_FAILURES)[number];
 
@@ -78,6 +79,7 @@ const MESSAGES: Readonly<Record<ProofPackFailure | ProofContentFailure, string>>
   recipient_mismatch: 'The disclosed recipient does not match the record.',
   receipt_not_on_chain: 'The proof lists a receipt that was never recorded.',
   receipt_mismatch: 'A receipt time in the proof does not match the recorded one.',
+  owner_approval_invalid: 'The owner approval in the proof is not valid for this record.',
   envelope_invalid: 'The included message is not in the expected format.',
   envelope_signature_invalid: 'The included message is not signed by its sender.',
   sender_mismatch:
@@ -94,4 +96,32 @@ const MESSAGES: Readonly<Record<ProofPackFailure | ProofContentFailure, string>>
 /** The fixed plain-language text for a failure code. */
 export function proofFailureMessage(code: ProofPackFailure | ProofContentFailure): string {
   return MESSAGES[code];
+}
+
+/**
+ * Non-fatal findings (M1-4d-c): the pack still verifies and its verdict is unchanged.
+ * - `signer_no_longer_confirms` (D-96): the record signer is a contract account (ERC-1271) whose
+ *   `isValidSignature` does not accept the pack's signature now; the Notary checked it when it
+ *   stored the record (05 §3.2), and the account's rules may have changed since.
+ * - `receipt_tx_mismatch`: a receipt's `txHash` names a transaction whose receipt does not show the
+ *   Notary recording that receipt. The receipt itself stands on `getRecord` (05 §3.3); the hash is
+ *   not reported.
+ */
+export const PROOF_NOTICES = Object.freeze([
+  'signer_no_longer_confirms',
+  'receipt_tx_mismatch',
+] as const);
+export type ProofNoticeCode = (typeof PROOF_NOTICES)[number];
+
+const NOTICE_MESSAGES: Readonly<Record<ProofNoticeCode, string>> = Object.freeze({
+  // Fixed wording of D-96 (11 §5).
+  signer_no_longer_confirms:
+    "The signer's account no longer confirms this record. The proof network checked it when the record was made.",
+  receipt_tx_mismatch:
+    "The proof's link for a receipt does not lead to that receipt. The receipt itself is on the proof network.",
+});
+
+/** The fixed plain-language text for a notice code. */
+export function proofNoticeMessage(code: ProofNoticeCode): string {
+  return NOTICE_MESSAGES[code];
 }
