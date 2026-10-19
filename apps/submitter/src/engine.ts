@@ -33,7 +33,8 @@
 //   its items are queued again (a fresh simulation shows any that landed as `skipped`) and the next
 //   nonce is the chain's `latest` one (mined transactions only), so neither a lost nonce nor a
 //   forgotten transaction still in some node's mempool leaves a gap that blocks later sends
-//   (IR-M1-10a-1 M-2, M1-10a-b). If that read fails, the given-up nonce is used again.
+//   (IR-M1-10a-1 M-2, M1-10a-b). If that read fails, the given-up nonce is used again. A send never
+//   takes a nonce that a transaction still in flight holds: it skips to the next free one.
 // - Nonces are serialised per chain: the engine holds one lock per state object.
 import type {
   Hex,
@@ -243,6 +244,19 @@ function applySimulation(
   return false;
 }
 
+/**
+ * The first nonce at or above `from` that no transaction still in flight holds. After a give-up the
+ * `latest` nonce can lie below transactions this queue still has pending (M1-10a-b): a new send
+ * must never take one of theirs, or it would replace (or be refused by) a live transaction.
+ */
+function freeNonce(state: QueueState, from: number): number {
+  const held = new Set<number>();
+  for (const tx of state.txs.values()) if (tx.state === 'pending') held.add(tx.nonce);
+  let n = from;
+  while (held.has(n)) n += 1;
+  return n;
+}
+
 async function sendGroup(
   port: SubmitterChain,
   settings: EngineSettings,
@@ -299,7 +313,7 @@ async function sendGroup(
   let nonce: number;
   let hash: Hex;
   try {
-    nonce = state.nonce ?? (await port.pendingNonce());
+    nonce = freeNonce(state, state.nonce ?? (await port.pendingNonce()));
     hash = await port.send(items, { gasLimit, nonce });
   } catch {
     // The nonce may or may not be used: read it from the chain next time.
