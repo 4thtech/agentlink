@@ -353,7 +353,10 @@ describe('drop adapter: put, presignGet and delete', () => {
     const drop = fakeDrop();
     const adapter = createDropAdapter({
       endpoint: ORIGIN,
-      signer: { signDropRequest: async () => SIGNATURE, getPublicBundle: async () => ({ keyEpoch: 0 }) },
+      signer: {
+        signDropRequest: async () => SIGNATURE,
+        getPublicBundle: async () => ({ keyEpoch: 0 }),
+      },
       fetch: drop.fetch,
       now: () => at,
     });
@@ -772,9 +775,7 @@ describe('drop adapter: the drop key epoch of an object (M1-1g-g; 04 ยง2.1, 07 ย
     const { drop, adapter } = setup();
     const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
     const signedBefore = drop.signed.length;
-    const error = await codeOf(
-      adapter.delete({ ...obj, keyEpoch } as unknown as StoredObject),
-    );
+    const error = await codeOf(adapter.delete({ ...obj, keyEpoch } as unknown as StoredObject));
     expect(error).toMatchObject({ code: 'invalid_argument' });
     expect(drop.signed.length).toBe(signedBefore);
   });
@@ -782,7 +783,12 @@ describe('drop adapter: the drop key epoch of an object (M1-1g-g; 04 ยง2.1, 07 ย
   it('an object recorded before epochs were kept is deleted at the current epoch', async () => {
     const { drop, adapter } = setup();
     const obj = await adapter.put(ciphertext(64), { size: 64, expiresAt: inADay });
-    const { keyEpoch: _omit, ...legacy } = obj;
+    const legacy: StoredObject = {
+      kind: obj.kind,
+      locator: obj.locator,
+      size: obj.size,
+      sha256: obj.sha256,
+    };
     await adapter.delete(legacy);
     expect(drop.options.at(-1)).toBeUndefined();
   });

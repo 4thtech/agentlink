@@ -19,14 +19,20 @@
 // - The object's locator is its signed GET URL, so it is a secret like any presigned URL (I-7): the
 //   core keeps it with the file key and never logs it. The drop fixes the expiry at upload; a later
 //   `presignGet` returns the same URL and cannot extend it.
+// - Key epochs (M1-1g-g; 04 §2.1, 07 §5.4): the drop key rotates with `keyEpoch`, and only the
+//   uploading drop key can delete. `put` records the epoch the upload and commit were signed under
+//   in the object (`keyEpoch`) and refuses an upload whose epoch moved between them; `delete` signs
+//   with that epoch, so an object stays deletable after a rotation. A POST never names an epoch.
 import {
   createSha256,
   decodeBase64url,
   encodeBase64url,
   encodeHex,
   encodeUtf8,
+  MAX_KEY_EPOCH,
   randomBytes,
   type DropAuthRequest,
+  type EpochOptions,
 } from '@4thtech-io/crypto';
 import type { Logger } from '@4thtech-io/log';
 import {
@@ -65,9 +71,18 @@ const GET_PATH_RE = /^\/v1\/get\/([A-Za-z0-9_-]{22})$/;
  * Signs one drop request with the agent's drop key (07 §5.4 signature format: a kind-27235 event
  * over the exact URL, method and body, `created_at` = the body's `ts`) and returns the Authorization
  * header value. The KeyStore implements it; the key never leaves the KeyStore.
+ *
+ * `options.epoch` (DELETE only, M1-1g-f) names the epoch of the drop key that uploaded the object;
+ * without it the KeyStore signs at its current epoch. `getPublicBundle` gives the current epoch,
+ * which `put` records with the object (M1-1g-g); the adapter reads nothing else from it.
  */
 export interface DropSigner {
-  signDropRequest(request: DropAuthRequest, createdAt: number): Promise<string>;
+  signDropRequest(
+    request: DropAuthRequest,
+    createdAt: number,
+    options?: EpochOptions,
+  ): Promise<string>;
+  getPublicBundle(): Promise<{ readonly keyEpoch: number }>;
 }
 
 export interface DropAdapterConfig {
@@ -104,6 +119,16 @@ interface Target {
   readonly part: number;
   readonly size: number;
   readonly url: string;
+}
+
+function keyUnavailable(): StorageError {
+  return new StorageError('credentials_unavailable', 'the drop key is unavailable');
+}
+
+function isKeyEpoch(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_KEY_EPOCH
+  );
 }
 
 function invalidResponse(): StorageError {
@@ -307,7 +332,8 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
   if (
     signer === null ||
     typeof signer !== 'object' ||
-    typeof signer.signDropRequest !== 'function'
+    typeof signer.signDropRequest !== 'function' ||
+    typeof signer.getPublicBundle !== 'function'
   ) {
     throw new StorageError('invalid_config', 'invalid drop signer');
   }
@@ -334,12 +360,30 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
     }
   }
 
-  /** One signed request (upload, commit, DELETE): JSON body with v, nonce and ts. */
+  /** The signer's current drop key epoch (M1-1g-g); anything but a key epoch is refused. */
+  async function currentEpoch(): Promise<number> {
+    let epoch: unknown;
+    try {
+      epoch = (await signer.getPublicBundle()).keyEpoch;
+    } catch {
+      throw keyUnavailable();
+    }
+    if (!isKeyEpoch(epoch)) throw keyUnavailable();
+    return epoch;
+  }
+
+  /**
+   * One signed request (upload, commit, DELETE): JSON body with v, nonce and ts. A POST is signed at
+   * the current epoch, which must still be `epoch` once it is signed, so the object's recorded epoch
+   * is the one that signed it (M1-1g-g); otherwise nothing is sent. A DELETE names `epoch` when the
+   * object recorded one.
+   */
   async function signed(
     method: 'POST' | 'DELETE',
     path: string,
     fields: Record<string, string | number>,
     at: Date,
+    epoch: number | undefined,
   ): Promise<Response> {
     const url = new URL(path, origin).href;
     const ts = Math.floor(at.getTime() / 1000);
@@ -347,12 +391,19 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
     const body = new Uint8Array(encodeUtf8(JSON.stringify({ v: 1, ...fields, nonce, ts })));
     let authorization: unknown;
     try {
-      authorization = await signer.signDropRequest({ method, url, body }, ts);
+      authorization =
+        method === 'DELETE' && epoch !== undefined
+          ? await signer.signDropRequest({ method, url, body }, ts, { epoch })
+          : await signer.signDropRequest({ method, url, body }, ts);
     } catch {
-      throw new StorageError('credentials_unavailable', 'the drop key is unavailable');
+      throw keyUnavailable();
     }
     if (typeof authorization !== 'string' || !/^Nostr [A-Za-z0-9_-]+={0,2}$/.test(authorization)) {
-      throw new StorageError('credentials_unavailable', 'the drop key is unavailable');
+      throw keyUnavailable();
+    }
+    if (method === 'POST' && (await currentEpoch()) !== epoch) {
+      // The key rotated while this upload was in flight: its epoch is not known for certain.
+      throw new StorageError('upload_failed', 'drop upload failed');
     }
     return send(
       new Request(url, {
@@ -397,9 +448,9 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
   }
 
   /** Best effort: an object that will never be committed is removed at once (04 §4 retention). */
-  async function cleanup(objectId: string): Promise<void> {
+  async function cleanup(objectId: string, epoch: number): Promise<void> {
     try {
-      const response = await signed('DELETE', `/v1/o/${objectId}`, { objectId }, now());
+      const response = await signed('DELETE', `/v1/o/${objectId}`, { objectId }, now(), epoch);
       await discard(response);
     } catch {
       // The drop expires an uncommitted upload anyway; nothing more to do.
@@ -415,7 +466,8 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
     if (expiresAt <= ts) {
       throw new StorageError('invalid_argument', 'expiresAt must be at least a second away');
     }
-    const granted = await signed('POST', '/v1/upload', { size: opts.size, expiresAt }, at);
+    const epoch = await currentEpoch();
+    const granted = await signed('POST', '/v1/upload', { size: opts.size, expiresAt }, at, epoch);
     if (granted.status !== 201) throw await refusal(granted, 'upload_failed');
     const grant = await readJson(granted);
     if (grant === null) throw invalidResponse();
@@ -445,6 +497,7 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
         `/v1/o/${objectId}/commit`,
         { objectId, ciphertextSha256: sha256 },
         now(),
+        epoch,
       );
       if (committed.status !== 200) throw await refusal(committed, 'upload_failed');
       const result = await readJson(committed);
@@ -455,10 +508,16 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
         throw invalidResponse();
       }
       log?.debug('drop put', { size: opts.size, parts: targets.length });
-      return { kind: 'drop', locator: result.getUrl as string, size: opts.size, sha256 };
+      return {
+        kind: 'drop',
+        locator: result.getUrl as string,
+        size: opts.size,
+        sha256,
+        keyEpoch: epoch,
+      };
     } catch (error) {
       await source.cancel();
-      await cleanup(objectId);
+      await cleanup(objectId, epoch);
       throw error;
     }
   }
@@ -540,7 +599,13 @@ export function createDropAdapter(config: DropAdapterConfig): DropAdapter {
 
     async delete(obj: StoredObject): Promise<void> {
       const { objectId } = own(obj);
-      const response = await signed('DELETE', `/v1/o/${objectId}`, { objectId }, now());
+      // The upload epoch (M1-1g-g). An object recorded before epochs were kept has none and is
+      // deleted at the current epoch, as before.
+      const epoch: unknown = obj.keyEpoch;
+      if (epoch !== undefined && !isKeyEpoch(epoch)) {
+        throw new StorageError('invalid_argument', 'invalid drop key epoch');
+      }
+      const response = await signed('DELETE', `/v1/o/${objectId}`, { objectId }, now(), epoch);
       // 404: already gone, which is the goal of a delete.
       if (response.status !== 204 && response.status !== 404) {
         const error = await refusal(response, 'delete_failed');

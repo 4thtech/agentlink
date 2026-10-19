@@ -342,7 +342,10 @@ describe('drop adapter × drop Worker (Miniflare)', () => {
 // M1-1g-g (04 §2.1, 07 §5.4): the drop key rotates with keyEpoch, and an object stays deletable by
 // the drop key it was uploaded under. Signed through the MemoryKeyStore and verified by the Worker.
 describe('drop adapter × drop Worker: key epochs (M1-1g-g)', () => {
-  const PRESENCE = { kind: 'passphrase', secret: encodeUtf8('epoch test owner passphrase') } as const;
+  const PRESENCE = {
+    kind: 'passphrase',
+    secret: encodeUtf8('epoch test owner passphrase'),
+  } as const;
   let seedCounter = 0;
   function keyStores(): { keys: MemoryKeyStore; owner: MemoryOwnerKeyStore } {
     seedCounter += 1;

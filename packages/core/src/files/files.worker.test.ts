@@ -175,7 +175,6 @@ describe('a file through the encrypted drop, no own storage (D-48, 07 §5.6)', (
   });
 });
 
-
 // M1-1g-g (04 §2.1, 07 §5.4): the sender's `files` row records the drop key epoch of the upload, so
 // a delete after a key rotation is signed with the drop key the object was uploaded under.
 describe('a drop object stays deletable after a key rotation (M1-1g-g)', () => {
