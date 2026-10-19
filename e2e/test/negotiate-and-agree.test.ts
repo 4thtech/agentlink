@@ -145,6 +145,20 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
   const messagesOf = (inbox: McpCall): Record<string, unknown>[] =>
     inbox.structured['messages'] as Record<string, unknown>[];
 
+  /**
+   * Marks read whatever an earlier test left unread, once the relays are quiet, so a test reads
+   * only its own traffic (an earlier test that failed midway may leave a message in flight).
+   */
+  async function drainInbox(mcp: Mcp): Promise<void> {
+    for (let i = 0; i < 10; i += 1) {
+      const s = await mcp.call('agentlink_status');
+      if ((s.structured['unread'] as number) === 0) return;
+      const inbox = await mcp.call('agentlink_inbox');
+      expect(inbox.structured['status']).toBe('ok');
+    }
+    throw new Error('the inbox did not drain');
+  }
+
   const versionOf = (message: Record<string, unknown> | undefined): unknown =>
     (message?.['termsRef'] as { version: number } | undefined)?.version;
 
@@ -420,6 +434,12 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
   }, 900_000);
 
   it('a reject is free, needs no approval and reaches the offerer', async () => {
+    // Independent of the test before it: start from quiet relays and empty inboxes.
+    await step('start clean: nothing unread from earlier tests', async () => {
+      await settledRelayCount();
+      await drainInbox(aliceMcp);
+      await drainInbox(bobMcp);
+    });
     const offer = await step('A: propose terms to be rejected', async () => {
       const sent = await tool(aliceMcp, 'agentlink_propose_terms', {
         to: 'Bob',
@@ -430,7 +450,9 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     });
     const received = await step('B: reads the offer', async () => {
       const inbox = await readInbox(bobMcp, 1);
-      const [message] = messagesOf(inbox);
+      const [message, ...rest] = messagesOf(inbox);
+      expect(rest).toEqual([]);
+      expect(message).toMatchObject({ type: 'offer', direction: 'in' });
       expect(hashOf(message)).toBe(offer['termsHash']);
       return message;
     });
