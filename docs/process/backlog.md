@@ -2749,7 +2749,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (IR-M1-9j-1 F03, 06 §8 terminal output rule) A pending request whose stored action carries an ANSI/OSC canary (cursor movement, screen clear, an OSC 8 link, C1 controls, bidi and zero-width characters) in its message text, file name and contact name, plus a CR overwrite (`approve\rdeny`), an ESC sequence split exactly at the 2 000-code-point cut, NEL U+0085 and C1 CSI U+009B, a 10 000-character single line, a 500-line value and a base letter with 50 combining marks, prints, in `approve <id>` and in `approve` with no ID, with every such sequence removed (no ESC, CR or C1 left), inside the marked untrusted region, cut after sanitizing to the 06 §8 limits (2 000 code points, 40 lines, 200-code-point lines wrapped, 60 lines per region, 2 combining marks per base character), and with the who, cost and consequence lines unchanged and after it; the signed digest is the one recomputed from the displayed action (IR-M1-9j-1 F06).
 
 #### M1-9m · CLI: policy and safety-code check (†) (new, split from M1-9a and M1-9b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
+- **Status:** in review (part 1: `policy show`, `policy allow-folder`, `policy remove-folder`); the rest is M1-9m-b · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the gate path: J8 and J9 run on the defaults)
 - **Repo/path:** agentlink · apps/cli (`src/commands/owner/{policy,verify-contact}.ts`)
 - **Depends on:** M1-9b, M1-7d, M1-7c-b; M1-20 for the `commitments` keys
 - **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
@@ -2758,6 +2758,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `policy show | set` † (including the `commitments` limits and `autoAcceptDirection`, M1-20); turning on selling auto-accept (`autoAcceptMinUSD`) first prints the sell warning (06 §3) and needs an explicit `y`.
   - `contacts --verify <id>` † (an interactive terminal with no harness marker): shows the safety code; "They match" signs `contact.check`; "Remember for this contact" binds the pair (04 §2.5).
 - **Acceptance:** piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; RED commit.
+- **Notes (part 1, 2026-10-19):** file sending (M1-9d-1) needs an allowed folder, so the folder commands land first: `policy show` (no owner code), `policy allow-folder <path>` † and `policy remove-folder <path>` † sign one `policy.set` from the current verified policy with only `files.allowedFolders` changed (version + 1). Allowed folders: a full path (`~/` expands), an existing folder, no symbolic link anywhere in it (its realpath must equal the path; the refusal names the real path), not the root, the home folder or a folder above it, not hidden, not under a protected root (04 §4); the canonical realpath is stored. Refused while the policy fails closed (G-6), never rebuilt from the defaults. The TTY owner prompt has one try per run (a wrong code changes nothing); the localhost page's wrong-code backoff (M1-11a) is not in this path. The 06 §8 usage line names the two subcommands (proposed, owner confirms at merge).
+
+#### M1-9m-b · CLI: `policy set` and `contacts --verify` (†) (new, split from M1-9m)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/commands/owner/{policy,verify-contact}.ts`)
+- **Depends on:** M1-9m (part 1), M1-7c-b; M1-20 for the `commitments` keys
+- **Spec:** 06 §3, §8 (†); 04 §2.5, §3.6.1; 11 §6.10; D-31, D-70
+- **Invariants:** I-4, I-5
+- **Scope:** the rest of M1-9m: `policy set <key> <value>` † (including the `commitments` limits and `autoAcceptDirection`, M1-20; turning on selling auto-accept first prints the sell warning, 06 §3, and needs an explicit `y`), and `contacts --verify <id>` † as in the M1-9m scope.
+- **Acceptance:** as M1-9m: piped stdin is refused; a policy set without owner presence never lands; the safety code is never printed to a non-TTY; RED commit.
+- **Review lows carried here (IR-M1-9m-1):**
+  - L2: `policy allow-folder` accepts a folder that contains protected folders (for example `~/Library`, which holds `~/Library/Keychains`). Today only the per-file check at send time (04 §4 protected roots, M1-15, M1-9d-1) keeps such files out. Decide whether to refuse a folder that contains a protected root, or to warn before the owner code.
+  - L3: recovering from a fail-closed policy (G-6: `mark_mismatch`, `rolled_back`, `tampered`). `policy` refuses while the policy fails closed and never rebuilds it from the defaults; give the owner a deliberate recovery path (show the problem, then sign a complete policy above the mark after an explicit confirmation), with `doctor` naming it.
 
 #### M1-9n · CLI: `relays set` (†) (new, split from M1-9b, D-73 (5))
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

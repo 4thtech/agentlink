@@ -13,7 +13,7 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 - `status`, `invite`, `accept <url> [--approval <approvalId>]`, `contacts`, `requests`
 - `contacts rename <contactId> <name>`, `contacts remove <contactId>` (owner operations, since v0.1.1: the owner's own name for a contact, or remove it; `contacts` lists each contact's ID)
 - `owner init`, `owner add-agent --agent <name>`, `approve`, `deny`, `cancel` (owner operations, typed in a terminal you opened; `owner init` once per computer user, `owner add-agent` for each further agent)
-- `policy show | set <key> <value>` (owner operation)
+- `policy show`, `policy allow-folder <path>`, `policy remove-folder <path>` (owner operations, next release, M1-9m: the folders your agent may send files from; the canonical realpath is stored in a new owner-signed `policy.set`, and symbolic links, relative paths, the root, the home folder and folders above it, hidden and protected folders are refused). `policy set <key> <value>` (owner operation) is not available yet
 - `ui` (local approval and settings UI)
 - `storage connect`, `backup`, `credits`, `verify` (v0.2.0)
 - `cloud deploy`, `cloud login` (v0.3.0)
