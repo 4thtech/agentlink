@@ -20,6 +20,11 @@ import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '../tools/strings/index.js';
 import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } from './shared.js';
 
+/** D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). */
+const DOCTOR_RULES_OK = 'OK       Your rules are in use';
+const DOCTOR_RULES_FAIL_CLOSED =
+  "Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run `agentlink policy recover` to review and confirm them again.";
+
 /** True when another local agent on this machine has a stored card (never reads a secret). */
 async function otherAgentHasCard(deps: CommandDeps, except: string): Promise<boolean> {
   const names = await listAgentNames(deps.home).catch(() => [] as string[]);
@@ -129,6 +134,19 @@ export function createDoctorHandler(deps: CommandDeps = createDeps()): CommandHa
         emit(state === 'ready' ? TEXT.doctorSend : TEXT.doctorSendBlocked, state !== 'ready');
       } catch {
         emit(TEXT.doctorSendBlocked, true);
+      }
+
+      // D-100 (06 §8): rules that fail closed (G-6) name the deliberate way back. Fixed text only:
+      // never the kind's code or anything from the stored rules. A runtime without the loader
+      // shows nothing here.
+      const rules = await Promise.resolve()
+        .then(() => client.ownerActions.loadPolicy())
+        .catch(() => undefined);
+      if (rules !== undefined) {
+        emit(
+          rules.mode === 'fail_closed' ? DOCTOR_RULES_FAIL_CLOSED : DOCTOR_RULES_OK,
+          rules.mode === 'fail_closed',
+        );
       }
 
       // Keychain hygiene (IR-M1-8a-1 L-10): offered only when the runtime can list the items.
