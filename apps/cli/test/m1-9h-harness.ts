@@ -131,12 +131,3 @@ export function runner(handlers: Partial<Record<CommandName, CommandHandler>>) {
     return { code, out, err, text: [...out, ...err].join('\n') };
   };
 }
-
-/**
- * A test RPC fetch carrying the address-checked brand the chain package requires (the brand
- * nodeRpcFetch sets, packages/chain/src/clients/checked-fetch.ts). Test only: no network.
- */
-export function checkedFetch<T extends (...args: never[]) => unknown>(fn: T): T {
-  Object.defineProperty(fn, Symbol.for('agentlink.address-checked-rpc-fetch'), { value: true });
-  return fn;
-}

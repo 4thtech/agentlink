@@ -57,6 +57,8 @@ export type CommandName =
   | 'contacts'
   | 'requests'
   | 'policy'
+  | 'credits'
+  | 'verify'
   | 'approve'
   | 'deny'
   | 'cancel'
@@ -66,9 +68,10 @@ export type CommandName =
 const AGENT: Options = { agent: { type: 'string' } };
 
 /**
- * The M1a commands of 06 §8, in its order. Not here (M1b or later): `ui`, `credits`, `verify`,
- * `storage connect`, `backup`, `relays set`, and `init --keystore file` / `keystore passphrase`
- * (they wait for the file KeyStore, M1-8f, off the M1a path, D-73 (4)).
+ * The commands of 06 §8, in its order. M1-9h adds `credits` and `verify`. Not here yet: `ui` and the
+ * passkey option of `init` (they wait for the local settings UI), `storage connect`, `backup`,
+ * `relays set`, and `init --keystore file` / `keystore passphrase` (they wait for the file KeyStore,
+ * M1-8f, off the M1a path, D-73 (4)).
  */
 export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   {
@@ -142,6 +145,18 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     options: AGENT,
   },
   {
+    name: 'credits',
+    usage: ['agentlink credits [--topup] [--agent <name>]'],
+    guard: 'none',
+    options: { ...AGENT, topup: { type: 'boolean' } },
+  },
+  {
+    name: 'verify',
+    usage: ['agentlink verify <proof.json> [--agent <name>]'],
+    guard: 'none',
+    options: AGENT,
+  },
+  {
     name: 'approve',
     usage: [
       'agentlink approve <approvalId> [--agent <name>]   †',
@@ -212,7 +227,7 @@ export const DISPATCH_TEXT = Object.freeze({
   failed: 'Something went wrong. Run `agentlink doctor` in your own terminal to see why.',
 });
 
-/** The `--help` text: exactly the M1a commands of 06 §8. */
+/** The `--help` text: exactly the registered commands of 06 §8. */
 export function helpText(): string {
   const lines = [
     'Usage: agentlink <command> [options]',

@@ -7,10 +7,12 @@ import process from 'node:process';
 import { isatty } from 'node:tty';
 import { acceptHandler } from './commands/accept.js';
 import { createContactsHandler } from './commands/contacts.js';
+import { creditsHandler } from './commands/credits.js';
 import { doctorHandler } from './commands/doctor.js';
 import { inviteHandler } from './commands/invite.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
+import { verifyHandler } from './commands/verify.js';
 import { createInitHandler, nodeInitDeps } from './commands/init.js';
 import {
   contactsManageHandler,
@@ -43,6 +45,9 @@ const dispatch = createDispatcher({
   status: statusHandler,
   doctor: doctorHandler,
   requests: requestsHandler,
+  // M1-9h.
+  credits: creditsHandler,
+  verify: verifyHandler,
   // M1-9b: the owner commands (owner init, approve, deny, cancel).
   ...ownerCommandHandlers(),
   mcp: mcpCommand(version),

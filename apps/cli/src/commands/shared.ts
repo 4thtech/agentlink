@@ -152,8 +152,6 @@ export const TEXT = Object.freeze({
   doctorOwnerCodeUnfinished:
     "Problem  An owner code change didn't finish. In a terminal you opened yourself, run `agentlink owner change-code` to finish or clean it up. Keep both your current and your new owner code until then.",
   doctorStrayRemoved: 'OK       Removed {count} leftover items',
-  doctorNotChecked:
-    'Not checked in this version: payments network, file storage and AI apps (`agentlink doctor` adds them later).',
 } as const);
 
 /** Fills `{name}` slots of a TEXT entry. Values are sanitized one-line text or numbers. */

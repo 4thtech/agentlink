@@ -26,11 +26,17 @@ import {
   AGENT_ID,
   PIPED_IN_HARNESS,
   URL_LIKE,
-  checkedFetch,
   fakeAgent,
   runner,
   vocabularyHits,
 } from './m1-9h-harness.js';
+
+/** The address-checked brand the chain package requires (nodeRpcFetch sets it). Test only. */
+const ADDRESS_CHECKED = Symbol.for('agentlink.address-checked-rpc-fetch');
+function checkedFetch<T extends (...args: never[]) => unknown>(fn: T): T {
+  Object.defineProperty(fn, ADDRESS_CHECKED, { value: true });
+  return fn;
+}
 
 const ACCOUNT: AccountView = {
   credits: [
@@ -170,7 +176,9 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
     const r = await t.run(['credits', '--topup']);
     expect(r.code).toBe(EXIT_OK);
     expect(r.text).toContain('Add at least $1.00 in credits to add proof ($0.10 each).');
-    expect(r.text).toContain(`To add credits, open ${TOP_UP_ORIGIN}/ and enter your agent ID: ${AGENT_ID}`);
+    expect(r.text).toContain(
+      `To add credits, open ${TOP_UP_ORIGIN}/ and enter your agent ID: ${AGENT_ID}`,
+    );
     expect(t.topUpCalls).toEqual([AGENT_ID]);
     // The only URL is our own deposit page; no network, token or chain.
     const urls = r.text.match(/https?:\/\/[^\s]+/g) ?? [];
@@ -198,7 +206,9 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
     expect(r1.code).toBe(EXIT_OK);
     expect(r1.text).toContain('You have enough credits to add proof ($0.10 each).');
 
-    const none = setup({ topUp: () => Promise.resolve({ status: 'unavailable', unavailable: [84532] }) });
+    const none = setup({
+      topUp: () => Promise.resolve({ status: 'unavailable', unavailable: [84532] }),
+    });
     const r2 = await none.run(['credits', '--topup']);
     expect(r2.code).toBe(EXIT_FAILED);
     expect(r2.text).toContain(CREDITS_TEXT.unavailable);
@@ -277,7 +287,9 @@ describe('doctor: the proof network line (06 §8 "RPC")', () => {
     const configs = chain.autoSelectableChains();
     const offline = nodeProofNetworkCheck({
       configs,
-      fetchFn: checkedFetch(() => Promise.reject(new Error('offline'))) as unknown as chain.RpcFetchFn,
+      fetchFn: checkedFetch(() =>
+        Promise.reject(new Error('offline')),
+      ) as unknown as chain.RpcFetchFn,
     });
     expect(await offline()).toEqual({ answered: 0, total: configs.length });
     const online = nodeProofNetworkCheck({

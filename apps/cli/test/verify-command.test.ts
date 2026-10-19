@@ -31,12 +31,18 @@ import {
   AGENT_ID,
   PIPED_IN_HARNESS,
   URL_LIKE,
-  checkedFetch,
   fakeAgent,
   runner,
   vocabularyHits,
   type FakeAgentParts,
 } from './m1-9h-harness.js';
+
+/** The address-checked brand the chain package requires (nodeRpcFetch sets it). Test only. */
+const ADDRESS_CHECKED = Symbol.for('agentlink.address-checked-rpc-fetch');
+function checkedFetch<T extends (...args: never[]) => unknown>(fn: T): T {
+  Object.defineProperty(fn, ADDRESS_CHECKED, { value: true });
+  return fn;
+}
 
 const hex = (byte: string, bytes: number): `0x${string}` => `0x${byte.repeat(bytes)}`;
 const SIGNER = hex('5e', 20);
@@ -59,7 +65,11 @@ function valid(over: Partial<chain.ProofPackValid> = {}): chain.ProofPackValid {
     envelopeHash: hex('38', 32),
     recipient: null,
     receipts: [
-      { type: 'DELIVERED', at: '2026-10-19T12:35:10Z', tx: { status: 'confirmed', txHash: hex('99', 32) } },
+      {
+        type: 'DELIVERED',
+        at: '2026-10-19T12:35:10Z',
+        tx: { status: 'confirmed', txHash: hex('99', 32) },
+      },
       { type: 'OPENED', at: '2026-10-19T12:40:00Z', tx: { status: 'not_checked' } },
     ],
     contentVerified: true,
@@ -142,7 +152,9 @@ describe('verify: the verdict first, the test network labelled (D-95, 05 §9.1 (
     expect(r.code).toBe(VERIFY_EXIT.verified);
     expect(r.out[0]).toMatch(/^Verified {2}The proof checks out\.$/);
     expect(r.out[1]).toMatch(/^Test network .*ID 84532.*not a live proof/);
-    expect(r.text).toContain('Record found on the public record, made 19 Oct 2026, 12:34 UTC (final)');
+    expect(r.text).toContain(
+      'Record found on the public record, made 19 Oct 2026, 12:34 UTC (final)',
+    );
     expect(r.text).toContain('Delivered 19 Oct 2026, 12:35 UTC');
     expect(r.text).toContain('Opened 19 Oct 2026, 12:40 UTC');
     expect(r.text).toContain(`Record ID: ${RECORD_ID}`);
@@ -183,7 +195,9 @@ describe('verify: the verdict first, the test network labelled (D-95, 05 §9.1 (
   });
 
   it('a chain this release does not mark as a known mainnet is labelled a test network', async () => {
-    const t = setup({ verify: () => Promise.resolve(valid({ chainId: 10200, chain: 'gnosis-chiado' })) });
+    const t = setup({
+      verify: () => Promise.resolve(valid({ chainId: 10200, chain: 'gnosis-chiado' })),
+    });
     const r = await t.run(['verify', 'p.json']);
     expect(r.out[1]).toMatch(/^Test network .*ID 10200/);
     // The network's own name is never printed by default (11 §5.1).
@@ -265,7 +279,9 @@ describe('verify: the verdict first, the test network labelled (D-95, 05 §9.1 (
 
 describe('verify: who made the record (06 §2.1 name rule)', () => {
   it('this agent; a contact by its shown name; otherwise the owner fingerprint, never a pack name', async () => {
-    const own = setup({ verify: () => Promise.resolve(valid({ signer: AGENT_ID as `0x${string}` })) });
+    const own = setup({
+      verify: () => Promise.resolve(valid({ signer: AGENT_ID as `0x${string}` })),
+    });
     expect((await own.run(['verify', 'p.json'])).text).toContain('OK       Recorded by this agent');
 
     const contact = setup({
@@ -319,7 +335,9 @@ describe('verify: a failing pack gets its specific reason (07 §8)', () => {
         continue;
       }
       expect(r.code, code).toBe(VERIFY_EXIT.failed);
-      expect(r.out, code).toEqual([`Failed  This proof doesn't check out: ${VERIFY_FAILURE_TEXT[code]}`]);
+      expect(r.out, code).toEqual([
+        `Failed  This proof doesn't check out: ${VERIFY_FAILURE_TEXT[code]}`,
+      ]);
       expect(seen.has(VERIFY_FAILURE_TEXT[code]), code).toBe(false);
       seen.add(VERIFY_FAILURE_TEXT[code]);
     }
