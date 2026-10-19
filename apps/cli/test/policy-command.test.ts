@@ -64,7 +64,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OwnerCommandDeps } from '../src/commands/owner/index.js';
-import { policyHandler } from '../src/commands/owner/policy.js';
+import { POLICY_REVIEW_ROWS, policyHandler } from '../src/commands/owner/policy.js';
 import { DISPATCH_TEXT, createDispatcher } from '../src/dispatch.js';
 import { agentToolContext } from '../src/mcp/command.js';
 import { createMcpServer } from '../src/mcp/server.js';
@@ -185,6 +185,10 @@ interface Agent {
   readonly opened: OpenedAgent;
   /** When true, the policy-version mark cannot be read (the G-6 loader fails closed). */
   markBroken: boolean;
+  /** When true, raising the mark does nothing (a failed raise: the stored version is above it). */
+  markStuck: boolean;
+  /** Sets the KeyStore mark directly (a rollback of the store, or a deleted KeyStore item). */
+  setMark(value: number): void;
 }
 
 /** The Node files platform's allowed-folder half: `~` expanded, realpath of each existing folder. */
@@ -214,7 +218,13 @@ async function makeAgent(n: number, name: string, net: RelayNetwork, home: strin
   const cipher = new TestCipher();
   const owner = new MemoryOwnerKeyStore(seed(100 + n), presence());
   let mark = 0;
-  const state = { markBroken: false };
+  const state = {
+    markBroken: false,
+    markStuck: false,
+    setMark: (value: number) => {
+      mark = value;
+    },
+  };
   const client = await AgentLinkClient.create({
     keyStore: new MemoryKeyStore(seed(n)),
     store,
@@ -227,7 +237,7 @@ async function makeAgent(n: number, name: string, net: RelayNetwork, home: strin
       read: () =>
         state.markBroken ? Promise.reject(new Error('mark unavailable')) : Promise.resolve(mark),
       raise: (v: number) => {
-        mark = Math.max(mark, v);
+        if (!state.markStuck) mark = Math.max(mark, v);
         return Promise.resolve(mark);
       },
     },
@@ -322,6 +332,9 @@ let bob: Agent;
 /** One entry per owner-code prompt (one owner operation each). */
 let codeEntries: string[];
 let summaries: string[];
+/** The visible questions asked (`policy recover`'s explicit y), and the lines typed back. */
+let asked: string[];
+let answers: string[];
 let ownerPresence: () => { kind: 'passphrase'; secret: Uint8Array };
 let run: (argv: string[], terminal?: TerminalContext) => Promise<Run>;
 
@@ -343,6 +356,8 @@ beforeEach(async () => {
   await pair(bob, alice); // alice is the invitee: her rules are at version 1
   codeEntries = [];
   summaries = [];
+  asked = [];
+  answers = [];
   ownerPresence = presence;
 
   const ownerDeps: OwnerCommandDeps = {
@@ -371,7 +386,10 @@ beforeEach(async () => {
       summaries.push(item.summary);
       return { kind: 'owner-action', signed: await sign(alice, item.action, ownerPresence) };
     },
-    ask: () => Promise.resolve(''),
+    ask: (question) => {
+      asked.push(question);
+      return Promise.resolve(answers.shift() ?? '');
+    },
     now: () => NOW,
     cardRelays: () => [],
   };
@@ -775,5 +793,264 @@ describe('end to end: allowing a folder makes file sending work (06 §2.3)', () 
     });
     expect(result.status).toBe('needs_setup');
     expect(again.opened()).toBe(false);
+  });
+});
+
+// --- M1-9m-b (D-99): a folder that contains a protected folder ------------------------------------
+
+describe('policy allow-folder refuses a folder that contains a protected folder (D-99, 04 §4)', () => {
+  it('`~/Library` is refused before the owner code, naming ~/Library/Keychains', async () => {
+    mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+    const result = await run(['policy', 'allow-folder', '~/Library']);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toContain('~/Library/Keychains');
+    expect(result.err.join('\n')).toMatch(/narrower folder/);
+    expect(codeEntries).toEqual([]);
+    expect(await folders()).toEqual([]);
+    expect(await version()).toBe(1);
+  });
+
+  it('is refused even when the protected folder does not exist yet (fail closed)', async () => {
+    mkdirSync(join(home, 'Library', 'Application Support'), { recursive: true });
+    const result = await run(['policy', 'allow-folder', join(home, 'Library')]);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toContain('~/Library/Keychains');
+    expect(codeEntries).toEqual([]);
+  });
+
+  it('a folder inside it that holds no protected folder is still allowed', async () => {
+    mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+    mkdirSync(join(home, 'Library', 'Shared'), { recursive: true });
+    const result = await run(['policy', 'allow-folder', '~/Library/Shared']);
+    expect(result.code).toBe(0);
+    expect(await folders()).toEqual([join(home, 'Library', 'Shared')]);
+  });
+
+  it('a folder holding the real folder of a linked protected folder is refused, naming it (realpath)', async () => {
+    // ~/.ssh is a link to ~/Dotfiles/ssh: allowing ~/Dotfiles would allow the keys behind it.
+    rmSync(join(home, '.ssh'), { recursive: true });
+    mkdirSync(join(home, 'Dotfiles', 'ssh'), { recursive: true });
+    symlinkSync(join(home, 'Dotfiles', 'ssh'), join(home, '.ssh'));
+    const result = await run(['policy', 'allow-folder', join(home, 'Dotfiles')]);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toContain('~/.ssh');
+    expect(result.err.join('\n')).toMatch(/narrower folder/);
+    expect(codeEntries).toEqual([]);
+    expect(await folders()).toEqual([]);
+  });
+
+  it('a folder that holds a protected folder under another spelling is refused (case-insensitive volumes)', async (ctx) => {
+    // macOS and Windows: ~/LIBRARY/keychains is the same folder as ~/Library/Keychains.
+    mkdirSync(join(home, 'LIBRARY', 'keychains'), { recursive: true });
+    let caseInsensitive = false;
+    try {
+      caseInsensitive = statSync(join(home, 'Library', 'Keychains')).isDirectory();
+    } catch {
+      // Case-sensitive volume.
+    }
+    if (!caseInsensitive) {
+      ctx.skip();
+      return;
+    }
+    const result = await run(['policy', 'allow-folder', join(home, 'LIBRARY')]);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toMatch(/Keychains/i);
+    expect(result.err.join('\n')).toMatch(/narrower folder/);
+    expect(codeEntries).toEqual([]);
+  });
+});
+
+// --- M1-9m-b (D-100): `agentlink policy recover` † --------------------------------------------------
+
+/** Signs and applies one policy.set for alice directly (another surface, or an earlier run). */
+async function applyAsOwner(versionNumber: number, policy: ReturnType<typeof defaultPolicy>) {
+  const keys = await alice.owner.getPublicKeys();
+  return alice.client.ownerActions.apply(
+    await sign(alice, {
+      v: 1,
+      agent: alice.client.agentId,
+      owner: encodeHex(keys.ownerNostr),
+      op: 'policy.set',
+      params: { version: versionNumber, policy: policy as unknown as JsonObject },
+      nonce: encodeBase64url(randomBytes(16)),
+      issuedAt: NOW,
+      expiresAt: NOW + 600,
+    }),
+  );
+}
+
+/** Alice's v2 rules: invites accepted automatically, and ~/Work allowed. */
+async function workRules(): Promise<void> {
+  const policy = defaultPolicy();
+  policy.contacts.acceptInvites = 'auto';
+  policy.files.allowedFolders = [join(home, 'Work')];
+  expect((await applyAsOwner(2, policy)).status).toBe('applied');
+}
+
+/** Changes a cached column of the stored row, so the G-6 loader reports `tampered`. */
+async function tamperPolicyHash(): Promise<void> {
+  const sealed = await alice.cipher.seal(
+    { table: 'policies', column: 'policy_hash', rowKey: rowKeyOf([SINGLETON_SLOT]) },
+    'not-the-digest',
+  );
+  await alice.store.transaction((tx) => {
+    const row = tx.get('policies', { slot: SINGLETON_SLOT });
+    if (row === undefined) throw new Error('no row');
+    tx.delete('policies', {});
+    tx.insert('policies', { ...row, policy_hash: sealed });
+  });
+}
+
+async function problem(): Promise<string | undefined> {
+  const policy = await loaded();
+  return policy.mode === 'fail_closed' ? policy.problem : undefined;
+}
+
+describe('policy recover † (D-100, 06 §3 G-6, §8)', () => {
+  it('is refused while the rules are valid: nothing asked, nothing signed', async () => {
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toMatch(/nothing to recover/i);
+    expect(asked).toEqual([]);
+    expect(codeEntries).toEqual([]);
+    expect(await version()).toBe(1);
+  });
+
+  it('is refused without an interactive terminal (piped stdin) or under an AI-app marker', async () => {
+    await workRules();
+    alice.setMark(5);
+    expect(await problem()).toBe('rolled_back');
+    for (const terminal of [
+      { stdinIsTTY: false, stdoutIsTTY: true, env: {} },
+      { stdinIsTTY: true, stdoutIsTTY: false, env: {} },
+    ]) {
+      const result = await run(['policy', 'recover'], terminal);
+      expect(result.code).toBe(1);
+      expect(result.err).toEqual([DISPATCH_TEXT.notInteractive]);
+    }
+    const marked = await run(['policy', 'recover'], { ...OWNER_TTY, env: { CLAUDECODE: '1' } });
+    expect(marked.err).toEqual([DISPATCH_TEXT.harnessDetected]);
+    expect(asked).toEqual([]);
+    expect(codeEntries).toEqual([]);
+    expect(await problem()).toBe('rolled_back');
+  });
+
+  it('after a rollback: shows the kind and the stored rules in full, signs them at mark + 1 after y and the owner code', async () => {
+    await workRules();
+    alice.setMark(5);
+    expect(await problem()).toBe('rolled_back');
+    answers = ['y'];
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(0);
+    expect(result.text).toMatch(/older version of your rules/i);
+    // The stored rules, in full: the allowed folder and the invite rule come from them.
+    expect(result.out.join('\n')).toContain(join(home, 'Work'));
+    expect(result.out.join('\n')).toMatch(/New contacts: accepted automatically/);
+    expect(asked).toHaveLength(1);
+    expect(codeEntries).toEqual(['policy.set']);
+    expect(await version()).toBe(6);
+    expect(await folders()).toEqual([join(home, 'Work')]);
+    const after = await loaded();
+    if (after.mode === 'fail_closed') throw new Error('closed');
+    expect(after.policy.contacts.acceptInvites).toBe('auto');
+  });
+
+  it('after a mark mismatch (the mark was not raised): the stored rules, signed above both', async () => {
+    alice.markStuck = true;
+    await workRules();
+    alice.markStuck = false;
+    expect(await problem()).toBe('mark_mismatch');
+    answers = ['y'];
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(0);
+    expect(result.out.join('\n')).toContain(join(home, 'Work'));
+    // The mark is 1 and the stored version 2: the core takes only a version above both.
+    expect(await version()).toBe(3);
+    expect(await folders()).toEqual([join(home, 'Work')]);
+  });
+
+  it('after tampering: shows the kind and the defaults in full, never the stored rules; signs the defaults at mark + 1', async () => {
+    await workRules();
+    await tamperPolicyHash();
+    expect(await problem()).toBe('tampered');
+    answers = ['y'];
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(0);
+    expect(result.text).toMatch(/changed outside AgentLink/i);
+    expect(result.text).not.toContain(join(home, 'Work'));
+    expect(result.out.join('\n')).toMatch(/default/i);
+    expect(result.out.join('\n')).toContain('~/AgentLink/Inbox');
+    expect(await version()).toBe(3);
+    const after = await loaded();
+    if (after.mode === 'fail_closed') throw new Error('closed');
+    expect(after.policy).toEqual(defaultPolicy());
+  });
+
+  it('shows every rule of the reviewed policy (in full)', async () => {
+    await workRules();
+    await tamperPolicyHash();
+    answers = ['n'];
+    const result = await run(['policy', 'recover']);
+    const shown = result.out.join('\n');
+    const leaves = (value: unknown, path: string): string[] =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? Object.entries(value).flatMap(([k, v]) => leaves(v, path === '' ? k : `${path}.${k}`))
+        : [path];
+    const paths = leaves(defaultPolicy(), '');
+    expect(paths.length).toBeGreaterThan(20);
+    expect(new Set(POLICY_REVIEW_ROWS.map((row) => row.path))).toEqual(new Set(paths));
+    for (const row of POLICY_REVIEW_ROWS) expect(shown).toContain(row.label);
+  });
+
+  it('anything but y changes nothing and asks for no owner code', async () => {
+    await workRules();
+    alice.setMark(5);
+    for (const answer of ['', 'n', 'yes please', 'Y y']) {
+      answers = [answer];
+      const result = await run(['policy', 'recover']);
+      expect(result.code).toBe(1);
+      expect(result.text).toMatch(/Nothing was changed/);
+    }
+    expect(codeEntries).toEqual([]);
+    expect(await problem()).toBe('rolled_back');
+  });
+
+  it('a wrong owner code changes nothing', async () => {
+    await workRules();
+    alice.setMark(5);
+    answers = ['y'];
+    ownerPresence = wrongPresence;
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toMatch(/Nothing was changed/);
+    expect(codeEntries).toEqual(['policy.set']);
+    expect(await problem()).toBe('rolled_back');
+  });
+
+  it('is refused when the mark cannot be read: nothing asked, nothing signed', async () => {
+    await workRules();
+    alice.markBroken = true;
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toMatch(/agentlink doctor/);
+    expect(asked).toEqual([]);
+    expect(codeEntries).toEqual([]);
+    alice.markBroken = false;
+    expect(await version()).toBe(2);
+  });
+
+  it('allow-folder still refuses while the rules fail closed, and points to recover', async () => {
+    await workRules();
+    alice.setMark(5);
+    const result = await run(['policy', 'allow-folder', join(home, 'Other')]);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toContain('agentlink policy recover');
+    expect(codeEntries).toEqual([]);
+  });
+
+  it('extra arguments are a usage error', async () => {
+    const result = await run(['policy', 'recover', 'now']);
+    expect(result.code).toBe(2);
+    expect(codeEntries).toEqual([]);
   });
 });
