@@ -227,7 +227,8 @@ export async function verifyProofPackHandler(
   const output = ok(summary, {
     valid: true,
     verdict: check.verdict,
-    chain: check.chain,
+    // M1-26-b (D-40, 11 §5.1): the proof network only under `advanced`.
+    advanced: { chain: check.chain },
     recordId: check.recordId,
     signer: check.signer,
     ...(named ?? {}),

@@ -345,13 +345,13 @@ async function withProofOf(
     };
   }
   const { status, summary, nextStep, code, approvalId: pending, url, ...rest } = proofOut.result;
-  const { chain, recordId, fee, receipts, agentAddress, topUpUrl } = rest as Record<
+  const { advanced, recordId, fee, receipts, agentAddress, topUpUrl } = rest as Record<
     string,
     unknown
   >;
   const proof = {
     status: PROOF_STATUSES.has(status) ? status : 'error',
-    ...(chain === undefined ? {} : { chain }),
+    ...(advanced === undefined ? {} : { advanced }),
     ...(recordId === undefined ? {} : { recordId }),
     ...(fee === undefined ? {} : { fee }),
     receipts: Array.isArray(receipts) ? receipts : [],

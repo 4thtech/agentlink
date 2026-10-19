@@ -116,7 +116,10 @@ export function needsCredits(
   });
 }
 
-/** The ProofStatus fields of a result (06 §2.4): chain, recordId, fee, receipts. */
+/**
+ * The ProofStatus fields of a result (06 §2.4): recordId, fee, receipts, and the proof network
+ * under `advanced` only (M1-26-b; D-40, 11 §5.1).
+ */
 export function proofFields(view: {
   readonly chain?: string;
   readonly recordId?: string;
@@ -124,7 +127,7 @@ export function proofFields(view: {
   readonly receipts?: readonly { readonly type: string; readonly at: string }[];
 }): Record<string, unknown> {
   return {
-    ...(view.chain === undefined ? {} : { chain: view.chain }),
+    ...(view.chain === undefined ? {} : { advanced: { chain: view.chain } }),
     ...(view.recordId === undefined ? {} : { recordId: view.recordId }),
     ...(view.fee === undefined
       ? {}

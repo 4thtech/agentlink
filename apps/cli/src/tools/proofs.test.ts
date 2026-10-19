@@ -329,10 +329,12 @@ describe('agentlink_notarize (06 §2.4)', () => {
     expect(r.structured).toMatchObject({
       status: 'ok',
       recordId: RECORD,
-      chain: 'base-sepolia',
+      // M1-26-b (D-40, 11 §5.1): the proof network only under Advanced.
+      advanced: { chain: 'base-sepolia' },
       fee: { token: TOKEN, amount: '100000', usd: '0.10' },
       receipts: [],
     });
+    expect(r.structured).not.toHaveProperty('chain');
     expect(r.structured.summary).toContain('$0.10');
     expect(calls.notarize).toEqual([{ envelopeId: ENVELOPE }]);
     // 11 §5.1: no network name or jargon in the summary.
@@ -580,9 +582,10 @@ describe('agentlink_get_proof (06 §2.4)', () => {
     expect(r.structured).toMatchObject({
       status: 'ok',
       recordId: RECORD,
-      chain: 'base-sepolia',
+      advanced: { chain: 'base-sepolia' },
       receipts: [{ type: 'DELIVERED', at: '2026-10-19T10:05:00Z' }],
     });
+    expect(r.structured).not.toHaveProperty('chain');
     expect(findTool('agentlink_get_proof')?.annotations.readOnlyHint).toBe(true);
   });
 
@@ -741,7 +744,7 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
       status: 'ok',
       valid: true,
       verdict: 'verified',
-      chain: 'base-sepolia',
+      advanced: { chain: 'base-sepolia' },
       recordId: RECORD,
       signer: B,
       timestamp: '2026-10-19T10:00:00Z',
@@ -889,8 +892,9 @@ describe('notarize on agentlink_send (06 §2.2: the proofs policy as for agentli
     expect(r.structured).toMatchObject({
       status: 'ok',
       envelopeId: ENVELOPE,
-      proof: { status: 'ok', recordId: RECORD, chain: 'base-sepolia' },
+      proof: { status: 'ok', recordId: RECORD, advanced: { chain: 'base-sepolia' } },
     });
+    expect(r.structured['proof']).not.toHaveProperty('chain');
     expect(calls.log).toEqual(['send', 'notarize']);
     expect(calls.notarize).toEqual([{ envelopeId: ENVELOPE }]);
   });
@@ -1044,9 +1048,11 @@ describe('agentlink_status credits, prices, agent address and top-up link (06 §
     expect(r.structured).toMatchObject({
       status: 'ok',
       agentAddress: A,
+      // M1-26-b (D-40, 11 §5.1): credits in $ by default; the network, the token and the token
+      // amount only under Advanced.
       credits: [
-        { chain: 'base-sepolia', token: 'USDC', amount: '2500000', usd: '2.50' },
-        { chain: 'gnosis-chiado', token: 'xDAI', amount: '0', usd: '0' },
+        { usd: '2.50', advanced: { chain: 'base-sepolia', token: 'USDC', amount: '2500000' } },
+        { usd: '0', advanced: { chain: 'gnosis-chiado', token: 'xDAI', amount: '0' } },
       ],
       prices: [
         {
@@ -1096,5 +1102,41 @@ describe('canary scan of every proof tool result in this file', () => {
       for (const part of CANARY_PARTS) expect(structured).not.toContain(part);
       expectOurTextClean(r);
     }
+  });
+});
+
+// ---- No network name outside Advanced (M1-26-b; D-40, 02 F-51, 11 §5.1) ---------------------------
+
+/** A copy without any `advanced` member, at any depth: what a default view shows. */
+function withoutAdvanced(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutAdvanced);
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== 'advanced')
+      .map(([key, v]) => [key, withoutAdvanced(v)]),
+  );
+}
+
+/** Network and fee-token names of the shipped chains, and the word "chain" itself (11 §5.1). */
+const NETWORK_NAMES =
+  /\b(chains?|on-chain|blockchain|base|sepolia|gnosis|chiado|usdc|usdt|xdai)\b/i;
+
+describe('no network name, token name or chain prompt outside Advanced in any proof tool result', () => {
+  it('summary, nextStep, code, text and structured fields outside `advanced` name no network', () => {
+    expect(all.length).toBeGreaterThan(40);
+    for (const r of all) {
+      const visible = JSON.stringify(withoutAdvanced(r.structured));
+      expect(visible, visible).not.toMatch(NETWORK_NAMES);
+      expect(visible, visible).not.toMatch(/"(chain|chainId|network)":/);
+      expect(r.text, r.text).not.toMatch(NETWORK_NAMES);
+    }
+  });
+
+  it('the network is moved under `advanced`, not lost: recorded, fetched and verified proofs', () => {
+    const advanced = all
+      .map((r) => JSON.stringify(r.structured))
+      .filter((s) => s.includes('"advanced":{"chain":"base-sepolia"}'));
+    expect(advanced.length).toBeGreaterThan(3);
   });
 });

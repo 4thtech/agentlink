@@ -58,17 +58,28 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "items": {
             "additionalProperties": false,
             "properties": {
-              "amount": {
-                "pattern": "^[0-9]{1,78}$",
-                "type": "string",
-              },
-              "chain": {
-                "pattern": "^[a-z0-9-]{1,32}$",
-                "type": "string",
-              },
-              "token": {
-                "maxLength": 16,
-                "type": "string",
+              "advanced": {
+                "additionalProperties": false,
+                "properties": {
+                  "amount": {
+                    "pattern": "^[0-9]{1,78}$",
+                    "type": "string",
+                  },
+                  "chain": {
+                    "pattern": "^[a-z0-9-]{1,32}$",
+                    "type": "string",
+                  },
+                  "token": {
+                    "maxLength": 16,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "chain",
+                  "token",
+                  "amount",
+                ],
+                "type": "object",
               },
               "usd": {
                 "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$",
@@ -76,10 +87,8 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               },
             },
             "required": [
-              "chain",
-              "token",
-              "amount",
               "usd",
+              "advanced",
             ],
             "type": "object",
           },
@@ -834,9 +843,18 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         "proof": {
           "additionalProperties": false,
           "properties": {
-            "chain": {
-              "pattern": "^[a-z0-9-]{1,32}$",
-              "type": "string",
+            "advanced": {
+              "additionalProperties": false,
+              "properties": {
+                "chain": {
+                  "pattern": "^[a-z0-9-]{1,32}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "chain",
+              ],
+              "type": "object",
             },
             "fee": {
               "additionalProperties": false,
@@ -1176,9 +1194,18 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         "proof": {
           "additionalProperties": false,
           "properties": {
-            "chain": {
-              "pattern": "^[a-z0-9-]{1,32}$",
-              "type": "string",
+            "advanced": {
+              "additionalProperties": false,
+              "properties": {
+                "chain": {
+                  "pattern": "^[a-z0-9-]{1,32}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "chain",
+              ],
+              "type": "object",
             },
             "fee": {
               "additionalProperties": false,
@@ -1496,9 +1523,18 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         "proof": {
           "additionalProperties": false,
           "properties": {
-            "chain": {
-              "pattern": "^[a-z0-9-]{1,32}$",
-              "type": "string",
+            "advanced": {
+              "additionalProperties": false,
+              "properties": {
+                "chain": {
+                  "pattern": "^[a-z0-9-]{1,32}$",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "chain",
+              ],
+              "type": "object",
             },
             "fee": {
               "additionalProperties": false,
@@ -2272,16 +2308,25 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "advanced": {
+          "additionalProperties": false,
+          "properties": {
+            "chain": {
+              "pattern": "^[a-z0-9-]{1,32}$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "chain",
+          ],
+          "type": "object",
+        },
         "agentAddress": {
           "pattern": "^0x[0-9a-f]{40}$",
           "type": "string",
         },
         "approvalId": {
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
-          "type": "string",
-        },
-        "chain": {
-          "pattern": "^[a-z0-9-]{1,32}$",
           "type": "string",
         },
         "code": {
@@ -2523,12 +2568,21 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "advanced": {
+          "additionalProperties": false,
+          "properties": {
+            "chain": {
+              "pattern": "^[a-z0-9-]{1,32}$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "chain",
+          ],
+          "type": "object",
+        },
         "agentAddress": {
           "pattern": "^0x[0-9a-f]{40}$",
-          "type": "string",
-        },
-        "chain": {
-          "pattern": "^[a-z0-9-]{1,32}$",
           "type": "string",
         },
         "code": {
@@ -2759,9 +2813,18 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
-        "chain": {
-          "pattern": "^[a-z0-9-]{1,32}$",
-          "type": "string",
+        "advanced": {
+          "additionalProperties": false,
+          "properties": {
+            "chain": {
+              "pattern": "^[a-z0-9-]{1,32}$",
+              "type": "string",
+            },
+          },
+          "required": [
+            "chain",
+          ],
+          "type": "object",
         },
         "code": {
           "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
