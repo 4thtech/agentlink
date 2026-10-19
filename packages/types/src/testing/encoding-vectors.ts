@@ -318,11 +318,11 @@ export const ENCODING_VECTOR_CASES: readonly EncodingVectorCase[] = [
     accept: false,
   },
   {
-    id: 'reject-proof-pack-signature-high-s',
+    id: 'decode-proof-pack-signature-erc1271-high-s',
     path: 'ProofPack.signature',
     value:
       '0x7f06ad46921912a062ae94ea3729d7936eced9807ee1b28288f1e72b77ac25d1b03ed2030d6656ad2c65e7650dc443d932cd8183e7571b47492f371a863bdda51c',
-    accept: false,
+    accept: true,
   },
   {
     id: 'decode-uint256-zero',

@@ -1809,6 +1809,28 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Vector packs: valid; each single-field tamper → its specific reason; ERC-1271 signer; disclosed-key content check; a `disclosure` without `envelope`, a 31-byte `contentKey`, and a key that opens a two-key ciphertext under AES-GCM but fails `kc` are each rejected (G-46).
   - Runs in browser and Workers (M0-9 harness).
 
+#### M1-4d-b · chain: proof-pack sender binding and agent card check (new, IR-M1-4d-1 M-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (blocks M1-9h)
+- **Repo/path:** agentlink · packages/chain/src/verify
+- **Depends on:** M1-4d
+- **Spec:** 07 §8; 04 §2.4, §3.1.1; 02 J5
+- **Invariants:** I-5
+- **Scope:**
+  - Expose the verified envelope `from` as the content's sender; with `signer.agentCard` present, verify `cardSig` (owner) and require `agentCard.agentEvm` = the record signer and `agentCard.agentNostr` = `from`; a mismatch makes the content not verified with its own code.
+  - Without a card, the result says the sender is not bound to the signer; `verdict` stays `record_only`.
+- **Acceptance:** a recipient that notarizes a received envelope under its own signer and discloses the key is not shown as the author; a forged or mismatched card is refused with a fixed code.
+
+#### M1-4d-c · chain: proof-pack follow-ups (new, IR-M1-4d-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (not blocking M1-9h)
+- **Repo/path:** agentlink · packages/chain/src/verify
+- **Depends on:** M1-4d
+- **Spec:** 07 §8; 04 §3.4 (proof of agreement); 05 §3.2
+- **Scope:**
+  - Verify `ownerApproval` (the signed `approval.decide` and its commitment action, or the standing-rule hash) and report it.
+  - Check each receipt `txHash` (a transaction receipt read, no log query) or report it as not checked.
+  - Give an ERC-1271 refusal at verification time its own code (the account may have changed since the Notary checked it at inclusion), distinct from `signature_invalid`; owner decides how it renders.
+  - Optional: cross-check `receiptFlags` with `receiptAt` once 05 §3.3 states the bit layout.
+
 #### M1-26 · chain: zero-config chain auto-detection and auto-selection (D-40) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain
@@ -2981,9 +3003,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9h · CLI: local UI, credits and verify commands; passkey and recovery kit in `init` (new, split from M1-9a)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli
-- **Depends on:** M1-9a, M1-8d, M1-8e, M1-1k, M1-4d, M1-26
+- **Depends on:** M1-9a, M1-8d, M1-8e, M1-1k, M1-4d, M1-26, M1-4d-b
 - **Spec:** 06 §7, §8; 02 F-51, J1, J3, J5; 04 §2.2, §2.3; 07 §6.3; D-39, D-40
 - **Invariants:** I-1, I-4, I-10
+- **Blocking prerequisites (IR-M1-4d-1; before `verify` is user-facing, J5):** M1-4d-b lands first: (1) the envelope `from` is exposed as the content's sender and bound to the record signer (M-1), so disclosed content is never attributed to the wrong party; (2) `signer.agentCard` and `cardSig` are verified, and the card's `agentEvm` and `agentNostr` bind the signer and `from`. `verify` renders the result's `verdict` first and never shows `record_only` as a full pass.
 - **Scope:**
   - D-71 (1) (supersedes D-64 (2)): testnet and mainnet contract addresses differ; `agentlink verify` still labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
   - `ui`, `credits [--topup]` (top-up routed to the cheapest supported chain, M1-26), `verify <proof.json>`; `doctor` checks for RPC and storage.
