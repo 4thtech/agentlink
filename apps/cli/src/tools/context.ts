@@ -323,6 +323,12 @@ export interface AccountView {
   }[];
 }
 
+/** How `account` selects (M1-26-c, 07 §6.3): as the paid path does. */
+export interface AccountOptions {
+  /** Policy `proofs.defaultChain` (06 §3); left out under fail-closed, as the core does. */
+  readonly defaultChain?: string;
+}
+
 /**
  * The proof calls (M1-9d-2; 06 §2.4). The core (M1-7g) does notarize, receipts and the pack; the
  * platform (src/runtime/proofs.ts in Node) reads and writes pack files and runs the verifier and the
@@ -355,7 +361,8 @@ export interface ProofPlatformTools {
   readPack(path: string, folders: PackFolders): Promise<PackReadOutcome>;
   savePack(exportFolder: string, recordId: string, json: string): Promise<PackSaveOutcome>;
   verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck>;
-  account(agentId: string): Promise<AccountView | undefined>;
+  /** Credits and the price where the paid path would pay (M1-26-c, the same selection). */
+  account(agentId: string, options?: AccountOptions): Promise<AccountView | undefined>;
   chainIdOf(key: string): number | undefined;
 }
 
@@ -565,7 +572,14 @@ function coreProofTools(client: AgentLinkClient, platform: ProofPlatformTools): 
       return platform.readPack(path, current);
     },
     verify: (pack) => platform.verify(pack),
-    account: (agentId) => platform.account(agentId),
+    async account(agentId) {
+      // M1-26-c: the core's paid path selects with the policy default chain (none under
+      // fail-closed); status follows the same selection.
+      const effective = await client.ownerActions.loadPolicy();
+      const defaultChain =
+        effective.mode === 'fail_closed' ? undefined : effective.policy.proofs.defaultChain;
+      return platform.account(agentId, defaultChain === undefined ? {} : { defaultChain });
+    },
     chainIdOf: (key) => platform.chainIdOf(key),
   });
 }
