@@ -1,5 +1,27 @@
 # @4thtech-io/node
 
+## 0.1.2
+
+### Patch Changes
+
+- dd9650b: M1-1g-e: `KeyStore.signDropRequest(request, createdAt)` signs one encrypted-drop request with the agent's separate drop key at the current epoch and returns the `Authorization` header (07 §5.4). It is the `DropSigner` the drop adapter takes. The KeyStore fixes the event kind (27235) and the `domain` tag, signs only POST and DELETE to an https URL in serialised form over the drop's signed JSON body with `createdAt` equal to its `ts`, and refuses anything else with one fixed error before reading any key. Implemented by `MemoryKeyStore` and the keychain KeyStore (and its facade). `dropRequestSnapshot` and `DROP_REQUEST_REFUSED` are in the main entry; the raw-key `signDropRequest` is in the restricted `@4thtech-io/crypto/keystore` entry.
+- 4d7d3e4: M1-1g-f: `KeyStore.signDropRequest(request, createdAt, options?)` takes an optional `{epoch}` for a DELETE, so an object uploaded under an older key epoch stays deletable after a rotation (04 §2.1). It is accepted only with DELETE and never above the current epoch (`epoch_unavailable`); a POST with an epoch or a malformed epoch gets the same fixed refusal, and every check runs before a key is read. Implemented by `MemoryKeyStore` and the keychain KeyStore (and its facade). `dropRequestEpoch` joins `dropRequestSnapshot` in the main entry.
+- bc3bfe4: M1-4a: the chain client foundation. A supported-chain registry composed from the shipped network entries and the pinned `@4thtech-io/occ-v2-abi` release (Base Sepolia today), automatic testnet-only chain selection, an RPC URL rule (04 §4: https, public host name, no key), a read-only viem client per chain with a fallback transport, timeouts and retries, calls encoded only from the client-safe ABIs, `Record`, `Receipt` and `AgentCard` builders with EIP-712 vector parity and signing through `KeyStore.sign712`, a fresh CSPRNG salt and nonce for every Record, and the Notary's record ID derivation. Read-client errors are fixed-code `ChainError`s with no RPC URL. `@4thtech-io/node` adds `nodeRpcFetch`, the RPC fetch that refuses private and loopback addresses at resolve time and pins the checked address per request (04 §4).
+- 5a9ee7d: M1-4b: fee quotes in USD (`quoteFee`: the vault's `quote` with the protocol and integrator parts, 1:1 for the stablecoin fee tokens, fail-closed when the parts do not add up), credits per chain and across chains (`readCredits`, `readCreditsAcrossChains`), the direct-mode deposit helper (`buildDeposit`: exact-amount approve, then deposit; sends nothing) and the credit event filter (`filterCreditEvents`, `readCreditHistory`: canonical vault only, zero-amount events ignored). Only offered allowlisted fee tokens are priced, shown or deposited. The read client is now a frozen view of the viem client: `extend` stays wrapped, namespaced actions and `onError` callbacks get URL-free `ChainError`s, and the transport exposes no RPC URL. `createReadClient` accepts only the address-checked fetch; `@4thtech-io/node` `nodeRpcFetch` carries that brand.
+- 2e6b70e: M1-4d-d-b: the agent card's proof of possession (04 §2.9, D-102). `TAGS.cardPop` (`agentlink/card-pop/v1`), `verifyCardPop`, `verifyCardPossession` and `cardPopSnapshot` are in the crypto main entry; the raw-key `signCardPop` is in the restricted `@4thtech-io/crypto/keystore` entry. `KeyStore.signCardPop(card)` signs only the store's own card at its current key epoch and refuses anything else with one fixed error; implemented by `MemoryKeyStore` and the keychain KeyStore (and its facade). The `handshake` and `handshake-ack` bodies take an optional `cardPop`, and `card-update` optional `cardAgentSig` and `cardPop`, together or not at all. The core makes `cardPop` with every own card (init, so also `owner add-agent`, and rotation once the KeyStore is at the new epoch; a card stored before this change gets one on first use), sends it in `handshake` and `handshake-ack`, verifies a received pair in `handshake`, `handshake-ack` and `card-update` (a present signature that does not verify drops the whole body), and stores a contact's verified pair. `proofSigner(from)` returns the signer block with the pair for the upcoming `exportProofPack` (M1-7g); the core does not yet send `card-update` itself. `verifyProofPack` uses the crypto check instead of its own composition (no behaviour change).
+- Updated dependencies [b63fd4e]
+- Updated dependencies [dd9650b]
+- Updated dependencies [4d7d3e4]
+- Updated dependencies [84bda36]
+- Updated dependencies [2e6b70e]
+- Updated dependencies [bdf5da6]
+- Updated dependencies [19e234d]
+- Updated dependencies [49eb7be]
+- Updated dependencies [c6eb603]
+  - @4thtech-io/core@0.1.2
+  - @4thtech-io/crypto@0.1.2
+  - @4thtech-io/transport-nostr@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes

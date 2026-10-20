@@ -1,5 +1,19 @@
 # @4thtech-io/transport-nostr
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [dd9650b]
+- Updated dependencies [4d7d3e4]
+- Updated dependencies [50340cb]
+- Updated dependencies [2e6b70e]
+- Updated dependencies [c5b21ee]
+- Updated dependencies [49eb7be]
+  - @4thtech-io/crypto@0.1.2
+  - @4thtech-io/types@0.1.2
+  - @4thtech-io/log@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
