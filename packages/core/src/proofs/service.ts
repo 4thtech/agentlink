@@ -101,6 +101,8 @@ export const RECORD_DEADLINE_SECONDS = 3_600;
 export const RECEIPT_DEADLINE_SECONDS = 3_600;
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
+const ZERO_BYTES32 = `0x${'0'.repeat(64)}`;
+const BYTES32 = /^0x[0-9a-f]{64}$/;
 const TERMS_TYPES: ReadonlySet<string> = new Set(['offer', 'accept', 'reject']);
 const RECEIPT_CODE: Readonly<Record<ReceiptTypeName, number>> = Object.freeze({
   DELIVERED: 1,
@@ -171,7 +173,9 @@ export type ProofCode =
   | 'RECORD_UNAVAILABLE'
   | 'RECEIPT_CONFLICT'
   | 'APPROVAL_INVALID'
-  | 'POLICY_CHANGED';
+  | 'POLICY_CHANGED'
+  /** `parentRecordId` is not zero and not a record the chain shows this agent signed (D-109). */
+  | 'PARENT_NOT_OWN';
 
 export interface ProofRejected {
   readonly status: 'rejected';
@@ -194,6 +198,13 @@ export interface NotarizeInput {
   /** The Advanced / tool `chain?` override (06 §2.4); never asked of the user. */
   readonly chainId?: number;
   readonly approvalId?: string;
+  /**
+   * The Record's `parentRecordId` (D-109; 05 §3.1, 04 §5.1). Absent or zero by default. Otherwise
+   * only a record the selected chain shows this agent signed (its own earlier record); a record of
+   * another signer, one the chain does not hold or a malformed value is `PARENT_NOT_OWN`, and a
+   * failed read is `CHAIN_UNAVAILABLE`. Either way nothing is signed or charged. No tool sets it.
+   */
+  readonly parentRecordId?: string;
 }
 
 interface RecordedFields {
@@ -320,15 +331,29 @@ interface ReceivedItem {
 type RecordCheck =
   | { readonly status: 'ok'; readonly received: ReceivedItem['received'] }
   /** A definite mismatch: the whole body is dropped (`proof_mismatch`). */
-  | { readonly status: 'mismatch' }
+  | { readonly status: 'mismatch'; readonly code?: 'proof_parent_mismatch' }
   /** A chain read failed: neither a pass nor a mismatch; the body stays pending. */
   | { readonly status: 'unavailable' };
 const MISMATCH: RecordCheck = Object.freeze({ status: 'mismatch' });
+/** The 04 §3.4 parent check (D-109): the Record names a parent another signer made. */
+const PARENT_MISMATCH: RecordCheck = Object.freeze({
+  status: 'mismatch',
+  code: 'proof_parent_mismatch',
+});
 const UNAVAILABLE: RecordCheck = Object.freeze({ status: 'unavailable' });
 
 class Abort extends Error {}
 
 type Selector = Pick<NonNullable<ProofsPlatform['selector']>, 'select' | 'clear'>;
+
+/**
+ * A requested `parentRecordId` (D-109): `undefined` for none (absent or zero, the default), the
+ * value for a well-formed `bytes32` (04 §2.4.1: `0x` + 64 lowercase hex), `null` for anything else.
+ */
+function parentOf(value: unknown): string | undefined | null {
+  if (value === undefined || value === ZERO_BYTES32) return undefined;
+  return typeof value === 'string' && BYTES32.test(value) ? value : null;
+}
 
 const iso = (seconds: bigint | number): string =>
   new Date(Number(seconds) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -375,6 +400,9 @@ export class ProofService implements RecordLookup {
     if (TERMS_TYPES.has(payload.type)) return rejected('USE_TERMS_TOOLS');
     const kind = this.#kit.recordKindForPayload(payload);
     if (kind === null) return rejected('NOT_NOTARIZABLE');
+    // D-109: zero by default; any other value must be well-formed before the chain is asked.
+    const parent = parentOf(input.parentRecordId);
+    if (parent === null) return rejected('PARENT_NOT_OWN');
 
     // Already recorded, or signed and not landed: never sign a second Record (04 §5).
     const existing = await this.#ownRows(input.envelopeId);
@@ -401,6 +429,12 @@ export class ProofService implements RecordLookup {
     if (selection.status !== 'ok') return rejected('CHAIN_UNAVAILABLE');
     const chain = this.#chain(selection.chainId);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
+    if (parent !== undefined) {
+      // Only this agent's own earlier record on this chain, before any approval, signature or
+      // reservation (D-109; 04 §5.1). A read that fails refuses: it is never a pass.
+      const own = await this.#ownParent(chain, self.agentId, parent);
+      if (own !== 'ok') return rejected(own);
+    }
     const tokenAddress = (selection.quote.tokenAddress ?? ZERO_ADDRESS).toLowerCase();
     const decimals = chain.config.feeTokens.find(
       (t) => t.symbol === selection.quote.token,
@@ -432,6 +466,8 @@ export class ProofService implements RecordLookup {
       args: {
         envelopeId: input.envelopeId,
         ...(input.chainId === undefined ? {} : { chain: chain.config.key }),
+        // The approval covers this parent and no other (absent: the default zero).
+        ...(parent === undefined ? {} : { parentRecordId: parent }),
       },
       context: {
         triggers: proofTriggers(pre.triggers),
@@ -469,6 +505,8 @@ export class ProofService implements RecordLookup {
       signer: self.agentId,
       envelopeHash: row.envelope_hash,
       recipient,
+      // Checked above against the chain; absent, the builder's zero (D-109).
+      ...(parent === undefined ? {} : { parentRecordId: parent }),
       kind: kind as RecordKind,
       feeToken: tokenAddress,
       maxFee: selection.quote.total,
@@ -488,6 +526,26 @@ export class ProofService implements RecordLookup {
     });
     if (stored === undefined) return rejected('POLICY_CHANGED');
     return this.#submit(stored);
+  }
+
+  /**
+   * The sender side of the `parentRecordId` rule (D-109; 05 §3.1, 04 §5.1): the chain must show a
+   * record with this ID whose signer is this agent. Absent or another signer's is `PARENT_NOT_OWN`;
+   * a read that fails is `CHAIN_UNAVAILABLE` (fail closed). Nothing from the chain is logged.
+   */
+  async #ownParent(
+    chain: ProofChain,
+    self: string,
+    parent: string,
+  ): Promise<'ok' | 'PARENT_NOT_OWN' | 'CHAIN_UNAVAILABLE'> {
+    let stored: Awaited<ReturnType<ProofChain['state']['getRecord']>>;
+    try {
+      stored = await chain.state.getRecord(parent as Hex);
+    } catch {
+      return 'CHAIN_UNAVAILABLE';
+    }
+    if (stored === null) return 'PARENT_NOT_OWN';
+    return String(stored.signer).toLowerCase() === self.toLowerCase() ? 'ok' : 'PARENT_NOT_OWN';
   }
 
   /** Signs nothing: stores the signed Record with its salt and reserves its fee, all or nothing. */
@@ -1062,9 +1120,18 @@ export class ProofService implements RecordLookup {
         tx.delete('proofs', { record_id: pendingKey, status: PENDING }),
       );
       // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
-      this.#ctx.log.warn('proof envelope does not match the chain (proof_mismatch)', {
-        code: 'proof_mismatch',
-      });
+      if (check.code === 'proof_parent_mismatch') {
+        // Dropped and logged: nothing is stored, so no receipt is ever signed (D-109). Flagging the
+        // contact (04 §3.4) is pending M1-7g-c, as for `proof_mismatch`.
+        this.#ctx.log.warn(
+          'proof envelope names another signer’s record as parent (proof_parent_mismatch)',
+          { code: 'proof_parent_mismatch' },
+        );
+      } else {
+        this.#ctx.log.warn('proof envelope does not match the chain (proof_mismatch)', {
+          code: 'proof_mismatch',
+        });
+      }
       return 0;
     }
     const checked = check.received;
@@ -1222,6 +1289,19 @@ export class ProofService implements RecordLookup {
       const sig = await this.#checkSignature(chain, recordId, signedItem, self.agentId, salt);
       if (sig === 'unavailable') return UNAVAILABLE;
       if (sig !== 'ok') return MISMATCH;
+      // Parent check (D-109; 04 §3.4, §5.1), after the checks above: a non-zero parent must be a
+      // record the chain shows `record.signer` made. A failed read is neither a pass nor a flag.
+      if (r.parentRecordId !== ZERO_BYTES32) {
+        let parent: Awaited<ReturnType<ProofChain['state']['getRecord']>>;
+        try {
+          parent = await chain.state.getRecord(r.parentRecordId as Hex);
+        } catch {
+          return UNAVAILABLE;
+        }
+        if (parent === null || String(parent.signer).toLowerCase() !== r.signer) {
+          return PARENT_MISMATCH;
+        }
+      }
     }
     return {
       status: 'ok',

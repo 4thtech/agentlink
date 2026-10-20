@@ -2568,7 +2568,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §3.4; 06 §2.4; 07 §3.2, §8
 - **Invariants:** I-3, I-5, I-7
 - **Scope:**
-  - Flag the contact when a `proof` body does not match the on-chain record (04 §3.4).
+  - Flag the contact when a `proof` body does not match the on-chain record (04 §3.4), including a parent mismatch (`proof_parent_mismatch`, M1-33c: today dropped and logged only).
   - A per-contact share of the 256-entry pending pool, so one contact cannot fill it.
   - A logger allowlist for the fixed codes, so only listed codes reach the logs.
   - The core signs the `ACCEPTED` receipt for `confirm`.
@@ -3741,7 +3741,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-6
 - **Scope:**
   - Today the core never sets `parentRecordId` (the builder defaults to zero). Make the rule explicit: the core accepts a parent only when the chain shows the same signer for it, and refuses otherwise with a fixed code; replacements keep the original value.
-  - Recipient: a received Record whose `parentRecordId` names another signer's record is flagged (04 §3.4 checks), and no receipt is signed for it.
+  - Recipient: a received Record whose `parentRecordId` names another signer's record is flagged (04 §3.4 checks), and no receipt is signed for it. (M1-33c drops and logs it as `proof_parent_mismatch`; the contact flag lands with M1-7g-c.)
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - A parent signed by another agent is refused and nothing is signed or charged; a parent of the same signer is accepted; a failed chain read refuses (fail closed); the recipient-side flag test.
 
