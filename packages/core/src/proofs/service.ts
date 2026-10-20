@@ -1121,7 +1121,8 @@ export class ProofService implements RecordLookup {
       );
       // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
       if (check.code === 'proof_parent_mismatch') {
-        // The contact is flagged and nothing is stored, so no receipt is ever signed (D-109).
+        // Dropped and logged: nothing is stored, so no receipt is ever signed (D-109). Flagging the
+        // contact (04 §3.4) is pending M1-7g-c, as for `proof_mismatch`.
         this.#ctx.log.warn(
           'proof envelope names another signer’s record as parent (proof_parent_mismatch)',
           { code: 'proof_parent_mismatch' },

@@ -1552,7 +1552,7 @@ describe('the sender sets parentRecordId only to zero or its own record (D-109, 
   });
 });
 
-describe('the recipient flags a Record whose parent is another signer’s (04 §3.4 parent check)', () => {
+describe('the recipient drops a Record whose parent is another signer’s (04 §3.4 parent check; contact flag pending M1-7g-c)', () => {
   async function received(parent: (ctx: { a: Agent; b: Agent }) => Promise<string>) {
     const { a, b } = await twoAgents();
     chain.fund(b.id, 10n * FEE_UNITS);
@@ -1571,7 +1571,7 @@ describe('the recipient flags a Record whose parent is another signer’s (04 §
     return ((await b.client.notarize({ envelopeId: reply })) as { recordId: Hex }).recordId;
   };
 
-  async function expectFlagged(out: { b: Agent; envelopeId: string }, acksBefore: number) {
+  async function expectDroppedParent(out: { b: Agent; envelopeId: string }, acksBefore: number) {
     expect(await receipts(out.b)).toEqual([]);
     expect(chain.calls.acknowledge).toBe(acksBefore);
     expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toBeUndefined();
@@ -1591,21 +1591,21 @@ describe('the recipient flags a Record whose parent is another signer’s (04 §
     expect(logged(out.b, 'proof_parent_mismatch')).toBe(false);
   });
 
-  it('a parent signed by another agent (the recipient’s own record) is flagged: no receipt', async () => {
+  it('a parent signed by another agent (the recipient’s own record) is dropped and logged: no receipt', async () => {
     const out = await received(bOwn);
     const acks = chain.calls.acknowledge;
     await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
-    await expectFlagged(out, acks);
+    await expectDroppedParent(out, acks);
   });
 
-  it('a parent the chain does not hold is flagged: no receipt', async () => {
+  it('a parent the chain does not hold is dropped and logged: no receipt', async () => {
     const out = await received(() => Promise.resolve(`0x${'ab'.repeat(32)}`));
     const acks = chain.calls.acknowledge;
     await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
-    await expectFlagged(out, acks);
+    await expectDroppedParent(out, acks);
   });
 
-  it('a failed parent read signs no receipt and is tried again at the next sync', async () => {
+  it('a failed parent read signs no receipt and is tried again at the next sync (then dropped)', async () => {
     const out = await received(bOwn);
     const acks = chain.calls.acknowledge;
     chain.stateReadsFail = true;
@@ -1616,7 +1616,7 @@ describe('the recipient flags a Record whose parent is another signer’s (04 §
     expect(logged(out.b, 'proof_parent_mismatch')).toBe(false);
     chain.stateReadsFail = false;
     await out.b.client.proofs.processInbound([]);
-    await expectFlagged(out, acks);
+    await expectDroppedParent(out, acks);
   });
 
   it('a failed read of an own parent passes once the read recovers', async () => {
