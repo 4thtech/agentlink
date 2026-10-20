@@ -34,7 +34,7 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 ## Status
 
 <!-- status:start -->
-> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 and updated in v0.1.1 on 18 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the building blocks merged but not yet usable from the CLI or the MCP tools · **Version:** v0.1.1 (M1a, walking skeleton: pair and talk) · **Last updated:** 2026-10-19
+> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 and updated in v0.1.1 on 18 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the building blocks merged but not yet usable from the CLI or the MCP tools · **Version:** v0.1.1 (M1a, walking skeleton: pair and talk) · **Last updated:** 2026-10-20
 >
 > - **M0 Foundations:** 6 merged, 1 in progress
 > - **Crypto (@4thtech-io/crypto):** 7 merged, 4 in progress
@@ -47,6 +47,7 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 > - **MCP server, CLI and apps:** 4 merged, 5 in progress, 1 planned
 > - **OCC v2 contracts (private repo):** 3 merged, 1 in progress, 1 planned
 > - **Design:** 1 merged, 1 in progress
+> - **Privacy of proofs (D-109):** 7 planned
 > - **In progress:** M1b is in progress. v0.1.1 (18 Oct 2026) is on npm `latest`. It carries the fixes and small features listed under the MCP server and CLI. In development, merged but not yet usable from the CLI or the MCP tools: STREAM file encryption, the owner-signed Revocation typed data, multipart upload with streaming encryption for your own storage, the localhost approval page (`agentlink mcp` opens it when an approval is needed), the safe fetch and path guard, the files and proof policy rules, the proof hashing, file send and fetch in the core (inline or through the encrypted drop, verified before a file is saved), and the file tools in the MCP server (send a file from an allowed folder, save a received file; M1-9d-1). The encrypted drop Worker is deployed to production through its pipeline (19 Oct 2026); no released CLI version uses it yet. The submitter Worker, which records signed proofs on the agent's behalf, is built and tested locally (M1-10a, M1-10a-b), with a testnet faucet for free test credits (M1-10b); neither is deployed yet. The chain client can send proofs, add credits and check who sent a message, but no tool uses it yet. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: deploying the submitter, the designed approval page and proof.
 > - **Does not exist yet:** file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, and `agentlink mcp` opens it when an approval is needed), the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. v0.1.1 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 18 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
 > - **Next:** Send files through the encrypted drop (M1-13c), add `agentlink ui`, run the two-person dogfood, then finish M1b: proof and credits on testnets, and cut the 0.2.0 release.
@@ -61,11 +62,12 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (v0.1.0 released 16 Oct 2026, v0.1.1 on 18 Oct 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (started; building blocks merged, none usable from the tools yet) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI | 0.2.0 (M1 gate) |
-| **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors | 0.3.0 |
+| **M1b Files, proof, credits** (started; building blocks merged, none usable from the tools yet) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.3.0 |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |
 | **M5 Agent commerce** | Deal records, payment linkage, arbitrator disclosure | after 1.0.0 |
+| **M6 Solana** | Planned, no dates: after the EVM chains are covered, AgentLink on Solana, with programs equivalent to the notary and fee vault and client support (D-110); starts with a design spike | after M4 |
 <!-- roadmap:end -->
 
 Gates, progress and versioning: [status and roadmap](docs-site/technical/project/status-and-roadmap.md) and [versioning](docs/process/versioning.md).

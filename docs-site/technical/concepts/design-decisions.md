@@ -173,6 +173,18 @@ Five small decisions, made together. Tool results put the proof network under `a
 
 **Availability.** Decided design (06 §2.1, §2.4, §8; 07 §5.1, §5.4), merged for the next release (0.1.2), not in v0.1.1 (cards M1-26-b, M1-1g-g, M1-9h).
 
+### Privacy of proofs (D-109)
+
+A proof shows publicly which agent recorded something, when and its kind; a receipt also shows who received it. Content never. The owner decided to write every recommendation of the 2026-10-20 privacy audit into the specs: delivery receipts off by default with a sender request and recipient opt-in, plain disclosure on every proof surface, `parentRecordId` only for the same signer, no IP logging and platform logging off at the submitter, and a list of what a shared proof pack reveals. Planned for M2: per-relationship signing addresses, a Registry without guessable identifiers, and optional delayed or batched receipts. See [Privacy of proofs](privacy.md).
+
+**Availability.** Decided design, not built (cards M1-33a–c, M2-17a–c, OPS-PRIV-1).
+
+### Solana after the EVM chains (D-110)
+
+After the EVM chains on the roadmap are deployed, AgentLink plans to add Solana: programs equivalent to the Notary and fee vault, and client support. This is a direction only, with no dates; a design spike (card M6-1) first answers the open questions, such as agent keys on Solana, fees and credits under Solana's account model, verification for a non-EVM chain, and keeping chain choice automatic.
+
+**Availability.** Planned (M6, after M4); nothing is built.
+
 ## Packages
 
 ### The internal package scope `@4thtech-io` (OPS-REL-2)

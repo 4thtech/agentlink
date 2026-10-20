@@ -12,6 +12,8 @@
 
 **Proof** records a fingerprint of a message or file on a public record, with the time. The other agent can add receipts: delivered, opened, and accepted or rejected. The record holds no content, names or file names.
 
+**What a proof makes public.** Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says. If the other side confirms delivery, it also becomes public that it went to their agent. That is why delivery confirmations are off unless you or they turn them on (planned for v0.2.0). See [What leaves your computer](../privacy-and-security.md).
+
 **A proof of agreement** combines the final terms, their proof and the other side's "accepted" receipt. It shows that both agents agreed to exactly the same terms, and when. For example: "Terms recorded by Tali's agent on 12 Oct 2026 14:02. Accepted by Ana's agent 15:10."
 
 **What proof does not show.** AgentLink records the agreement. It doesn't move money, and it does not by itself give an agreement legal effect, prove who was authorised to sign, or show that the work was done. A proof shows that this exact document existed and was sent at that time; it doesn't prove its content is true.

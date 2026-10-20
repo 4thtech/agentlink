@@ -115,7 +115,7 @@ struct Record {
     address signer;               // agent EVM address (EOA or ERC-1271 account)
     bytes32 envelopeHash;         // sha256(JCS(envelope without sig)) — see 04 §3.1
     bytes32 recipientCommitment;  // keccak256(abi.encode(recipientAgentEvm, salt)); 0 for self-notes
-    bytes32 parentRecordId;       // threading / replies; 0 if none
+    bytes32 parentRecordId;       // 0 by default; only the same signer's earlier record (D-109, 04 §5.1)
     bytes32 appId;                // integrator; 0 for official clients
     uint8   kind;                 // 1 MESSAGE, 2 FILE, 3 OFFER, 4 ACCEPT, 5 DELIVERY, 6 NOTE (extensible)
     address feeToken;             // address(0) = native
@@ -134,6 +134,8 @@ struct Receipt {
 ```
 
 **Kind mapping (G-13, D-86; decided by Tali in chat, 2026-10-18).** The core sets `kind` from the notarized envelope's payload (04 §3.4); no tool takes a kind as input. `offer` → 3 OFFER; `accept` → 4 ACCEPT; `delivery` → 5 DELIVERY; `note` → 6 NOTE; `file` → 2 FILE; `text` and `request` → 2 FILE when `files` is non-empty, otherwise 1 MESSAGE; `reject` → 1 MESSAGE. Every other type (`ack`, `handshake`, `handshake-ack`, `proof`, `approval`, `approval-request`, `policy`, `card-update`, `revoke`) is never notarized: the call returns `rejected` with code `NOT_NOTARIZABLE` and records nothing. `kind` is public and permanent, so it reveals the category of the message, never its content. **Checks.** Before signing any receipt, a recipient checks that the record's `kind` equals this mapping for the envelope it holds (with `envelopeHash`, 04 §3.4 `proof`); otherwise it signs nothing and flags the contact. A verifier with a disclosed content key (07 §8) applies the same check after step 6; on a mismatch the pack proves no content (`contentVerified: false`), while the record and receipts are still verified. Values 7–255 are reserved; adding one is a spec change.
+
+**`parentRecordId` rule (D-109; proposed, owner confirms at merge).** The core sets `parentRecordId` to zero, or to a `recordId` whose stored `signer` equals this Record's `signer`. It never names a record signed by another agent, since that would publish the link between the two agents with no receipt; a link both sides agree in terms needs its own decision first (04 §5.1). The contract does not check this rule; clients do (M1-33c).
 
 **JSON form (04 §2.4.1).** Wherever these values appear in JSON (the `proof` body, proof packs, tool results, the submitter API), addresses and every `bytes32` (`recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`), transaction hashes and signatures are `0x` + lowercase hex; `uint256` values (`maxFee`, `nonce`) are decimal strings; the other integers are JSON integers. Anything else is rejected, never normalised.
 
@@ -195,7 +197,7 @@ Signatures are verified with OpenZeppelin `SignatureChecker.isValidSignatureNow(
   - Proposed additions (pre-audit AUDIT-FABLE-OCCv2-1 FA-1, FA-3; accepted, D-93 and D-94), stated in 07 §7: items from signers with code are submitted solo (or at most one per batch) from their first item, every transaction's gas limit is its simulated gas plus a fixed margin, and items already on-chain at simulation are reported `skipped` without being transmitted.
   - A pause is not an item failure. While the Notary is paused, the submitter holds items and sends them after unpause. An item whose deadline passes in the meantime is `failed` (`Expired()`), and the client may sign a replacement only under 04 §5 ("Replacing a signed item").
 
-> Privacy note: a receipt reveals the salt, linking the recipient's agent address to the record. Records without receipts reveal only the salted commitment. Per-relationship agent keys (P2) reduce linkability.
+> Privacy note (D-109, 04 §5.1): a receipt reveals the salt, linking the recipient's agent address to the record. Records without receipts reveal only the salted commitment. Receipts are therefore opt-in: `receipts.autoDelivered` defaults to `false` (06 §3). Optional delayed or batched receipts (M2-17c) hide when the recipient was online, and per-relationship signing addresses (M2-17a, moved forward from P2) stop one address from collecting every proof.
 
 Verifiers can check everything shown in a proof (signer, time, envelope hash, recipient, receipts with timestamps, and all other record fields via `recordStructHash`) from `getRecord` alone. That matters because some RPCs prune old logs.
 
@@ -242,7 +244,8 @@ function getAgent(address agentEvm) external view returns (AgentEntry memory);
 - A higher `keyEpoch` from the same owner replaces the entry (new registration and fee).
 - **Revocation (D-81).** `struct Revocation { address agentEvm; uint32 keyEpoch; uint256 nonce; uint64 deadline; }` (`keyEpoch` type aligned to the stored `uint32`), signed by `ownerEvm` (EIP-712, OCC v2 chain domain; ERC-1271 accepted). The signer must equal the stored `ownerEvm` of `agentEvm`, otherwise `InvalidSignature()`. `Registration` and `Revocation` nonces are random, single-use per owner, tracked in `usedNonces[ownerEvm][nonce]` and shared by both types. Reverts if expired (`Expired()`), the nonce is used (`NonceUsed()`), `keyEpoch` ≠ stored epoch (`EpochMismatch()`), the agent is not registered (`AgentNotRegistered()`) or is already revoked (`AlreadyRevoked()`). Revoke works while paused (§5.1).
 - **Revocation JSON form (proposed, owner confirms at merge; 04 §2.4.1).** As the §3.1 JSON form of `Record` and `Receipt`: exactly the four keys `agentEvm`, `keyEpoch`, `nonce` and `deadline`; `agentEvm` is `0x` + 40 lowercase hex; `nonce` is a canonical decimal string (`^(0|[1-9][0-9]*)$`) of at most 2^256 − 1; `keyEpoch` (at most 2^32 − 1) and `deadline` (at most 2^53 − 1) are JSON integers. Every other form is rejected, never normalised.
-- Stores `{ownerEvm, cardHash, keyEpoch, registeredAt, revoked}`; emits full card fields in `AgentRegistered`.
+- Stores `{ownerEvm, cardHash, keyEpoch, registeredAt, revoked}`.
+- **Registry privacy (D-109; M2-17b; proposed, owner confirms at merge).** Registration is the owner's choice and the only way the agent-to-owner link reaches the public record: no default flow registers, and nothing in the product requires it (11 §6.13 says what becomes public before the owner approves). `AgentRegistered` and the `register` calldata carry no `nameHash`, `relaysHash`, `agentNostr`, `agentEnc`, `ownerNostr` or `ownerEnc`, nor any other value from which a display name or relay list can be confirmed by guessing or from which the agent's message traffic can be watched. The event carries `agentEvm`, `ownerEvm`, `keyEpoch` and `cardHash` only; whoever holds the card (a contact, a proof pack) checks it against `cardHash` off-chain. The `register` interface above passes the full card and is therefore replaced in M2-17b by one of: (a) `register(agentEvm, ownerEvm, keyEpoch, cardHash, …)`, where both signatures are over the card digest built from `cardHash` and the card's address fields are checked off-chain; or (b) a card whose name commitment is salted, so a public card no longer reveals a guessable name. M2-17b picks one with the owner before M2-4a is built.
 - ERC-8004 bridge (P2).
 
 ---
@@ -343,7 +346,7 @@ As in OpenZeppelin `Pausable`, `pause` while already paused reverts `EnforcedPau
 RecordNotarized(bytes32 indexed recordId, address indexed signer, bytes32 envelopeHash,
                 bytes32 recipientCommitment, bytes32 indexed parentRecordId, bytes32 appId, uint8 kind, uint64 timestamp)
 ReceiptRecorded(bytes32 indexed recordId, uint8 receiptType, address indexed signer, uint64 timestamp)
-AgentRegistered(address indexed agentEvm, address indexed ownerEvm, uint32 keyEpoch, bytes32 cardHash, ...)
+AgentRegistered(address indexed agentEvm, address indexed ownerEvm, uint32 keyEpoch, bytes32 cardHash)  // no other card fields (D-109, §4)
 AgentRevoked(address indexed agentEvm, address indexed ownerEvm)
 Deposited(address indexed payer, address indexed token, uint256 amount, address indexed from)
 Withdrawn(address indexed payer, address indexed token, uint256 amount, address to)

@@ -17,11 +17,24 @@
 |---|---|---|
 | Your messages | Open message servers that anyone can run, as sealed, unreadable packages | The two agents and the people responsible for each of them. The servers see an unreadable package, who it is for (as a random-looking code), a deliberately blurred time and where whoever connects is connecting from (IP) |
 | Your files (larger than about 12 KB) | The 4thTech encrypted drop, or your own storage if you connected it, as locked data with a random name. The encrypted drop deletes it within 7 days; with your own storage, AgentLink deletes it on schedule when it can | The same people as for messages. The drop sees only locked data, its size, upload and download times and where people connect from (IP); it never gets what is needed to open it, or the file name |
-| Proof | A public record, if you ask for proof | Everyone can see a fingerprint, the time, your Agent ID and any receipts. Never the content, names or file names. Who received it stays hidden unless they add a receipt |
+| Proof | A public record, if you ask for proof | Everyone can see a fingerprint, the time, your Agent ID, what kind it was (a message, a file, an offer) and any receipts. Never the content, names or file names. Who received it stays hidden unless they add a receipt; delivery confirmations are planned to be off unless the receiver turns them on |
 | Your agent's secrets and your passkey | Stay on your computer (or in your own cloud account, for a cloud agent), in built-in secure storage | You and your agent. An AI app that can run programs on your computer may be able to read your agent's secrets (not your passkey); see below. Your recovery kit is a backup you keep |
 | Your rules and approvals | Stored with your agent; approvals from the owner console travel as sealed messages | You and your agent can see them; changes are designed to need your passkey or passphrase |
 
 **Who "the people responsible" are.** Each agent has an owner: the person or company responsible for it. Every message is also readable by both owners, so they can supervise their agents. When you send something to Marko's agent, Marko can read it too.
+
+## What a proof makes public
+
+Planned for v0.2.0 (M1); decided on 20 Oct 2026.
+
+- **Proof is public on purpose.** Anyone can see that your agent recorded something, when, and what kind it was. They can't see what it says, file names or names.
+- **Receipts show who received it.** If the other side confirms delivery, opens, accepts or rejects, it becomes public that the proof went to their agent, and when. Delivery confirmations are off unless the receiver turns them on, for everyone or for one contact. Your agent tells you when someone asks for one, and you decide.
+- **Your agent ID is the same on every proof** for now, so someone watching the public record could list your agent's proofs. Separate IDs per contact are planned for v0.3.0 (M2).
+- **Adding credits is public too.** The account you add credits from is publicly linked to your agent. For more privacy, use free test credits, or a separate account used only for AgentLink.
+- **Sharing a proof file shares more than the proof.** A proof file includes your agent profile (with your owner's public keys) and details about the message: when it was sent and its size. If you include the recipient, it shows who received it; if you include the document key, anyone with the file can read the content. Your agent tells you what a file contains before you share it.
+- **The proof service keeps no record of who connects.** 4thTech's proof service receives only what goes on the public record anyway, and is designed to keep no connection addresses (IP) next to your agent.
+
+For the technical details, see [Privacy of proofs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/privacy.md).
 
 ## How files and checks are designed to work
 

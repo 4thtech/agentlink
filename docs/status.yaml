@@ -14,7 +14,7 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-10-19"
+updated: "2026-10-20"
 version: "v0.1.1"
 versionLabel: "M1a, walking skeleton: pair and talk"
 milestone: "M1a Walking skeleton: pair and talk"
@@ -372,6 +372,31 @@ areas:
         state: in-progress
         prs: [82]
         summary: "Console, desktop apps, onboarding and more; partly in."
+  - id: privacy
+    title: "Privacy of proofs (D-109)"
+    intro: "Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which agent recorded it, when and what kind, and a receipt shows who received it. These items limit that. None is built yet."
+    components:
+      - name: "Delivery receipts off by default"
+        state: planned
+        summary: "M1b (M1-33a): a delivery receipt is signed only when the recipient's rules allow it for that contact or the recipient says yes to the sender's request, since it shows publicly who received a proof."
+      - name: "Plain-language disclosure"
+        state: planned
+        summary: "M1b (M1-33b): every proof, receipt, export and top-up screen says what becomes public and what stays private."
+      - name: "Record linking rule"
+        state: planned
+        summary: "M1b (M1-33c): a proof links only to the same agent's earlier proof, never to the other side's, so no link between two agents is published without a receipt."
+      - name: "Per-relationship signing addresses"
+        state: planned
+        summary: "M2 (M2-17a): a separate, unlinkable signing address for each contact, so one agent does not collect a public log of all its proofs."
+      - name: "Registry privacy"
+        state: planned
+        summary: "M2 (M2-17b): registration stays optional and publishes no guessable name or other identifier."
+      - name: "Delayed or batched receipts"
+        state: planned
+        summary: "M2 (M2-17c): optional random delay and batching, so receipt times do not show when an agent was online."
+      - name: "Service logging off"
+        state: planned
+        summary: "Ongoing (OPS-PRIV-1): the proof submitter and other 4thTech services keep no IP address next to an agent, with platform logging off and checked at every deploy."
 
 # The deploy state of the OCC v2 contracts and services. No addresses here (public-safe).
 deploy:
@@ -418,7 +443,7 @@ roadmap:
     stateNote: "started; building blocks merged, none usable from the tools yet"
     version: "0.2.0 (M1 gate)"
     duration: "~3–4 weeks"
-    outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI"
+    outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109)"
     gate: "10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement (completes M1, testnets)."
     progress: "Released in v0.1.1 as part of M1a hardening: live relay subscriptions, the claude-desktop setup option and Gemini CLI detection, clearer status and recovery messages, `owner change-code`, contact rename and remove, the invite approval naming who is inviting, and the Node.js 22.14 check. Merged, in development and not usable from the CLI or the MCP tools yet: STREAM file encryption, the Revocation typed data, the storage adapters with multipart upload and streaming encryption, the localhost approval server and page, the safe fetch and path guard, the files and proof policy rules, the proof hashing, file send and fetch in the core, the file tools in the MCP server (M1-9d-1), and the passkey and recovery-code backup formats. The encrypted drop Worker and its deploy pipeline are built, and the Worker is deployed to production (19 Oct 2026). The two-machine M1 gate run passed 17 of 17 for J1, J4, J8 and J9; J2, J3 and J5 wait for the M1b features. Merged for the next release: `agentlink policy allow-folder` for allowing folders for sending. Not started or not merged: the designed approval page, proofs and credits in the tools."
   - id: "M2"
@@ -426,7 +451,7 @@ roadmap:
     state: planned
     version: "0.3.0"
     duration: "~4–6+ weeks"
-    outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors"
+    outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109)"
     gate: "20 to 50 external early adopters on testnets; install to first message in under 5 minutes."
   - id: "M3"
     name: "Mainnet beta (Base, Gnosis)"
@@ -449,3 +474,10 @@ roadmap:
     duration: "rolling"
     outcome: "Deal records, payment linkage, arbitrator disclosure"
     gate: "Rolling, no single gate yet: deal records, x402 settlement linkage, arbitrator disclosure."
+  - id: "M6"
+    name: "Solana"
+    state: planned
+    version: "after M4"
+    duration: "rolling"
+    outcome: "Planned, no dates: after the EVM chains are covered, AgentLink on Solana, with programs equivalent to the notary and fee vault and client support (D-110); starts with a design spike"
+    gate: "Planned, no single gate yet: a design spike accepted by the owner (M6-1), then audited programs and client support; users still never pick a chain."
