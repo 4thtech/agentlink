@@ -189,6 +189,8 @@ interface Agent {
   markStuck: boolean;
   /** Sets the KeyStore mark directly (a rollback of the store, or a deleted KeyStore item). */
   setMark(value: number): void;
+  /** The receipts-kept KeyStore marker (04 §2.2, 06 §3, M1-33a): the version kept at, or null. */
+  kept: number | null;
 }
 
 /** The Node files platform's allowed-folder half: `~` expanded, realpath of each existing folder. */
@@ -224,6 +226,7 @@ async function makeAgent(n: number, name: string, net: RelayNetwork, home: strin
     setMark: (value: number) => {
       mark = value;
     },
+    kept: null as number | null,
   };
   const client = await AgentLinkClient.create({
     keyStore: new MemoryKeyStore(seed(n)),
@@ -239,6 +242,13 @@ async function makeAgent(n: number, name: string, net: RelayNetwork, home: strin
       raise: (v: number) => {
         if (!state.markStuck) mark = Math.max(mark, v);
         return Promise.resolve(mark);
+      },
+    },
+    receiptsKept: {
+      read: () => Promise.resolve(state.kept),
+      write: (v: number) => {
+        state.kept = v;
+        return Promise.resolve();
       },
     },
     logger: silent,
@@ -1052,5 +1062,112 @@ describe('policy recover † (D-100, 06 §3 G-6, §8)', () => {
     const result = await run(['policy', 'recover', 'now']);
     expect(result.code).toBe(2);
     expect(codeEntries).toEqual([]);
+  });
+});
+
+// --- M1-33a (D-109): delivery receipts on from an older default --------------------------------------
+
+/** The question the owner is asked (11 §5.6), as `ask` receives it. */
+const KEEP_QUESTION = /Keep delivery receipts on\?/;
+
+/** Alice's v2 rules as an older version signed them: invites automatic, delivery receipts on. */
+async function olderDefaultRules(): Promise<void> {
+  const policy = defaultPolicy();
+  policy.contacts.acceptInvites = 'auto';
+  policy.receipts.autoDelivered = true;
+  expect((await applyAsOwner(2, policy)).status).toBe('applied');
+}
+
+async function autoDelivered(): Promise<boolean> {
+  const policy = await loaded();
+  if (policy.mode === 'fail_closed') throw new Error('closed');
+  return policy.policy.receipts.autoDelivered;
+}
+
+describe('delivery receipts on from an older default (06 §3, D-109; M1-33a)', () => {
+  it('is reported before the first re-sign; a re-sign without a yes turns them off', async () => {
+    await olderDefaultRules();
+    expect(await alice.client.ownerActions.receiptsOnFromOlderDefault()).toBe(true);
+    answers = ['']; // just Enter
+    const result = await run(['policy', 'allow-folder', join(home, 'Work')]);
+    expect(result.code).toBe(0);
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).toMatch(KEEP_QUESTION);
+    expect(result.out.join('\n')).toMatch(/on from an older default/);
+    // The owner sees, before the owner code, that receipts turn off.
+    expect(summaries[0]).toMatch(/[Dd]elivery receipts turn off/);
+    expect(await version()).toBe(3);
+    expect(await folders()).toEqual([join(home, 'Work')]);
+    expect(await autoDelivered()).toBe(false);
+    expect(alice.kept).toBeNull();
+    expect(await alice.client.ownerActions.receiptsOnFromOlderDefault()).toBe(false);
+  });
+
+  it('anything but y turns them off', async () => {
+    await olderDefaultRules();
+    answers = ['yes please'];
+    expect((await run(['policy', 'allow-folder', join(home, 'Work')])).code).toBe(0);
+    expect(await autoDelivered()).toBe(false);
+  });
+
+  it('y keeps them on and records the marker; the next re-sign does not ask again', async () => {
+    await olderDefaultRules();
+    answers = ['y'];
+    const first = await run(['policy', 'allow-folder', join(home, 'Work')]);
+    expect(first.code).toBe(0);
+    expect(asked).toHaveLength(1);
+    expect(await autoDelivered()).toBe(true);
+    expect(alice.kept).toBe(3);
+    expect(summaries[0]).not.toMatch(/turn off/);
+    expect(await alice.client.ownerActions.receiptsOnFromOlderDefault()).toBe(false);
+
+    const second = await run(['policy', 'allow-folder', join(home, 'Other')]);
+    expect(second.code).toBe(0);
+    expect(asked).toHaveLength(1); // not asked again
+    expect(await version()).toBe(4);
+    expect(await autoDelivered()).toBe(true);
+    expect(alice.kept).toBe(3);
+  });
+
+  it('a wrong owner code changes nothing and records no marker', async () => {
+    await olderDefaultRules();
+    answers = ['y'];
+    ownerPresence = wrongPresence;
+    const result = await run(['policy', 'allow-folder', join(home, 'Work')]);
+    expect(result.code).toBe(1);
+    expect(await version()).toBe(2);
+    expect(alice.kept).toBeNull();
+    expect(await alice.client.ownerActions.receiptsOnFromOlderDefault()).toBe(true);
+  });
+
+  it('rules signed under the new default never ask', async () => {
+    const result = await run(['policy', 'allow-folder', join(home, 'Work')]);
+    expect(result.code).toBe(0);
+    expect(asked).toEqual([]);
+    expect(await autoDelivered()).toBe(false);
+  });
+
+  it('policy recover with the stored rules asks first, and the review shows the answer', async () => {
+    await olderDefaultRules();
+    alice.setMark(5);
+    expect(await problem()).toBe('rolled_back');
+    answers = ['', 'y']; // no to keeping receipts, then yes to the review
+    const result = await run(['policy', 'recover']);
+    expect(result.code).toBe(0);
+    expect(asked).toHaveLength(2);
+    expect(asked[0]).toMatch(KEEP_QUESTION);
+    expect(result.out.join('\n')).toMatch(/Tell the sender a message arrived: no/);
+    expect(await version()).toBe(6);
+    expect(await autoDelivered()).toBe(false);
+  });
+
+  it('fail closed is unchanged: allow-folder refuses and asks nothing about receipts', async () => {
+    await olderDefaultRules();
+    alice.setMark(5);
+    const result = await run(['policy', 'allow-folder', join(home, 'Work')]);
+    expect(result.code).toBe(1);
+    expect(asked).toEqual([]);
+    expect(codeEntries).toEqual([]);
+    expect(await alice.client.ownerActions.receiptsOnFromOlderDefault()).toBe(false);
   });
 });

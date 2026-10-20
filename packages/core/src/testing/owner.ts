@@ -33,6 +33,29 @@ export class MemoryPolicyMark implements PolicyVersionMark {
   }
 }
 
+/**
+ * The receipts-kept marker in memory (04 §2.2, 06 §3, D-109; M1-33a): the version at which the owner
+ * kept delivery receipts on, or null. The real one is a KeyStore item next to the policy mark.
+ */
+export class MemoryReceiptsKept {
+  value: number | null = null;
+  failRead = false;
+  failWrite = false;
+  writes: number[] = [];
+
+  read(): Promise<number | null> {
+    if (this.failRead) return Promise.reject(new Error('marker unreadable'));
+    return Promise.resolve(this.value);
+  }
+
+  write(version: number): Promise<void> {
+    if (this.failWrite) return Promise.reject(new Error('marker not written'));
+    this.writes.push(version);
+    this.value = version;
+    return Promise.resolve();
+  }
+}
+
 export const newNonce = (): string => encodeBase64url(randomBytes(16));
 export const newApprovalId = (): string => `apr_${encodeBase64url(randomBytes(16))}`;
 
