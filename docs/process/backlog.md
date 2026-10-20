@@ -1986,9 +1986,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 06 §2.4 (`needs_credits`), §8 (`credits --topup`); 08 §1
 - **Invariants:** I-5
 - **Scope:**
-  - Build the top-up link in the decided format from the shipped config; `needs_credits` `url` and `nextStep` per 06 §2.4; `agentlink credits --topup` prints the link and a terminal QR code and opens the browser when one is available.
+  - Build the top-up link in the decided format from the shipped config; `needs_credits` `url` and `nextStep` per 06 §2.4; `agentlink credits --topup` prints the link, the agent's address with a terminal QR code, and opens the browser when one is available.
+  - Agent-assisted funding (D-111, 06 §2.4): the skill file and server instructions tell the agent to explain the one step, share the link or address and QR, watch `credits` and confirm; never ask for keys, recovery codes or card details, never move funds.
 - **Acceptance:**
-  - Tests first: the link host comes only from the shipped config; no network, token or "wallet" in `nextStep` or the CLI default output.
+  - Tests first: the link host comes only from the shipped config; no network, token or "wallet" in `nextStep` or the CLI default output; no tool or `nextStep` asks for a key, recovery code or card detail.
 
 #### M1-34 · owner decision: who pays for receipts (new, D-111, DECISION NEEDED)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before receipts go live on testnets)
@@ -1997,7 +1998,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 12 §2, §11; 07 §7; `docs/design/topup-ux.md` §8
 - **Invariants:** I-1
 - **Scope:**
-  - The owner decides who pays for a receipt when the recipient has no credits on the record's network: A recipient pays; B the sender's proof fee covers up to 3 receipts and the submitter accepts them whatever the recipient holds, capped per record; C a small free allowance paid by 4thTech; D receipts deferred or skipped.
+  - The owner decides who pays for a receipt when the recipient has no credits on the record's network. Constraint (D-111): a user pays, never 4thTech (12 §1). Options: A recipient pays; B the sender's proof fee covers up to 3 receipts and the submitter accepts them whatever the recipient holds, capped per record; D receipts deferred or skipped. (A 4thTech-paid allowance is excluded.)
   - Recommendation: B, with D as the fallback when the submitter is unreachable; a recipient is never charged without asking.
   - Record the decision in 00; update 12 §2 and 07 §7; open follow-up cards for the submitter and, if needed, the contracts (private repo).
 - **Acceptance:**
@@ -4217,7 +4218,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Spec:** 08 §1 (top-up link), §2.2 (Credits), §2.3 (separate origin, pay page methods); 03 §4.4; 02 J3; 11 §6.7, §6.8; 12 §4.5
 - **Invariants:** I-1
 - **Scope:**
-  - The pay page shell (D-111): reads the top-up link (08 §1, M1-26-d), shows the short Agent ID, the balance and amount presets in USD, free test credits on testnets (faucet, M1-10b), and hosts the methods built in M2-18b (own account), M2-18c (exchange address and QR) and later M3-4c (card). Receives only the agent address; allowlisted stablecoins only (D-46). The only origin allowed to load an account connector.
+  - The pay page shell (D-111): reads the top-up link (08 §1, M1-26-d), shows the short Agent ID, the balance and amount presets in USD, free test credits on testnets (faucet, M1-10b), and hosts the methods built in M2-18b (own account), M2-18c (exchange address and QR) and, last, M3-4c (card, after D-15). Receives only the agent address; allowlisted stablecoins only (D-46). The only origin allowed to load an account connector.
   - Progress read in the browser from public RPC; nothing stored server-side; one privacy line per method (D-109).
   - Testnets in M2; mainnet enablement in M3-4a. Design brief: `docs/design/topup-ux.md`.
 - **Acceptance:**
@@ -4626,14 +4627,14 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Acceptance:**
   - Client IDs issued and provider reviews passed (or their status recorded) before M2-15b–M2-15d ship.
 
-#### M2-18a · card payment: approach and provider spike, with a legal check (new, D-111)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2 (decision before M3)
+#### M2-18a · card payment: approach and provider spike, with a legal check (new, D-111; last step)
+- **Status:** backlog (waits for D-15) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** last, after the legal entity is decided (D-15); not an M2 or M3 gate item
 - **Repo/path:** agentlink · docs (public trade-offs only); agentlink-ops (provider and legal notes)
-- **Depends on:** D-15 (entity), counsel (M3-7) for the legal part
-- **Spec:** 12 §4.5, §9; 08 §2.3; `docs/design/topup-ux.md` §3a
+- **Depends on:** D-15 (entity, decided first), counsel (M3-7) for the legal part
+- **Spec:** 12 §1, §4.5, §9; 08 §2.3; `docs/design/topup-ux.md` §3a
 - **Invariants:** I-1
 - **Scope:**
-  - Compare an on-ramp provider (sells a stablecoin delivered to the agent's address) with a 4thTech merchant account (`depositFor` after a card payment): identity checks and limits, countries, fees and minimums, refunds and chargebacks against withdrawable credits, D-47 and VAT, hosted checkout versus embedding (CSP), what the provider receives (only the agent address and the amount), privacy (D-109), sandbox availability for testnets.
+  - Every fee is the user's (12 §1). Compare an on-ramp provider (sells a stablecoin delivered to the agent's address) with a 4thTech merchant account (`depositFor` after a card payment): identity checks and limits, countries, fees and minimums, refunds and chargebacks against withdrawable credits, D-47 and VAT, hosted checkout versus embedding (CSP), what the provider receives (only the agent address and the amount), privacy (D-109), sandbox availability for testnets.
   - Present options and a recommendation to the owner; no vendor is chosen in the public repo before the owner decides.
 - **Acceptance:**
   - The owner's decision recorded in 00; 12 §4.5 and 08 §2.3 updated; M3-4c unblocked or re-scoped.
@@ -4825,18 +4826,6 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - The core refuses to sign a `ReceiveWithAuthorization` unless `to` equals the configured fee vault for that chain, and reads the token domain from chain (EIP-5267 `eip712Domain()`), never hard-coded (M1-1j, IR-M1-1j-1 L-1).
   - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
 - Review note (IR-M1-1j-1 L-1/L-2, 2026-10-17): acceptance: document the EIP-3009 recipient rule and per-chain token domain handling; add an `eip3009` vector case set.
-
-#### M3-4c · pay page: pay by card (new, D-111)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M3 (before the paid mainnet launch)
-- **Repo/path:** agentlink · apps/pay
-- **Depends on:** M2-18a (owner decision), M2-2f, M3-4a, M3-4b, M3-7
-- **Spec:** 08 §2.3; 12 §4.5, §9; 11 §6.7; `docs/design/topup-ux.md` §3a
-- **Invariants:** I-1
-- **Scope:**
-  - The decided card path through the provider's hosted checkout: the provider receives only the agent address and the amount; the fee is shown before paying; processing, failed and added states; the privacy line (D-109).
-- **Acceptance:**
-  - Tests first: nothing but the agent address and amount leaves the pay page for the provider; no provider script on the `pay.` origin unless the CSP review accepted it.
-  - A small real card top-up becomes credits on mainnet (recorded).
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -5120,6 +5109,18 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 
 Epics are decomposed into cards (same format, same rules) when the milestone starts. Each sub-card goes through the normal Definition of Ready.
 
+#### M3-4c · pay page: pay by card (new, D-111; last step)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** last: after the legal entity is decided (D-15) and after the crypto paths are live on mainnet (M3-4a, M3-4b); not an M3 gate item
+- **Repo/path:** agentlink · apps/pay
+- **Depends on:** D-15, M2-18a (owner decision), M2-2f, M2-18b, M2-18c, M3-4a, M3-4b, M3-7
+- **Spec:** 08 §2.3; 12 §4.5, §9; 11 §6.7; `docs/design/topup-ux.md` §3a
+- **Invariants:** I-1
+- **Scope:**
+  - The decided card path through the provider's hosted checkout: the provider receives only the agent address and the amount; the provider's fee is shown before paying and paid by the user (12 §1); processing, failed and added states; the privacy line (D-109).
+- **Acceptance:**
+  - Tests first: nothing but the agent address and amount leaves the pay page for the provider; no provider script on the `pay.` origin unless the CSP review accepted it.
+  - A small real card top-up becomes credits on mainnet (recorded).
+
 #### M4-EPIC · Expansion (rolling)
 - **Status:** backlog · **Size:** — · **Tier:** Opus (decomposition) · **Security:** S2 (contains S2 work)
 - **Repo/path:** agentlink, occ-v2-contracts
@@ -5194,7 +5195,7 @@ Sizes are effort, not calendar time. The M1a path has thirteen sequential M1 car
 | **C — M1a weeks 2–4** | Core: M1-7a → M1-7b → M1-7c → M1-7h → M1-7j; M1-7d → {M1-7e, M1-20} → M1-32 · Transport: M1-5a → M1-5b → M1-5c · Node: M1-8a → {M1-8b, M1-8c}; M1-8f in parallel, off the critical path · CLI: M1-9a → M1-9b · MCP: M1-9c → {M1-9e, M1-9g (after DESIGN-D1), M1-12a, M1-13b} · Install: M1-12b → M1-25 → M1-19 (invite page with prompt); M1-29 · E2E: M1-13a → M1-22 → **M1-23 (M1a gate)** · Spec follow-up: M1-30 (after D-53 merges) · M1b in parallel: M1-1d, M1-1j, M1-1k, M1-3c, M1-3e, M1-3f, M1-6a |
 | **D — M1b weeks 4–6** | Chain: M1-4a → {M1-4b → M1-26, M1-4d}, M1-3g → M1-4c · Storage: M1-6b → M1-6c · Drop: M1-27a → M1-27b · Core: M1-7f, M1-7i, M1-7g · Owner presence: M1-8d → M1-8e → M1-11a → M1-11c → M1-11b (after DESIGN-D1) · Submitter: M1-10a → M1-10b → M1-10c · CLI: M1-9h, M1-9i · Owner: M2-14 enrolment and M2-16 OAuth registrations start |
 | **E — M1b weeks 6–7** | M1-9d, M1-9f, M1-12c, M1-12d, M1-13c, M1-13d → M1-GATE |
-| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f → {M2-18b, M2-18c, M2-18d}, M2-2h · Top-up (D-111): M1-26-d → M1-26-e; M2-18a → M3-4c · Cloud: M2-3a → M2-3b → M2-3c → {M2-3d, M2-3e}, M2-2g · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
+| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f → {M2-18b, M2-18c, M2-18d}, M2-2h · Top-up (D-111, crypto first): M1-26-d → M1-26-e; card last: D-15 → M2-18a → M3-4c · Cloud: M2-3a → M2-3b → M2-3c → {M2-3d, M2-3e}, M2-2g · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
 | **M3** | M3-12 and M3-2a first · Audits: M3-1a, M3-1b · Governance: M3-2b → M3-2c → {M3-3, M3-4a, M3-5, M3-6} · M3-4b · M3-7, M3-8, M3-9 · M3-14, M3-15, M3-16 (after M3-3) · M3-10 → M3-11 → M3-GATE |
 
 ### 7.3 M2 critical path

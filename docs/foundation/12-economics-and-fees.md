@@ -15,6 +15,7 @@
 5. **One price on every chain.** The client picks the proof network automatically (D-40), so the price must not depend on it.
 6. **Bounded and transparent.** Hard caps on-chain, a public schedule, advance notice of increases, and quotes anyone can check.
 7. **Non-custodial.** Prepaid credits stay yours and can be withdrawn at any time.
+8. **Users pay every cost (D-111).** Fees, network costs, receipts and the costs of adding credits are paid by users; 4thTech subsidises none of them. Submitter network costs are recovered from the user-paid prices (§2). The testnet faucet is the only exception, and only on testnets. *Open for the owner:* the encrypted drop's storage, borne by 4thTech today (§2, D-48), predates this rule.
 
 ---
 
@@ -108,10 +109,12 @@ How a user adds credits on the pay page (08 §2.3). Design brief: `docs/design/t
 | Path | How the funds arrive | Fees the user sees | Status |
 |---|---|---|---|
 | **Free test credits** (testnets) | Faucet `depositFor` (05 §9, M1-10b) | None | Testnets only |
-| **Pay by card** (default) | A regulated provider delivers a US-dollar stablecoin to the agent's address; the agent turns it into credits without network fees (gasless top-up, §4.1) | The provider's fee and minimum, shown before paying; AgentLink adds none | Open: on-ramp or 4thTech merchant account, provider, countries, who pays the provider fee (M2-18a); live before the paid mainnet launch (M3-4c) |
+| **Pay by card** (last step) | A regulated provider delivers a US-dollar stablecoin to the agent's address; the agent turns it into credits without network fees (gasless top-up, §4.1) | The provider's fee and minimum, shown before paying; AgentLink adds none | Last step, after the legal entity (D-15) and after the crypto paths are live (M3-4c); open: on-ramp or 4thTech merchant account, provider, countries (M2-18a); the provider fee is the user's (§1) |
 | **Use crypto you already have** | One transfer of the exact amount from the user's own account to the agent's address, then gasless top-up; optional two-step `depositFor` under Advanced (open) | The network's own fee for the transfer, paid by the user's account | Testnets in M2 (M2-18b) |
 | **Send from an exchange** | Transfer to the agent's address on the named network, then gasless top-up | The exchange's withdrawal fee | Testnets in M2 (M2-18c) |
 
+- **Crypto first (D-111).** The address-based paths are the product; nothing waits for the card path.
+- **Network cost of gasless top-ups.** The submitter pays it at submission; under §1 it is recovered from the user-paid prices. Whether a deposit fee is ever needed is open (owner).
 - **Minimums.** The address-based paths need at least the gasless minimum (`minDeposit`, proposed $5, §4.1); the card path has the provider's minimum.
 - **Card path and D-47.** The on-ramp approach keeps AgentLink charging only in stablecoins (the provider sells the stablecoin); a 4thTech merchant account selling credits for fiat would amend D-47 and depends on the entity (D-15) and the VAT assessment (§9, M3-7). Because credits are withdrawable (§4.1), a merchant account also carries chargeback cash-out risk.
 - **Zero access.** A provider receives only the agent's address and the amount.
@@ -188,7 +191,7 @@ All figures are **estimates** and move with network prices.
 ## 9. Payments and legal stance (D-47)
 
 - **Crypto only during beta.** Fees are paid in the stablecoins in §3. There is no card or bank payment.
-- **Card payment (D-111, direction).** A card path is planned before the paid mainnet launch (§4.5). Its approach (an on-ramp provider selling stablecoin, or a 4thTech merchant account) is an owner decision that waits on the entity (D-15) and counsel (M3-7).
+- **Card payment (D-111).** A card path is the last step (§4.5), after the entity is decided (D-15). Its approach (an on-ramp provider selling stablecoin, or a 4thTech merchant account) is an owner decision that also needs counsel (M3-7).
 - **Operating entity:** to be decided (D-15); intended to be outside the EU.
 - **Tax.** Counsel will assess tax and VAT treatment, including for consumers in the EU, before the paid mainnet launch (M3-7). Paying in crypto is not assumed to change the tax treatment.
 - This document describes the protocol and its fee mechanics. It is **not legal or tax advice**.
@@ -219,6 +222,8 @@ Sybil considerations:
 | Paid larger drop quotas (D-48) | Owner, later; not offered now |
 | Billing profiles: data protection and VAT, accounting treatment of stablecoin revenue (§7.1, D-50) | Counsel and owner (M3-7) |
 | Indexer for the internal finance dashboard (D-50) | Owner (M4) |
-| Card path: on-ramp or merchant account, provider, countries, who pays the provider fee (§4.5, D-111) | Owner, after the spike and counsel check (M2-18a) |
+| Card path (last step): on-ramp or merchant account, provider, countries (§4.5, D-111) | Owner, after the entity (D-15), the spike and counsel check (M2-18a) |
+| Recovering the network cost of gasless top-ups from users (§1, §4.5) | Owner (M3-3) |
+| Encrypted drop storage borne by 4thTech against the users-pay rule (§1, D-48) | Owner |
 | Top-up link format (08 §1, D-111) | Owner (M1-26-d) |
-| Who pays for receipts when the recipient has no credits on the record's network (D-111; recommendation: the sender's proof fee covers up to 3 receipts, deferred posting as the fallback) | Owner (M1-34) |
+| Who pays for receipts when the recipient has no credits on the record's network (D-111; must be user-paid, §1; recommendation: the sender's proof fee covers up to 3 receipts, deferred posting as the fallback) | Owner (M1-34) |
