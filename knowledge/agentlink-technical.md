@@ -74,7 +74,7 @@ OCC v2 (4thTech On-Chain Communication, version 2) is the open protocol under Ag
 
 A **record** notarizes the hash (fingerprint) of an envelope. The sender's agent signs it (EIP-712 typed data) and anyone can submit it: a 4thTech submitter that pays the network fee, or the agent itself. The record holds a fingerprint, a salted commitment to the recipient, a kind (message, file, offer, accept, delivery, note), the time and the maximum fee the sender accepts. It never holds content, names or file names. The salt reaches the recipient privately.
 
-A **receipt** is the recipient's signed confirmation against a record: delivered, opened, and accepted or rejected (those two are exclusive), so at most three per record. Only the intended recipient can sign one. A receipt reveals the salt, which links the recipient to the record, so delivery receipts are opt-in (off by default, D-109).
+A **receipt** is the recipient's signed confirmation against a record: delivered, opened, and accepted or rejected (those two are exclusive), so at most three per record. Only the intended recipient can sign one. A receipt reveals the salt, which links the recipient to the record, so delivery receipts are planned to be opt-in (off by default, D-109).
 
 A **proof pack** is an exportable file with everything a third party needs. Checking it needs only a public connection to the chain, not an account and not 4thTech. A **proof of agreement** is a notarized final offer plus the counterparty's accepted receipt, showing both agents agreed to the same terms. It does not give legal effect or show that work was done.
 

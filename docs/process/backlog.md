@@ -3557,7 +3557,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
 - **Invariants:** I-1, I-2, I-5, I-6
 - **Scope:**
-  - Extends the M1-13a scenario: a 5 MB file with zero storage setup (encrypted drop, D-48), notarize, DELIVERED and OPENED, export and verify the proof pack.
+  - Extends the M1-13a scenario: a 5 MB file with zero storage setup (encrypted drop, D-48), notarize, DELIVERED and OPENED, export and verify the proof pack. Since D-109, DELIVERED needs a contact rule with `receipts.autoDelivered: true` or an explicit `agentlink_acknowledge` with `delivered`, and OPENED an explicit acknowledge; the scenario sets one up and also checks that none is signed under the defaults.
   - J8 with proof of agreement: extends M1-22; the final `terms` are notarized, the counterparty's ACCEPTED receipt is signed after owner approval, and the exported pack verifies as a proof of agreement. Both shapes (accept recorded; offer recorded, including an offer recorded after the accept): each owner sees exactly one approval for the agreement (D-55).
   - Deterministic variant on local relays, MinIO, a local drop Worker (Miniflare) and testnets or anvil forks; LLM variant on a schedule against the staging drop.
 - **Acceptance:**
@@ -3694,6 +3694,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A `receiptRequest` alone never signs anything; the user's `agentlink_acknowledge {type: "delivered"}` signs exactly one; a malformed `receiptRequest` refuses the body.
   - No tool can set the contact rule (I-4); the summaries carry the 11 §5.6 lines.
   - Lands before the first release that ships proofs, or carries a release gate like M1-7g-b.
+  - Older policies (D-109, owner decision 2026-10-20): a policy signed under the old default with `autoDelivered: true`, re-signed for any other change, ends with `autoDelivered: false` unless the owner explicitly keeps `true`; while it remains `true` from the old default, `agentlink doctor` shows "Delivery receipts are on from an older default; they will turn off unless you keep them." (one test each).
 
 #### M1-33b · Proof privacy disclosure in tools, CLI, local UI and docs (new, D-109)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -4464,6 +4465,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Scope:**
   - First an architecture task (Opus, with an independent review): the derivation label and `info`, per relationship or per proof; the binding signatures and where they travel (handshake, card-update, proof pack, never on-chain); the recipient's relationship address in the commitment; how fees are paid without funding each address (a payer separate from the signer, or submitter-held credits), as a decision for the owner.
   - Then the build, including the verifier's `verified` path with the binding, and contract changes before the M3 audit scope is frozen.
+- **Open points for the design:** interplay with automatic chain selection (07 §6.3: credits and funding per relationship address per chain) and with the submitter's per-signer rate limits and cooling-off (07 §7), which would count per relationship address.
 - **Acceptance:**
   - Two contacts' records from one agent show different, unlinkable signer addresses on-chain; a pack still verifies to the agent's card; no deposit links a relationship address to the identity address or to another relationship address.
 
