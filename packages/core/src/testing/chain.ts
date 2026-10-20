@@ -105,6 +105,11 @@ export class FakeNotary implements ChainState {
    */
   readsFail = false;
   /**
+   * The chain-state port's `getRecord` rejects (an RPC outage seen through `ChainState`, M1-33c).
+   * Off by default; the read client is not affected.
+   */
+  stateReadsFail = false;
+  /**
    * Contract accounts (ERC-1271, 05 §3.2): an address listed here has code, and its
    * `isValidSignature` accepts every signature when the value is true and none when it is false.
    */
@@ -143,6 +148,7 @@ export class FakeNotary implements ChainState {
   // --- ChainState ----------------------------------------------------------------------------------
 
   getRecord(recordId: Hex): Promise<StoredRecord | null> {
+    if (this.stateReadsFail) return Promise.reject(new Error('fake chain: unavailable'));
     const s = this.records.get(recordId.toLowerCase());
     return Promise.resolve(
       s === undefined

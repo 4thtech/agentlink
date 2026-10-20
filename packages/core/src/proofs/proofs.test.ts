@@ -1381,7 +1381,11 @@ async function signedRecordOf(
   to: Agent,
   envelopeId: string,
   kind: number,
-  options: { readonly put?: boolean; readonly envelopeHash?: string } = {},
+  options: {
+    readonly put?: boolean;
+    readonly envelopeHash?: string;
+    readonly parentRecordId?: string;
+  } = {},
 ): Promise<SignedRecord> {
   const built = buildRecord({
     chainId: chain.config.chainId,
@@ -1389,6 +1393,7 @@ async function signedRecordOf(
     signer: from.id,
     envelopeHash: options.envelopeHash ?? (await envelopeHashOf(from, envelopeId)),
     recipient: to.id,
+    ...(options.parentRecordId === undefined ? {} : { parentRecordId: options.parentRecordId }),
     kind: kind as never,
     feeToken: USDC,
     maxFee: FEE_UNITS,
@@ -1465,3 +1470,242 @@ async function sendRawProof(from: Agent, to: Agent, body: ProofBodyIn) {
   await to.client.proofs.processInbound(reports);
   return reports;
 }
+
+// --- M1-33c: the parentRecordId rule (D-109; 05 §3.1, 04 §5.1, 04 §3.4 parent check) -----------
+
+const ZERO32 = `0x${'0'.repeat(64)}`;
+const ownRecord = async (agent: Agent, recordId: string) =>
+  parseJson((await proofRows(agent)).find((r) => r.record_id === recordId)!.record_json) as {
+    record: RecordJson;
+  };
+
+describe('the sender sets parentRecordId only to zero or its own record (D-109, 05 §3.1)', () => {
+  /** A and B paired, both funded; `own` is A's earlier record, `foreign` is B's record. */
+  async function withRecords() {
+    const { a, b } = await twoAgents();
+    chain.fund(b.id, 10n * FEE_UNITS);
+    const first = await sendText(a, b, 'version one');
+    const own = (await a.client.notarize({ envelopeId: first })) as { recordId: Hex };
+    const fromB = await sendText(b, a, 'a reply');
+    const foreign = (await b.client.notarize({ envelopeId: fromB })) as { recordId: Hex };
+    const envelopeId = await sendText(a, b, 'version two');
+    return { a, b, own: own.recordId, foreign: foreign.recordId, envelopeId };
+  }
+
+  /** Nothing new is signed, stored, reserved or charged for `envelopeId` (04 §5). */
+  async function nothingSigned(
+    a: Agent,
+    envelopeId: string,
+    before: { calls: number; credit: bigint },
+  ) {
+    expect((await proofRows(a)).filter((r) => r.envelope_id === envelopeId)).toEqual([]);
+    expect((await ledger(a)).filter((e) => e.state === 'reserved')).toEqual([]);
+    expect(await ledger(a)).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(before.calls);
+    expect(chain.creditOf(a.id)).toBe(before.credit);
+  }
+
+  it('by default the Record carries parentRecordId zero', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId })) as { recordId: Hex };
+    expect(onChain(proof.recordId)?.record.parentRecordId).toBe(ZERO32);
+    expect((await ownRecord(a, proof.recordId)).record.parentRecordId).toBe(ZERO32);
+  });
+
+  it('an explicit zero parent is the default: recorded with zero', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = await a.client.notarize({ envelopeId, parentRecordId: ZERO32 } as never);
+    expect(proof).toMatchObject({ status: 'ok' });
+    const recordId = (proof as { recordId: Hex }).recordId;
+    expect(onChain(recordId)?.record.parentRecordId).toBe(ZERO32);
+  });
+
+  it('a parent the chain shows signed by this agent is accepted and recorded', async () => {
+    const { a, own, envelopeId } = await withRecords();
+    const proof = await a.client.notarize({ envelopeId, parentRecordId: own } as never);
+    expect(proof).toMatchObject({ status: 'ok' });
+    const recordId = (proof as { recordId: Hex }).recordId;
+    expect(onChain(recordId)?.record.parentRecordId).toBe(own);
+    expect((await ownRecord(a, recordId)).record.parentRecordId).toBe(own);
+  });
+
+  it('a parent signed by another agent is refused: nothing signed or charged', async () => {
+    const { a, foreign, envelopeId } = await withRecords();
+    const before = { calls: chain.calls.notarize, credit: chain.creditOf(a.id) };
+    expect(await a.client.notarize({ envelopeId, parentRecordId: foreign } as never)).toEqual({
+      status: 'rejected',
+      code: 'PARENT_NOT_OWN',
+    });
+    await nothingSigned(a, envelopeId, before);
+  });
+
+  it('a parent the chain does not hold is refused: nothing signed or charged', async () => {
+    const { a, envelopeId } = await withRecords();
+    const before = { calls: chain.calls.notarize, credit: chain.creditOf(a.id) };
+    expect(
+      await a.client.notarize({ envelopeId, parentRecordId: `0x${'ab'.repeat(32)}` } as never),
+    ).toEqual({ status: 'rejected', code: 'PARENT_NOT_OWN' });
+    await nothingSigned(a, envelopeId, before);
+  });
+
+  it.each([
+    ['upper-case hex', (id: string) => `0x${id.slice(2).toUpperCase()}`],
+    ['too short', (id: string) => id.slice(0, 40)],
+    ['not hex', () => `0x${'zz'.repeat(32)}`],
+    ['not a string', () => 7 as unknown as string],
+  ])('a malformed parent (%s) is refused: nothing signed or charged', async (_c, spell) => {
+    const { a, own, envelopeId } = await withRecords();
+    const before = { calls: chain.calls.notarize, credit: chain.creditOf(a.id) };
+    expect(await a.client.notarize({ envelopeId, parentRecordId: spell(own) } as never)).toEqual({
+      status: 'rejected',
+      code: 'PARENT_NOT_OWN',
+    });
+    await nothingSigned(a, envelopeId, before);
+  });
+
+  it('a failed chain read refuses (fail closed): nothing signed or charged', async () => {
+    const { a, own, envelopeId } = await withRecords();
+    const before = { calls: chain.calls.notarize, credit: chain.creditOf(a.id) };
+    chain.stateReadsFail = true;
+    expect(await a.client.notarize({ envelopeId, parentRecordId: own } as never)).toEqual({
+      status: 'rejected',
+      code: 'CHAIN_UNAVAILABLE',
+    });
+    chain.stateReadsFail = false;
+    await nothingSigned(a, envelopeId, before);
+  });
+
+  it('under an approval policy a foreign parent is refused before any approval is asked', async () => {
+    const { a, foreign, envelopeId } = await withRecords();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await a.client.notarize({ envelopeId, parentRecordId: foreign } as never)).toEqual({
+      status: 'rejected',
+      code: 'PARENT_NOT_OWN',
+    });
+    expect(await a.store.transaction((tx) => tx.select('approvals'))).toEqual([]);
+  });
+
+  it('an approval for a Record without a parent does not cover one with a parent', async () => {
+    const { a, own, envelopeId } = await withRecords();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const pending = await a.client.notarize({ envelopeId });
+    expect(pending.status).toBe('pending_approval');
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    expect(
+      await a.client.notarize({ envelopeId, parentRecordId: own, approvalId } as never),
+    ).toEqual({ status: 'rejected', code: 'APPROVAL_INVALID' });
+  });
+
+  it('a replacement keeps the original parentRecordId', async () => {
+    const { a, own, envelopeId } = await withRecords();
+    chain.censor = true;
+    const first = await a.client.notarize({ envelopeId, parentRecordId: own } as never);
+    expect(first.status).toBe('submitted');
+    const firstId = (first as { recordId: string }).recordId;
+    clock.t += 3601 + 60;
+    chain.censor = false;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1 });
+    const replacement = (await proofRows(a)).find(
+      (r) => r.envelope_id === envelopeId && r.record_id !== firstId,
+    )!;
+    expect(onChain(replacement.record_id)?.record.parentRecordId).toBe(own);
+  });
+});
+
+describe('the recipient drops a Record whose parent is another signer’s (04 §3.4 parent check; contact flag pending M1-7g-c)', () => {
+  async function received(parent: (ctx: { a: Agent; b: Agent }) => Promise<string>) {
+    const { a, b } = await twoAgents();
+    chain.fund(b.id, 10n * FEE_UNITS);
+    const parentRecordId = await parent({ a, b });
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { parentRecordId });
+    return { a, b, envelopeId, rec };
+  }
+
+  const aOwn = async ({ a, b }: { a: Agent; b: Agent }) => {
+    const earlier = await sendText(a, b, 'version one');
+    return ((await a.client.notarize({ envelopeId: earlier })) as { recordId: Hex }).recordId;
+  };
+  const bOwn = async ({ a, b }: { a: Agent; b: Agent }) => {
+    const reply = await sendText(b, a, 'a reply');
+    return ((await b.client.notarize({ envelopeId: reply })) as { recordId: Hex }).recordId;
+  };
+
+  async function expectDroppedParent(out: { b: Agent; envelopeId: string }, acksBefore: number) {
+    expect(await receipts(out.b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(acksBefore);
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toBeUndefined();
+    expect(await pendingRows(out.b)).toEqual([]);
+    expect(logged(out.b, 'proof_parent_mismatch')).toBe(true);
+    const ack = await out.b.client.acknowledge({ envelopeId: out.envelopeId, type: 'opened' });
+    expect(ack.status).toBe('rejected');
+    expect(chain.calls.acknowledge).toBe(acksBefore);
+  }
+
+  it('a parent signed by the same signer passes and the record is stored', async () => {
+    const out = await received(aOwn);
+    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toMatchObject({
+      recordId: out.rec.recordId,
+    });
+    expect(logged(out.b, 'proof_parent_mismatch')).toBe(false);
+  });
+
+  it('a parent signed by another agent (the recipient’s own record) is dropped and logged: no receipt', async () => {
+    const out = await received(bOwn);
+    const acks = chain.calls.acknowledge;
+    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    await expectDroppedParent(out, acks);
+  });
+
+  it('a parent the chain does not hold is dropped and logged: no receipt', async () => {
+    const out = await received(() => Promise.resolve(`0x${'ab'.repeat(32)}`));
+    const acks = chain.calls.acknowledge;
+    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    await expectDroppedParent(out, acks);
+  });
+
+  it('a failed parent read signs no receipt and is tried again at the next sync (then dropped)', async () => {
+    const out = await received(bOwn);
+    const acks = chain.calls.acknowledge;
+    chain.stateReadsFail = true;
+    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    expect(await receipts(out.b)).toEqual([]);
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toBeUndefined();
+    expect(await pendingRows(out.b)).toHaveLength(1);
+    expect(logged(out.b, 'proof_parent_mismatch')).toBe(false);
+    chain.stateReadsFail = false;
+    await out.b.client.proofs.processInbound([]);
+    await expectDroppedParent(out, acks);
+  });
+
+  it('a failed read of an own parent passes once the read recovers', async () => {
+    const out = await received(aOwn);
+    chain.stateReadsFail = true;
+    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    expect(await pendingRows(out.b)).toHaveLength(1);
+    chain.stateReadsFail = false;
+    await out.b.client.proofs.processInbound([]);
+    expect(await pendingRows(out.b)).toEqual([]);
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toMatchObject({
+      recordId: out.rec.recordId,
+    });
+  });
+
+  it('a zero parent needs no read: stored while chain-state reads fail', async () => {
+    const out = await received(() => Promise.resolve(ZERO32));
+    chain.stateReadsFail = true;
+    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    chain.stateReadsFail = false;
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toMatchObject({
+      recordId: out.rec.recordId,
+    });
+  });
+});

@@ -218,6 +218,28 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
     expect(r3.text).not.toContain('rpc.example');
   });
 
+  it('M1-9h-b: no known fee prints no empty "( each)" clause', async () => {
+    const t = setup({
+      account: { credits: ACCOUNT.credits, prices: [] },
+      topUp: (agentId) =>
+        Promise.resolve({
+          status: 'needs_credits',
+          topUp: {
+            chainId: 84532,
+            chain: 'base-sepolia',
+            token: 'USDC',
+            usd: '1',
+            feeUsd: 'not-a-number',
+            agentAddress: agentId as chain.Hex,
+          },
+          unavailable: [],
+        }),
+    });
+    const r = await t.run(['credits', '--topup']);
+    expect(r.text).toContain('Add at least $1.00 in credits to add proof.');
+    expect(r.text).not.toMatch(/\(\s*each\)/);
+  });
+
   it('the default check refuses a malformed agent ID before any request', async () => {
     let fetched = 0;
     const check = nodeTopUpCheck({

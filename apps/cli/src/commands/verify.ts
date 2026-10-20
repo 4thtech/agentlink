@@ -28,8 +28,8 @@ import process from 'node:process';
 import * as chain from '@4thtech-io/chain';
 import { renderContactName } from '@4thtech-io/core';
 import { decodeHex0x, formatFingerprint, ownerFingerprint } from '@4thtech-io/crypto';
-import { nodeRpcFetch } from '@4thtech-io/node';
 import { DISPATCH_TEXT, EXIT_FAILED, EXIT_USAGE, type CommandHandler } from '../dispatch.js';
+import { createPackVerifier } from '../runtime/pack-verifier.js';
 import { nodeProofPacks } from '../runtime/proofs.js';
 import { terminalOneLine, untrustedRegion } from '../terminal/sanitize.js';
 import type { PackFolders, PackReadOutcome } from '../tools/context.js';
@@ -71,14 +71,8 @@ export interface NodePackVerifierOptions {
  * Notary address always comes from the shipped config, never from the pack.
  */
 export function nodePackVerifier(options: NodePackVerifierOptions = {}): PackVerifier {
-  let readers: chain.VerifyChain[] | undefined;
-  return (bytes) => {
-    readers ??= (options.configs ?? chain.chainRegistry()).map((config) => ({
-      config,
-      client: chain.createReadClient(config, { fetchFn: options.fetchFn ?? nodeRpcFetch() }),
-    }));
-    return chain.verifyProofPack(bytes, { chains: readers });
-  };
+  const verify = createPackVerifier(options);
+  return (bytes) => verify(bytes);
 }
 
 /** Fixed text (11 §5: "public record", "proof network" only in proof details; no chain words). */
@@ -337,7 +331,7 @@ export async function renderVerifyResult(
     case 'unattributed':
       lines.push(
         fill(VERIFY_CLI_TEXT.contentUnattributed, {
-          message: VERIFY_CONTENT_TEXT[content.reason],
+          message: VERIFY_CONTENT_TEXT[content.reason] ?? VERIFY_CONTENT_TEXT.payload_invalid,
         }),
       );
       payload = content.payload;
