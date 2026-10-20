@@ -194,6 +194,28 @@ describe('verify: the verdict first, the test network labelled (D-95, 05 §9.1 (
     expect(vocabularyHits(r.text)).toEqual([]);
   });
 
+  it('M1-9h-b: an unattributed content reason with no wording yet gets a fallback sentence', async () => {
+    const t = setup({
+      verify: () =>
+        Promise.resolve(
+          valid({
+            verdict: 'record_only',
+            contentVerified: true,
+            content: {
+              status: 'unattributed',
+              reason: 'some_future_reason' as never,
+              message: 'x',
+              payload: { type: 'text', text: 'hello' } as never,
+              sender: 'ab'.repeat(32),
+            },
+          }),
+        ),
+    });
+    const r = await t.run(['verify', 'p.json']);
+    expect(r.text).not.toContain('undefined');
+    expect(r.text).toContain(`Warning  Content: ${VERIFY_CONTENT_TEXT.payload_invalid}`);
+  });
+
   it('a chain this release does not mark as a known mainnet is labelled a test network', async () => {
     const t = setup({
       verify: () => Promise.resolve(valid({ chainId: 10200, chain: 'gnosis-chiado' })),
