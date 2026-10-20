@@ -44,7 +44,7 @@ Files, proof, credits and the apps are **in development or planned**; they are n
 > - **Chain client (@4thtech-io/chain):** 5 merged
 > - **Core (@4thtech-io/core):** 18 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
-> - **MCP server, CLI and apps:** 4 merged, 5 in progress, 1 planned
+> - **MCP server, CLI and apps:** 4 merged, 5 in progress, 2 planned
 > - **OCC v2 contracts (private repo):** 3 merged, 1 in progress, 1 planned
 > - **Design:** 1 merged, 1 in progress
 > - **Privacy of proofs (D-109):** 7 planned
