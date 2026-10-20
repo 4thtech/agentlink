@@ -1,7 +1,0 @@
----
-'@4thtech-io/chain': patch
----
-
-M1-4c: submission, direct mode and inclusion tracking (07 §6.2, §7; 04 §5, §7). `createProofSubmitter` sends a signed Record or Receipt through up to five submitters, then direct mode from the agent's own account (the same one-item `notarizeBatch` when credits cover the fee, otherwise `notarizeDirect`, which pays now after an exact `approve(maxFee)` or with `maxFee` as the native value; `acknowledge` for receipts), and decides every outcome from chain reads (`recorded`, `needs_credits`, `pending`, `failed`, `conflict`); it signs nothing and resends only the same signed item. `replacementAllowed` is the 04 §5 check at the `finalized` block (or the configured depth). `readInclusion` tracks inclusion and confirmations. `createChainState` is the read port; `sendDirect` simulates, has an injected `DirectSigner` sign, checks the signed bytes and broadcasts through `createBroadcaster` (address-checked fetch only). Deposits: `buildDeposit` takes the current allowance (exact reuse, or a reset to 0 first for USDT-style tokens), `planDeposit` reads it, `sendDeposit` checks the steps against the request (token, amount, values, order), sends them and then clears the selector and selects again once; `checkGaslessTopUp` enforces the `eip3009` flag and `minDeposit` and builds nothing (D-89). `selectAgain` clears the selection cache and selects once.
-
-The default submitter at submit.agentlink.4thtech.io is not deployed yet, so proofs need it before they work out of the box.
