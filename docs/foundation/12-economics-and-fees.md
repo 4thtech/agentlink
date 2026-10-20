@@ -101,6 +101,22 @@ Without credits, a payer can call the module's direct function (e.g. `notarizeDi
 
 Official clients use `appId = 0`: no integrator fee.
 
+### 4.5 Funding paths (D-111; direction, owner decides details)
+
+How a user adds credits on the pay page (08 §2.3). Design brief: `docs/design/topup-ux.md`.
+
+| Path | How the funds arrive | Fees the user sees | Status |
+|---|---|---|---|
+| **Free test credits** (testnets) | Faucet `depositFor` (05 §9, M1-10b) | None | Testnets only |
+| **Pay by card** (default) | A regulated provider delivers a US-dollar stablecoin to the agent's address; the agent turns it into credits without network fees (gasless top-up, §4.1) | The provider's fee and minimum, shown before paying; AgentLink adds none | Open: on-ramp or 4thTech merchant account, provider, countries, who pays the provider fee (M2-18a); live before the paid mainnet launch (M3-4c) |
+| **Use crypto you already have** | One transfer of the exact amount from the user's own account to the agent's address, then gasless top-up; optional two-step `depositFor` under Advanced (open) | The network's own fee for the transfer, paid by the user's account | Testnets in M2 (M2-18b) |
+| **Send from an exchange** | Transfer to the agent's address on the named network, then gasless top-up | The exchange's withdrawal fee | Testnets in M2 (M2-18c) |
+
+- **Minimums.** The address-based paths need at least the gasless minimum (`minDeposit`, proposed $5, §4.1); the card path has the provider's minimum.
+- **Card path and D-47.** The on-ramp approach keeps AgentLink charging only in stablecoins (the provider sells the stablecoin); a 4thTech merchant account selling credits for fiat would amend D-47 and depends on the entity (D-15) and the VAT assessment (§9, M3-7). Because credits are withdrawable (§4.1), a merchant account also carries chargeback cash-out risk.
+- **Zero access.** A provider receives only the agent's address and the amount.
+- **Privacy.** Each path's public link between the paying account and the agent is stated once on the pay page (D-109).
+
 ---
 
 ## 5. Integrator fees
@@ -172,6 +188,7 @@ All figures are **estimates** and move with network prices.
 ## 9. Payments and legal stance (D-47)
 
 - **Crypto only during beta.** Fees are paid in the stablecoins in §3. There is no card or bank payment.
+- **Card payment (D-111, direction).** A card path is planned before the paid mainnet launch (§4.5). Its approach (an on-ramp provider selling stablecoin, or a 4thTech merchant account) is an owner decision that waits on the entity (D-15) and counsel (M3-7).
 - **Operating entity:** to be decided (D-15); intended to be outside the EU.
 - **Tax.** Counsel will assess tax and VAT treatment, including for consumers in the EU, before the paid mainnet launch (M3-7). Paying in crypto is not assumed to change the tax treatment.
 - This document describes the protocol and its fee mechanics. It is **not legal or tax advice**.
@@ -202,3 +219,6 @@ Sybil considerations:
 | Paid larger drop quotas (D-48) | Owner, later; not offered now |
 | Billing profiles: data protection and VAT, accounting treatment of stablecoin revenue (§7.1, D-50) | Counsel and owner (M3-7) |
 | Indexer for the internal finance dashboard (D-50) | Owner (M4) |
+| Card path: on-ramp or merchant account, provider, countries, who pays the provider fee (§4.5, D-111) | Owner, after the spike and counsel check (M2-18a) |
+| Top-up link format (08 §1, D-111) | Owner (M1-26-d) |
+| Who pays for receipts when the recipient has no credits on the record's network (D-111; recommendation: the sender's proof fee covers up to 3 receipts, deferred posting as the fallback) | Owner (M1-34) |

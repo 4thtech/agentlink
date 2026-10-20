@@ -249,6 +249,8 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 
 **No network picker outside Advanced** (D-40). The client picks the proof network automatically. It never appears in default flows, top-ups or approvals.
 
+**Adding credits (D-111; copy proposals, owner decides).** Method labels: "Pay by card", "Use crypto you already have", "Send from an exchange". The connect method's helper says "the app or browser extension where you hold US-dollar stablecoins", not "wallet"; the word appears only inside the third-party connector and under Advanced (open: the owner may allow it in this one optional label). The only default text that names a network is the exchange method's "Network: …" line, because the exchange asks for it (§6.7, §14 Q5). In chat: "Adding proof needs credits. Add at least $0.10 here: {link}. $5 covers 50 proofs." (06 §2.4).
+
 ### 5.2 Identity labels and identifiers
 
 Labels, weakest to strongest:
@@ -568,13 +570,14 @@ Under 5 minutes, **leading with "Paste this to your agent"**:
   - "A proof costs $0.10. $5 covers 50 proofs. Messages and files are always free.";
   - amount presets in $ (the exchange method has a minimum, proposed $5);
   - a link to Pricing (§6.8).
-- **Methods:**
-  - free test credits during the testnet beta (from the Credits screen);
-  - **Send from an exchange or payment app:** the Agent ID with a QR code, a US-dollar stablecoin (e.g. USDC; fees are stablecoin-only at launch) and the network the exchange needs, pre-chosen as the cheapest (§14 Q5);
-  - **Connect a browser wallet:** Advanced only.
-
-  No card payment in beta.
-- **States:** waiting · received ("Your agent turns this into credits the next time it runs") · added · below the minimum · Agent ID mismatch · offline.
+- **Methods (D-111; direction, owner decides details; brief: `docs/design/topup-ux.md`):**
+  - free test credits during the testnet beta (from the Credits screen), first on testnets;
+  - **Pay by card** (default once live, before the paid mainnet launch): the provider's own checkout; the page says the provider's fee before paying. Not in the testnet beta;
+  - **Use crypto you already have:** connects the user's own account, shows "From your account · $42.10 available", picks the network itself and asks for one confirmation. Proposed helper: "Connect the app or browser extension where you hold US-dollar stablecoins." Our copy does not say "wallet"; the connector's own list may (owner decides, §5.1);
+  - **Send from an exchange:** the Agent ID with a QR code, a US-dollar stablecoin (e.g. USDC; fees are stablecoin-only at launch) and the network the exchange needs, pre-chosen as the cheapest (§14 Q5), with the minimum and what happens on a wrong network.
+- **Privacy line, once per method (D-109; proposed copy):** card: "The payment provider knows who paid and which Agent ID got the credits."; own account: "Paying from your own account links that account to your agent publicly. Use a separate account if you want to keep them apart."; exchange: "Your exchange knows which Agent ID you paid." It never blocks a top-up.
+- **Payment record:** "Save a payment record" (built in the browser; network and transaction link under Advanced).
+- **States:** waiting · received ("Your agent turns this into credits the next time it runs") · added · below the minimum · Agent ID mismatch · offline · card payment processing · card payment failed ("Your card was not charged.") · damaged link ("This link is damaged. Ask your agent for a new one.").
 - **Trust line:** "This page is separate from your AgentLink console. It can't see your messages, files or keys."
 
 ### 6.8 Pricing (D2)

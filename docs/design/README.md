@@ -46,6 +46,8 @@ The owner exported the brand and the application design again. Compared byte for
 
 **Intake cards.** DESIGN-D1's acceptance is met (drop recorded), so M1-9g, M1-11b and the M1-19 restyle no longer wait on design (their other dependencies still apply). DESIGN-D2 is partial: M2-1a can start from the delivered tokens and components; M2-1b, M2-5a/b and M2-11g build only the surfaces listed as delivered and keep the rest functional and unstyled until the owner delivers or waives the missing items.
 
+**Design briefs.** Briefs for flows the owner has set a direction for, ahead of their design drop: [`topup-ux.md`](topup-ux.md), adding credits on the pay page (D-111, direction only).
+
 When a drop lands, the orchestrator records it here: the date, the links or files, and the delivered or partial status. It then schedules the intake tasks from the backlog.
 
 ## Rules for agents

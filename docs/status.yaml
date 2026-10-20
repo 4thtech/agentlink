@@ -14,7 +14,7 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-10-19"
+updated: "2026-10-20"
 version: "v0.1.1"
 versionLabel: "M1a, walking skeleton: pair and talk"
 milestone: "M1a Walking skeleton: pair and talk"
@@ -335,6 +335,9 @@ areas:
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2."
+      - name: "Adding credits: pay page"
+        state: planned
+        summary: "Direction set (D-111): one link from the agent opens a separate pay page with three ways to add credits in dollars: pay by card (planned before the paid mainnet launch; approach and provider are an owner decision, M2-18a, M3-4c), use crypto you already have (connect your own account, M2-18b) and send from an exchange (M2-18c), plus free test credits on testnets. The top-up link format and who pays for receipts are open owner decisions (M1-26-d, M1-34)."
       - name: "Encrypted drop service"
         state: in-progress
         summary: "The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs, M1-27a) is deployed: staging, and production at drop.agentlink.4thtech.io since 19 Oct 2026, through its deploy pipeline (staging, smoke test, production with automatic rollback, M1-27b). The first production deploy is healthy; its pipeline now waits for a new domain's certificate and reports a rollback that Cloudflare refuses across a storage change (M1-27b-c). Sending files through it from the CLI and the MCP tools (M1-13c) follows."
