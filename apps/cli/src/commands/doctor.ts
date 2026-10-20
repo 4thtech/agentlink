@@ -28,6 +28,10 @@ const DOCTOR_RULES_OK = 'OK       Your rules are in use';
 const DOCTOR_RULES_FAIL_CLOSED =
   "Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run `agentlink policy recover` to review and confirm them again.";
 
+/** M1-33a (06 §3, D-109; decided by Tali in chat, 2026-10-20): the exact line, after a status word. */
+export const DOCTOR_RECEIPTS_OLDER_DEFAULT =
+  'Warning  Delivery receipts are on from an older default; they will turn off unless you keep them.';
+
 /** M1-9h: how long `doctor` waits for each proof network. */
 export const DOCTOR_PROOF_BUDGET_MS = 4_000;
 
@@ -212,6 +216,14 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
           rules.mode === 'fail_closed' ? DOCTOR_RULES_FAIL_CLOSED : DOCTOR_RULES_OK,
           rules.mode === 'fail_closed',
         );
+        // M1-33a (06 §3 "Existing policies", D-109): a notice, not a problem. A runtime that can't
+        // tell shows nothing.
+        if (rules.mode === 'signed') {
+          const older = await Promise.resolve()
+            .then(() => client.ownerActions.receiptsOnFromOlderDefault())
+            .catch(() => false);
+          if (older) emit(DOCTOR_RECEIPTS_OLDER_DEFAULT);
+        }
       }
 
       // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).

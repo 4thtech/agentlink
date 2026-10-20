@@ -6,6 +6,7 @@
 import {
   StoreUsageError,
   type PolicyVersionMark,
+  type ReceiptsKeptMark,
   type Store,
   type StoreTx,
 } from '@4thtech-io/core';
@@ -13,6 +14,7 @@ import { NodeKeyStoreError } from './errors.js';
 import { KeychainKeyStore, type KeychainKeyStoreOptions } from './keychain-keystore.js';
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';
 import { keychainPolicyMark } from './policy-mark.js';
+import { keychainReceiptsKept } from './receipts-kept.js';
 import { SqliteStore } from './sqlite-store.js';
 import { createAgentStoreCipher, type AgentStoreCipher } from './store-cipher.js';
 
@@ -30,6 +32,11 @@ export interface AgentStore {
    * policy.set applies and a loaded policy fails closed (M1-7d).
    */
   readonly policyMark: PolicyVersionMark;
+  /**
+   * The receipts-kept marker of the agent's recorded backend (M1-33a; 04 §2.2, 06 §3), written under
+   * this store's inter-process lock. Pass it as AgentLinkClient.create's `receiptsKept`.
+   */
+  readonly receiptsKept: ReceiptsKeptMark;
   /** Closes the store and drops the cipher's keys. */
   close(): Promise<void>;
 }
@@ -99,10 +106,21 @@ export async function openAgentStoreWith(
     read: (): Promise<number> => (closed ? storeClosed() : mark.read()),
     raise: (version: number): Promise<number> => (closed ? storeClosed() : mark.raise(version)),
   });
+  const kept = keychainReceiptsKept(
+    backends.keychain,
+    agentId,
+    (fn) => store.withInterProcessLock(fn),
+    keyOptions,
+  );
+  const receiptsKept: ReceiptsKeptMark = Object.freeze({
+    read: (): Promise<number | null> => (closed ? storeClosed() : kept.read()),
+    write: (version: number): Promise<void> => (closed ? storeClosed() : kept.write(version)),
+  });
   return Object.freeze({
     store: storeFacade(store),
     cipher,
     policyMark,
+    receiptsKept,
     close: async (): Promise<void> => {
       closed = true;
       cipher.close();

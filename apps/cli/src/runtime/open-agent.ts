@@ -191,6 +191,7 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
       clock,
       logger,
       policyMark: agentStore.policyMark,
+      receiptsKept: agentStore.receiptsKept,
       transport: deps.transport(),
       dropOrigins: DROP_ORIGINS,
       files: nodeFilesPlatform({ home }),

@@ -112,6 +112,7 @@ export {
   type OwnerActionOutcome,
   type PolicyRecovery,
   type PolicyVersionMark,
+  type ReceiptsKeptMark,
 } from './owner-actions.js';
 export {
   BUDGET_WINDOW_SECONDS,
