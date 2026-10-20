@@ -67,10 +67,10 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 147 (M1a 80, M1b 67, M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
-| M2 Console, desktop apps, self-host, design | 40 (incl. 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
+| M1 Local beta | 150 (M1a 80, M1b 70; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M2 Console, desktop apps, self-host, design | 43 (incl. M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
-| M4, M5 | 2 epics |
+| M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
 ---
@@ -775,6 +775,18 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - The roll reads fragments and legacy lines, refuses only when both are empty, rejects an unknown section naming the file, deletes consumed fragments and is idempotent (fixture tests); CI fails a user-visible, spec or process PR without an entry and only warns on a direct `[Unreleased]` edit; docs, PR template and the `AGENTS.md` Versioning bullet updated.
 - Review note (IR-OPS-REL-4-1 L1..L5, 2026-10-17): validate changelog fragments in CI (format and section); align `versioning.md` wording with the check.
+
+#### OPS-PRIV-1 · Submitter and service logging off, with a deploy check (new, D-109)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy configuration)
+- **Repo/path:** agentlink · `apps/submitter/wrangler.toml` (when it lands with M1-10c), `apps/drop/wrangler.toml`, the deploy workflows, `docs/runbooks/`
+- **Depends on:** M1-10c (submitter deploy pipeline)
+- **Spec:** 07 §7 (privacy invariant); 04 §4, §5.1; D-109. Ongoing: applies to every 4thTech service and any relay 4thTech runs
+- **Invariants:** I-1, I-2, I-7
+- **Scope:**
+  - Workers observability logs and traces, invocation logs, Logpush and Tail Workers off for the submitter and faucet in every environment, as for the drop; a deploy step that reads the deployed settings and fails the deploy when any is on; a runbook line for the owner's account-level checks (Cloudflare dashboard settings an agent cannot see).
+  - A test that no submitter log line or metric carries an IP, signer, recipient, `recordId` or transaction hash.
+- **Acceptance:**
+  - The deploy check fails on a fixture configuration with logging on and passes on the shipped one; the log test passes; the runbook names the account-level settings and who checks them.
 
 ### Documentation (DOCS) (new)
 
@@ -3571,7 +3583,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
 - **Invariants:** I-1, I-2, I-5, I-6
 - **Scope:**
-  - Extends the M1-13a scenario: a 5 MB file with zero storage setup (encrypted drop, D-48), notarize, DELIVERED and OPENED, export and verify the proof pack.
+  - Extends the M1-13a scenario: a 5 MB file with zero storage setup (encrypted drop, D-48), notarize, DELIVERED and OPENED, export and verify the proof pack. Since D-109, DELIVERED needs a contact rule with `receipts.autoDelivered: true` or an explicit `agentlink_acknowledge` with `delivered`, and OPENED an explicit acknowledge; the scenario sets one up and also checks that none is signed under the defaults.
   - J8 with proof of agreement: extends M1-22; the final `terms` are notarized, the counterparty's ACCEPTED receipt is signed after owner approval, and the exported pack verifies as a proof of agreement. Both shapes (accept recorded; offer recorded, including an offer recorded after the accept): each owner sees exactly one approval for the agreement (D-55).
   - Deterministic variant on local relays, MinIO, a local drop Worker (Miniflare) and testnets or anvil forks; LLM variant on a schedule against the staging drop.
 - **Acceptance:**
@@ -3691,6 +3703,47 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Prompt tests: a hostile invite (name with instructions, closing tags, control and bidi characters; oversized or malformed payloads) yields either no prompt or a prompt equal to the template plus the canonical link; the prompt passes the vocabulary lint.
   - DOM test (Playwright): with a name containing `<img src=x onerror=…>`, `<div>` and a fake "Copy this to your AI" line, no DOM element derives from the name, no script runs, no Trusted Types violation is allowed through, and the copy button yields exactly the template plus the canonical link; run in Chromium (Trusted Types enforced); a framing attempt is refused.
   - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+
+#### M1-33a · Delivery receipts off by default; sender request and recipient opt-in (new, D-109)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/types (policy default, `ContactRule.receipts`, `proof` body `receiptRequest`), packages/core (proofs, inbox, policy engine), apps/cli (tool inputs, policy review, local UI rule)
+- **Depends on:** M1-7g, M1-7g-b, M1-9d-2
+- **Spec:** 04 §3.4 (`proof`, receipt request), §5, §5.1; 06 §2.2, §2.4, §3 (delivery receipts, contact rules); 11 §5.6; D-109
+- **Invariants:** I-4, I-5, I-6
+- **Scope:**
+  - Default `receipts.autoDelivered: false` in `packages/types/src/policy.ts` and its fixtures; the 06 §3 defaults snapshot test follows. A policy signed earlier keeps its value.
+  - `ContactRule.receipts.autoDelivered` (strict schema; `receipts` without `proofs` allowed); the effective-value rule of 06 §3 in the policy engine; the local UI's "Confirm deliveries from <name> automatically" as an owner-signed `policy.set`.
+  - `requestReceipt?` on `agentlink_notarize` and `agentlink_send`; `receiptRequest: "delivered"` in the `proof` body; on the recipient, `receiptRequested: true` on the inbox item and `agentlink_acknowledge` with `delivered`.
+  - `files.deleteAfter: receipt` falls back to `expiry` without a receipt.
+- **Acceptance (tests first; a `RED (expected):` commit before the fix):**
+  - Under the new defaults, reading a notarized message or fetching a notarized file signs no receipt; with a contact rule on, it signs DELIVERED for that contact only; under a failing policy, none.
+  - A `receiptRequest` alone never signs anything; the user's `agentlink_acknowledge {type: "delivered"}` signs exactly one; a malformed `receiptRequest` refuses the body.
+  - No tool can set the contact rule (I-4); the summaries carry the 11 §5.6 lines.
+  - Lands before the first release that ships proofs, or carries a release gate like M1-7g-b.
+  - Older policies (D-109, owner decision 2026-10-20): a policy signed under the old default with `autoDelivered: true`, re-signed for any other change, ends with `autoDelivered: false` unless the owner explicitly keeps `true`; while it remains `true` from the old default, `agentlink doctor` shows "Delivery receipts are on from an older default; they will turn off unless you keep them." (one test each).
+
+#### M1-33b · Proof privacy disclosure in tools, CLI, local UI and docs (new, D-109)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (tool summaries, approval cards, CLI output, local UI), docs-site/guide
+- **Depends on:** M1-9d-2, M1-33a
+- **Spec:** 11 §5.6; 06 §2.4 (What a proof makes public); 07 §8 (what sharing a pack reveals); 12 §4.4; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - The 11 §5.6 strings, as fixed string keys, in: the first proof of a session and every approval that adds proof; receipt requests and receipts; the export summary; the top-up methods. No inbound content in any of them.
+- **Acceptance:**
+  - Snapshot tests of each summary and card; a vocabulary test (11 §5.1) over the new strings; the user-guide privacy page and the proof page match the strings.
+
+#### M1-33c · `parentRecordId` rule: zero or the agent's own record (new, D-109)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (proofs), packages/chain (record builder)
+- **Depends on:** M1-7g
+- **Spec:** 05 §3.1 (`parentRecordId` rule); 04 §5.1; D-109
+- **Invariants:** I-6
+- **Scope:**
+  - Today the core never sets `parentRecordId` (the builder defaults to zero). Make the rule explicit: the core accepts a parent only when the chain shows the same signer for it, and refuses otherwise with a fixed code; replacements keep the original value.
+  - Recipient: a received Record whose `parentRecordId` names another signer's record is flagged (04 §3.4 checks), and no receipt is signed for it.
+- **Acceptance (tests first; a `RED (expected):` commit before the fix):**
+  - A parent signed by another agent is refused and nothing is signed or charged; a parent of the same signer is accepted; a failed chain read refuses (fail closed); the recipient-side flag test.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
@@ -4315,7 +4368,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-4a · contracts: OCCRegistry
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
 - **Repo/path:** occ-v2-contracts · src/OCCRegistry.sol
-- **Depends on:** M1-3e, M1-1h (AgentCard vectors), M1-1i (Registration vectors), M1-3j (Chiado M1 stage deployed, D-63); G-20 resolved by D-81
+- **Depends on:** M1-3e, M1-1h (AgentCard vectors), M1-1i (Registration vectors), M1-3j (Chiado M1 stage deployed, D-63); G-20 resolved by D-81; M2-17b (Registry privacy, D-109)
 - **Spec:** 05 §4, §5, §6, §7; 04 §2.4, §7 (public-card abuse)
 - **Invariants:** I-6
 - **Scope:**
@@ -4429,6 +4482,41 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - Decision recorded; the console's RP ID set accordingly before external testers onboard; if a later move is planned, the migration plan is written and tested on staging.
   - (IR-D48-1 F16) 08 §2.3 contains the RP ID pinning rule; a test creates a passkey on a non-pinned origin and is refused.
+
+#### M2-17a · Per-relationship signing addresses (new, D-109)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · packages/crypto (derivation label), packages/core, packages/chain; occ-v2-contracts (payer separate from signer, if chosen)
+- **Depends on:** M1-4d-d (D-102 proof of possession), M1-33a; owner decision on the funding design
+- **Spec:** 04 §5.1 (design goal and constraints), §2.1, §2.9; 05 §2.4, §3; 07 §8; 12 §4.4; D-102, D-109
+- **Invariants:** I-1, I-6
+- **Scope:**
+  - First an architecture task (Opus, with an independent review): the derivation label and `info`, per relationship or per proof; the binding signatures and where they travel (handshake, card-update, proof pack, never on-chain); the recipient's relationship address in the commitment; how fees are paid without funding each address (a payer separate from the signer, or submitter-held credits), as a decision for the owner.
+  - Then the build, including the verifier's `verified` path with the binding, and contract changes before the M3 audit scope is frozen.
+- **Open points for the design:** interplay with automatic chain selection (07 §6.3: credits and funding per relationship address per chain) and with the submitter's per-signer rate limits and cooling-off (07 §7), which would count per relationship address.
+- **Acceptance:**
+  - Two contacts' records from one agent show different, unlinkable signer addresses on-chain; a pack still verifies to the agent's card; no deposit links a relationship address to the identity address or to another relationship address.
+
+#### M2-17b · Registry privacy: no guessable identifiers on the public record (new, D-109)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** occ-v2-contracts (OCCRegistry interface and events); agentlink · packages/chain, packages/types
+- **Depends on:** — (must be decided before M2-4a is built)
+- **Spec:** 05 §4 (Registry privacy), §6 (`AgentRegistered`); 04 §2.4; 11 §6.13; D-109
+- **Invariants:** I-6
+- **Scope:**
+  - Pick option (a) or (b) of 05 §4 with the owner; update 05 §4, §6 and the AgentCard and Registration vectors; M2-4a builds to it.
+- **Acceptance:**
+  - Neither `AgentRegistered` nor `register` calldata carries `nameHash`, `relaysHash` or any message or encryption key (test on the event and on the decoded calldata); registration stays owner-initiated only.
+
+#### M2-17c · Optional delayed or batched receipts (new, D-109)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · packages/core (receipt queue), packages/types (policy key), apps/submitter (receipt batching)
+- **Depends on:** M1-33a, M1-10a
+- **Spec:** 04 §5.1 (Planned); 05 §3.3 (batches); 06 §3; D-109
+- **Invariants:** I-6
+- **Scope:**
+  - A policy setting for a random delay window (off by default) and batching of receipts at the submitter; receipts never held past their deadline, the terms' `validUntil` or a commitment scope's `expiresAt`. Adding the policy key is a schema change (06 §3).
+- **Acceptance:**
+  - With the window on, receipt times are spread across the window (statistical test with a fixed seed); deadlines and commitment expiries are always met; off by default.
 
 ### Desktop apps, owner identity, counterparty (D-34…D-36, D-41) (new)
 
@@ -5105,7 +5193,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 
 ---
 
-## 6. M4 and M5 — epics
+## 6. M4, M5 and M6 — epics
 
 Epics are decomposed into cards (same format, same rules) when the milestone starts. Each sub-card goes through the normal Definition of Ready.
 
@@ -5120,6 +5208,23 @@ Epics are decomposed into cards (same format, same rules) when the milestone sta
 - **Acceptance:**
   - Tests first: nothing but the agent address and amount leaves the pay page for the provider; no provider script on the `pay.` origin unless the CSP review accepted it.
   - A small real card top-up becomes credits on mainnet (recorded).
+
+#### M6-1 · Solana design spike (new, D-110)
+- **Status:** backlog · **Size:** M · **Tier:** Opus (design); contract-audit tier for the program review · **Security:** S2 once it reaches code (the spike itself is a design record)
+- **Repo/path:** agentlink-ops or a design record under `docs/` (the spike); programs later in a private repo like `occ-v2-contracts`
+- **Depends on:** M4-EPIC EVM deployments (direction: Solana follows EVM coverage); can start as a paper spike earlier if the owner asks
+- **Spec:** D-110; 10 M6; 04 §2.1, §2.4, §2.9, §5.1; 05; 07 §6.3, §8; 12; D-39, D-40, D-45, D-46, D-102, D-109
+- **Invariants:** I-1 … I-10
+- **Scope (questions to answer, not decided):**
+  - Program language and framework, and the audit path (licence per D-11; an independent contract audit before mainnet).
+  - Agent keys: ed25519 versus secp256k1 signing on Solana; how the agent card and proof of possession (D-102) bind a Solana key; one identity across EVM and Solana.
+  - Account and rent model versus the fee vault, credits and the flat USD price (12); USDC on Solana and the USD price list (D-45, D-46).
+  - No "same addresses on every chain" property: how clients, packs and the verifier name a Solana program.
+  - Automatic chain selection and proof-pack verification for a non-EVM chain (07 §6.3, §8); the user never picks a chain (D-39, D-40).
+  - The D-109 privacy properties (salted commitments, opt-in receipts, per-relationship addresses) on Solana.
+- **Acceptance:**
+  - A design record reviewed by an independent Opus review and accepted by the owner, with a decomposition into M6 cards; no code before that.
+
 
 #### M4-EPIC · Expansion (rolling)
 - **Status:** backlog · **Size:** — · **Tier:** Opus (decomposition) · **Security:** S2 (contains S2 work)

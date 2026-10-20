@@ -4,7 +4,7 @@
 
 ## Records
 
-A **record** notarizes an envelope hash. The sender's agent signs an EIP-712 `Record` (domain `{name: "OCC", version: "2", chainId, verifyingContract}`) containing: the signer, the envelope hash, a salted **recipient commitment** `keccak256(abi.encode(recipientAgentEvm, salt))`, an optional parent record, the integrator `appId`, a `kind` (message, file, offer, accept, delivery, note), the fee token and the **maximum fee** the signer accepts, a single-use random nonce and a deadline.
+A **record** notarizes an envelope hash. The sender's agent signs an EIP-712 `Record` (domain `{name: "OCC", version: "2", chainId, verifyingContract}`) containing: the signer, the envelope hash, a salted **recipient commitment** `keccak256(abi.encode(recipientAgentEvm, salt))`, an optional parent record (zero, or the same signer's earlier record, D-109), the integrator `appId`, a `kind` (message, file, offer, accept, delivery, note), the fee token and the **maximum fee** the signer accepts, a single-use random nonce and a deadline.
 
 Anyone can submit the signed record: the 4thTech submitter (which pays gas and recovers it from fees) or the agent itself. A submitter can censor but cannot forge or alter a record. The salt reaches the recipient in a follow-up `proof` envelope.
 
@@ -14,9 +14,9 @@ On-chain data is minimal: no content, file names or display names. The core, not
 
 The recipient signs a `Receipt` against a record: `DELIVERED`, `OPENED`, and `ACCEPTED` or `REJECTED` (mutually exclusive), so at most three per record. Only the intended recipient can acknowledge, because the receipt must open the recipient commitment. Each type can be recorded once. Receipts cost the recipient nothing; the record fee covers them.
 
-A receipt reveals the salt, which links the recipient's agent address to the record. Records without receipts reveal only the commitment.
+A receipt reveals the salt, which links the recipient's agent address to the record. Records without receipts reveal only the commitment. See [Privacy of proofs](privacy.md).
 
-`DELIVERED` can be automatic; `OPENED` only when the user asked the agent to open the item; `ACCEPTED` and `REJECTED` need owner approval by default.
+`DELIVERED` is signed only when the recipient's policy allows it for that contact (off by default, D-109) or its user says yes to the sender's request; `OPENED` only when the user asked the agent to open the item; `ACCEPTED` and `REJECTED` need owner approval by default.
 
 ## Proof of agreement
 

@@ -103,6 +103,13 @@ Code that is merged is not necessarily published: only the `@4thtech-io/agentlin
 | OCC v2 contracts (private repo) | Pre-audit fixes | Planned | - | Follow-ups for M1b; mainnet follows the external audit (M3). |
 | Design | Design drop D1 | Done | [#33](https://github.com/4thtech/agentlink/pull/33) | Brand core, tokens, components and the local approvals screens. |
 | Design | Design drop D2 | In progress | [#82](https://github.com/4thtech/agentlink/pull/82) | Console, desktop apps, onboarding and more; partly in. |
+| Privacy of proofs (D-109) | Delivery receipts off by default | Planned | - | M1b (M1-33a): a delivery receipt is signed only when the recipient's rules allow it for that contact or the recipient says yes to the sender's request, since it shows publicly who received a proof. |
+| Privacy of proofs (D-109) | Plain-language disclosure | Planned | - | M1b (M1-33b): every proof, receipt, export and top-up screen says what becomes public and what stays private. |
+| Privacy of proofs (D-109) | Record linking rule | Planned | - | M1b (M1-33c): a proof links only to the same agent's earlier proof, never to the other side's, so no link between two agents is published without a receipt. |
+| Privacy of proofs (D-109) | Per-relationship signing addresses | Planned | - | M2 (M2-17a): a separate, unlinkable signing address for each contact, so one agent does not collect a public log of all its proofs. |
+| Privacy of proofs (D-109) | Registry privacy | Planned | - | M2 (M2-17b): registration stays optional and publishes no guessable name or other identifier. |
+| Privacy of proofs (D-109) | Delayed or batched receipts | Planned | - | M2 (M2-17c): optional random delay and batching, so receipt times do not show when an agent was online. |
+| Privacy of proofs (D-109) | Service logging off | Planned | - | Ongoing (OPS-PRIV-1): the proof submitter and other 4thTech services keep no IP address next to an agent, with platform logging off and checked at every deploy. |
 <!-- status-summary:end -->
 
 ## Milestones
@@ -112,11 +119,12 @@ Code that is merged is not necessarily published: only the `@4thtech-io/agentlin
 |---|---|---|---|---|
 | **M0** Foundations | Repository, CI and rules in place | 0.0.x | ~1 week | In progress |
 | **M1a** Walking skeleton: pair and talk | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 | ~2–3 weeks | In progress |
-| **M1b** Files, proof, credits | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI | 0.2.0 (M1 gate) | ~3–4 weeks | In progress |
-| **M2** Owner console, desktop apps, self-host, design | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors | 0.3.0 | ~4–6+ weeks | Planned |
+| **M1b** Files, proof, credits | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) | ~3–4 weeks | In progress |
+| **M2** Owner console, desktop apps, self-host, design | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.3.0 | ~4–6+ weeks | Planned |
 | **M3** Mainnet beta (Base, Gnosis) | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 | ~4 weeks | Planned |
 | **M4** Expansion | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 | rolling | Planned |
 | **M5** Agent commerce | Deal records, payment linkage, arbitrator disclosure | after 1.0.0 | rolling | Planned |
+| **M6** Solana | Planned, no dates: after the EVM chains are covered, AgentLink on Solana, with programs equivalent to the notary and fee vault and client support (D-110); starts with a design spike | after M4 | rolling | Planned |
 <!-- status-milestones:end -->
 
 ## Milestone gates in detail
@@ -131,6 +139,7 @@ Code that is merged is not necessarily published: only the `@4thtech-io/agentlin
 | **M3 Mainnet beta (Base, Gnosis)** | External audit findings (high and medium) fixed; first paid proofs with zero security incidents. |
 | **M4 Expansion** | Rolling, no single gate yet: more proof networks, batched receipts, hosted approval-mode MCP, more adapters. |
 | **M5 Agent commerce** | Rolling, no single gate yet: deal records, x402 settlement linkage, arbitrator disclosure. |
+| **M6 Solana** | Planned, no single gate yet: a design spike accepted by the owner (M6-1), then audited programs and client support; users still never pick a chain. |
 <!-- status-roadmap-detail:end -->
 
 ## Gates

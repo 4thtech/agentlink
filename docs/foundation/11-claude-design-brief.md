@@ -61,7 +61,7 @@ AgentLink adds all four through one add-on to the AI apps people already use. **
 | Agent, AI app, owner | An AI with an AgentLink identity; the app hosting it (internally "harness"); the human behind it, who reads everything and approves |
 | Contact, invite, safety code | A paired counterparty; a single-use pairing link; 12 digits compared through another channel |
 | Message, file (free) | Encrypted. Files over 12 KB go through AgentLink's **encrypted drop** with no setup (or the sender's own storage, an optional Advanced setting), on a link valid up to 7 days (with Google Drive, Dropbox or OneDrive, the sender's AI removes the link at expiry: best effort, the file stays encrypted) |
-| Proof (paid), receipts | A public record of an exact item and time. Receipts: Delivered (automatic), Opened (only when the recipient asks their AI to open it), Accepted or Rejected |
+| Proof (paid), receipts | A public record of an exact item and time. Receipts: Delivered (only if the recipient allows it, D-109), Opened (only when the recipient asks their AI to open it), Accepted or Rejected. A proof shows publicly who recorded it, when and what kind; a receipt also shows who received it (§5.6) |
 | Terms, commitment | A structured offer: subject, parties, deliverables, price, deadlines, valid until, version. A commitment is accepting or rejecting one, which needs owner approval by default |
 | Proof of agreement | Recorded terms plus the other side's Accepted receipt |
 | Approval, rules, credits | The owner's passkey/biometric OK (the AI can never approve itself); owner-set limits; a prepaid $ balance for proofs |
@@ -321,6 +321,25 @@ Each has its own name and look. Never call any of them "password", and never sho
 Secrets are shown once, with Copy, Download or Print, and an "I've saved it" step. Entry fields allow paste and password managers (§11.3).
 
 ---
+
+### 5.6 What a proof makes public (D-109)
+
+Proof is public by design, so the user is told what others can see, in plain words, before it happens. Never overstate privacy (§5.3). These strings are the source; surfaces may shorten them only on tight layouts, never drop the receipt line.
+
+| Where | String |
+|---|---|
+| First proof, and every approval that adds proof | "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." |
+| Same, second line | "If {contactName} confirms delivery, it also becomes public that it went to their agent." |
+| Asking for a delivery receipt (sender) | "Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent." |
+| Receipt request (recipient) | "{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content." Buttons: **Confirm delivery** · **Not now** |
+| Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent." |
+| Opened, accepted or rejected receipt | "This is public: anyone can see that your agent {opened / accepted / rejected} it, and when." |
+| Rules page, delivery confirmations (default off) | "Confirm deliveries publicly: Off (recommended). Turn on for contacts you trust." |
+| Top-up (each method, once) | "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink." |
+| Proof export | "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content." |
+| Get the Registered badge (§6.13) | "Registering puts your agent's link to you on the public record. Your agent's name is not published." |
+
+Help text (user guide, privacy page) explains the same in full: what is public (who recorded, when, the kind, receipts and who gave them, which account paid for credits), what is never public (content, file and display names, terms, rules, approvals), and how to keep more private (delivery confirmations off, a separate top-up account, sharing proof files only when needed).
 
 ## 6. Surfaces and information architecture
 
@@ -664,7 +683,7 @@ Show amounts only in dollars; never mention tokens or networks outside Advanced.
 
 | Screen | Data and actions |
 |---|---|
-| **Get the Registered badge** (Agents → agent) | What it means ("this agent's link to you is on the public record"), $5 one-time, quote, approve with passkey or biometrics → recording → "Registered" |
+| **Get the Registered badge** (Agents → agent) | What it means ("this agent's link to you is on the public record"; the agent's name is not published, D-109, §5.6), $5 one-time, quote, approve with passkey or biometrics → recording → "Registered" |
 | **Verify a domain** (Settings) | Enter domain (show punycode for internationalized names) → choose a DNS record or a file on the website → copy the exact value → Check now → "Verified domain · acme.com". What it proves: whoever controlled the domain vouched for this owner; not legal identity. Signing the claim needs owner presence |
 
 **States:** not registered · recording · registered · failed; domain not found yet · value doesn't match · verified · re-check failed ("Domain no longer verified", with date) · expired.
@@ -697,7 +716,7 @@ Each journey lists its steps in order, then the states to design.
 | Journey | Steps | States |
 |---|---|---|
 | **J1 Install and first message** (< 5 min, no payment) | 1. Copy the prompt. 2. The AI runs `init`, shows the diff, applies it after "yes". 3. Protect approvals and get the recovery kit. 4. "Create an AgentLink invite for Marko" → the link and ready-to-send text (no safety code yet: it needs both sides' pairing messages). 5. Marko's **New contact** screen (name, label, owner fingerprint): approve; once pairing completes, the safety code appears on both sides' contact screens and both compare it. 6. A 2 MB file sends with no storage setup (encrypted drop). 7. Marko's next session starts by saying a new message is waiting and reads it when he asks (D-53) | AI app not detected · restart needed · protection skipped · invite expired · no keychain (D-54) |
-| **J2 Notarized handover** | 1. "Send the signed contract to Marko and notarize it." 2. Rule check, with J4 if needed. 3. Quote → `submitted` → `ok`. 4. Delivered is automatic; Opened only on Marko's request. 5. "Did Marko get it?" → receipt timeline. 6. Export (adding the document key needs approval) | Recording · failed · link expired · fresh link requested |
+| **J2 Notarized handover** | 1. "Send the signed contract to Marko and notarize it." 2. Rule check, with J4 if needed. 3. Quote → `submitted` → `ok`. 4. Delivered only if Marko's rules allow it or Marko says yes to the request (D-109); Opened only on Marko's request. 5. "Did Marko get it?" → receipt timeline. 6. Export (adding the document key needs approval) | Recording · failed · link expired · fresh link requested |
 | **J3 No credits** | 1. `needs_credits` link. 2. Pay page: amount in $, no network choice. 3. "Credits added. Shall I record the proof now?" | Waiting · converting on next run · added |
 | **J4 Owner approval** (mobile, desktop) | 1. `pending_approval`, plus an OS notification or push. 2. Card → Approve with passkey, Touch ID or Windows Hello. 3. "Approved. Your AI will continue." 4. The AI retries | Denied ("nothing was sent") · expired · biometrics failed · decided on another device |
 | **J5 Verification** | 1. Open the link or file. 2. Checking → Valid with sentence. 3. Optional: document match, Advanced, Print | As in §6.4 |
