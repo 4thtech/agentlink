@@ -77,7 +77,19 @@ export type PolicyAction =
   /** Disclosing a content key (proofs.allowKeyDisclosure). */
   | { readonly kind: 'key.disclose' }
   /** Signing a DELIVERED or OPENED receipt without being asked (receipts.*). */
-  | { readonly kind: 'receipt.auto'; readonly receipt: 'delivered' | 'opened' };
+  | ReceiptAutoAction;
+
+/**
+ * Signing a receipt without being asked (06 §3 `receipts`, D-109). For DELIVERED, `counterparty`
+ * is the record's signer as the contact book holds it, built by the core from verified data:
+ * `ruleEligible` is true only while it is a paired contact that is not blocked or revoked. Its
+ * contact rule's `receipts.autoDelivered` then replaces the global value. Absent or null: no rule.
+ */
+export interface ReceiptAutoAction {
+  readonly kind: 'receipt.auto';
+  readonly receipt: 'delivered' | 'opened';
+  readonly counterparty?: { readonly contact: string; readonly ruleEligible: boolean } | null;
+}
 
 /**
  * A paid proof. Built by the core from verified data: the fee quote and the counterparty's state in
@@ -199,6 +211,26 @@ export function policyLimits(effective: EffectivePolicy): PolicyLimits {
   };
 }
 
+/**
+ * 06 §3 "Delivery receipts" (D-109): the effective `autoDelivered` for a record from contact `c` is
+ * its contact rule's value if present, else the global one; OPENED reads only the global flag. Under
+ * fail closed (no verified document) both are false and no rule applies.
+ */
+function autoReceipt(
+  policy: PolicyDocument | undefined,
+  limits: PolicyLimits,
+  action: ReceiptAutoAction,
+): PolicyDecision {
+  if (action.receipt === 'opened') return limits.autoOpened ? 'allow' : 'deny';
+  if (policy === undefined) return 'deny';
+  const cp = action.counterparty;
+  const rule =
+    cp !== undefined && cp !== null && cp.ruleEligible
+      ? policy.contactRules.find((r) => r.contact === cp.contact)
+      : undefined;
+  return (rule?.receipts?.autoDelivered ?? limits.autoDelivered) ? 'allow' : 'deny';
+}
+
 function hourlyCount(context: PolicyContext | undefined): number {
   const n = context?.contactEnvelopesLastHour;
   if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 0) {
@@ -308,7 +340,7 @@ export function evaluateProof(
       ? effective.policy.contactRules.find((r) => r.contact === cp.contact)
       : undefined;
   // Step 2: the rule's notarize replaces the global one.
-  const notarize = rule?.proofs.notarize ?? proofs.notarize;
+  const notarize = rule?.proofs?.notarize ?? proofs.notarize;
   if (notarize === 'deny') return { decision: 'deny', triggers: ['notarize'] };
   const now = context?.now;
   const view = context?.ledger;
@@ -316,7 +348,7 @@ export function evaluateProof(
   const triggers: ProofTrigger[] = [];
   if (notarize === 'approval') triggers.push('notarize');
   // Step 3: the rule's per-action maximum replaces the global one; the fee is compared.
-  const perActionMax = parseUsd(rule?.proofs.perActionMaxUSD ?? proofs.perActionMaxUSD);
+  const perActionMax = parseUsd(rule?.proofs?.perActionMaxUSD ?? proofs.perActionMaxUSD);
   if (fee > perActionMax) triggers.push('per_action');
   // Step 4: always the global budget; spent + the reserved maximum fee above it asks the owner.
   const spent = budgetSpentMicros(view, now);
@@ -439,9 +471,7 @@ export function evaluate(
     case 'key.disclose':
       return policy?.proofs.allowKeyDisclosure === 'deny' ? 'deny' : 'approval';
 
-    case 'receipt.auto': {
-      const on = action.receipt === 'delivered' ? limits.autoDelivered : limits.autoOpened;
-      return on ? 'allow' : 'deny';
-    }
+    case 'receipt.auto':
+      return autoReceipt(policy, limits, action);
   }
 }

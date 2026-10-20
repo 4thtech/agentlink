@@ -363,7 +363,10 @@ describe('policy rejects (M1-2b acceptance)', () => {
     expectAccept(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: true } }));
     expectReject(policySchema, at({ contact: CONTACT_A }));
     // `proofs`, when present, still needs one of its two keys.
-    expectReject(policySchema, at({ contact: CONTACT_A, proofs: {}, receipts: { autoDelivered: true } }));
+    expectReject(
+      policySchema,
+      at({ contact: CONTACT_A, proofs: {}, receipts: { autoDelivered: true } }),
+    );
     // `receipts` holds exactly `autoDelivered`, a boolean; nothing else (never OPENED).
     expectReject(policySchema, at({ contact: CONTACT_A, receipts: {} }));
     expectReject(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: 'yes' } }));

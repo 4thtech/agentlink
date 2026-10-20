@@ -75,6 +75,16 @@ const REPAIRS: Readonly<Record<string, (p: Json) => void>> = {
   'reject-policy-set-contact-rule-unknown-key': (p) => {
     delete (p.contactRules as Json[])[0]!.note;
   },
+  // D-109 (M1-33a): a ContactRule's `receipts` part.
+  'reject-policy-set-contact-rule-no-part': (p) => {
+    (p.contactRules as Json[])[0]!.receipts = { autoDelivered: true };
+  },
+  'reject-policy-set-contact-rule-empty-receipts': (p) => {
+    (p.contactRules as { receipts: Json }[])[0]!.receipts.autoDelivered = true;
+  },
+  'reject-policy-set-contact-rule-receipts-opened': (p) => {
+    delete (p.contactRules as { receipts: Json }[])[0]!.receipts.autoOpened;
+  },
   'reject-policy-set-missing-key': (p) => {
     at(p, 'files').storage = 'auto';
   },

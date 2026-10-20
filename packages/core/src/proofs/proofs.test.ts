@@ -182,11 +182,21 @@ const proofRows = (agent: Agent) => agent.store.transaction((tx) => tx.select('p
 const ledger = (agent: Agent) => agent.store.transaction((tx) => tx.select('budget_ledger'));
 const onChain = (recordId: string) => chain.records.get(recordId);
 
-async function twoAgents() {
+/**
+ * A and B, paired, A funded. Delivery receipts are off by default (D-109), so unless a test asks
+ * for the defaults, B's owner turns them on (`receipts.autoDelivered: true`): every "no receipt"
+ * check below then proves the refusal, not the default.
+ */
+async function twoAgents({ defaults = false }: { readonly defaults?: boolean } = {}) {
   const a = await openAgent(31, ownerA, 'alice');
   const b = await openAgent(32, ownerB, 'bob');
   await pair(a, b);
   chain.fund(a.id, 10n * FEE_UNITS);
+  if (!defaults) {
+    await setPolicy(b, (p) => {
+      p.receipts.autoDelivered = true;
+    });
+  }
   return { a, b };
 }
 
@@ -197,7 +207,7 @@ beforeEach(() => {
 
 describe('notarize → DELIVERED → OPENED → export → verify (acceptance, testnet-style)', () => {
   it('records, delivers the salt, gets automatic DELIVERED and explicit OPENED, and the pack verifies', async () => {
-    const { a, b } = await twoAgents();
+    const { a, b } = await twoAgents({ defaults: true });
     // B's owner turned delivery receipts on for A (06 §3 contact rule, D-109).
     await setPolicy(b, (p) => {
       p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
@@ -290,7 +300,7 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
   });
 
   it('the default rules (D-109): the proof is checked and stored, and no DELIVERED is signed', async () => {
-    const { a, b } = await twoAgents();
+    const { a, b } = await twoAgents({ defaults: true });
     const envelopeId = await sendText(a, b);
     const proof = await a.client.notarize({ envelopeId });
     await deliver(a, b);
@@ -302,7 +312,7 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
   });
 
   it('a contact rule turns DELIVERED on for that contact only (06 §3, D-109)', async () => {
-    const { a, b } = await twoAgents();
+    const { a, b } = await twoAgents({ defaults: true });
     const c = await openAgent(33, ownerC, 'carol');
     await pair(c, b);
     chain.fund(c.id, 10n * FEE_UNITS);
@@ -514,13 +524,14 @@ describe('credits and policy (06 §3, 07 §6.3)', () => {
 
 describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', () => {
   it('no ACCEPTED under the default policy without an owner-signed approval; then exclusive', async () => {
-    const { a, b } = await twoAgents();
+    // The defaults in full (D-109: no automatic DELIVERED either); ACCEPTED is unchanged.
+    const { a, b } = await twoAgents({ defaults: true });
     const envelopeId = await sendText(a, b);
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
     const pending = await b.client.acknowledge({ envelopeId, type: 'accepted' });
     expect(pending.status).toBe('pending_approval');
-    expect((await receipts(b)).map((r) => r.type)).toEqual([1]);
+    expect((await receipts(b)).map((r) => r.type)).toEqual([]);
     const approvalId = (pending as { approvalId: string }).approvalId;
     // An approval ID the owner has not signed does nothing.
     expect(await b.client.acknowledge({ envelopeId, type: 'accepted', approvalId })).toMatchObject({
@@ -531,7 +542,7 @@ describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', (
       status: 'ok',
       receipt: 'ACCEPTED',
     });
-    expect((await receipts(b)).map((r) => r.type).sort()).toEqual([1, 3]);
+    expect((await receipts(b)).map((r) => r.type)).toEqual([3]);
     // REJECTED is exclusive with ACCEPTED.
     expect(await b.client.acknowledge({ envelopeId, type: 'rejected' })).toEqual({
       status: 'rejected',

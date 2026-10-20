@@ -75,7 +75,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 5
+VERSION = 6
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -256,7 +256,8 @@ def build():
         },
         "envelopes": {"maxEnvelopeKB": 24},
         "proofs": {"notarize": "allow", "dailyBudgetUSD": "5", "perActionMaxUSD": "1", "allowKeyDisclosure": "approval", "exportFolder": "~/AgentLink/Proofs", "defaultChain": "base"},
-        "receipts": {"autoDelivered": True, "autoOpened": False},
+        # D-109 (M1-33a, owner-action version 6): delivery receipts are off by default.
+        "receipts": {"autoDelivered": False, "autoOpened": False},
         "commitments": {"accept": "approval", "autoAcceptContacts": [], "autoAcceptMaxUSD": "0", "autoAcceptDirection": "buy", "autoAcceptMinUSD": None},
         "contactRules": [],
     }
@@ -273,6 +274,9 @@ def build():
     ]
     policy_with_rules = copy.deepcopy(policy)
     policy_with_rules["contactRules"] = rules
+    # A receipts-only rule (06 §3, D-109): `receipts` without `proofs` turns DELIVERED on for one contact.
+    policy_with_receipts_rule = copy.deepcopy(policy)
+    policy_with_receipts_rule["contactRules"] = [{"receipts": {"autoDelivered": True}, "contact": rule_contacts[0]}]
     if [r["contact"] for r in rules] != sorted({r["contact"] for r in rules}):
         v.fail("contactRules must be sorted and unique")
     for case_id, why, b in [
@@ -281,6 +285,7 @@ def build():
         ("sign-approval-cancel", "approval.cancel (D-55)", op_body("approval.cancel", {"approvalId": approval_id})),
         ("sign-policy-set", "policy.set with the 06 §3 defaults in the policy JSON form as policy (G-32)", op_body("policy.set", {"version": 1, "policy": policy})),
         ("sign-policy-set-contact-rules", "policy.set with two contactRules, sorted by contact, in JCS key order once canonicalised (06 §3, G-32)", op_body("policy.set", {"version": 2, "policy": policy_with_rules})),
+        ("sign-policy-set-receipts-rule", "policy.set with a ContactRule that has `receipts` and no `proofs` (06 §3, D-109)", op_body("policy.set", {"version": 3, "policy": policy_with_receipts_rule})),
     ]:
         cases.append(
             v.case(
@@ -467,6 +472,9 @@ def build():
         ("duplicate-contact-rule", "two `contactRules` for one contact", policy_edit(policy, ["contactRules"], [rules[0], {"contact": rules[0]["contact"], "proofs": {"notarize": "deny"}}])),
         ("contact-rule-empty-proofs", "a ContactRule with `proofs: {}`", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0], "proofs": {}}])),
         ("contact-rule-unknown-key", "an unknown key in a ContactRule", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0], "proofs": {"notarize": "allow"}, "note": "x"}])),
+        ("contact-rule-no-part", "a ContactRule with neither `proofs` nor `receipts` (D-109)", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0]}])),
+        ("contact-rule-empty-receipts", "a ContactRule with `receipts: {}` (D-109)", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0], "receipts": {}}])),
+        ("contact-rule-receipts-opened", "a ContactRule `receipts` with `autoOpened` (only DELIVERED, D-109)", policy_edit(policy, ["contactRules"], [{"contact": rule_contacts[0], "receipts": {"autoDelivered": True, "autoOpened": True}}])),
         ("missing-key", "`files.storage` missing (never filled from a default)", policy_edit(policy, ["files", "storage"], delete=True)),
     ]:
         reject(f"reject-policy-set-{case_id}", f"policy.set: {why}", signed_body(op_body("policy.set", {"version": 1, "policy": bad})))

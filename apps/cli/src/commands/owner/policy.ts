@@ -197,14 +197,18 @@ const list =
       : none;
 
 function contactRule(item: unknown): string {
-  const { contact, proofs } = item as {
+  const { contact, proofs, receipts } = item as {
     contact: string;
-    proofs: { notarize?: string; perActionMaxUSD?: string };
+    proofs?: { notarize?: string; perActionMaxUSD?: string };
+    receipts?: { autoDelivered: boolean };
   };
   const parts: string[] = [];
-  if (proofs.notarize !== undefined) parts.push(`add proof: ${rule(proofs.notarize)}`);
-  if (proofs.perActionMaxUSD !== undefined) {
+  if (proofs?.notarize !== undefined) parts.push(`add proof: ${rule(proofs.notarize)}`);
+  if (proofs?.perActionMaxUSD !== undefined) {
     parts.push(`each proof at most ${usd(proofs.perActionMaxUSD)}`);
+  }
+  if (receipts !== undefined) {
+    parts.push(`tell the sender a message arrived: ${yesNo(receipts.autoDelivered)}`);
   }
   return `${contact}: ${parts.join(', ')}`;
 }
