@@ -145,11 +145,13 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
           );
         } else {
           const add = dollars(selection.topUp.usd);
-          const each = dollars(selection.topUp.feeUsd) ?? fee ?? '';
+          const each = dollars(selection.topUp.feeUsd) ?? fee;
           lines.push(
             add === undefined
               ? CREDITS_TEXT.unavailable
-              : fill(CREDITS_TEXT.needs, { usd: add, fee: each }),
+              : each === undefined
+                ? fill(CREDITS_TEXT.needs.replace(' ({fee} each)', ''), { usd: add })
+                : fill(CREDITS_TEXT.needs, { usd: add, fee: each }),
           );
         }
         lines.push(fill(CREDITS_TEXT.topUpHow, { url: `${TOP_UP_ORIGIN}/`, agentId }));

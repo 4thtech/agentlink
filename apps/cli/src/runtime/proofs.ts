@@ -46,6 +46,7 @@ import type {
   ProofPlatformTools,
 } from '../tools/context.js';
 import { resolveOwnFolder } from './files.js';
+import { createPackVerifier } from './pack-verifier.js';
 
 const FLAVOR: PathFlavor = process.platform === 'win32' ? 'win32' : 'posix';
 const SEP = FLAVOR === 'win32' ? '\\' : '/';
@@ -247,13 +248,11 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
   // from the chains automatic selection may pick: a pack recorded through the Advanced override on a
   // held-back chain (Chiado, M1-3j-b) still verifies. Each read goes to that chain's shipped RPC and
   // its known Notary only, never to an address or URL from the pack.
-  const verifyReaders =
-    options.configs === undefined
-      ? chain.chainRegistry().map((config) => {
-          const own = readers.find((r) => r.config.chainId === config.chainId);
-          return own ?? { config, client: chain.createReadClient(config, { fetchFn }) };
-        })
-      : readers;
+  const verifyPack = createPackVerifier({
+    fetchFn,
+    reuse: readers,
+    ...(options.configs === undefined ? {} : { configs: readers.map((r) => r.config) }),
+  });
   const packs = nodeProofPacks(options);
 
   const platform: ProofsPlatform = Object.freeze({ kit: chain, chains, selector });
@@ -261,7 +260,7 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
   const tools = Object.freeze<ProofPlatformTools>({
     ...packs,
     async verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck> {
-      const result = await chain.verifyProofPack(pack, { chains: verifyReaders });
+      const result = await verifyPack(pack);
       if (!result.valid) return { valid: false, verdict: 'failed', reason: result.reason };
       const content =
         result.content.status === 'verified' || result.content.status === 'unattributed'
