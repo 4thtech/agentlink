@@ -198,6 +198,10 @@ beforeEach(() => {
 describe('notarize → DELIVERED → OPENED → export → verify (acceptance, testnet-style)', () => {
   it('records, delivers the salt, gets automatic DELIVERED and explicit OPENED, and the pack verifies', async () => {
     const { a, b } = await twoAgents();
+    // B's owner turned delivery receipts on for A (06 §3 contact rule, D-109).
+    await setPolicy(b, (p) => {
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
     const envelopeId = await sendText(a, b);
 
     const proof = await a.client.notarize({ envelopeId });
@@ -213,7 +217,7 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     expect(stored?.record.kind).toBe(RECORD_KIND.MESSAGE);
     expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
 
-    // The proof envelope reaches B; B checks on-chain, then DELIVERED goes out on its own.
+    // The proof envelope reaches B; B checks on-chain, then DELIVERED goes out under B's rule.
     await deliver(a, b);
     expect(stored?.receiptAt[0]).not.toBe(0n);
     expect(stored?.receiptAt[1]).toBe(0n);
@@ -283,6 +287,58 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     expect(await b.client.getProof({ envelopeId })).toMatchObject({
       recordId: (proof as { recordId: string }).recordId,
     });
+  });
+
+  it('the default rules (D-109): the proof is checked and stored, and no DELIVERED is signed', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const proof = await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+    expect(await b.client.getProof({ envelopeId })).toMatchObject({
+      recordId: (proof as { recordId: string }).recordId,
+    });
+  });
+
+  it('a contact rule turns DELIVERED on for that contact only (06 §3, D-109)', async () => {
+    const { a, b } = await twoAgents();
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    chain.fund(c.id, 10n * FEE_UNITS);
+    await setPolicy(b, (p) => {
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
+
+    const fromA = await sendText(a, b);
+    const recordA = (await a.client.notarize({ envelopeId: fromA })) as { recordId: string };
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([
+      expect.objectContaining({ record_id: recordA.recordId, type: 1, signer: b.id }),
+    ]);
+
+    const fromC = await sendText(c, b);
+    const recordC = (await c.client.notarize({ envelopeId: fromC })) as { recordId: string };
+    await deliver(c, b);
+    expect((await receipts(b)).map((r) => r.record_id)).toEqual([recordA.recordId]);
+    expect(onChain(recordC.recordId)?.receiptAt[0]).toBe(0n);
+    expect(chain.calls.acknowledge).toBe(1);
+  });
+
+  it('under failing rules no DELIVERED is signed, even with a contact rule on (G-6)', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(b, (p) => {
+      p.receipts.autoDelivered = true;
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
+    // The stored rules go missing after a version was applied: fail closed (06 §3).
+    await b.store.transaction((tx) => tx.delete('policies', {}));
+    expect((await b.client.ownerActions.loadPolicy()).mode).toBe('fail_closed');
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
   });
 
   it('a second notarize of the same envelope returns the stored record and charges nothing', async () => {

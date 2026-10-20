@@ -41,6 +41,8 @@ const send = (sizeBytes = 100, contact = A): PolicyAction => ({
   contact,
   sizeBytes,
 });
+/** A paired contact that is not blocked or revoked: its contact rule applies (06 §3). */
+const RULED_A = { contact: A, ruleEligible: true } as const;
 const hour = (n: number): PolicyContext => ({ contactEnvelopesLastHour: n });
 /** A paid proof well within the default limits, with an empty budget ledger (M1-7i). */
 const PROOF: PolicyAction = {
@@ -274,10 +276,79 @@ const RULES: readonly Row[] = [
   },
   // receipts
   {
+    // D-109 (M1-33a): delivery receipts are public, so off by default.
     name: 'auto DELIVERED, defaults',
     policy: defaults,
     action: { kind: 'receipt.auto', receipt: 'delivered' },
+    expected: 'deny',
+  },
+  {
+    name: 'auto DELIVERED, defaults, from a paired contact without a rule',
+    policy: defaults,
+    action: { kind: 'receipt.auto', receipt: 'delivered', counterparty: RULED_A },
+    expected: 'deny',
+  },
+  {
+    name: 'auto DELIVERED, contact rule on, that contact',
+    policy: signed((p) => (p.contactRules = [{ contact: A, receipts: { autoDelivered: true } }])),
+    action: { kind: 'receipt.auto', receipt: 'delivered', counterparty: RULED_A },
     expected: 'allow',
+  },
+  {
+    name: 'auto DELIVERED, contact rule on, another contact',
+    policy: signed((p) => (p.contactRules = [{ contact: A, receipts: { autoDelivered: true } }])),
+    action: {
+      kind: 'receipt.auto',
+      receipt: 'delivered',
+      counterparty: { contact: B, ruleEligible: true },
+    },
+    expected: 'deny',
+  },
+  {
+    name: 'auto DELIVERED, contact rule on, contact not eligible (blocked or revoked)',
+    policy: signed((p) => (p.contactRules = [{ contact: A, receipts: { autoDelivered: true } }])),
+    action: {
+      kind: 'receipt.auto',
+      receipt: 'delivered',
+      counterparty: { contact: A, ruleEligible: false },
+    },
+    expected: 'deny',
+  },
+  {
+    name: 'auto DELIVERED, contact rule on, no counterparty',
+    policy: signed((p) => (p.contactRules = [{ contact: A, receipts: { autoDelivered: true } }])),
+    action: { kind: 'receipt.auto', receipt: 'delivered' },
+    expected: 'deny',
+  },
+  {
+    name: 'auto DELIVERED, contact rule off replaces a global on',
+    policy: signed((p) => {
+      p.receipts.autoDelivered = true;
+      p.contactRules = [{ contact: A, receipts: { autoDelivered: false } }];
+    }),
+    action: { kind: 'receipt.auto', receipt: 'delivered', counterparty: RULED_A },
+    expected: 'deny',
+  },
+  {
+    name: 'auto DELIVERED, global on, a proofs-only rule keeps the global value',
+    policy: signed((p) => {
+      p.receipts.autoDelivered = true;
+      p.contactRules = [{ contact: A, proofs: { notarize: 'allow' } }];
+    }),
+    action: { kind: 'receipt.auto', receipt: 'delivered', counterparty: RULED_A },
+    expected: 'allow',
+  },
+  {
+    name: 'auto DELIVERED, global on (an owner choice)',
+    policy: signed((p) => (p.receipts.autoDelivered = true)),
+    action: { kind: 'receipt.auto', receipt: 'delivered', counterparty: RULED_A },
+    expected: 'allow',
+  },
+  {
+    name: 'auto OPENED, a DELIVERED contact rule never applies to OPENED',
+    policy: signed((p) => (p.contactRules = [{ contact: A, receipts: { autoDelivered: true } }])),
+    action: { kind: 'receipt.auto', receipt: 'opened', counterparty: RULED_A },
+    expected: 'deny',
   },
   {
     name: 'auto OPENED, defaults',
@@ -389,6 +460,12 @@ const FAIL_CLOSED: readonly Row[] = [
     name: 'no automatic DELIVERED',
     policy: failClosed,
     action: { kind: 'receipt.auto', receipt: 'delivered' },
+    expected: 'deny',
+  },
+  {
+    name: 'no automatic DELIVERED, even for a contact the stored rules would allow',
+    policy: failClosed,
+    action: { kind: 'receipt.auto', receipt: 'delivered', counterparty: RULED_A },
     expected: 'deny',
   },
   {
@@ -508,6 +585,7 @@ describe('evaluate is deterministic and side-effect free (property)', () => {
               [],
               [{ contact: A, proofs: { notarize: 'allow' } }],
               [{ contact: A, proofs: { perActionMaxUSD: '3' } }],
+              [{ contact: A, receipts: { autoDelivered: true } }],
             ] as const) as Policy['contactRules'];
             p.receipts.autoDelivered = rand() < 0.5;
             p.receipts.autoOpened = rand() < 0.5;
@@ -534,7 +612,12 @@ describe('evaluate is deterministic and side-effect free (property)', () => {
           }) as const,
         () => ({ kind: 'file.receive', sizeBytes: int(300 * MB) }) as const,
         () => ({ kind: 'key.disclose' }) as const,
-        () => ({ kind: 'receipt.auto', receipt: pick(['delivered', 'opened'] as const) }) as const,
+        () =>
+          ({
+            kind: 'receipt.auto',
+            receipt: pick(['delivered', 'opened'] as const),
+            counterparty: pick([null, { contact: A, ruleEligible: rand() < 0.5 }]),
+          }) as PolicyAction,
       ])();
       const context: PolicyContext = {
         ...hour(int(4000)),
