@@ -15,7 +15,7 @@ So: **crypto first, card last.** The pay page and the agent flows work without a
 - **Crypto first (decided).** Everything below works with no card path: the user's own account, or a transfer to the agent's address (QR code, link). Anybody can send stablecoins to an address, so no account, sign-up or provider is needed.
 - **Users pay every cost (decided, 12 §1).** Fees, network costs, receipts and top-up costs are paid by users. 4thTech subsidises nothing; the testnet faucet is the only exception, and it exists only on testnets.
 - **Agent-assisted (decided, §4).** The agent explains the one step, gives the link or the address and QR, watches for the funds and confirms the credits. It never holds or asks for the user's keys and never moves the user's funds.
-- **Under a minute** from "your agent needs credits" to credits the agent can use, on the default path, for a first-time user.
+- **Under a minute (proposed target, not set by the owner)** from "your agent needs credits" to credits the agent can use, on the default path, for a first-time user.
 - **No crypto knowledge on the default path.** No network choice, no token choice, no address typing (D-39, D-40). Amounts in US dollars only (D-45, 12).
 - **One link.** The agent gives one link; the user finishes on one page; the agent notices the credits by itself.
 - **Zero access (AGENTS.md hard rules, I-1).** The pay page and any payment provider receive only the agent's address and an amount. Never keys, seeds, plaintext, file keys, salts or tokens. The pay page runs on its own origin (`pay.`, 08 §2.3, D-28) with no access to the console or the agent.
@@ -67,7 +67,7 @@ The pay page shows the crypto methods (b, c) first; the card method (a) is added
 
 **Why a transfer and not `depositFor`.** `depositFor` needs two confirmations (an exact-amount approval, D-59, then the deposit) and fees in the network's own coin for both. `depositWithAuthorization` credits the account that signs it (05 §2.5), so the user's own signature would credit the user, not the agent. A transfer is one confirmation. **OPEN:** whether to also offer the two-step `depositFor` (credits at once, without waiting for the agent to run) under Advanced, and whether a later contract version adds a deposit that credits a named agent from an EIP-3009 signature (one gasless signature; needs a contract change and audit, out of scope for M1-3c).
 
-**Edge cases.** Funds only on an unsupported network: "We can't use funds on that network yet", with the other methods. Not enough of the network's own coin for the transfer fee: say so in plain words and offer card or exchange. A token we do not accept (for example a bridged USDC variant): not offered.
+**Edge cases.** Funds only on an unsupported network: "We can't use funds on that network yet", with the other methods. Not enough of the network's own coin for the transfer fee: say so in plain words and offer sending from an exchange instead (card only once that path is live). A token we do not accept (for example a bridged USDC variant): not offered.
 
 **Privacy line (D-109).** "Paying from your own account links that account to your agent publicly. Use a separate account if you want to keep them apart." Shown once, never blocking.
 
