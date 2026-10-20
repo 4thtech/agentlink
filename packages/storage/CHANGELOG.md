@@ -1,5 +1,20 @@
 # @4thtech-io/storage
 
+## 0.1.2
+
+### Patch Changes
+
+- 84bda36: M1-1g-g: a file shared through the encrypted drop stays deletable after a key rotation. The drop adapter records the drop key epoch of each upload and signs its delete with that epoch's key; the core keeps the epoch in the sealed file record.
+- 942b276: The encrypted-drop adapter and storage selection: `createDropAdapter` uploads ALF1 ciphertext to the 4thTech drop (signed upload, PUT, signed commit with the streamed SHA-256, signed delete) through an injected drop-key signer, refuses any off-origin or non-https upload or download URL, and maps the drop's errors to typed codes (`needs_setup` for size and quota limits; retryable `rate_limited` and `unavailable`). `selectStorage`, `resolveStorage`, `selectionForError` and `planInline` (G-27 option a) apply 07 §5.6. The S3 adapter's `put` now routes objects above 64 MiB to multipart upload.
+- 19e234d: M1-7f: files in the core. `sendMessage({files})` checks every file (size cap, realpath strictly inside an allowed folder, storage) and the D-85 inline plan, refusing `PAYLOAD_TOO_LARGE` before any read or upload, then encrypts each file with a fresh key (inline, own storage, or the encrypted drop signed through `KeyStore.signDropRequest`) and stores sealed `files` rows; uploads are deleted on any later failure. `fetchFile({envelopeId, fileIndex})` applies the receive cap, the expiry and the URL check, verifies inline ciphertext before decryption and saves through a quarantine file (D-84) under a sanitised, never-overwriting name. `isInsideFolder` is one helper with an explicit `self` rule, used by the path guard and the policy engine. New: the `files` client option (`FilesPlatform`), `withNameSuffix`, `planPacking` and `measurePayload`.
+  
+  `@4thtech-io/storage`: the response helpers move from the S3 session into `http.ts`, so the drop adapter no longer imports the S3 signer (aws4fetch) and a bundle that uses only the drop does not load it. No behaviour change.
+- Updated dependencies [dd9650b]
+- Updated dependencies [4d7d3e4]
+- Updated dependencies [2e6b70e]
+  - @4thtech-io/crypto@0.1.2
+  - @4thtech-io/log@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes

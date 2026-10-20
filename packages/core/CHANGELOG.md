@@ -1,5 +1,45 @@
 # @4thtech-io/core
 
+## 0.1.2
+
+### Patch Changes
+
+- b63fd4e: Terms: one approval reports `ok` to one request only. A later or concurrent call with the same `approvalId` under another request returns `APPROVAL_USED` with the original envelope, also while that accept is still waiting for relay acknowledgements; a repeat of the same `clientRequestId` still returns its original result (04 §3.4.2).
+- 84bda36: M1-1g-g: a file shared through the encrypted drop stays deletable after a key rotation. The drop adapter records the drop key epoch of each upload and signs its delete with that epoch's key; the core keeps the epoch in the sealed file record.
+- 2e6b70e: M1-4d-d-b: the agent card's proof of possession (04 §2.9, D-102). `TAGS.cardPop` (`agentlink/card-pop/v1`), `verifyCardPop`, `verifyCardPossession` and `cardPopSnapshot` are in the crypto main entry; the raw-key `signCardPop` is in the restricted `@4thtech-io/crypto/keystore` entry. `KeyStore.signCardPop(card)` signs only the store's own card at its current key epoch and refuses anything else with one fixed error; implemented by `MemoryKeyStore` and the keychain KeyStore (and its facade). The `handshake` and `handshake-ack` bodies take an optional `cardPop`, and `card-update` optional `cardAgentSig` and `cardPop`, together or not at all. The core makes `cardPop` with every own card (init, so also `owner add-agent`, and rotation once the KeyStore is at the new epoch; a card stored before this change gets one on first use), sends it in `handshake` and `handshake-ack`, verifies a received pair in `handshake`, `handshake-ack` and `card-update` (a present signature that does not verify drops the whole body), and stores a contact's verified pair. `proofSigner(from)` returns the signer block with the pair for the upcoming `exportProofPack` (M1-7g); the core does not yet send `card-update` itself. `verifyProofPack` uses the crypto check instead of its own composition (no behaviour change).
+- bdf5da6: M1-4d-f: the core sends `card-update` itself (04 §2.6, §2.9, §3.4.1; D-102). `client.sendCardUpdates()` (also run by `syncInbox`) sends the current card with `cardSig`, `cardAgentSig` and `cardPop` to every active, paired contact that does not hold it yet and that the owner's `contacts.allowed` permits (D-106; none while the policy fails closed); it is idempotent and resends one the outbox gave up on. The agent keeps its own earlier cards, one per key epoch, in the sealed identity card (no schema change), so `proofSigner(from)` returns the card of the envelope's key epoch for the upcoming `exportProofPack` (M1-7g); a future epoch or an unfinished rotation never gets one. A rotation signs the outgoing card's `cardPop` when it still lacks one. The late `cardPop` write checks its compare-and-set: a lost race is read again, and a race that keeps losing is reported (`key_epoch_mismatch`).
+- 19e234d: M1-7f: files in the core. `sendMessage({files})` checks every file (size cap, realpath strictly inside an allowed folder, storage) and the D-85 inline plan, refusing `PAYLOAD_TOO_LARGE` before any read or upload, then encrypts each file with a fresh key (inline, own storage, or the encrypted drop signed through `KeyStore.signDropRequest`) and stores sealed `files` rows; uploads are deleted on any later failure. `fetchFile({envelopeId, fileIndex})` applies the receive cap, the expiry and the URL check, verifies inline ciphertext before decryption and saves through a quarantine file (D-84) under a sanitised, never-overwriting name. `isInsideFolder` is one helper with an explicit `self` rule, used by the path guard and the policy engine. New: the `files` client option (`FilesPlatform`), `withNameSuffix`, `planPacking` and `measurePayload`.
+  
+  `@4thtech-io/storage`: the response helpers move from the S3 session into `http.ts`, so the drop adapter no longer imports the S3 signer (aws4fetch) and a bundle that uses only the drop does not load it. No behaviour change.
+- 49eb7be: M1-7g-b (D-107): recipient-side proof-pack export. `@4thtech-io/types`: the strict `proof` body schema accepts the signed `record` (05 §3.1 JSON form) and its `signature` (1 to 4 096 bytes), present together or not at all. `@4thtech-io/core`: every `proof` body the core sends carries the signed Record and signature; the recipient runs the 04 §3.4 receive checks 1–5 before storing them (a mismatch drops the whole body, `proof_mismatch`), keeps a body whose chain read failed pending and checks it again at later syncs (at most 256 bodies, 7 days, then `proof_unchecked`), and `exportProofPack` builds the recipient's own pack (recipient and salt only with `includeRecipient`; `RECORD_UNAVAILABLE` for an older sender's body). `ProofKit` now also takes `computeRecordId` and `verifyProofPack` from `@4thtech-io/chain`.
+- c6eb603: M1-7g: notarize, receipts and the proof-pack export in the core. `notarize` records a sent envelope (kind from the payload, automatic chain selection, policy and daily budget, approvals) and delivers the salt in a `proof` envelope; the recipient checks the record on-chain before any receipt, signs DELIVERED per policy and the deferred ACCEPTED of an approved accept; `acknowledge`, `getProof` and `proofs.exportProofPack` (key disclosure only with an owner approval). New client option `proofs`.
+- Updated dependencies [8c9cdd1]
+- Updated dependencies [1753640]
+- Updated dependencies [75737c8]
+- Updated dependencies [dd9650b]
+- Updated dependencies [4d7d3e4]
+- Updated dependencies [84bda36]
+- Updated dependencies [6c759e0]
+- Updated dependencies [2b11a8d]
+- Updated dependencies [85b6c1d]
+- Updated dependencies [bc3bfe4]
+- Updated dependencies [5a9ee7d]
+- Updated dependencies [248b9af]
+- Updated dependencies [92871c9]
+- Updated dependencies [3c350b7]
+- Updated dependencies [50340cb]
+- Updated dependencies [2e6b70e]
+- Updated dependencies [c5b21ee]
+- Updated dependencies [942b276]
+- Updated dependencies [19e234d]
+- Updated dependencies [49eb7be]
+  - @4thtech-io/chain@0.1.2
+  - @4thtech-io/crypto@0.1.2
+  - @4thtech-io/storage@0.1.2
+  - @4thtech-io/types@0.1.2
+  - @4thtech-io/transport-nostr@0.1.2
+  - @4thtech-io/log@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes

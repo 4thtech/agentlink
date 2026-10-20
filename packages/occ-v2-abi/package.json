@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/occ-v2-abi",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "OCC v2 contract ABIs and testnet addresses, imported from the private contracts repository's tagged releases and verified against their SHA-256 manifest. Bundled into the CLI; never published (D-83).",
   "license": "MIT",
