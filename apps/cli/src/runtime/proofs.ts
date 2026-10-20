@@ -12,8 +12,11 @@
 // - verify: `verifyProofPack` against every shipped chain (`chainRegistry()`, M1-26-b), so a pack
 //   verifies with no chain configured (07 §6.3, §8): a pack naming any other chain or Notary fails
 //   with a fixed code.
-// - account: credits on every chain and the notarize price (USD, protocol and app parts) on the
-//   first chain that answers, within a short budget; undefined when none answered.
+// - account: credits on every selectable chain and the notarize price (USD, protocol and app parts)
+//   where the next proof would be paid, within a short budget; undefined when none answered.
+//   M1-26-c (07 §6.3, D-40): the same selection as the paid path (the shared selector, the policy
+//   default chain): the paying chain's quote, or the top-up route's when nothing is funded; the
+//   paying chain's credits come first.
 // - nodeProofPacks: the pack files. `readPack` confines `path` to `proofs.exportFolder` and
 //   `files.inboxFolder` (D-87): a lexical check of the normalised path before any disk access, then
 //   @4thtech-io/node's `openAllowedFile` (realpath on both sides, hidden and protected refusals,
@@ -38,6 +41,7 @@ import {
 } from '@4thtech-io/core';
 import { nodeRpcFetch, openAllowedFile } from '@4thtech-io/node';
 import type {
+  AccountOptions,
   AccountView,
   PackCheck,
   PackFolders,
@@ -289,32 +293,65 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
         notices: result.notices.map((n) => n.code),
       };
     },
-    async account(agentId: string): Promise<AccountView | undefined> {
+    async account(agentId: string, options: AccountOptions = {}): Promise<AccountView | undefined> {
       const read = async (): Promise<AccountView | undefined> => {
         const payer = agentId as chain.Hex;
-        const { credits, unavailable } = await chain.readCreditsAcrossChains(readers, payer);
+        // M1-26-c (07 §6.3, D-40): the same selection the paid path makes (the shared selector,
+        // the policy default chain), read beside the credits on every selectable chain.
+        const [selection, { credits, unavailable }] = await Promise.all([
+          selector
+            .select(readers, payer, {
+              feeType: 'NOTARIZE',
+              budgetMs: ACCOUNT_BUDGET_MS,
+              ...(options.defaultChain === undefined ? {} : { defaultChain: options.defaultChain }),
+            })
+            .catch(() => undefined),
+          chain.readCreditsAcrossChains(readers, payer),
+        ]);
         const answering = readers.filter((r) => !unavailable.includes(r.config.chainId));
         if (answering.length === 0) return undefined;
-        const first = answering[0];
-        const token = first?.config.feeTokens[0]?.symbol;
-        let prices: AccountView['prices'] = [];
-        if (first !== undefined && token !== undefined) {
-          const quote = await chain
-            .quoteFee(first.client, first.config, { feeType: 'NOTARIZE', token })
-            .catch(() => undefined);
-          if (quote !== undefined) {
-            prices = [
-              {
-                action: 'notarize',
-                usd: quote.usd,
-                protocolUsd: quote.protocolUsd,
-                integratorUsd: quote.integratorUsd,
-              },
-            ];
+        // The price where the next proof would be paid: the paying chain's quote, or the quote on
+        // the chain a top-up routes to; the first chain that answers only when selection failed.
+        let quote: chain.FeeQuote | undefined;
+        let paying: number | undefined;
+        if (selection?.status === 'ok') {
+          quote = selection.quote;
+          paying = selection.chainId;
+        } else {
+          const route = selection?.status === 'needs_credits' ? selection.topUp : undefined;
+          const at =
+            route === undefined
+              ? answering[0]
+              : readers.find((r) => r.config.chainId === route.chainId);
+          const token = route?.token ?? at?.config.feeTokens[0]?.symbol;
+          paying = route?.chainId;
+          if (at !== undefined && token !== undefined) {
+            quote = await chain
+              .quoteFee(at.client, at.config, { feeType: 'NOTARIZE', token })
+              .catch(() => undefined);
           }
         }
+        const prices: AccountView['prices'] =
+          quote === undefined
+            ? []
+            : [
+                {
+                  action: 'notarize',
+                  usd: quote.usd,
+                  protocolUsd: quote.protocolUsd,
+                  integratorUsd: quote.integratorUsd,
+                },
+              ];
+        // The paying (or top-up) chain's credits first; the order is otherwise unchanged.
+        const ordered =
+          paying === undefined
+            ? credits
+            : [
+                ...credits.filter((c) => c.chainId === paying),
+                ...credits.filter((c) => c.chainId !== paying),
+              ];
         return {
-          credits: credits.flatMap((c) =>
+          credits: ordered.flatMap((c) =>
             c.usd === null
               ? []
               : [{ chain: c.chain, token: c.token, amount: c.amount.toString(), usd: c.usd }],

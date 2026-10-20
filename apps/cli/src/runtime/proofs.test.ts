@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import * as chain from '@4thtech-io/chain';
-import { decodeFunctionData, encodeFunctionResult } from 'viem';
+import { encodeHex, encodeUtf8, keccak256 } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { nodeProofPacks, nodeProofs } from './proofs.js';
 
@@ -251,8 +251,18 @@ describe('nodeProofs: paid calls and status follow the automatic selection (M1-2
     ...BASE,
     key: 'third-testnet',
     chainId: 11155420,
-    rpcUrls: Object.freeze(['https://third-testnet-rpc.publicnode.com', 'https://third-testnet.drpc.org']),
+    rpcUrls: ['https://third-testnet-rpc.publicnode.com', 'https://third-testnet.drpc.org'],
   });
+
+  /** The fee vault's view functions by 4-byte selector (from the shipped ABI, no viem here). */
+  const SELECTORS = new Map(
+    chain.FEE_VAULT_CLIENT_ABI.flatMap((item) => {
+      if (item.type !== 'function') return [];
+      const signature = `${item.name}(${item.inputs.map((i) => i.type).join(',')})`;
+      const selector = `0x${encodeHex(keccak256(encodeUtf8(signature))).slice(0, 8)}`;
+      return [[selector, item.name] as const];
+    }),
+  );
 
   interface Fake {
     /** Fee in USDC base units (6 decimals). */
@@ -286,23 +296,14 @@ describe('nodeProofs: paid calls and status follow the automatic selection (M1-2
         );
       if (body.method === 'eth_chainId') return answer(`0x${config.chainId.toString(16)}`);
       if (body.method !== 'eth_call') return Promise.reject(new Error('unexpected method'));
-      const tx = body.params[0] as { to: string; data: `0x${string}` };
-      const { functionName } = decodeFunctionData({
-        abi: chain.FEE_VAULT_CLIENT_ABI,
-        data: tx.data,
-      });
-      let result: unknown;
-      if (functionName === 'quote') result = [fake.fee, 0n, fake.fee];
-      else if (functionName === 'creditsOf') result = fake.credits ?? 0n;
-      else if (functionName === 'minDeposit') result = 0n;
+      const tx = body.params[0] as { to: string; data: string };
+      const functionName = SELECTORS.get(tx.data.slice(0, 10).toLowerCase());
+      let words: bigint[];
+      if (functionName === 'quote') words = [fake.fee, 0n, fake.fee];
+      else if (functionName === 'creditsOf') words = [fake.credits ?? 0n];
+      else if (functionName === 'minDeposit') words = [0n];
       else return Promise.reject(new Error('unexpected function'));
-      return answer(
-        encodeFunctionResult({
-          abi: chain.FEE_VAULT_CLIENT_ABI,
-          functionName,
-          result,
-        } as Parameters<typeof encodeFunctionResult>[0]),
-      );
+      return answer(`0x${words.map((w) => w.toString(16).padStart(64, '0')).join('')}`);
     };
     Object.defineProperty(fn, ADDRESS_CHECKED, { value: true });
     return { fetchFn: fn as unknown as chain.RpcFetchFn, hosts };
