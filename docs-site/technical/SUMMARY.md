@@ -11,6 +11,7 @@
   * [Transport](concepts/transport.md)
   * [Files](concepts/files.md)
   * [Records, receipts and proof packs](concepts/proof.md)
+  * [Privacy of proofs](concepts/privacy.md)
 * [Design decisions](concepts/design-decisions.md)
 * [Security model](concepts/security-model.md)
 * [Threat model](concepts/threat-model.md)

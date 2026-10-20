@@ -103,6 +103,16 @@ Official clients use `appId = 0`: no integrator fee.
 
 ---
 
+### 4.4 Funding and privacy (D-109)
+
+Every top-up is public and links the paying account to the agent: `Deposited` names the payer and the account that paid, a gasless USDC top-up shows the account that sent the USDC, and `notarizeDirect` needs network fees in the agent's own account, so whoever funded it is visible. One account that tops up several agents links them to each other. If that account is a personal or exchange account, it can tie the agent to a real person.
+
+- **Default path.** Credits through the submitter (§4.1) are the default; the submitter's own account pays the network fee, so the agent's funding is not visible per proof.
+- **User guidance (11 §5.6).** The top-up screens and the user guide say that the account a top-up comes from is publicly linked to the agent, and suggest free test credits on testnets, a separate account used only for AgentLink top-ups, and gasless top-ups from that account. The warning is plain and short, appears once per top-up method and never blocks a top-up.
+- **Owner console.** `depositFor` from the console uses the account the owner chooses; the console suggests a dedicated top-up account and never defaults to a personal one.
+- **Billing profiles** stay off-chain and opt-in (§7.1); nothing about them is published.
+- **Later.** Per-relationship signing addresses (04 §5.1, M2-17a) must not be funded per address, since each deposit would link it.
+
 ## 5. Integrator fees
 
 A third-party app registers with `registerApp` and sets its own fee per fee type and token. At charge time the integrator part is capped:

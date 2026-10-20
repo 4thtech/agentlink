@@ -34,6 +34,7 @@ We build in public, in stages, and each stage ends with something you can try. T
 | **M2** | Console, desktop apps, cloud agent, verify and invite pages, verified domains, storage connectors; 20–50 external testers | 8, 9, 6, 7 | ~4–6+ weeks | 0.3.0 |
 | **M3** | External audit, then mainnet on Base and Gnosis | 7 | ~4 weeks | 1.0.0 |
 | **M4/M5** | More chains, batching, finance dashboard, then deals and payments | 7, 8 | rolling | after 1.0.0 |
+| **M6** | AgentLink on Solana, after the EVM chains (D-110; direction only, no dates) | 7, 1, 3 | rolling | after M4 |
 
 ### External services by stage
 
@@ -113,6 +114,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M1-11 Local approval UI (functional and unstyled; styled from D1 when it lands) | apps/cli | Owner passkey setup, approvals with passkey, storage (drop usage; optional own storage), allowed folders, policies, credits (faucet on testnet), backup |
 | M1-12 Skill file + quickstart docs (rest) | skills/, docs | A new user completes J1 from docs alone |
 | M1-13 E2E suite (rest) | e2e | 5 MB file with zero storage setup (encrypted drop), notarize, DELIVERED/OPENED, export + verify pack; J8 with on-chain proof of agreement; prompt-injection suite on file and proof tools (06 §9) |
+| M1-33 Privacy of on-chain proofs, M1 part (D-109) | core, types, apps/cli, docs | Delivery receipts off by default, asked for by the sender and confirmed by the recipient or its rules (M1-33a); the 11 §5.6 disclosure in every proof, receipt, export and top-up surface (M1-33b); `parentRecordId` only ever zero or the agent's own record (M1-33c). Lands before the first release that ships proofs |
 
 **Gate M1:** 10 internal testers on ≥ 3 harness combinations complete J1, J2, J4, J5 on testnets, and J3 using faucet credits; J8 completed with on-chain proof of agreement. In J1 a file over 12 KB (5 MB in the e2e suite) is sent with zero storage setup through the encrypted drop (D-48). UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears in any J1–J9 default flow, and install → first message stays under 5 minutes.
 
@@ -132,6 +134,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M2-12 Domain verification (D-34) | contracts, chain, core, console | The owner proves control of a domain (DNS TXT or `/.well-known`); ships with OCCRegistry; clients check it themselves before showing it |
 | M2-13 Browser counterparty view-and-accept (D-35, P1) | web client | A counterparty without an agent opens the invite link, views the offer and accepts in the browser; keys generated in the browser, same identity model as the console; design in D2 |
 | M2-15 Consumer storage connectors (D-49, P1) | packages/storage, apps/desktop | Google Drive, Dropbox and OneDrive adapters behind the same `StorageAdapter` interface; Settings → Storage → Connect in the desktop apps with OAuth (PKCE, loopback redirect), minimal scopes and tokens only in the OS keychain; only ciphertext with random names in an app folder; time-limited share links, or the owner's decision per provider (07 §5.5); round trips against each provider |
+| M2-17 Privacy of on-chain proofs, M2 part (D-109) | contracts, chain, core, console | Per-relationship signing addresses with proof of possession and no per-address funding (M2-17a); a Registry whose events and calldata carry no guessable identifier (M2-17b, before M2-4a); optional delayed or batched receipts (M2-17c). Contract changes land before the M3 audit |
 
 **Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met; no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
 
@@ -156,7 +159,11 @@ Arbitrum, Optimism, Polygon deployments · native-coin fees behind a bounded `PR
 
 ## M5 — Agent commerce
 
-OCCDeals state machine · x402 settlement linkage · arbitrator disclosure · per-relationship agent keys.
+OCCDeals state machine · x402 settlement linkage · arbitrator disclosure. (Per-relationship agent keys moved to M2, M2-17a, D-109.)
+
+## M6 — Solana (after the EVM chains; D-110)
+
+Direction only, no dates. Once the EVM chains on this plan are deployed (Base and Gnosis in M3, the M4 EVM chains), AgentLink adds Solana: on-chain programs equivalent to OCCNotary and OCCFeeVault, and client support in the chain package, the verifier and the submitter. It starts with a design spike (M6-1) that answers the open questions in D-110 before any program or client code; each program is externally audited before mainnet, like the EVM contracts.
 
 ---
 

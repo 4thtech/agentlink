@@ -11,7 +11,7 @@ Policies are owner-signed documents, stored locally and verified on load. They c
 - `contacts`: accepting invites, unknown senders, allowed contacts, rate limits
 - `files`: allowed folders, inbox folder, size limits, storage choice (encrypted drop or own storage), expiry, delete after expiry or receipt
 - `proofs`: notarize allow, approval or deny; daily budget; per-action maximum; key disclosure; export folder
-- `receipts`: automatic `DELIVERED`; `OPENED` only on request
+- `receipts`: `DELIVERED` off by default (D-109; a contact rule can turn it on for one contact, and the user can confirm one on request); `OPENED` only on request
 - `commitments`: accepting terms (approval by default), auto-accept allowlist and maximum value
 - `contactRules`: per-contact proof rules, created by "Remember for this contact" on a proof approval
 - How a change is signed and applied
