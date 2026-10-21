@@ -19,7 +19,7 @@ function pushPaths(source) {
   if (!on) return null;
   const push = /(?:^|\n) {2}push:\n((?: {4}.*\n|\s*\n)*)/.exec(on[1]);
   if (!push) return null;
-  const paths = /(?:^|\n) {4}paths:\n((?: {6}- .*\n)*)/.exec(push[1]);
+  const paths = /(?:^|\n) {4}paths:\n((?: {6}(?:- |#).*\n)*)/.exec(push[1]);
   if (!paths) return null;
   return [...paths[1].matchAll(/ {6}- (?:"([^"]*)"|'([^']*)'|(\S+))/g)].map(
     (m) => m[1] ?? m[2] ?? m[3],
@@ -100,6 +100,7 @@ describe('the helpers', () => {
       '    branches: [main]',
       '    paths:',
       '      - "apps/drop/**"',
+      '      # a comment',
       "      - '.github/workflows/x.yml'",
       '  workflow_dispatch:',
       'jobs:',
