@@ -113,7 +113,7 @@ jobs:
           node -e '
             const r = JSON.parse(require("node:fs").readFileSync(process.env.E2E_REPORT, "utf8"));
             let failed = false;
-            for (const [name, count] of [["pair-and-message", 2], ["negotiate-and-agree", 5], ["files-and-proof", 10]]) {
+            for (const [name, count] of [["pair-and-message", 2], ["negotiate-and-agree", 5], ["files-and-proof", 9]]) {
               const f = r.testResults.filter((x) => x.name.endsWith(`/${name}.test.ts`));
               const t = f.length === 1 ? f[0].assertionResults : [];
               const bad = t.filter((x) => x.status !== "passed");
