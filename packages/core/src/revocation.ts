@@ -12,18 +12,30 @@
 //   keys (all of them for the own agent) as `not_delivered` with reason `revoked` (07 §3.2). A
 //   re-published copy is a no-op. From then on screenInboundTx drops that agent's envelopes, and
 //   card-update and handshake for it are refused (contacts.ts, M1-7a).
-// - Not here (backlog M1-7h-b): voiding pending approvals and open commitment parts with the revoked
-//   agent as counterparty (07 §3.4, 04 §3.4.2 void rule 3) and the Registry source (05 §4, M2-4b).
+// - Void rule 3 (04 §3.4.2; 07 §3.4 "Transaction"; M1-7h-b): in that same transaction, every
+//   `pending` approval and every `unclaimed` or `claimed` commitment part with the revoked contact
+//   as counterparty becomes `void` (parts with void_reason `void`, APPROVAL_VOID). The counterparty
+//   is read from the sealed action (`context.counterparty`, or `context.scope.counterparty` for a
+//   commitment), opened in `prepare` because the transaction cannot decrypt (07 §3.1), and from the
+//   clear `scope_json` inside the transaction. An approved scope keeps its row (only an owner
+//   signature ends what an owner approved, 07 §3.5); its open parts end. If a pending approval
+//   without a scope appeared after `prepare` read the approvals, the effect writes nothing
+//   (`stale`) and the next pass applies the revoke, so none is missed. An action that cannot be
+//   opened is decided by its scope alone: it authorises nothing anyway (approvals.ts, fail closed).
+// - The activity line (07 §3.2): the counts of stopped outbox rows, voided approvals and voided
+//   parts, in the envelope's report and one log line (envelopes.ts).
+// - Not here: the Registry source (05 §4, M2-4b).
 //
 // I-4: nothing here takes presence or holds an owner key; the owner signature is the authority.
 // I-5, I-7: refusals are fixed codes; nothing from the object is logged.
 import { canonicalize, encodeHex } from '@4thtech-io/crypto';
 import type { Payload } from '@4thtech-io/types';
 import type { ContactBook } from './contacts.js';
-import { nowOf, type CoreContext } from './context.js';
-import type { InboundReason, PreparedRevoke, RevokeHandler } from './envelopes.js';
+import { nowOf, open, type CoreContext } from './context.js';
+import type { InboundReason, PreparedRevoke, RevokeActivity, RevokeHandler } from './envelopes.js';
 import type { IdentityService } from './identity.js';
 import { verifyOwnerAction } from './owner-action.js';
+import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
 const NOSTR_KEY = /^[0-9a-f]{64}$/;
@@ -40,13 +52,17 @@ function keyList(text: string | null | undefined): string[] {
   }
 }
 
-/** Stops the `pending` outbox rows to `keys` (every row when `keys` is undefined), 07 §3.2. */
-function stopOutboxTx(tx: StoreTx, keys: readonly string[] | undefined): void {
+/**
+ * Stops the `pending` outbox rows to `keys` (every row when `keys` is undefined), 07 §3.2. Returns
+ * how many rows it stopped.
+ */
+function stopOutboxTx(tx: StoreTx, keys: readonly string[] | undefined): number {
   const rows = tx
     .select('outbox', { state: 'pending' })
     .filter((r) => keys === undefined || keys.includes(r.recipient_key));
+  let stopped = 0;
   for (const row of rows) {
-    tx.update(
+    stopped += tx.update(
       'outbox',
       { wrap_id: row.wrap_id, state: 'pending' },
       { state: 'not_delivered', reason: 'revoked', wrap_json: null },
@@ -59,6 +75,104 @@ function stopOutboxTx(tx: StoreTx, keys: readonly string[] | undefined): void {
       );
     }
   }
+  return stopped;
+}
+
+/** Part states that a void rule ends (07 §3.5 "Done and void": `done` and `void` are final). */
+const OPEN_PARTS = ['unclaimed', 'claimed'] as const;
+
+/**
+ * The approvals a revoke may void: every `pending` one, and every other one with an open
+ * commitment part (an approved scope or a policy grant).
+ */
+function voidCandidatesTx(tx: StoreTx): Row<'approvals'>[] {
+  const pending = tx.select('approvals', { status: 'pending' });
+  const withParts = new Set(
+    tx.select('commitment_parts', { state: { in: [...OPEN_PARTS] } }).map((p) => p.approval_id),
+  );
+  for (const row of pending) withParts.delete(row.approval_id);
+  const others = [...withParts]
+    .sort()
+    .map((id) => tx.get('approvals', { approval_id: id }))
+    .filter((row): row is Row<'approvals'> => row !== undefined);
+  return [...pending, ...others];
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** `counterparty.agentId` of a parsed object, if it is a string (a defensive read). */
+function agentIdOf(holder: unknown): string | undefined {
+  if (!isRecord(holder)) return undefined;
+  const counterparty = holder.counterparty;
+  if (!isRecord(counterparty)) return undefined;
+  return typeof counterparty.agentId === 'string' ? counterparty.agentId : undefined;
+}
+
+/** The counterparty of a stored commitment scope (`approvals.scope_json`, in clear), if any. */
+function scopeCounterparty(scopeJson: string | null): string | undefined {
+  if (scopeJson === null) return undefined;
+  try {
+    return agentIdOf(JSON.parse(scopeJson) as unknown);
+  } catch {
+    return undefined;
+  }
+}
+
+/** The counterparty an approval action names (04 §3.4.1 `context`), if any. */
+function actionCounterparty(actionText: string): string | undefined {
+  let action: unknown;
+  try {
+    action = JSON.parse(actionText) as unknown;
+  } catch {
+    return undefined;
+  }
+  if (!isRecord(action) || !isRecord(action.context)) return undefined;
+  return agentIdOf(action.context) ?? agentIdOf(action.context.scope);
+}
+
+/** What `prepare` read of the approvals (outside the transaction, which cannot decrypt). */
+interface ApprovalsRead {
+  /** Every candidate approval that was read. */
+  readonly seen: ReadonlySet<string>;
+  /** Those whose sealed action names the revoked agent as counterparty. */
+  readonly named: ReadonlySet<string>;
+}
+
+/**
+ * Void rule 3 for a revoked contact (04 §3.4.2; 07 §3.4), inside the revoke transaction. Returns
+ * `stale` (and writes nothing) when a pending approval without a scope appeared after `read`.
+ */
+function voidForCounterpartyTx(
+  tx: StoreTx,
+  agent: string,
+  read: ApprovalsRead,
+  now: number,
+): { readonly approvals: number; readonly parts: number } | 'stale' {
+  const candidates = voidCandidatesTx(tx);
+  const hits: Row<'approvals'>[] = [];
+  for (const row of candidates) {
+    const scoped = scopeCounterparty(row.scope_json);
+    if (!read.seen.has(row.approval_id) && scoped === undefined) return 'stale';
+    if (read.named.has(row.approval_id) || scoped === agent) hits.push(row);
+  }
+  let approvals = 0;
+  let parts = 0;
+  for (const row of hits) {
+    if (row.status === 'pending') {
+      approvals += tx.update(
+        'approvals',
+        { approval_id: row.approval_id, status: 'pending' },
+        { status: 'void', decided_at: now },
+      );
+    }
+    parts += tx.update(
+      'commitment_parts',
+      { approval_id: row.approval_id, state: { in: [...OPEN_PARTS] } },
+      { state: 'void', void_reason: 'void', updated_at: now },
+    );
+  }
+  return { approvals, parts };
 }
 
 export class RevocationService implements RevokeHandler {
@@ -119,8 +233,8 @@ export class RevocationService implements RevokeHandler {
             tx.update('identity', { agent_id: row.agent_id }, { revoked_at: now, updated_at: now });
           }
           // 07 §3.2: for the own agent, every pending row stops.
-          stopOutboxTx(tx, undefined);
-          return 'applied';
+          const outboxStopped = stopOutboxTx(tx, undefined);
+          return { self: true, outboxStopped, approvalsVoided: 0, partsVoided: 0 };
         },
       };
     }
@@ -137,6 +251,7 @@ export class RevocationService implements RevokeHandler {
     }
     const { body } = verdict.signed;
     const signedJson = canonicalize(verdict.signed as never);
+    const read = await this.#readApprovals(agent);
     return {
       contactId: agent,
       effect: (tx) => {
@@ -147,6 +262,9 @@ export class RevocationService implements RevokeHandler {
           }
           return 'noop';
         }
+        // Before any write: a pending approval this read missed defers the whole revoke.
+        const voided = voidForCounterpartyTx(tx, agent, read, now);
+        if (voided === 'stale') return 'stale';
         const keys = [
           ...new Set([
             ...keyList(contact?.nostr_keys),
@@ -166,9 +284,41 @@ export class RevocationService implements RevokeHandler {
         if (contact !== undefined) {
           tx.update('contacts', { contact_id: agent }, { status: 'revoked', updated_at: now });
         }
-        stopOutboxTx(tx, keys);
-        return 'applied';
+        const outboxStopped = stopOutboxTx(tx, keys);
+        const activity: RevokeActivity = {
+          self: false,
+          outboxStopped,
+          approvalsVoided: voided.approvals,
+          partsVoided: voided.parts,
+        };
+        return activity;
       },
     };
+  }
+
+  /**
+   * Opens the action of every approval a revoke may void and notes those that name `agent` as
+   * counterparty. A row whose action does not open is decided by its scope alone (it authorises
+   * nothing, approvals.ts). A store read error throws (fail closed: the revoke is not dropped).
+   */
+  async #readApprovals(agent: string): Promise<ApprovalsRead> {
+    const ctx = this.#ctx;
+    // A re-published copy of an applied revoke is a no-op in its transaction: nothing to read.
+    const rows = await ctx.store.transaction((tx) =>
+      tx.get('revoked_agents', { agent_evm: agent }) === undefined ? voidCandidatesTx(tx) : [],
+    );
+    const seen = new Set<string>();
+    const named = new Set<string>();
+    for (const row of rows) {
+      seen.add(row.approval_id);
+      let text: string;
+      try {
+        text = await open(ctx, 'approvals', 'action_json', [row.approval_id], row.action_json);
+      } catch {
+        continue;
+      }
+      if (actionCounterparty(text) === agent) named.add(row.approval_id);
+    }
+    return { seen, named };
   }
 }

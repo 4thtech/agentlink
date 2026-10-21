@@ -146,6 +146,8 @@ function fake(
     requests?: number;
     page?: 'before_not_found';
     syncFails?: boolean;
+    /** M1-5g: seconds a relay returned at its cap in this sync (a count only). */
+    incomplete?: number;
     openOffers?: OpenOffer[];
   } = {},
 ): Fake {
@@ -181,7 +183,9 @@ function fake(
       calls.push(`syncInbox:${budgetMs}`);
       return options.syncFails === true
         ? Promise.reject(new Error(`relay said ${HOSTILE}`))
-        : Promise.resolve();
+        : Promise.resolve(
+            options.incomplete === undefined ? undefined : { incomplete: options.incomplete },
+          );
     },
     inboxPage: (query): Promise<InboxPage> => {
       calls.push('inboxPage');
@@ -506,6 +510,33 @@ describe('agentlink_inbox: sync and query (06 §2.2, §6)', () => {
     expect(result.structured.status).toBe('ok');
     expect(client.calls).toContain('inboxPage');
     for (const part of CANARY_PARTS) expect(lines.join('\n')).not.toContain(part);
+  });
+
+  it('M1-5g: a sync with an incomplete second adds the fixed nextStep; the page still answers', async () => {
+    const { logger, lines } = capture();
+    const result = await inbox({}, fake({ incomplete: 3 }), logger);
+    expect(result.structured.status).toBe('ok');
+    expect(messagesOf(result)).toHaveLength(1);
+    expect(result.structured.nextStep).toBe(copy('chat.inbox.incompleteNextStep'));
+    expect(result.structured.nextStep).toContain('some messages may be missing');
+    expect(result.structured.nextStep).toContain('look for them again');
+    // Fixed text: no count, no relay word (11 §5.1); the log carries the count only.
+    expect(result.structured.nextStep).not.toMatch(/\d|relay/i);
+    expect(lines.join('\n')).toContain('"incomplete":3');
+  });
+
+  it('M1-5g: a complete sync, or one that failed, adds no incomplete line', async () => {
+    for (const client of [fake({ incomplete: 0 }), fake(), fake({ syncFails: true })]) {
+      const result = await inbox({}, client);
+      expect(String(result.structured.nextStep ?? '')).not.toContain('may be missing');
+    }
+  });
+
+  it('M1-5g: the incomplete line follows the request and receipt lines', async () => {
+    const result = await inbox({}, fake({ incomplete: 1, items: [acceptedRequest()] }));
+    expect(result.structured.nextStep).toBe(
+      `${copy('chat.inbox.requestNextStep')} ${copy('chat.inbox.incompleteNextStep')}`,
+    );
   });
 
   it('needs_setup when the agent has no identity', async () => {

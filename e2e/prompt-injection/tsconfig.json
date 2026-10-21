@@ -1,0 +1,6 @@
+{
+  // Type-checks the prompt-injection suites (M1-13b, M1-13d) with the e2e settings:
+  //   pnpm --filter @4thtech-io/e2e exec tsc -p prompt-injection/tsconfig.json
+  "extends": "../tsconfig.json",
+  "include": ["**/*.ts"]
+}

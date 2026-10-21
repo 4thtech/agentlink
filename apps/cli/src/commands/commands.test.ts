@@ -530,6 +530,27 @@ describe('status (06 §2.0, D-73)', () => {
     const result = await harness(fakeAgent()).run(['status', '--brief']);
     expect(result.out).toEqual(['Nothing new on AgentLink.']);
   });
+
+  it('M1-5g: an incomplete second adds one fixed warning: no count, no relay word', async () => {
+    const f = fakeAgent({
+      catchUp: () => Promise.resolve({ partial: false, incomplete: 2, inbox: [], requests: 0 }),
+    });
+    const result = await harness(f).run(['status', '--brief']);
+    expect(result.code).toBe(EXIT_OK);
+    expect(result.out).toEqual([
+      'Nothing new on AgentLink.',
+      'Warning  Some messages may be missing from this check. AgentLink will look for them again on the next check.',
+    ]);
+    expect(result.text).not.toMatch(/relay|\b2\b/i);
+  });
+
+  it('M1-5g: no incomplete second, no warning', async () => {
+    const f = fakeAgent({
+      catchUp: () => Promise.resolve({ partial: false, incomplete: 0, inbox: [], requests: 0 }),
+    });
+    const result = await harness(f).run(['status', '--brief']);
+    expect(result.text).not.toContain('may be missing');
+  });
 });
 
 describe('doctor (07 §9.4)', () => {

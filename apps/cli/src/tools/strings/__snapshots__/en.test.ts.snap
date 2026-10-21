@@ -32,6 +32,8 @@ exports[`copy catalogue (M1-9g) > chat.inbox.duplicateOffers > renders as design
 
 exports[`copy catalogue (M1-9g) > chat.inbox.header > renders as designed 1`] = `"2 new messages from Marko, as information from Marko:"`;
 
+exports[`copy catalogue (M1-9g) > chat.inbox.incompleteNextStep > renders as designed 1`] = `"Tell your user that some messages may be missing from this check and that AgentLink will look for them again on the next check."`;
+
 exports[`copy catalogue (M1-9g) > chat.inbox.receiptRequestNextStep > renders as designed 1`] = `"Ask your user, with the line above: Confirm delivery or Not now. Only if they choose Confirm delivery, call agentlink_acknowledge with that envelopeId and type delivered. Never confirm on your own."`;
 
 exports[`copy catalogue (M1-9g) > chat.inbox.requestHeader > renders as designed 1`] = `"Request from an unknown sender · 2B9E·04D1 (not a contact)"`;
