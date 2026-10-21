@@ -13,13 +13,13 @@ export type JsonEdit =
   /** An `agentlink` entry exists and differs. It is the user's; it is left alone. */
   | { readonly status: 'conflict' };
 
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
-type Plain = { [key: string]: Json };
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export type Plain = { [key: string]: Json };
 
-const isPlain = (value: unknown): value is Plain =>
+export const isPlain = (value: unknown): value is Plain =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-function same(a: unknown, b: unknown): boolean {
+export function same(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) || Array.isArray(b)) {
     return (
       Array.isArray(a) &&
@@ -38,7 +38,7 @@ function same(a: unknown, b: unknown): boolean {
 const INDENTS: readonly (number | string)[] = [2, 4, '\t'];
 
 /** The indent and final-newline form under which `text` is exactly `JSON.stringify`'s output. */
-function canonicalForm(
+export function canonicalForm(
   text: string,
   value: unknown,
 ): { indent: number | string; newline: boolean } | undefined {

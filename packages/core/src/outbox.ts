@@ -24,10 +24,13 @@
 // - envelopes.delivery follows the `contact` rows of the latest attempt per key (07 §3.2 "States");
 //   an envelope without a contact row (the owner channel) follows all of its rows.
 // - Staged envelopes (IR-M1-7k-1 F01): only the pairing messages that M1-7c stages (a `handshake`
-//   with its pairing row, a `handshake-ack` recorded on its contact) are wrapped and given rows
-//   here, in a transaction that checks again that they still have none, so each is wrapped once and
-//   its rows survive a restart. Nothing else that is `queued` (for example `envelopes.build`
-//   output) is ever published: Talk messages get their rows only from `sendMessage`.
+//   with its pairing row, a `handshake-ack` recorded on its contact) and the delivery acks that a
+//   processing pass stages (IR-M1-7h-1 F04 b: an `ack` to an active, paired contact whose sealed
+//   payload is an ack of an inbound message of that same contact, acks.ts) are wrapped and given
+//   rows here, in a transaction that checks again that they still have none, so each is wrapped
+//   once and its rows survive a restart. Nothing else that is `queued` (for example
+//   `envelopes.build` output) is ever published: Talk messages get their rows only from
+//   `sendMessage`.
 // - Stale staged envelopes (IR-M1-7k-1 F08; M1-7k-b): one still without rows 24 h after its
 //   created_at is marked `not_delivered`; one whose wrap fails transiently records the failure in
 //   `outbox_staged` and goes behind the never-tried and less recently failed ones, so it never
@@ -45,7 +48,7 @@ import {
   type AgentCard,
   type Envelope,
 } from '@4thtech-io/crypto';
-import { isAllowedRelayUrl } from '@4thtech-io/types';
+import { isAllowedRelayUrl, payloadSchema, type Payload } from '@4thtech-io/types';
 import {
   MAX_RELAYS_PER_WRAP,
   OutboxWorker,
@@ -64,6 +67,7 @@ import type { ContactBook } from './contacts.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
+import { INBOX_TYPES } from './inbox.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 import type { Transport, TransportFactory } from './transport.js';
@@ -77,8 +81,11 @@ export const OUTBOX_CLAIM_SECONDS = 30;
 const DUE_BATCH = 8;
 /** Listings per processDue pass (at most 512 rows). */
 const MAX_BATCHES = 64;
-/** The only types a core flow stages for the outbox (pairing, M1-7c; IR-M1-7k-1 F01). */
-const STAGED_TYPES: readonly string[] = Object.freeze(['handshake', 'handshake-ack']);
+/**
+ * The only types a core flow stages for the outbox (pairing, M1-7c; IR-M1-7k-1 F01; delivery acks,
+ * IR-M1-7h-1 F04 b).
+ */
+const STAGED_TYPES: readonly string[] = Object.freeze(['handshake', 'handshake-ack', 'ack']);
 /** Staged envelopes given rows (or dropped) per pass (IR-M1-7k-1 F08: failures do not count). */
 export const OUTBOX_STAGED_BATCH = 50;
 /** Staged envelopes tried per pass, failures included, so one pass stays bounded. */
@@ -638,9 +645,10 @@ export class OutboxService {
   }
 
   /**
-   * The rows of one staged pairing message, `drop` when it can never be routed (permanent), or a
-   * throw for a transient fault. The counterparty comes from the pairing row (`handshake`) or the
-   * contact row whose recorded ack this is (`handshake-ack`).
+   * The rows of one staged message, `drop` when it can never be routed (permanent), or a throw for
+   * a transient fault. The counterparty comes from the pairing row (`handshake`), the contact row
+   * whose recorded ack this is (`handshake-ack`), or the contact whose message a delivery ack
+   * answers (`ack`).
    */
   async #stagedRows(row: Row<'envelopes'>): Promise<Row<'outbox'>[] | 'drop'> {
     let envelope: Envelope;
@@ -672,9 +680,64 @@ export class OutboxService {
         return 'drop';
       }
       peer = await this.contactPeer(contact.contact_id);
+    } else if (row.type === 'ack') {
+      const contact = found.contact;
+      if (
+        contact === undefined ||
+        contact.status !== 'active' ||
+        contact.pairing !== 'complete' ||
+        !(await this.#isStagedAck(row, contact.contact_id))
+      ) {
+        return 'drop';
+      }
+      peer = await this.contactPeer(contact.contact_id);
     } else {
       return 'drop';
     }
     return this.prepareRows(envelope, await this.routes(peer));
+  }
+
+  /**
+   * A staged `ack` is published only if it is what acks.ts stages (IR-M1-7h-1 F04 b): its sealed
+   * payload is `{kind: "received", envelopeId}` with `replyTo` equal to `envelopeId`, and that
+   * envelope is an `ok` inbound message from the same contact. A payload that does not open or
+   * parse is never published (fail closed).
+   */
+  async #isStagedAck(row: Row<'envelopes'>, contactId: string): Promise<boolean> {
+    if (row.payload_json === null) return false;
+    let payload: Payload;
+    try {
+      const text = await open(
+        this.#ctx,
+        'envelopes',
+        'payload_json',
+        [row.envelope_id],
+        row.payload_json,
+      );
+      const parsed = payloadSchema.safeParse(parseJson(text));
+      if (!parsed.success) return false;
+      payload = parsed.data;
+    } catch {
+      return false;
+    }
+    if (payload.type !== 'ack' || typeof payload.body !== 'object') return false;
+    const answered = payload.body.envelopeId;
+    if (
+      payload.body.kind !== 'received' ||
+      typeof answered !== 'string' ||
+      payload.replyTo !== answered
+    ) {
+      return false;
+    }
+    const inbound = await this.#ctx.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: answered }),
+    );
+    return (
+      inbound !== undefined &&
+      inbound.direction === 'in' &&
+      inbound.state === 'ok' &&
+      inbound.contact_id === contactId &&
+      INBOX_TYPES.includes(inbound.type)
+    );
   }
 }

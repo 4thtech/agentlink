@@ -443,7 +443,7 @@ DECISION NEEDED (owner): whether submitter gas-key addresses and the mainnet dep
 
 | When | Steps (in order) |
 |---|---|
-| **Start** | 1. Auto-load `AGENTS.md` / `CLAUDE.md`. 2. `get_project_context` for project `agentlink` (scope `orchestrator`; a single-task session uses its task ID). 3. Read the `sync` branch: `board.md` (claims, ownership) and every person file (status, feedback). 4. Verify handoff and sync claims against the repository before relying on them. |
+| **Start** | 1. Auto-load `AGENTS.md` / `CLAUDE.md`. 2. `get_project_context` for project `agentlink` (scope `orchestrator`; a single-task session uses its task ID). 3. Read the `sync` branch: `board.md` (claims, ownership) and every person file (status, feedback). 4. Verify handoff and sync claims against the repository before relying on them. 5. Before planning or briefing UI work, read the Status and screen index in `docs/design/README.md`, the only design status (D-116, LL-16); never infer design status from a handoff, card or memory. |
 | **During** | Save Curator state per §13.2. Claim or release tasks on `board.md` as they start or finish. |
 | **At ~60% context** | Save the Curator handoff and the own sync file, then suggest a fresh session to the owner (§3.5). |
 | **End** | 0. Docs pass (§5 step 11): `docs/status.yaml` matches what merged and the status check passes. 1. Update own sync file (status, claims, feedback dispositions; `sync-protocol.md`), within its budget (§3.6). 2. `save_working_state` with the complete current state, within the handoff budget. |

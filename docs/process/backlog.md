@@ -67,7 +67,8 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 153 (M1a 80, M1b 73; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
+| M1 Local beta | 157 (M1a 80, M1b 77; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 43 (incl. M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -974,6 +975,8 @@ Goal (10 M1): two people on different harnesses exchange messages and files and 
 
 The owner designs in Claude Design and delivers in three drops (10 "Design deliveries"; intake and live status in `docs/design/README.md`). Until a surface's drop has landed, every UI card builds it **functional and unstyled, strings externalized, no invented visual design**. A late D2 slips M2: the M2 critical path starts from DESIGN-D2.
 
+**D-116 (build-plan deviation, 21 Oct 2026).** D1 and the D2 first pass have been in `docs/design/` since 14 Oct 2026. Every surface with a screen in the `docs/design/README.md` screen index is built **styled** from it, after DESIGN-ADJ-1 has listed its adjustments; only surfaces with no screen stay functional and unstyled. UI build order (*orchestrator plan, not the owner's words*): wave 0 DESIGN-ADJ-1 and M1-35a in parallel; wave 1 M1-35b and M1-35c (and the owner's redesigns from the (b) briefs); wave 2 M1-11b, M1-11c and M1-19-c; wave 3 (M2) M2-5a, M2-1a/b, then the console and desktop cards.
+
 #### DESIGN-D1 · Design drop D1: foundations and M1 surfaces
 - **Status:** done (4thtech/agentlink#33, merged 2026-10-14; partial points listed in `docs/design/README.md`) · **Size:** — · **Tier:** Owner · **Security:** S0 · **Phase:** M1a
 - **Repo/path:** Claude Design links or `docs/design/d1/` (+ `MANIFEST.md`); private material to `agentlink-ops`
@@ -995,6 +998,21 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Complete component library; OS app, tray and PWA icons (§2.4); desktop apps for macOS, Windows and Linux (§6.2.2); cloud agent pages (§6.9); storage, proofs and printed records, registration and domain verification (§6.11–§6.13); owner console (§6.3, desktop and mobile); verify page (§6.4); invite landing (§6.5); browser counterparty view-and-accept (D-35); onboarding (§6.6); pay page (§6.7) and pricing (§6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (§13). The console screens are also the desktop dashboard (D-41).
 - **Acceptance:**
   - Drop recorded in `docs/design/README.md`; M2-1a becomes `ready`. Arriving after M1-GATE delays the start of M2 by the same amount.
+- **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
+
+#### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
+- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
+- **Depends on:** — (runs in parallel with M1-35a)
+- **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
+- **Invariants:** — (read-only on code)
+- **Scope:**
+  - Compare every screen in `docs/design/` (PNGs and `d2/source/screens/*.dc.html`), `d1/copy/strings.en.json` and the 31 component specs with the current specs and decisions. Owner, 2026-10-21: "The design must be adjusted. It was built before we fine-tuned everything."
+  - Per screen, list what is outdated, what is missing (for example a receipt request and confirm UI, D-109; the 11 §5.6 disclosure lines; top-up gated off until the pay page ships, `PAY_PAGE.live`; backup and restore per D-115; own storage connect; networks only under Advanced and the funded network chosen automatically, D-40) and what to remove.
+  - Classify each item: **(a) agents fix in code** (copy and small flow changes, done by the building card) or **(b) owner redesigns in Claude Design** (layout or new screens), with a short brief per (b) item, ready to paste into Claude Design.
+  - Say whether the tokens are affected (default: not; M1-35a proceeds).
+- **Acceptance:**
+  - `docs/design/adjustments.md` covers every row of the screen index; each item names its screen, the spec or decision it follows, (a) or (b), and the card that fixes it; the known copy issues (Pay network name, raw `0x…` record IDs, `strings.en.json`) are included; the owner has seen the (b) briefs.
 
 #### DESIGN-D3 · Design drop D3: launch brand
 - **Status:** backlog · **Size:** — · **Tier:** Owner · **Security:** S0
@@ -2171,7 +2189,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An unverified envelope that reuses another envelope's `id` (different `envelopeHash`, or a bad signature) does not suppress the real one (IR-M1-5a-1 L-3).
 
 #### M1-5d · transport-nostr: more events than a relay's cap within one second (new, IR-M1-5c-1 residual)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
+- **Status:** in review (built: detect and report a gap; later options in 07 §4.2) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M1-5c
 - **Spec:** 07 §4.2 (Sync), §4.3 (relay lists); 04 §3.5; 06 §6
@@ -2680,7 +2698,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (Catch-up) The M1-9c read-only test passes against this API: a handshake pending in the relay stays unprocessed, and no ack, contact, read mark or receipt results.
 
 #### M1-7h-b · core: revocation follow-ups (new, IR-M1-7h-1 F01, F04; blocks the M1 gate)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#351) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h, M1-7e, M1-32
 - **Spec:** 07 §3.4 (`revoked_agents` "Transaction"), §3.2; 04 §3.4.1, §3.4.2 (void rule 3); 06 §2.1, §6
@@ -3114,7 +3132,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (2026-10-21):** blocked on spec gaps (ops, kit format, config location, restore rules). Design proposal: `docs/design/m1-9i-storage-backup.md`. The owner accepted A to E (D-115, 2026-10-21), so this card is narrowed to `apps/cli/src/**` and depends on M1-9i-a and M1-9i-c.
 
 #### M1-9i-s · spec: own storage ops, recovery kit `ALKK`, restore rules (new, split from M1-9i)
-- **Status:** backlog (decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#352; decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S2 (changes 04, 06 and 07; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md, 06-mcp-server.md, 07-sdk-transport-storage.md, 00-README.md (decision row)
 - **Depends on:** D-115 (decided)
 - **Spec:** design proposal §6 (diff-style list)
@@ -3460,7 +3478,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A mainnet chain ID is rejected (test); a repeat inside the window is rejected; the global cap holds.
 
 #### M1-10b-b · faucet hardening (new, M1-10b review)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the faucet is deployed)
+- **Status:** in review (`apps/submitter/src/faucet-claim.ts`, `packages/chain/src/fees/faucet.ts`; pinned faucet addresses in `apps/submitter/wrangler.toml`) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the faucet is deployed)
 - **Repo/path:** agentlink · apps/submitter (faucet route)
 - **Depends on:** M1-10b
 - **Spec:** 05 §9 (faucet); 03 §4.4; `release-and-deployment.md` §4.5
@@ -3606,30 +3624,66 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11c · local UI: settings pages
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · apps/cli (local UI bundle)
-- **Depends on:** M1-11a, M1-9b, M1-9i, M1-26
-- **Spec:** 08 §1 (pages); 11 §6.2; 10 M1-11
+- **Repo/path:** agentlink · packages/node (new settings page modules; `approval-page.ts` belongs to M1-11b); consumes `packages/ui`
+- **Depends on:** M1-11a, M1-9b, M1-9i, M1-26; DESIGN-ADJ-1, M1-35a, M1-35b, M1-35c (D-116)
+- **Spec:** 08 §1 (pages); 11 §6.2; 10 M1-11; D-116; `docs/design/README.md` (screen index)
 - **Invariants:** I-4, I-10
 - **Scope:**
   - Activity; Contacts (safety-code compare per 04 §3.6.1: "They match" signs `contact.check` with presence, "They don't" blocks; block); Files (allowed folders with resolved paths, inbox folder, expiry); Storage (drop usage against the quota; optional own storage under Advanced: connect, test; D-48); Proofs & credits (balances, agent address QR, faucet button on testnets); Policies (plain-language rules → owner-signed, incl. `commitments` limits); Backup (recovery kit export/restore); Advanced (fingerprints, relays, RPCs, chains; the only place a chain can be chosen, D-40).
   - All owner operations call M1-8c / M1-8e / M1-9b / M1-9i APIs; no new crypto or signing code in the UI.
-  - Before DESIGN-D1 lands: functional and unstyled, strings externalized, no invented visual design. Styling is M1-11b.
+  - D-116: built styled from the D1 local screens (Local-activity, Local-contacts, Local-files, Local-storage, Local-proofs, Local-rules, Local-backup, Local-advanced) with the DESIGN-ADJ-1 fixes, using `packages/ui`; classes only. Files: new settings page modules in packages/node; `approval-page.ts` belongs to M1-11b.
 - **Acceptance:**
-  - Playwright flow per page; every mutating action requires presence; default views pass the vocabulary lint.
+  - Playwright flow per page; every mutating action requires presence; default views pass the vocabulary lint; owner confirms fidelity to the adjusted design.
 
 #### M1-11b · local UI: apply design drop D1 (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus for the passkey, approval and policy screens) · **Security:** S1 (S2 where a change touches owner-presence or approval flows) · **Phase:** M1b
-- **Repo/path:** agentlink · packages/ui (D1 tokens and core components), apps/cli (local UI bundle)
-- **Depends on:** DESIGN-D1, M1-11a, M1-11c
-- **Spec:** 11 §6.2, §8, §9, §11; D-30; `docs/design/README.md`
+- **Repo/path:** agentlink · packages/node (`approval-page.ts` and its tests: first run, approvals, review together); consumes `packages/ui` (M1-35a, M1-35b), never edits it
+- **Depends on:** DESIGN-D1, DESIGN-ADJ-1, M1-35a, M1-35b, M1-35c, M1-11a
+- **Spec:** 11 §6.2, §8, §9, §11; D-30, D-116; `docs/design/README.md` (screen index), `docs/design/adjustments.md`
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Implement the D1 tokens (CSS variables + JSON) and core components in `packages/ui`; apply them to every local UI screen and state in 11 §6.2 and §9. Self-hosted fonts, light and dark, no CDNs.
+  - D-116: style the first run (Local-firstrun, Local-recovery), approvals (Local-approvals, approval and commitment cards in all themes) and shared states (Local-states) from the D1 screens, with the DESIGN-ADJ-1 (a) fixes. Tokens and components come from `packages/ui` (M1-35a, M1-35b); classes only, no inline styles (08 §4 CSP); self-hosted fonts, light and dark, no CDNs. The settings pages are styled in M1-11c.
   - Implement the design as delivered; any deviation (technical, accessibility, CSP) written up in the PR for the owner's OK.
   - Visual only: no change to owner-presence, approval or signing logic.
 - **Acceptance:**
   - All M1-11a/M1-11c Playwright flows pass unchanged; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to D1.
   - Untrusted strings still render as text (XSS fixtures re-run); no external URL in the bundle.
+
+### Design system from the design (`packages/ui`, D-116)
+
+#### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
+- **Status:** ready · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/ui (`src/tokens/**`, `fonts/**`, a third-party notices file, `package.json` exports, `src/index.ts`). This card owns `src/index.ts`; M1-35b only appends component exports to it after this card lands
+- **Depends on:** — (parallel with DESIGN-ADJ-1)
+- **Spec:** 11 §11.7; 08 §4; D-30, D-116; `docs/design/d1/tokens/`, `d1/design-system/contrast.md`
+- **Invariants:** —
+- **Scope:**
+  - Bring `tokens.css` (`--al-` prefix, `data-theme`, contrast, forced colours) and the DTCG JSON into `packages/ui` as CSS variables and typed TS exports; Geist and Geist Mono woff2 with `OFL.txt`; the Lucide ISC notice, before any Lucide path is copied.
+  - No CDN, no external URL; fonts self-hosted.
+- **Acceptance:**
+  - Token diff test against `docs/design/d1/tokens/`; no external URL in built CSS/JS (CI grep); the package ships the OFL and ISC notices; light, dark and contrast snapshot of a token sheet.
+
+#### M1-35b · ui: core components in TypeScript from the 31 specs (new, D-116)
+- **Status:** backlog · **Size:** L (split per group if over the §7.4 limits) · **Tier:** Sonnet; Opus for ApprovalCard, CommitmentCard, UntrustedContent, SafetyCode, SecretDisplay · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/ui (`src/components/**` and their tests). `src/index.ts` is owned by M1-35a; this card only appends component exports to it, after M1-35a lands
+- **Depends on:** M1-35a, DESIGN-ADJ-1
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116; `docs/design/d1/components/*.md` (the reference bundle is a visual reference only)
+- **Invariants:** I-5
+- **Scope:**
+  - Rebuild the 31 components in TypeScript from the specs with the DESIGN-ADJ-1 fixes; classes, no inline styles (08 §4 CSP); untrusted strings as text only, Trusted Types compatible; no colour-only status. The `.dc.html` screens and `support.js` never ship.
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures render inert in every component; no `style=` attribute in rendered output; owner confirms visual match.
+
+#### M1-35c · Copy audit of strings and screens against 11 §5 (new, D-116)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/ui (`src/strings/**`: the shipped English strings and their vocabulary test)
+- **Depends on:** DESIGN-ADJ-1 (its (a) copy items)
+- **Spec:** 11 §5, §5.1, §5.6; D-39, D-40, D-109, D-116
+- **Invariants:** I-5
+- **Scope:**
+  - Audit `docs/design/d1/copy/strings.en.json` and the copy of every screen against 11 §5; ship the corrected strings in `packages/ui`. Known items: the Pay network line ("choose Base (cheapest)") leaves the default view; raw `0x…` record IDs move to Advanced or detail; the 11 §5.6 disclosure lines are present; the `@4thtech-io` package scope.
+- **Acceptance:**
+  - A vocabulary test fails on any banned term in a default-view string; every changed string lists its 11 § reference in the PR.
 
 ### Agent instructions, docs, end-to-end
 
@@ -3712,7 +3766,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Follow-ups from IR-M1-13a-ACCEPT-1 (S2, backlog):** (a) Low: two concurrent `agentlink_accept_invite` calls without `approvalId` can both miss `findOpen` and create two requests (pre-existing; a double use stays impossible through the compare-and-set claim); make lookup and insert one store transaction. (b) The CLI `agentlink accept` without a TTY (`apps/cli/src/commands/accept.ts`) applies the same reuse rule: pending → print the same ID; approved → print "run again with `--approval <id>`", never use it automatically.
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
-- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#358) · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-13a (runner and API-key secrets as in D-73 (9)), M1-22, M1-9d, M1-10c, M1-11a, M1-12c, M1-27b
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
@@ -3727,9 +3781,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - J3 (02): an agent with no credits is refused with `needs_credits`, takes the faucet link, receives testnet credits and retries successfully, with no chain chosen by hand (D-40). Added 2026-10-18: no other card covered J3 end to end before M1-GATE.
   - J5 (02): a third party who has only the exported proof pack runs `agentlink verify` (M1-9h) and gets a pass; a tampered pack fails with its specific reason. Added 2026-10-18: no other card covered J5 end to end before M1-GATE.
 - Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
+- Delivered (2026-10-21): `e2e/test/files-and-proof.test.ts` (deterministic, in the e2e job: J2, J3, J5, D-109 defaults and contact rule, zero-access audit; fakes: `FakeNotary`, an in-memory drop) and `e2e/test/live-files-and-proof.test.ts` (opt-in live run on Base Sepolia through `e2e-live` in `e2e.yml`, manual dispatch on `main`, environment `e2e-live`, no secret). Chiado is not covered live (not auto-selected, no faucet yet).
+- **Open finding (product gap, needs its own card):** the terms tools refuse `notarize` with `NOTARIZE_UNAVAILABLE` (`packages/core/src/terms-flow.ts`, "records are M1-7i"; M1-7i shipped as the policy-rules card) and `agentlink_notarize` refuses an offer (`USE_TERMS_TOOLS`), so nothing records an offer or an accept and the proof of agreement of J8 (both shapes, the ACCEPTED receipt after owner approval, the exported pack, one approval each) cannot be reached through the tools. The receiving half is tested in `packages/core`. The two J8 proof tests are `it.fails` in `files-proof-scenario.ts` (they pass while the gap is open and turn red the day it closes); a plain test pins the current `NOTARIZE_UNAVAILABLE` refusal. This card's J8 acceptance stays open until that card lands.
 
 #### M1-13b · prompt-injection suite
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#359) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/prompt-injection/
 - **Depends on:** M1-9c, M1-9p, M1-9q, M1-21
 - **Spec:** 06 §4, §9; 04 I-5, §7
@@ -3742,7 +3798,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The LLM report is reviewed before the M1a dogfood starts (M1-23).
 
 #### M1-13d · prompt-injection suite: file and proof tools (new, split from M1-13b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#359) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/prompt-injection/
 - **Depends on:** M1-13b, M1-9d
 - **Spec:** 06 §4, §9; 04 I-5, §4, §7
@@ -3832,12 +3888,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Until M2-5b, the invite host serves a static how-to-install page at `agentlink.4thtech.io` (invite links `https://agentlink.4thtech.io/i#<payload>`). No analytics; `Referrer-Policy: no-referrer`; CSP per 08 §4 (D-53): one first-party script file, no inline script, `connect-src 'none'`, `base-uri 'none'`, `form-action 'none'`, `frame-ancestors 'none'`, `require-trusted-types-for 'script'`, `trusted-types 'none'`.
   - Payload fields are rendered with `textContent` only; the inviter's name follows the 06 §2.1 contact-name rule with the Self-declared label. The prompt sits in its own section under our own heading, structurally and visually separate from inviter details; the copy button copies the script's prompt string, not text read from the DOM.
   - One link installs and pairs (D-53, 08 §4): a first-party script reads the fragment in the browser only, decodes it with a size cap, checks version, schema and expiry, and shows the per-harness install-and-accept prompt (06 §7.1) with a copy button. The prompt holds only the official template and the canonical invite link rebuilt from the checked payload, never the inviter's name or other inviter-chosen text. Damaged, expired or oversized invites show their state and no prompt. The fragment is never transmitted.
-  - Functional and unstyled, strings externalized, no invented visual design until DESIGN-D1 (which includes the invite placeholder) lands; then restyled in a follow-up PR under this card.
+  - Functional and unstyled, strings externalized, no invented visual design until DESIGN-D1 (which includes the invite placeholder) lands; the restyle is M1-19-c (D-116).
 - **Acceptance:**
   - Playwright asserts no request, beacon or storage write carries the fragment; headers verified on staging.
   - Prompt tests: a hostile invite (name with instructions, closing tags, control and bidi characters; oversized or malformed payloads) yields either no prompt or a prompt equal to the template plus the canonical link; the prompt passes the vocabulary lint.
   - DOM test (Playwright): with a name containing `<img src=x onerror=…>`, `<div>` and a fake "Copy this to your AI" line, no DOM element derives from the name, no script runs, no Trusted Types violation is allowed through, and the copy button yields exactly the template plus the canonical link; run in Chromium (Trusted Types enforced); a framing attempt is refused.
   - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+
+#### M1-19-c · Invite page: styled from the invite landing screen (new, D-116)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/invite (stylesheet, page markup classes, self-hosted fonts); consumes `packages/ui`
+- **Depends on:** M1-19, M1-19-b (deploy pipeline, proposed in #350), DESIGN-ADJ-1, M1-35a, M1-35b
+- **Spec:** 11 §6.5; 08 §4 (CSP); 04 §3.6; D-53, D-116; screen Invite-landing (`docs/design/d2/screens/invite/`)
+- **Invariants:** I-2, I-5
+- **Scope:**
+  - Style the M1-19 page from the invite landing screen with the DESIGN-ADJ-1 fixes: one first-party stylesheet, classes only, no inline style; any CSP change (for example `style-src 'self'`, `font-src 'self'`) is stated in the PR. Browser view-and-accept (Accept-browser) stays M2-13.
+  - Visual only: decoding, the prompt template and the copy button are unchanged.
+- **Acceptance:**
+  - All M1-19 tests pass unchanged (fragment never sent, hostile-name DOM test, Trusted Types); axe-core zero WCAG 2.1 AA violations; no external URL; owner confirms fidelity.
+  - **Deploy (D-25)** block as in M1-19.
 
 #### M1-33a · Delivery receipts off by default; sender request and recipient opt-in (new, D-109)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -4223,7 +4292,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `init` writes no harness config without an explicit confirmation, and owner setup refuses non-TTY input (tests); prompts pass the vocabulary lint.
 
 #### M1-29 · J9 session habit: `status --brief` and optional SessionStart hooks per harness (D-53) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review; the in-harness transcript is pending an owner run · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`status --brief`, optional `init` offer), docs-site/guide/get-started/ and docs-site/technical/reference/harness-configuration.md (hook snippets)
 - **Depends on:** M1-9a, M1-9c, M1-12a
 - **Spec:** D-53; 06 §6.1, §7, §8; 02 J9; 11 §6.1 (J9 strings); 04 §2.5
@@ -4344,11 +4413,11 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-1a · ui: design tokens, theming, i18n foundation
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/ui
-- **Depends on:** DESIGN-D2, M1-11b (D1 tokens already in `packages/ui`)
+- **Depends on:** M1-35a (D1 tokens already in `packages/ui`, D-116); DESIGN-D2 for any later themes
 - **Spec:** 11 §11, §13; 03 §6; D-30
 - **Invariants:** —
 - **Scope:**
-  - Complete the token set from D2 (colour, type, spacing, radius, elevation) as CSS variables and JSON, extending the D1 tokens; light and dark themes; self-hosted fonts.
+  - Complete the token set from D2 (colour, type, spacing, radius, elevation; the light and contrast themes are sparse in the first pass) as CSS variables and JSON, extending the D1 tokens; light and dark themes; self-hosted fonts.
   - String externalisation (English first; localised dates and currency); static component catalogue.
 - **Acceptance:**
   - Token diff test against the design export; no external URL in built CSS/JS (CI grep); light/dark snapshot tests.
@@ -4356,8 +4425,8 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-1b · ui: component library
 - **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/ui
-- **Depends on:** M2-1a, DESIGN-D2
-- **Spec:** 11 §8, §9, §11; 10 M2-1; D-30
+- **Depends on:** M2-1a, M1-35b (core components, D-116), DESIGN-ADJ-1
+- **Spec:** 11 §8, §9, §11; 10 M2-1; D-30, D-116
 - **Invariants:** I-5
 - **Scope:**
   - Proof badge (all states), receipt timeline, contact card (self-declared / safety-checked / registered), safety-code compare, approval card, cost chip, file card, agent chip, empty states, network status; every state in 11 §9.
@@ -4575,12 +4644,13 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-5a · verify page
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · apps/verify
-- **Depends on:** M1-4d, M2-1b, M2-2h (pipeline)
-- **Spec:** 08 §4; 11 §6.4; 02 F-44, J5
+- **Depends on:** M1-4d, M1-35b, DESIGN-ADJ-1, M2-2h (pipeline)
+- **Spec:** 08 §4; 11 §6.4; 02 F-44, J5; D-116; screens Verify, Proof-detail, Print-record (`docs/design/d2/screens/verify/`, `print/`)
 - **Invariants:** I-3
 - **Scope:**
   - D-71 (1) (supersedes D-64 (2)): testnet and mainnet contract addresses differ; the verify page still labels a testnet chain ID prominently and never presents a testnet proof as a mainnet proof (05 §9.1 (iv)).
   - G-52 (D-71 (6), 08 §4 "Proof-pack links"): the link uses the invite's format (raw DEFLATE, base64url) and the same bounded strict decoder with pack-sized caps (decided); one generic capped-inflate function in `@4thtech-io/core` is derived and proposed; a pack above the link limit is shared as a file, never a link. The exact caps are set when the M1b proof work starts.
+  - Styled from the Verify, Proof-detail and Print-record screens with the DESIGN-ADJ-1 fixes (raw `0x…` record IDs only under Advanced; the failure, altered and not-found states the design lacks follow DESIGN-ADJ-1); classes only (08 §4).
   - Drop zone, or a pack compressed in the URL fragment; verification in the browser via public RPC; plain-language result with self-declared labels; disclosed-key content check; what it proves and does not prove; print-friendly; Advanced data.
   - Beta at `verify.agentlink.4thtech.io`.
 - **Acceptance:**
@@ -4590,7 +4660,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-5b · invite landing page
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · apps/invite
-- **Depends on:** M1-19, M2-1b, M1-7c (decoder), M2-2h (pipeline)
+- **Depends on:** M1-19, M1-19-c (styled page, D-116), M2-1b, M1-7c (decoder), M2-2h (pipeline)
 - **Spec:** 08 §4; 11 §6.5; 02 J7; 04 §3.6; D-28
 - **Invariants:** I-2
 - **Scope:**

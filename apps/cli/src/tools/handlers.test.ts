@@ -28,6 +28,7 @@ import {
   type FinishedResult,
 } from './result.js';
 import { statusSummary } from './status.js';
+import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 
 // ---- Fakes ---------------------------------------------------------------------------------------
@@ -287,6 +288,36 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured.status).toBe('ok');
     expect(result.structured['openOffers']).toBe(0);
     expect(dump(result) + lines.join('\n')).not.toContain('CANARY');
+  });
+
+  it('M1-5g: a catch-up with an incomplete second adds the fixed nextStep; the summary is unchanged', async () => {
+    const { logger, lines } = capture();
+    const client = fakeClient({
+      counts: { inbox: [{ contactId: B, unread: 1 }], requests: 0, incomplete: 2 },
+      contacts: [marko],
+    });
+    const result = await callTool('agentlink_status', {}, context(client, logger));
+    expect(result.structured.status).toBe('ok');
+    expect(result.structured.summary).toBe(
+      '1 new message from \u201cMarko Novak\u201d (self-declared). To read it, call agentlink_inbox.',
+    );
+    expect(result.structured.nextStep).toBe(copy('chat.inbox.incompleteNextStep'));
+    expect(result.structured.nextStep).not.toMatch(/\d|relay/i);
+    expect(result.structured).not.toHaveProperty('incomplete');
+    const validate = new Ajv({ strict: false }).compile(findTool('agentlink_status')!.outputSchema);
+    expect(validate(result.structured)).toBe(true);
+    expect(lines.join('\n')).toContain('"incomplete":2');
+  });
+
+  it('M1-5g: no incomplete second, or stored counts after a failed catch-up: no nextStep', async () => {
+    for (const client of [
+      fakeClient({ counts: { inbox: [], requests: 0, incomplete: 0 } }),
+      fakeClient(),
+      fakeClient({ catchUpFails: true }),
+    ]) {
+      const result = await callTool('agentlink_status', {}, context(client));
+      expect(result.structured).not.toHaveProperty('nextStep');
+    }
   });
 
   it('ok: nothing new', async () => {

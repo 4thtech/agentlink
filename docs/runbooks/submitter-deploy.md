@@ -55,6 +55,7 @@ Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Eve
    ```bash
    newkey SUBMITTER_FAUCET_KEY_84532 staging
    ```
+   The printed address (public, never the key) goes into `apps/submitter/wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_84532` under `[env.staging.vars]`, in lowercase, through a PR (M1-10b-b). The faucet serves only that wallet. Never commit a key.
 8. Staging IP-bucket key (32 random bytes, base64url; no address):
    ```bash
    openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' | pnpm exec wrangler secret put SUBMITTER_IP_KEY --env staging --config wrangler.toml
@@ -67,6 +68,7 @@ Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Eve
     ```bash
     newkey SUBMITTER_FAUCET_KEY_84532 production
     ```
+    The printed address (public, never the key) goes into `apps/submitter/wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_84532` under `[env.production.vars]`, in lowercase, through a PR. It must differ from the staging one; CI refuses a shared address. Never commit a key.
 11. Production IP-bucket key (a new one, never the staging one):
     ```bash
     openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' | pnpm exec wrangler secret put SUBMITTER_IP_KEY --env production --config wrangler.toml
@@ -81,7 +83,7 @@ Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Eve
     pnpm exec wrangler secret list --env staging --config wrangler.toml
     pnpm exec wrangler secret list --env production --config wrangler.toml
     ```
-    Each must list `SUBMITTER_IP_KEY`, `SUBMITTER_GAS_KEY_84532` and `SUBMITTER_FAUCET_KEY_84532`, and must **not** list `SUBMITTER_CHAINS` or `SUBMITTER_FAUCET_CHAINS` (those are reviewed `wrangler.toml` vars; the deploy fails if a secret shadows one).
+    Each must list `SUBMITTER_IP_KEY`, `SUBMITTER_GAS_KEY_84532` and `SUBMITTER_FAUCET_KEY_84532`, and must **not** list `SUBMITTER_CHAINS`, `SUBMITTER_FAUCET_CHAINS` or `SUBMITTER_FAUCET_ADDRESS_84532` (those are reviewed `wrangler.toml` vars; the deploy fails if a secret shadows one).
 
    *Without a terminal:* a secret can also be added in the Cloudflare dashboard, <https://dash.cloudflare.com/?to=/:account/workers-and-pages> → the Worker → Settings → Variables and Secrets → Add → type **Secret**, once the Worker exists. Creating the keys still needs a computer.
 
@@ -138,8 +140,9 @@ Residual (04 §4): Cloudflare, as the infrastructure operator, still sees reques
 - **Skipped with "Worker secrets not set"**: the notice names the missing secrets; repeat the matching Part B step, then step 17.
 - **`has a Worker secret SUBMITTER_CHAINS`** (or `SUBMITTER_FAUCET_CHAINS`): `pnpm exec wrangler secret delete <name> --env <staging|production> --config wrangler.toml`, then step 17.
 - **Health shows a chain `"available":false`**: its gas key is missing or malformed (must be `0x` + 64 lowercase hex), or the RPC URLs are unreachable. Create and store a new key (step 6 or 9; then fund the new address) and rerun.
-- **Faucet answers `faucet_empty` or `unavailable`**: fund the faucet wallet (step 15); check that its key differs from the gas key.
+- **Faucet answers `faucet_empty` or `unavailable`**: fund the faucet wallet (step 15); check that its key differs from the gas key, and that its address is that environment's `SUBMITTER_FAUCET_ADDRESS_84532` in `wrangler.toml` (steps 7 and 10).
 - **Production failed after deploying**: CI rolled back and set `DEPLOY_FREEZE`. Read the run summary; only the owner clears the freeze ([RB-11](rollback-and-freeze.md)).
+- **Rolled back to a version before M1-10b-b**: the older faucet does not read the newer per-agent claim records. An agent who claimed earlier that UTC day can claim once more. The per-IP daily limit (3 claims by default) and the global daily cap still hold, because their records did not change format. The extra credits are therefore bounded by that day's global cap (by default 200 claims at $1 testnet USDC, at most $200 of testnet funds), and the risk ends with the one-day agent window.
 - A key leaked or is suspected: put a new one (Part B) and move the remaining funds from the old address; follow `audit-rules.md` §10.3.
 
 ## Related
