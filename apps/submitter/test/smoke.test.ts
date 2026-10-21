@@ -117,11 +117,9 @@ describe('deploy smoke negative controls', () => {
       Promise.resolve({ charged: true, set: [] });
     chain.simulateItem = (): Promise<ItemSimulation> =>
       Promise.resolve({ outcome: 'ok', gas: 160_000n });
-    const error = await smokeUncoveredReceipt(
-      target(),
-      CHAIN_ID,
-      await newSmokeAgent(),
-    ).catch((e: unknown) => e);
+    const error = await smokeUncoveredReceipt(target(), CHAIN_ID, await newSmokeAgent()).catch(
+      (e: unknown) => e,
+    );
     expect(error).toBeInstanceOf(SmokeFailure);
     expect(String(error)).toMatch(/accepted for sending/);
   });

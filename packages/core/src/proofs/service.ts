@@ -117,6 +117,11 @@ import { RECEIPT_REQUEST, receiptRequestKey, senderRequestedTx } from './receipt
 export const RECORD_DEADLINE_SECONDS = 3_600;
 /** A Receipt's `deadline` is this far after signing (proposed). */
 export const RECEIPT_DEADLINE_SECONDS = 3_600;
+/**
+ * Queued receipts posted per sync pass (D-114, M1-34-b): a receipt no submitter took stays stored
+ * and is posted again on a later pass; the least recently tried go first, so none waits forever.
+ */
+export const QUEUED_RECEIPTS_PER_PASS = 5;
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
 const ZERO_BYTES32 = `0x${'0'.repeat(64)}`;
@@ -459,6 +464,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #deps: ProofServiceDeps;
   readonly #platform: ProofsPlatform | undefined;
   readonly #selector: Selector | undefined;
+  /** Queued receipt ID -> the pass that last tried it (in memory; M1-34-b). */
+  readonly #receiptTries = new Map<string, number>();
+  #receiptPass = 0;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
     this.#ctx = ctx;
@@ -1132,17 +1140,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     );
     for (const row of receiptRows) {
       resent += 1;
-      if ((await this.#submitReceipt(row)) === 'recorded') {
-        recorded += 1;
-        continue;
-      }
-      if (await this.#replaceReceipt(row)) {
-        replaced += 1;
-        const after = await this.#ctx.store.transaction((tx) =>
-          tx.get('proofs', { record_id: row.record_id }),
-        );
-        if (after?.status === RECEIPT_RECORDED) recorded += 1;
-      }
+      const outcome = await this.#postReceipt(row);
+      if (outcome === 'recorded' || outcome === 'replaced') recorded += 1;
+      if (outcome === 'replaced' || outcome === 'replaced_open') replaced += 1;
     }
     for (const row of rows) {
       if (row.status === 'recorded') {
@@ -1278,6 +1278,63 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     return this.#submit(stored);
   }
 
+  /**
+   * One stored receipt, posted again unchanged; replaced (04 §5) only when the chain shows the
+   * earlier one can never land. `recorded`: on-chain now; `replaced`: a replacement landed;
+   * `replaced_open`: a replacement was signed and is still open; `open`: still queued.
+   */
+  async #postReceipt(
+    row: Row<'proofs'>,
+  ): Promise<'recorded' | 'replaced' | 'replaced_open' | 'open'> {
+    if ((await this.#submitReceipt(row)) === 'recorded') return 'recorded';
+    if (!(await this.#replaceReceipt(row))) return 'open';
+    const after = await this.#ctx.store.transaction((tx) =>
+      tx.get('proofs', { record_id: row.record_id }),
+    );
+    return after?.status === RECEIPT_RECORDED ? 'replaced' : 'replaced_open';
+  }
+
+  /**
+   * The receipt queue (D-114; 07 §7; M1-34-b): a signed receipt that no submitter took when it was
+   * signed stays stored (`receipt_signed`) and is posted here on a later sync pass, at most
+   * QUEUED_RECEIPTS_PER_PASS per pass, least recently tried first. The same signed bytes are sent
+   * until they land (04 §5); the proof stays valid with fewer receipts meanwhile. Receipts go only
+   * through the submitters, which the sender's proof fee covers: nothing here pays from this
+   * agent's account or asks it for credits. Never throws; returns how many are on-chain now.
+   */
+  async postQueuedReceipts(): Promise<number> {
+    if (this.#platform === undefined) return 0;
+    let rows: Row<'proofs'>[];
+    try {
+      rows = await this.#ctx.store.transaction((tx) =>
+        tx.select('proofs', { status: RECEIPT_SIGNED }),
+      );
+    } catch {
+      this.#log.warn('queued receipts not read', { code: 'submit_error' });
+      return 0;
+    }
+    const live = new Set(rows.map((r) => r.record_id));
+    for (const id of [...this.#receiptTries.keys()]) {
+      if (!live.has(id)) this.#receiptTries.delete(id);
+    }
+    this.#receiptPass += 1;
+    const tried = (r: Row<'proofs'>) => this.#receiptTries.get(r.record_id) ?? 0;
+    const due = [...rows]
+      .sort((x, y) => tried(x) - tried(y) || x.created_at - y.created_at)
+      .slice(0, QUEUED_RECEIPTS_PER_PASS);
+    let landed = 0;
+    for (const row of due) {
+      this.#receiptTries.set(row.record_id, this.#receiptPass);
+      try {
+        const outcome = await this.#postReceipt(row);
+        if (outcome === 'recorded' || outcome === 'replaced') landed += 1;
+      } catch {
+        this.#log.warn('queued receipt not posted', { code: 'submit_error' });
+      }
+    }
+    return landed;
+  }
+
   // --- the recipient: proof envelopes and receipts ---------------------------------------------
 
   /**
@@ -1289,6 +1346,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   async processInbound(reports: readonly InboundReport[]): Promise<ProofInboundResult> {
     const flags: InboundReport[] = [];
     if (this.#platform === undefined) return { signed: 0, reports: flags };
+    // Receipts no submitter took on an earlier pass are posted again first (D-114); the ones this
+    // pass signs were just submitted and wait for the next pass.
+    await this.postQueuedReceipts();
     let signed = 0;
     // Bodies kept pending by an earlier pass (a failed chain read): expired ones go first, the rest
     // are checked again after this pass's new envelopes (04 §3.4, M1-7g-b).

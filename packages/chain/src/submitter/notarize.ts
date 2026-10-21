@@ -13,7 +13,13 @@
 // simulated first: the same one-item `notarizeBatch` when its credits cover the fee, otherwise
 // `notarizeDirect`, which pays now (an exact `approve(maxFee)` first for an ERC-20 fee token, reset
 // to 0 first when another allowance is set; `maxFee` as the value for the native coin);
-// `acknowledge` for a receipt.
+// `acknowledge` for a receipt only when the caller set `directReceipts` (D-114).
+//
+// Receipts (D-114; 07 §7; 12 §2): the sender's proof fee covers them, so a receipt goes through the
+// submitters whatever the recipient holds. When none takes it, the outcome is `pending`: the caller
+// keeps the signed item and posts it again later (the core's receipt queue). Direct mode would pay
+// the network cost from the recipient's own account, so it never runs for a receipt unless the
+// caller says the user asked for that (`directReceipts`); a recipient is never charged unasked.
 //
 // This module signs nothing and never builds a replacement. `replacementAllowed` is the 04 §5 test
 // a caller must pass before it signs one (new nonce, fresh salt, new deadline).
@@ -55,6 +61,12 @@ export interface ProofSubmitterOptions extends PollOptions {
   readonly submitters?: readonly SubmitterClient[];
   /** Direct mode: the agent's own account pays the gas (03 §4.3). */
   readonly direct?: DirectMode;
+  /**
+   * Also send receipts in direct mode, paying their network cost from the agent's own account.
+   * Default false (D-114): set it only when the user asked for that; otherwise a receipt no
+   * submitter takes stays `pending` for a later post.
+   */
+  readonly directReceipts?: boolean;
   readonly directOptions?: DirectSendOptions;
   /** The chain selector's cache (createChainSelector): cleared after paying or a credit refusal. */
   readonly selector?: { clear(): void };
@@ -414,8 +426,10 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
       if (s === 'conflict') return conflict();
     }
 
-    // 4. Direct mode: the agent's own account, simulated first, only with enough native gas.
-    const call = direct && from ? item.direct(from) : undefined;
+    // 4. Direct mode: the agent's own account, simulated first, only with enough native gas. Never
+    //    for a receipt unless the caller asked (D-114): it stays pending for a later post instead.
+    const directAllowed = item.paid || options.directReceipts === true;
+    const call = direct && from && directAllowed ? item.direct(from) : undefined;
     if (direct && call) {
       let sent: DirectSend;
       try {
