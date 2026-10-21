@@ -3712,7 +3712,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Follow-ups from IR-M1-13a-ACCEPT-1 (S2, backlog):** (a) Low: two concurrent `agentlink_accept_invite` calls without `approvalId` can both miss `findOpen` and create two requests (pre-existing; a double use stays impossible through the compare-and-set claim); make lookup and insert one store transaction. (b) The CLI `agentlink accept` without a TTY (`apps/cli/src/commands/accept.ts`) applies the same reuse rule: pending → print the same ID; approved → print "run again with `--approval <id>`", never use it automatically.
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
-- **Status:** in review · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#358) · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-13a (runner and API-key secrets as in D-73 (9)), M1-22, M1-9d, M1-10c, M1-11a, M1-12c, M1-27b
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
