@@ -41,6 +41,8 @@ export async function sealFileRows(
       file_key: await seal(ctx, 'files', 'file_key', key, r.entry.fileKey),
       expires_at: r.entry.expiresAt,
       deleted_at: null,
+      // M1-1g-i: the retention in effect at send time; a later policy change never applies to it.
+      delete_after: r.deleteAfter,
     });
   }
   return rows;

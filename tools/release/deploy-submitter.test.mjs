@@ -393,7 +393,7 @@ describe('deploy-submitter.yml structure', () => {
     for (const env of ['staging', 'production']) {
       const section = toml.split(`[env.${env}.vars]\n`)[1]?.split('\n\n')[0] ?? '';
       const vars = Object.fromEntries(
-        [...section.matchAll(/^([A-Z_]+) = "([^"]*)"$/gm)].map((m) => [m[1], m[2]]),
+        [...section.matchAll(/^([A-Z0-9_]+) = "([^"]*)"$/gm)].map((m) => [m[1], m[2]]),
       );
       const ids = (raw) => (raw ?? '').split(',').filter(Boolean);
       const required = [

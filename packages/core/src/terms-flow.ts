@@ -1826,18 +1826,21 @@ export class TermsService {
 
   /**
    * The deferred `ACCEPTED` receipt (07 §2.1 step 4), for M1-7g when it processes a record's
-   * `proof` envelope (never from `agentlink_status`): an approved `accept` scope whose
-   * `answers.envelopeHash` is the record's, the record kind `OFFER`, the signer the scope's
-   * counterparty, with its receipt part unclaimed. Void rules 2–6 and, for a grant, the policy are
-   * re-checked. M1-7g then checks the recipient commitment on-chain and claims the part
-   * (claimReceiptPart) in the transaction that stores the signed receipt.
+   * `proof` envelope (never from `agentlink_status`): an approved scope whose
+   * `answers.envelopeHash` is the record's, the signer the scope's counterparty, with its receipt
+   * part unclaimed, and the record kind matching the decision: `OFFER` for an `accept`, `ACCEPT`
+   * for a `confirm` (their accept of our offer, 04 §3.4.2; M1-7g-d). Void rules 2–6 and, for a
+   * grant, the policy are re-checked. M1-7g then checks the recipient commitment on-chain and claims
+   * the part (claimReceiptPart) in the transaction that stores the signed receipt.
    */
   async deferredReceipt(record: {
     readonly envelopeHash: string;
     readonly kind: 'OFFER' | 'ACCEPT';
     readonly signer: string;
   }): Promise<DeferredReceipt> {
-    if (record.kind !== 'OFFER') return { status: 'none' };
+    const decision: CommitmentDecision | undefined =
+      record.kind === 'OFFER' ? 'accept' : record.kind === 'ACCEPT' ? 'confirm' : undefined;
+    if (decision === undefined) return { status: 'none' };
     const self = await this.#self();
     const candidates = await this.#ctx.store.transaction((tx) =>
       tx
@@ -1869,7 +1872,7 @@ export class TermsService {
         continue;
       }
       if (
-        scope.decision !== 'accept' ||
+        scope.decision !== decision ||
         scope.agentId !== self.agentId ||
         scope.answers?.envelopeHash !== record.envelopeHash ||
         scope.counterparty.agentId !== record.signer

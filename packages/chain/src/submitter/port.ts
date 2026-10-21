@@ -153,7 +153,6 @@ export function batchCalldata(items: readonly SubmitItem[]): Hex {
   } as never);
 }
 
-/** The contract error name in revert data, or `reverted`. */
 /** An unknown record, as `getRecord` would decode it if the Notary returned instead of reverting. */
 const ABSENT_RECORD = Object.freeze({
   signer: ZERO_ADDRESS as string,
@@ -161,6 +160,7 @@ const ABSENT_RECORD = Object.freeze({
   receiptAt: Object.freeze([]) as readonly bigint[],
 });
 
+/** The contract error name in revert data, or `reverted`. */
 function revertName(data: Hex | undefined): string {
   if (data === undefined || data === '0x') return 'reverted';
   try {
@@ -250,7 +250,13 @@ export function createSubmitterChain(
     } catch (error) {
       // The deployed Notary reverts RecordNotFound() for an unknown ID: that, and only that
       // revert, means "absent" (as the read client, clients/state.ts). Any other stays an error.
-      if (error instanceof RpcAnswerError && revertName(error.data) === 'RecordNotFound') {
+      // The revert data must be exactly the 4-byte selector: decodeErrorResult ignores trailing
+      // bytes after a no-argument error, and those are not RecordNotFound() (IR #338 L1).
+      if (
+        error instanceof RpcAnswerError &&
+        error.data?.length === 10 &&
+        revertName(error.data) === 'RecordNotFound'
+      ) {
         return ABSENT_RECORD;
       }
       if (error instanceof RpcAnswerError) throw new ChainError('rpc_error');

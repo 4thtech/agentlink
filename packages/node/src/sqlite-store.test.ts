@@ -441,8 +441,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     // add a migration with the next version instead (07 §3.7: forward migrations only).
     const digestOf = (i: number) =>
       encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-    expect(STORE_SCHEMA_VERSION).toBe(3);
-    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3]);
+    expect(STORE_SCHEMA_VERSION).toBe(4);
+    expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4]);
     // Version 1 (G-9) is unchanged by D-72.
     expect(digestOf(0)).toMatchInlineSnapshot(
       `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -481,6 +481,54 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       ) STRICT",
       ]
     `);
+    // Version 3 is unchanged by version 4.
+    expect(digestOf(2)).toMatchInlineSnapshot(
+      `"e1ed945ccd595fde33376a7b00fbd31990cfe23411b175b297a5e7c145370e73"`,
+    );
+    // Version 4 (M1-1g-i): files.delete_after, the files.deleteAfter in effect at send time.
+    expect(MIGRATIONS[3]?.statements).toMatchInlineSnapshot(`
+      [
+        "ALTER TABLE "files" ADD COLUMN "delete_after" TEXT CHECK ("delete_after" IS NULL OR (typeof("delete_after") = 'text' AND "delete_after" IN ('expiry', 'receipt')))",
+      ]
+    `);
+  });
+
+  it('migrates a version 3 file to version 4 (M1-1g-i): files rows kept with delete_after null', async () => {
+    // A file as the version 3 code left it: the frozen v1 to v3 statements and user_version 3.
+    const raw = new Database(path());
+    for (const m of MIGRATIONS.slice(0, 3)) {
+      for (const statement of m.statements) raw.prepare(statement).run();
+    }
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 3');
+    raw
+      .prepare(
+        `INSERT INTO "files" ("envelope_id", "idx", "name", "size", "sha256", "locator", "url", ` +
+          `"file_key", "expires_at", "deleted_at") VALUES ` +
+          `('e1', 0, 'n', 5, 'h', 'l', NULL, 'k', 60, NULL)`,
+      )
+      .run();
+    raw.close();
+    const v4 = await SqliteStore.open(path());
+    expect(v4.schemaVersion).toBe(4);
+    // No value was recorded at send time: null, which retention reads as "keep until expiry".
+    expect(
+      await v4.transaction((tx) => tx.get('files', { envelope_id: 'e1', idx: 0 })),
+    ).toMatchObject({ size: 5, deleted_at: null, delete_after: null });
+    await v4.transaction((tx) =>
+      tx.update('files', { envelope_id: 'e1', idx: 0 }, { delete_after: 'receipt' }),
+    );
+    expect(
+      await rejects(
+        v4.transaction((tx) =>
+          tx.update('files', { envelope_id: 'e1', idx: 0 }, { delete_after: 'never' as never }),
+        ),
+      ),
+    ).toBeInstanceOf(StoreConstraintError);
+    await v4.close();
+    const fresh = await SqliteStore.open(join(dir, 'fresh.db'));
+    expect(fresh.schemaVersion).toBe(4);
+    await fresh.close();
   });
 
   it('migrates a version 2 file to version 3 (M1-7k-b): rows kept, publisher_lease and outbox_staged added', async () => {
@@ -508,7 +556,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       .run('k2', 6, 'e0');
     raw.close();
     const v3 = await SqliteStore.open(path());
-    expect(v3.schemaVersion).toBe(3);
+    expect(v3.schemaVersion).toBe(4);
     expect(await v3.transaction((tx) => tx.get('envelopes', { envelope_id: 'e1' }))).toMatchObject({
       type: 'handshake',
       delivery: 'queued',
@@ -528,7 +576,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     ).toBeInstanceOf(StoreConstraintError);
     await v3.close();
     const fresh = await SqliteStore.open(join(dir, 'fresh.db'));
-    expect(fresh.schemaVersion).toBe(3);
+    expect(fresh.schemaVersion).toBe(4);
     await fresh.close();
   });
 
@@ -548,9 +596,9 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       )
       .run();
     raw.close();
-    // Opening runs version 2 and then version 3 (M1-7k-b, new tables only).
+    // Opening runs versions 2, 3 (M1-7k-b, new tables only) and 4 (M1-1g-i, a nullable column).
     const v2 = await SqliteStore.open(path());
-    expect(v2.schemaVersion).toBe(3);
+    expect(v2.schemaVersion).toBe(4);
     expect(await v2.transaction((tx) => tx.get('envelopes', { envelope_id: 'e1' }))).toMatchObject({
       state: 'refused',
       refused_at: null,
@@ -563,7 +611,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     await v2.close();
     // A fresh file through every migration is the same schema as the migrated one.
     const fresh = await SqliteStore.open(join(dir, 'fresh.db'));
-    expect(fresh.schemaVersion).toBe(3);
+    expect(fresh.schemaVersion).toBe(4);
     await fresh.close();
   });
 
@@ -571,12 +619,12 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const v1 = await SqliteStore.open(path());
     await v1.transaction((tx) => tx.insert('seen', seen('kept')));
     await v1.close();
-    const v4: StoreMigration = {
-      version: 4,
+    const v5: StoreMigration = {
+      version: 5,
       statements: ['CREATE INDEX "seen__by_time" ON "seen" ("first_seen_at")'],
     };
-    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v4] });
-    expect(migrated.schemaVersion).toBe(4);
+    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v5] });
+    expect(migrated.schemaVersion).toBe(5);
     expect(await migrated.transaction((tx) => tx.count('seen'))).toBe(1);
     const check = new Database(path(), { readonly: true });
     expect(
@@ -592,7 +640,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const error = await rejects(SqliteStore.open(path()));
     expect((error as NodeStoreError).code).toBe('store_too_new');
     const raw = new Database(path(), { readonly: true });
-    expect(raw.pragma('user_version', { simple: true })).toBe(4);
+    expect(raw.pragma('user_version', { simple: true })).toBe(5);
     raw.close();
   });
 

@@ -168,6 +168,8 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
       file_key: await sealed('file_key', 'AAAA'),
       expires_at: clock.t + 86_400,
       deleted_at: null,
+      // As a sender row under `receipt` would be: only the direction keeps it out (M1-1g-i).
+      delete_after: 'receipt' as const,
     };
     await a.store.transaction((tx) => tx.insert('files', row));
 

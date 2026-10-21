@@ -265,11 +265,33 @@ async function readRecordAt(
       blockTag,
     });
     return state as unknown as RecordState;
-  } catch {
+  } catch (error) {
+    // The deployed Notary reverts RecordNotFound() for an unknown ID: that revert, and only that
+    // one, is "no record at this block" (as clients/state.ts), read as the empty record so the
+    // pack fails `record_not_found` (07 §8) and never verifies. Any other failure is an outage.
+    if (
+      error instanceof ChainError &&
+      error.code === 'call_reverted' &&
+      error.revertName === 'RecordNotFound'
+    ) {
+      return ABSENT_RECORD;
+    }
     // ChainErrors carry no URL; none of their detail leaves here either.
     throw new Unavailable();
   }
 }
+
+/** The record state of an unknown ID: no signer, no timestamp (`exists` is false). */
+const ABSENT_RECORD: RecordState = Object.freeze({
+  signer: ZERO_ADDRESS,
+  timestamp: 0n,
+  kind: 0,
+  envelopeHash: `0x${'0'.repeat(64)}`,
+  recipientCommitment: `0x${'0'.repeat(64)}`,
+  recordStructHash: `0x${'0'.repeat(64)}`,
+  receiptFlags: 0,
+  receiptAt: Object.freeze([]) as readonly bigint[],
+});
 
 const exists = (state: RecordState): boolean =>
   state.signer.toLowerCase() !== ZERO_ADDRESS && state.timestamp !== 0n;

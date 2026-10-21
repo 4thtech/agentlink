@@ -4,10 +4,12 @@
 // - Sending. After a processing pass, each new message from a paired contact (INBOX_TYPES) gets one
 //   `ack` envelope back to that contact: `{type: "ack", body: {kind: "received", envelopeId},
 //   replyTo: envelopeId}`. It is an ordinary envelope from the agent's current key (04 §3.1.1 key
-//   table), with the full 04 §3.2 recipient set, stored with its outbox rows in one store
-//   transaction and published like any send (07 §3.2). The `envelope.send` policy applies: a contact
-//   the policy does not allow gets no ack. An `ack` is never acknowledged, so two agents never loop.
-//   Only `syncInbox` sends acks; the fetch-only catch-up never does (06 §2.0).
+//   table), with the full 04 §3.2 recipient set, signed and stored as a staged outbox message
+//   (`queued`, no rows yet; IR-M1-7h-1 F04 b): the next outbox pass gives it its wraps and rows and
+//   publishes it (outbox.ts `enqueueStaged`, 07 §3.2), so a processing pass never waits on relays.
+//   The `envelope.send` policy applies, read once per pass: a contact the policy does not allow gets
+//   no ack. An `ack` is never acknowledged, so two agents never loop. Only `syncInbox` and the live
+//   loop's processing send acks; the fetch-only catch-up never does (06 §2.0).
 // - Reading. `status(envelopeId)` reports whether the contact that an outbound envelope went to
 //   has acknowledged it: an `ack` stored as `ok` from that same contact (so from its current key,
 //   04 §3.1.1 step 7) whose `replyTo` and `body.envelopeId` both name it. An ack proves only that the
@@ -74,9 +76,9 @@ export class DeliveryAcks {
   }
 
   /**
-   * Sends one ack for each new message in `reports` (outcome `ok`, from a contact). Never throws:
-   * a failure skips that ack and is counted in the log. Returns the number of acks stored for
-   * sending. Does nothing while the flag is off.
+   * Stages one ack for each new message in `reports` (outcome `ok`, from a contact). Never throws:
+   * a failure skips that ack and is counted in the log. Returns the number of acks staged for the
+   * outbox; nothing is published here. Does nothing while the flag is off.
    */
   async sendFor(reports: readonly InboundReport[]): Promise<number> {
     if (!this.enabled) return 0;
@@ -91,6 +93,7 @@ export class DeliveryAcks {
       .catch(() => []);
     let sent = 0;
     let skipped = 0;
+    let policy: Awaited<ReturnType<OwnerActions['loadPolicy']>> | undefined;
     for (const row of rows) {
       if (
         row === undefined ||
@@ -106,7 +109,8 @@ export class DeliveryAcks {
         continue;
       }
       try {
-        if (await this.#send(row.contact_id, row.envelope_id)) sent += 1;
+        policy ??= await this.#deps.ownerActions.loadPolicy();
+        if (await this.#stage(row.contact_id, row.envelope_id, policy)) sent += 1;
         else skipped += 1;
       } catch {
         skipped += 1;
@@ -116,16 +120,22 @@ export class DeliveryAcks {
     return sent;
   }
 
-  /** Stores one ack with its outbox rows, then publishes it. False when the policy refuses it. */
-  async #send(contactId: string, envelopeId: string): Promise<boolean> {
-    const { identity, envelopes, outbox, ownerActions } = this.#deps;
+  /**
+   * Signs one ack and stores it staged for the outbox (07 §3.2): the envelope row `queued`, without
+   * outbox rows, which the outbox pass adds (outbox.ts). False when the policy refuses it.
+   */
+  async #stage(
+    contactId: string,
+    envelopeId: string,
+    policy: Awaited<ReturnType<OwnerActions['loadPolicy']>>,
+  ): Promise<boolean> {
+    const { identity, envelopes, outbox } = this.#deps;
     outbox.requireTransport();
     await identity.assertCanSend();
-    const policy = await ownerActions.loadPolicy();
     if (evaluate(policy, { kind: 'envelope.send', contact: contactId, sizeBytes: 0 }) !== 'allow') {
       return false;
     }
-    const { built, row } = await envelopes.prepare({
+    const { row } = await envelopes.prepare({
       to: { contact: contactId },
       payload: ackPayload(envelopeId),
     });
@@ -135,28 +145,14 @@ export class DeliveryAcks {
     ) {
       return false;
     }
-    const routes = await outbox.routes(await outbox.contactPeer(contactId));
-    const keys = routes.map((r) => r.recipient);
-    if (
-      keys.length !== built.recipientNostrKeys.length ||
-      !built.recipientNostrKeys.every((k) => keys.includes(k))
-    ) {
-      return false; // the contact's card changed between the build and the routing
-    }
-    const rows = await outbox.prepareRows(built.envelope, routes);
     await this.#ctx.store.transaction((tx) => {
       const contact = tx.get('contacts', { contact_id: contactId });
       if (contact?.status !== 'active' || contact.pairing !== 'complete') {
         throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
       }
-      tx.insert('envelopes', row);
-      for (const r of rows) tx.insert('outbox', r);
+      // Staged: `queued` with no outbox rows (07 §3.2); never published from here (F04 b).
+      tx.insert('envelopes', { ...row, delivery: 'queued' });
     });
-    try {
-      await outbox.publishEnvelope(built.envelope.id);
-    } catch {
-      // The rows stay pending; the outbox retries (07 §3.2).
-    }
     return true;
   }
 

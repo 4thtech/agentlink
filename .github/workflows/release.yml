@@ -7,6 +7,10 @@
 # CI-GREEN (OPS-CI-2)
 #   The first job, `ci-green`, waits for this commit's push runs of ci.yml and security.yml and
 #   stops the whole run unless `ci-gate` and `security-gate` succeeded (tools/release/wait-for-ci.mjs).
+#   SUPERSEDED (CHORE-CI-SUPERSEDED): when this commit's CI run was cancelled before it ran because a
+#   newer push to main took its pending slot, and main has moved on past this commit, `ci-green`
+#   ends green with result=superseded and every later job is skipped. The newer commit's own run
+#   of this workflow (every push to main starts one) releases main's state.
 #
 # GUARD
 #   This workflow does nothing until the repository is ready: the `guard` job checks for
@@ -104,6 +108,8 @@ jobs:
   # security.yml) to have succeeded. Fails closed: red, cancelled or skipped, no run within 10
   # minutes, still pending after 45, or an API that keeps failing. After a CI re-run turns green,
   # re-run this workflow's failed jobs. Reads workflow-run metadata only (`actions: read`).
+  # Superseded (--superseded-ok): CI cancelled because main moved on ends green with
+  # result=superseded; `guard` requires result == 'green', so nothing else runs.
   ci-green:
     name: ci-green
     if: github.repository_owner == '4thtech'
@@ -112,6 +118,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+    outputs:
+      result: ${{ steps.wait.outputs.result }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -119,6 +127,7 @@ jobs:
           persist-credentials: false
 
       - name: Wait for this commit's CI and require it green
+        id: wait
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -129,12 +138,14 @@ jobs:
             --require security.yml:security-gate \
             --timeout-minutes 45 \
             --interval-seconds 30 \
-            --missing-grace-minutes 10
+            --missing-grace-minutes 10 \
+            --superseded-ok
 
   guard:
     name: guard
     needs: ci-green
-    if: github.repository_owner == '4thtech'
+    # A superseded ci-green exits 0 with result=superseded: nothing after it may run.
+    if: github.repository_owner == '4thtech' && needs.ci-green.outputs.result == 'green'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

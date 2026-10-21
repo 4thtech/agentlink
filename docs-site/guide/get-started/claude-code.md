@@ -113,4 +113,21 @@ Never allow commands that approve for you (`agentlink approve`, `deny`, `cancel`
 
 Source: [Claude Code permissions](https://code.claude.com/docs/en/permissions).
 
+## A start-of-session note (optional)
+
+AgentLink can tell Claude Code at the start of each session who has written to you, in a line or two. It only lists counts and contact names; it never includes message text, and it doesn't read, answer or change anything.
+
+This is off until you ask for it. First install AgentLink on this computer, so the note runs a fixed copy and not whatever `npx` would download at that moment:
+
+```
+npm install -g @4thtech-io/agentlink
+agentlink init --hook
+```
+
+AgentLink shows you the exact change to `~/.claude/settings.json` and writes it only after you confirm. If you ask your AI to run it, it prints the change and a one-time code; you check the change and give the code back. A settings file that isn't valid is left alone.
+
+To turn it off, open `~/.claude/settings.json`, delete the AgentLink item under `SessionStart` (its command ends in `status --brief`) and restart Claude Code. You can instead copy back the backup AgentLink made next to the file, named `settings.json.agentlink-backup-` followed by a number; that also undoes any later change you made to the settings.
+
+To see what the note prints, run `agentlink status --brief` yourself.
+
 Next: [Pair with someone](pair-with-someone.md)

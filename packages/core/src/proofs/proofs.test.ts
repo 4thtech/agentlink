@@ -2264,3 +2264,232 @@ describe('a malformed receiptRequest refuses the whole body (04 §3.4, I-5)', ()
     expect(await receipts(b)).toEqual([expect.objectContaining({ type: 1 })]);
   });
 });
+
+// --- M1-7g-d: logged fixed codes, the ACCEPTED of `confirm`, the waiting pool's share ------------
+
+/** The `code` fields of `agent`'s log lines. */
+const codesLogged = (agent: Agent) =>
+  agent.lines
+    .map((l) => parseJson(l) as { code?: unknown })
+    .filter((r) => r.code !== undefined)
+    .map((r) => r.code);
+
+describe('the proof flow logs only its listed fixed codes (M1-7g-d, I-7)', () => {
+  it('a mismatching body logs the fixed code as a field, and nothing unlisted', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const body = bodyOf(rec, envelopeId);
+    (body.record as RecordJson).envelopeHash = `0x${'e1'.repeat(32)}`;
+    await sendProofEnvelope(a, b, body);
+    const codes = codesLogged(b);
+    expect(codes).toContain('proof_mismatch');
+    for (const code of codes) expect(core.PROOF_LOG_CODES).toContain(code);
+  });
+
+  it('a body dropped unchecked logs `proof_unchecked` as a field', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId });
+    chain.readsFail = true;
+    await deliver(a, b);
+    expect(codesLogged(b)).toContain('proof_pending');
+    clock.t += 8 * 86_400;
+    await b.client.proofs.processInbound([]);
+    expect(codesLogged(b)).toContain('proof_unchecked');
+  });
+
+  it('every listed code is a fixed identifier the logger accepts', () => {
+    expect(core.PROOF_LOG_CODES.length).toBeGreaterThan(0);
+    expect(() => createLogger({ codes: core.PROOF_LOG_CODES })).not.toThrow();
+  });
+});
+
+describe('`confirm` signs the ACCEPTED receipt on their ACCEPT record (M1-7g-d; 04 §3.4.2, 07 §2.1)', () => {
+  /** A offers, B accepts with its owner's approval and records the accept; A holds that record. */
+  async function acceptRecorded() {
+    const { a, b } = await twoAgents();
+    const offer = await sendOffer(a, b);
+    const asked = await b.client.respondToTerms({ envelopeId: offer, decision: 'accept' });
+    const bApproval = (asked as { approvalId: string }).approvalId;
+    await approve(b, bApproval);
+    const sent = await b.client.respondToTerms({
+      envelopeId: offer,
+      decision: 'accept',
+      approvalId: bApproval,
+    });
+    const accept = (sent as { envelopeId: string }).envelopeId;
+    expect(accept).toBeDefined();
+    await deliver(b, a);
+    const rec = await recordDirectly(b, a, accept, RECORD_KIND.ACCEPT);
+    await sendProofEnvelope(b, a, { envelopeId: accept, recordId: rec.recordId, salt: rec.salt });
+    expect(await a.client.getProof({ envelopeId: accept })).toMatchObject({
+      recordId: rec.recordId,
+    });
+    return { a, b, offer, accept, ...rec };
+  }
+
+  it('the approved confirm signs exactly one ACCEPTED, on-chain, and marks its part done', async () => {
+    const { a, accept, recordId } = await acceptRecorded();
+    const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
+    expect(asked.status).toBe('pending_approval');
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    // Nothing is signed before the owner approves (04 §3.4.2).
+    expect(onChain(recordId)!.receiptAt[2]).toBe(0n);
+    await approve(a, approvalId);
+    expect(
+      await a.client.respondToTerms({ envelopeId: accept, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok' });
+    expect(onChain(recordId)!.receiptAt[2]).not.toBe(0n);
+    expect((await receipts(a)).filter((r) => r.type === 3)).toHaveLength(1);
+    const part = await a.store.transaction((tx) =>
+      tx.get('commitment_parts', { approval_id: approvalId, part: 'receipt' }),
+    );
+    expect(part?.state).toBe('done');
+
+    // A repeat call with the same approval signs nothing more.
+    const before = chain.calls.acknowledge;
+    expect(
+      await a.client.respondToTerms({ envelopeId: accept, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'rejected', code: 'APPROVAL_USED' });
+    await a.client.proofs.runDeferredReceipts();
+    expect(chain.calls.acknowledge).toBe(before);
+    expect((await receipts(a)).filter((r) => r.type === 3)).toHaveLength(1);
+  });
+
+  it('a confirm that is only pending signs nothing, whatever the sync passes', async () => {
+    const { a, accept, recordId } = await acceptRecorded();
+    const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
+    expect(asked.status).toBe('pending_approval');
+    await a.client.proofs.runDeferredReceipts();
+    await a.client.proofs.processInbound([]);
+    expect(onChain(recordId)!.receiptAt[2]).toBe(0n);
+    expect((await receipts(a)).filter((r) => r.type === 3)).toEqual([]);
+  });
+
+  it('a confirm approved after its scope expired signs nothing', async () => {
+    const { a, accept, recordId } = await acceptRecorded();
+    const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    clock.t += 8 * 86_400;
+    const r = await a.client.respondToTerms({
+      envelopeId: accept,
+      decision: 'accept',
+      approvalId,
+    });
+    expect(r.status).toBe('rejected');
+    await a.client.proofs.runDeferredReceipts();
+    expect(onChain(recordId)!.receiptAt[2]).toBe(0n);
+  });
+
+  it('an approved accept scope never matches an ACCEPT record', async () => {
+    const { a, b, accept, recordId } = await acceptRecorded();
+    const acceptHash = (await a.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: accept }),
+    ))!.envelope_hash;
+    // B's own approved accept scope answers A's offer; an ACCEPT record (B's own) never matches it.
+    expect(
+      await b.client.terms.deferredReceipt({
+        envelopeHash: acceptHash,
+        kind: 'ACCEPT',
+        signer: b.id,
+      }),
+    ).toEqual({ status: 'none' });
+    expect(onChain(recordId)!.receiptAt[2]).toBe(0n);
+  });
+});
+
+describe('each contact has a share of the waiting pool (M1-7g-d; 04 §3.4)', () => {
+  const AWAITING = 'awaiting';
+  const awaitingRows = async (agent: Agent) =>
+    (await proofRows(agent)).filter((r) => r.status === AWAITING);
+
+  /** `count` waiting proof envelopes attributed to `contactId` (white-box rows). */
+  async function fillAwaiting(agent: Agent, contactId: string, count: number, tag: string) {
+    const template = await agent.store.transaction(
+      (tx) => tx.select('envelopes', { direction: 'in', contact_id: contactId })[0],
+    );
+    if (template === undefined) throw new Error('test: no envelope from that contact');
+    const empty = await agent.cipher.seal(
+      { table: 'proofs', column: 'salt', rowKey: JSON.stringify(['filler']) },
+      '',
+    );
+    await agent.store.transaction((tx) => {
+      for (let i = 0; i < count; i += 1) {
+        const id = `${tag}${String(i)}`;
+        tx.insert('envelopes', {
+          ...template,
+          envelope_id: id,
+          envelope_hash: `${tag}hash${String(i)}`,
+          type: 'proof',
+        });
+        tx.insert('proofs', {
+          record_id: `await:${id}`,
+          envelope_id: `${tag}message${String(i)}`,
+          chain_id: chain.config.chainId,
+          record_json: '{}',
+          tx_hash: null,
+          status: AWAITING,
+          fee_token: null,
+          fee_amount: null,
+          salt: empty,
+          created_at: clock.t,
+        });
+      }
+    });
+  }
+
+  /** `from` sends a message that `to` has not received, then its proof envelope, which `to` gets. */
+  async function proofBeforeMessage(from: Agent, to: Agent, text: string) {
+    const sent = await from.client.sendMessage({ to: to.id, text });
+    const envelopeId = (sent as { envelopeId: string }).envelopeId;
+    const rec = await recordDirectly(from, to, envelopeId, RECORD_KIND.MESSAGE);
+    await sendProofEnvelope(from, to, { envelopeId, recordId: rec.recordId, salt: rec.salt });
+    return { envelopeId, ...rec };
+  }
+
+  it('a contact at its share of 32 cannot add a waiting proof; another contact still can', async () => {
+    const { a, b } = await twoAgents();
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    await sendText(a, b);
+    await sendText(c, b, 'from carol');
+    await fillAwaiting(b, a.id, 32, 'waitA');
+
+    const fromA = await proofBeforeMessage(a, b, 'late from alice');
+    expect((await awaitingRows(b)).some((r) => r.envelope_id === fromA.envelopeId)).toBe(false);
+    expect(codesLogged(b)).toContain('proof_unchecked');
+    const fromC = await proofBeforeMessage(c, b, 'late from carol');
+    expect((await awaitingRows(b)).some((r) => r.envelope_id === fromC.envelopeId)).toBe(true);
+
+    // The messages arrive: only carol's waiting proof is checked and stored.
+    await deliver(a, b);
+    await deliver(c, b);
+    expect(await b.client.getProof({ envelopeId: fromA.envelopeId })).toBeUndefined();
+    expect(await b.client.getProof({ envelopeId: fromC.envelopeId })).toMatchObject({
+      recordId: fromC.recordId,
+    });
+    expect(core.PROOF_AWAITING_PER_CONTACT).toBe(32);
+  });
+
+  it('below its share a contact keeps adding waiting proofs', async () => {
+    const { a, b } = await twoAgents();
+    await sendText(a, b);
+    await fillAwaiting(b, a.id, 31, 'waitA');
+    const fromA = await proofBeforeMessage(a, b, 'late from alice');
+    expect((await awaitingRows(b)).some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
+    expect(codesLogged(b)).not.toContain('proof_unchecked');
+  });
+
+  it('a waiting row whose proof envelope was refused does not count against the contact', async () => {
+    const { a, b } = await twoAgents();
+    await sendText(a, b);
+    await fillAwaiting(b, a.id, 32, 'waitA');
+    await b.store.transaction((tx) => {
+      tx.update('envelopes', { envelope_id: 'waitA0' }, { state: 'refused' });
+    });
+    const fromA = await proofBeforeMessage(a, b, 'late from alice');
+    expect((await awaitingRows(b)).some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
+  });
+});

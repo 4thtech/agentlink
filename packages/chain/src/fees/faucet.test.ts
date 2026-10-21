@@ -1,4 +1,4 @@
-// M1-10b: the testnet faucet's chain side (05 §9; 03 §4.4; 12 §4.1; audit-rules SUB-7). The
+// M1-10b, M1-10b-b: the testnet faucet's chain side (05 §9; 03 §4.4; 12 §4.1; audit-rules SUB-7). The
 // hard-coded testnet allowlist, the `depositFor` calls and the faucet key's wallet. No network:
 // every request goes to an in-memory chain behind a mock fetch.
 //
@@ -45,10 +45,20 @@ interface MockChain {
   gasBalance: bigint;
   nonce: number;
   estimate: bigint;
+  /** What `eth_estimateGas` answers for a `depositFor` (it reverts while the allowance is short). */
+  depositEstimate: bigint;
   revertEstimate: boolean;
   failSend: 'none' | 'answer' | 'network';
+  /** Which sends fail as `failSend` says: every one, or only the approve or the depositFor. */
+  failOn: 'all' | 'approve' | 'deposit';
+  /** How a sent transaction's receipt answers: mined (status 1), never mined, or reverted. */
+  receipt: 'mined' | 'pending' | 'reverted';
   methods: string[];
   sent: { raw: Hex; hash: Hex }[];
+  /** Every raw transaction handed to `eth_sendRawTransaction`, whatever the answer. */
+  attempted: Hex[];
+  /** The gas of every `depositFor` simulation, in order. */
+  depositEstimates: number;
 }
 
 function newChain(overrides: Partial<MockChain> = {}): MockChain {
@@ -59,10 +69,15 @@ function newChain(overrides: Partial<MockChain> = {}): MockChain {
     gasBalance: 10n ** 18n,
     nonce: 7,
     estimate: 60_000n,
+    depositEstimate: 71_000n,
     revertEstimate: false,
     failSend: 'none',
+    failOn: 'all',
+    receipt: 'mined',
     methods: [],
     sent: [],
+    attempted: [],
+    depositEstimates: 0,
     ...overrides,
   };
 }
@@ -91,11 +106,35 @@ function mockFetch(chain: MockChain) {
         return reply('0x3b9aca00');
       case 'eth_getBlockByNumber':
         return reply({ number: '0x10', baseFeePerGas: '0x77359400', timestamp: '0x1' });
-      case 'eth_estimateGas':
-        if (chain.revertEstimate) {
-          return replyError({ code: 3, message: 'execution reverted', data: '0x08c379a0' });
+      case 'eth_estimateGas': {
+        const reverted = () =>
+          replyError({ code: 3, message: 'execution reverted', data: '0x08c379a0' });
+        if (chain.revertEstimate) return reverted();
+        const call = p[0] as { to: string; data: ViemHex };
+        if (call.to.toLowerCase() === VAULT) {
+          // depositFor pulls the amount with transferFrom: it reverts while the allowance is short.
+          const d = decodeFunctionData({ abi: FEE_VAULT_CLIENT_ABI, data: call.data });
+          const amount = (d.args as readonly unknown[])[2] as bigint;
+          if (chain.allowance < amount) return reverted();
+          chain.depositEstimates += 1;
+          return reply(`0x${chain.depositEstimate.toString(16)}`);
         }
         return reply(`0x${chain.estimate.toString(16)}`);
+      }
+      case 'eth_getTransactionReceipt': {
+        const hash = String(p[0]).toLowerCase();
+        const known = chain.sent.find((s) => s.hash === hash);
+        if (!known || chain.receipt === 'pending') return reply(null);
+        if (chain.receipt === 'reverted') return reply({ transactionHash: hash, status: '0x0' });
+        // Mining an approve sets the allowance it grants.
+        const tx = parseTransaction(known.raw as ViemHex);
+        if (String(tx.to).toLowerCase() === USDC) {
+          const a = decodeFunctionData({ abi: erc20Abi, data: tx.data as ViemHex });
+          if (a.functionName === 'approve')
+            chain.allowance = (a.args as readonly bigint[])[1] ?? 0n;
+        }
+        return reply({ transactionHash: hash, status: '0x1' });
+      }
       case 'eth_call': {
         const call = p[0] as { to: string; data: ViemHex };
         const decoded = decodeFunctionData({ abi: erc20Abi, data: call.data });
@@ -120,11 +159,14 @@ function mockFetch(chain: MockChain) {
         return replyError({ code: -32000, message: 'unexpected call' });
       }
       case 'eth_sendRawTransaction': {
-        if (chain.failSend === 'network') throw new TypeError('network down');
-        if (chain.failSend === 'answer') {
+        const raw = p[0] as ViemHex;
+        chain.attempted.push(raw as Hex);
+        const isDeposit = String(parseTransaction(raw).to).toLowerCase() === VAULT;
+        const failing = chain.failOn === 'all' || (chain.failOn === 'deposit') === isDeposit;
+        if (failing && chain.failSend === 'network') throw new TypeError('network down');
+        if (failing && chain.failSend === 'answer') {
           return replyError({ code: -32000, message: 'nonce too low' });
         }
-        const raw = p[0] as ViemHex;
         const hash = keccak256(raw) as Hex;
         chain.sent.push({ raw: raw as Hex, hash });
         return reply(hash);
@@ -143,6 +185,8 @@ function faucet(chain: MockChain, cfg: ChainConfig = config) {
     faucetKey: FAUCET_KEY,
     rpcUrls: [RPC_URL],
     timeoutMs: 1000,
+    receiptPollMs: 1,
+    receiptTimeoutMs: 40,
   });
 }
 
@@ -246,6 +290,74 @@ describe('createFaucetChain().credit', () => {
     if (result.state === 'sent') expect(result.txHash).toBe(chain.sent[1]?.hash);
   });
 
+  it('with no allowance: the depositFor gas comes from its simulation once the approve is mined (M1-10b-b)', async () => {
+    const chain = newChain({ estimate: 46_000n, depositEstimate: 71_000n });
+    const result = await faucet(chain).credit(AGENT, 100);
+    expect(result.state).toBe('sent');
+    const [approve, deposit] = chain.sent.map((s) => decodeSent(s.raw));
+    expect(approve?.tx.gas).toBe(46_000n + 25_000n);
+    expect(deposit?.functionName).toBe('depositFor');
+    // Simulated, not a fixed limit: the estimate plus the margin.
+    expect(deposit?.tx.gas).toBe(71_000n + 25_000n);
+    expect(deposit?.tx.gas).not.toBe(200_000n);
+    expect(chain.depositEstimates).toBe(1);
+    // The depositFor is simulated only after the approve's receipt, and signed after that.
+    const sends = chain.methods.flatMap((m, i) => (m === 'eth_sendRawTransaction' ? [i] : []));
+    const receipt = chain.methods.indexOf('eth_getTransactionReceipt');
+    const lastEstimate = chain.methods.lastIndexOf('eth_estimateGas');
+    expect(sends).toHaveLength(2);
+    expect(receipt).toBeGreaterThan(sends[0] ?? Infinity);
+    expect(lastEstimate).toBeGreaterThan(receipt);
+    expect(sends[1]).toBeGreaterThan(lastEstimate);
+  });
+
+  it('with no allowance: an approve that is not mined in time sends no depositFor', async () => {
+    const chain = newChain({ receipt: 'pending' });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'unavailable',
+    });
+    expect(chain.sent.map((s) => decodeSent(s.raw).functionName)).toEqual(['approve']);
+  });
+
+  it('with no allowance: a reverted approve sends no depositFor', async () => {
+    const chain = newChain({ receipt: 'reverted' });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'unavailable',
+    });
+    expect(chain.sent.map((s) => decodeSent(s.raw).functionName)).toEqual(['approve']);
+  });
+
+  it('with no allowance: an approve whose answer was lost sends no depositFor', async () => {
+    const chain = newChain({ failSend: 'network', failOn: 'approve' });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'unavailable',
+    });
+    expect(chain.attempted).toHaveLength(1);
+  });
+
+  it('with no allowance: a depositFor whose answer was lost is unknown, with its hash', async () => {
+    const chain = newChain({ failSend: 'network', failOn: 'deposit' });
+    const result = await faucet(chain).credit(AGENT, 100);
+    expect(chain.attempted).toHaveLength(2);
+    expect(result).toEqual({ state: 'unknown', txHash: keccak256(chain.attempted[1] as ViemHex) });
+  });
+
+  it('refuses receipt polling options out of bounds', () => {
+    const base = {
+      fetchFn: mockFetch(newChain()) as unknown as typeof fetch,
+      faucetKey: FAUCET_KEY,
+    };
+    for (const bad of [0, -1, 1.5, 10_001]) {
+      expect(() => createFaucetChain(config, { ...base, receiptPollMs: bad })).toThrow();
+    }
+    for (const bad of [0, 120_001, 2.5]) {
+      expect(() => createFaucetChain(config, { ...base, receiptTimeoutMs: bad })).toThrow();
+    }
+  });
+
   it('with an allowance that covers the amount: one depositFor, gas = estimate + margin', async () => {
     const chain = newChain({ allowance: 5n * ONE_USDC });
     const result = await faucet(chain).credit(AGENT, 100);
@@ -253,7 +365,7 @@ describe('createFaucetChain().credit', () => {
     expect(chain.sent).toHaveLength(1);
     const only = decodeSent(chain.sent[0]?.raw as Hex);
     expect(only.functionName).toBe('depositFor');
-    expect(only.tx.gas).toBe(60_000n + 25_000n);
+    expect(only.tx.gas).toBe(71_000n + 25_000n);
   });
 
   it('converts US cents to token units by the token decimals', async () => {
@@ -303,7 +415,11 @@ describe('createFaucetChain().credit', () => {
       reason: 'unavailable',
     });
     const lost = newChain({ allowance: ONE_USDC, failSend: 'network' });
-    expect(await faucet(lost).credit(AGENT, 100)).toEqual({ state: 'unknown' });
+    // The hash is computed locally from the signed bytes, so a retry can return it (M1-10b-b).
+    expect(await faucet(lost).credit(AGENT, 100)).toEqual({
+      state: 'unknown',
+      txHash: keccak256(lost.attempted[0] as ViemHex),
+    });
   });
 
   it('bounds the amount per claim and refuses a bad agent before any request', async () => {

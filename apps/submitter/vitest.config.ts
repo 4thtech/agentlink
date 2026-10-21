@@ -41,6 +41,7 @@ export default defineConfig({
             'src/**/*.test.ts',
             'test/engine.test.ts',
             'test/config.test.ts',
+            'test/faucet-claim.test.ts',
             'test/smoke-config.test.ts',
           ],
           // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default.
@@ -78,6 +79,8 @@ export default defineConfig({
                 SUBMITTER_SIGNER_ITEMS_PER_HOUR: '3',
                 SUBMITTER_IP_READS_PER_HOUR: '30',
                 SUBMITTER_FAUCET_CHAINS: '84532',
+                // The FakeFaucet's address (test/fake-faucet.ts): the faucet serves only this wallet.
+                SUBMITTER_FAUCET_ADDRESS_84532: `0x${'fa'.repeat(20)}`,
                 SUBMITTER_FAUCET_IP_CLAIMS_PER_DAY: '2',
                 SUBMITTER_FAUCET_DAILY_CAP: '10',
                 SUBMITTER_FAUCET_IP_REQUESTS_PER_HOUR: '20',
@@ -87,7 +90,12 @@ export default defineConfig({
         ],
         test: {
           name: 'submitter',
-          include: ['test/submitter.test.ts', 'test/faucet.test.ts', 'test/smoke.test.ts'],
+          include: [
+            'test/submitter.test.ts',
+            'test/faucet.test.ts',
+            'test/smoke.test.ts',
+            'test/entry.test.ts',
+          ],
           testTimeout: 20_000,
         },
       },
