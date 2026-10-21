@@ -16,7 +16,10 @@
 // The uncovered receipt never spends gas either: a correctly signed Receipt from a fresh agent that
 // holds nothing, for a random record ID the Notary does not store. No proof fee was charged for that
 // record, so the submitter must refuse it with `RecordNotFound` after reading the chain, never ask
-// the recipient for credits (`InsufficientCredits`) and never send it (D-114).
+// the recipient for credits (`InsufficientCredits`) and never send it (D-114). Limit (IR-M1-34-b-1
+// L-2, accepted): the step cannot tell whether the submitter's own record pre-check ran, because
+// the Notary's simulation answers `RecordNotFound` for an unknown record too. It shows the receipt
+// route works end to end and refuses an uncovered receipt; the engine tests cover the pre-check.
 //
 // Zero access (AGENTS.md, I-7): nothing here prints a URL, address, signature or response body.
 // Failures carry fixed text, HTTP status codes and the submitter's fixed error codes only.

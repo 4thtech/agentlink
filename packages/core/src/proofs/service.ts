@@ -122,6 +122,21 @@ export const RECEIPT_DEADLINE_SECONDS = 3_600;
  * and is posted again on a later pass; the least recently tried go first, so none waits forever.
  */
 export const QUEUED_RECEIPTS_PER_PASS = 5;
+/**
+ * How long one queued receipt waits for inclusion on a sync pass (IR-M1-34-b-1 M-1): short, since
+ * the next pass reads the chain first; five slow posts then cost seconds, not minutes.
+ */
+export const QUEUED_RECEIPT_WAIT_MS = 2_000;
+/**
+ * The client's own simulation refusals that no resend can fix (IR-M1-34-b-1 L-1): the record is not
+ * on-chain, the signature or the recipient commitment is wrong. `Expired` is not here: 04 §5 may
+ * allow a replacement.
+ */
+const TERMINAL_RECEIPT_ERRORS: ReadonlySet<string> = new Set([
+  'RecordNotFound',
+  'InvalidSignature',
+  'NotRecipient',
+]);
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
 const ZERO_BYTES32 = `0x${'0'.repeat(64)}`;
@@ -157,7 +172,14 @@ const RECEIPT_SIGNED = 'receipt_signed';
 const RECEIPT_RECORDED = 'receipt_recorded';
 /** The conflicting ACCEPTED/REJECTED type is on-chain: this receipt can never land. */
 const RECEIPT_CONFLICT = 'receipt_conflict';
-const RECEIPT_STATUSES: readonly string[] = [RECEIPT_SIGNED, RECEIPT_RECORDED, RECEIPT_CONFLICT];
+/** The chain refuses this receipt for good (TERMINAL_RECEIPT_ERRORS): it leaves the queue. */
+const RECEIPT_FAILED = 'receipt_failed';
+const RECEIPT_STATUSES: readonly string[] = [
+  RECEIPT_SIGNED,
+  RECEIPT_RECORDED,
+  RECEIPT_CONFLICT,
+  RECEIPT_FAILED,
+];
 /**
  * A `proof` envelope whose message has not arrived yet (IR-M1-7g-1 L5): kept, keyed
  * `await:<proof envelope id>`, with the message's envelope ID, and checked when that arrives.
@@ -201,6 +223,7 @@ export const PROOF_LOG_CODES: readonly string[] = Object.freeze([
   'proof_mismatch',
   'proof_parent_mismatch',
   'receipt_conflict',
+  'receipt_failed',
   'deferred_error',
   'pack_invalid',
   'APPROVAL_VOID',
@@ -1285,8 +1308,11 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
    */
   async #postReceipt(
     row: Row<'proofs'>,
-  ): Promise<'recorded' | 'replaced' | 'replaced_open' | 'open'> {
-    if ((await this.#submitReceipt(row)) === 'recorded') return 'recorded';
+    waitMs?: number,
+  ): Promise<'recorded' | 'replaced' | 'replaced_open' | 'open' | 'failed'> {
+    const status = await this.#submitReceipt(row, waitMs);
+    if (status === 'recorded') return 'recorded';
+    if (status === 'terminal') return 'failed';
     if (!(await this.#replaceReceipt(row))) return 'open';
     const after = await this.#ctx.store.transaction((tx) =>
       tx.get('proofs', { record_id: row.record_id }),
@@ -1300,9 +1326,11 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
    * QUEUED_RECEIPTS_PER_PASS per pass, least recently tried first. The same signed bytes are sent
    * until they land (04 §5); the proof stays valid with fewer receipts meanwhile. Receipts go only
    * through the submitters, which the sender's proof fee covers: nothing here pays from this
-   * agent's account or asks it for credits. Never throws; returns how many are on-chain now.
+   * agent's account or asks it for credits. Each post waits at most QUEUED_RECEIPT_WAIT_MS for
+   * inclusion. A receipt the chain refuses for good leaves the queue (`receipt_failed`). `only`
+   * limits the pass to those queued IDs. Never throws; returns how many are on-chain now.
    */
-  async postQueuedReceipts(): Promise<number> {
+  async postQueuedReceipts(only?: ReadonlySet<string>): Promise<number> {
     if (this.#platform === undefined) return 0;
     let rows: Row<'proofs'>[];
     try {
@@ -1319,14 +1347,15 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     }
     this.#receiptPass += 1;
     const tried = (r: Row<'proofs'>) => this.#receiptTries.get(r.record_id) ?? 0;
-    const due = [...rows]
+    const due = rows
+      .filter((r) => only === undefined || only.has(r.record_id))
       .sort((x, y) => tried(x) - tried(y) || x.created_at - y.created_at)
       .slice(0, QUEUED_RECEIPTS_PER_PASS);
     let landed = 0;
     for (const row of due) {
       this.#receiptTries.set(row.record_id, this.#receiptPass);
       try {
-        const outcome = await this.#postReceipt(row);
+        const outcome = await this.#postReceipt(row, QUEUED_RECEIPT_WAIT_MS);
         if (outcome === 'recorded' || outcome === 'replaced') landed += 1;
       } catch {
         this.#log.warn('queued receipt not posted', { code: 'submit_error' });
@@ -1346,9 +1375,19 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   async processInbound(reports: readonly InboundReport[]): Promise<ProofInboundResult> {
     const flags: InboundReport[] = [];
     if (this.#platform === undefined) return { signed: 0, reports: flags };
-    // Receipts no submitter took on an earlier pass are posted again first (D-114); the ones this
-    // pass signs were just submitted and wait for the next pass.
-    await this.postQueuedReceipts();
+    // Receipts no submitter took on an earlier pass (D-114). They are posted after this pass's new
+    // envelopes (IR-M1-34-b-1 M-1); the ones this pass signs were just submitted and wait for the
+    // next pass.
+    let queued: ReadonlySet<string> = new Set();
+    try {
+      queued = new Set(
+        (
+          await this.#ctx.store.transaction((tx) => tx.select('proofs', { status: RECEIPT_SIGNED }))
+        ).map((r) => r.record_id),
+      );
+    } catch {
+      this.#log.warn('queued receipts not read', { code: 'submit_error' });
+    }
     let signed = 0;
     // Bodies kept pending by an earlier pass (a failed chain read): expired ones go first, the rest
     // are checked again after this pass's new envelopes (04 §3.4, M1-7g-b).
@@ -1375,6 +1414,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         this.#log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
+    if (queued.size > 0) await this.postQueuedReceipts(queued);
     return { signed, reports: flags };
   }
 
@@ -1951,6 +1991,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   async #receiptResult(stored: Row<'proofs'>, type: ReceiptTypeName): Promise<AcknowledgeResult> {
     const recordId = stored.record_id.slice(0, stored.record_id.lastIndexOf(':'));
     if (stored.status === RECEIPT_CONFLICT) return rejected('RECEIPT_CONFLICT');
+    if (stored.status === RECEIPT_FAILED) return rejected('NOT_RECORDED');
     const onChain =
       stored.status === RECEIPT_RECORDED || (await this.#submitReceipt(stored)) === 'recorded';
     return { status: 'ok', recordId, receipt: type, onChain };
@@ -1960,15 +2001,34 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
    * Submits the stored signed Receipt unchanged. On-chain: the row becomes `receipt_recorded` and a
    * commitment part that holds this item becomes `done` (07 §2.1 step 3, §3.5).
    */
-  async #submitReceipt(stored: Row<'proofs'>): Promise<ProofOutcome['status'] | 'error'> {
+  async #submitReceipt(
+    stored: Row<'proofs'>,
+    waitMs?: number,
+  ): Promise<ProofOutcome['status'] | 'error' | 'terminal'> {
     const chain = this.#chain(stored.chain_id);
     if (chain === undefined) return 'error';
-    let status: ProofOutcome['status'];
+    let outcome: ProofOutcome;
     try {
-      status = (await chain.submitter.acknowledge(parseJson(stored.record_json) as never)).status;
+      outcome = await chain.submitter.acknowledge(
+        parseJson(stored.record_json) as never,
+        waitMs === undefined ? undefined : { waitMs },
+      );
     } catch {
       this.#log.warn('receipt submit failed', { code: 'submit_error' });
       return 'error';
+    }
+    const status = outcome.status;
+    if (status === 'failed' && TERMINAL_RECEIPT_ERRORS.has(outcome.error)) {
+      // The chain's own simulation refuses it for good: no resend or replacement can land it.
+      this.#log.warn('receipt refused by the chain', { code: 'receipt_failed' });
+      await this.#ctx.store.transaction((tx) =>
+        tx.update(
+          'proofs',
+          { record_id: stored.record_id, status: RECEIPT_SIGNED },
+          { status: RECEIPT_FAILED },
+        ),
+      );
+      return 'terminal';
     }
     const now = nowOf(this.#ctx);
     if (status === 'recorded') {

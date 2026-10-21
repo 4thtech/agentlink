@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from '../client.js';
 import { MemoryStore } from '../store/memory-store.js';
 import { FakeNotary, FEE_UNITS } from '../testing/chain.js';
+import { QUEUED_RECEIPT_WAIT_MS } from './service.js';
 import {
   FakeClock,
   RecordingApprovalChannel,
@@ -20,6 +21,7 @@ import {
 import { pairWith, type TestOwner } from '../testing/envelopes.js';
 import { MemoryPolicyMark } from '../testing/owner.js';
 import type { TransportFactory } from '../transport.js';
+import type { ProofsPlatform } from './platform.js';
 
 // Two real cores per test; slow on a loaded CI runner, as proofs.test.ts.
 vi.setConfig({ testTimeout: 60_000 });
@@ -50,7 +52,12 @@ const RELAYS = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alph
 const ownerA = new MemoryOwnerKeyStore(seed(241), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(242), passphrase());
 
-async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
+async function openAgent(
+  n: number,
+  owner: TestOwner,
+  name: string,
+  platform: ProofsPlatform = chain.platform(),
+): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
   const keyStore = new MemoryKeyStore(seed(n));
@@ -63,7 +70,7 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     transport: relayFactory,
     policyMark: new MemoryPolicyMark(),
     logger: createLogger({ name: 'core', level: 'debug', sink: () => undefined }),
-    proofs: chain.platform(),
+    proofs: platform,
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -95,9 +102,9 @@ async function deliver(from: Agent, to: Agent) {
 }
 
 /** A, B paired; only A funded. B (the recipient) holds nothing on the chain. */
-async function twoAgents() {
+async function twoAgents(platformB?: ProofsPlatform) {
   const a = await openAgent(51, ownerA, 'alice');
-  const b = await openAgent(52, ownerB, 'bob');
+  const b = await openAgent(52, ownerB, 'bob', platformB);
   await pairWith(clock, a, b);
   await pairWith(clock, b, a);
   chain.fund(a.id, 10n * FEE_UNITS);
@@ -168,5 +175,77 @@ describe('a receipt the submitter could not take is queued and posted later (D-1
     expect(chain.creditOf(b.id)).toBe(0n);
     // The receipt is covered by the sender's proof fee, charged once at notarize (12 §2).
     expect(chain.creditOf(a.id)).toBe(senderCredits);
+  });
+});
+
+describe('queued posts stay short and come after new envelopes (IR-M1-34-b-1 M-1, L-1)', () => {
+  /** B's platform, recording record reads (new envelopes) and receipt posts with their wait. */
+  function watched(events: string[]): ProofsPlatform {
+    const base = chain.platform();
+    const c = base.chains[0] as ProofsPlatform['chains'][number];
+    const client = {
+      ...c.client,
+      readContract: (call: { functionName: string }) => {
+        if (call.functionName === 'getRecord') events.push('inbound');
+        return (c.client.readContract as (x: unknown) => Promise<unknown>)(call);
+      },
+    } as unknown as typeof c.client;
+    const submitter = {
+      ...c.submitter,
+      acknowledge: (
+        item: Parameters<typeof c.submitter.acknowledge>[0],
+        call?: { waitMs?: number },
+      ) => {
+        events.push(`post:${String(call?.waitMs ?? 'default')}`);
+        return c.submitter.acknowledge(item, call);
+      },
+    };
+    return { ...base, chains: [{ ...c, client, submitter }] };
+  }
+
+  it('a pass checks its new proof envelopes first, then posts queued receipts with a short wait', async () => {
+    const events: string[] = [];
+    const { a, b } = await twoAgents(watched(events));
+    const first = await notarizedText(a, b);
+    chain.censor = true;
+    await b.client.acknowledge({ envelopeId: first.envelopeId, type: 'opened' });
+    // A second message and its proof arrive in the same pass as the queued post.
+    const sent = await a.client.sendMessage({ to: b.id, text: 'a second note' });
+    if (sent.status !== 'ok') throw new Error('test: send failed');
+    chain.censor = false;
+    const proof = await a.client.notarize({ envelopeId: sent.envelopeId });
+    expect(proof.status).toBe('ok');
+    events.length = 0;
+    await deliver(a, b);
+    const inbound = events.indexOf('inbound');
+    const posted = events.indexOf(`post:${String(QUEUED_RECEIPT_WAIT_MS)}`);
+    expect(inbound).toBeGreaterThanOrEqual(0);
+    expect(posted).toBeGreaterThan(inbound);
+    expect(QUEUED_RECEIPT_WAIT_MS).toBeLessThanOrEqual(5_000);
+    expect(chain.records.get(first.recordId)?.receiptAt[1]).not.toBe(0n);
+  });
+
+  it('a receipt the chain refuses for good leaves the queue and is not retried', async () => {
+    const { a, b } = await twoAgents();
+    const { envelopeId, recordId } = await notarizedText(a, b);
+    chain.censor = true;
+    await b.client.acknowledge({ envelopeId, type: 'opened' });
+    expect(await queued(b)).toHaveLength(1);
+    // The record is gone from the chain (the client's own simulation: RecordNotFound).
+    chain.records.delete(recordId);
+    chain.censor = false;
+    await b.client.proofs.processInbound([]);
+    expect(await queued(b)).toEqual([]);
+    const rows = await b.store.transaction((tx) =>
+      tx.select('proofs', { status: 'receipt_failed' }),
+    );
+    expect(rows).toHaveLength(1);
+    const calls = chain.calls.acknowledge;
+    await b.client.proofs.processInbound([]);
+    await b.client.proofs.processInbound([]);
+    expect(chain.calls.acknowledge).toBe(calls);
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'rejected',
+    });
   });
 });

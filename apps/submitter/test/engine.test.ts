@@ -768,6 +768,21 @@ describe('receipts covered by the sender’s proof fee (D-114; M1-34-b)', () => 
     ]);
   });
 
+  it('two concurrent requests for one record share the cap of 3 (IR-M1-34-b-1 L-3)', async () => {
+    const t = setup();
+    const recordId = charged(t);
+    const [one, two] = await Promise.all([
+      t.submit([fakeReceiptItem(R, recordId, 1), fakeReceiptItem(R, recordId, 2)]),
+      t.submit([fakeReceiptItem(R, recordId, 3), fakeReceiptItem(R, recordId, 4)]),
+    ]);
+    const all = [...(one ?? []), ...(two ?? [])];
+    expect(all.filter((r) => r.status === 'submitted')).toHaveLength(3);
+    expect(all.filter((r) => r.status === 'failed').map((r) => r.error)).toEqual(['receipt_limit']);
+    const sentIds = t.chain.sent.flatMap((tx) => tx.ids);
+    expect(sentIds).toHaveLength(3);
+    expect(new Set(sentIds).size).toBe(3);
+  });
+
   it('refuses REJECTED while ACCEPTED is in flight for the same record (never a doomed batch)', async () => {
     const t = setup();
     const recordId = charged(t);

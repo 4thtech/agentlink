@@ -112,10 +112,17 @@ export type ProofOutcome =
 
 export interface ProofSubmitter {
   notarize(item: { readonly record: unknown; readonly signature: unknown }): Promise<ProofOutcome>;
-  acknowledge(item: {
-    readonly receipt: unknown;
-    readonly signature: unknown;
-  }): Promise<ProofOutcome>;
+  /**
+   * `call.waitMs` (0 to 600 000) shortens or lengthens this call's wait for inclusion, for example
+   * for a queued receipt posted again on a sync pass, whose next pass reads the chain first.
+   */
+  acknowledge(
+    item: {
+      readonly receipt: unknown;
+      readonly signature: unknown;
+    },
+    call?: { readonly waitMs?: number },
+  ): Promise<ProofOutcome>;
 }
 
 type Seen = 'match' | 'absent' | 'conflict';
@@ -292,7 +299,7 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
   // Validate the poll settings up front: a bad value must not look like a submitter failure.
   pollPlan(options);
 
-  async function run(item: Item): Promise<ProofOutcome> {
+  async function run(item: Item, poll: PollOptions = options): Promise<ProofOutcome> {
     const base = { id: item.id, recordId: item.recordId };
     const seenNow = async (): Promise<Seen> => item.seen(await state.getRecord(item.recordId));
 
@@ -336,7 +343,7 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
     const sendAndWait = async (call: Omit<ContractTx, 'from'>): Promise<DirectSend> => {
       const sent = await sendDirect(state, direct as DirectMode, call, options.directOptions);
       if (!sent.ok) return sent;
-      const st = await waitForTx(state, sent.txHash, options);
+      const st = await waitForTx(state, sent.txHash, poll);
       if (st === 'success') return sent;
       return { ok: false, error: st === 'reverted' ? 'reverted' : 'not_included' };
     };
@@ -380,7 +387,7 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
       pollChain(async () => {
         const s = await seenNow();
         return s === 'absent' ? undefined : s;
-      }, options);
+      }, poll);
 
     // 1. Already on-chain? Then nothing is sent and nothing is charged again (04 §5).
     const before = await seenNow();
@@ -453,8 +460,12 @@ export function createProofSubmitter(options: ProofSubmitterOptions): ProofSubmi
   return Object.freeze({
     notarize: (item) =>
       Promise.resolve().then(() => run(recordItem(state, item.record, item.signature))),
-    acknowledge: (item) =>
-      Promise.resolve().then(() => run(receiptItem(state, item.receipt, item.signature))),
+    acknowledge: (item, call) =>
+      Promise.resolve().then(() => {
+        const poll = call?.waitMs === undefined ? options : { ...options, waitMs: call.waitMs };
+        pollPlan(poll); // a bad waitMs is a caller error, never a submitter failure
+        return run(receiptItem(state, item.receipt, item.signature), poll);
+      }),
   } satisfies ProofSubmitter);
 }
 

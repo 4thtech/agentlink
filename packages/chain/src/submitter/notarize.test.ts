@@ -1109,6 +1109,28 @@ describe('acknowledge: receipts confirmed by chain reads, both ways', () => {
     expect(up.sent[0]).toEqual({ receipt: rc.receipt, signature: rc.signature });
   });
 
+  it('a per-call waitMs bounds the wait for a receipt that does not land (queued posts, M1-34-b)', async () => {
+    const ledger = new Ledger();
+    const recordId = await onChainRecord(ledger);
+    const rc = await signedReceipt(ledger, recordId);
+    let sleeps = 0;
+    const sleep = () => {
+      sleeps += 1;
+      return Promise.resolve();
+    };
+    const sub = submitterFor(ledger, [fakeSubmitter(ledger, 'silent_drop')], {
+      sleep,
+      waitMs: 50,
+    });
+    expect((await sub.acknowledge(rc)).status).toBe('pending');
+    const full = sleeps;
+    expect(full).toBeGreaterThanOrEqual(50);
+    sleeps = 0;
+    expect((await sub.acknowledge(rc, { waitMs: 2 })).status).toBe('pending');
+    expect(sleeps).toBeLessThanOrEqual(2);
+    await expect(sub.acknowledge(rc, { waitMs: -1 })).rejects.toThrow();
+  });
+
   it('a receipt from a recipient with no credits on the network goes through the submitter (D-114)', async () => {
     const ledger = new Ledger();
     const recordId = await onChainRecord(ledger);
