@@ -240,7 +240,12 @@ describe('deploy-submitter.yml structure', () => {
     // The gas and faucet keys are Worker secrets only: GitHub never holds them (release §4.5, §6).
     expect(workflow).not.toMatch(/secrets\.SUBMITTER_/);
     expect(workflow).not.toMatch(/secrets\.[A-Z_]*(GAS|FAUCET|RPC|IP_KEY)/);
-    expect(workflow).not.toMatch(/wrangler secret (put|bulk)/);
+    // CI never sets a Worker secret: `wrangler secret` appears only in owner hints and comments.
+    const executed = workflow
+      .split('\n')
+      .filter((line) => !/^\s*#/.test(line))
+      .map((line) => line.replace(/"[^"]*"/g, '""'));
+    expect(executed.filter((line) => /wrangler secret/.test(line))).toEqual([]);
   });
 
   it('runs the staging smoke without credentials, against the staging origin', () => {

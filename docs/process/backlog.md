@@ -3338,7 +3338,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (local red run): a storage failure at charge time sends nothing and allows no second claim; a lost broadcast answer is followed by a retry that returns the transaction; the gas limit comes from simulation; the staging and production configs cannot share a faucet key.
 
 #### M1-10c · submitter and faucet deploy pipeline (new sub-task)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (`.github/workflows/deploy-submitter.yml`, `apps/submitter/wrangler.toml`; owner setup RB-19 `docs/runbooks/submitter-deploy.md`; deploy waits for the owner's Worker secrets and funding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · .github/workflows/deploy-submitter.yml, apps/submitter/wrangler config
 - **Depends on:** M1-10a, M1-10b, M0-2g; gap G-40 resolved (D-88)
 - **Spec:** `release-and-deployment.md` §1, §4.5, §5, §8; D-28
