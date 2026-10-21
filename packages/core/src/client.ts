@@ -400,6 +400,18 @@ export class AgentLinkClient {
       } catch {
         this.#ctx.log.warn('deferred receipt failed', { code: 'deferred_error' });
       }
+      // The result says what happened to the receipt in that run, not the state before it
+      // (M1-7g-f): the part is read again. Never fails the call.
+      if (result.receipt !== undefined) {
+        try {
+          const status = await this.terms.receiptStatus(input.envelopeId);
+          if (status !== undefined && status !== result.receipt.status) {
+            return { ...result, receipt: { ...result.receipt, status } };
+          }
+        } catch {
+          this.#ctx.log.warn('deferred receipt failed', { code: 'deferred_error' });
+        }
+      }
     }
     return result;
   }
