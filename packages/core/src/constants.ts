@@ -4,7 +4,7 @@
 // imported from there and not repeated here.
 
 /** The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7). */
-export const STORE_SCHEMA_VERSION = 3;
+export const STORE_SCHEMA_VERSION = 4;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;
