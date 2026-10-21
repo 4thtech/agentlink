@@ -110,7 +110,10 @@ class RelayNetwork implements RelayConnector {
           let events = (this.stored.get(target.url) ?? []).filter((e) => matches(filter, e));
           events = events
             .sort((x, y) => y.created_at - x.created_at)
-            .slice(0, Math.min(filter.limit ?? events.length, this.caps.get(target.url) ?? Infinity));
+            .slice(
+              0,
+              Math.min(filter.limit ?? events.length, this.caps.get(target.url) ?? Infinity),
+            );
           for (const e of events) push(['EVENT', subId, e]);
           push(['EOSE', subId]);
         }
