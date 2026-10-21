@@ -14,6 +14,21 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 ## 1. How to read a card
 
 ```
+#### M1-34-b · submitter: receipts covered by the sender's proof fee, and the deferred fallback (new, D-114)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
+- **Repo/path:** agentlink · the submitter (07 §7), packages/chain (submitter port, deferred posting), packages/core (receipt queue)
+- **Depends on:** M1-34, M1-10a, M1-4c
+- **Spec:** 07 §7; 12 §2, §11; `docs/design/topup-ux.md` §8; D-114, D-111
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - The submitter accepts up to 3 receipts for a record whose fee was charged, whatever the recipient holds, capped per record (D-114). No amounts or prices change (12 §2).
+  - When the submitter is unreachable, the receipt is queued locally and posted when possible; the proof stays valid with fewer receipts (D-114).
+  - A recipient is never charged without asking (D-114).
+  - If the receipt path cannot do this without a contract change, open a card noting that the work happens in the private `occ-v2-contracts` repo (no contract details in this repo).
+- **Acceptance:**
+  - Tests first (S2, with a `RED (expected):` commit): the first 3 receipts for a charged record are accepted with a recipient that holds nothing on the network, the 4th is refused; a record whose fee was not charged gets none; an unreachable submitter queues the receipt and a later post succeeds; no path charges the recipient without asking.
+  - Independent S2 review.
+
 #### M1-5a · transport-nostr: gift wrap / unwrap
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr
@@ -2035,8 +2050,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: the link host comes only from the shipped config; no network, token or "wallet" in `nextStep` or the CLI default output; no tool or `nextStep` asks for a key, recovery code or card detail.
 
-#### M1-34 · owner decision: who pays for receipts (new, D-111, DECISION NEEDED)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before receipts go live on testnets)
+#### M1-34 · owner decision: who pays for receipts (new, D-111, decided D-114)
+- **Status:** done (→ docs-m1-34-receipt-payer PR, 2026-10-21; decided by the owner, D-114) · **Size:** XS · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before receipts go live on testnets)
 - **Repo/path:** agentlink · docs/foundation/12 §2, §11; 05 (receipts); 07 §7 (submitter)
 - **Depends on:** —
 - **Spec:** 12 §2, §11; 07 §7; `docs/design/topup-ux.md` §8
@@ -2047,6 +2062,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Record the decision in 00; update 12 §2 and 07 §7; open follow-up cards for the submitter and, if needed, the contracts (private repo).
 - **Acceptance:**
   - A decision-log entry and the spec lines updated.
+- **Outcome (2026-10-21):** D-114: B, with D as the fallback when the submitter is unreachable; a recipient is never charged without asking. Spec lines in 12 §2, §11, 07 §7 and `docs/design/topup-ux.md` §8. The submitter work is M1-34-b. The specs state no contract change; if M1-34-b finds one is needed, it opens a card noting the work happens in the private `occ-v2-contracts` repo.
 
 #### M1-5a · transport-nostr: gift wrap / unwrap
 - **Status:** done (4thtech/agentlink#45, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
