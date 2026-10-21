@@ -2562,7 +2562,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - No log line, error or tool result carries the Record, signature or salt (I-7); the largest allowed body fits the payload limit.
 
 #### M1-7g-c · core: proof and receipt follow-ups (new, M1-7g and M1-7g-b reviews)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (part 1: the contact flag for a mismatching `proof` body, including `proof_parent_mismatch`, and the per-contact share of the pending pool; the logger allowlist and the core-signed `confirm` ACCEPTED remain on this card) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, receipts, inbox), packages/node (logger)
 - **Depends on:** M1-7g-b
 - **Spec:** 04 §3.4; 06 §2.4; 07 §3.2, §8

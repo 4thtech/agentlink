@@ -23,7 +23,11 @@
 // its signature exactly as submitted. The recipient runs the 04 §3.4 checks 1–5 on them with the
 // existing checks; any mismatch drops the whole body (`proof_mismatch`). A chain read that fails is
 // never a pass: the body stays pending and is checked again at later syncs (at most 256 bodies, 7
-// days each, then `proof_unchecked`). A passing body's Record and signature are stored as received,
+// days each, then `proof_unchecked`; at most PROOF_PENDING_PER_CONTACT of them from one contact,
+// M1-7g-c). A definite mismatch (`proof_mismatch`, `proof_parent_mismatch`) flags the contact
+// (04 §3.4, M1-7g-c): the `proof` envelope is stored as refused with that fixed code, and
+// `processInbound` reports it as a flagged refusal for the activity feed. Nothing clears it.
+// A passing body's Record and signature are stored as received,
 // and the recipient can export its own pack from them; an older sender's body carries neither
 // (RECORD_UNAVAILABLE on export).
 //
@@ -154,6 +158,11 @@ const PENDING_PREFIX = 'pending:';
 /** At most this many bodies are pending, each at most this long after it was received. */
 const MAX_PENDING = 256;
 const PENDING_SECONDS = 7 * 86_400;
+/**
+ * One contact's share of the pending pool (M1-7g-c): at most this many of the MAX_PENDING bodies
+ * come from one contact, so one contact cannot fill the pool and push out the others' bodies.
+ */
+export const PROOF_PENDING_PER_CONTACT = 32;
 /** Rows that are a record: own or received (not a stored receipt or a waiting proof). */
 const isRecordRow = (r: Row<'proofs'>): boolean =>
   !RECEIPT_STATUSES.includes(r.status) && r.status !== AWAITING && r.status !== PENDING;
@@ -177,6 +186,18 @@ export type ProofCode =
   | 'POLICY_CHANGED'
   /** `parentRecordId` is not zero and not a record the chain shows this agent signed (D-109). */
   | 'PARENT_NOT_OWN';
+
+/** What one `processInbound` pass did (M1-7g-c). */
+export interface ProofInboundResult {
+  /** Receipts signed in this pass. */
+  readonly signed: number;
+  /**
+   * A `proof` envelope that did not match the chain (04 §3.4): outcome `refused`, reason
+   * `proof_mismatch` or `proof_parent_mismatch`, its contact, `flagged: true`. Fixed codes and
+   * validated IDs only, never a value from the body or the chain answer (I-5, I-7).
+   */
+  readonly reports: readonly InboundReport[];
+}
 
 export interface ProofRejected {
   readonly status: 'rejected';
@@ -944,10 +965,12 @@ export class ProofService implements RecordLookup {
   /**
    * After a processing pass (syncInbox, the live subscription): checks each new `proof` envelope
    * from a contact on-chain, stores the record, signs DELIVERED per policy and the deferred
-   * ACCEPTED (07 §2.1 step 4). Never throws; returns the receipts signed.
+   * ACCEPTED (07 §2.1 step 4). Never throws; returns the receipts signed and the contacts flagged
+   * for a `proof` body that does not match the chain (04 §3.4, M1-7g-c).
    */
-  async processInbound(reports: readonly InboundReport[]): Promise<number> {
-    if (this.#platform === undefined) return 0;
+  async processInbound(reports: readonly InboundReport[]): Promise<ProofInboundResult> {
+    const flags: InboundReport[] = [];
+    if (this.#platform === undefined) return { signed: 0, reports: flags };
     let signed = 0;
     // Bodies kept pending by an earlier pass (a failed chain read): expired ones go first, the rest
     // are checked again after this pass's new envelopes (04 §3.4, M1-7g-b).
@@ -961,20 +984,20 @@ export class ProofService implements RecordLookup {
       if (report.outcome !== 'ok' || report.envelopeId === undefined) continue;
       if (report.contactId === undefined) continue;
       try {
-        signed += await this.#inbound(report.envelopeId, report.contactId);
-        signed += await this.#released(report.envelopeId, report.contactId);
+        signed += await this.#inbound(report.envelopeId, report.contactId, flags);
+        signed += await this.#released(report.envelopeId, report.contactId, flags);
       } catch {
         this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
     for (const row of pending) {
       try {
-        signed += await this.#recheck(row);
+        signed += await this.#recheck(row, flags);
       } catch {
         this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
-    return signed;
+    return { signed, reports: flags };
   }
 
   /** Drops pending bodies older than PENDING_SECONDS (`proof_unchecked`); returns the rest. */
@@ -998,7 +1021,7 @@ export class ProofService implements RecordLookup {
   }
 
   /** One pending body, checked again from the existing checks on (04 §3.4). */
-  async #recheck(row: Row<'proofs'>): Promise<number> {
+  async #recheck(row: Row<'proofs'>, flags: InboundReport[]): Promise<number> {
     const proofEnvelopeId = row.record_id.slice(PENDING_PREFIX.length);
     const envelope = await this.#envelope(proofEnvelopeId);
     if (envelope?.contact_id == null || !row.record_id.startsWith(PENDING_PREFIX)) {
@@ -1008,20 +1031,35 @@ export class ProofService implements RecordLookup {
       );
       return 0;
     }
-    return this.#inbound(proofEnvelopeId, envelope.contact_id);
+    return this.#inbound(proofEnvelopeId, envelope.contact_id, flags);
   }
 
   /**
    * Keeps a body whose chain read failed (never a pass, never a mismatch), bounded like the wait for
    * a `proof` that arrives before its message: past MAX_PENDING it is dropped as `proof_unchecked`.
    */
-  async #pend(proofEnvelopeId: string, envelopeId: string, chainId: number): Promise<void> {
+  async #pend(
+    proofEnvelopeId: string,
+    envelopeId: string,
+    chainId: number,
+    contactId: string,
+  ): Promise<void> {
     const now = nowOf(this.#ctx);
     const key = `${PENDING_PREFIX}${proofEnvelopeId}`;
     const empty = await seal(this.#ctx, 'proofs', 'salt', [key], '');
     const kept = await this.#ctx.store.transaction((tx) => {
       if (tx.get('proofs', { record_id: key }) !== undefined) return 'kept';
-      if (tx.count('proofs', { status: PENDING }) >= MAX_PENDING) return 'full';
+      const pending = tx.select('proofs', { status: PENDING });
+      if (pending.length >= MAX_PENDING) return 'full';
+      // The contact's share (M1-7g-c): a pending row belongs to the contact of its proof envelope.
+      let mine = 0;
+      for (const r of pending) {
+        const proofEnvelope = tx.get('envelopes', {
+          envelope_id: r.record_id.slice(PENDING_PREFIX.length),
+        });
+        if (proofEnvelope?.contact_id === contactId) mine += 1;
+      }
+      if (mine >= PROOF_PENDING_PER_CONTACT) return 'full';
       tx.insert('proofs', {
         record_id: key,
         envelope_id: envelopeId,
@@ -1046,7 +1084,7 @@ export class ProofService implements RecordLookup {
   }
 
   /** The proof envelopes that waited for this message (L5): each is checked once, now. */
-  async #released(envelopeId: string, contactId: string): Promise<number> {
+  async #released(envelopeId: string, contactId: string, flags: InboundReport[]): Promise<number> {
     const now = nowOf(this.#ctx);
     const waiting = await this.#ctx.store.transaction((tx) => {
       tx.delete('proofs', { status: AWAITING, created_at: { lt: now - AWAITING_SECONDS } });
@@ -1056,7 +1094,7 @@ export class ProofService implements RecordLookup {
     });
     let signed = 0;
     for (const r of waiting) {
-      signed += await this.#inbound(r.record_id.slice('await:'.length), contactId);
+      signed += await this.#inbound(r.record_id.slice('await:'.length), contactId, flags);
     }
     return signed;
   }
@@ -1085,7 +1123,11 @@ export class ProofService implements RecordLookup {
     });
   }
 
-  async #inbound(proofEnvelopeId: string, contactId: string): Promise<number> {
+  async #inbound(
+    proofEnvelopeId: string,
+    contactId: string,
+    flags: InboundReport[],
+  ): Promise<number> {
     const row = await this.#envelope(proofEnvelopeId);
     if (row?.type !== 'proof' || row.direction !== 'in' || row.state !== 'ok') return 0;
     if (row.contact_id !== contactId) return 0;
@@ -1113,17 +1155,42 @@ export class ProofService implements RecordLookup {
       signedItem,
     );
     if (check.status === 'unavailable') {
-      await this.#pend(proofEnvelopeId, envelopeId, chainId);
+      await this.#pend(proofEnvelopeId, envelopeId, chainId, contactId);
       return 0;
     }
     if (check.status === 'mismatch') {
-      await this.#ctx.store.transaction((tx) =>
-        tx.delete('proofs', { record_id: pendingKey, status: PENDING }),
-      );
+      // The whole body is dropped and the contact is flagged (04 §3.4, M1-7g-c): the `proof`
+      // envelope is stored as refused with the fixed code, in the transaction that drops its pending
+      // row. Compare-and-set on `ok`, so a concurrent pass flags it once. No proof is stored, so no
+      // receipt is ever signed for it (D-109). No tool clears a refusal (I-4).
+      const reason = check.code ?? 'proof_mismatch';
+      const now = nowOf(this.#ctx);
+      const refused = await this.#ctx.store.transaction((tx) => {
+        tx.delete('proofs', { record_id: pendingKey, status: PENDING });
+        return tx.update(
+          'envelopes',
+          { envelope_id: proofEnvelopeId, contact_id: contactId, state: 'ok', type: 'proof' },
+          {
+            state: 'refused',
+            refused_reason: reason,
+            refused_at: now,
+            envelope_json: null,
+            payload_json: null,
+          },
+        );
+      });
+      if (refused === 1) {
+        const flag: InboundReport = {
+          envelopeId: proofEnvelopeId,
+          outcome: 'refused',
+          reason,
+          contactId,
+          flagged: true,
+        };
+        flags.push(Object.freeze(flag));
+      }
       // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
-      if (check.code === 'proof_parent_mismatch') {
-        // Dropped and logged: nothing is stored, so no receipt is ever signed (D-109). Flagging the
-        // contact (04 §3.4) is pending M1-7g-c, as for `proof_mismatch`.
+      if (reason === 'proof_parent_mismatch') {
         this.#ctx.log.warn(
           'proof envelope names another signer’s record as parent (proof_parent_mismatch)',
           { code: 'proof_parent_mismatch' },
