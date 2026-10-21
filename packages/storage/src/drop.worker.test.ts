@@ -162,6 +162,15 @@ async function roundTrip(size: number): Promise<void> {
   expect(encodeHex(sha256(sink.bytes()))).toBe(encodeHex(sha256(plaintext)));
 }
 
+// Timeouts of the two large round trips (CHORE-DROP-5MB-FLAKE): 300 s each. Measured: 2.9 s each on
+// a laptop (put 1.5 s, download and decrypt 0.7 s, two SHA-256 of the file 0.7 s, all pure JS in
+// workerd, so CPU-bound). On the merge-group CI runner, where turbo runs every package's tests in
+// parallel, the same code took 15.4 s for the 0.3 s small round trip and 34.6 to 35.9 s for 6 MiB,
+// and the 5 MB test passed the old 90 s limit twice (runs 39604257053 and 39600881141). The payload
+// stays 5 MB (card M1-6c: the single-PUT shape just under the 5 MiB part size) and every
+// assertion is unchanged.
+const LARGE_ROUND_TRIP_TIMEOUT_MS = 300_000;
+
 describe('drop adapter × drop Worker (Miniflare)', () => {
   it('round trip: the drop only ever receives ciphertext, never the plaintext or the file key', async () => {
     const h = harness();
@@ -231,32 +240,40 @@ describe('drop adapter × drop Worker (Miniflare)', () => {
     }
   });
 
-  it('5 MB round trip (single PUT)', async () => {
-    await roundTrip(5_000_000);
-  }, 90_000);
+  it(
+    '5 MB round trip (single PUT)',
+    async () => {
+      await roundTrip(5_000_000);
+    },
+    LARGE_ROUND_TRIP_TIMEOUT_MS,
+  );
 
-  it('6 MiB round trip (multipart: one signed target per 5 MiB part)', async () => {
-    const h = harness();
-    const adapter = h.make();
-    const plaintext = plaintextOf(6 * MiB);
-    const result = await putEncrypted(adapter, plaintext, {
-      plaintextSize: plaintext.length,
-      expiresAt: new Date(Date.now() + DAY_MS),
-    });
-    const puts = h.requests.filter((r) => r.method === 'PUT');
-    expect(puts.map((r) => new URL(r.url).pathname.split('/').pop())).toEqual(['1', '2']);
-    const response = await SELF.fetch(
-      await adapter.presignGet(result.object, new Date(Date.now() + DAY_MS)),
-    );
-    const sink = memorySink();
-    await decryptDownload(response.body!, sink, {
-      fileKey: result.fileKey,
-      plaintextSize: plaintext.length,
-      ciphertextSha256: result.ciphertextSha256,
-      plaintextSha256: result.plaintextSha256,
-    });
-    expect(sink.committed).toBe(true);
-  }, 120_000);
+  it(
+    '6 MiB round trip (multipart: one signed target per 5 MiB part)',
+    async () => {
+      const h = harness();
+      const adapter = h.make();
+      const plaintext = plaintextOf(6 * MiB);
+      const result = await putEncrypted(adapter, plaintext, {
+        plaintextSize: plaintext.length,
+        expiresAt: new Date(Date.now() + DAY_MS),
+      });
+      const puts = h.requests.filter((r) => r.method === 'PUT');
+      expect(puts.map((r) => new URL(r.url).pathname.split('/').pop())).toEqual(['1', '2']);
+      const response = await SELF.fetch(
+        await adapter.presignGet(result.object, new Date(Date.now() + DAY_MS)),
+      );
+      const sink = memorySink();
+      await decryptDownload(response.body!, sink, {
+        fileKey: result.fileKey,
+        plaintextSize: plaintext.length,
+        ciphertextSha256: result.ciphertextSha256,
+        plaintextSha256: result.plaintextSha256,
+      });
+      expect(sink.committed).toBe(true);
+    },
+    LARGE_ROUND_TRIP_TIMEOUT_MS,
+  );
 
   it('refuses an expired link: the adapter will not hand it out and the drop answers 410', async () => {
     const h = harness();

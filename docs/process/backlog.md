@@ -68,8 +68,8 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 157 (M1a 80, M1b 77; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
-| M2 Console, desktop apps, self-host, design | 43 (incl. M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
+| M1 Local beta | 159 (M1a 80, M1b 79; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M2 Console, desktop apps, self-host, design | 44 (incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
@@ -759,6 +759,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Seen 2026-10-21 on the #326 push run 39547945275: the Windows `node-os` job failed with a hook in `packages/node/src/relay-io.test.ts` that timed out at 10000 ms; the re-run passed. Find the slow hook, then fix it or give it a measured per-file timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout. Found: the file's `beforeAll`, which spawns `openssl` once for the test certificate (about 0.04 s on macOS; on Windows attempt 1 it passed the 10 s default hook timeout, the re-run took 7.6 s for the whole file). It now has a 60 s hook timeout. `safe-fetch.test.ts` and `rpc-fetch.test.ts` spawn `openssl` the same way in their `beforeAll` and have not failed yet; a package-wide `hookTimeout` in `packages/node/vitest.config.ts` would cover all three (follow-up if they flake).
 - **Acceptance:** the PR names the slow hook with its measured Windows duration; the fix or the per-file timeout lands with that measurement; no test or gate weakened.
 
+#### CHORE-DROP-5MB-FLAKE · packages/storage drop.worker.test.ts: 5 MB round trip timed out at 90 s in merge-group CI (new, flake 2026-10-21)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only)
+- **Repo/path:** agentlink · `packages/storage/src/drop.worker.test.ts`
+- **Depends on:** —
+- **Scope:** Merge-group runs 39604257053 and 39600881141 ejected PRs: "5 MB round trip (single PUT)" timed out at 90000 ms (the 6 MiB test took 34.6 and 35.9 s, the small round trip 15.4 s). Locally the test takes 2.9 s (encrypt and upload 1.5 s, download and decrypt 0.7 s, two SHA-256 of the file 0.7 s: pure JS in workerd, CPU-bound), so the cause is a CPU-starved runner while turbo runs all packages in parallel, not Miniflare startup or chunking. Both large round trips now share a measured 300 s per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). The payload stays 5 MB (card M1-6c) and no assertion changed. No retries.
+- **Acceptance:** the PR cites the local and CI timings; no test or gate weakened.
+
 #### CHORE-CI-SUPERSEDED · A deploy or release whose CI was superseded ends skipped, and main's head still deploys (new, 2026-10-21)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml`, `.github/workflows/deploy-submitter.yml`, `.github/workflows/deploy-drop.yml`, `tools/release/**`
@@ -1001,7 +1008,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
 
 #### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
-- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#362; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
 - **Depends on:** — (runs in parallel with M1-35a)
 - **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
@@ -2234,6 +2241,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Existing M1-5b and M1-5c tests stay green; no test is weakened.
   - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
 
+#### M1-5g · core: sync carries the transport's incomplete flag up to the user (new, IR-M1-5d-1 M-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
+- **Repo/path:** agentlink · packages/core (inbox sync), apps/cli (`agentlink_inbox`, `agentlink_status`)
+- **Depends on:** M1-5d
+- **Spec:** 07 §4.2 (Sync); 06 §2.1; 04 §3.5
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - The transport reports a second that a relay returned at its cap as a sync gap (M1-5d). Core sync drops it today. Carry it as a fixed incomplete flag or a count (never relay text, never an event ID) through the inbox result and the MCP tool to the user, in the plain words of 11 §5.
+  - Do not retry in a loop and do not advance the saved position past the incomplete second.
+- **Acceptance:**
+  - Tests first (RED commit): a fake relay that caps results gives an inbox result with the incomplete flag; a normal sync gives none; the flag carries no relay text and no event ID; the tool summary says some messages may be missing and will be tried again.
+  - Existing M1-5c and M1-5d tests stay green; no test is weakened.
+
 ### Storage (`@4thtech-io/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
@@ -3319,7 +3339,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split (2026-10-19):** M1-9d-1 (`agentlink_send` `path`, `agentlink_fetch_file`, `agentlink_status` `storage`) is in review; M1-9d-2 (`notarize`, `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, the proof-pack tools, receipts, `credits`, `agentAddress`, `topUpUrl`, `prices`) follows. M1-9d-1 notes: `expiresInDays` on send is not exposed yet (the core uses `files.defaultExpiryDays`); a send with `path` and no `text` or `body` carries an empty text; the `needs_setup` next steps name no local settings link, because neither `agentlink policy` (M1-9m) nor the settings page has landed, so owners cannot yet allow a folder; the drop fetch is the global fetch held to the drop's https origin with redirects off (an SSRF-safe non-GET fetch in `@4thtech-io/node` would be the stricter form). Map any chain wording at the tool layer in M1-9d-2; add `aws4fetch` to the CLI when own S3 storage is wired.
 
 #### M1-9d-2 · MCP server: proof tools (new, split from M1-9d, D-101)
-- **Status:** done (4thtech/agentlink#308, merged 2026-10-19) · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#308, merged 2026-10-19); `notarize` on the terms tools did not land here (the core refused it with `NOTARIZE_UNAVAILABLE`) and moved to M1-9d-3 (IR-M1-13c-1) · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/**`)
 - **Depends on:** M1-9d-1 (done); M1-4d-c (D-96 code and wording); D-95 (interim `record_only`); M1-26 (done); M1-10a (done); M1-9o, M1-9p, M1-9q (copy templates; file and proof templates through M1-9g)
 - **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`notarize`), §2.2a (receipts and `notarize`), §2.4, §9; 07 §8; 04 §3.4.2; 12 §4.3; D-53, D-55, D-87, D-95, D-96; G-25, G-43
@@ -3335,6 +3355,42 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Register the proof tools against the 06 §2.0 table in M1-9e's rules, with an explicit, justified allowlist entry for `export`; never loosen a rule.
   - Map `@4thtech-io/chain` error codes to 11 §5 copy; never pass chain or contract wording through.
 - **Acceptance:** the proof lines of the M1-9d acceptance, as tool-layer tests: `agentlink_notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`; `agentlink_notarize` on an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS` with no record submitted; `agentlink_acknowledge` `accepted` on a record with terms → `USE_RESPOND_TO_TERMS`; export with the content key creates an approval and writes nothing before it; `agentlink_verify_proof_pack` outside the D-87 folders → `PATH_NOT_ALLOWED` with the file never opened; the name canary returns `signerName` only restricted, with `signerLabel`; schema and behaviour test per `status` value of each tool; RED commit.
+
+#### M1-9d-3 · Terms tools: firm offers and recorded accepts (new, from IR-M1-13c-1)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (commitments and paid actions, D-31, D-55) · **Phase:** M1b · **Blocks:** M1 GATE (J8)
+- **Repo/path:** agentlink · packages/core (`src/terms-flow.ts`, `src/proofs/service.ts`), apps/cli (`src/tools/propose-terms.ts`, `respond-to-terms.ts`, `terms-common.ts`)
+- **Depends on:** M1-32 (done), M1-7g, M1-7g-d (done: the deferred ACCEPTED receipt), M1-9d-2 (done); D-114 (the submitter side of receipts is M1-34-b, not this card)
+- **Spec:** 06 §2.2a, §2.4, §3 "Commitments"; 04 §3.4, §3.4.2; 05 §3.1 (kinds `OFFER`, `ACCEPT`), 05 §3.3; 07 §2.1, §6.3, §8; 02 J8; 11 §5, §5.6; D-31, D-55, D-109, D-111, D-114
+- **Invariants:** I-4, I-5, I-6, I-7
+- **Finding:** IR-M1-13c-1 (verified by an independent reviewer): the terms tools refused `notarize` with `NOTARIZE_UNAVAILABLE` and `agentlink_notarize` refuses offers with `USE_TERMS_TOOLS`, so no offer or accept was ever recorded and the proof of agreement of J8 could not be reached. M1-9d-2 listed it in scope; the code comment pointed to M1-7i (the policy-rules card).
+- **Scope:**
+  - `agentlink_propose_terms` with `notarize`: a firm offer (scope `offer`, `answers: null`), one `offer` envelope and its `OFFER` Record under exactly one commitment approval (fee on the same card, 04 §3.4.2 "One request per call"); never covered by the auto-accept limits.
+  - `agentlink_respond_to_terms` `accept` with `notarize`: the `accept` envelope, its `ACCEPT` Record and the `ACCEPTED` receipt part under one approval; the Record part is left out (nothing charged) when the offer is already recorded.
+  - The existing credits flow: `needs_credits` before the owner is asked, nothing sent; automatic network choice (07 §6.3); the fee bound by `maxFeeUsd`; the Record part claimed in the transaction that stores the signed Record and reserves its fee.
+  - `counter` and `reject` with `notarize` stay refused (`NOTARIZE_UNAVAILABLE`, nothing sent).
+  - Fix the stale terms-flow comment (M1-7i).
+  - The owner's card in `agentlink approve` for a firm offer: the stored, bound terms (never `args.terms`), the "commits you if they accept" line, what the one approval does, the cost and the 11 §5.6 proof lines; an accept with proof says it commits you (IR-M1-9d-3-1).
+  - A repeat with the same `approvalId` after the Record part is claimed is `APPROVAL_USED` (the stored Record is only resent); a later scope after the accept ran covers only the receipt, never a Record (IR-M1-9d-3-1).
+  - The `agentlink_propose_terms` description names the `notarize` caveat (tool-surface change; owner "merge").
+- **Acceptance:** core tests, two real cores against the in-memory Notary: both J8 shapes end with an `ACCEPTED` receipt on-chain and an exported pack that verifies with the owner's signed approval; one owner approval per side; zero credits gives `needs_credits` with nothing sent or asked; a changed argument gets a new approval; a repeat with the same `approvalId` signs and charges nothing more; summaries carry no terms text (I-5); RED commit. The e2e `it.fails` J8 tests of M1-13c flip to plain tests once both land.
+
+#### M1-9d-4 · Terms tools: the top-up link for `needs_credits` (new, from IR-M1-9d-3-1)
+- **Status:** todo · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/tools/registry.ts`, `terms-common.ts`), `test/fixtures/tool-surface.json`
+- **Depends on:** M1-9d-3
+- **Spec:** 06 §2.2a, §2.4 (`needs_credits`: `url` set to the top-up link), §2.1 (`topUpUrl`, `agentAddress`); D-111, D-113
+- **Invariants:** I-5
+- **Scope:** a terms tool's `needs_credits` carries the top-up link only inside `nextStep`, because the terms outputs have no `topUpUrl`/`agentAddress` field and `url` is pinned to the local-UI origins. Decide the form (06 says `url`; `agentlink_send` uses `topUpUrl` and `agentAddress`), add it to both terms outputs, use the D-113 link format, and update the tool-surface snapshot (owner "merge").
+- **Acceptance:** schema and behaviour tests for `needs_credits` on both terms tools with the structured link; no other URL in the result.
+
+#### M1-9d-5 · Terms tools: recorded counter-offers (new, from IR-M1-9d-3-1)
+- **Status:** todo · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`src/terms-flow.ts`), apps/cli (`src/commands/owner/terms-card.ts`)
+- **Depends on:** M1-9d-3
+- **Spec:** 06 §2.2a (`counter` with `notarize`: a firm offer as in `agentlink_propose_terms`); 04 §3.4.2 (scope `offer`)
+- **Invariants:** I-4, I-5, I-6
+- **Scope:** `agentlink_respond_to_terms` `counter` with `notarize` (today `NOTARIZE_UNAVAILABLE`, nothing sent) as a firm offer under one approval, with the owner's terms card for a `respond_to_terms` action whose scope is `offer`. A recorded `reject` is not specified and stays refused.
+- **Acceptance:** as M1-9d-3's firm-offer tests, through `counter`; RED commit.
 
 #### M1-9e · MCP conformance and tool-surface guard
 - **Status:** done (4thtech/agentlink#143, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -4246,11 +4302,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
 
 #### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
 - **Depends on:** M1-9zb
 - **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.
 - **Acceptance:** RED commit; test with a mismatching invite is refused and writes nothing; the matching case passes.
+
+#### M1-9zf · core: invite acceptance binds the counterparty's owner fingerprint or card hash (new, IR-M1-9ze-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
+- **Depends on:** M1-9ze
+- **Spec:** 04 §3.3 (pairing); 06 §2.1 (`accept_invite`)
+- **Invariants:** I-2, I-5
+- **Scope:** when an invite is accepted, bind the staged counterparty to the `ownerFingerprint` or the `agentCardJcsHash` the invite carries (as the spec chooses), so a card that matches the contact id but belongs to another owner is refused with no state change. Source: IR-M1-9ze-1.
+- **Acceptance:** RED commit; a test with a matching contact id but a different owner fingerprint or card hash is refused and writes nothing; the matching case passes; no test is weakened.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
@@ -5009,6 +5074,15 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Pay page progress from public RPC reads; "Save a payment record" built in the browser; top-ups in the console fee history; the agent's one-time "credits arrived" line in the next status summary if the owner agrees.
 - **Acceptance:**
   - No payment data is sent to or stored by any 4thTech service; the record names no network outside Advanced.
+
+#### M2-19 · transport-nostr: bounded `ids` re-query for a relay-cap gap (new, IR-M1-5d-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2
+- **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
+- **Depends on:** M1-5d, M1-5g
+- **Spec:** 07 §4.2 (Sync); 04 §3.5
+- **Invariants:** I-3, I-5
+- **Scope:** for a second a relay returned at its cap (M1-5d), do one bounded re-query by `ids` learned from the agent's other relays, with a fixed cap on queries and ids per gap, so the gap closes where another relay holds the events. NIP-77 negentropy is a later step, only for relays that support it.
+- **Acceptance:** tests first: a capped relay plus a second relay that holds the missing events closes the gap; the re-query count and id count stay within the fixed bounds; a gap no relay can close stays reported as incomplete (M1-5g).
 
 #### M2-GATE · Milestone 2 gate: internal audit and external testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2

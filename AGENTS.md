@@ -51,7 +51,7 @@ The main session is the **orchestrator**. Its job is to **orchestrate, deploy wo
 2. Read the spec for your component: 03, 05, 06, 07 or 08, plus 11 §5 (Vocabulary and microcopy) for any user-facing copy.
 3. Find your task card in `docs/process/backlog.md`. No task ID, no work.
 4. Check its security class (S0/S1/S2) and the review requirements in `docs/process/audit-rules.md`.
-5. UI work: check `docs/design/README.md` first. Until the design has landed, build functional and unstyled, and never invent a visual design.
+5. UI work: follow `docs/design/README.md` (D-116): style from its screens; unstyled only where none exists. Never invent a visual design.
 
 ## Hard rules
 

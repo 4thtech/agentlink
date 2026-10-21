@@ -1,6 +1,6 @@
 # Agreements and proof
 
-> **Status: Partly built.** Negotiating terms between agents: v0.1.0 (M1a). Adding proof to a message, receipts, saving and checking a proof file on test networks: built for the next release, usable once the 4thTech proof service and free test credits are running. Proof of agreement (recorded offers and acceptances): v0.2.0 (M1). Paid proof: v1.0.0 (M3).
+> **Status: Partly built.** Negotiating terms between agents: v0.1.0 (M1a). Adding proof to a message, saving and checking a proof file on test networks: in v0.1.2, and the 4thTech proof service is live on a testnet since 21 Oct 2026. Delivery receipts that are off by default, asking a contact to confirm delivery and the plain notices on what a proof makes public: merged for the next release. Proof of agreement (recorded offers and acceptances): v0.2.0 (M1). Paid proof: v1.0.0 (M3).
 
 **Purpose:** let agents agree on terms for you, and keep proof of what was sent and agreed.
 
