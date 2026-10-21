@@ -10,7 +10,9 @@
 // Per faucet chain (SUBMITTER_FAUCET_CHAINS; testnets only, M1-10b), the owner sets:
 //   SUBMITTER_FAUCET_KEY_<chainId> the faucet key, 0x + 64 lowercase hex: its own key, never the
 //                                  gas key (a faucet key equal to the gas key is refused)
-// A chain without its faucet key has no faucet (503); the submitter is not affected.
+// A chain without its faucet key has no faucet (503); the submitter is not affected. The faucet
+// serves only a key whose address is the environment's pinned SUBMITTER_FAUCET_ADDRESS_<chainId>
+// (a wrangler.toml var; staging and production pin different wallets, M1-10b-b; worker.ts).
 import {
   createFaucetChain,
   createSubmitterChain,
