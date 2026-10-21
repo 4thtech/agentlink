@@ -78,6 +78,8 @@ class RelayNetwork implements RelayConnector {
   readonly reqs: { relay: string; filter: Filter }[] = [];
   /** EVENT frames published to any relay (M1-7h-b: acks are not published inside syncInbox). */
   published = 0;
+  /** M1-5g: a relay's cap on the events it returns per filter (newest first), by relay. */
+  readonly caps = new Map<string, number>();
 
   inject(relay: string, event: NostrEvent): void {
     const list = this.stored.get(relay) ?? [];
@@ -108,7 +110,10 @@ class RelayNetwork implements RelayConnector {
           let events = (this.stored.get(target.url) ?? []).filter((e) => matches(filter, e));
           events = events
             .sort((x, y) => y.created_at - x.created_at)
-            .slice(0, filter.limit ?? events.length);
+            .slice(
+              0,
+              Math.min(filter.limit ?? events.length, this.caps.get(target.url) ?? Infinity),
+            );
           for (const e of events) push(['EVENT', subId, e]);
           push(['EOSE', subId]);
         }
@@ -229,6 +234,24 @@ async function deliverRaw(
   return event;
 }
 
+/**
+ * M1-5g: `n` junk kind-1059 events for `to` at one second on one relay (a flood). The sync drops each
+ * one as not a gift wrap for us; on a relay that caps below `n`, that second is a gap (M1-5d).
+ */
+function flood(net: RelayNetwork, relay: string, to: Agent, second: number, n: number): void {
+  for (let i = 0; i < n; i += 1) {
+    net.inject(relay, {
+      id: (i + 1).toString(16).padStart(64, 'e'),
+      pubkey: 'f'.repeat(64),
+      created_at: second,
+      kind: 1059,
+      tags: [['p', to.nostr]],
+      content: 'canary-flood-text',
+      sig: '0'.repeat(128),
+    } as NostrEvent);
+  }
+}
+
 const rowsOf = (agent: Agent) =>
   agent.store.transaction((tx) => ({
     envelopes: tx.select('envelopes'),
@@ -263,6 +286,8 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
 
     const first = await b.client.syncInbox();
     expect(first.partial).toBe(false);
+    // M1-5g: a normal pass reports no incomplete second.
+    expect(first.incomplete).toBe(0);
     expect(first.items).toHaveLength(1);
     const item = first.items[0];
     expect(item?.envelopeId).toBe(sent.envelopeId);
@@ -523,6 +548,7 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
     const counts = await b.client.catchUp();
     expect(counts).toEqual({
       partial: false,
+      incomplete: 0,
       inbox: [{ contactId: a.id, unread: 2 }],
       requests: 0,
     });
@@ -577,7 +603,7 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
     const before = await rowsOf(a);
 
     const counts = await a.client.catchUp();
-    expect(counts).toEqual({ partial: false, inbox: [], requests: 0 });
+    expect(counts).toEqual({ partial: false, incomplete: 0, inbox: [], requests: 0 });
     const after = await rowsOf(a);
     expect(after.contacts).toEqual([]);
     expect(after.outbox).toEqual([]);
@@ -619,7 +645,7 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
     expect(synced.items).toEqual([]);
     expect(synced.requests).toBe(1);
     const counts = await b.client.catchUp();
-    expect(counts).toEqual({ partial: false, inbox: [], requests: 1 });
+    expect(counts).toEqual({ partial: false, incomplete: 0, inbox: [], requests: 1 });
     expect(JSON.stringify(counts)).not.toContain('mallory');
   });
 });
@@ -1378,6 +1404,7 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
     // The read-only catch-up still counts what is stored (06 §2.0).
     expect(await b.client.catchUp()).toEqual({
       partial: true,
+      incomplete: 0,
       inbox: [{ contactId: a.id, unread: 1 }],
       requests: 0,
     });
@@ -1394,5 +1421,69 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
     expect(result.items.map((i) => i.payload.body)).toEqual(['stored earlier']);
     expect(b.lines.join('\n')).toContain('inbox fetch failed');
     expect(b.lines.join('\n')).not.toContain('keystore unavailable');
+  });
+});
+
+// --- M1-5g: the transport's relay-cap gaps reach the caller as a count --------------------------
+
+describe('M1-5g (IR-M1-5d-1 M-1): a relay-cap gap reaches the inbox result as a count only', () => {
+  it('syncInbox: a capped relay gives incomplete 1; the pass is not partial and the cursor moves', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const capped = RELAYS_B[0] as string;
+    const second = clock.now() - 1_000;
+    net.caps.set(capped, 5);
+    flood(net, capped, b, second, 8);
+    await a.client.sendMessage({ to: b.id, text: 'still delivered' });
+    b.lines.length = 0;
+
+    const result = await b.client.syncInbox();
+    expect(result.incomplete).toBe(1);
+    // A gap neither makes the pass partial nor holds the cursor (07 §4.2, M1-5d).
+    expect(result.partial).toBe(false);
+    expect(result.items.map((i) => i.payload.body)).toEqual(['still delivered']);
+    const cursors = (await rowsOf(b)).cursors;
+    expect(cursors.some((row) => row['relay_url'] === capped)).toBe(true);
+    // A count only: no relay text, no second, no event ID in the result or the logs (I-5, I-7).
+    const text = JSON.stringify(result) + '\n' + b.lines.join('\n');
+    expect(text).not.toContain('relay-beta');
+    expect(text).not.toContain(String(second));
+    expect(text).not.toContain('e'.repeat(63));
+    expect(text).not.toContain('canary-flood-text');
+    expect(b.lines.join('\n')).toContain('"incomplete":1');
+  });
+
+  it('catchUp: the same gap is a count in the fetch-only result', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const capped = RELAYS_B[1] as string;
+    const second = clock.now() - 2_000;
+    net.caps.set(capped, 4);
+    flood(net, capped, b, second, 9);
+
+    const counts = await b.client.catchUp();
+    expect(counts.incomplete).toBe(1);
+    expect(counts.partial).toBe(false);
+    const text = JSON.stringify(counts);
+    expect(text).not.toContain('relay-beta');
+    expect(text).not.toContain(String(second));
+  });
+
+  it('a capped relay that holds no overflowing second reports nothing', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    net.caps.set(RELAYS_B[0] as string, 5);
+    for (let i = 0; i < 3; i += 1) {
+      await a.client.sendMessage({ to: b.id, text: `normal ${i}` });
+    }
+    const result = await b.client.syncInbox();
+    expect(result.incomplete).toBe(0);
+    expect(result.items).toHaveLength(3);
   });
 });

@@ -82,6 +82,12 @@ export interface SyncInboxOptions {
 export interface FetchSummary {
   /** True when a relay did not finish (budget, failure, a bound): more may be waiting. */
   readonly partial: boolean;
+  /**
+   * Seconds a relay returned at its cap in this pass (the transport's `gaps`, M1-5d, M1-5g): some
+   * messages may be missing. A count only: never the relay, the second or an event ID (I-5, I-7).
+   * It neither makes the pass partial nor holds the cursor (07 §4.2); the next pass looks again.
+   */
+  readonly incomplete: number;
   /** New envelopes stored as `received` in this pass. */
   readonly stored: number;
   /** Envelopes dropped by the per-contact rate limit, by contact (07 §3.2; activity feed). */
@@ -135,6 +141,8 @@ const LIVE_LIMIT_REFRESH_SECONDS = 60;
 /** The fetch-only catch-up's answer (M1-7h addendum): counts only. */
 export interface CatchUpResult extends InboxCounts {
   readonly partial: boolean;
+  /** Seconds a relay returned at its cap (M1-5g): a count only, as in `FetchSummary`. */
+  readonly incomplete: number;
 }
 
 export interface SyncDeps {
@@ -342,6 +350,7 @@ export class SyncService {
       items: items.length,
       acks: acksSent,
       partial: fetched.partial,
+      incomplete: fetched.incomplete,
     });
     return { ...fetched, rateLimited, items, reports, requests, acksSent };
   }
@@ -354,7 +363,7 @@ export class SyncService {
   async catchUp(options: SyncInboxOptions = {}): Promise<CatchUpResult> {
     const fetched = await this.#fetch(readBudget(options.budgetMs));
     const counts = await this.#deps.inbox.counts();
-    return { partial: fetched.partial, ...counts };
+    return { partial: fetched.partial, incomplete: fetched.incomplete, ...counts };
   }
 
   /**
@@ -504,7 +513,7 @@ export class SyncService {
       identities = await this.#identities();
     } catch {
       this.#ctx.log.warn('inbox fetch failed', {});
-      return { partial: true, stored: 0, rateLimited: [] };
+      return { partial: true, incomplete: 0, stored: 0, rateLimited: [] };
     }
     const limit = policyLimits(await ownerActions.loadPolicy()).rateLimitPerContactPerHour;
 
@@ -542,7 +551,9 @@ export class SyncService {
         dropped: rateLimited.reduce((s, r) => s + r.dropped, 0),
       });
     }
-    return { partial: result === undefined || result.partial, stored, rateLimited };
+    // M1-5g: the gaps become a count here; their relay and second go no further (I-5, I-7).
+    const incomplete = result?.gaps?.length ?? 0;
+    return { partial: result === undefined || result.partial, incomplete, stored, rateLimited };
   }
 
   /** One fetched envelope: seen by its hash, or verified and stored once, then rate-limited. */
