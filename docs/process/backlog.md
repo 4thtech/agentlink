@@ -3408,7 +3408,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A cancelled or timed-out deploy leaves the previous version serving (rehearsed on staging); `cpu_ms` is set to the measured need plus margin; the pre-deploy check fails the job when the lifecycle rule is missing; `actionlint` runs as a required check. The 100 MB staging round trip passes in the deploy smoke.
 
 #### M1-27b-d · drop: deploy-drop lows (new, M1-27b-c review)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `.github/workflows/deploy-drop.yml`, `docs/process/release-and-deployment.md`
 - **Depends on:** M1-27b-c (4thtech/agentlink#311)
 - **Spec:** `release-and-deployment.md` §4.5
