@@ -941,7 +941,7 @@ export interface ConformanceRunner {
 }
 
 /** The current epoch the suite opens stores at, so two older epochs are retained. */
-export const CONFORMANCE_EPOCH = 2;
+const CONFORMANCE_EPOCH = 2;
 
 const CONFORMANCE_TS = 1_790_000_000;
 const CONFORMANCE_NONCE = 'IQmYQx-k6oKFW4qJwstHFw';
@@ -1032,147 +1032,192 @@ export function runKeyStoreConformance(
     conformanceCheck(messageOfError(error) === DROP_REQUEST_REFUSED, `${what}: the fixed message`);
   }
 
-  runner.describe(`${backend.name}: KeyStore conformance, epochs and drop requests (M1-1g-h)`, () => {
-    runner.it('getPublicBundle: the current epoch by default, a retained one on request, never one above', async () => {
-      await withStore(async (store) => {
-        const bundle = await store.getPublicBundle();
-        conformanceCheck(bundle.keyEpoch === current, 'the current epoch');
-        for (let epoch = 0; epoch <= current; epoch += 1) {
-          const at = await store.getPublicBundle({ epoch });
-          const expected = derivePublicIdentity(seed, epoch);
-          conformanceCheck(at.keyEpoch === epoch, `the bundle of epoch ${String(epoch)}`);
-          conformanceCheck(
-            equalBytes(at.agentNostr, expected.agentNostr),
-            `the Nostr key of epoch ${String(epoch)}`,
-          );
-        }
-        const above = await conformanceOutcome(() => store.getPublicBundle({ epoch: current + 1 }));
-        conformanceCheck(codeOfError(above) === 'epoch_unavailable', 'an epoch above the current');
-      });
-    });
-
-    runner.it('signDropRequest: an upload signs with the current-epoch drop key, never the Nostr identity key', async () => {
-      await withStore(async (store) => {
-        const pubkey = verifiedDropKey(await store.signDropRequest(upload, CONFORMANCE_TS), upload);
-        conformanceCheck(pubkey === dropKeyHex(seed, current), 'the current-epoch drop key');
-        const bundle = await store.getPublicBundle();
-        conformanceCheck(pubkey !== encodeHex(bundle.agentNostr), 'not the Nostr identity key');
-      });
-    });
-
-    runner.it('a DELETE with {epoch: n} verifies and carries the epoch-n drop key, for every retained epoch', async () => {
-      await withStore(async (store) => {
-        for (let epoch = 0; epoch <= current; epoch += 1) {
-          const authorization = await store.signDropRequest(del, CONFORMANCE_TS, { epoch });
-          conformanceCheck(
-            verifiedDropKey(authorization, del) === dropKeyHex(seed, epoch),
-            `the DELETE drop key of epoch ${String(epoch)}`,
-          );
-        }
-      });
-    });
-
-    runner.it('without an epoch (or with epoch undefined) it signs with the current epoch', async () => {
-      await withStore(async (store) => {
-        const want = dropKeyHex(seed, current);
-        const cases: [DropAuthRequest, EpochOptions | undefined][] = [
-          [del, undefined],
-          [upload, {}],
-          [upload, { epoch: undefined } as never],
-          [del, { epoch: undefined } as never],
-        ];
-        for (const [request, options] of cases) {
-          const authorization = await store.signDropRequest(request, CONFORMANCE_TS, options);
-          conformanceCheck(verifiedDropKey(authorization, request) === want, 'the current epoch');
-        }
-      });
-    });
-
-    runner.it('refuses a POST with an epoch, and a malformed epoch or options, with the fixed error before any key is read', async () => {
-      const store = await backend.open(current);
-      // A closed store fails with keystore_closed once it touches its seed, so the fixed refusal
-      // shows each request was refused before that.
-      await store.close();
-      const cases: [string, DropAuthRequest, unknown][] = [
-        ['a POST with an older epoch', upload, { epoch: 0 }],
-        ['a POST with the current epoch', upload, { epoch: current }],
-        ['a POST with an epoch above the current one', upload, { epoch: current + 1 }],
-        ['a negative epoch', del, { epoch: -1 }],
-        ['a fractional epoch', del, { epoch: 0.5 }],
-        ['a NaN epoch', del, { epoch: Number.NaN }],
-        ['an epoch above 2^32 - 1', del, { epoch: 2 ** 32 }],
-        ['an epoch as text', del, { epoch: '0' }],
-        ['null options', del, null],
-        ['options that are not an object', del, 0],
-        ['options with another key', del, { epoch: 0, label: 'x' }],
-      ];
-      for (const [what, request, options] of cases) {
-        expectFixedRefusal(
-          await conformanceOutcome(() =>
-            store.signDropRequest(request, CONFORMANCE_TS, options as never),
-          ),
-          what,
-        );
-      }
-    });
-
-    runner.it('refuses a DELETE epoch above the current one with epoch_unavailable, before any key is read', async () => {
-      await withStore(async (store) => {
-        for (const epoch of [current + 1, current + 2, MAX_KEY_EPOCH]) {
-          const error = await conformanceOutcome(() =>
-            store.signDropRequest(del, CONFORMANCE_TS, { epoch }),
-          );
-          conformanceCheck(codeOfError(error) === 'epoch_unavailable', 'epoch_unavailable');
-        }
-      });
-      const closed = await backend.open(current);
-      await closed.close();
-      const error = await conformanceOutcome(() =>
-        closed.signDropRequest(del, CONFORMANCE_TS, { epoch: current + 1 }),
+  runner.describe(
+    `${backend.name}: KeyStore conformance, epochs and drop requests (M1-1g-h)`,
+    () => {
+      runner.it(
+        'getPublicBundle: the current epoch by default, a retained one on request, never one above',
+        async () => {
+          await withStore(async (store) => {
+            const bundle = await store.getPublicBundle();
+            conformanceCheck(bundle.keyEpoch === current, 'the current epoch');
+            for (let epoch = 0; epoch <= current; epoch += 1) {
+              const at = await store.getPublicBundle({ epoch });
+              const expected = derivePublicIdentity(seed, epoch);
+              conformanceCheck(at.keyEpoch === epoch, `the bundle of epoch ${String(epoch)}`);
+              conformanceCheck(
+                equalBytes(at.agentNostr, expected.agentNostr),
+                `the Nostr key of epoch ${String(epoch)}`,
+              );
+            }
+            const above = await conformanceOutcome(() =>
+              store.getPublicBundle({ epoch: current + 1 }),
+            );
+            conformanceCheck(
+              codeOfError(above) === 'epoch_unavailable',
+              'an epoch above the current',
+            );
+          });
+        },
       );
-      conformanceCheck(codeOfError(error) === 'epoch_unavailable', 'checked before the seed');
-    });
 
-    runner.it('reads the epoch once and signs with that value (no swap after the check)', async () => {
-      await withStore(async (store) => {
-        let reads = 0;
-        const options = {
-          get epoch(): number {
-            reads += 1;
-            return reads === 1 ? 0 : current + 5;
-          },
-        };
-        const authorization = await store.signDropRequest(del, CONFORMANCE_TS, options);
-        conformanceCheck(reads === 1, 'one read of the epoch');
-        conformanceCheck(verifiedDropKey(authorization, del) === dropKeyHex(seed, 0), 'epoch 0');
+      runner.it(
+        'signDropRequest: an upload signs with the current-epoch drop key, never the Nostr identity key',
+        async () => {
+          await withStore(async (store) => {
+            const pubkey = verifiedDropKey(
+              await store.signDropRequest(upload, CONFORMANCE_TS),
+              upload,
+            );
+            conformanceCheck(pubkey === dropKeyHex(seed, current), 'the current-epoch drop key');
+            const bundle = await store.getPublicBundle();
+            conformanceCheck(pubkey !== encodeHex(bundle.agentNostr), 'not the Nostr identity key');
+          });
+        },
+      );
+
+      runner.it(
+        'a DELETE with {epoch: n} verifies and carries the epoch-n drop key, for every retained epoch',
+        async () => {
+          await withStore(async (store) => {
+            for (let epoch = 0; epoch <= current; epoch += 1) {
+              const authorization = await store.signDropRequest(del, CONFORMANCE_TS, { epoch });
+              conformanceCheck(
+                verifiedDropKey(authorization, del) === dropKeyHex(seed, epoch),
+                `the DELETE drop key of epoch ${String(epoch)}`,
+              );
+            }
+          });
+        },
+      );
+
+      runner.it(
+        'without an epoch (or with epoch undefined) it signs with the current epoch',
+        async () => {
+          await withStore(async (store) => {
+            const want = dropKeyHex(seed, current);
+            const cases: [DropAuthRequest, EpochOptions | undefined][] = [
+              [del, undefined],
+              [upload, {}],
+              [upload, { epoch: undefined } as never],
+              [del, { epoch: undefined } as never],
+            ];
+            for (const [request, options] of cases) {
+              const authorization = await store.signDropRequest(request, CONFORMANCE_TS, options);
+              conformanceCheck(
+                verifiedDropKey(authorization, request) === want,
+                'the current epoch',
+              );
+            }
+          });
+        },
+      );
+
+      runner.it(
+        'refuses a POST with an epoch, and a malformed epoch or options, with the fixed error before any key is read',
+        async () => {
+          const store = await backend.open(current);
+          // A closed store fails with keystore_closed once it touches its seed, so the fixed refusal
+          // shows each request was refused before that.
+          await store.close();
+          const cases: [string, DropAuthRequest, unknown][] = [
+            ['a POST with an older epoch', upload, { epoch: 0 }],
+            ['a POST with the current epoch', upload, { epoch: current }],
+            ['a POST with an epoch above the current one', upload, { epoch: current + 1 }],
+            ['a negative epoch', del, { epoch: -1 }],
+            ['a fractional epoch', del, { epoch: 0.5 }],
+            ['a NaN epoch', del, { epoch: Number.NaN }],
+            ['an epoch above 2^32 - 1', del, { epoch: 2 ** 32 }],
+            ['an epoch as text', del, { epoch: '0' }],
+            ['null options', del, null],
+            ['options that are not an object', del, 0],
+            ['options with another key', del, { epoch: 0, label: 'x' }],
+          ];
+          for (const [what, request, options] of cases) {
+            expectFixedRefusal(
+              await conformanceOutcome(() =>
+                store.signDropRequest(request, CONFORMANCE_TS, options as never),
+              ),
+              what,
+            );
+          }
+        },
+      );
+
+      runner.it(
+        'refuses a DELETE epoch above the current one with epoch_unavailable, before any key is read',
+        async () => {
+          await withStore(async (store) => {
+            for (const epoch of [current + 1, current + 2, MAX_KEY_EPOCH]) {
+              const error = await conformanceOutcome(() =>
+                store.signDropRequest(del, CONFORMANCE_TS, { epoch }),
+              );
+              conformanceCheck(codeOfError(error) === 'epoch_unavailable', 'epoch_unavailable');
+            }
+          });
+          const closed = await backend.open(current);
+          await closed.close();
+          const error = await conformanceOutcome(() =>
+            closed.signDropRequest(del, CONFORMANCE_TS, { epoch: current + 1 }),
+          );
+          conformanceCheck(codeOfError(error) === 'epoch_unavailable', 'checked before the seed');
+        },
+      );
+
+      runner.it(
+        'reads the epoch once and signs with that value (no swap after the check)',
+        async () => {
+          await withStore(async (store) => {
+            let reads = 0;
+            const options = {
+              get epoch(): number {
+                reads += 1;
+                return reads === 1 ? 0 : current + 5;
+              },
+            };
+            const authorization = await store.signDropRequest(del, CONFORMANCE_TS, options);
+            conformanceCheck(reads === 1, 'one read of the epoch');
+            conformanceCheck(
+              verifiedDropKey(authorization, del) === dropKeyHex(seed, 0),
+              'epoch 0',
+            );
+          });
+        },
+      );
+
+      runner.it(
+        'refuses what is not a drop request with the fixed error, before any key is read',
+        async () => {
+          const store = await backend.open(current);
+          await store.close();
+          const cases: [string, DropAuthRequest, number][] = [
+            ['a GET', { ...del, method: 'GET' as never }, CONFORMANCE_TS],
+            ['a ts other than createdAt', upload, CONFORMANCE_TS + 1],
+            [
+              'a body that is not JSON',
+              { ...upload, body: encodeUtf8('not json') },
+              CONFORMANCE_TS,
+            ],
+          ];
+          for (const [what, request, createdAt] of cases) {
+            expectFixedRefusal(
+              await conformanceOutcome(() => store.signDropRequest(request, createdAt)),
+              what,
+            );
+          }
+        },
+      );
+
+      runner.it('a closed store refuses a valid drop request with keystore_closed', async () => {
+        const store = await backend.open(current);
+        await store.close();
+        for (const options of [undefined, { epoch: 0 }]) {
+          const error = await conformanceOutcome(() =>
+            store.signDropRequest(del, CONFORMANCE_TS, options),
+          );
+          conformanceCheck(codeOfError(error) === 'keystore_closed', 'keystore_closed');
+        }
       });
-    });
-
-    runner.it('refuses what is not a drop request with the fixed error, before any key is read', async () => {
-      const store = await backend.open(current);
-      await store.close();
-      const cases: [string, DropAuthRequest, number][] = [
-        ['a GET', { ...del, method: 'GET' as never }, CONFORMANCE_TS],
-        ['a ts other than createdAt', upload, CONFORMANCE_TS + 1],
-        ['a body that is not JSON', { ...upload, body: encodeUtf8('not json') }, CONFORMANCE_TS],
-      ];
-      for (const [what, request, createdAt] of cases) {
-        expectFixedRefusal(
-          await conformanceOutcome(() => store.signDropRequest(request, createdAt)),
-          what,
-        );
-      }
-    });
-
-    runner.it('a closed store refuses a valid drop request with keystore_closed', async () => {
-      const store = await backend.open(current);
-      await store.close();
-      for (const options of [undefined, { epoch: 0 }]) {
-        const error = await conformanceOutcome(() =>
-          store.signDropRequest(del, CONFORMANCE_TS, options),
-        );
-        conformanceCheck(codeOfError(error) === 'keystore_closed', 'keystore_closed');
-      }
-    });
-  });
+    },
+  );
 }

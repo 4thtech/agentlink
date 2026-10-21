@@ -1316,7 +1316,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Tests first: after an epoch advance, delete-on-receipt for an object uploaded under an older epoch is accepted by the drop; an unretained epoch is refused with the fixed error; the shared conformance cases run against every KeyStore backend that exists.
 
 #### M1-1g-h · core: delete-on-receipt caller for `deleteFileObject`; shared KeyStore conformance (new, M1-1g-g follow-up)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, receipts), packages/crypto and packages/node (KeyStore conformance)
 - **Depends on:** M1-1g-g, M1-7g
 - **Spec:** 04 §2.1; 07 §5.4 (Upload epoch, D-108)

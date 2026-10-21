@@ -4,7 +4,14 @@
     "composite": false,
     "noEmit": true,
     "declaration": false,
-    "rootDir": "."
+    // `..` (packages/): the seam source below is outside this package; noEmit, so no output paths.
+    "rootDir": "..",
+    // M1-1g-h: the crypto test seam (the shared KeyStore conformance suite) is never built and has
+    // no package export: type-check it from source, as vitest.config.ts resolves it. Only this
+    // noEmit config has the path; tsconfig.json (the build) cannot resolve it.
+    "paths": {
+      "@4thtech-io/crypto/testing": ["../crypto/src/testing.ts"]
+    }
   },
   "include": ["src"],
   "exclude": [],

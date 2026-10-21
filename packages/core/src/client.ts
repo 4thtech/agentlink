@@ -26,6 +26,7 @@ import { DeliveryAcks } from './acks.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
+import { deleteFilesOnReceipt, type ReceiptRetentionResult } from './files/retention.js';
 import { InboxService } from './inbox.js';
 import { policyLimits } from './policy-engine.js';
 import { RevocationService } from './revocation.js';
@@ -157,6 +158,7 @@ export class AgentLinkClient {
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
+  readonly #filesPlatform: FilesPlatform | undefined;
   readonly #ctx: CoreContext;
 
   private constructor(
@@ -217,6 +219,7 @@ export class AgentLinkClient {
       ...(files === undefined ? {} : { files }),
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
+    this.#filesPlatform = files;
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,
@@ -280,7 +283,26 @@ export class AgentLinkClient {
     await this.cardUpdates.sendPending().catch(() => {
       this.#ctx.log.warn('card updates not sent');
     });
+    // M1-1g-h: delete on receipt, per `files.deleteAfter`. Best effort, as above.
+    await this.deleteFilesOnReceipt().catch(() => {
+      this.#ctx.log.warn('delete on receipt not run');
+    });
     return result;
+  }
+
+  /**
+   * Delete on receipt (M1-1g-h; 04 §4, 06 §3, 07 §5.4): with `files.deleteAfter: receipt` in the
+   * effective policy, deletes the stored object of every file of a sent envelope whose DELIVERED
+   * receipt the chain shows, the drop with a DELETE signed at the upload epoch. Under `expiry` (the
+   * default, and always while the policy fails closed) it does nothing. `syncInbox` runs it;
+   * idempotent, and a failed delete is retried on the next pass.
+   */
+  async deleteFilesOnReceipt(): Promise<ReceiptRetentionResult> {
+    const limits = policyLimits(await this.ownerActions.loadPolicy());
+    if (limits.deleteAfter !== 'receipt') return { deleted: 0, failed: 0 };
+    return deleteFilesOnReceipt(this.#ctx, this.#filesPlatform, {
+      delivered: (envelopeId) => this.proofs.deliveredReceiptOnChain(envelopeId),
+    });
   }
 
   /**

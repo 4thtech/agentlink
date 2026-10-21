@@ -130,7 +130,9 @@ export const RESTRICTED_ENTRY_POINTS = [
     zones: ['test-vectors', 'e2e'],
     // M1-6c: packages/storage, for the drop adapter's Miniflare test against the drop Worker, which
     // signs drop requests with fixed test keys (signDropAuthorization) in place of the KeyStore.
-    testZones: ['packages/core', 'packages/transport-nostr', 'packages/storage'],
+    // M1-1g-h: packages/node, for the shared KeyStore conformance suite (runKeyStoreConformance)
+    // that its KeyStore backends (keychain, facade; the file backend with M1-8f) run.
+    testZones: ['packages/core', 'packages/transport-nostr', 'packages/storage', 'packages/node'],
     // IR-M1-9k-1 F01 (S1, owner-side decision on #107): narrower than a test zone. Only *.test.ts
     // files under these directories may import it, never the package's src/ (production or tests):
     // apps/cli/test holds the two-process keychain test, which needs a test owner identity

@@ -9,7 +9,8 @@ import { MemoryKeyStore, MemoryOwnerKeyStore, runKeyStoreConformance } from './t
 
 const SEED = Uint8Array.from({ length: 32 }, (_, i) => i + 1);
 const OWNER_SEED = Uint8Array.from({ length: 32 }, (_, i) => 77 ^ i);
-const presence = () => ({ kind: 'passphrase', secret: encodeUtf8('correct horse battery') }) as const;
+const presence = () =>
+  ({ kind: 'passphrase', secret: encodeUtf8('correct horse battery') }) as const;
 
 runKeyStoreConformance(
   {
