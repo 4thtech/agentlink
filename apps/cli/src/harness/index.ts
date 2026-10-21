@@ -21,5 +21,15 @@ export {
   type HarnessId,
   type HarnessPlan,
 } from './harnesses.js';
+export {
+  HOOK_HARNESS,
+  HOOK_SETTINGS_DISPLAY,
+  addJsonSessionHook,
+  applySessionHook,
+  planSessionHook,
+  sessionHookEntry,
+  type HookPlan,
+} from './hook.js';
+export { resolveInstalledCli } from './installed-cli.js';
 export { addJsonMcpServer, type JsonEdit } from './json-config.js';
 export { addTomlMcpServer, agentlinkTable, scanToml, type TomlEdit } from './toml-config.js';

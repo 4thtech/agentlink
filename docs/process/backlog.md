@@ -2189,7 +2189,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An unverified envelope that reuses another envelope's `id` (different `envelopeHash`, or a bad signature) does not suppress the real one (IR-M1-5a-1 L-3).
 
 #### M1-5d · transport-nostr: more events than a relay's cap within one second (new, IR-M1-5c-1 residual)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
+- **Status:** in review (built: detect and report a gap; later options in 07 §4.2) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M1-5c
 - **Spec:** 07 §4.2 (Sync), §4.3 (relay lists); 04 §3.5; 06 §6
@@ -2698,7 +2698,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - (Catch-up) The M1-9c read-only test passes against this API: a handshake pending in the relay stays unprocessed, and no ack, contact, read mark or receipt results.
 
 #### M1-7h-b · core: revocation follow-ups (new, IR-M1-7h-1 F01, F04; blocks the M1 gate)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#351) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h, M1-7e, M1-32
 - **Spec:** 07 §3.4 (`revoked_agents` "Transaction"), §3.2; 04 §3.4.1, §3.4.2 (void rule 3); 06 §2.1, §6
@@ -3766,7 +3766,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Follow-ups from IR-M1-13a-ACCEPT-1 (S2, backlog):** (a) Low: two concurrent `agentlink_accept_invite` calls without `approvalId` can both miss `findOpen` and create two requests (pre-existing; a double use stays impossible through the compare-and-set claim); make lookup and insert one store transaction. (b) The CLI `agentlink accept` without a TTY (`apps/cli/src/commands/accept.ts`) applies the same reuse rule: pending → print the same ID; approved → print "run again with `--approval <id>`", never use it automatically.
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
-- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#358) · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-13a (runner and API-key secrets as in D-73 (9)), M1-22, M1-9d, M1-10c, M1-11a, M1-12c, M1-27b
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
@@ -3781,9 +3781,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - J3 (02): an agent with no credits is refused with `needs_credits`, takes the faucet link, receives testnet credits and retries successfully, with no chain chosen by hand (D-40). Added 2026-10-18: no other card covered J3 end to end before M1-GATE.
   - J5 (02): a third party who has only the exported proof pack runs `agentlink verify` (M1-9h) and gets a pass; a tampered pack fails with its specific reason. Added 2026-10-18: no other card covered J5 end to end before M1-GATE.
 - Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
+- Delivered (2026-10-21): `e2e/test/files-and-proof.test.ts` (deterministic, in the e2e job: J2, J3, J5, D-109 defaults and contact rule, zero-access audit; fakes: `FakeNotary`, an in-memory drop) and `e2e/test/live-files-and-proof.test.ts` (opt-in live run on Base Sepolia through `e2e-live` in `e2e.yml`, manual dispatch on `main`, environment `e2e-live`, no secret). Chiado is not covered live (not auto-selected, no faucet yet).
+- **Open finding (product gap, needs its own card):** the terms tools refuse `notarize` with `NOTARIZE_UNAVAILABLE` (`packages/core/src/terms-flow.ts`, "records are M1-7i"; M1-7i shipped as the policy-rules card) and `agentlink_notarize` refuses an offer (`USE_TERMS_TOOLS`), so nothing records an offer or an accept and the proof of agreement of J8 (both shapes, the ACCEPTED receipt after owner approval, the exported pack, one approval each) cannot be reached through the tools. The receiving half is tested in `packages/core`. The two J8 proof tests are `it.fails` in `files-proof-scenario.ts` (they pass while the gap is open and turn red the day it closes); a plain test pins the current `NOTARIZE_UNAVAILABLE` refusal. This card's J8 acceptance stays open until that card lands.
 
 #### M1-13b · prompt-injection suite
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (4thtech/agentlink#359) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/prompt-injection/
 - **Depends on:** M1-9c, M1-9p, M1-9q, M1-21
 - **Spec:** 06 §4, §9; 04 I-5, §7
@@ -3796,7 +3798,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The LLM report is reviewed before the M1a dogfood starts (M1-23).
 
 #### M1-13d · prompt-injection suite: file and proof tools (new, split from M1-13b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#359) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/prompt-injection/
 - **Depends on:** M1-13b, M1-9d
 - **Spec:** 06 §4, §9; 04 I-5, §4, §7
@@ -4290,7 +4292,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `init` writes no harness config without an explicit confirmation, and owner setup refuses non-TTY input (tests); prompts pass the vocabulary lint.
 
 #### M1-29 · J9 session habit: `status --brief` and optional SessionStart hooks per harness (D-53) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review; the in-harness transcript is pending an owner run · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`status --brief`, optional `init` offer), docs-site/guide/get-started/ and docs-site/technical/reference/harness-configuration.md (hook snippets)
 - **Depends on:** M1-9a, M1-9c, M1-12a
 - **Spec:** D-53; 06 §6.1, §7, §8; 02 J9; 11 §6.1 (J9 strings); 04 §2.5

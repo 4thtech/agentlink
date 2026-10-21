@@ -24,6 +24,10 @@
 //    its user; only the user's "Confirm delivery" leads to agentlink_acknowledge `delivered`. The
 //    request never signs anything, and nothing the sender wrote reaches these lines (I-5).
 //
+// 7. Incomplete sync (M1-5g; 07 §4.2): when a relay returned a second at its cap, the core counts it
+//    (`incomplete`) and the nextStep adds one fixed line: some messages may be missing and the next
+//    check looks again. No count, relay, second or event ID reaches the result or the log text.
+//
 // I-5, I-7: summaries and `nextStep` are fixed text with counts and names under the 06 §2.1 rule;
 // logs carry counts only.
 import { canonicalize, encodeUtf8 } from '@4thtech-io/crypto';
@@ -308,8 +312,10 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
     contactId = resolved.contact.id;
   }
 
+  // M1-5g: seconds a relay returned at its cap. A count only; it reaches the user as fixed text.
+  let incomplete = 0;
   try {
-    await client.syncInbox(INBOX_SYNC_BUDGET_MS);
+    incomplete = (await client.syncInbox(INBOX_SYNC_BUDGET_MS))?.incomplete ?? 0;
   } catch {
     // Offline or no relay: the stored items still answer. The error text is never logged (I-5).
     logger.info('inbox sync unavailable; stored items used');
@@ -431,8 +437,9 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
   const nextSteps = [
     ...(receiptLines.length > 0 ? [copy('chat.inbox.receiptRequestNextStep')] : []),
     ...(hasRequest ? [copy('chat.inbox.requestNextStep')] : []),
+    ...(incomplete > 0 ? [copy('chat.inbox.incompleteNextStep')] : []),
   ];
-  logger.info('inbox read', { messages: items.length, requests: page.requests });
+  logger.info('inbox read', { messages: items.length, requests: page.requests, incomplete });
 
   const fields = {
     messages: items.map((item) => item.message),

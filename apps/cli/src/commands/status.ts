@@ -34,6 +34,7 @@ export function createStatusHandler(deps: CommandDeps = createDeps()): CommandHa
         const caught: CatchUpResult = await client.catchUp({ budgetMs: STATUS_CATCH_UP_MS });
         counts = caught;
         if (caught.partial) warnings.push(TEXT.statusPartial);
+        if (caught.incomplete > 0) warnings.push(TEXT.statusIncomplete);
       } catch {
         // Offline or no transport: the stored counts still answer (store reads only).
         counts = await client.inbox.counts();

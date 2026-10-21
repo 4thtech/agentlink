@@ -76,7 +76,10 @@ const AGENT: Options = { agent: { type: 'string' } };
 export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   {
     name: 'init',
-    usage: ['agentlink init [--agent <name>] [--harness <id|none>] [--config <path>]'],
+    usage: [
+      'agentlink init [--agent <name>] [--harness <id|none>] [--config <path>]',
+      'agentlink init --hook [--agent <name>]',
+    ],
     guard: 'none',
     options: {
       ...AGENT,
@@ -85,6 +88,8 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
       // Antigravity only (checked in the handler).
       harness: { type: 'string' },
       config: { type: 'string' },
+      // M1-29 (06 §7, D-53): the optional SessionStart hook, a separate opt-in.
+      hook: { type: 'boolean' },
     },
   },
   {
