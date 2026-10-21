@@ -405,23 +405,18 @@ interface PageRecord {
 }
 
 /**
- * True when the walk of `learned` read second `t` in full (IR-M2-19-1 H-1). Positive evidence only:
- * - a page whose range holds `t` also held an event older than `t`, so a newest-first cap cut that
- *   page below `t`; or
- * - a page whose range holds `t` returned fewer events than the largest page of the walk, so the
- *   relay did not cap that page.
- * `t` must lie above the walk's `since` (a walk may stop in the middle of its oldest second), and a
- * walk that ended because the relay ignores `until` proves nothing.
+ * True when the walk of `learned` read second `t` in full (IR-M2-19-1 H-1, IR-M2-19-2 H-2). The one
+ * piece of evidence: a page whose range holds `t` also held an event older than `t`, so a
+ * newest-first cap cut that page below `t`. A page smaller than the largest is no proof (a lower cap
+ * can cut it). `t` must lie above the walk's `since` (a walk may stop in the middle of its oldest
+ * second), and a walk that ended because the relay ignores `until` proves nothing.
  */
 function readInFull(learned: Learned, t: number): boolean {
   if (learned.full || learned.untrusted || t <= learned.since) return false;
-  let largest = 0;
-  for (const page of learned.pages) largest = Math.max(largest, page.count);
-  return learned.pages.some((page) => {
-    if (page.until !== undefined && t > page.until) return false;
-    if (page.oldest !== undefined && page.oldest < t) return true;
-    return page.count < largest;
-  });
+  return learned.pages.some(
+    (page) =>
+      (page.until === undefined || t <= page.until) && page.oldest !== undefined && page.oldest < t,
+  );
 }
 
 interface RelayOutcome {
