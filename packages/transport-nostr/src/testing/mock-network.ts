@@ -45,6 +45,10 @@ export interface MockRelayConfig {
   maxLimit?: number;
   /** M1-5c: ignores `limit` and `until` (a relay that does not paginate). */
   ignoreLimit?: boolean;
+  /** M2-19: accepts a REQ with an `ids` filter but never answers it. */
+  silentIdsReq?: boolean;
+  /** M2-19: raw frames sent before the stored events of every REQ with an `ids` filter (hostile input). */
+  idsExtraFrames?: (subId: string) => string[];
 }
 
 const microtask = (fn: () => void): void => {
@@ -55,6 +59,7 @@ export const PUBLIC_ADDRESS = '93.184.216.34';
 
 /** A NIP-01 filter, as far as the mock relay reads it. */
 interface MockFilter {
+  ids?: string[];
   kinds?: number[];
   '#p'?: string[];
   since?: number;
@@ -163,6 +168,7 @@ export class MockSocket implements RelaySocket {
 
   /** Whether `event` matches the filter of subscription `subId`. */
   matches(filter: MockFilter, event: NostrEvent): boolean {
+    if (filter.ids !== undefined && !filter.ids.includes(event.id)) return false;
     if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
     if (filter['#p'] !== undefined) {
       const wanted = filter['#p'];
@@ -178,7 +184,11 @@ export class MockSocket implements RelaySocket {
       return;
     }
     if (config.silentReq === true) return;
+    if (config.silentIdsReq === true && filter.ids !== undefined) return;
     this.subs.set(subId, filter);
+    if (filter.ids !== undefined) {
+      for (const raw of config.idsExtraFrames?.(subId) ?? []) this.push(raw);
+    }
     const ignore = config.ignoreLimit === true;
     const withoutUntil: MockFilter = { ...filter };
     delete withoutUntil.until;
