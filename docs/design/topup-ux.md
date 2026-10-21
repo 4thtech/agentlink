@@ -131,10 +131,12 @@ https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, opt
 | 5 | Top-up link format (M1-26-d) | §5 (**accepted**, D-113) |
 | 6 | Minimums per method (exchange and connect: the gasless minimum, proposed $5; card: the provider's) | As proposed |
 | 7 | Agent tells the user when credits arrive | Yes, once |
-| 8 | **Who pays for receipts** when the recipient has no credits on the record's network (M1-34); must be user-paid | See §8 |
+| 8 | **Who pays for receipts** when the recipient has no credits on the record's network (M1-34); must be user-paid | Decided (D-114), see §8 |
 | 9 | How the network cost of a gasless top-up is recovered from users (today the submitter pays it and there is no deposit fee, 12 §2) | Inside the proof price, which already covers submitter costs; a deposit fee only if the numbers need it |
 
-## 8. Open: who pays for receipts (M1-34)
+## 8. Decided: who pays for receipts (M1-34, D-114)
+
+**Decided by the owner, 2026-10-21 (D-114):** "B: the sender's proof fee covers up to 3 receipts; D as fallback when the submitter is unreachable; a recipient is never charged without asking." The submitter side is built by M1-34-b. The analysis below is kept as the record of the options.
 
 **Today.** 12 §2 prices a proof at $0.10 "including up to 3 receipts", prepaid by the sender, and says recipients pay nothing; 05 says receipts carry no fee. **The gap:** the recipient's agent posts its receipts on the record's network. The submitter's anti-abuse checks are keyed to credits and signers (07 §7), and posting directly needs that network's own coin, so a recipient with nothing on that network may not be able to post a receipt.
 
@@ -146,4 +148,4 @@ https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, opt
 - **C. A free receipt allowance paid by 4thTech.** Excluded: users pay every cost (12 §1).
 - **D. Skip or defer.** The receipt is queued locally and posted when possible; the proof stays valid without it, with fewer receipts.
 
-**Recommendation:** **B** (the sender pays for up to 3 receipts inside the proof price, so a user pays), with **D** as the fallback when the submitter is unreachable. A recipient is never charged without asking. Owner decides (card M1-34); the contracts and submitter follow the decision.
+**Recommendation:** **B** (the sender pays for up to 3 receipts inside the proof price, so a user pays), with **D** as the fallback when the submitter is unreachable. A recipient is never charged without asking. The owner chose this on 2026-10-21 (D-114); the submitter follows (M1-34-b).
