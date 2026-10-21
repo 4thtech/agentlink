@@ -492,6 +492,30 @@ describe('workflow run-step reader', () => {
     expect(wranglerCalls('WRANGLER_OUTPUT_FILE_PATH=x cat wrangler.toml')).toEqual([]);
   });
 
+  it('throws on a plain run value continued on a more-indented line', () => {
+    const source = [
+      '      - run: pnpm exec wrangler deploy x.js',
+      '          --env production',
+    ].join('\n');
+    expect(() => runScripts(source)).toThrow(/unsupported/);
+  });
+
+  it('joins the lines of a folded (>) block with spaces', () => {
+    const source = [
+      '      - run: >',
+      '          pnpm exec wrangler deploy x.js',
+      '          --env production',
+      '      - run: echo done',
+    ].join('\n');
+    const scripts = runScripts(source);
+    expect(scripts.map((s) => s.script)).toEqual([
+      'pnpm exec wrangler deploy x.js --env production',
+      'echo done',
+    ]);
+    const calls = commandLines(scripts[0].script).flatMap((line) => wranglerCalls(line));
+    expect(calls[0]?.text).toBe('wrangler deploy x.js --env production');
+  });
+
   it('fails closed on a run value it does not know', () => {
     expect(() => runScripts('      - run:\n          wrangler deploy')).toThrow(/unsupported/);
     expect(() => runScripts('        run: [a]')).toThrow(/unsupported/);
@@ -545,6 +569,15 @@ describe('logging settings read-back', () => {
     ).toBe(true);
   });
 
+  // IR-OPS-PRIV-1-2: Cloudflare documents `observability.traces.enabled` as optional.
+  it('accepts traces without `enabled`, and refuses traces enabled or exported', () => {
+    const traces = (t) => off({ observability: { enabled: false, traces: t } });
+    expect(check({ success: true, result: traces({}) })).toBe(true);
+    expect(check({ success: true, result: traces({ destinations: [] }) })).toBe(true);
+    expect(check({ success: true, result: traces({ enabled: true }) })).toBe(false);
+    expect(check({ success: true, result: traces({ destinations: ['otel'] }) })).toBe(false);
+  });
+
   // IR-OPS-PRIV-1-1 HIGH: a missing, null or renamed field is not "off"; the check fails closed.
   it('fails closed on an unexpected response shape', () => {
     const shapes = [
@@ -562,7 +595,10 @@ describe('logging settings read-back', () => {
       { success: true, result: { logpush: null, observability: { enabled: false } } },
       { success: true, result: off({ observability: { enabled: false, logs: 'off' } }) },
       { success: true, result: off({ observability: { enabled: false, logs: {} } }) },
-      { success: true, result: off({ observability: { enabled: false, traces: {} } }) },
+      {
+        success: true,
+        result: off({ observability: { enabled: false, traces: { destinations: {} } } }),
+      },
       {
         success: true,
         result: off({

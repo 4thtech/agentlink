@@ -376,6 +376,15 @@ describe('logging settings read-back', () => {
     ).toBe(true);
   });
 
+  // IR-OPS-PRIV-1-2: Cloudflare documents `observability.traces.enabled` as optional.
+  it('accepts traces without `enabled`, and refuses traces enabled or exported', () => {
+    const traces = (t) => off({ observability: { enabled: false, traces: t } });
+    expect(check({ success: true, result: traces({}) }).ok).toBe(true);
+    expect(check({ success: true, result: traces({ destinations: [] }) }).ok).toBe(true);
+    expect(check({ success: true, result: traces({ enabled: true }) }).ok).toBe(false);
+    expect(check({ success: true, result: traces({ destinations: ['otel'] }) }).ok).toBe(false);
+  });
+
   // IR-OPS-PRIV-1-1 HIGH: a missing, null or renamed field is not "off"; the check fails closed.
   it('fails closed on an unexpected response shape', () => {
     const shapes = [
@@ -393,7 +402,10 @@ describe('logging settings read-back', () => {
       { success: true, result: { logpush: null, observability: { enabled: false } } },
       { success: true, result: off({ observability: { enabled: false, logs: 'off' } }) },
       { success: true, result: off({ observability: { enabled: false, logs: {} } }) },
-      { success: true, result: off({ observability: { enabled: false, traces: {} } }) },
+      {
+        success: true,
+        result: off({ observability: { enabled: false, traces: { destinations: {} } } }),
+      },
       {
         success: true,
         result: off({
