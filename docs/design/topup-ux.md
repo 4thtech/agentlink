@@ -71,11 +71,11 @@ The pay page shows the crypto methods (b, c) first; the card method (a) is added
 
 **Privacy line (D-109).** "Paying from your own account links that account to your agent publicly. Use a separate account if you want to keep them apart." Shown once, never blocking.
 
-**Wording (11 §5.1, OPEN).** The default UI never says "wallet". Proposed: method label "Use crypto you already have"; helper "Connect the app or browser extension where you hold US-dollar stablecoins." The word "wallet" appears only inside the third-party connector and under Advanced. Alternative for the owner: allow "wallet" in this one optional method's label, since these users know the word.
+**Wording (11 §5.1; decided, D-117 C).** The default UI never says "wallet". Method label "Use crypto you already have"; helper "Connect the app or browser extension where you hold US-dollar stablecoins." The word "wallet" appears only inside the third-party connector and under Advanced. Decided: "wallet" never appears in our labels (D-117 C).
 
 ### 3c. Send from an exchange (address and QR)
 
-**Flow.** "Send from an exchange" → the agent's address with a QR code and a copy button, the coin ("USDC") and the network the exchange will ask for, pre-chosen as the cheapest supported one and named in large type ("Network: Base"). This is the one place outside Advanced where a network is named, because the exchange asks for it (11 §14 Q5). Minimum: the gasless top-up minimum (12 §4.1, proposed $5); the page says that smaller amounts are not added.
+**Flow.** "Send from an exchange" → the agent's address with a QR code and a copy button, the coin ("USDC") and the network the exchange will ask for, pre-chosen as the cheapest supported one and named in large type ("Network: Base"). This is the one place outside Advanced where a network is named, because the exchange asks for it (11 §14 Q5, option A, decided in D-117 B: shown only inside the exchange steps, as information, never a choice). Minimum: the gasless top-up minimum (12 §4.1, $5, D-117 D); the page says that smaller amounts are not added.
 
 **States.** Waiting (watching the address) · received ("Your agent turns this into credits the next time it runs") · added · below the minimum ("Received $3. The minimum is $5; send at least $2 more and your agent adds it all") · offline.
 
@@ -126,10 +126,10 @@ https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, opt
 |---|---|---|
 | 1 | Card approach: on-ramp or merchant; which provider; countries (M2-18a; last step, after D-15) | On-ramp, hosted checkout; provider after the entity, the spike and counsel check |
 | 2 | Whether the card path waits for the entity | **Decided:** card is the last step, after D-15 |
-| 3 | Wording for the connect method ("wallet" or not) | No "wallet" in our label (§3b) |
+| 3 | Wording for the connect method ("wallet" or not) | No "wallet" in our label (§3b) (**accepted**, D-117 C) |
 | 4 | Two-step `depositFor` under Advanced; a later contract deposit that credits a named agent from one signature | Offer `depositFor` under Advanced; contract change only after M3 if users ask |
 | 5 | Top-up link format (M1-26-d) | §5 (**accepted**, D-113) |
-| 6 | Minimums per method (exchange and connect: the gasless minimum, proposed $5; card: the provider's) | As proposed |
+| 6 | Minimums per method (exchange and connect: the gasless minimum, $5; card: the provider's) | As proposed (**accepted** for exchange and connect: $5, D-117 D; card still open) |
 | 7 | Agent tells the user when credits arrive | Yes, once |
 | 8 | **Who pays for receipts** when the recipient has no credits on the record's network (M1-34); must be user-paid | Decided (D-114), see §8 |
 | 9 | How the network cost of a gasless top-up is recovered from users (today the submitter pays it and there is no deposit fee, 12 §2) | Inside the proof price, which already covers submitter costs; a deposit fee only if the numbers need it |
