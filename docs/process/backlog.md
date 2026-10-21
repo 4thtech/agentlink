@@ -3805,6 +3805,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-5
 - **Scope:**
   - The M1-13b corpus plus file paths, hostile file names and hostile proof packs, run against the file and proof tools.
+- Wired into CI (CHORE-E2E-INJECTION, 2026-10-21): the deterministic suites of M1-13b and M1-13d run in the `e2e-deterministic` job with exact counts (checker 13, talk 10, files-proofs 9); the LLM layer stays opt-in.
 - **Acceptance:**
   - For every corpus item: wrapped and escaped in text and `structuredContent`; no tool call issued by our code; no inbound bytes in descriptions, instructions or errors.
   - The LLM report is reviewed at M1-GATE.

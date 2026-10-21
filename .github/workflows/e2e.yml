@@ -126,6 +126,39 @@ jobs:
             if (failed) process.exit(1);
           '
 
+      # M1-13b, M1-13d: the deterministic prompt-injection suites (e2e/prompt-injection/). No Docker,
+      # keychain or secret needed. Run even when the scenarios failed, so one report shows both. The
+      # LLM layer (llm/) is not selected: it stays opt-in (AGENTLINK_E2E_LLM).
+      - name: Run the deterministic prompt-injection suites
+        if: always()
+        run: |
+          set -euo pipefail
+          pnpm --filter @4thtech-io/e2e exec vitest run --config prompt-injection/vitest.config.ts deterministic/ --reporter=default --reporter=json --outputFile.json="$AGENTLINK_E2E_ARTIFACTS/injection-report.json" 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/injection-output.log"
+
+      - name: Check that the prompt-injection suites ran in full, with no skipped test
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.AGENTLINK_E2E_ARTIFACTS + "/injection-report.json", "utf8"));
+            let failed = false;
+            for (const [name, count] of [["checker", 13], ["talk", 10], ["files-proofs", 9]]) {
+              const f = r.testResults.filter((x) => x.name.endsWith(`/deterministic/${name}.test.ts`));
+              const t = f.length === 1 ? f[0].assertionResults : [];
+              const bad = t.filter((x) => x.status !== "passed");
+              console.log(`injection ${name}.test.ts: ${t.length} tests, ${bad.length} not passed`);
+              if (t.length !== count || bad.length > 0) {
+                console.error(`::error::prompt-injection ${name}.test.ts must run ${count} tests, all passed`);
+                failed = true;
+              }
+            }
+            if (r.testResults.length !== 3) {
+              console.error("::error::the prompt-injection suites must be exactly 3 test files");
+              failed = true;
+            }
+            if (failed) process.exit(1);
+          '
+
       - name: Canary scan of every log and artifact
         id: scan
         if: always()
