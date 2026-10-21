@@ -9,6 +9,9 @@
 // an unknown key is refused before the core is called. No default input asks for a chain (D-40).
 // `clientRequestId` is accepted for the 06 §1 rule 6 shape; the core never signs a second Record for
 // one envelope (04 §5), so a repeat returns the same proof.
+// `requestReceipt` (M1-33d, D-109): asks the recipient for a delivery receipt through the `proof`
+// envelope. The summary then always says what a receipt makes public (11 §5.6), not only the first
+// time in a session; it is said only when the core reports the request was kept.
 import type { NotarizeInput } from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
 import {
@@ -30,7 +33,7 @@ export async function notarizeHandler(
   context: ToolContext,
 ): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
-  const { envelopeId, chain, approvalId } = input;
+  const { envelopeId, chain, approvalId, requestReceipt } = input;
   if (typeof envelopeId !== 'string') return invalidArgument();
   const self = await needsIdentity(context);
   if (isOutput(self)) return self;
@@ -46,6 +49,7 @@ export async function notarizeHandler(
     envelopeId,
     ...(chainId === undefined ? {} : { chainId }),
     ...(typeof approvalId === 'string' ? { approvalId } : {}),
+    ...(requestReceipt === true ? { requestReceipt: true } : {}),
   };
   let result;
   try {

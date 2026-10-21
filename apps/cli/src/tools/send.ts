@@ -82,6 +82,9 @@ export const SEND_TEXT = Object.freeze({
   proofApproval: "Adding proof to this message needs the owner's approval.",
   proofApprovalTail:
     'The message is already sent: to finish, call agentlink_notarize with envelopeId {envelopeId} and this approvalId.',
+  // M1-33d: the approval covers the receipt request too, so the finishing call repeats it.
+  proofApprovalTailReceipt:
+    'The message is already sent: to finish, call agentlink_notarize with envelopeId {envelopeId}, requestReceipt true and this approvalId.',
   // IR-M1-9d-2 M2: the message went out, only its proof did not.
   proofFailed: 'Its proof was not added.',
   proofFailedNextStep:
@@ -132,6 +135,7 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
 export async function sendHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
   const { to, text, body, type, replyTo, clientRequestId, path, notarize, approvalId } = input;
+  const requestReceipt = input['requestReceipt'] === true;
   // 1. D-55: before anything else, so a negotiation never even resolves a contact.
   if (isPlainObject(body) && Object.hasOwn(body, 'terms')) return useTermsTools();
   // 2. The schema checked each field's type; here only their combination.
@@ -145,6 +149,8 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
 
   // 6. A repeat with an approval must name the first call's request, so nothing is sent twice.
   const withProof = notarize === true;
+  // M1-33d (06 §2.2): a delivery receipt is asked for through the proof, so only with notarize.
+  if (requestReceipt && !withProof) return invalidArgument();
   if (withProof && typeof approvalId === 'string' && typeof clientRequestId !== 'string') {
     return fail(
       'error',
@@ -241,6 +247,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
         self.agentId,
         context,
         name,
+        requestReceipt,
       );
     }
     case 'needs_setup':
@@ -315,6 +322,7 @@ async function withProofOf(
   agentId: string,
   context: ToolContext,
   contactName: string,
+  requestReceipt: boolean,
 ): Promise<HandlerOutput> {
   const proofs = context.client.proofs;
   if (proofs === undefined || !ENVELOPE_ID.test(envelopeId)) return internalError();
@@ -323,11 +331,15 @@ async function withProofOf(
     const result = await proofs.notarize({
       envelopeId,
       ...(typeof approvalId === 'string' ? { approvalId } : {}),
+      ...(requestReceipt ? { requestReceipt: true } : {}),
     });
     proofOut = notarizeOutput(result, context, agentId, {
       contactName,
       approvalSummary: SEND_TEXT.proofApproval,
-      approvalNextStepTail: SEND_TEXT.proofApprovalTail.replace('{envelopeId}', envelopeId),
+      approvalNextStepTail: (requestReceipt
+        ? SEND_TEXT.proofApprovalTailReceipt
+        : SEND_TEXT.proofApprovalTail
+      ).replace('{envelopeId}', envelopeId),
     });
   } catch (error) {
     // Every proof-step error after a successful send (IR-M1-9d-2 M2): never INTERNAL, never "nothing

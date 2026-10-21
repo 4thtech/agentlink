@@ -25,3 +25,20 @@ describe('the user guide matches the 11 §5.6 strings', () => {
     expect(guide('everyday-use/credits.md')).toContain(en['common.privacy.topUp']);
   });
 });
+
+// M1-33d (D-109): asking for a delivery receipt and confirming one are built, so the guide quotes
+// the 11 §5.6 lines the tools print, and no longer calls them planned.
+describe('the user guide covers delivery receipt requests (M1-33d)', () => {
+  const privacy = guide('privacy-and-security.md');
+  const proof = guide('everyday-use/agreements-and-proof.md');
+  it('quotes the ask and the request lines (contact name shown as "Ana")', () => {
+    for (const page of [privacy, proof]) {
+      expect(page).toContain(en['common.privacy.receiptAsk'].replace('{contactName}', 'Ana'));
+      expect(page).toContain(en['common.privacy.receiptRequest'].replace('{contactName}', 'Ana'));
+    }
+  });
+  it('no longer says asking for a receipt is planned', () => {
+    expect(privacy).not.toMatch(/Asking a contact for one, being told when someone asks you/);
+    expect(proof).not.toMatch(/asking for one and turning them on for a contact are planned/);
+  });
+});

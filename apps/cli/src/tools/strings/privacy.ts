@@ -5,6 +5,8 @@
 import { copy } from './index.js';
 
 const RECEIPT_WORDS: Readonly<Record<string, string>> = Object.freeze({
+  // M1-33d: the user's own DELIVERED shows publicly that the item reached their agent (D-109).
+  delivered: 'received',
   opened: 'opened',
   accepted: 'accepted',
   rejected: 'rejected',
@@ -23,7 +25,7 @@ export function proofLines(contactName?: string): string[] {
 /** The same as one line, for a tool summary (tool text is one line, 06 §1). */
 export const proofDisclosure = (contactName?: string): string => proofLines(contactName).join(' ');
 
-/** The line for an opened, accepted or rejected receipt; undefined for any other value. */
+/** The line for a delivered, opened, accepted or rejected receipt; undefined for any other value. */
 export function receiptDisclosure(type: unknown): string | undefined {
   const receipt = typeof type === 'string' ? RECEIPT_WORDS[type] : undefined;
   return receipt === undefined ? undefined : copy('common.privacy.receiptPublic', { receipt });
@@ -47,6 +49,19 @@ function cardProofLines(who: string | null | undefined): string[] {
   return who === null ? [first] : proofLines(who);
 }
 
+/**
+ * M1-33d (11 §5.6 "Asking for a delivery receipt"): an approval whose stored action asks the named
+ * recipient for a delivery receipt also carries the "ask" line. Only the boolean `true` asks; with
+ * no named recipient the receipt line above already says it, so no name is invented.
+ */
+function cardAskLines(
+  args: Readonly<Record<string, unknown>> | undefined,
+  who: string | null | undefined,
+): string[] {
+  if (args?.['requestReceipt'] !== true || typeof who !== 'string') return [];
+  return [copy('common.privacy.receiptAsk', { contactName: who })];
+}
+
 export function cardDisclosure(
   tool: string,
   args: Readonly<Record<string, unknown>> | undefined,
@@ -54,11 +69,14 @@ export function cardDisclosure(
 ): string[] {
   switch (tool) {
     case 'agentlink_notarize':
+      return [...cardProofLines(who), ...cardAskLines(args, who)];
     case 'agentlink_propose_terms':
     case 'agentlink_respond_to_terms':
       return cardProofLines(who);
     case 'agentlink_send':
-      return args?.['notarize'] === true ? cardProofLines(who) : [];
+      return args?.['notarize'] === true
+        ? [...cardProofLines(who), ...cardAskLines(args, who)]
+        : [];
     case 'agentlink_acknowledge': {
       const line = receiptDisclosure(args?.['type']);
       return line === undefined ? [] : [line];

@@ -2026,3 +2026,241 @@ describe('only a definite contradiction flags; not-yet and unknown cases are ret
     expect(await receipts(b)).toEqual([]);
   });
 });
+
+// --- M1-33d: receipt requests and the user's own DELIVERED (D-109; 04 §3.4, 06 §2.2, §2.4, §3) ---
+
+/** The agent's inbound items, read and unread, as `agentlink_inbox` reads them (06 §2.2). */
+async function inboxItems(agent: Agent) {
+  const page = await agent.client.inbox.page({
+    limit: 100,
+    includeRead: true,
+    includeSent: false,
+    sizeOf: () => 1,
+    maxBytes: 1_000_000,
+  });
+  if (page.status !== 'ok') throw new Error('test: inbox page');
+  return page.items;
+}
+
+const itemOf = async (agent: Agent, envelopeId: string) =>
+  (await inboxItems(agent)).find((i) => i.envelopeId === envelopeId) as
+    (Record<string, unknown> & { receiptRequested?: boolean }) | undefined;
+
+describe('the sender asks for a delivery receipt (06 §2.4 requestReceipt, 04 §3.4)', () => {
+  it('requestReceipt puts receiptRequest "delivered" in the proof body, and says so in the result', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const proof = await a.client.notarize({ envelopeId, requestReceipt: true });
+    expect(proof).toMatchObject({ status: 'ok', receiptRequested: true });
+    const bodies = await proofBodiesSent(a);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ envelopeId, receiptRequest: 'delivered' });
+  });
+
+  it('without requestReceipt the body asks for nothing and the result claims no request', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const proof = await a.client.notarize({ envelopeId });
+    expect(proof).toMatchObject({ status: 'ok' });
+    expect(proof).not.toHaveProperty('receiptRequested');
+    const [body] = await proofBodiesSent(a);
+    expect(body).not.toHaveProperty('receiptRequest');
+  });
+
+  it('the request never reaches the proof service: the stored, submitted item is the Record only', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId, requestReceipt: true })) as {
+      recordId: string;
+    };
+    const own = (await proofRows(a)).find((r) => r.record_id === proof.recordId)!;
+    expect(Object.keys(parseJson(own.record_json) as object).sort()).toEqual([
+      'record',
+      'signature',
+    ]);
+  });
+
+  it('a request on an envelope already notarized without one asks for nothing more', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId });
+    const again = await a.client.notarize({ envelopeId, requestReceipt: true });
+    expect(again).toMatchObject({ status: 'ok' });
+    expect(again).not.toHaveProperty('receiptRequested');
+    const bodies = await proofBodiesSent(a);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toHaveProperty('receiptRequest');
+  });
+
+  it('under an approval policy the approval covers the request; one call without it is refused', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b);
+    const pending = await a.client.notarize({ envelopeId, requestReceipt: true });
+    expect(pending.status).toBe('pending_approval');
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    // The approved action carries the request: a call without it is another action.
+    expect(await a.client.notarize({ envelopeId, approvalId })).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_INVALID',
+    });
+    expect(await a.client.notarize({ envelopeId, approvalId, requestReceipt: true })).toMatchObject(
+      { status: 'ok', receiptRequested: true },
+    );
+    const [body] = await proofBodiesSent(a);
+    expect(body).toMatchObject({ receiptRequest: 'delivered' });
+  });
+
+  it('a replacement Record keeps the request (04 §5)', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    chain.censor = true;
+    const first = await a.client.notarize({ envelopeId, requestReceipt: true });
+    expect(first.status).toBe('submitted');
+    clock.t += 3601 + 60;
+    chain.censor = false;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1 });
+    const bodies = await proofBodiesSent(a);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ receiptRequest: 'delivered' });
+  });
+});
+
+describe('the recipient: a receipt request alone never signs anything (D-109, I-4, I-6)', () => {
+  it('default rules: nothing is signed, and the inbox item says the sender asked', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId, requestReceipt: true });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+    expect(await itemOf(b, envelopeId)).toMatchObject({ receiptRequested: true });
+  });
+
+  it('the user’s acknowledge delivered signs exactly one DELIVERED; a repeat signs nothing more', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId, requestReceipt: true })) as {
+      recordId: string;
+    };
+    await deliver(a, b);
+    const policyBefore = await b.client.ownerActions.loadPolicy();
+
+    const first = await b.client.acknowledge({ envelopeId, type: 'delivered' });
+    expect(first).toMatchObject({
+      status: 'ok',
+      recordId: proof.recordId,
+      receipt: 'DELIVERED',
+      onChain: true,
+    });
+    expect(await receipts(b)).toEqual([
+      expect.objectContaining({ record_id: proof.recordId, type: 1, signer: b.id }),
+    ]);
+    expect(onChain(proof.recordId)!.receiptAt[0]).not.toBe(0n);
+    expect(chain.calls.acknowledge).toBe(1);
+
+    const second = await b.client.acknowledge({ envelopeId, type: 'delivered' });
+    expect(second).toMatchObject({ status: 'ok', receipt: 'DELIVERED' });
+    expect(await receipts(b)).toHaveLength(1);
+    expect(chain.calls.acknowledge).toBe(1);
+    expect((await proofRows(b)).filter((r) => r.record_id === `${proof.recordId}:1`)).toHaveLength(
+      1,
+    );
+
+    // Signed: the item no longer asks. The rules are unchanged (no tool changes a policy, I-4).
+    const item = await itemOf(b, envelopeId);
+    expect(item).toBeDefined();
+    expect(item).not.toHaveProperty('receiptRequested');
+    expect(await b.client.ownerActions.loadPolicy()).toEqual(policyBefore);
+  });
+
+  it('later passes never sign the request on their own', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId, requestReceipt: true });
+    await deliver(a, b);
+    await b.client.proofs.processInbound([]);
+    await b.client.proofs.runDeferredReceipts();
+    await b.client.proofs.resubmitPending();
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+  });
+
+  it('with delivery receipts on for the contact, DELIVERED is signed once by policy and nothing is asked', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    await setPolicy(b, (p) => {
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId, requestReceipt: true });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([expect.objectContaining({ type: 1 })]);
+    expect(await itemOf(b, envelopeId)).not.toHaveProperty('receiptRequested');
+  });
+
+  it('a proof without a request: the item does not ask, and the user can still confirm delivery', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(await itemOf(b, envelopeId)).not.toHaveProperty('receiptRequested');
+    expect(await b.client.acknowledge({ envelopeId, type: 'delivered' })).toMatchObject({
+      status: 'ok',
+      receipt: 'DELIVERED',
+    });
+    expect(await receipts(b)).toHaveLength(1);
+  });
+
+  it('acknowledge delivered on a message without a proof signs nothing (NOT_RECORDED)', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    expect(await b.client.acknowledge({ envelopeId, type: 'delivered' })).toEqual({
+      status: 'rejected',
+      code: 'NOT_RECORDED',
+    });
+    expect(await receipts(b)).toEqual([]);
+  });
+
+  it('a request in a body kept pending on a failed read is shown once the body is checked', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    chain.readsFail = true;
+    await sendProofEnvelope(a, b, { ...bodyOf(rec, envelopeId), receiptRequest: 'delivered' });
+    expect(await itemOf(b, envelopeId)).not.toHaveProperty('receiptRequested');
+    chain.readsFail = false;
+    await b.client.proofs.processInbound([]);
+    expect(await receipts(b)).toEqual([]);
+    expect(await itemOf(b, envelopeId)).toMatchObject({ receiptRequested: true });
+  });
+});
+
+describe('a malformed receiptRequest refuses the whole body (04 §3.4, I-5)', () => {
+  it.each([
+    ['opened', 'opened'],
+    ['DELIVERED', 'DELIVERED'],
+    ['true', true],
+    ['an object', { type: 'delivered' }],
+  ])('receiptRequest %s: no proof stored, no receipt, no request shown', async (_l, value) => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    await sendRawProof(a, b, { ...bodyOf(rec, envelopeId), receiptRequest: value });
+    // B's rules turn DELIVERED on (twoAgents), so only the refusal explains the empty list.
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+    expect(await itemOf(b, envelopeId)).not.toHaveProperty('receiptRequested');
+  });
+
+  it('the control: the same body with "delivered" is stored and gets DELIVERED by policy', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    await sendRawProof(a, b, { ...bodyOf(rec, envelopeId), receiptRequest: 'delivered' });
+    expect(await receipts(b)).toEqual([expect.objectContaining({ type: 1 })]);
+  });
+});

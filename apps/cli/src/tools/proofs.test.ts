@@ -31,7 +31,7 @@ import type {
 import { callTool } from './index.js';
 import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
-import { findTool } from './registry.js';
+import { TOOLS, findTool } from './registry.js';
 import { matchesSchema } from './input.js';
 
 const A = `0x${'a'.repeat(40)}`;
@@ -1238,5 +1238,184 @@ describe('proof privacy disclosure (11 §5.6, D-109)', () => {
     expect(`${r.structured.summary}\n${r.structured.nextStep ?? ''}`).toContain(
       copy('common.privacy.topUp'),
     );
+  });
+});
+
+// ---- M1-33d: asking for a delivery receipt, and the user's own DELIVERED (D-109; 11 §5.6) ---------
+
+const RECEIPT_LINE_GENERIC = copy('common.privacy.proofReceiptGeneric');
+
+describe('requestReceipt on agentlink_notarize and agentlink_send (06 §2.4, 11 §5.6)', () => {
+  it('notarize passes requestReceipt to the core; the summary always carries the receipt line', async () => {
+    const { client, calls } = fake({
+      notarize: () => ({ ...recorded(), receiptRequested: true }) as NotarizeResult,
+    });
+    // The first proof of the session already disclosed; the request still says what a receipt shows.
+    await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: true },
+      client,
+    );
+    expect(calls.notarize[1]).toEqual({ envelopeId: ENVELOPE, requestReceipt: true });
+    expect(r.structured.status).toBe('ok');
+    expect(r.structured.summary).toContain(RECEIPT_LINE_GENERIC);
+    expectOurTextClean(r);
+  });
+
+  it('notarize without requestReceipt passes nothing extra; a later proof has no receipt line', async () => {
+    const { client, calls } = fake();
+    await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(calls.notarize).toEqual([{ envelopeId: ENVELOPE }, { envelopeId: ENVELOPE }]);
+    expect(r.structured.summary).not.toContain(RECEIPT_LINE_GENERIC);
+  });
+
+  it('a requested receipt the core did not record (an earlier proof) is not claimed', async () => {
+    const { client } = fake();
+    await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: true },
+      client,
+    );
+    expect(r.structured.summary).not.toContain(RECEIPT_LINE_GENERIC);
+  });
+
+  it('a non-boolean requestReceipt is refused by the schema; nothing runs', async () => {
+    const { client, calls } = fake();
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: 'yes' },
+      client,
+    );
+    expect(r.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
+    expect(calls.log).toEqual([]);
+  });
+
+  it('send with notarize and requestReceipt asks; the summary names the contact in the receipt line', async () => {
+    const { client, calls } = fake({
+      notarize: () => ({ ...recorded(), receiptRequested: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_send',
+      { to: B, text: 'hi', notarize: true, requestReceipt: true },
+      client,
+    );
+    expect(calls.notarize).toEqual([{ envelopeId: ENVELOPE, requestReceipt: true }]);
+    expect(r.structured).toMatchObject({ status: 'ok', proof: { status: 'ok' } });
+    expect(r.structured.summary).toContain(
+      copy('common.privacy.proofReceipt', { contactName: '“Contact 7F3A·19C2” (self-declared)' }),
+    );
+    expectOurTextClean(r);
+  });
+
+  it('send with requestReceipt but without notarize is refused before anything is sent', async () => {
+    const { client, calls } = fake();
+    const r = await call('agentlink_send', { to: B, text: 'hi', requestReceipt: true }, client);
+    expect(r.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
+    expect(calls.log).toEqual([]);
+  });
+
+  it('send pending approval with requestReceipt: the nextStep keeps the request for agentlink_notarize', async () => {
+    const { client } = fake({
+      notarize: () => ({
+        status: 'pending_approval',
+        approvalId: APPROVAL,
+        actionDigest: 'd'.repeat(64),
+        summary: 'x',
+        expiresAt: 1_760_700_000,
+      }),
+    });
+    const r = await call(
+      'agentlink_send',
+      { to: B, text: 'hi', notarize: true, requestReceipt: true },
+      client,
+    );
+    expect(r.structured.status).toBe('pending_approval');
+    expect(r.structured.nextStep).toContain('requestReceipt true');
+  });
+
+  it('the descriptions say to set requestReceipt only when the user asked', () => {
+    expect(findTool('agentlink_notarize')?.description).toMatch(
+      /requestReceipt only when the user asked/,
+    );
+    expect(findTool('agentlink_send')?.description).toMatch(
+      /requestReceipt only when the user asked/,
+    );
+  });
+});
+
+describe('agentlink_acknowledge delivered (06 §2.4, §3; D-109)', () => {
+  it('ok: the user’s yes signs DELIVERED; the summary says what becomes public', async () => {
+    const { client, calls } = fake({
+      acknowledge: () => ({ status: 'ok', recordId: RECORD, receipt: 'DELIVERED', onChain: true }),
+    });
+    const r = await call(
+      'agentlink_acknowledge',
+      { envelopeId: ENVELOPE, type: 'delivered' },
+      client,
+    );
+    expect(calls.acknowledge).toEqual([{ envelopeId: ENVELOPE, type: 'delivered' }]);
+    expect(r.structured).toMatchObject({ status: 'ok', recordId: RECORD, receipt: 'DELIVERED' });
+    expect(r.structured.summary).toBe(
+      `Receipt recorded: delivered. ${copy('common.privacy.receiptPublic', { receipt: 'received' })}`,
+    );
+  });
+
+  it('submitted: signed, on its way, with the same disclosure', async () => {
+    const { client } = fake({
+      acknowledge: () => ({ status: 'ok', recordId: RECORD, receipt: 'DELIVERED', onChain: false }),
+    });
+    const r = await call(
+      'agentlink_acknowledge',
+      { envelopeId: ENVELOPE, type: 'delivered' },
+      client,
+    );
+    expect(r.structured).toMatchObject({ status: 'submitted', receipt: 'DELIVERED' });
+    expect(r.structured.summary).toContain(
+      copy('common.privacy.receiptPublic', { receipt: 'received' }),
+    );
+  });
+
+  it('not recorded: nothing signed', async () => {
+    const { client } = fake({
+      acknowledge: () => ({ status: 'rejected', code: 'NOT_RECORDED' }),
+    });
+    const r = await call(
+      'agentlink_acknowledge',
+      { envelopeId: ENVELOPE, type: 'delivered' },
+      client,
+    );
+    expect(r.structured).toMatchObject({ status: 'not_found', code: 'NOT_RECORDED' });
+  });
+
+  it('the description says delivered only when the user confirms delivery', () => {
+    expect(findTool('agentlink_acknowledge')?.description).toMatch(
+      /delivered only when the user confirms delivery/i,
+    );
+  });
+});
+
+describe('no tool turns on automatic delivery receipts (I-4, 06 §3)', () => {
+  /** Every property name anywhere in a JSON schema. */
+  function propertyNames(schema: unknown, out: Set<string> = new Set()): Set<string> {
+    if (Array.isArray(schema)) {
+      for (const s of schema) propertyNames(s, out);
+    } else if (typeof schema === 'object' && schema !== null) {
+      const props = (schema as { properties?: Record<string, unknown> }).properties;
+      if (props !== undefined) for (const k of Object.keys(props)) out.add(k);
+      for (const v of Object.values(schema)) propertyNames(v, out);
+    }
+    return out;
+  }
+
+  it('no tool input names a receipts rule, a contact rule or a policy', () => {
+    for (const tool of TOOLS) {
+      const names = propertyNames(tool.inputSchema);
+      for (const banned of ['autoDelivered', 'receipts', 'contactRules', 'policy', 'autoOpened']) {
+        expect(names.has(banned), `${tool.name}.${banned}`).toBe(false);
+      }
+    }
   });
 });

@@ -1171,3 +1171,13 @@ describe('delivery receipts on from an older default (06 §3, D-109; M1-33a)', (
     expect(await alice.client.ownerActions.receiptsOnFromOlderDefault()).toBe(false);
   });
 });
+
+describe('files.deleteAfter help text (06 §3, D-109, M1-33d)', () => {
+  it('says that without a delivery confirmation, deletion falls back to expiry', () => {
+    const row = POLICY_REVIEW_ROWS.find((r) => r.path === 'files.deleteAfter')!;
+    expect(row.read?.('receipt')).toBe(
+      'the contact confirms delivery (if they never do, when they expire)',
+    );
+    expect(row.read?.('expiry')).toBe('they expire');
+  });
+});

@@ -483,6 +483,40 @@ describe('proof body with the signed Record (04 §3.4, D-107)', () => {
   });
 });
 
+// M1-33d (D-109; 04 §3.4 "Receipt request"): `receiptRequest: "delivered"` is the only value; any
+// other value or type is a malformed payload, refused like any other.
+describe('proof body with a receipt request (04 §3.4, D-109)', () => {
+  const withRequest = (value: unknown) =>
+    edit(payloads().proof, ['body', 'receiptRequest'], value as never);
+
+  it('accepts "delivered", with and without the signed Record; a body without the key asks for nothing', () => {
+    expectRoundTrip(payloadSchema, withRequest('delivered'));
+    expectRoundTrip(
+      payloadSchema,
+      edit(
+        edit(withRequest('delivered'), ['body', 'record'], record() as never),
+        ['body', 'signature'],
+        CARD_SIG,
+      ),
+    );
+    expectRoundTrip(payloadSchema, payloads().proof);
+  });
+
+  it.each([
+    ['opened', 'opened'],
+    ['upper case', 'DELIVERED'],
+    ['empty', ''],
+    ['true', true],
+    ['1', 1],
+    ['null', null],
+    ['array', ['delivered']],
+    ['object', { type: 'delivered' }],
+    ['padded', ' delivered'],
+  ] as const)('rejects receiptRequest %s', (_l, value) => {
+    expectReject(payloadSchema, withRequest(value));
+  });
+});
+
 describe('owner-channel bodies (04 §3.4.1)', () => {
   it('approval carries approval.decide, approval.decideBatch or approval.cancel (04 §3.4.1, D-55, D-68)', () => {
     expectRoundTrip(payloadSchema, payloads().approval);

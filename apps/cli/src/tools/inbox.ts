@@ -18,6 +18,12 @@
 //    items, so a fresh session finds an offer an earlier session already read. Each is wrapped like
 //    any other inbound item.
 //
+// 6. Receipt requests (M1-33d; 06 §2.2, §3; 11 §5.6; D-109): a contact's item whose checked proof
+//    asks for a delivery receipt not signed yet carries `receiptRequested: true` (ours). The summary
+//    adds the 11 §5.6 line once per contact (at most three), and the nextStep tells the agent to ask
+//    its user; only the user's "Confirm delivery" leads to agentlink_acknowledge `delivered`. The
+//    request never signs anything, and nothing the sender wrote reaches these lines (I-5).
+//
 // I-5, I-7: summaries and `nextStep` are fixed text with counts and names under the 06 §2.1 rule;
 // logs carry counts only.
 import { canonicalize, encodeUtf8 } from '@4thtech-io/crypto';
@@ -258,7 +264,11 @@ function render(item: PageItem): Rendered {
     header = INBOX_TEXT.headerFrom(renderRef(ref), removeInvisible(item.from.ownerFingerprint));
     // The self-declared name: only here, as the escaped `from` attribute (06 §2.1, §4).
     from = item.from.declaredName;
-    extra = { contact: ref, read: item.read };
+    extra = {
+      contact: ref,
+      read: item.read,
+      ...(item.receiptRequested === true ? { receiptRequested: true } : {}),
+    };
   }
   const block = untrustedBlock({
     header,
@@ -391,6 +401,18 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
       );
     }
   }
+  // M1-33d: one 11 §5.6 line per contact that asked for a delivery receipt, at most three.
+  const asked = new Map<string, string>();
+  for (const item of page.items) {
+    if (item.direction !== 'in' || item.from === null || item.receiptRequested !== true) continue;
+    if (asked.has(item.from.contactId)) continue;
+    const ref = displayRef(item.from.contactId, item.from.display);
+    asked.set(
+      item.from.contactId,
+      copy('common.privacy.receiptRequest', { contactName: renderRef(ref) }),
+    );
+  }
+  const receiptLines = [...asked.values()].slice(0, 3);
   const requestsLine =
     page.requests > 0 ? [copy('chat.inbox.requestsWaiting', { count: page.requests })] : [];
   const first = offersOnly
@@ -402,14 +424,20 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
       : filtered
         ? INBOX_TEXT.noMatching
         : copy('chat.session.nothingNew');
-  const summary = [first, ...duplicateLines.slice(0, 3), ...requestsLine].join(' ');
+  const summary = [first, ...duplicateLines.slice(0, 3), ...receiptLines, ...requestsLine].join(
+    ' ',
+  );
   const hasRequest = page.items.some((item) => item.direction === 'in' && item.from === null);
+  const nextSteps = [
+    ...(receiptLines.length > 0 ? [copy('chat.inbox.receiptRequestNextStep')] : []),
+    ...(hasRequest ? [copy('chat.inbox.requestNextStep')] : []),
+  ];
   logger.info('inbox read', { messages: items.length, requests: page.requests });
 
   const fields = {
     messages: items.map((item) => item.message),
     requests: page.requests,
-    ...(hasRequest ? { nextStep: copy('chat.inbox.requestNextStep') } : {}),
+    ...(nextSteps.length > 0 ? { nextStep: nextSteps.join(' ') } : {}),
   };
   const output = ok(summary, fields);
   return items.length === 0

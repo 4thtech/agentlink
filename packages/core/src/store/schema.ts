@@ -197,7 +197,9 @@ export const TABLES = {
   // a record a contact made for this agent (`received`: the checked on-chain view, salt `enc`), a
   // signed Receipt kept for resending (`receipt_*`, keyed `<recordId>:<receiptType>` as the
   // submitter item ID, 07 §7, with an empty sealed salt) and a `proof` envelope waiting for its
-  // message (`awaiting`, keyed `await:<envelope id>`, bounded in number and age).
+  // message (`awaiting`, keyed `await:<envelope id>`, bounded in number and age). M1-33d: the
+  // sender's delivery receipt request for its own envelope (`receipt_request`, keyed
+  // `request:<envelope id>`, `record_json` `{}`, an empty sealed salt).
   proofs: {
     columns: {
       record_id: id,

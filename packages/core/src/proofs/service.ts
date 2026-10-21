@@ -16,7 +16,9 @@
 // stored envelope's, its kind is the 05 §3.1 kind of the payload this agent holds, and its recipient
 // commitment opens to this agent with the delivered salt. Then DELIVERED per the effective
 // `receipts.autoDelivered` (default off; the contact rule, else the global value; D-109)
-// and the deferred ACCEPTED of an approved accept (07 §2.1 step 4). OPENED only on request;
+// and the deferred ACCEPTED of an approved accept (07 §2.1 step 4). A `receiptRequest` in the body
+// (M1-33d) is kept as a flag on the received record and never signs anything; the user's
+// `acknowledge {type: "delivered"}` signs exactly one DELIVERED (receipt-request.ts). OPENED only on request;
 // ACCEPTED / REJECTED without terms are commitments (`commitments.accept`, D-31) and exclusive.
 //
 // Signed Record in the body (M1-7g-b, D-107): the sender's `proof` body also carries the Record and
@@ -99,6 +101,7 @@ import type { Row } from '../store/schema.js';
 import type { StoreTx } from '../store/store.js';
 import type { KnownRecord, RecordLookup, TermsService } from '../terms-flow.js';
 import type { ProofChain, ProofKit, ProofsPlatform } from './platform.js';
+import { RECEIPT_REQUEST, receiptRequestKey, senderRequestedTx } from './receipt-request.js';
 
 /** A Record's `deadline` is this far after signing (proposed; 04 §5 replacement window). */
 export const RECORD_DEADLINE_SECONDS = 3_600;
@@ -165,7 +168,10 @@ const PENDING_SECONDS = 7 * 86_400;
 export const PROOF_PENDING_PER_CONTACT = 32;
 /** Rows that are a record: own or received (not a stored receipt or a waiting proof). */
 const isRecordRow = (r: Row<'proofs'>): boolean =>
-  !RECEIPT_STATUSES.includes(r.status) && r.status !== AWAITING && r.status !== PENDING;
+  !RECEIPT_STATUSES.includes(r.status) &&
+  r.status !== AWAITING &&
+  r.status !== PENDING &&
+  r.status !== RECEIPT_REQUEST;
 const receiptItemId = (recordId: string, code: number): string => `${recordId}:${String(code)}`;
 
 /** Fixed refusal codes (06 §1 rule 3). */
@@ -227,6 +233,12 @@ export interface NotarizeInput {
    * failed read is `CHAIN_UNAVAILABLE`. Either way nothing is signed or charged. No tool sets it.
    */
   readonly parentRecordId?: string;
+  /**
+   * The user asked for a delivery receipt (06 §2.4 `requestReceipt`, D-109; M1-33d): the `proof`
+   * envelope carries `receiptRequest: "delivered"`. Kept with the Record when it is first signed
+   * (an approval covers it); an envelope already notarized without one asks for nothing more.
+   */
+  readonly requestReceipt?: boolean;
 }
 
 interface RecordedFields {
@@ -234,6 +246,8 @@ interface RecordedFields {
   readonly chainId: number;
   readonly chain: string;
   readonly fee: ProofFee;
+  /** Present (true) only when this proof's envelope asks the recipient for a delivery receipt. */
+  readonly receiptRequested?: true;
 }
 
 export type NotarizeResult =
@@ -257,7 +271,8 @@ export type NotarizeResult =
 
 export interface AcknowledgeInput {
   readonly envelopeId: string;
-  readonly type: 'opened' | 'accepted' | 'rejected';
+  /** `delivered` is the user's own yes (06 §2.4, D-109; M1-33d): no owner approval, one receipt. */
+  readonly type: 'delivered' | 'opened' | 'accepted' | 'rejected';
   readonly approvalId?: string;
 }
 
@@ -347,6 +362,8 @@ interface ReceivedItem {
   };
   readonly record?: RecordJson;
   readonly signature?: string;
+  /** The sender asked for a delivery receipt (M1-33d): a flag only, never signs anything (D-109). */
+  readonly receiptRequest?: 'delivered';
 }
 
 /** The outcome of the recipient's checks of a `proof` body (04 §3.4). */
@@ -410,6 +427,17 @@ export class ProofService implements RecordLookup {
 
   /** Records an envelope this agent sent (06 §2.4 `agentlink_notarize`). */
   async notarize(input: NotarizeInput): Promise<NotarizeResult> {
+    const result = await this.#notarize(input);
+    if (result.status !== 'ok' && result.status !== 'submitted') return result;
+    // Says "asked" only when the stored marker is there: a request on an envelope already notarized
+    // without one is not claimed (M1-33d).
+    const asked = await this.#ctx.store.transaction((tx) =>
+      senderRequestedTx(tx, input.envelopeId),
+    );
+    return asked ? Object.freeze({ ...result, receiptRequested: true as const }) : result;
+  }
+
+  async #notarize(input: NotarizeInput): Promise<NotarizeResult> {
     const platform = this.#platform;
     if (platform === undefined) return rejected('PROOFS_UNAVAILABLE');
     const self = await this.#self();
@@ -490,6 +518,8 @@ export class ProofService implements RecordLookup {
         ...(input.chainId === undefined ? {} : { chain: chain.config.key }),
         // The approval covers this parent and no other (absent: the default zero).
         ...(parent === undefined ? {} : { parentRecordId: parent }),
+        // And this receipt request, or none (M1-33d): the card says what a receipt makes public.
+        ...(input.requestReceipt === true ? { requestReceipt: true } : {}),
       },
       context: {
         triggers: proofTriggers(pre.triggers),
@@ -545,6 +575,7 @@ export class ProofService implements RecordLookup {
       approvalId: claim === undefined ? null : (input.approvalId ?? null),
       claim,
       replaces: undefined,
+      receiptRequest: input.requestReceipt === true,
     });
     if (stored === undefined) return rejected('POLICY_CHANGED');
     return this.#submit(stored);
@@ -582,6 +613,8 @@ export class ProofService implements RecordLookup {
     readonly claim: ((tx: StoreTx) => boolean) | undefined;
     /** The row and ledger entry of the Record this one replaces (04 §5). */
     readonly replaces: { readonly recordId: string } | undefined;
+    /** Keep the sender's receipt-request marker with this Record (M1-33d). */
+    readonly receiptRequest?: boolean;
   }): Promise<Row<'proofs'> | undefined> {
     const { built } = input;
     const now = nowOf(this.#ctx);
@@ -600,6 +633,11 @@ export class ProofService implements RecordLookup {
       created_at: now,
     };
     const entryId = `led_${recordId.slice(2, 34)}`;
+    const requestKey = receiptRequestKey(input.envelopeId);
+    const requestSalt =
+      input.receiptRequest === true
+        ? await seal(this.#ctx, 'proofs', 'salt', [requestKey], '')
+        : undefined;
     try {
       await this.#ctx.store.transaction((tx) => {
         if (input.claim !== undefined && !input.claim(tx)) throw new Abort();
@@ -637,6 +675,24 @@ export class ProofService implements RecordLookup {
           tx.update('budget_ledger', { entry_id: entryId }, { replaces: replacedEntry });
         }
         tx.insert('proofs', row);
+        // The request travels in the `proof` envelope only, never in the signed item (M1-33d).
+        if (
+          requestSalt !== undefined &&
+          tx.get('proofs', { record_id: requestKey }) === undefined
+        ) {
+          tx.insert('proofs', {
+            record_id: requestKey,
+            envelope_id: input.envelopeId,
+            chain_id: row.chain_id,
+            record_json: '{}',
+            tx_hash: null,
+            status: RECEIPT_REQUEST,
+            fee_token: null,
+            fee_amount: null,
+            salt: requestSalt,
+            created_at: now,
+          });
+        }
       });
     } catch (error) {
       if (error instanceof Abort) return undefined;
@@ -780,6 +836,10 @@ export class ProofService implements RecordLookup {
       // D-107: the signed Record and its signature, exactly as submitted, so the recipient can
       // export a pack too. Only inside this end-to-end encrypted envelope (I-2, I-3).
       const item = parseJson(row.record_json) as unknown as SignedItem;
+      // M1-33d: the user's delivery receipt request, kept per envelope (a replacement keeps it).
+      const requested = await this.#ctx.store.transaction((tx) =>
+        senderRequestedTx(tx, row.envelope_id),
+      );
       const { built, row: envRow } = await envelopes.prepare({
         to: { contact: contactId },
         payload: {
@@ -791,6 +851,7 @@ export class ProofService implements RecordLookup {
             salt,
             record: item.record as never,
             signature: item.signature,
+            ...(requested ? { receiptRequest: 'delivered' as const } : {}),
           },
           replyTo: row.envelope_id,
           files: [],
@@ -1152,6 +1213,8 @@ export class ProofService implements RecordLookup {
       body.data.record === undefined || body.data.signature === undefined
         ? undefined
         : { record: body.data.record, signature: body.data.signature };
+    // The sender's request is its content (I-5): kept as a flag, never signs anything (M1-33d).
+    const request = body.data.receiptRequest === 'delivered' ? 'delivered' : undefined;
     const pendingKey = `${PENDING_PREFIX}${proofEnvelopeId}`;
     const check = await this.#checkRecord(
       contactId,
@@ -1213,23 +1276,30 @@ export class ProofService implements RecordLookup {
     const sealedSalt = await seal(this.#ctx, 'proofs', 'salt', [recordId], salt);
     const now = nowOf(this.#ctx);
     // The Record and signature exactly as received, after every check passed (04 §3.4, D-107).
-    const item: ReceivedItem =
-      signedItem === undefined ? { received: checked } : { received: checked, ...signedItem };
+    const item: ReceivedItem = {
+      received: checked,
+      ...(signedItem ?? {}),
+      ...(request === undefined ? {} : { receiptRequest: request }),
+    };
     await this.#ctx.store.transaction((tx) => {
       tx.delete('proofs', { record_id: pendingKey, status: PENDING });
       const existing = tx.get('proofs', { record_id: recordId });
       if (existing !== undefined) {
-        // An older sender's body stored first: a later body with the checked Record completes it.
+        // An older sender's body stored first: a later body with the checked Record completes it,
+        // keeping a request either body made (M1-33d).
+        const held = this.#receivedItem(existing);
         if (
           signedItem !== undefined &&
           existing.status === 'received' &&
           existing.envelope_id === envelopeId &&
-          this.#receivedItem(existing)?.record === undefined
+          held?.record === undefined
         ) {
+          const merged: ReceivedItem =
+            held?.receiptRequest === 'delivered' ? { ...item, receiptRequest: 'delivered' } : item;
           tx.update(
             'proofs',
             { record_id: recordId, status: 'received', record_json: existing.record_json },
-            { record_json: canonicalize(item as never) },
+            { record_json: canonicalize(merged as never) },
           );
         }
         return;
@@ -1715,6 +1785,9 @@ export class ProofService implements RecordLookup {
       )
     )[0];
     if (row === undefined) return rejected('NOT_RECORDED');
+    // The user's own yes (06 §2.4, §3; D-109): no owner approval, as for `opened`. #signReceipt
+    // signs at most one per record and type (I-6); a repeat returns the stored receipt.
+    if (input.type === 'delivered') return this.#signReceipt(row, 'DELIVERED');
     if (input.type === 'opened') return this.#signReceipt(row, 'OPENED');
 
     const type: ReceiptTypeName = input.type === 'accepted' ? 'ACCEPTED' : 'REJECTED';
