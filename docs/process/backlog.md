@@ -1986,7 +1986,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: with credits on one shipped chain only, a paid call uses that chain without any chain input; `agentlink_status` `prices` and `credits` follow the same selection; no chain name outside `advanced`.
 
 #### M1-26-d · owner decision: top-up link format (new, decided D-113)
-- **Status:** done (decided by the owner 2026-10-21, D-113; PR docs-d111-topup-link) · **Size:** XS · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** done (decided by the owner 2026-10-21, D-113; PR #336) · **Size:** XS · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/08 §1
 - **Depends on:** —
 - **Spec:** 08 §1; 06 §2.1 (`topUpUrl`), §2.4 (`needs_credits`)
