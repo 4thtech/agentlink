@@ -317,7 +317,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
       decision: 'accept',
       summary: withDisclosure(
         TERMS_TEXT.askAccept(3, '“Marko” (self-declared)'),
-        proofDisclosure(),
+        proofDisclosure('“Marko” (self-declared)'),
       ),
       nextStep: nextStepOf(APPROVAL),
     });
@@ -345,7 +345,9 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
           }),
       });
       const result = await respond({ envelopeId: ENVELOPE, decision: 'accept' }, client);
-      expect(result.structured.summary).toBe(withDisclosure(summary, proofDisclosure()));
+      expect(result.structured.summary).toBe(
+        withDisclosure(summary, proofDisclosure('“Marko” (self-declared)')),
+      );
     }
   });
 

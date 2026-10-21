@@ -14,7 +14,9 @@ describe('the user guide matches the 11 §5.6 strings', () => {
     expect(privacy).toContain(en['common.privacy.proof']);
     expect(privacy).toContain(en['common.privacy.topUp']);
     expect(privacy).toContain(en['common.privacy.export']);
-    expect(privacy).toContain('This is public: anyone can see that your agent opened');
+    expect(privacy).toContain(
+      en['common.privacy.receiptPublic'].replace('{receipt}', 'opened (accepted, rejected)'),
+    );
   });
   it('proof page: the proof string', () => {
     expect(guide('everyday-use/agreements-and-proof.md')).toContain(en['common.privacy.proof']);

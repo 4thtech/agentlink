@@ -123,12 +123,14 @@ export async function acknowledgeHandler(
             fields,
           );
     }
-    case 'pending_approval':
+    case 'pending_approval': {
+      const note = receiptDisclosure(type);
       return pendingApproval(
         context,
         result.approvalId,
-        withDisclosure(ACK_TEXT.approval, receiptDisclosure(type) ?? ''),
+        note === undefined ? ACK_TEXT.approval : withDisclosure(ACK_TEXT.approval, note),
       );
+    }
     case 'rejected':
       return refusal(result.code);
     default:

@@ -3,6 +3,7 @@
 import { restrictName, type AgentLinkClient } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import type { PendingRequest } from './pending.js';
+import { copy } from '../../tools/strings/index.js';
 import { cardFacts, cardLines } from './render.js';
 
 // Built from code points so the source holds no bidi or zero-width character.
@@ -99,6 +100,27 @@ describe('approval cards say what a proof or receipt makes public (M1-33b, 11 §
   it('shows the receipt line, and the export line', () => {
     expect(card('agentlink_acknowledge', { type: 'opened' })).toMatchSnapshot();
     expect(card('agentlink_export_proof_pack', { includeContentKey: true })).toMatchSnapshot();
+  });
+  it('uses the unnamed receipt line for a fallback label, never the label as a name', () => {
+    for (const who of ['Someone who is not in your contacts yet', 'No contact']) {
+      const lines = cardLines(
+        {
+          ...request,
+          action: { tool: 'agentlink_notarize', args: {} },
+        } as unknown as PendingRequest,
+        { ...facts, who },
+      );
+      expect(lines.join('\n')).toContain(copy('common.privacy.proofReceiptGeneric'));
+      expect(lines.join('\n')).not.toContain(`If ${who}`);
+    }
+  });
+  it('drops the receipt line for a note to yourself: there is no recipient', () => {
+    const lines = cardLines(
+      { ...request, action: { tool: 'agentlink_notarize', args: {} } } as unknown as PendingRequest,
+      { ...facts, who: 'You (a note to yourself)' },
+    );
+    expect(lines).toContain(copy('common.privacy.proof'));
+    expect(lines.join('\n')).not.toContain('confirms delivery');
   });
   it('adds nothing for a send without proof', () => {
     expect(card('agentlink_send', { text: 'hi' }).join('\n')).not.toContain('public');

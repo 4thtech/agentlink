@@ -35,6 +35,7 @@ import {
   askSummary,
   dateOf,
   nameOf,
+  oneLineName,
   termsApprovalState,
   termsCoreError,
   termsInProgress,
@@ -107,7 +108,10 @@ export async function respondToTermsHandler(
       return pendingApproval(
         context,
         result.approvalId,
-        withDisclosure(askSummary(result.card), proofDisclosure()),
+        withDisclosure(
+          askSummary(result.card),
+          proofDisclosure(oneLineName(result.card.counterparty.shown) || undefined),
+        ),
         { decision },
       );
     case 'rejected':

@@ -38,20 +38,27 @@ export const withDisclosure = (summary: string, disclosure: string): string =>
 
 /**
  * The disclosure lines for one approval card, by the stored action's tool and arguments. `who` is
- * the name-rule label of the contact. Empty when the action adds no proof and makes nothing public.
+ * the contact's name under the name rule; `undefined` when the card has no named contact (the
+ * receipt line then uses the unnamed form); `null` when there is no recipient (a note to yourself),
+ * which drops the receipt line. Empty when the action adds no proof and makes nothing public.
  */
+function cardProofLines(who: string | null | undefined): string[] {
+  const [first = ''] = proofLines();
+  return who === null ? [first] : proofLines(who);
+}
+
 export function cardDisclosure(
   tool: string,
   args: Readonly<Record<string, unknown>> | undefined,
-  who: string,
+  who: string | null | undefined,
 ): string[] {
   switch (tool) {
     case 'agentlink_notarize':
     case 'agentlink_propose_terms':
     case 'agentlink_respond_to_terms':
-      return proofLines(who);
+      return cardProofLines(who);
     case 'agentlink_send':
-      return args?.['notarize'] === true ? proofLines(who) : [];
+      return args?.['notarize'] === true ? cardProofLines(who) : [];
     case 'agentlink_acknowledge': {
       const line = receiptDisclosure(args?.['type']);
       return line === undefined ? [] : [line];

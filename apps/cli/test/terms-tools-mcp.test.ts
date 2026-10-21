@@ -457,7 +457,7 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
     const approvalId = asked.structured['approvalId'] as string;
     expect(asked.structured['nextStep']).toBe(approvalNextStep(approvalId, 'alice'));
     expect(asked.structured['summary']).toBe(
-      `Accepting “Bob” (self-declared)'s terms (version 2) commits you. One approval covers your acceptance and its proof. ${proofDisclosure()}`,
+      `Accepting “Bob” (self-declared)'s terms (version 2) commits you. One approval covers your acceptance and its proof. ${proofDisclosure('“Bob” (self-declared)')}`,
     );
     expect(asked.structured).not.toHaveProperty('url');
     expect(await outboundOfType(alice, 'accept')).toHaveLength(0);

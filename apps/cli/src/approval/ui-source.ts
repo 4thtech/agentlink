@@ -31,7 +31,7 @@ import {
   readRow,
   type PendingRequest,
 } from '../commands/owner/pending.js';
-import { cardFacts, type CardFacts } from '../commands/owner/render.js';
+import { cardFacts, recipientName, type CardFacts } from '../commands/owner/render.js';
 import { cardDisclosure } from '../tools/strings/privacy.js';
 
 /** Longest name and value shown for one AI argument (the server refuses longer). */
@@ -79,7 +79,9 @@ function ruleOf(action: JsonObject): string {
 /** 11 §5.6: what the proof or receipt makes public, fixed text chosen by the tool (never AI text). */
 function disclosureOf(action: JsonObject, facts: CardFacts): string[] {
   const tool = action['tool'];
-  return typeof tool === 'string' ? cardDisclosure(tool, asObject(action['args']), facts.who) : [];
+  return typeof tool === 'string'
+    ? cardDisclosure(tool, asObject(action['args']), recipientName(facts.who))
+    : [];
 }
 
 function fromAi(action: JsonObject): { name: string; value: string }[] {
