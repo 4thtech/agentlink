@@ -126,6 +126,8 @@ agentlink init --hook
 
 AgentLink shows you the exact change to `~/.claude/settings.json` and writes it only after you confirm. If you ask your AI to run it, it prints the change and a one-time code; you check the change and give the code back. A settings file that isn't valid is left alone.
 
+To turn it off, open `~/.claude/settings.json`, delete the AgentLink item under `SessionStart` (its command ends in `status --brief`) and restart Claude Code. You can instead copy back the backup AgentLink made next to the file, named `settings.json.agentlink-backup-` followed by a number; that also undoes any later change you made to the settings.
+
 To see what the note prints, run `agentlink status --brief` yourself.
 
 Next: [Pair with someone](pair-with-someone.md)

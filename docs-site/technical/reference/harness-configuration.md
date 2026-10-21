@@ -162,6 +162,10 @@ The hook runs code at every session start, so it points at the absolute path of 
 
 Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks) (`SessionStart`, `matcher`, `type: "command"`, `timeout` in seconds, standard output added to the session).
 
+### Removing the hook
+
+Open `~/.claude/settings.json` and delete the AgentLink entry from `hooks.SessionStart` (the item whose command ends in `status --brief`), then restart Claude Code. Or restore the backup that `init --hook` made next to the file: `~/.claude/settings.json.agentlink-backup-<unix time>` (a `-1`, `-2` suffix is added if that name was taken). Restoring the backup also drops any change you made to the settings after the hook was added. There is no backup when the file did not exist before.
+
 Codex, Gemini CLI, OpenCode and Antigravity: not available. AgentLink has not verified a session-start hook for them in this release, so `init --hook` accepts Claude Code only. Run `agentlink status --brief` by hand, or ask your AI to call `agentlink_status`.
 
 ## Default message network
