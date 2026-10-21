@@ -3,34 +3,38 @@ import { describe, expect, it } from 'vitest';
 import {
   TOP_UP_MAX_USD,
   TOP_UP_MIN_USD,
-  TOP_UP_PAY_HOST,
   TOP_UP_PRESETS_USD,
   buildTopUpLink,
   suggestTopUpUsd,
 } from './top-up-link.js';
 
 const A = `0x${'ab'.repeat(20)}`;
+/** The host is configuration the caller passes in (the chain package's PAY_PAGE); none is built in. */
+const TOP_UP_PAY_HOST = 'pay.example.test';
 
 describe('buildTopUpLink (D-113)', () => {
   it('puts everything in the fragment: https://{payHost}/#v=1&a=<address>&usd=<amount>', () => {
-    expect(buildTopUpLink({ agentAddress: A, usd: '10' })).toBe(
+    expect(buildTopUpLink({ agentAddress: A, usd: '10', payHost: TOP_UP_PAY_HOST })).toBe(
       `https://${TOP_UP_PAY_HOST}/#v=1&a=${A}&usd=10`,
     );
   });
 
   it('usd is optional', () => {
-    expect(buildTopUpLink({ agentAddress: A })).toBe(`https://${TOP_UP_PAY_HOST}/#v=1&a=${A}`);
-  });
-
-  it('the host comes from the config argument, with the shipped testing host as the default', () => {
-    expect(TOP_UP_PAY_HOST).toBe('pay.agentlink.4thtech.io');
-    expect(buildTopUpLink({ agentAddress: A, payHost: 'pay.example.test' })).toBe(
-      `https://pay.example.test/#v=1&a=${A}`,
+    expect(buildTopUpLink({ agentAddress: A, payHost: TOP_UP_PAY_HOST })).toBe(
+      `https://${TOP_UP_PAY_HOST}/#v=1&a=${A}`,
     );
   });
 
+  it('the host is the configuration the caller passes in, with no built-in default', () => {
+    expect(buildTopUpLink({ agentAddress: A, payHost: 'pay.other.test' })).toBe(
+      `https://pay.other.test/#v=1&a=${A}`,
+    );
+    // @ts-expect-error payHost is required: the core carries no host of its own
+    expect(buildTopUpLink({ agentAddress: A })).toBeUndefined();
+  });
+
   it('nothing but the address and the amount is in the link: no query, no network, no token', () => {
-    const url = buildTopUpLink({ agentAddress: A, usd: '25' }) ?? '';
+    const url = buildTopUpLink({ agentAddress: A, usd: '25', payHost: TOP_UP_PAY_HOST }) ?? '';
     expect(url).not.toContain('?');
     expect(url.split('#').length).toBe(2);
     expect(url).not.toMatch(/chain|network|token|usdc|key|seed/i);
@@ -48,7 +52,7 @@ describe('buildTopUpLink (D-113)', () => {
     ['trailing text', `${A}&x=1`],
     ['empty', ''],
   ])('refuses a bad agent address (%s)', (_name, bad) => {
-    expect(buildTopUpLink({ agentAddress: bad })).toBeUndefined();
+    expect(buildTopUpLink({ agentAddress: bad, payHost: TOP_UP_PAY_HOST })).toBeUndefined();
   });
 
   it.each([
@@ -71,13 +75,13 @@ describe('buildTopUpLink (D-113)', () => {
     '.5',
     '5.',
   ])('refuses a bad usd %j', (usd) => {
-    expect(buildTopUpLink({ agentAddress: A, usd })).toBeUndefined();
+    expect(buildTopUpLink({ agentAddress: A, usd, payHost: TOP_UP_PAY_HOST })).toBeUndefined();
   });
 
   it.each(['5', '5.5', '10', '25', '26', '99.99', String(TOP_UP_MAX_USD)])(
     'accepts usd %s',
     (usd) => {
-      expect(buildTopUpLink({ agentAddress: A, usd })).toBe(
+      expect(buildTopUpLink({ agentAddress: A, usd, payHost: TOP_UP_PAY_HOST })).toBe(
         `https://${TOP_UP_PAY_HOST}/#v=1&a=${A}&usd=${usd}`,
       );
     },
@@ -139,7 +143,11 @@ describe('suggestTopUpUsd (08 §1: the shortfall rounded up to the first preset,
     for (const s of ['0.1', '7', '30', '9999.5']) {
       const usd = suggestTopUpUsd(s);
       expect(usd).toBeDefined();
-      expect(buildTopUpLink({ agentAddress: A, ...(usd === undefined ? {} : { usd }) })).toContain(
+      expect(buildTopUpLink({
+          agentAddress: A,
+          payHost: TOP_UP_PAY_HOST,
+          ...(usd === undefined ? {} : { usd }),
+        })).toContain(
         `&usd=${usd}`,
       );
     }

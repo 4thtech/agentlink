@@ -21,7 +21,7 @@ import {
 import { createDeps } from '../src/commands/shared.js';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../src/dispatch.js';
 import type { AccountView } from '../src/tools/context.js';
-import { TOP_UP_PAY_HOST } from '@4thtech-io/core';
+import { PAY_PAGE, type PayPageConfig } from '@4thtech-io/chain';
 import { renderQr } from '../src/terminal/qr.js';
 import { copy } from '../src/tools/strings/index.js';
 import {
@@ -62,6 +62,10 @@ const quote = (usd: string): chain.FeeQuote => ({
   usd,
 });
 
+/** A live pay page for the tests of the link; the shipped PAY_PAGE is not live yet. */
+const LIVE: PayPageConfig = { host: 'pay.agentlink.4thtech.io', live: true };
+const TOP_UP_PAY_HOST = LIVE.host;
+
 const needs = (agentId: string): chain.ChainSelection => ({
   status: 'needs_credits',
   topUp: {
@@ -80,7 +84,7 @@ function setup(
     account?: AccountView | undefined | 'throw';
     topUp?: TopUpCheck;
     proofs?: boolean;
-    payHost?: string;
+    payPage?: PayPageConfig;
     browser?: boolean | 'throw';
   } = {},
 ) {
@@ -114,7 +118,7 @@ function setup(
       return (options.topUp ?? (() => Promise.resolve(undefined)))(agentId);
     },
     testnetOnly: () => true,
-    ...(options.payHost === undefined ? {} : { payHost: options.payHost }),
+    payPage: options.payPage ?? LIVE,
     openBrowser: (url: string) => {
       opened.push(url);
       if (options.browser === 'throw') return Promise.reject(new Error('no browser'));
@@ -254,7 +258,7 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
   it('the link host comes only from the config dependency; a bad host prints no link and opens nothing', async () => {
     const custom = setup({
       topUp: (agentId) => Promise.resolve(needs(agentId)),
-      payHost: 'pay.example.test',
+      payPage: { host: 'pay.example.test', live: true },
     });
     const r1 = await custom.run(['credits', '--topup']);
     expect(r1.text).toContain(`https://pay.example.test/#v=1&a=${AGENT_ID}&usd=5`);
@@ -262,12 +266,71 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
 
     const bad = setup({
       topUp: (agentId) => Promise.resolve(needs(agentId)),
-      payHost: 'https://evil.test/x',
+      payPage: { host: 'https://evil.test/x', live: true },
     });
     const r2 = await bad.run(['credits', '--topup']);
     expect(r2.text).not.toContain('evil.test');
     expect(r2.text).not.toMatch(/https?:\/\//);
     expect(bad.opened).toEqual([]);
+  });
+
+  it('opens the browser only on an interactive terminal outside an AI app (M-2)', async () => {
+    const link = `#v=1&a=${AGENT_ID}`;
+    // A harness that gives commands a pty: stdout is a terminal but stdin is not.
+    const ptyOnly = setup({ topUp: (id) => Promise.resolve(needs(id)) });
+    const r1 = await ptyOnly.run(['credits', '--topup'], {
+      stdinIsTTY: false,
+      stdoutIsTTY: true,
+      env: {},
+    });
+    expect(ptyOnly.opened).toEqual([]);
+    expect(r1.text).toContain(link);
+    // Both are terminals but an AI app marked the environment.
+    const marked = setup({ topUp: (id) => Promise.resolve(needs(id)) });
+    await marked.run(['credits', '--topup'], { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } });
+    expect(marked.opened).toEqual([]);
+  });
+
+  it('never opens the browser when the balance is enough or the check failed (M-2)', async () => {
+    const enough = setup({
+      topUp: () =>
+        Promise.resolve({
+          status: 'ok',
+          chainId: 84532,
+          chain: 'base-sepolia',
+          token: 'USDC',
+          payFrom: 'credits',
+          quote: quote('0.1'),
+          reason: 'cheapest',
+          unavailable: [],
+        }),
+    });
+    await enough.run(['credits', '--topup']);
+    expect(enough.opened).toEqual([]);
+    const failed = setup({
+      topUp: () => Promise.resolve({ status: 'unavailable', unavailable: [84532] }),
+    });
+    await failed.run(['credits', '--topup']);
+    expect(failed.opened).toEqual([]);
+  });
+
+  it('the shipped pay page is not live: no link, no QR, no browser, an honest line (M-3)', async () => {
+    for (const payPage of [PAY_PAGE, { host: LIVE.host, live: false }]) {
+      const t = setup({ topUp: (id) => Promise.resolve(needs(id)), payPage });
+      const r = await t.run(['credits', '--topup']);
+      expect(r.code).toBe(EXIT_OK);
+      expect(r.text).toContain('Add at least $1.00 in credits to add proof ($0.10 each).');
+      expect(r.text).toContain(CREDITS_TEXT.topUpNotLive);
+      expect(r.text).not.toMatch(/https?:\/\/|#v=1|\u2588/);
+      expect(r.text).not.toContain(copy('common.privacy.topUp'));
+      expect(t.opened).toEqual([]);
+    }
+  });
+
+  it('the shipped config in the real handler deps is not live', async () => {
+    const { nodeCreditsDeps } = await import('../src/commands/credits.js');
+    expect(nodeCreditsDeps().payPage).toBe(PAY_PAGE);
+    expect(nodeCreditsDeps().payPage.live).toBe(false);
   });
 
   it('with enough credits there is no suggested amount; no key, recovery code or card is ever asked for', async () => {

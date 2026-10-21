@@ -16,6 +16,7 @@ import type {
   RespondToTermsInput,
   SendMessageInput,
 } from '@4thtech-io/core';
+import { PAY_PAGE } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
 import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
@@ -289,21 +290,31 @@ function fake(options: FakeOptions = {}): { client: ToolClient; calls: Calls } {
   return { client, calls };
 }
 
-function context(client: ToolClient): ToolContext {
+/** A pay page that is live (the shipped config is not live yet, so most link tests opt in). */
+const LIVE_PAY = { host: 'pay.agentlink.4thtech.io', live: true } as const;
+
+function context(client: ToolClient, over: Partial<ToolContext> = {}): ToolContext {
   return {
     client,
+    payPage: LIVE_PAY,
     clock: () => 1_760_600_000,
     logger: createLogger({ level: 'debug', sink: () => undefined }),
     agentName: 'default',
     approvalNextStep: (id) =>
       `Tell the user: Approval needed. In your own terminal, run \`agentlink approve ${id}\`. Your AI can't approve this for you. After they approve, call the same tool again with approvalId.`,
     urlOrigins: [],
+    ...over,
   };
 }
 
 const all: FinishedResult[] = [];
-async function call(name: string, input: Record<string, unknown>, client: ToolClient) {
-  const r = await callTool(name, input, context(client));
+async function call(
+  name: string,
+  input: Record<string, unknown>,
+  client: ToolClient,
+  over: Partial<ToolContext> = {},
+) {
+  const r = await callTool(name, input, context(client, over));
   all.push(r);
   // Every structured result matches the tool's own output schema (06 §1 rule 3).
   const tool = findTool(name);
@@ -406,6 +417,41 @@ describe('agentlink_notarize (06 §2.4)', () => {
     const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
     expect(r.structured['topUpUrl']).toBe(linkFor('25'));
     expect(dump(r)).not.toContain('evil.example.test');
+  });
+
+  it('the shipped config is not live: no link anywhere, no top-up promise (M1-26-e)', async () => {
+    const route = {
+      chainId: 84532,
+      chain: 'base-sepolia',
+      token: 'USDC',
+      usd: '1.00',
+      feeUsd: '0.10',
+      agentAddress: A as `0x${string}`,
+    };
+    const { client } = fake({ notarize: () => ({ status: 'needs_credits', topUp: route }) });
+    // `payPage: PAY_PAGE` is what the product ships with.
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client, {
+      payPage: PAY_PAGE,
+    });
+    expect(r.structured.status).toBe('needs_credits');
+    expect(r.structured['agentAddress']).toBe(A);
+    expect(r.structured['topUpUrl']).toBeUndefined();
+    expect(dump(r)).not.toMatch(/https?:\/\/|pay\.agentlink|#v=1/);
+    expect(r.structured.nextStep).toContain('not available yet');
+    expect(r.structured.nextStep).not.toContain(copy('common.privacy.topUp'));
+    expect(dump(r)).not.toMatch(/wallet|\bgas\b|transaction|USDC|sepolia/i);
+
+    // The same when the context says nothing about the pay page (the shipped default).
+    const r2 = await callTool('agentlink_notarize', { envelopeId: ENVELOPE }, {
+      ...context(client),
+      payPage: undefined,
+    } as ToolContext);
+    expect(r2.structured['topUpUrl']).toBeUndefined();
+
+    // A stored needs_credits proof and the status call follow the same rule.
+    const status = await call('agentlink_status', {}, fake().client, { payPage: PAY_PAGE });
+    expect(status.structured['topUpUrl']).toBeUndefined();
+    expect(status.structured['agentAddress']).toBe(A);
   });
 
   it('an offer, accept or reject envelope → USE_TERMS_TOOLS, and nothing else runs (D-55)', async () => {
