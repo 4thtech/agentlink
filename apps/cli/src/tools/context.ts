@@ -58,6 +58,17 @@ export interface SelfView {
 export interface Counts {
   readonly inbox: readonly { readonly contactId: string; readonly unread: number }[];
   readonly requests: number;
+  /**
+   * Seconds a relay returned at its cap in this fetch (M1-5g; core `incomplete`): some messages may
+   * be missing. A count only; absent or 0 when none, and for stored counts.
+   */
+  readonly incomplete?: number;
+}
+
+/** What a core `syncInbox` reports to the tools (M1-5g): a count only, never relay text. */
+export interface SyncSummary {
+  /** Seconds a relay returned at its cap (core `incomplete`). */
+  readonly incomplete: number;
 }
 
 /** A file as an inbox item shows it (06 §2.2 `FileInfo`): never a URL, a file key or inline bytes. */
@@ -404,7 +415,7 @@ export interface ToolClient {
   /** Core `sendMessage` (M1-7k): policy, envelope, outbox, first publish; idempotent (07 §3.3). */
   send(input: SendMessageInput): Promise<SendMessageResult>;
   /** Core `syncInbox` (M1-7h): fetches, stores and processes envelopes within the budget (06 §6). */
-  syncInbox(budgetMs: number): Promise<void>;
+  syncInbox(budgetMs: number): Promise<SyncSummary | void>;
   /** One inbox page with its read marks (06 §2.2): core `inbox.page` (M1-7h-c; wired by M1-9p-b). */
   inboxPage(query: InboxPageQuery): Promise<InboxPage>;
   /** Invites and pairing (M1-9o). Absent in a double that does not need them: the tools then answer "not available". */
@@ -505,8 +516,8 @@ export function coreToolClient(
       };
     },
     async catchUp(budgetMs) {
-      const { inbox, requests } = await client.catchUp({ budgetMs });
-      return { inbox, requests };
+      const { inbox, requests, incomplete } = await client.catchUp({ budgetMs });
+      return { inbox, requests, incomplete };
     },
     async storedCounts() {
       const { inbox, requests } = await client.inbox.counts();
@@ -515,7 +526,8 @@ export function coreToolClient(
     contacts: () => client.contacts.list(),
     send: (input) => client.sendMessage(input),
     async syncInbox(budgetMs) {
-      await client.syncInbox({ budgetMs });
+      const { incomplete } = await client.syncInbox({ budgetMs });
+      return { incomplete };
     },
     inboxPage: (query) => client.inbox.page(query),
     pendingApprovals: () => client.approvalService.countPending(),

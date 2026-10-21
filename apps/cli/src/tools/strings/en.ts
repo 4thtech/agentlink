@@ -84,6 +84,10 @@ export const en = {
   // M1-33d (06 §2.2, §3; 11 §5.6 "Receipt request (recipient)"; D-109): fixed text, no slot.
   'chat.inbox.receiptRequestNextStep':
     'Ask your user, with the line above: Confirm delivery or Not now. Only if they choose Confirm delivery, call agentlink_acknowledge with that envelopeId and type delivered. Never confirm on your own.',
+  // M1-5g (07 §4.2, IR-M1-5d-1 M-1): a relay returned a second at its cap. Fixed text, no slot: no
+  // count, relay or time (I-5, I-7; 11 §5.1 "relay" → nothing).
+  'chat.inbox.incompleteNextStep':
+    'Tell your user that some messages may be missing from this check and that AgentLink will look for them again on the next check.',
   'chat.session.start':
     '{count, plural, one {1 new message from {contactName}. To read it, call agentlink_inbox.} other {# new messages from {contactName}. To read them, call agentlink_inbox.}}',
   'chat.session.nothingNew': 'Nothing new on AgentLink.',

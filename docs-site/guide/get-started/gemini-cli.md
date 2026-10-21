@@ -56,4 +56,8 @@ This is a guard that matches command text. It can be bypassed. The [technical re
 
 Source: [Gemini CLI policy engine](https://geminicli.com/docs/reference/policy-engine/) (`[[rule]]`, `toolName`, `commandPrefix`, `decision`, `priority` and `denyMessage` as shown there).
 
+## A start-of-session note
+
+The optional start-of-session note (`agentlink init --hook`) is not available for Gemini CLI yet. Run `agentlink status --brief` yourself to see the same counts.
+
 Next: [Pair with someone](pair-with-someone.md)

@@ -12,6 +12,12 @@
 //   then send EOSE. So a relay is read in pages (`limit`, `until`) walking back to `since`, and the
 //   cursor moves only after the last page. A pass that stops early saves the page it reached
 //   (optional `setResume`), and the next pass continues there, so a flood of junk cannot stall it.
+// - Gaps (M1-5d, 07 §4.2): Nostr pages only by whole seconds, so a relay that holds more than its
+//   cap of events in one second cannot return the rest of that second. A page at `until` = T that
+//   holds only events at T, at least MIN_GAP_EVENTS and at least as many as any page of the walk
+//   (a relay's cap is at least that), reports T as a gap with a fixed reason. The walk goes on and
+//   the cursor still moves: reading the relay again cannot fetch that second, and the wraps are sent
+//   to every relay of the list.
 // - Cursor (07 §4.2): per relay, `last_seen` is the local time the pass started, written only after
 //   the relay reached EOSE and every event of the pass was handled. The next REQ asks for
 //   `since = last_seen - 48 h - S` (NIP-59 randomises wrap times by up to 2 days; S = 300 s, 04 §2.5.1),
@@ -73,6 +79,11 @@ export const MAX_NEW_WRAPS_PER_PASS = 2_000;
 export const MAX_LIVE_NEW_WRAPS_PER_MINUTE = 600;
 /** Stored events asked for per page (strfry's own default result cap is 500). */
 export const SYNC_PAGE_LIMIT = 500;
+/**
+ * Fewest events a page at one second must hold before that second is reported as a gap (M1-5d): a
+ * relay that returns a single event per filter is not treated as capped.
+ */
+export const MIN_GAP_EVENTS = 2;
 /** Pages one relay may take in a pass (about 50 000 events at the page limit). */
 export const MAX_PAGES_PER_PASS = 100;
 /** A saved page position older than this is not resumed. */
@@ -198,9 +209,30 @@ export interface SyncRelayResult {
   readonly reason: SyncRelayReason;
 }
 
+/** Why a second of a relay may not have been read in full. A fixed set: relay text never reaches a caller. */
+export type SyncGapReason = 'relay_cap';
+
+/**
+ * A second (`created_at`) a relay may hold more events in than it returns for one filter (M1-5d,
+ * 07 §4.2). Nostr pages only by whole seconds, so the rest of that second cannot be fetched from
+ * that relay; the same wraps are usually on the other relays of the list. Reading the relay again
+ * does not help, so a gap neither holds the cursor nor makes the pass partial.
+ */
+export interface SyncGap {
+  readonly relay: string;
+  /** The second (Unix seconds, a wrap's randomised `created_at`), never a time the wrap was sent. */
+  readonly second: number;
+  readonly reason: SyncGapReason;
+}
+
 export interface SyncResult {
   /** True when any relay did not complete (budget, failure, retry): more may be waiting. */
   readonly partial: boolean;
+  /**
+   * Seconds that may not have been read in full on one relay (M1-5d). Omitted or empty: none. At
+   * most MAX_PAGES_PER_PASS per relay.
+   */
+  readonly gaps?: readonly SyncGap[];
   /** Items handed to the handler and reported processed. */
   readonly delivered: number;
   /** Wraps skipped because they were seen (any relay, this or an earlier pass). */
@@ -325,6 +357,8 @@ interface Run {
   readonly hooks: Set<() => void>;
   /** Event tasks still running (handler calls, cursor writes), so a stop can wait for them. */
   readonly tasks: Set<Promise<void>>;
+  /** sync(): seconds a relay may hold more events in than it returned (M1-5d). Live runs log them. */
+  readonly gaps: SyncGap[];
 }
 
 interface RelayOutcome {
@@ -408,6 +442,7 @@ export class SyncEngine {
       status: (outcomes[i] as RelayOutcome).status,
       reason: (outcomes[i] as RelayOutcome).reason,
     }));
+    const gaps = [...run.gaps];
     const partial = results.some((r) => r.status !== 'complete');
     this.logger?.info('sync pass', {
       relays: results.length,
@@ -416,8 +451,9 @@ export class SyncEngine {
       duplicates: run.counters.duplicates,
       dropped: run.counters.dropped,
       deferred: run.counters.deferred,
+      gaps: gaps.length,
     });
-    return { partial, ...run.counters, relays: results };
+    return { partial, ...run.counters, gaps, relays: results };
   }
 
   /**
@@ -485,6 +521,7 @@ export class SyncEngine {
       stopReason: 'stopped',
       hooks: new Set(),
       tasks: new Set(),
+      gaps: [],
     };
   }
 
@@ -611,6 +648,10 @@ export class SyncEngine {
       // that ignores `until`)?
       let sawAtUntil = false;
       let sawNewer = false;
+      // Events of this page inside the window and at or below its `until` (repeats included), and
+      // the most any page of this walk returned: a relay's cap is at least that (M1-5d).
+      let pageCount = 0;
+      let maxPageCount = 0;
       let pages = 1;
       let eosePending = false;
       const pageRequest = (): string =>
@@ -691,8 +732,18 @@ export class SyncEngine {
         // it returns per filter, newest first, so a second that holds at least the cap returns the
         // same events again for `until` = that second (H-1b): step below it, giving up only the
         // overflow of that one second. If an event lies above `until`, the relay ignores `until`:
-        // stop. Residual limit: more events than the relay's cap within one single second cannot
-        // all be fetched (Nostr has no sub-second paging).
+        // stop. More events than the relay's cap within one single second cannot all be fetched
+        // (Nostr has no sub-second paging): that second is reported as a gap (M1-5d).
+        maxPageCount = Math.max(maxPageCount, pageCount);
+        if (
+          pageUntil !== undefined &&
+          !sawNewer &&
+          (pageOldest === undefined || pageOldest === pageUntil) &&
+          pageCount >= MIN_GAP_EVENTS &&
+          pageCount >= maxPageCount
+        ) {
+          this.reportGap(relay, run, pageUntil);
+        }
         const next = ((): { until: number; skip: readonly string[] } | undefined => {
           if (sawNewer) return undefined;
           if (pageOldest !== undefined) {
@@ -722,6 +773,7 @@ export class SyncEngine {
           pageOldestIds = [];
           sawAtUntil = false;
           sawNewer = false;
+          pageCount = 0;
           pages += 1;
           eosePending = false;
           subId = newSubId();
@@ -792,6 +844,7 @@ export class SyncEngine {
               skipIds.has(event.id)
             ) {
               sawAtUntil = true;
+              pageCount += 1; // the relay's cap counts it
               return; // the repeat of the previous page's last second
             }
             frames += 1;
@@ -811,6 +864,14 @@ export class SyncEngine {
               if (typeof at === 'number' && pageUntil !== undefined) {
                 if (at > pageUntil) sawNewer = true;
                 else if (at === pageUntil) sawAtUntil = true;
+              }
+              if (
+                typeof at === 'number' &&
+                Number.isSafeInteger(at) &&
+                at >= since &&
+                (pageUntil === undefined || at <= pageUntil)
+              ) {
+                pageCount += 1;
               }
               if (
                 typeof at === 'number' &&
@@ -1024,6 +1085,18 @@ export class SyncEngine {
     } catch {
       return undefined; // an unreadable position: start from the newest page
     }
+  }
+
+  /**
+   * A second this relay may hold more events in than it returned (M1-5d). sync() returns it; a live
+   * run logs it by host only, never the second (it is a wrap's created_at).
+   */
+  private reportGap(relay: string, run: Run, second: number): void {
+    if (run.live) {
+      this.logger?.warn('relay second over cap', { host: host(relay) });
+      return;
+    }
+    run.gaps.push({ relay, second, reason: 'relay_cap' });
   }
 
   private async safeSetResume(relay: string, resume: SyncResume | undefined): Promise<void> {

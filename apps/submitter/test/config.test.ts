@@ -1,7 +1,16 @@
 // M1-10a: the submitter's settings (07 §7, 05 §3.3; FA-1). Defaults are the spec's; each override is
 // bounded; anything invalid makes readConfig return null, and the Worker fails closed. Runs in Node.
 import { describe, expect, it } from 'vitest';
-import { DEFAULTS, FAUCET_DEFAULTS, readConfig, readFaucetConfig } from '../src/config.js';
+import type { Hex } from '@4thtech-io/chain';
+import {
+  DEFAULTS,
+  FAUCET_DEFAULTS,
+  pinnedFaucet,
+  readConfig,
+  readFaucetAddress,
+  readFaucetConfig,
+} from '../src/config.js';
+import { FakeFaucet } from './fake-faucet.js';
 
 // A synthetic IP-bucket key (32 bytes of 0x5a, base64url), only to run the parser.
 const IP_KEY = 'WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo';
@@ -147,5 +156,43 @@ describe('readFaucetConfig', () => {
       { ...base, SUBMITTER_FAUCET_IP_REQUESTS_PER_HOUR: '1.5' },
     ];
     for (const env of bad) expect(readFaucetConfig(env), JSON.stringify(env)).toBeNull();
+  });
+});
+
+// M1-10b-b: faucet key separation across environments. Each environment pins its own faucet
+// wallet's public address in wrangler.toml (SUBMITTER_FAUCET_ADDRESS_<chainId>), and the Worker
+// serves the faucet only from a key of that address. test/smoke-config.test.ts asserts that staging
+// and production pin different addresses, so the two configs cannot share a faucet key.
+describe('the pinned faucet wallet', () => {
+  const PINNED = `0x${'fa'.repeat(20)}` as Hex;
+
+  it('reads a lowercase address per chain; anything else is no pin', () => {
+    expect(readFaucetAddress({ SUBMITTER_FAUCET_ADDRESS_84532: PINNED }, 84532)).toBe(PINNED);
+    expect(readFaucetAddress({}, 84532)).toBeNull();
+    for (const bad of [
+      '',
+      PINNED.toUpperCase(),
+      `0x${'FA'.repeat(20)}`,
+      `0x${'fa'.repeat(19)}`,
+      `0x${'fa'.repeat(32)}`,
+      `0x${'0'.repeat(40)}`,
+      PINNED.slice(2),
+      ` ${PINNED}`,
+    ]) {
+      expect(readFaucetAddress({ SUBMITTER_FAUCET_ADDRESS_84532: bad }, 84532), bad).toBeNull();
+    }
+    expect(readFaucetAddress({ SUBMITTER_FAUCET_ADDRESS_84532: 42 }, 84532)).toBeNull();
+  });
+
+  it('serves a faucet wallet only when its address is the pinned one', () => {
+    const env = { SUBMITTER_FAUCET_ADDRESS_84532: PINNED };
+    const right = new FakeFaucet(84532, PINNED);
+    expect(pinnedFaucet(env, 84532, right)).toBe(right);
+    const wrong = new FakeFaucet(84532, `0x${'fb'.repeat(20)}` as Hex);
+    expect(pinnedFaucet(env, 84532, wrong)).toBeNull();
+    expect(pinnedFaucet({}, 84532, right)).toBeNull();
+    expect(pinnedFaucet(env, 84532, null)).toBeNull();
+    // A pin for another chain does not count.
+    expect(pinnedFaucet({ SUBMITTER_FAUCET_ADDRESS_10200: PINNED }, 84532, right)).toBeNull();
   });
 });

@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Tests read tokens.css as text (`?raw`); the default config would replace it with "".
+    css: { include: [/.+/] },
     testTimeout: 20_000,
   },
 });
