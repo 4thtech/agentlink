@@ -3729,7 +3729,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
 
 #### M1-13b · prompt-injection suite
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · e2e/prompt-injection/
 - **Depends on:** M1-9c, M1-9p, M1-9q, M1-21
 - **Spec:** 06 §4, §9; 04 I-5, §7
@@ -3742,7 +3742,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The LLM report is reviewed before the M1a dogfood starts (M1-23).
 
 #### M1-13d · prompt-injection suite: file and proof tools (new, split from M1-13b)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/prompt-injection/
 - **Depends on:** M1-13b, M1-9d
 - **Spec:** 06 §4, §9; 04 I-5, §4, §7
