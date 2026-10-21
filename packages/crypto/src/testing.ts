@@ -26,7 +26,12 @@ import {
 import { argon2idRaw, type Argon2idParams } from './argon2.js';
 import { bip340PublicKey, bip340Sign } from './bip340.js';
 import { assertBytes, equalBytes } from './bytes.js';
-import { dropAuthEvent, encodeDropAuthorization, type DropAuthRequest } from './drop-auth.js';
+import {
+  dropAuthEvent,
+  encodeDropAuthorization,
+  verifyDropAuthorization,
+  type DropAuthRequest,
+} from './drop-auth.js';
 import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
 import { signTypedData, type TypedData } from './eip712.js';
 import { CryptoInputError } from './errors.js';
@@ -63,6 +68,7 @@ import {
 import type { AgentCard } from './agent-card.js';
 import { cardPopSnapshot, signCardPop as signCardPopWithKey } from './card-pop.js';
 import {
+  DROP_REQUEST_REFUSED,
   dropRequestEpoch,
   dropRequestSnapshot,
   signDropRequest as signDropRequestWithKey,
@@ -905,4 +911,268 @@ export class MemoryOwnerKeyStore implements OwnerKeyStore {
       wipe(this.#seed, this.#presenceBytes);
     }
   }
+}
+
+// --- M1-1g-h: the shared KeyStore conformance suite (04 §2.1, §3.1.1; 07 §5.4) -------------------
+//
+// One set of epoch and drop-request cases that every KeyStore backend runs: MemoryKeyStore in this
+// package (keystore-conformance.test.ts) and the keychain KeyStore and its facade in packages/node
+// (keystore-conformance.test.ts). A new backend (the passphrase file, M1-8f) adds one harness. The
+// suite takes the test runner's `describe` and `it` and asserts with plain errors, so this file
+// imports no test framework. Assertion messages name cases and codes only, never key material.
+
+/** A KeyStore backend as the conformance suite drives it. */
+export interface KeyStoreConformanceBackend {
+  /** The backend's name in the test titles. */
+  readonly name: string;
+  /** The 32-byte master seed the stores it opens hold (the expected keys derive from it). */
+  readonly seed: Uint8Array;
+  /**
+   * A fresh store over `seed` whose current key epoch is `epoch`, reached the way the backend
+   * reaches it (an owner advance, or the epoch recorded for the agent). The suite closes it.
+   */
+  open(epoch: number): Promise<KeyStore>;
+}
+
+/** The two test-runner functions the suite needs (Vitest's `describe` and `it` fit). */
+export interface ConformanceRunner {
+  readonly describe: (name: string, fn: () => void) => void;
+  readonly it: (name: string, fn: () => Promise<void>) => void;
+}
+
+/** The current epoch the suite opens stores at, so two older epochs are retained. */
+export const CONFORMANCE_EPOCH = 2;
+
+const CONFORMANCE_TS = 1_790_000_000;
+const CONFORMANCE_NONCE = 'IQmYQx-k6oKFW4qJwstHFw';
+const CONFORMANCE_OBJECT = 'ZWOMpLAsUhfSBVsghbLRDw';
+
+function conformanceRequests(): { upload: DropAuthRequest; del: DropAuthRequest } {
+  const json = (value: unknown): Uint8Array => encodeUtf8(JSON.stringify(value));
+  return {
+    upload: {
+      method: 'POST',
+      url: 'https://drop.agentlink.4thtech.io/v1/upload',
+      body: json({
+        v: 1,
+        size: 20000,
+        expiresAt: CONFORMANCE_TS + 86_400,
+        nonce: CONFORMANCE_NONCE,
+        ts: CONFORMANCE_TS,
+      }),
+    },
+    del: {
+      method: 'DELETE',
+      url: `https://drop.agentlink.4thtech.io/v1/o/${CONFORMANCE_OBJECT}`,
+      body: json({
+        v: 1,
+        objectId: CONFORMANCE_OBJECT,
+        nonce: CONFORMANCE_NONCE,
+        ts: CONFORMANCE_TS,
+      }),
+    },
+  };
+}
+
+function conformanceCheck(ok: boolean, what: string): void {
+  if (!ok) throw new Error(`KeyStore conformance: ${what}`);
+}
+
+async function conformanceOutcome(fn: () => Promise<unknown>): Promise<unknown> {
+  try {
+    await fn();
+  } catch (error) {
+    return error;
+  }
+  return 'accepted';
+}
+
+const codeOfError = (error: unknown): unknown =>
+  typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : error;
+
+const messageOfError = (error: unknown): unknown =>
+  error instanceof Error ? error.message : undefined;
+
+function dropKeyHex(seed: Uint8Array, epoch: number): string {
+  const key = derivePublicKey(seed, KEY_LABELS.drop, epoch);
+  if (key.label !== KEY_LABELS.drop) throw new Error('unreachable');
+  return encodeHex(key.publicKey);
+}
+
+/** The `pubkey` of a signed drop Authorization header, or undefined when it does not verify. */
+function verifiedDropKey(authorization: string, request: DropAuthRequest): string | undefined {
+  const verified = verifyDropAuthorization(authorization, request, CONFORMANCE_TS);
+  return verified.ok && verified.createdAt === CONFORMANCE_TS ? verified.pubkey : undefined;
+}
+
+/**
+ * Registers the shared epoch and drop-request cases for one backend (M1-1g-h). Each case opens its
+ * own store at CONFORMANCE_EPOCH and closes it.
+ */
+export function runKeyStoreConformance(
+  backend: KeyStoreConformanceBackend,
+  runner: ConformanceRunner,
+): void {
+  const { upload, del } = conformanceRequests();
+  const seed = backend.seed;
+  const current = CONFORMANCE_EPOCH;
+
+  async function withStore(fn: (store: KeyStore) => Promise<void>): Promise<void> {
+    const store = await backend.open(current);
+    try {
+      await fn(store);
+    } finally {
+      await store.close();
+    }
+  }
+
+  /** The one fixed drop-request refusal (`invalid_argument`, DROP_REQUEST_REFUSED). */
+  function expectFixedRefusal(error: unknown, what: string): void {
+    conformanceCheck(codeOfError(error) === 'invalid_argument', `${what}: invalid_argument`);
+    conformanceCheck(messageOfError(error) === DROP_REQUEST_REFUSED, `${what}: the fixed message`);
+  }
+
+  runner.describe(`${backend.name}: KeyStore conformance, epochs and drop requests (M1-1g-h)`, () => {
+    runner.it('getPublicBundle: the current epoch by default, a retained one on request, never one above', async () => {
+      await withStore(async (store) => {
+        const bundle = await store.getPublicBundle();
+        conformanceCheck(bundle.keyEpoch === current, 'the current epoch');
+        for (let epoch = 0; epoch <= current; epoch += 1) {
+          const at = await store.getPublicBundle({ epoch });
+          const expected = derivePublicIdentity(seed, epoch);
+          conformanceCheck(at.keyEpoch === epoch, `the bundle of epoch ${String(epoch)}`);
+          conformanceCheck(
+            equalBytes(at.agentNostr, expected.agentNostr),
+            `the Nostr key of epoch ${String(epoch)}`,
+          );
+        }
+        const above = await conformanceOutcome(() => store.getPublicBundle({ epoch: current + 1 }));
+        conformanceCheck(codeOfError(above) === 'epoch_unavailable', 'an epoch above the current');
+      });
+    });
+
+    runner.it('signDropRequest: an upload signs with the current-epoch drop key, never the Nostr identity key', async () => {
+      await withStore(async (store) => {
+        const pubkey = verifiedDropKey(await store.signDropRequest(upload, CONFORMANCE_TS), upload);
+        conformanceCheck(pubkey === dropKeyHex(seed, current), 'the current-epoch drop key');
+        const bundle = await store.getPublicBundle();
+        conformanceCheck(pubkey !== encodeHex(bundle.agentNostr), 'not the Nostr identity key');
+      });
+    });
+
+    runner.it('a DELETE with {epoch: n} verifies and carries the epoch-n drop key, for every retained epoch', async () => {
+      await withStore(async (store) => {
+        for (let epoch = 0; epoch <= current; epoch += 1) {
+          const authorization = await store.signDropRequest(del, CONFORMANCE_TS, { epoch });
+          conformanceCheck(
+            verifiedDropKey(authorization, del) === dropKeyHex(seed, epoch),
+            `the DELETE drop key of epoch ${String(epoch)}`,
+          );
+        }
+      });
+    });
+
+    runner.it('without an epoch (or with epoch undefined) it signs with the current epoch', async () => {
+      await withStore(async (store) => {
+        const want = dropKeyHex(seed, current);
+        const cases: [DropAuthRequest, EpochOptions | undefined][] = [
+          [del, undefined],
+          [upload, {}],
+          [upload, { epoch: undefined } as never],
+          [del, { epoch: undefined } as never],
+        ];
+        for (const [request, options] of cases) {
+          const authorization = await store.signDropRequest(request, CONFORMANCE_TS, options);
+          conformanceCheck(verifiedDropKey(authorization, request) === want, 'the current epoch');
+        }
+      });
+    });
+
+    runner.it('refuses a POST with an epoch, and a malformed epoch or options, with the fixed error before any key is read', async () => {
+      const store = await backend.open(current);
+      // A closed store fails with keystore_closed once it touches its seed, so the fixed refusal
+      // shows each request was refused before that.
+      await store.close();
+      const cases: [string, DropAuthRequest, unknown][] = [
+        ['a POST with an older epoch', upload, { epoch: 0 }],
+        ['a POST with the current epoch', upload, { epoch: current }],
+        ['a POST with an epoch above the current one', upload, { epoch: current + 1 }],
+        ['a negative epoch', del, { epoch: -1 }],
+        ['a fractional epoch', del, { epoch: 0.5 }],
+        ['a NaN epoch', del, { epoch: Number.NaN }],
+        ['an epoch above 2^32 - 1', del, { epoch: 2 ** 32 }],
+        ['an epoch as text', del, { epoch: '0' }],
+        ['null options', del, null],
+        ['options that are not an object', del, 0],
+        ['options with another key', del, { epoch: 0, label: 'x' }],
+      ];
+      for (const [what, request, options] of cases) {
+        expectFixedRefusal(
+          await conformanceOutcome(() =>
+            store.signDropRequest(request, CONFORMANCE_TS, options as never),
+          ),
+          what,
+        );
+      }
+    });
+
+    runner.it('refuses a DELETE epoch above the current one with epoch_unavailable, before any key is read', async () => {
+      await withStore(async (store) => {
+        for (const epoch of [current + 1, current + 2, MAX_KEY_EPOCH]) {
+          const error = await conformanceOutcome(() =>
+            store.signDropRequest(del, CONFORMANCE_TS, { epoch }),
+          );
+          conformanceCheck(codeOfError(error) === 'epoch_unavailable', 'epoch_unavailable');
+        }
+      });
+      const closed = await backend.open(current);
+      await closed.close();
+      const error = await conformanceOutcome(() =>
+        closed.signDropRequest(del, CONFORMANCE_TS, { epoch: current + 1 }),
+      );
+      conformanceCheck(codeOfError(error) === 'epoch_unavailable', 'checked before the seed');
+    });
+
+    runner.it('reads the epoch once and signs with that value (no swap after the check)', async () => {
+      await withStore(async (store) => {
+        let reads = 0;
+        const options = {
+          get epoch(): number {
+            reads += 1;
+            return reads === 1 ? 0 : current + 5;
+          },
+        };
+        const authorization = await store.signDropRequest(del, CONFORMANCE_TS, options);
+        conformanceCheck(reads === 1, 'one read of the epoch');
+        conformanceCheck(verifiedDropKey(authorization, del) === dropKeyHex(seed, 0), 'epoch 0');
+      });
+    });
+
+    runner.it('refuses what is not a drop request with the fixed error, before any key is read', async () => {
+      const store = await backend.open(current);
+      await store.close();
+      const cases: [string, DropAuthRequest, number][] = [
+        ['a GET', { ...del, method: 'GET' as never }, CONFORMANCE_TS],
+        ['a ts other than createdAt', upload, CONFORMANCE_TS + 1],
+        ['a body that is not JSON', { ...upload, body: encodeUtf8('not json') }, CONFORMANCE_TS],
+      ];
+      for (const [what, request, createdAt] of cases) {
+        expectFixedRefusal(
+          await conformanceOutcome(() => store.signDropRequest(request, createdAt)),
+          what,
+        );
+      }
+    });
+
+    runner.it('a closed store refuses a valid drop request with keystore_closed', async () => {
+      const store = await backend.open(current);
+      await store.close();
+      for (const options of [undefined, { epoch: 0 }]) {
+        const error = await conformanceOutcome(() =>
+          store.signDropRequest(del, CONFORMANCE_TS, options),
+        );
+        conformanceCheck(codeOfError(error) === 'keystore_closed', 'keystore_closed');
+      }
+    });
+  });
 }

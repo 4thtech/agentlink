@@ -13,6 +13,7 @@ import type { CoreContext } from '../context.js';
 import { rowKeyOf } from '../store/store.js';
 import { deleteFileObject } from './records.js';
 import type { Sealed } from '../store/schema.js';
+import { FakeNotary, FEE_UNITS } from '../testing/chain.js';
 import { FakeClock, passphrase, seed } from '../testing/fixtures.js';
 import {
   INBOX,
@@ -264,5 +265,88 @@ describe('a drop object stays deletable after a key rotation (M1-1g-g)', () => {
     expect(String((error as Error).message)).not.toContain(locator.locator as string);
     expect(seen).toHaveLength(0);
     expect((await SELF.fetch(locator.locator as string)).status).toBe(200);
+  });
+});
+
+// M1-1g-h (04 §2.1, §4; 06 §3 "Delivery receipts"; 07 §5.4): with `files.deleteAfter: receipt`, the
+// contact's DELIVERED receipt deletes the drop object. The receipt is seen after the sender's key
+// epoch moved on, so the DELETE must be signed with the drop key of the upload epoch, and the real
+// drop Worker must accept it.
+describe('delete on receipt after a key rotation (M1-1g-h)', () => {
+  let chain: FakeNotary;
+
+  beforeEach(async () => {
+    chain = new FakeNotary(clock.now);
+    a = await openFileAgent(clock, new MemoryKeyStore(seed(23)), ownerA, 'alice', {
+      relays: RELAYS_A,
+      drop: { endpoint: ORIGIN, fetch: dropFetch() },
+      proofs: chain.platform(),
+    });
+    b = await openFileAgent(clock, new MemoryKeyStore(seed(24)), ownerB, 'bob', {
+      relays: RELAYS_B,
+      drop: { endpoint: ORIGIN, fetch: dropFetch() },
+      proofs: chain.platform(),
+    });
+    await pairForFiles(clock, a, b, (p) => {
+      p.files.deleteAfter = 'receipt';
+      p.receipts.autoDelivered = true;
+    });
+    chain.fund(a.id, 10n * FEE_UNITS);
+  });
+
+  async function locatorOf(envelopeId: string): Promise<JsonObject> {
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0];
+    return JSON.parse(
+      await a.cipher.open(
+        { table: 'files', column: 'locator', rowKey: rowKeyOf([envelopeId, 0]) },
+        row?.locator as Sealed,
+      ),
+    ) as JsonObject;
+  }
+
+  it('after an epoch advance, the DELIVERED receipt deletes the object uploaded under the older epoch', async () => {
+    const sent = await a.client.sendMessage({
+      to: b.id,
+      text: 'file',
+      files: [outgoing('receipt.bin', fileBytes(30_000, 'DROP-RECEIPT-PLAINTEXT'))],
+    });
+    expect(sent).toMatchObject({ status: 'ok', files: [{ index: 0, delivery: 'drop' }] });
+    if (sent.status !== 'ok') throw new Error('not sent');
+    await deliver(a, b);
+    const locator = await locatorOf(sent.envelopeId);
+    expect(locator).toMatchObject({ kind: 'drop', keyEpoch: 0 });
+    const url = locator.locator as string;
+
+    // Notarized; B receives the proof and its DELIVERED receipt goes on-chain (B's policy).
+    const proof = await a.client.notarize({ envelopeId: sent.envelopeId });
+    expect(proof).toMatchObject({ status: 'ok' });
+    await deliver(a, b);
+    const recordId = (proof as { recordId: string }).recordId;
+    expect(chain.records.get(recordId)?.receiptAt[0]).not.toBe(0n);
+    expect((await SELF.fetch(url)).status).toBe(200);
+
+    // The sender's key epoch moves on before its core sees the receipt.
+    await ownerA
+      .epochControl(a.keyStore as MemoryKeyStore)
+      .advanceEpoch(0, await ownerA.unlock(passphrase()));
+    expect((await a.keyStore.getPublicBundle()).keyEpoch).toBe(1);
+
+    seen.length = 0;
+    expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 1, failed: 0 });
+    expect(seen.map((r) => r.method)).toEqual(['DELETE']);
+    expect((await SELF.fetch(url)).status).not.toBe(200);
+    const row = (await a.store.transaction((tx) => tx.select('files')))[0];
+    expect(row?.deleted_at).toBe(clock.t);
+
+    // Done once: the next pass sends nothing.
+    seen.length = 0;
+    expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 0, failed: 0 });
+    expect(seen).toHaveLength(0);
+
+    // I-7: no drop URL or object ID in any log line.
+    const objectId = /\/v1\/get\/([A-Za-z0-9_-]{22})/.exec(url)?.[1] as string;
+    for (const line of a.lines) {
+      for (const canary of [url, objectId]) expect(line).not.toContain(canary);
+    }
   });
 });

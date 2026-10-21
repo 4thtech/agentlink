@@ -29,6 +29,7 @@ import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { AgentLinkClient } from '../client.js';
 import type { FilesPlatform, InboxFolder, OutgoingFile } from '../files/platform.js';
+import type { ProofsPlatform } from '../proofs/platform.js';
 import { MemoryStore } from '../store/memory-store.js';
 import type { TransportFactory } from '../transport.js';
 import { FakeClock, RecordingApprovalChannel, TestStoreCipher, passphrase } from './fixtures.js';
@@ -211,6 +212,8 @@ export interface FileAgentOptions {
   readonly drop?: FilesPlatform['drop'];
   readonly download?: FilesPlatform['download'];
   readonly relays: readonly string[];
+  /** The proofs platform (M1-7g), for the delete-on-receipt tests (M1-1g-h). */
+  readonly proofs?: ProofsPlatform;
 }
 
 /** An agent with a files platform whose allowed folder is WORK and whose inbox is INBOX. */
@@ -249,6 +252,7 @@ export async function openFileAgent(
     transport: spy.factory,
     policyMark: new MemoryPolicyMark(),
     files: platform,
+    ...(options.proofs === undefined ? {} : { proofs: options.proofs }),
     logger: createLogger({
       name: 'core',
       level: 'debug',
@@ -312,7 +316,10 @@ export async function deliver(from: FileAgent, to: FileAgent): Promise<void> {
   if (wrap === undefined) throw new Error('nothing published to that agent');
   const opened = await unwrapGiftWrap(wrap.event, to.keyStore as EnvelopeKeys);
   await to.client.envelopes.receive({ envelope: opened.envelope, giftWrapId: opened.giftWrapId });
-  await to.client.envelopes.processReceived();
+  const reports = await to.client.envelopes.processReceived();
+  // The step syncInbox runs after processing (07 §2.1 step 4; M1-7g): a `proof` envelope is
+  // checked on-chain and DELIVERED is signed per policy. A no-op without a proofs platform.
+  await to.client.proofs.processInbound(reports);
 }
 
 /** Deterministic bytes of a given length with a recognisable marker at the start. */
