@@ -4223,7 +4223,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `init` writes no harness config without an explicit confirmation, and owner setup refuses non-TTY input (tests); prompts pass the vocabulary lint.
 
 #### M1-29 · J9 session habit: `status --brief` and optional SessionStart hooks per harness (D-53) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review; the in-harness transcript is pending an owner run · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`status --brief`, optional `init` offer), docs-site/guide/get-started/ and docs-site/technical/reference/harness-configuration.md (hook snippets)
 - **Depends on:** M1-9a, M1-9c, M1-12a
 - **Spec:** D-53; 06 §6.1, §7, §8; 02 J9; 11 §6.1 (J9 strings); 04 §2.5
