@@ -95,6 +95,7 @@ enabled = false
 [env.staging.vars]
 SUBMITTER_CHAINS = "84532"
 SUBMITTER_FAUCET_CHAINS = "84532"
+SUBMITTER_FAUCET_ADDRESS_84532 = "0x8846edc0bb0181b8b92c295cd3405a6914fbdb69"
 
 [[env.staging.durable_objects.bindings]]
 name = "SUBMITTER_QUEUE"
@@ -131,6 +132,7 @@ enabled = false
 [env.production.vars]
 SUBMITTER_CHAINS = "84532"
 SUBMITTER_FAUCET_CHAINS = "84532"
+SUBMITTER_FAUCET_ADDRESS_84532 = "0x194b23b695c9a20949ca321615678bd6cac651e9"
 
 [[env.production.durable_objects.bindings]]
 name = "SUBMITTER_QUEUE"
