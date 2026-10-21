@@ -178,6 +178,16 @@ const approvals = (agent: Agent) => agent.store.transaction((tx) => tx.select('a
 const outOfType = (agent: Agent, type: string) =>
   agent.store.transaction((tx) => tx.select('envelopes', { direction: 'out', type }));
 const ledger = (agent: Agent) => agent.store.transaction((tx) => tx.select('budget_ledger'));
+/** This agent's own Record rows (not received records, receipts or markers). */
+const OWN = ['signed', 'pending', 'needs_credits', 'recorded', 'announced', 'failed', 'conflict'];
+const ownRecords = async (agent: Agent) =>
+  (await agent.store.transaction((tx) => tx.select('proofs'))).filter((r) =>
+    OWN.includes(r.status),
+  );
+const recordPartOf = (agent: Agent, approvalId: string) =>
+  agent.store.transaction((tx) =>
+    tx.get('commitment_parts', { approval_id: approvalId, part: 'record' }),
+  );
 const onChain = (recordId: string) => chain.records.get(recordId);
 const verify = (pack: unknown) =>
   verifyProofPack(JSON.stringify(pack), {
@@ -428,7 +438,7 @@ describe('credits, policy and approvals for terms with notarize (06 §2.4, §3; 
     );
   });
 
-  it('credits gone after the approval: the accept goes out, its Record runs on the next call with the same approval', async () => {
+  it('credits gone after the approval: the accept goes out; a repeat is APPROVAL_USED and only resends the signed Record', async () => {
     const { a, b } = await twoAgents();
     const offered = await a.client.proposeTerms({ to: b.id, terms: terms('130.00') });
     const offerId = field<string>(offered, 'envelopeId');
@@ -441,19 +451,88 @@ describe('credits, policy and approvals for terms with notarize (06 §2.4, §3; 
     const first = await b.client.respondToTerms({ ...args, approvalId });
     expect(first).toMatchObject({ status: 'ok', proof: { status: 'needs_credits' } });
     expect(await outOfType(b, 'accept')).toHaveLength(1);
-    expect(chain.calls.notarize).toBe(0);
+    const signed = await ownRecords(b);
+    expect(signed).toHaveLength(1);
     chain.fund(b.id, 10n * FEE_UNITS);
-    const second = await b.client.respondToTerms({ ...args, approvalId });
-    expect(second).toMatchObject({ status: 'ok', proof: { status: 'ok' } });
-    expect(await outOfType(b, 'accept')).toHaveLength(1);
-    expect(chain.calls.notarize).toBe(1);
-    // Every part has run now: a repeat is APPROVAL_USED, and nothing more is signed or charged.
+    // 04 §3.4.2: the Record part has run (claimed); a repeat is APPROVAL_USED, sends nothing new,
+    // signs nothing new, and resends the stored Record unchanged.
     expect(await b.client.respondToTerms({ ...args, approvalId })).toMatchObject({
       status: 'rejected',
       code: 'APPROVAL_USED',
     });
-    expect(chain.calls.notarize).toBe(1);
+    expect(await outOfType(b, 'accept')).toHaveLength(1);
+    expect((await ownRecords(b)).map((r) => r.record_id)).toEqual(signed.map((r) => r.record_id));
+    expect(onChain(signed[0]!.record_id)).toBeDefined();
+    expect(await recordPartOf(b, approvalId)).toMatchObject({ state: 'done' });
     expect(await approvals(b)).toHaveLength(1);
+  });
+
+  it('a Record the chain has not confirmed: a repeat with the same approval is APPROVAL_USED, never a second Record', async () => {
+    const { a, b } = await twoAgents();
+    const args = { to: b.id, terms: terms('131.00'), notarize: true };
+    const pending = await a.client.proposeTerms(args);
+    const approvalId = field<string>(pending, 'approvalId');
+    await approve(a, approvalId);
+    chain.censor = true;
+    const first = await a.client.proposeTerms({ ...args, approvalId });
+    expect(first).toMatchObject({ status: 'ok', proof: { status: 'submitted' } });
+    const signed = await ownRecords(a);
+    expect(signed).toHaveLength(1);
+    expect(onChain(signed[0]!.record_id)).toBeUndefined();
+    expect(await recordPartOf(a, approvalId)).toMatchObject({ state: 'claimed' });
+    for (let i = 0; i < 2; i += 1) {
+      expect(await a.client.proposeTerms({ ...args, approvalId })).toMatchObject({
+        status: 'rejected',
+        code: 'APPROVAL_USED',
+      });
+    }
+    expect(await ownRecords(a)).toHaveLength(1);
+    expect(await outOfType(a, 'offer')).toHaveLength(1);
+    // The chain comes back: the same signed Record lands (resubmitPending), the part is done.
+    chain.censor = false;
+    await a.client.proofs.resubmitPending();
+    expect(onChain(signed[0]!.record_id)).toBeDefined();
+    expect(await recordPartOf(a, approvalId)).toMatchObject({ state: 'done' });
+    expect(await ownRecords(a)).toHaveLength(1);
+  });
+
+  it('notarize after an accept sent without it: the later scope covers only the receipt, never a Record (04 §3.4.2)', async () => {
+    const { a, b } = await twoAgents();
+    const offered = await a.client.proposeTerms({ to: b.id, terms: terms('132.00') });
+    const offerId = field<string>(offered, 'envelopeId');
+    await deliver(a, b);
+    const plain = await b.client.respondToTerms({ envelopeId: offerId, decision: 'accept' });
+    await approve(b, field<string>(plain, 'approvalId'));
+    expect(
+      await b.client.respondToTerms({
+        envelopeId: offerId,
+        decision: 'accept',
+        approvalId: field<string>(plain, 'approvalId'),
+      }),
+    ).toMatchObject({ status: 'ok' });
+    const later = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'accept',
+      notarize: true,
+    });
+    expect(later.status).toBe('pending_approval');
+    const card = field<Loose>(later, 'card');
+    expect(field<string[]>(card, 'parts')).toEqual(['accepted_receipt']);
+    expect(card.fee).toBeNull();
+    const laterId = field<string>(later, 'approvalId');
+    await approve(b, laterId);
+    const run = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'accept',
+      notarize: true,
+      approvalId: laterId,
+    });
+    expect(field<unknown>(run, 'proof')).toBeUndefined();
+    expect(await recordPartOf(b, laterId)).toBeUndefined();
+    expect(chain.calls.notarize).toBe(0);
+    expect(await ownRecords(b)).toHaveLength(0);
+    expect(await ledger(b)).toEqual([]);
+    expect(await outOfType(b, 'accept')).toHaveLength(1);
   });
 
   it('an approval covers its own arguments only: other terms get a new request and nothing is sent', async () => {

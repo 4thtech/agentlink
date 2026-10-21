@@ -177,6 +177,8 @@ export interface CommitmentRecorder {
     readonly ownerApproved: boolean;
     readonly claimTx: (tx: StoreTx, recordId: string, itemJson: string) => boolean;
   }): Promise<CommitmentRecordResult>;
+  /** Resends the stored Record of a sent envelope unchanged, if one is live; never signs. */
+  resendRecord(envelopeId: string): Promise<void>;
 }
 
 /** The ProofStatus of a terms result's Record (06 §2.2a `proof`). */
@@ -1158,18 +1160,10 @@ export class TermsService {
     }
     // With `notarize`, the accept's Record runs only if the offer has no record (04 §3.4.2), and
     // only once: an accept already sent and recorded needs none (M1-9d-3).
-    let record = false;
-    if (call.notarize) {
-      record = !(await this.#offerRecorded(rec.envelopeHash, contactId));
-      if (record && acceptRan) {
-        const own = (n?.records ?? []).find(
-          (r) => r.direction === 'out' && r.type === 'accept' && r.replyTo === rec.envelopeId,
-        );
-        const known =
-          own === undefined ? undefined : await this.#deps.records?.recordOf(own.envelopeHash);
-        if (known?.kind === 'ACCEPT' && known.signer === self) record = false;
-      }
-    }
+    // Once the accept has run, a later scope covers only the receipt (04 §3.4.2): never a Record
+    // of an accept sent under an earlier scope.
+    const record =
+      call.notarize && !acceptRan && !(await this.#offerRecorded(rec.envelopeHash, contactId));
     let fee: ApprovalFee | null = null;
     let proofTriggers: readonly string[] = [];
     if (record) {
@@ -1611,9 +1605,9 @@ export class TermsService {
     const envelopePart = parts.find((p) => p.part === 'envelope');
     const receiptPart = parts.find((p) => p.part === 'receipt');
     const recordPart = parts.find((p) => p.part === 'record');
-    // The Record part (M1-9d-3) not yet on-chain: unclaimed (it runs), or claimed (its stored item
-    // is resent unchanged and reported, never signed again; 04 §3.4.2, §5).
-    const recordOpen = recordPart?.state === 'unclaimed' || recordPart?.state === 'claimed';
+    // The Record part (M1-9d-3) that has not run: still unclaimed (no credits then, say). A claimed
+    // one has run: a repeat resends its stored item unchanged and is APPROVAL_USED (04 §3.4.2).
+    const recordOpen = recordPart?.state === 'unclaimed';
     const receipt = (): ReceiptState | undefined =>
       receiptPart === undefined || receiptPart.state === 'void'
         ? undefined
@@ -1644,6 +1638,13 @@ export class TermsService {
         ...(rc === undefined ? {} : { receipt: rc }),
       });
     };
+    // A Record already claimed (signed, perhaps not on-chain yet): resent unchanged, never signed
+    // again, and the approval is used (04 §3.4.2, §5).
+    if (recordPart?.state === 'claimed') {
+      if (envelopePart?.item_ref != null)
+        await this.#deps.recorder?.resendRecord(envelopePart.item_ref);
+      return used(envelopePart?.item_ref);
+    }
     // Already sent: a repeat call never sends or signs a part twice (04 §3.4.2). A Record part
     // that has not run yet (no credits then, say) still runs, under the checks below.
     if (envelopePart?.state === 'done' && !recordOpen) return used(envelopePart.item_ref);
@@ -1708,13 +1709,6 @@ export class TermsService {
       }
       const proof = await this.#recordPart(approvalId, stored, id);
       return proof === 'lost' ? used(id) : ok(id, proof);
-    }
-    if (envelopePart === undefined && recordPart !== undefined) {
-      // An accept sent under an earlier scope, recorded under this one (M1-9d-3).
-      const sentAccept = await this.#sentAcceptOf(selfId, scope);
-      if (!recordOpen || sentAccept === undefined) return used(sentAccept);
-      const proof = await this.#recordPart(approvalId, stored, sentAccept);
-      return proof === 'lost' ? used(sentAccept) : ok(sentAccept, proof);
     }
     if (envelopePart === undefined) {
       // A receipt-only scope: nothing is sent. The first call with the approval reports the
@@ -1837,18 +1831,6 @@ export class TermsService {
   async #offerRecorded(envelopeHash: string, contactId: string): Promise<boolean> {
     const known = await this.#deps.records?.recordOf(envelopeHash);
     return known?.kind === 'OFFER' && known.signer === contactId;
-  }
-
-  /** The `accept` this agent sent for the envelope a scope answers, if any. */
-  async #sentAcceptOf(self: string, scope: CommitmentScope): Promise<string | undefined> {
-    if (scope.answers === null) return undefined;
-    const snapshot = await loadTermsSnapshot(this.#ctx, self, scope.counterparty.agentId);
-    const entry = snapshot.byEnvelope.get(scope.answers.envelopeId);
-    const n = entry === undefined ? undefined : snapshot.negotiations.get(entry.key);
-    return (n?.records ?? []).find(
-      (r) =>
-        r.direction === 'out' && r.type === 'accept' && r.replyTo === scope.answers!.envelopeId,
-    )?.envelopeId;
   }
 
   /**
@@ -2185,8 +2167,8 @@ export class TermsService {
     const envelopePart = parts.find((p) => p.part === 'envelope');
     const recordPart = parts.find((p) => p.part === 'record');
     if (envelopePart === undefined || recordPart === undefined) return rejected('APPROVAL_VOID');
-    // Not yet on-chain: unclaimed (it runs) or claimed (resent unchanged, never signed again).
-    const recordOpen = recordPart.state === 'unclaimed' || recordPart.state === 'claimed';
+    // Only an unclaimed Record part still runs; a claimed one has run (04 §3.4.2).
+    const recordOpen = recordPart.state === 'unclaimed';
     const sent = (envelopeId: string, proof?: TermsProof): TermsSent => ({
       status: 'ok',
       envelopeId,
@@ -2202,6 +2184,13 @@ export class TermsService {
         'APPROVAL_USED',
         envelopeId === null || envelopeId === undefined ? {} : { envelopeId },
       );
+    // A Record already claimed: resent unchanged, never signed again; the approval is used.
+    if (recordPart.state === 'claimed') {
+      if (envelopePart.item_ref !== null) {
+        await this.#deps.recorder?.resendRecord(envelopePart.item_ref);
+      }
+      return used(envelopePart.item_ref);
+    }
     // Already sent and recorded (or the Record is void): never a part twice (04 §3.4.2).
     if (envelopePart.state === 'done' && !recordOpen) return used(envelopePart.item_ref);
     if (envelopePart.state === 'claimed' && envelopePart.item_ref !== null) {

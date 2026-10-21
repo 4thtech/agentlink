@@ -751,6 +751,23 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     return this.#submit(stored);
   }
 
+  /**
+   * A repeat of a commitment whose Record part is claimed (04 §3.4.2, §5): the stored signed Record
+   * is submitted again unchanged, or its proof envelope sent once recorded. Never signs; never
+   * throws (a failure leaves it to resubmitPending).
+   */
+  async resendRecord(envelopeId: string): Promise<void> {
+    if (this.#platform === undefined) return;
+    try {
+      const live = (await this.#ownRows(envelopeId)).find(
+        (r) => r.status !== 'replaced' && r.status !== 'released',
+      );
+      if (live !== undefined) await this.#continue(live);
+    } catch {
+      this.#log.warn('proof submit failed', { code: 'submit_error' });
+    }
+  }
+
   /** The automatic chain choice and its fee (07 §6.3), as `notarize` makes it, without override. */
   async #price(
     payer: string,

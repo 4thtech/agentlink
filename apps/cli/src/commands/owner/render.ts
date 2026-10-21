@@ -182,7 +182,13 @@ export function cardLines(request: PendingRequest, facts: CardFacts, index?: num
     if (terms.warning !== undefined) lines.push(terms.warning);
   }
   const args = asObject(request.action['args']);
-  lines.push(...untrustedRegion(FROM_YOUR_AI, fieldValues(args)));
+  // A firm offer (M1-9d-3): its terms are shown from the stored, bound copy in the terms region, so
+  // the agent's `args.terms` is not shown here (04 §3.4.2 "What the owner sees").
+  const shownArgs =
+    terms !== undefined && terms.ownTerms === true && args !== undefined
+      ? Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'terms'))
+      : args;
+  lines.push(...untrustedRegion(FROM_YOUR_AI, fieldValues(shownArgs)));
   if (terms !== undefined) lines.push(...terms.region);
   lines.push(
     `Who:      ${facts.who}`,

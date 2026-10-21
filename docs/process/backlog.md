@@ -3331,7 +3331,28 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The existing credits flow: `needs_credits` before the owner is asked, nothing sent; automatic network choice (07 §6.3); the fee bound by `maxFeeUsd`; the Record part claimed in the transaction that stores the signed Record and reserves its fee.
   - `counter` and `reject` with `notarize` stay refused (`NOTARIZE_UNAVAILABLE`, nothing sent).
   - Fix the stale terms-flow comment (M1-7i).
+  - The owner's card in `agentlink approve` for a firm offer: the stored, bound terms (never `args.terms`), the "commits you if they accept" line, what the one approval does, the cost and the 11 §5.6 proof lines; an accept with proof says it commits you (IR-M1-9d-3-1).
+  - A repeat with the same `approvalId` after the Record part is claimed is `APPROVAL_USED` (the stored Record is only resent); a later scope after the accept ran covers only the receipt, never a Record (IR-M1-9d-3-1).
+  - The `agentlink_propose_terms` description names the `notarize` caveat (tool-surface change; owner "merge").
 - **Acceptance:** core tests, two real cores against the in-memory Notary: both J8 shapes end with an `ACCEPTED` receipt on-chain and an exported pack that verifies with the owner's signed approval; one owner approval per side; zero credits gives `needs_credits` with nothing sent or asked; a changed argument gets a new approval; a repeat with the same `approvalId` signs and charges nothing more; summaries carry no terms text (I-5); RED commit. The e2e `it.fails` J8 tests of M1-13c flip to plain tests once both land.
+
+#### M1-9d-4 · Terms tools: the top-up link for `needs_credits` (new, from IR-M1-9d-3-1)
+- **Status:** todo · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`src/tools/registry.ts`, `terms-common.ts`), `test/fixtures/tool-surface.json`
+- **Depends on:** M1-9d-3
+- **Spec:** 06 §2.2a, §2.4 (`needs_credits`: `url` set to the top-up link), §2.1 (`topUpUrl`, `agentAddress`); D-111, D-113
+- **Invariants:** I-5
+- **Scope:** a terms tool's `needs_credits` carries the top-up link only inside `nextStep`, because the terms outputs have no `topUpUrl`/`agentAddress` field and `url` is pinned to the local-UI origins. Decide the form (06 says `url`; `agentlink_send` uses `topUpUrl` and `agentAddress`), add it to both terms outputs, use the D-113 link format, and update the tool-surface snapshot (owner "merge").
+- **Acceptance:** schema and behaviour tests for `needs_credits` on both terms tools with the structured link; no other URL in the result.
+
+#### M1-9d-5 · Terms tools: recorded counter-offers (new, from IR-M1-9d-3-1)
+- **Status:** todo · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`src/terms-flow.ts`), apps/cli (`src/commands/owner/terms-card.ts`)
+- **Depends on:** M1-9d-3
+- **Spec:** 06 §2.2a (`counter` with `notarize`: a firm offer as in `agentlink_propose_terms`); 04 §3.4.2 (scope `offer`)
+- **Invariants:** I-4, I-5, I-6
+- **Scope:** `agentlink_respond_to_terms` `counter` with `notarize` (today `NOTARIZE_UNAVAILABLE`, nothing sent) as a firm offer under one approval, with the owner's terms card for a `respond_to_terms` action whose scope is `offer`. A recorded `reject` is not specified and stays refused.
+- **Acceptance:** as M1-9d-3's firm-offer tests, through `counter`; RED commit.
 
 #### M1-9e · MCP conformance and tool-surface guard
 - **Status:** done (4thtech/agentlink#143, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
