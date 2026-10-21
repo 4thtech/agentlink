@@ -2357,6 +2357,58 @@ describe('`confirm` signs the ACCEPTED receipt on their ACCEPT record (M1-7g-d; 
     expect((await receipts(a)).filter((r) => r.type === 3)).toHaveLength(1);
   });
 
+  // M1-7g-f: the result reports what happened to the receipt part, read after the deferred run.
+  it('an approved confirm whose ACCEPTED lands returns receipt status `recorded` (M1-7g-f)', async () => {
+    const { a, accept } = await acceptRecorded();
+    const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    expect(
+      await a.client.respondToTerms({ envelopeId: accept, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok', receipt: { type: 'ACCEPTED', status: 'recorded' } });
+  });
+
+  it('an approved confirm whose ACCEPTED is signed but not landed returns `submitted` (M1-7g-f)', async () => {
+    const { a, accept, recordId } = await acceptRecorded();
+    const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    chain.censor = true;
+    expect(
+      await a.client.respondToTerms({ envelopeId: accept, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok', receipt: { type: 'ACCEPTED', status: 'submitted' } });
+    expect(onChain(recordId)!.receiptAt[2]).toBe(0n);
+    chain.censor = false;
+  });
+
+  // A confirm needs their ACCEPT record first (NOT_RECORDED otherwise, 06 §2.2a), so the case of
+  // a record that has not arrived is an accept of an offer that is not recorded yet.
+  it('an approved accept of an offer not recorded yet returns `waiting_for_record` (M1-7g-f)', async () => {
+    const { a, b } = await twoAgents();
+    const offer = await sendOffer(a, b);
+    const asked = await b.client.respondToTerms({ envelopeId: offer, decision: 'accept' });
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    expect(
+      await b.client.respondToTerms({ envelopeId: offer, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok', receipt: { type: 'ACCEPTED', status: 'waiting_for_record' } });
+    expect((await receipts(b)).filter((r) => r.type === 3)).toEqual([]);
+  });
+
+  it('an approved accept of an offer already recorded returns `recorded` (M1-7g-f)', async () => {
+    const { a, b } = await twoAgents();
+    const offer = await sendOffer(a, b);
+    const rec = await recordDirectly(a, b, offer, RECORD_KIND.OFFER);
+    await sendProofEnvelope(a, b, { envelopeId: offer, recordId: rec.recordId, salt: rec.salt });
+    const asked = await b.client.respondToTerms({ envelopeId: offer, decision: 'accept' });
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    await approve(b, approvalId);
+    expect(
+      await b.client.respondToTerms({ envelopeId: offer, decision: 'accept', approvalId }),
+    ).toMatchObject({ status: 'ok', receipt: { type: 'ACCEPTED', status: 'recorded' } });
+    expect(onChain(rec.recordId)!.receiptAt[2]).not.toBe(0n);
+  });
+
   it('a confirm that is only pending signs nothing, whatever the sync passes', async () => {
     const { a, accept, recordId } = await acceptRecorded();
     const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
@@ -2491,5 +2543,23 @@ describe('each contact has a share of the waiting pool (M1-7g-d; 04 §3.4)', () 
     });
     const fromA = await proofBeforeMessage(a, b, 'late from alice');
     expect((await awaitingRows(b)).some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
+  });
+
+  it('a refused waiting row releases its slot in the full pool of 256 (M1-7g-f)', async () => {
+    const { a, b } = await twoAgents();
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    await sendText(a, b);
+    await sendText(c, b, 'from carol');
+    await fillAwaiting(b, c.id, 256, 'waitC');
+    await b.store.transaction((tx) => {
+      tx.update('envelopes', { envelope_id: 'waitC0' }, { state: 'refused' });
+    });
+    const fromA = await proofBeforeMessage(a, b, 'late from alice');
+    const rows = await awaitingRows(b);
+    expect(rows.some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
+    // The refused row's slot is released, not held until it expires.
+    expect(rows.some((r) => r.record_id === 'await:waitC0')).toBe(false);
+    expect(rows).toHaveLength(256);
   });
 });
