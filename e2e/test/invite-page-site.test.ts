@@ -48,7 +48,7 @@ describe('the pages', () => {
       const html = read(page);
 
       it('has exactly one script, a first-party module with a src, and nothing inline', () => {
-        const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+        const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)];
         expect(scripts).toHaveLength(1);
         const [, attrs, body] = scripts[0] ?? [];
         expect(attrs).toMatch(/\btype="module"/);
