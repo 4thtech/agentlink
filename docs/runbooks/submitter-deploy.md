@@ -18,7 +18,7 @@ The owner (Tali). Agents never run `wrangler secret put`, never see a key and ne
 
 ### OWNER SECTION (phone or browser, except Part B)
 
-Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Every key goes straight from your terminal into the `wrangler secret put` prompt. Staging and production never share a key, and a faucet key is never a gas key (the Worker refuses that).
+Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Every key is generated and piped straight into `wrangler secret put`, so it never appears on screen, in the scrollback or in the clipboard. If you ever copy a key by hand, clear the clipboard right after (macOS: `pbcopy < /dev/null`). Staging and production never share a key, and a faucet key is never a gas key (the Worker refuses that).
 
 **Part A · Check GitHub (2 minutes, phone)**
 
@@ -35,38 +35,47 @@ Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Eve
    ```bash
    pnpm exec wrangler login
    ```
-5. Create the **staging gas** wallet: run `cast wallet new` (Foundry). Write down the **Address** (public, needed in Part C) labelled "staging gas".
-6. Store its private key:
+5. Define a small helper for this shell session. It creates a new wallet, prints **only its address**, pipes the private key straight into `wrangler secret put` and then forgets it:
    ```bash
-   pnpm exec wrangler secret put SUBMITTER_GAS_KEY_84532 --env staging --config wrangler.toml
+   newkey() {  # usage: newkey <SECRET_NAME> <staging|production>
+     local w; w="$(cast wallet new --json)" || return 1
+     printf '%s address: %s\n' "$1 ($2)" "$(jq -r '.[0].address' <<<"$w")"
+     jq -r '.[0].private_key' <<<"$w" | tr -d '\n' | pnpm exec wrangler secret put "$1" --env "$2" --config wrangler.toml
+     unset w
+   }
    ```
-   Wrangler asks whether to create the Worker `agentlink-submitter-staging`: answer **yes**. Then paste the **Private key** from step 5 at the prompt (`0x` + 64 lowercase hex characters).
-7. Create the **staging faucet** wallet: run `cast wallet new` again. Write down its Address as "staging faucet".
-8. Store its private key:
+   It needs Foundry's `cast` and `jq`. **Not verified by the builder** (no Foundry on the build machine): the jq paths assume `cast wallet new --json` prints `[{"address":"0x…","private_key":"0x…"}]`, as current Foundry releases do. Check this once without creating a real key, for example `cast wallet new --json | jq 'map(keys)'` must print `[["address","private_key"]]` (that wallet is never used). If the field names differ, adjust the two jq paths. The key must be `0x` + 64 **lowercase** hex characters; `cast` prints it that way.
+6. **Staging gas** wallet. Write down the printed address as "staging gas" (public, needed in Part C):
    ```bash
-   pnpm exec wrangler secret put SUBMITTER_FAUCET_KEY_84532 --env staging --config wrangler.toml
+   newkey SUBMITTER_GAS_KEY_84532 staging
    ```
-9. Store the staging IP-bucket key. Generate it and pipe it in, so it never shows on screen:
+   The first secret of an environment creates the Worker `agentlink-submitter-staging`. With piped input Wrangler cannot ask, and it uses its default (create). If it stops with an error about a missing Worker instead, tell the orchestrator; do not paste the key by hand.
+7. **Staging faucet** wallet. Write down the address as "staging faucet":
+   ```bash
+   newkey SUBMITTER_FAUCET_KEY_84532 staging
+   ```
+8. Staging IP-bucket key (32 random bytes, base64url; no address):
    ```bash
    openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' | pnpm exec wrangler secret put SUBMITTER_IP_KEY --env staging --config wrangler.toml
    ```
-10. Create the **production gas** wallet with `cast wallet new`; write down its Address as "production gas". Store the key (answer **yes** to create `agentlink-submitter`):
+9. **Production gas** wallet. Write down the address as "production gas". This creates `agentlink-submitter`:
+   ```bash
+   newkey SUBMITTER_GAS_KEY_84532 production
+   ```
+10. **Production faucet** wallet. Write down the address as "production faucet":
     ```bash
-    pnpm exec wrangler secret put SUBMITTER_GAS_KEY_84532 --env production --config wrangler.toml
+    newkey SUBMITTER_FAUCET_KEY_84532 production
     ```
-11. Create the **production faucet** wallet with `cast wallet new`; write down its Address as "production faucet". Store the key:
-    ```bash
-    pnpm exec wrangler secret put SUBMITTER_FAUCET_KEY_84532 --env production --config wrangler.toml
-    ```
-12. Store the production IP-bucket key (a new one, never the staging one):
+11. Production IP-bucket key (a new one, never the staging one):
     ```bash
     openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' | pnpm exec wrangler secret put SUBMITTER_IP_KEY --env production --config wrangler.toml
     ```
-13. Optional: a keyed RPC provider for production (the shipped public RPCs work without it). Paste comma-separated `https://` URLs at the prompt:
+12. Forget the helper: `unset -f newkey`. No private key was ever printed, so there is nothing to clear from the scrollback.
+13. Optional: a keyed RPC provider for production (the shipped public RPCs work without it). Type or paste comma-separated `https://` URLs at the prompt (if you pasted them, clear the clipboard afterwards: `pbcopy < /dev/null`):
     ```bash
     pnpm exec wrangler secret put SUBMITTER_RPC_URLS_84532 --env production --config wrangler.toml
     ```
-14. Check the names (values are never shown), then clear the terminal (`clear`, and close the window so the private keys leave the scrollback):
+14. Check the names (values are never shown):
     ```bash
     pnpm exec wrangler secret list --env staging --config wrangler.toml
     pnpm exec wrangler secret list --env production --config wrangler.toml
@@ -113,7 +122,7 @@ All four wallets are on **Base Sepolia only**. Testnet funds have no value; keep
 ## If it fails
 - **Skipped with "Worker secrets not set"**: the notice names the missing secrets; repeat the matching Part B step, then step 17.
 - **`has a Worker secret SUBMITTER_CHAINS`** (or `SUBMITTER_FAUCET_CHAINS`): `pnpm exec wrangler secret delete <name> --env <staging|production> --config wrangler.toml`, then step 17.
-- **Health shows a chain `"available":false`**: its gas key is missing or malformed (must be `0x` + 64 lowercase hex), or the RPC URLs are unreachable. Put the key again (step 6 or 10) and rerun.
+- **Health shows a chain `"available":false`**: its gas key is missing or malformed (must be `0x` + 64 lowercase hex), or the RPC URLs are unreachable. Create and store a new key (step 6 or 9; then fund the new address) and rerun.
 - **Faucet answers `faucet_empty` or `unavailable`**: fund the faucet wallet (step 15); check that its key differs from the gas key.
 - **Production failed after deploying**: CI rolled back and set `DEPLOY_FREEZE`. Read the run summary; only the owner clears the freeze ([RB-11](rollback-and-freeze.md)).
 - A key leaked or is suspected: put a new one (Part B) and move the remaining funds from the old address; follow `audit-rules.md` §10.3.

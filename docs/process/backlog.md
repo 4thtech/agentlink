@@ -3344,7 +3344,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** `release-and-deployment.md` §1, §4.5, §5, §8; D-28
 - **Invariants:** I-3, I-7
 - **Scope:**
-  - CI-only `wrangler deploy`; staging on `workers.dev` previews (CI and smoke only); production `submit.agentlink.4thtech.io` serves the testnet beta (D-88): one Cloudflare account, Wrangler `--env staging` and the default (production), Workers `agentlink-submitter-staging` and `agentlink-submitter`, mirroring the drop; gas and faucet keys separate per environment.
+  - CI-only `wrangler deploy`; staging on `workers.dev` previews (CI and smoke only); production `submit.agentlink.4thtech.io` serves the testnet beta (D-88): one Cloudflare account, Wrangler `--env staging` and `--env production` (`[env.production]`; the top level is local-only), Workers `agentlink-submitter-staging` and `agentlink-submitter`, mirroring the drop; gas and faucet keys separate per environment.
   - Gas and faucet keys set by the owner with `wrangler secret put`; never in GitHub, logs or sync files.
 - **Acceptance:**
   - **Deploy (D-25):** staging deploy on merge; smoke test (health + simulated notarize per chain); production automatically once staging smoke is green (`production` environment, D-52); health check after deploy with automatic `wrangler rollback` on failure (rehearsed); deploy record written; nothing runs while `DEPLOY_FREEZE` is set.
