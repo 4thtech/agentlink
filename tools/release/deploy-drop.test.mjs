@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readbackDiagnosisSuite, runReadback } from './readback-settings-suite.mjs';
 import { commandLines, isDeployCall, runScripts, wranglerCalls } from './workflow-run-steps.mjs';
 
 // M1-27b: the encrypted drop's deploy workflow (release-and-deployment.md §4.5, D-25, D-52).
@@ -348,7 +349,7 @@ describe('logging settings read-back', () => {
     tail_consumers: [],
     ...overrides,
   });
-  const check = (body) => runBlock(script, { SETTINGS_JSON: fixture(body) });
+  const check = (body) => runReadback(script, body);
 
   it('is the same block in staging and production', () => {
     expect(copies.length).toBe(2);
@@ -522,6 +523,8 @@ function runWithFakes(script, fakes, env) {
   })();
   return { ...result, github: readFileSync(fakes.output, 'utf8') };
 }
+
+readbackDiagnosisSuite('deploy-drop.yml', block('READBACK-SETTINGS'));
 
 describe('credential and Worker secret check', () => {
   const copies = block('SECRET-CHECK');

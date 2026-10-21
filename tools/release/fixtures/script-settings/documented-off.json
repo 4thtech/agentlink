@@ -1,0 +1,29 @@
+{
+  "success": true,
+  "errors": [],
+  "messages": [],
+  "result": {
+    "logpush": false,
+    "observability": {
+      "enabled": false,
+      "head_sampling_rate": 1,
+      "redact_query_string": false,
+      "logs": {
+        "enabled": false,
+        "invocation_logs": false,
+        "head_sampling_rate": 1,
+        "persist": true,
+        "destinations": []
+      },
+      "traces": {
+        "enabled": false,
+        "head_sampling_rate": 1,
+        "persist": true,
+        "destinations": [],
+        "propagation_policy": null
+      }
+    },
+    "tags": [],
+    "tail_consumers": null
+  }
+}

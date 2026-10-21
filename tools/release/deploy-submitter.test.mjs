@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readbackDiagnosisSuite, runReadback } from './readback-settings-suite.mjs';
 import { commandLines, isDeployCall, runScripts, wranglerCalls } from './workflow-run-steps.mjs';
 
 // M1-10c: the submitter and faucet deploy workflow (release-and-deployment.md §4.5, D-25, D-52,
@@ -531,17 +532,7 @@ describe('logging settings read-back', () => {
     tail_consumers: [],
     ...overrides,
   });
-  const check = (body) => {
-    try {
-      execFileSync('bash', ['-euo', 'pipefail', '-c', script], {
-        env: { PATH: process.env.PATH, SETTINGS_JSON: fixture(body) },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  };
+  const check = (body) => runReadback(script, body).ok;
 
   it('is the same block in staging and production', () => {
     expect(copies.length).toBe(2);
@@ -673,6 +664,8 @@ describe('logging settings read-back', () => {
     expect(check('not json')).toBe(false);
   });
 });
+
+readbackDiagnosisSuite('deploy-submitter.yml', block('READBACK-SETTINGS'));
 
 describe('credential and Worker secret check', () => {
   const copies = block('SECRET-CHECK');
