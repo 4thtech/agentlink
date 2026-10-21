@@ -24,6 +24,14 @@ export interface LoggerOptions {
   readonly bindings?: Fields;
   /** Clock, for tests. */
   readonly now?: () => Date;
+  /**
+   * Fixed codes that may be written in the top-level `code` field (M1-7g-d, I-7). A `code` whose
+   * value is a listed string is written as is; any other value gets the `code` key rule (only HTTP
+   * status and system error codes are kept, the rest is redacted). Each listed code is a snake-case
+   * identifier (all lower or all upper case, at most 64 characters) that redaction leaves unchanged;
+   * anything else throws a TypeError. Default: none.
+   */
+  readonly codes?: Iterable<string>;
 }
 
 export interface Logger {
@@ -39,10 +47,31 @@ export interface Logger {
   error(msg: string, fields?: Fields | Error): void;
   /** A logger that adds `bindings` to every line. */
   child(bindings: Fields): Logger;
+  /** A logger that also lists `codes` (see LoggerOptions.codes); this one is unchanged. */
+  withCodes(codes: Iterable<string>): Logger;
 }
 
 const RESERVED = new Set(['time', 'level', 'name', 'msg']);
 const EPOCH = new Date(0);
+const MAX_CODE_LENGTH = 64;
+const FIXED_CODE = /^(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)$/;
+
+/** The listed codes, each checked: a fixed identifier that redaction would not change. */
+function toCodes(codes: Iterable<string> | undefined, into: Set<string> = new Set()): Set<string> {
+  if (codes === undefined) return into;
+  for (const code of codes) {
+    if (
+      typeof code !== 'string' ||
+      code.length > MAX_CODE_LENGTH ||
+      !FIXED_CODE.test(code) ||
+      redactString(code) !== code
+    ) {
+      throw new TypeError('createLogger: a listed code is not a fixed identifier');
+    }
+    into.add(code);
+  }
+  return into;
+}
 
 function isLevel(value: unknown): value is Level {
   return typeof value === 'string' && (LEVELS as readonly string[]).includes(value);
@@ -81,16 +110,21 @@ export function formatRecord(
   msg: unknown,
   bindings: Fields,
   fields: unknown,
+  codes: ReadonlySet<string> = new Set(),
 ): string {
   const record: { [key: string]: JsonValue } = { time: time.toISOString(), level };
   if (name !== undefined) record.name = redactString(name);
   record.msg = redactString(typeof msg === 'string' ? msg : String(msg));
-  const merged = redact({ ...bindings, ...toFields(fields) });
+  const raw = { ...bindings, ...toFields(fields) };
+  const merged = redact(raw);
   if (merged !== null && typeof merged === 'object' && !Array.isArray(merged)) {
     for (const [key, value] of Object.entries(merged)) {
       record[RESERVED.has(key) ? `_${key}` : key] = value;
     }
   }
+  // A listed fixed code, and only the exact top-level `code` field holding that string (M1-7g-d).
+  const code: unknown = Object.prototype.hasOwnProperty.call(raw, 'code') ? raw.code : undefined;
+  if (typeof code === 'string' && codes.has(code)) record.code = code;
   return JSON.stringify(record);
 }
 
@@ -102,6 +136,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
   const sink = options.sink ?? consoleSink();
   const now = options.now ?? (() => new Date());
   const bindings = toBindings(options.bindings);
+  const codes = toCodes(options.codes);
 
   const clock = (): Date => {
     try {
@@ -117,7 +152,7 @@ export function createLogger(options: LoggerOptions = {}): Logger {
     const time = clock();
     let line: string;
     try {
-      line = formatRecord(time, at, options.name, msg, bindings, fields);
+      line = formatRecord(time, at, options.name, msg, bindings, fields, codes);
     } catch {
       // Never fall back to the raw input.
       line = JSON.stringify({ time: time.toISOString(), level: at, msg: '[Unloggable record]' });
@@ -142,7 +177,17 @@ export function createLogger(options: LoggerOptions = {}): Logger {
         level,
         sink,
         now,
+        codes,
         bindings: { ...bindings, ...toBindings(more) },
+      }),
+    withCodes: (more) =>
+      createLogger({
+        ...options,
+        level,
+        sink,
+        now,
+        bindings,
+        codes: toCodes(more, new Set(codes)),
       }),
   };
 }

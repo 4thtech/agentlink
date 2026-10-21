@@ -26,8 +26,9 @@ import {
   readConfig,
 } from './worker.js';
 
-export const packageName = '@4thtech-io/submitter';
-export * from './worker.js';
+// The entry module exports only the fetch handler and the Durable Object classes wrangler.toml
+// binds: Wrangler refuses any other export here (CHORE-SUBMITTER-WRANGLER-DEV). The package name
+// and the shared exports of worker.ts are in lib.ts.
 
 /** One port per chain per isolate; a changed secret starts a new isolate. */
 const ports = new Map<number, SubmitterChain | null>();

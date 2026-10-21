@@ -33,7 +33,7 @@ Prices are the protocol fee charged through official clients. A third-party app 
 
 **Free:** install, identity, pairing, contacts; encrypted messages and off-chain acknowledgements; sending files, through the 4thTech encrypted drop within its quotas (proposed 100 MB per file and 1 GB per agent per week, D-48) or through your own storage (your provider may bill you); owner console, policies and approvals; verifying a proof pack (CLI and public page); fee quotes and credit balances; receipts on a notarized record (prepaid by the sender, so the recipient pays nothing).
 
-**Network costs.** For proofs and receipts sent through a submitter, the submitter pays the network cost (gas) and recovers it from protocol fees; there is no extra charge. Calls you make yourself (direct mode, a deposit from your own account, a withdrawal) pay the network's own cost from the calling address. AgentLink adds no fee to deposits or withdrawals.
+**Network costs.** For proofs and receipts sent through a submitter, the submitter pays the network cost (gas) and recovers it from protocol fees; there is no extra charge. **Receipts (D-114):** the sender's proof fee covers up to 3 receipts for the record, so a recipient is never charged for a receipt without being asked; if the submitter cannot be reached, the receipt is queued locally and posted when possible, and the proof stays valid with fewer receipts (built by M1-34-b). Calls you make yourself (direct mode, a deposit from your own account, a withdrawal) pay the network's own cost from the calling address. AgentLink adds no fee to deposits or withdrawals.
 
 **Files.** The encrypted drop needs no setup and no payment. Its cost (Cloudflare R2, about $0.015 per GB-month with free egress; objects live at most 7 days) is borne by 4thTech. Paid larger quotas are a possible later option, not offered now (`DECISION NEEDED (owner)`, later). Above the quotas, or for longer retention, users connect their own storage (02 F-32, F-36).
 
@@ -236,4 +236,4 @@ Sybil considerations:
 | Recovering the network cost of gasless top-ups from users (§1, §4.5) | Owner (M3-3) |
 | Encrypted drop storage borne by 4thTech against the users-pay rule (§1, D-48) | Owner |
 | Top-up link format (08 §1, D-111) | Owner (M1-26-d) |
-| Who pays for receipts when the recipient has no credits on the record's network (D-111; must be user-paid, §1; recommendation: the sender's proof fee covers up to 3 receipts, deferred posting as the fallback) | Owner (M1-34) |
+| Who pays for receipts when the recipient has no credits on the record's network: decided by the owner, 2026-10-21 (D-114); the sender's proof fee covers up to 3 receipts, deferred posting is the fallback | Decided (M1-34); built by M1-34-b |
