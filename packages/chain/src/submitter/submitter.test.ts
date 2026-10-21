@@ -653,6 +653,53 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
     for (const method of chain.methods) expect(SUBMITTER_RPC_METHODS).toContain(method);
   });
 
+  it('runs over the Workers runtime fetch, which refuses redirect: "error"', async () => {
+    // workerd throws a TypeError for `redirect: "error"` (it supports only "follow" and
+    // "manual"), so every RPC URL failed and /v1/health reported the chain unavailable.
+    const chain = newChain();
+    const inner = mockFetch(chain);
+    const inits: RequestInit[] = [];
+    const workerdFetch = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      if (init?.redirect !== 'follow' && init?.redirect !== 'manual') {
+        throw new TypeError('Invalid redirect value, must be one of "follow" or "manual"');
+      }
+      inits.push(init);
+      return inner(url, init);
+    });
+    const p = createSubmitterChain(config, {
+      fetchFn: workerdFetch as unknown as typeof fetch,
+      gasKey: GAS_KEY,
+      rpcUrls: [RPC_URL],
+      timeoutMs: 1000,
+    });
+    expect(await p.gasBalance()).toBe(5n * 10n ** 17n);
+    for (const init of inits) expect(init.redirect).toBe('manual');
+  });
+
+  it('never follows a redirect: a 3xx answer moves to the next RPC URL', async () => {
+    const chain = newChain();
+    const inner = mockFetch(chain);
+    const seen: string[] = [];
+    const fetchFn = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      seen.push(String(url));
+      if (String(url) === 'https://rpc.provider-one.io/first') {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://rpc.provider-two.io/elsewhere' },
+        });
+      }
+      return inner(url, init);
+    });
+    const p = createSubmitterChain(config, {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      gasKey: GAS_KEY,
+      rpcUrls: ['https://rpc.provider-one.io/first', RPC_URL],
+      timeoutMs: 1000,
+    });
+    expect(await p.gasBalance()).toBe(5n * 10n ** 17n);
+    expect(seen).toEqual(['https://rpc.provider-one.io/first', RPC_URL]);
+  });
+
   it('never puts the RPC URL or the gas key in an error', async () => {
     const chain = newChain();
     chain.failNetwork = true;

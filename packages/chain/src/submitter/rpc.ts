@@ -7,6 +7,9 @@
 // - No redirect, no credentials, no referrer; a per-request timeout. A transport failure (network,
 //   timeout, HTTP status, a body that is not JSON-RPC) moves to the next URL; a JSON-RPC error is an
 //   answer and is returned as such, so a contract revert is never retried elsewhere.
+// - Redirects use `redirect: "manual"`: the Workers runtime throws a TypeError for "error" (it
+//   supports only "follow" and "manual"). A 3xx answer is not ok, so it is never followed and the
+//   caller moves to the next URL, the same outcome as "error".
 //
 // Why the Worker does not go through `createReadClient` (IR-M1-4a-2 R-3): that client needs the
 // platform's address-checked fetch, which exists only in Node (`nodeRpcFetch`). This caller runs in
@@ -51,7 +54,8 @@ export interface FetchInit {
   readonly method: 'GET' | 'POST';
   readonly headers?: Record<string, string>;
   readonly body?: string;
-  readonly redirect: 'error';
+  /** `manual` in the Worker (workerd refuses `error`); a 3xx is then not ok and never followed. */
+  readonly redirect: 'error' | 'manual';
   readonly credentials: 'omit';
   readonly referrerPolicy: 'no-referrer';
   readonly signal: unknown;
@@ -112,7 +116,7 @@ export function createRpcCaller(
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body,
-          redirect: 'error',
+          redirect: 'manual',
           credentials: 'omit',
           referrerPolicy: 'no-referrer',
           signal: timeoutSignal(timeoutMs),
