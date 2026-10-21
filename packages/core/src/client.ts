@@ -159,6 +159,8 @@ export class AgentLinkClient {
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
   readonly #filesPlatform: FilesPlatform | undefined;
+  /** Where the next delete-on-receipt pass starts (M1-1g-h; files/retention.ts). */
+  readonly #retentionCursor = { next: 0 };
   readonly #ctx: CoreContext;
 
   private constructor(
@@ -302,6 +304,7 @@ export class AgentLinkClient {
     if (limits.deleteAfter !== 'receipt') return { deleted: 0, failed: 0 };
     return deleteFilesOnReceipt(this.#ctx, this.#filesPlatform, {
       delivered: (envelopeId) => this.proofs.deliveredReceiptOnChain(envelopeId),
+      cursor: this.#retentionCursor,
     });
   }
 

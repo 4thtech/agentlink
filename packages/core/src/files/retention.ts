@@ -32,31 +32,53 @@ export interface ReceiptRetentionResult {
 export interface ReceiptRetentionDeps {
   /** True when the chain shows the contact's DELIVERED receipt for this sent envelope. */
   delivered(envelopeId: string): Promise<boolean>;
+  /**
+   * Where the next pass starts in the candidate list (kept by the caller across passes), so
+   * candidates whose receipt never comes cannot hold the per-pass window for good.
+   */
+  readonly cursor: { next: number };
 }
 
+/** The statuses of an own record on-chain (proofs/service.ts ON_CHAIN). */
+const OWN_ON_CHAIN = ['recorded', 'announced'] as const;
+
 /**
- * One delete-on-receipt pass: every sent envelope with a stored file not yet deleted is checked for
- * its DELIVERED receipt, and the files of each delivered one are deleted. The caller checks that
- * the effective policy says `files.deleteAfter: receipt` first. Never throws.
+ * One delete-on-receipt pass. Candidates are only the sent envelopes this agent recorded on-chain
+ * (an own `proofs` row in `recorded` or `announced`): without an own record no receipt can exist,
+ * so an envelope never notarized is never a candidate and costs no chain read. For each candidate
+ * with a stored file not yet deleted (its rows read by the `files` key prefix), the chain is asked
+ * for the DELIVERED receipt, and the files of each delivered one are deleted. At most
+ * MAX_RECEIPT_RETENTION_PER_PASS candidates per pass, rotating through the list. The caller checks
+ * that the effective policy says `files.deleteAfter: receipt` first. Never throws.
  */
 export async function deleteFilesOnReceipt(
   ctx: CoreContext,
   platform: FilesPlatform | undefined,
   deps: ReceiptRetentionDeps,
 ): Promise<ReceiptRetentionResult> {
-  const pending = await ctx.store.transaction((tx) => {
-    const byEnvelope = new Map<string, Row<'files'>[]>();
-    for (const row of tx.select('files')) {
-      if (row.deleted_at !== null) continue;
-      const envelope = tx.get('envelopes', { envelope_id: row.envelope_id });
+  const candidates = await ctx.store.transaction((tx) => {
+    const envelopeIds = [
+      ...new Set(
+        tx.select('proofs', { status: { in: [...OWN_ON_CHAIN] } }).map((r) => r.envelope_id),
+      ),
+    ].sort();
+    const out: [string, Row<'files'>[]][] = [];
+    for (const envelopeId of envelopeIds) {
       // Only files this agent sent: a receipt is about the sender's own record.
-      if (envelope?.direction !== 'out') continue;
-      const rows = byEnvelope.get(row.envelope_id) ?? [];
-      rows.push(row);
-      byEnvelope.set(row.envelope_id, rows);
+      if (tx.get('envelopes', { envelope_id: envelopeId })?.direction !== 'out') continue;
+      const rows = tx
+        .select('files', { envelope_id: envelopeId })
+        .filter((row) => row.deleted_at === null);
+      if (rows.length > 0) out.push([envelopeId, rows]);
     }
-    return [...byEnvelope.entries()].slice(0, MAX_RECEIPT_RETENTION_PER_PASS);
+    return out;
   });
+  const start = candidates.length === 0 ? 0 : deps.cursor.next % candidates.length;
+  const pending = [...candidates.slice(start), ...candidates.slice(0, start)].slice(
+    0,
+    MAX_RECEIPT_RETENTION_PER_PASS,
+  );
+  deps.cursor.next = start + pending.length;
   let deleted = 0;
   let failed = 0;
   for (const [envelopeId, rows] of pending) {
