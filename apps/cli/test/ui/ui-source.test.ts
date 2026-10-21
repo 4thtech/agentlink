@@ -31,6 +31,7 @@ import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing'
 import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { createUiApprovalSource } from '../../src/approval/ui-source.js';
+import { copy } from '../../src/tools/strings/index.js';
 import type { OwnerAgent } from '../../src/commands/owner/deps.js';
 
 const T0 = 1_800_000_000;
@@ -151,6 +152,15 @@ describe('the local UI approval source (M1-11a)', () => {
       { name: 'text', value: 'hello' },
       { name: 'to', value: 'Ana' },
     ]);
+  });
+
+  it('says what a proof makes public on a send that adds proof (11 §5.6, D-109)', async () => {
+    const w = await world();
+    await w.request({ to: 'Ana', text: 'hello', notarize: true });
+    const [view] = await w.source.list();
+    expect(view?.details?.rule).toContain(copy('common.privacy.proof'));
+    expect(view?.details?.rule).toMatch(/If .+ confirms delivery, it also becomes public/);
+    expect(view?.details?.rule).toMatchSnapshot();
   });
 
   it('passes injected HTML in AI-chosen text through as data, never as markup', async () => {

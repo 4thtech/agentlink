@@ -31,7 +31,8 @@ import {
   readRow,
   type PendingRequest,
 } from '../commands/owner/pending.js';
-import { cardFacts, type CardFacts } from '../commands/owner/render.js';
+import { cardFacts, recipientName, type CardFacts } from '../commands/owner/render.js';
+import { cardDisclosure } from '../tools/strings/privacy.js';
 
 /** Longest name and value shown for one AI argument (the server refuses longer). */
 const MAX_NAME = 256;
@@ -75,6 +76,14 @@ function ruleOf(action: JsonObject): string {
   return lines.length === 0 ? OUTSIDE_RULES : lines.join(' ');
 }
 
+/** 11 §5.6: what the proof or receipt makes public, fixed text chosen by the tool (never AI text). */
+function disclosureOf(action: JsonObject, facts: CardFacts): string[] {
+  const tool = action['tool'];
+  return typeof tool === 'string'
+    ? cardDisclosure(tool, asObject(action['args']), recipientName(facts.who))
+    : [];
+}
+
 function fromAi(action: JsonObject): { name: string; value: string }[] {
   const args = asObject(action['args']);
   if (args === undefined) return [];
@@ -100,7 +109,7 @@ function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
     what: facts.what,
     cost: facts.cost,
     expires: facts.expires,
-    rule: ruleOf(request.action),
+    rule: [ruleOf(request.action), ...disclosureOf(request.action, facts)].join(' '),
     fromAi: fromAi(request.action).slice(0, 64),
     ...(lines === undefined ? {} : { terms: lines }),
   };

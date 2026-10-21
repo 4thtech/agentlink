@@ -21,6 +21,7 @@ import {
   proofRefusal,
   proofThrown,
 } from './proofs-common.js';
+import { exportDisclosure, withDisclosure } from './strings/privacy.js';
 import { fail, internalError, ok, pendingApproval, type HandlerOutput } from './result.js';
 
 export const EXPORT_TEXT = Object.freeze({
@@ -92,7 +93,11 @@ export async function exportProofPackHandler(
   switch (result.status) {
     case 'pending_approval':
       // Nothing is written before the owner approved (06 §2.4, §3).
-      return pendingApproval(context, result.approvalId, EXPORT_TEXT.approval);
+      return pendingApproval(
+        context,
+        result.approvalId,
+        withDisclosure(EXPORT_TEXT.approval, exportDisclosure()),
+      );
     case 'rejected':
       context.logger.info('proof pack refused', { code: result.code });
       return refusal(result.code);
@@ -115,10 +120,16 @@ export async function exportProofPackHandler(
             );
       }
       context.logger.info('proof pack saved', { content: withKey });
-      return ok(withKey ? EXPORT_TEXT.savedWithContent : EXPORT_TEXT.saved, {
-        savedTo: saved.savedTo,
-        recordId: result.recordId,
-      });
+      return ok(
+        withDisclosure(
+          withKey ? EXPORT_TEXT.savedWithContent : EXPORT_TEXT.saved,
+          exportDisclosure(),
+        ),
+        {
+          savedTo: saved.savedTo,
+          recordId: result.recordId,
+        },
+      );
     }
     default:
       return internalError();

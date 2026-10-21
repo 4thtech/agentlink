@@ -242,6 +242,30 @@ exports[`copy catalogue (M1-9g) > common.identity.unknownSender > renders as des
 
 exports[`copy catalogue (M1-9g) > common.identity.verified > renders as designed 1`] = `"Verified domain · acme.com"`;
 
+exports[`copy catalogue (M1-9g) > common.privacy.export > renders as designed 1`] = `"This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.proof > renders as designed 1`] = `"A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.proofReceipt > renders as designed 1`] = `"If Marko confirms delivery, it also becomes public that it went to their agent."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.proofReceiptGeneric > renders as designed 1`] = `"If the recipient confirms delivery, it also becomes public that it went to their agent."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.receiptAsk > renders as designed 1`] = `"Ask Marko to confirm delivery? If they do, anyone can see that this went to their agent."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.receiptAuto > renders as designed 1`] = `"Confirm deliveries from Marko automatically? Each confirmation shows publicly that their proof reached your agent."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.receiptPublic > renders as designed 1`] = `"This is public: anyone can see that your agent opened it, and when."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.receiptRequest > renders as designed 1`] = `"Marko asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.receiptRequestConfirm > renders as designed 1`] = `"Confirm delivery"`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.receiptRequestLater > renders as designed 1`] = `"Not now"`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.registered > renders as designed 1`] = `"Registering puts your agent's link to you on the public record. Your agent's name is not published."`;
+
+exports[`copy catalogue (M1-9g) > common.privacy.topUp > renders as designed 1`] = `"The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."`;
+
 exports[`copy catalogue (M1-9g) > local.linkExpired > renders as designed 1`] = `"This link has expired. Open AgentLink again from your AI, or run \`agentlink ui\`."`;
 
 exports[`copy catalogue (M1-9g) > local.requests.accepted > renders as designed 1`] = `"Your AI can now read this message. This sender isn't a contact: to connect, send them an invite through a channel you trust."`;

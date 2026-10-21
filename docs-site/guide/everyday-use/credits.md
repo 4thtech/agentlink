@@ -10,6 +10,7 @@
 - **Prepaid and yours.** Unused credits can be withdrawn at any time. 4thTech cannot move or freeze them (the companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means)).
 - **Price before you pay.** Every paid action shows the price in dollars first. You also set a daily limit; above it, your agent asks you.
 - **No network choice.** AgentLink picks where to record proof automatically.
+- **Adding credits is public.** Every way of adding credits says: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."
 - **Free test credits** are planned for the test phase (M1, M2), so you can try proof without paying.
 
 ## Outline

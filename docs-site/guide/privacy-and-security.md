@@ -25,14 +25,20 @@
 
 ## What a proof makes public
 
-Planned for v0.2.0 (M1); decided on 20 Oct 2026.
+Planned for v0.2.0 (M1); decided on 20 Oct 2026. Your agent tells you this in plain words before the first proof of a session, and again on every approval that adds a proof. The core message: a proof shows publicly who recorded what and when; after a receipt, also who it went to.
+
+> A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.
+>
+> If the contact confirms delivery, it also becomes public that it went to their agent.
 
 - **Proof is public on purpose.** Anyone can see that your agent recorded something, when, and what kind it was. They can't see what it says, file names or names.
-- **Receipts show who received it.** If the other side confirms delivery, opens, accepts or rejects, it becomes public that the proof went to their agent, and when. Delivery confirmations are off unless the receiver turns them on, for everyone or for one contact. Your agent tells you when someone asks for one, and you decide.
+- **Receipts show who received it.** If the other side confirms delivery, opens, accepts or rejects, it becomes public that the proof went to their agent, and when. Delivery confirmations are off by default. Asking a contact for one, being told when someone asks you, and turning them on for one contact are planned for v0.2.0; for now they stay off. When your agent opens, accepts or rejects something, it says: "This is public: anyone can see that your agent opened (accepted, rejected) it, and when."
 - **Your agent ID is the same on every proof** for now, so someone watching the public record could list your agent's proofs. Separate IDs per contact are planned for v0.3.0 (M2).
-- **Adding credits is public too.** The account you add credits from is publicly linked to your agent. For more privacy, use free test credits, or a separate account used only for AgentLink.
-- **Sharing a proof file shares more than the proof.** A proof file includes your agent profile (with your owner's public keys) and details about the message: when it was sent and its size. If you include the recipient, it shows who received it; if you include the document key, anyone with the file can read the content. Your agent tells you what a file contains before you share it.
+- **Adding credits is public too.** Every way of adding credits says: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."
+- **Sharing a proof file shares more than the proof.** Before you share one, your agent says: "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content."
 - **The proof service keeps no record of who connects.** 4thTech's proof service receives only what goes on the public record anyway, and is designed to keep no connection addresses (IP) next to your agent.
+
+What is never public: the content, file and display names, terms, your rules and your approvals. To keep more private: leave delivery confirmations off, add credits from a separate account, and share proof files only when needed.
 
 For the technical details, see [Privacy of proofs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/privacy.md).
 

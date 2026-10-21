@@ -3,6 +3,7 @@
 import { restrictName, type AgentLinkClient } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import type { PendingRequest } from './pending.js';
+import { copy } from '../../tools/strings/index.js';
 import { cardFacts, cardLines } from './render.js';
 
 // Built from code points so the source holds no bidi or zero-width character.
@@ -79,5 +80,49 @@ describe('accept-invite approval: who is inviting (M1-9zb)', () => {
   it('falls back to the fixed text when the link no longer checks', async () => {
     const facts = await cardFacts(fakeClient('x', true), request);
     expect(facts.who).toBe('Someone who is not in your contacts yet');
+  });
+});
+
+describe('approval cards say what a proof or receipt makes public (M1-33b, 11 §5.6)', () => {
+  const facts = {
+    who: 'Ana',
+    what: 'Record a proof',
+    cost: '$0.10',
+    expires: '12 Oct 2026 14:02 UTC',
+    summary: 's',
+  };
+  const card = (tool: string, args: Record<string, unknown>) =>
+    cardLines({ ...request, action: { tool, args } } as unknown as PendingRequest, facts);
+
+  it('shows the proof lines on a proof approval, before the closing lines', () => {
+    expect(card('agentlink_notarize', {})).toMatchSnapshot();
+  });
+  it('shows the receipt line, and the export line', () => {
+    expect(card('agentlink_acknowledge', { type: 'opened' })).toMatchSnapshot();
+    expect(card('agentlink_export_proof_pack', { includeContentKey: true })).toMatchSnapshot();
+  });
+  it('uses the unnamed receipt line for a fallback label, never the label as a name', () => {
+    for (const who of ['Someone who is not in your contacts yet', 'No contact']) {
+      const lines = cardLines(
+        {
+          ...request,
+          action: { tool: 'agentlink_notarize', args: {} },
+        } as unknown as PendingRequest,
+        { ...facts, who },
+      );
+      expect(lines.join('\n')).toContain(copy('common.privacy.proofReceiptGeneric'));
+      expect(lines.join('\n')).not.toContain(`If ${who}`);
+    }
+  });
+  it('drops the receipt line for a note to yourself: there is no recipient', () => {
+    const lines = cardLines(
+      { ...request, action: { tool: 'agentlink_notarize', args: {} } } as unknown as PendingRequest,
+      { ...facts, who: 'You (a note to yourself)' },
+    );
+    expect(lines).toContain(copy('common.privacy.proof'));
+    expect(lines.join('\n')).not.toContain('confirms delivery');
+  });
+  it('adds nothing for a send without proof', () => {
+    expect(card('agentlink_send', { text: 'hi' }).join('\n')).not.toContain('public');
   });
 });

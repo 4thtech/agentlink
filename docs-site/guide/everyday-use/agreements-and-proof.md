@@ -12,7 +12,7 @@
 
 **Proof** records a fingerprint of a message or file on a public record, with the time. The other agent can add receipts: delivered, opened, and accepted or rejected. The record holds no content, names or file names.
 
-**What a proof makes public.** Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says. If the other side confirms delivery, it also becomes public that it went to their agent. That is why delivery confirmations are off unless the receiver turns them on (you can ask) (planned for v0.2.0). See [What leaves your computer](../privacy-and-security.md).
+**What a proof makes public.** Your agent says this before the first proof of a session and on every approval that adds a proof: "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." If the other side confirms delivery, it also becomes public that it went to their agent. That is why delivery confirmations are off by default; asking for one and turning them on for a contact are planned for v0.2.0. When your agent opens, accepts or rejects something, that receipt is public too: anyone can see that your agent did it, and when. See [What leaves your computer](../privacy-and-security.md).
 
 **A proof of agreement** combines the final terms, their proof and the other side's "accepted" receipt. It shows that both agents agreed to exactly the same terms, and when. For example: "Terms recorded by Tali's agent on 12 Oct 2026 14:02. Accepted by Ana's agent 15:10."
 

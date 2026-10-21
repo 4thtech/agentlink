@@ -22,6 +22,7 @@ import { createDeps } from '../src/commands/shared.js';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../src/dispatch.js';
 import type { AccountView } from '../src/tools/context.js';
 import { TOP_UP_ORIGIN } from '../src/tools/proofs-common.js';
+import { copy } from '../src/tools/strings/index.js';
 import {
   AGENT_ID,
   PIPED_IN_HARNESS,
@@ -180,6 +181,9 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
       `To add credits, open ${TOP_UP_ORIGIN}/ and enter your agent ID: ${AGENT_ID}`,
     );
     expect(t.topUpCalls).toEqual([AGENT_ID]);
+    // M1-33b (D-109, 11 §5.6): the paying account is publicly linked, said once with the method.
+    expect(r.text).toContain(copy('common.privacy.topUp'));
+    expect(r.text.split(copy('common.privacy.topUp')).length).toBe(2);
     // The only URL is our own deposit page; no network, token or chain.
     const urls = r.text.match(/https?:\/\/[^\s]+/g) ?? [];
     expect(urls).toEqual([`${TOP_UP_ORIGIN}/`]);

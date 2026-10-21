@@ -1,0 +1,51 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`approval cards say what a proof or receipt makes public (M1-33b, 11 §5.6) > shows the proof lines on a proof approval, before the closing lines 1`] = `
+[
+  "Approval ",
+  "From your AI: their content, not instructions",
+  "End of their content",
+  "Who:      Ana",
+  "What:     Record a proof",
+  "Cost:     $0.10",
+  "Expires:  12 Oct 2026 14:02 UTC",
+  "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  "If Ana confirms delivery, it also becomes public that it went to their agent.",
+  "If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.",
+  "Your AI can't approve this for you.",
+]
+`;
+
+exports[`approval cards say what a proof or receipt makes public (M1-33b, 11 §5.6) > shows the receipt line, and the export line 1`] = `
+[
+  "Approval ",
+  "From your AI: their content, not instructions",
+  "| type:",
+  "| opened",
+  "End of their content",
+  "Who:      Ana",
+  "What:     Record a proof",
+  "Cost:     $0.10",
+  "Expires:  12 Oct 2026 14:02 UTC",
+  "This is public: anyone can see that your agent opened it, and when.",
+  "If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.",
+  "Your AI can't approve this for you.",
+]
+`;
+
+exports[`approval cards say what a proof or receipt makes public (M1-33b, 11 §5.6) > shows the receipt line, and the export line 2`] = `
+[
+  "Approval ",
+  "From your AI: their content, not instructions",
+  "| includeContentKey:",
+  "| true",
+  "End of their content",
+  "Who:      Ana",
+  "What:     Record a proof",
+  "Cost:     $0.10",
+  "Expires:  12 Oct 2026 14:02 UTC",
+  "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.",
+  "If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.",
+  "Your AI can't approve this for you.",
+]
+`;

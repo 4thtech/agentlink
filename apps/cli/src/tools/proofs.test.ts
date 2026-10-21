@@ -29,6 +29,7 @@ import type {
   ToolContext,
 } from './context.js';
 import { callTool } from './index.js';
+import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
 import { findTool } from './registry.js';
 import { matchesSchema } from './input.js';
@@ -1138,5 +1139,104 @@ describe('no network name, token name or chain prompt outside Advanced in any pr
       .map((r) => JSON.stringify(r.structured))
       .filter((s) => s.includes('"advanced":{"chain":"base-sepolia"}'));
     expect(advanced.length).toBeGreaterThan(3);
+  });
+});
+
+// ---- M1-33b: what a proof makes public (11 §5.6, D-109) ----------------------------------------------
+
+describe('proof privacy disclosure (11 §5.6, D-109)', () => {
+  const PROOF_LINE = copy('common.privacy.proof');
+  const pending = {
+    status: 'pending_approval',
+    approvalId: APPROVAL,
+    actionDigest: 'd'.repeat(64),
+    summary: 'x',
+    expiresAt: 1_760_700_000,
+  } as const;
+
+  it('notarize: the approval and the first recorded proof of a session say what is public, once', async () => {
+    const { client } = fake({
+      notarize: (input) => (input.approvalId === undefined ? pending : recorded()),
+    });
+    const ask = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(ask.structured.summary).toContain(PROOF_LINE);
+    expect(ask.structured.summary).toContain(copy('common.privacy.proofReceiptGeneric'));
+    const first = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, approvalId: APPROVAL },
+      client,
+    );
+    expect(first.structured.summary).toContain(PROOF_LINE);
+    const second = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, approvalId: APPROVAL },
+      client,
+    );
+    expect(second.structured.summary).not.toContain(PROOF_LINE);
+    expect(second.structured.summary).toContain('Proof recorded.');
+  });
+
+  it('send with proof: the approval names the contact in the receipt line', async () => {
+    const { client } = fake({ notarize: () => pending });
+    const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+    expect(r.structured.summary).toContain(PROOF_LINE);
+    expect(r.structured.summary).toMatch(/If .+ confirms delivery, it also becomes public/);
+  });
+
+  it('acknowledge: a receipt says it is public, by type, in the result and the approval', async () => {
+    const opened = await call(
+      'agentlink_acknowledge',
+      { envelopeId: ENVELOPE, type: 'opened' },
+      fake().client,
+    );
+    expect(opened.structured.summary).toContain(
+      copy('common.privacy.receiptPublic', { receipt: 'opened' }),
+    );
+    const { client } = fake({ acknowledge: () => pending });
+    const ask = await call(
+      'agentlink_acknowledge',
+      { envelopeId: ENVELOPE, type: 'accepted' },
+      client,
+    );
+    expect(ask.structured.summary).toContain(
+      copy('common.privacy.receiptPublic', { receipt: 'accepted' }),
+    );
+  });
+
+  it('export: the saved result and the key approval say what the file shows', async () => {
+    const saved = await call(
+      'agentlink_export_proof_pack',
+      { envelopeId: ENVELOPE },
+      fake().client,
+    );
+    expect(saved.structured.summary).toContain(copy('common.privacy.export'));
+    const { client } = fake({ exportPack: () => pending });
+    const ask = await call(
+      'agentlink_export_proof_pack',
+      { envelopeId: ENVELOPE, includeContentKey: true },
+      client,
+    );
+    expect(ask.structured.summary).toContain(copy('common.privacy.export'));
+  });
+
+  it('adding credits: the top-up route says the paying account is publicly linked', async () => {
+    const { client } = fake({
+      notarize: () => ({
+        status: 'needs_credits',
+        topUp: {
+          chainId: 84532,
+          chain: 'base-sepolia',
+          token: 'USDC',
+          usd: '1.00',
+          feeUsd: '0.10',
+          agentAddress: A as `0x${string}`,
+        },
+      }),
+    });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(r.structured.status).toBe('needs_credits');
+    expect(`${r.structured.summary}\n${r.structured.nextStep ?? ''}`).toContain(
+      copy('common.privacy.topUp'),
+    );
   });
 });

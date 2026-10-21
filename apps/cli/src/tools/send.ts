@@ -233,7 +233,15 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
         };
       }
       if (!withProof) return ok(summary, sentFields);
-      return withProofOf(result.envelopeId, summary, sentFields, approvalId, self.agentId, context);
+      return withProofOf(
+        result.envelopeId,
+        summary,
+        sentFields,
+        approvalId,
+        self.agentId,
+        context,
+        name,
+      );
     }
     case 'needs_setup':
       logger.info('file send needs setup', { reason: result.reason });
@@ -306,6 +314,7 @@ async function withProofOf(
   approvalId: unknown,
   agentId: string,
   context: ToolContext,
+  contactName: string,
 ): Promise<HandlerOutput> {
   const proofs = context.client.proofs;
   if (proofs === undefined || !ENVELOPE_ID.test(envelopeId)) return internalError();
@@ -316,6 +325,7 @@ async function withProofOf(
       ...(typeof approvalId === 'string' ? { approvalId } : {}),
     });
     proofOut = notarizeOutput(result, context, agentId, {
+      contactName,
       approvalSummary: SEND_TEXT.proofApproval,
       approvalNextStepTail: SEND_TEXT.proofApprovalTail.replace('{envelopeId}', envelopeId),
     });

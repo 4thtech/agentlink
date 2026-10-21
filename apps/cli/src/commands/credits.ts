@@ -21,6 +21,7 @@ import {
 } from '../dispatch.js';
 import type { AccountView } from '../tools/context.js';
 import { TOP_UP_ORIGIN, dollars } from '../tools/proofs-common.js';
+import { topUpDisclosure } from '../tools/strings/privacy.js';
 import { createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 
 /** How long `--topup` waits for the proof networks (07 §6.3 default per-chain budget). */
@@ -155,6 +156,8 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
           );
         }
         lines.push(fill(CREDITS_TEXT.topUpHow, { url: `${TOP_UP_ORIGIN}/`, agentId }));
+        // 11 §5.6: each top-up method says the paying account is publicly linked (D-109).
+        lines.push(topUpDisclosure());
       } else {
         lines.push(CREDITS_TEXT.topUpHelp);
       }

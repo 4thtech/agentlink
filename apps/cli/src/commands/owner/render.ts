@@ -25,6 +25,7 @@ import { RESTRICTED_NAME_FALLBACK, isUsdAmount, parseUsd } from '@4thtech-io/typ
 import { isApprovalId } from '../../approval/next-step.js';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
 import { formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';
+import { cardDisclosure } from '../../tools/strings/privacy.js';
 import type { PendingRequest } from './pending.js';
 import { OWNER_TEXT } from './strings.js';
 import { termsCard, type TermsCardView } from './terms-card.js';
@@ -122,6 +123,13 @@ function expiryOf(expiresAt: number): string {
   return `${formatDate(at)} ${formatTime(at)} UTC`;
 }
 
+/** The name for a receipt line: undefined for a fallback label, null for a note to yourself. */
+export function recipientName(who: string): string | null | undefined {
+  if (who === OWNER_TEXT.noteToSelf) return null;
+  if (who === OWNER_TEXT.notAContact || who === OWNER_TEXT.noContact) return undefined;
+  return who;
+}
+
 export async function cardFacts(
   client: AgentLinkClient,
   request: PendingRequest,
@@ -183,6 +191,9 @@ export function cardLines(request: PendingRequest, facts: CardFacts, index?: num
     `Expires:  ${facts.expires}`,
   );
   if (terms !== undefined) lines.push(...terms.after);
+  // 11 §5.6: say what the proof or receipt makes public, from the stored action (never AI text).
+  const tool = request.action['tool'];
+  if (typeof tool === 'string') lines.push(...cardDisclosure(tool, args, recipientName(facts.who)));
   lines.push(OWNER_TEXT.consequence, OWNER_TEXT.cannotApprove);
   return lines;
 }

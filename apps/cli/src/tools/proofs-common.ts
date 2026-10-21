@@ -21,6 +21,7 @@ import {
   pendingApproval,
   type HandlerOutput,
 } from './result.js';
+import { proofDisclosure, topUpDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
 
 /** The deposit page origin (D-28 testing hostnames; 08 §1: a separate origin, no owner keys). */
@@ -109,7 +110,8 @@ export function needsCredits(
     url === undefined
       ? PROOF_TEXT.needsCreditsNoLink
       : fill(PROOF_TEXT.needsCreditsNextStep, { url, agentId });
-  return fail('needs_credits', summary, nextStep, undefined, {
+  // 11 §5.6: the top-up method says the paying account is publicly linked (D-109).
+  return fail('needs_credits', summary, withDisclosure(nextStep, topUpDisclosure()), undefined, {
     ...fields,
     agentAddress: agentId,
     ...(url === undefined ? {} : { topUpUrl: url }),
@@ -210,6 +212,15 @@ export async function needsIdentity(
 export const isOutput = (value: unknown): value is HandlerOutput =>
   typeof value === 'object' && value !== null && 'result' in value;
 
+const toldThisSession = new WeakSet<object>();
+
+/** True once per session (per core client): the first proof says what a proof makes public. */
+function firstProofOfSession(context: ToolContext): boolean {
+  if (toldThisSession.has(context.client)) return false;
+  toldThisSession.add(context.client);
+  return true;
+}
+
 /**
  * A core `notarize` result as a ProofStatus result (06 §2.4). `fields` are added to every result
  * (agentlink_send's envelope fields); `approvalSummary` and `nextStepTail` let a caller word the
@@ -223,22 +234,32 @@ export function notarizeOutput(
     readonly fields?: Readonly<Record<string, unknown>>;
     readonly approvalSummary?: string;
     readonly approvalNextStepTail?: string;
+    /** The recipient under the name rule (06 §2.1), when the caller knows it (send). */
+    readonly contactName?: string;
   } = {},
 ): HandlerOutput {
   const fields = options.fields ?? {};
+  const disclosure = proofDisclosure(options.contactName);
   switch (result.status) {
     case 'ok': {
       const fee = dollars(result.fee.usd);
-      return ok(fee === undefined ? PROOF_TEXT.recordedNoFee : fill(PROOF_TEXT.recorded, { fee }), {
+      const text =
+        fee === undefined ? PROOF_TEXT.recordedNoFee : fill(PROOF_TEXT.recorded, { fee });
+      return ok(firstProofOfSession(context) ? withDisclosure(text, disclosure) : text, {
         ...fields,
         ...proofFields(result),
       });
     }
     case 'submitted':
-      return fail('submitted', PROOF_TEXT.recording, PROOF_TEXT.recordingNextStep, undefined, {
-        ...fields,
-        ...proofFields(result),
-      });
+      return fail(
+        'submitted',
+        firstProofOfSession(context)
+          ? withDisclosure(PROOF_TEXT.recording, disclosure)
+          : PROOF_TEXT.recording,
+        PROOF_TEXT.recordingNextStep,
+        undefined,
+        { ...fields, ...proofFields(result) },
+      );
     case 'needs_credits':
       return needsCredits(agentId, result.topUp, {
         ...fields,
@@ -255,7 +276,7 @@ export function notarizeOutput(
       const output = pendingApproval(
         context,
         result.approvalId,
-        options.approvalSummary ?? PROOF_TEXT.approval,
+        withDisclosure(options.approvalSummary ?? PROOF_TEXT.approval, disclosure),
         { ...fields, receipts: [] },
       );
       if (options.approvalNextStepTail === undefined) return output;

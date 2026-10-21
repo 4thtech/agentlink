@@ -35,11 +35,13 @@ import {
   askSummary,
   dateOf,
   nameOf,
+  oneLineName,
   termsApprovalState,
   termsCoreError,
   termsInProgress,
   termsRefusal,
 } from './terms-common.js';
+import { proofDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
 
 interface RespondInput {
@@ -103,7 +105,15 @@ export async function respondToTermsHandler(
       return termsApprovalState(context, 'agentlink_respond_to_terms', result);
     case 'pending_approval':
       logger.info('terms approval requested', { requests: 1 });
-      return pendingApproval(context, result.approvalId, askSummary(result.card), { decision });
+      return pendingApproval(
+        context,
+        result.approvalId,
+        withDisclosure(
+          askSummary(result.card),
+          proofDisclosure(oneLineName(result.card.counterparty.shown) || undefined),
+        ),
+        { decision },
+      );
     case 'rejected':
       logger.info('respond to terms refused', { kind: 'terms' });
       return termsRefusal(
