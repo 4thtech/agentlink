@@ -87,7 +87,12 @@ export default defineConfig({
         ],
         test: {
           name: 'submitter',
-          include: ['test/submitter.test.ts', 'test/faucet.test.ts', 'test/smoke.test.ts'],
+          include: [
+            'test/submitter.test.ts',
+            'test/faucet.test.ts',
+            'test/smoke.test.ts',
+            'test/entry.test.ts',
+          ],
           testTimeout: 20_000,
         },
       },
