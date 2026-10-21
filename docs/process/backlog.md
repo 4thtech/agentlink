@@ -1001,7 +1001,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
 
 #### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
-- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** in review (`docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
 - **Depends on:** — (runs in parallel with M1-35a)
 - **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
