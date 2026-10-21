@@ -476,7 +476,7 @@ describe('createFaucetChain().credit robustness (M1-10b-c)', () => {
     const port = faucet(chain);
     expect(await port.credit(AGENT, 100)).toEqual({ state: 'not_sent', reason: 'busy' });
     chain.nonce = 8;
-    chain.pendingNonce = undefined;
+    delete chain.pendingNonce;
     expect((await port.credit(AGENT, 100)).state).toBe('sent');
     expect(decodeSent(chain.sent[0]?.raw as Hex).tx.nonce).toBe(8);
   });
