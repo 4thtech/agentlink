@@ -35,6 +35,13 @@ Argon2id, HKDF and AES-GCM are `cryptography`, JCS is `rfc8785`. A reference ope
 every accept case and refuse every reject case before anything is written. Seeds, codes, salts,
 nonce prefixes, store bytes and item values are synthetic test values (vectorlib.det).
 
+credentialDigest (04 §2.5.1 `storage.set`, M1-9i-b2): HMAC-SHA256(key = the 16 raw bytes of the
+`s3:<id>` item's salt, msg = JCS({"accessKeyId","secretAccessKey"})) as 64 lowercase hex, with both
+values non-empty, well-formed UTF-8 and never normalised; the item (04 §2.2) is the JCS JSON
+{"v":1,"salt","accessKeyId","secretAccessKey"} as UTF-8 bytes, salt as base64url, and an item
+reader accepts exactly that canonical form. HMAC is Python's `hmac`; JCS is `rfc8785`, checked
+against Python's `json` module.
+
 `openWithKek` opens with the case's kek (the code path minus Argon2id), so the many entry-list cases
 do not each pay for a KDF run; the header, code and KDF refusals go through `open` with the code.
 
@@ -55,7 +62,7 @@ import generate_stream as st  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "recovery-kit"
-VERSION = 1
+VERSION = 2
 SPEC = "04 §2.3.3 ALKK v1"
 INFO = b"agentlink/v1/recovery-kit"
 MAGIC = b"ALKK"
@@ -278,6 +285,193 @@ def flipped(data, offset, mask=0x01):
     out = bytearray(data)
     out[offset] ^= mask
     return bytes(out)
+
+
+# --- credentialDigest (04 §2.5.1 `storage.set`, §2.2 `s3:<id>`; M1-9i-b2) -------------------------
+#
+# credentialDigest = HMAC-SHA256(key = the item's salt, its 16 raw bytes, msg =
+# JCS({"accessKeyId", "secretAccessKey"})) as 64 lowercase hex. The item `s3:<id>` is the JCS JSON
+# {"v":1,"salt","accessKeyId","secretAccessKey"} as UTF-8 bytes, salt 16 bytes as base64url.
+# Both values are UTF-8 bytes: they must be well-formed UTF-8 (no overlong form, surrogate or code
+# point above U+10FFFF) and non-empty, and are never normalised. JCS (RFC 8785) escapes `"` and `\`,
+# writes U+0008, U+0009, U+000A, U+000C and U+000D as \b \t \n \f \r and every other code point below
+# U+0020 as \u00xx in lower-case hex, and writes everything else (U+007F, U+2028, `/`, non-ASCII) as
+# itself. Encoded twice here, with `rfc8785` and with Python's json module, which must agree.
+
+SALT_LEN = 16
+CREDENTIAL_KEYS = ["accessKeyId", "salt", "secretAccessKey", "v"]
+
+
+def credential_text(raw):
+    """A credential value: non-empty, strict UTF-8 (Python's codec refuses overlongs, surrogates and
+    code points above U+10FFFF)."""
+    text = bytes(raw).decode("utf-8", "strict")
+    if text == "":
+        raise ValueError("empty credential value")
+    return text
+
+
+def jcs_twice(obj):
+    a = v.jcs(obj)
+    b = json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if a != b:
+        v.fail("credentialDigest: rfc8785 and json disagree")
+    return a
+
+
+def credential_digest(salt, access_key_id, secret_access_key):
+    if len(salt) != SALT_LEN:
+        raise ValueError("salt must be 16 bytes")
+    msg = jcs_twice({"accessKeyId": credential_text(access_key_id), "secretAccessKey": credential_text(secret_access_key)})
+    return v.hmac_sha256(salt, msg)
+
+
+def credential_item(salt, access_key_id, secret_access_key):
+    if len(salt) != SALT_LEN:
+        raise ValueError("salt must be 16 bytes")
+    return jcs_twice({"v": 1, "salt": v.b64u(salt), "accessKeyId": credential_text(access_key_id), "secretAccessKey": credential_text(secret_access_key)})
+
+
+def parse_credential_item(item):
+    """Strict reader of an `s3:<id>` item: exactly the canonical JCS bytes of the four keys."""
+
+    def no_duplicates(pairs):
+        keys = [k for k, _ in pairs]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate key")
+        return dict(pairs)
+
+    obj = json.loads(bytes(item).decode("utf-8", "strict"), object_pairs_hook=no_duplicates)
+    if not isinstance(obj, dict) or sorted(obj) != CREDENTIAL_KEYS:
+        raise ValueError("wrong keys")
+    if type(obj["v"]) is not int or obj["v"] != 1:
+        raise ValueError("v must be 1")
+    if not all(isinstance(obj[k], str) for k in ("salt", "accessKeyId", "secretAccessKey")):
+        raise ValueError("strings expected")
+    salt = v.unb64u(obj["salt"])
+    # A lone surrogate written as \udxxx decodes to a str with no UTF-8 form: refused here.
+    access, secret = (obj[k].encode("utf-8", "strict") for k in ("accessKeyId", "secretAccessKey"))
+    if credential_item(salt, access, secret) != bytes(item):
+        raise ValueError("not the canonical item")
+    return salt, access, secret
+
+
+def credential_digest_of_item(item):
+    return credential_digest(*parse_credential_item(item))
+
+
+def build_credential_digest():
+    cases = []
+    src = "04 §2.5.1 storage.set credentialDigest = HMAC-SHA256(key = the s3:<id> item's salt, msg = JCS({\"accessKeyId\",\"secretAccessKey\"})); 04 §2.2 s3:<id> item"
+    salt = v.det("recovery-kit/credential/salt", SALT_LEN)
+    key_id = b"test-key-id-0001"
+    secret = b"test-secret-0001-" + v.b64u(v.det("recovery-kit/credential/secret", 24)).encode("ascii")
+
+    def fields(s, k, sec):
+        return {"op": "credentialDigest", "salt": v.hx(s), "accessKeyId": v.hx(k), "secretAccessKey": v.hx(sec)}
+
+    def accept(case_id, why, s, k, sec):
+        digest = credential_digest(s, k, sec)
+        item = credential_item(s, k, sec)
+        if credential_digest_of_item(item) != digest:
+            v.fail(f"{case_id}: the item reader disagrees")
+        cases.append(v.case(f"credential-digest-{case_id}", f"{src}: {why}", fields(s, k, sec), {"credentialDigest": v.hx(digest), "item": v.hx(item)}))
+        return item
+
+    def reject(case_id, why, s, k, sec):
+        if not refused(credential_digest, s, k, sec) or not refused(credential_item, s, k, sec):
+            v.fail(f"{case_id}: the reference accepts it")
+        cases.append(v.case(f"credential-digest-reject-{case_id}", f"{src}: {why}", fields(s, k, sec), {"outcome": "reject"}))
+
+    def item_accept(case_id, why, item):
+        cases.append(v.case(f"credential-item-{case_id}", f"{src}: {why}", {"op": "credentialItem", "item": v.hx(item)}, {"credentialDigest": v.hx(credential_digest_of_item(item))}))
+
+    def item_reject(case_id, why, item):
+        if not refused(credential_digest_of_item, item):
+            v.fail(f"{case_id}: the reference item reader accepts it")
+        cases.append(v.case(f"credential-item-reject-{case_id}", f"{src}: {why}", {"op": "credentialItem", "item": v.hx(item)}, {"outcome": "reject"}))
+
+    # Accept: the salt.
+    base = accept("ascii", "an ASCII key ID and secret", salt, key_id, secret)
+    other_salt = v.det("recovery-kit/credential/other-salt", SALT_LEN)
+    if credential_digest(other_salt, key_id, secret) == credential_digest(salt, key_id, secret):
+        v.fail("credentialDigest: the salt does not change the digest")
+    accept("other-salt", "the same credentials under another salt give another digest", other_salt, key_id, secret)
+    accept("zero-salt", "an all-zero salt", bytes(SALT_LEN), key_id, secret)
+    accept("ff-salt", "an all-0xff salt (its base64url uses _)", b"\xff" * SALT_LEN, key_id, secret)
+    accept("swapped", "the key ID and secret swapped (the field names are part of the message)", salt, secret, key_id)
+    # Accept: JCS escaping.
+    accept("escape-quote-backslash", "a secret with \" and \\ (written as \\\" and \\\\)", salt, key_id, b'se"cr\\et')
+    accept("escape-short-forms", "a secret with U+0008, U+0009, U+000A, U+000C and U+000D (written as \\b \\t \\n \\f \\r)", salt, key_id, b"a\x08b\x09c\x0ad\x0ce\x0df")
+    accept("escape-u00xx", "a secret with U+0000, U+0001, U+000B and U+001F (written as \\u0000 \\u0001 \\u000b \\u001f, lower-case hex)", salt, key_id, b"a\x00b\x01c\x0bd\x1fe")
+    accept("no-escape", "a secret with U+007F, /, < and & (JCS writes them as themselves)", salt, key_id, b"a\x7fb/c<d&e")
+    # Accept: Unicode.
+    accept("unicode", "non-ASCII values in 2-, 3- and 4-byte UTF-8 (é, 鍵, 🔑), written as UTF-8, never as \\u escapes", salt, "kéy-鍵".encode("utf-8"), "s€cret-🔑".encode("utf-8"))
+    accept("u2028", "U+2028 and U+2029 written as themselves", salt, key_id, "a b c".encode("utf-8"))
+    nfc = accept("nfc", "é as U+00E9 (NFC)", salt, key_id, "café".encode("utf-8"))
+    nfd = accept("nfd", "é as U+0065 U+0301 (NFD): never normalised, so another digest than the NFC case", salt, key_id, "café".encode("utf-8"))
+    if credential_digest_of_item(nfc) == credential_digest_of_item(nfd):
+        v.fail("credentialDigest: NFC and NFD agree")
+    accept("long", "a 1024-byte secret", salt, key_id, v.b64u(v.det("recovery-kit/credential/long", 768)).encode("ascii"))
+    # Reject.
+    reject("salt-15", "a 15-byte salt", salt[:15], key_id, secret)
+    reject("salt-17", "a 17-byte salt", salt + b"\x00", key_id, secret)
+    reject("salt-empty", "an empty salt", b"", key_id, secret)
+    reject("empty-key-id", "an empty access key ID", salt, b"", secret)
+    reject("empty-secret", "an empty secret", salt, key_id, b"")
+    reject("utf8-ff", "a secret with the byte 0xff (not UTF-8)", salt, key_id, b"ab\xffcd")
+    reject("utf8-overlong", "a secret with C0 AF, an overlong form of /", salt, key_id, b"a\xc0\xafb")
+    reject("utf8-surrogate", "a secret with ED A0 80, the UTF-8 form of the surrogate U+D800", salt, key_id, b"a\xed\xa0\x80b")
+    reject("utf8-above-10ffff", "a secret with F4 90 80 80 (above U+10FFFF)", salt, key_id, b"a\xf4\x90\x80\x80b")
+    reject("utf8-truncated", "a secret ending in the first two bytes of a three-byte sequence", salt, key_id, b"ab\xe2\x82")
+    reject("utf8-key-id", "an access key ID with a lone continuation byte 0x80", salt, b"key\x80", secret)
+
+    # The item reader: the digest of a stored item, which must be exactly its canonical form.
+    item_accept("ascii", "the canonical item of the ascii case", base)
+    item_accept("escapes", "the canonical item of a secret with every JCS escape", credential_item(salt, key_id, b'"\\\x08\x09\x0a\x0c\x0d\x00\x1f'))
+    item_accept("unicode", "the canonical item of the unicode case", credential_item(salt, "kéy-鍵".encode("utf-8"), "s€cret-🔑".encode("utf-8")))
+    b64 = v.b64u(salt)
+    k, sec = key_id.decode("ascii"), secret.decode("ascii")
+
+    def shaped(salt_text=b64, secret_text=sec, tail=',"v":1}'):
+        return ('{"accessKeyId":"%s","salt":"%s","secretAccessKey":%s%s' % (k, salt_text, secret_text, tail)).encode("utf-8")
+
+    def quoted(text):
+        return '"%s"' % text
+
+    if shaped(secret_text=quoted(sec)) != base:
+        v.fail("credentialItem: the shaped item is not the canonical one")
+    item_reject("whitespace", "a space after a colon", base.replace(b'"v":1', b'"v": 1'))
+    item_reject("trailing-newline", "a trailing line feed", base + b"\n")
+    item_reject("key-order", "v first instead of in key order", ('{"v":1,"accessKeyId":"%s","salt":"%s","secretAccessKey":"%s"}' % (k, b64, sec)).encode("utf-8"))
+    item_reject("duplicate-key", "accessKeyId twice", ('{"accessKeyId":"%s","accessKeyId":"%s","salt":"%s","secretAccessKey":"%s","v":1}' % (k, k, b64, sec)).encode("utf-8"))
+    item_reject("session-token", "an extra sessionToken (temporary credentials are refused in M1)", shaped(secret_text=quoted(sec), tail=',"sessionToken":"t","v":1}'))
+    item_reject("missing-v", "no v", shaped(secret_text=quoted(sec), tail="}"))
+    item_reject("missing-salt", "no salt", ('{"accessKeyId":"%s","secretAccessKey":"%s","v":1}' % (k, sec)).encode("utf-8"))
+    item_reject("v-2", "v = 2", shaped(secret_text=quoted(sec), tail=',"v":2}'))
+    item_reject("v-string", "v = \"1\"", shaped(secret_text=quoted(sec), tail=',"v":"1"}'))
+    item_reject("v-float", "v = 1.0", shaped(secret_text=quoted(sec), tail=',"v":1.0}'))
+    item_reject("v-true", "v = true", shaped(secret_text=quoted(sec), tail=',"v":true}'))
+    item_reject("salt-15", "a salt of 15 bytes", shaped(salt_text=v.b64u(salt[:15]), secret_text=quoted(sec)))
+    item_reject("salt-padded", "a salt with = padding", shaped(salt_text=b64 + "==", secret_text=quoted(sec)))
+    item_reject("salt-noncanonical", "a salt with non-zero trailing bits", shaped(salt_text=b64[:21] + chr(ord(b64[21]) + 1), secret_text=quoted(sec)))
+    item_reject("salt-std-base64", "a salt in standard base64 (+ and /)", shaped(salt_text=base64.b64encode(b"\xfb\xff" * 8).rstrip(b"=").decode("ascii"), secret_text=quoted(sec)))
+    item_reject("salt-not-string", "a salt as a number", ('{"accessKeyId":"%s","salt":0,"secretAccessKey":"%s","v":1}' % (k, sec)).encode("utf-8"))
+    item_reject("empty-secret", "an empty secret", shaped(secret_text='""'))
+    item_reject("not-string", "a number as the secret", shaped(secret_text="7"))
+    item_reject("escape-upper-hex", "\\u001F in upper-case hex", shaped(secret_text='"a\\u001Fb"'))
+    item_reject("escape-long-form", "\\u000a where JCS writes \\n", shaped(secret_text='"a\\u000ab"'))
+    item_reject("escape-printable", "\\u0041 for A", shaped(secret_text='"\\u0041b"'))
+    item_reject("escape-solidus", "\\/ for /", shaped(secret_text='"a\\/b"'))
+    item_reject("escape-non-ascii", "\\u00e9 for é", shaped(secret_text='"caf\\u00e9"'))
+    item_reject("escape-surrogate", "a lone surrogate written as \\ud800", shaped(secret_text='"a\\ud800b"'))
+    item_reject("escape-unknown", "the escape \\x41", shaped(secret_text='"a\\x41b"'))
+    item_reject("raw-control", "a raw U+000A inside the secret (JCS writes \\n)", shaped(secret_text='"a\nb"'))
+    item_reject("unterminated", "a secret with no closing quote", shaped(secret_text='"ab', tail=""))
+    item_reject("not-utf8", "the byte 0xff inside the secret", shaped(secret_text='"aÿb"').replace("ÿ".encode("utf-8"), b"\xff"))
+    item_reject("not-object", "a JSON array", b"[]")
+    item_reject("empty", "no bytes", b"")
+    return cases
 
 
 # --- fixtures ------------------------------------------------------------------------------------
@@ -604,6 +798,9 @@ def build():
         cases.append(v.case(f"cross-{name.lower()}-reader", f"{SPEC}: the {name} reader refuses an ALKK kit (D-115)", cross_input(name, single.data, single.code, owner_seed), {"outcome": "reject"}))
         patched = name.encode("ascii") + single.data[4:]
         cases.append(v.case(f"cross-{name.lower()}-reader-magic-patched", f"{SPEC}: the {name} reader refuses an ALKK kit whose magic is rewritten to {name}", cross_input(name, patched, single.code, owner_seed), {"outcome": "reject"}))
+
+    # credentialDigest (04 §2.3.3: "The suite also carries credentialDigest vectors") ----------------
+    cases.extend(build_credential_digest())
     return cases
 
 
@@ -663,8 +860,11 @@ SCHEMA = v.case_schema(
     "entry names (comma-separated, in kit order) and each value as `entry:<name>` hex, or a rejection. "
     "`header`: the public header fields read before the code is asked for, or a rejection. "
     "`crossType`: another format's reader (ALKP with `key` as the PRF output, ALKR and ALKS and ALKO "
-    "with `code`, ALF1 with `key` as the file key) given an ALKK kit, which it refuses. Hex without "
-    "0x except agent and owner keys in the ALKO and ALKS inputs; codes as text.",
+    "with `code`, ALF1 with `key` as the file key) given an ALKK kit, which it refuses. "
+    "`credentialDigest` (04 §2.5.1 storage.set): the digest as 64 lowercase hex and the `s3:<id>` item "
+    "bytes (04 §2.2) for a salt and the access key ID and secret as UTF-8 bytes, or a rejection. "
+    "`credentialItem`: the digest of a stored item, which must be exactly its canonical JCS form, or a "
+    "rejection. Hex without 0x except agent and owner keys in the ALKO and ALKS inputs; codes as text.",
     {
         "kek": ({"code": v.STRING, "salt": v.hexn(16), **KDF}, [{"kek": v.hexn(32)}]),
         "seal": (
@@ -678,6 +878,8 @@ SCHEMA = v.case_schema(
             {"reader": {"enum": ["ALKP", "ALKR", "ALKO", "ALKS", "ALF1"]}, "blob": v.HEX, "code": v.STRING, "key": v.hexn(32), "agentId": v.ADDRESS, "ownerEvm": v.ADDRESS, "ownerNostr": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"}},
             [v.REJECT],
         ),
+        "credentialDigest": ({"salt": v.HEX, "accessKeyId": v.HEX, "secretAccessKey": v.HEX}, [{"credentialDigest": v.hexn(32), "item": v.HEX}, v.REJECT]),
+        "credentialItem": ({"item": v.HEX}, [{"credentialDigest": v.hexn(32)}, v.REJECT]),
     },
 )
 # `open` and `openWithKek` succeed with a variable set of entry fields, which strict_object cannot express.
