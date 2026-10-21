@@ -19,7 +19,7 @@
 //   the cursor still moves: reading the relay again cannot fetch that second, and the wraps are sent
 //   to every relay of the list.
 // - Closing gaps (M2-19, 07 §4.2): after the pages, a gap of relay R at T is closed when another
-//   relay of the pass read T in full and one bounded `ids` query on R returns every wrap that relay
+//   relay of the pass read T in full (positive evidence from its pages, never "no gap" alone), served every wrap R showed at T, and one bounded `ids` query on R returns every wrap that relay
 //   served at T and R did not show. One query per gap, bounded ids, queries, time and memory; every
 //   other gap stays in the result. Live subscriptions do not re-query.
 // - Cursor (07 §4.2): per relay, `last_seen` is the local time the pass started, written only after
@@ -382,14 +382,46 @@ interface Run {
 
 /**
  * The wraps one relay served in a sync pass that opened or were already seen, by `created_at`
- * (M2-19). Bounded by `max` (MAX_LEARNED_IDS_PER_RELAY); past it `full` is set and the relay closes no gap.
+ * (M2-19). Bounded by `max` (MAX_LEARNED_IDS_PER_RELAY); past it `full` is set and the relay closes
+ * no gap. `pages` records each page of the walk, so a second counts as read in full only on positive
+ * evidence (IR-M2-19-1 H-1), and `untrusted` is set when the walk ended because the relay ignores
+ * `until`.
  */
 interface Learned {
   readonly since: number;
   readonly max: number;
   readonly bySecond: Map<number, Set<string>>;
+  readonly pages: PageRecord[];
   count: number;
   full: boolean;
+  untrusted: boolean;
+}
+
+/** One page of a walk: its `until` (undefined: the first page), its oldest in-window second, its size. */
+interface PageRecord {
+  readonly until: number | undefined;
+  readonly oldest: number | undefined;
+  readonly count: number;
+}
+
+/**
+ * True when the walk of `learned` read second `t` in full (IR-M2-19-1 H-1). Positive evidence only:
+ * - a page whose range holds `t` also held an event older than `t`, so a newest-first cap cut that
+ *   page below `t`; or
+ * - a page whose range holds `t` returned fewer events than the largest page of the walk, so the
+ *   relay did not cap that page.
+ * `t` must lie above the walk's `since` (a walk may stop in the middle of its oldest second), and a
+ * walk that ended because the relay ignores `until` proves nothing.
+ */
+function readInFull(learned: Learned, t: number): boolean {
+  if (learned.full || learned.untrusted || t <= learned.since) return false;
+  let largest = 0;
+  for (const page of learned.pages) largest = Math.max(largest, page.count);
+  return learned.pages.some((page) => {
+    if (page.until !== undefined && t > page.until) return false;
+    if (page.oldest !== undefined && page.oldest < t) return true;
+    return page.count < largest;
+  });
 }
 
 interface RelayOutcome {
@@ -729,7 +761,15 @@ export class SyncEngine {
       // M2-19: what this relay served in a sync pass, so another relay's gap can be closed.
       let learned: Learned | undefined;
       if (!run.live) {
-        learned = { since, max: this.learnedMax, bySecond: new Map(), count: 0, full: false };
+        learned = {
+          since,
+          max: this.learnedMax,
+          bySecond: new Map(),
+          pages: [],
+          count: 0,
+          full: false,
+          untrusted: false,
+        };
         run.learned.set(relay, learned);
       }
 
@@ -782,6 +822,14 @@ export class SyncEngine {
         // stop. More events than the relay's cap within one single second cannot all be fetched
         // (Nostr has no sub-second paging): that second is reported as a gap (M1-5d).
         maxPageCount = Math.max(maxPageCount, pageCount);
+        if (learned !== undefined) {
+          if (sawNewer) learned.untrusted = true;
+          if (learned.pages.length < MAX_PAGES_PER_PASS) {
+            learned.pages.push({ until: pageUntil, oldest: pageOldest, count: pageCount });
+          } else {
+            learned.full = true;
+          }
+        }
         if (
           pageUntil !== undefined &&
           !sawNewer &&
@@ -1141,9 +1189,10 @@ export class SyncEngine {
 
   /**
    * After the pass: a gap of relay R at second T is closed when another relay S of the same pass
-   * completed, has no gap at T, covered T (`since` ≤ T) and served wraps at T that R did not show,
-   * and one `ids` query on R for those wraps (at most MAX_GAP_REQUERY_IDS) returns every one of them.
-   * Then S read that second in full and R holds what S holds there. One query per gap, at most
+   * completed, has no gap at T, read T in full on positive evidence (`readInFull`), served every wrap
+   * R showed at T plus some R did not show, and one `ids` query on R for those (at most
+   * MAX_GAP_REQUERY_IDS) returns every one of them. Then S read that second in full and R holds what
+   * S holds there. One query per gap, at most
    * MAX_GAP_REQUERIES_PER_PASS per pass, inside the pass budget. Every other gap stays reported.
    */
   private async closeGaps(
@@ -1160,15 +1209,18 @@ export class SyncEngine {
     for (const gap of gaps) {
       const k = key(gap.relay, gap.second);
       if (queried.has(k) || queries.length >= MAX_GAP_REQUERIES_PER_PASS) continue;
-      const own = run.learned.get(gap.relay)?.bySecond.get(gap.second);
+      const ownRecord = run.learned.get(gap.relay);
+      // What R showed at T must be known to check that S holds all of it (IR-M2-19-1 H-1 (d)).
+      if (ownRecord === undefined || ownRecord.full) continue;
+      const own = ownRecord.bySecond.get(gap.second) ?? new Set<string>();
       let ids: string[] | undefined;
       for (const source of complete) {
         if (source === gap.relay || gapKeys.has(key(source, gap.second))) continue;
         const learned = run.learned.get(source);
-        if (learned === undefined || learned.full || gap.second < learned.since) continue;
-        const missing = [...(learned.bySecond.get(gap.second) ?? [])].filter(
-          (id) => own?.has(id) !== true,
-        );
+        if (learned === undefined || !readInFull(learned, gap.second)) continue;
+        const theirs = learned.bySecond.get(gap.second) ?? new Set<string>();
+        if ([...own].some((id) => !theirs.has(id))) continue;
+        const missing = [...theirs].filter((id) => !own.has(id));
         if (missing.length > 0 && missing.length <= MAX_GAP_REQUERY_IDS) {
           ids = missing.sort();
           break;
