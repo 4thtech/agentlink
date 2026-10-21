@@ -8,32 +8,27 @@
 // - Limits (new identities are free, so per-agent limits alone are not enough): one claim per agent
 //   per window, claims per IP (IPv6 /64) per UTC day, and a global cap per chain per UTC day. A
 //   per-IP hourly request limit in front (SubmitterLimits) bounds the work any one IP causes.
-// - One Durable Object per chain (`faucet:<chainId>`) checks the limits, sends and charges them, one
+// - One Durable Object per chain (`faucet:<chainId>`) runs the claim steps of faucet-claim.ts one
 //   claim at a time, so the caps hold under concurrent claims and the faucet wallet's nonces never
-//   race. A claim is charged when its `depositFor` was broadcast (sent, or its answer was lost); a
-//   claim that sent nothing is not charged.
-// - Privacy (07 §7, I-7): nothing is logged. Storage keeps `a:<agent>` (the claim time; the agent
-//   is public on-chain once credited), `i:<HMAC of the IP bucket>` (a day and a count) and `g` (a
-//   day and a count), never an IP and never an agent next to an IP tag. Entries are deleted once
-//   their window is over (alarm).
+//   race. A claim is charged in storage before its broadcast and refunded if nothing was sent; a
+//   retry after a lost broadcast answer returns that transaction (M1-10b-b).
+// - The faucet serves only the wallet its environment pins (config.ts `pinnedFaucet`, M1-10b-b).
+// - Privacy (07 §7, I-7): nothing is logged. Storage keeps `a:<agent>` (the claim time, its state
+//   and, after a lost answer, the transaction hash; the agent is public on-chain once credited),
+//   `i:<HMAC of the IP bucket>` (a day and a count) and `g` (a day and a count), never an IP and
+//   never an agent next to an IP tag. Entries are deleted once their window is over (alarm).
 import { DurableObject } from 'cloudflare:workers';
 import { isEvmAddress, isFaucetChain, type FaucetChain, type Hex } from '@4thtech-io/chain';
 import { parseJson } from '@4thtech-io/crypto';
-import { readFaucetConfig } from './config.js';
+import { pinnedFaucet, readFaucetConfig } from './config.js';
+import { DAY, claimTime, runClaim, type ClaimAnswer, type DayCount } from './faucet-claim.js';
+
+export type { ClaimAnswer } from './faucet-claim.js';
 
 export interface FaucetDeps {
   /** The faucet wallet of an allowlisted chain, or null when its faucet key is not configured. */
   faucetFor(env: unknown, chainId: number): FaucetChain | null;
 }
-
-export type ClaimAnswer =
-  | { readonly ok: true; readonly txHash: Hex }
-  | {
-      readonly ok: false;
-      readonly error: 'already_claimed' | 'rate_limited' | 'daily_cap_reached';
-      readonly retryAfter: number;
-    }
-  | { readonly ok: false; readonly error: 'unavailable' };
 
 /** The faucet's RPC surface, as the Worker calls it. */
 export interface SubmitterFaucetApi {
@@ -76,14 +71,10 @@ export function parseFaucetRequest(text: string): FaucetRequest {
   return { ok: true, chainId, agent: agent.toLowerCase() as Hex };
 }
 
-const DAY = 86_400;
 const IP_TAG = /^[0-9a-f]{64}$/;
 const AGENT = /^0x[0-9a-f]{40}$/;
 /** The longest agent window the settings allow (config.ts), for pruning without settings. */
 const MAX_AGENT_WINDOW = 30 * DAY;
-
-/** [UTC day index, count]. */
-type DayCount = [number, number];
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 const UNAVAILABLE: ClaimAnswer = Object.freeze({ ok: false, error: 'unavailable' });
@@ -120,48 +111,9 @@ export function createFaucetClass(deps: FaucetDeps): SubmitterFaucetClass {
         return UNAVAILABLE;
       }
       if (typeof ipTag !== 'string' || !IP_TAG.test(ipTag)) return UNAVAILABLE;
-      const port = deps.faucetFor(this.env, chainId);
+      const port = pinnedFaucet(this.env, chainId, deps.faucetFor(this.env, chainId));
       if (!port || port.chainId !== chainId) return UNAVAILABLE;
-
-      const now = nowSeconds();
-      const day = Math.floor(now / DAY);
-      const untilTomorrow = Math.max(1, (day + 1) * DAY - now);
-      const storage = this.ctx.storage;
-      const agentKey = `a:${agent}`;
-      const ipKey = `i:${ipTag}`;
-      const global = await storage.get<DayCount>('g');
-      const used = global && global[0] === day ? global[1] : 0;
-      if (used >= config.dailyCap) {
-        return { ok: false, error: 'daily_cap_reached', retryAfter: untilTomorrow };
-      }
-      const claimedAt = await storage.get<number>(agentKey);
-      if (typeof claimedAt === 'number' && now - claimedAt < config.agentWindowSeconds) {
-        const retryAfter = Math.max(1, claimedAt + config.agentWindowSeconds - now);
-        return { ok: false, error: 'already_claimed', retryAfter };
-      }
-      const ip = await storage.get<DayCount>(ipKey);
-      const ipUsed = ip && ip[0] === day ? ip[1] : 0;
-      if (ipUsed >= config.ipClaimsPerDay) {
-        return { ok: false, error: 'rate_limited', retryAfter: untilTomorrow };
-      }
-
-      let result;
-      try {
-        result = await port.credit(agent, config.usdCents);
-      } catch {
-        return UNAVAILABLE;
-      }
-      if (result.state === 'not_sent') return UNAVAILABLE;
-      // Broadcast (sent, or its answer lost): charge every limit.
-      await storage.put({
-        g: [day, used + 1] satisfies DayCount,
-        [agentKey]: now,
-        [ipKey]: [day, ipUsed + 1] satisfies DayCount,
-      });
-      if ((await storage.getAlarm()) === null) {
-        await storage.setAlarm(((day + 1) * DAY + 60) * 1000);
-      }
-      return result.state === 'sent' ? { ok: true, txHash: result.txHash } : UNAVAILABLE;
+      return runClaim(this.ctx.storage, port, config, agent, ipTag, nowSeconds());
     }
 
     /** Daily: deletes the entries whose window is over; runs again while any remain. */
@@ -171,8 +123,9 @@ export function createFaucetClass(deps: FaucetDeps): SubmitterFaucetClass {
       const window = readFaucetConfig(this.env)?.agentWindowSeconds ?? MAX_AGENT_WINDOW;
       const storage = this.ctx.storage;
       const stale: string[] = [];
-      for (const [key, at] of await storage.list<number>({ prefix: 'a:' })) {
-        if (typeof at !== 'number' || now - at >= window) stale.push(key);
+      for (const [key, entry] of await storage.list({ prefix: 'a:' })) {
+        const at = claimTime(entry);
+        if (at === null || now - at >= window) stale.push(key);
       }
       for (const [key, count] of await storage.list<DayCount>({ prefix: 'i:' })) {
         if (!Array.isArray(count) || count[0] !== day) stale.push(key);

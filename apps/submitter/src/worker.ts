@@ -22,7 +22,7 @@ import {
   type SubmitterChain,
 } from '@4thtech-io/chain';
 import { encodeHex, encodeUtf8, hmacSha256, parseJson } from '@4thtech-io/crypto';
-import { readConfig, readFaucetConfig, type SubmitterConfig } from './config.js';
+import { pinnedFaucet, readConfig, readFaucetConfig, type SubmitterConfig } from './config.js';
 import {
   MAX_FAUCET_BODY_BYTES,
   createFaucetClass,
@@ -39,7 +39,9 @@ export { METRICS, type Metric } from './limits.js';
 export {
   DEFAULTS,
   FAUCET_DEFAULTS,
+  pinnedFaucet,
   readConfig,
+  readFaucetAddress,
   readFaucetConfig,
   type FaucetConfig,
   type Limits,
@@ -287,7 +289,7 @@ async function faucetClaim(
   }
   if (
     !faucetConfig.chains.includes(parsed.chainId) ||
-    c.deps.faucetFor(c.env, parsed.chainId) === null
+    pinnedFaucet(c.env, parsed.chainId, c.deps.faucetFor(c.env, parsed.chainId)) === null
   ) {
     count(c, 'unavailable');
     return refuse(503, 'unavailable');

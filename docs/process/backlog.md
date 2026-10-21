@@ -3396,7 +3396,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A mainnet chain ID is rejected (test); a repeat inside the window is rejected; the global cap holds.
 
 #### M1-10b-b · faucet hardening (new, M1-10b review)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the faucet is deployed)
+- **Status:** in review (`apps/submitter/src/faucet-claim.ts`, `packages/chain/src/fees/faucet.ts`; merge waits for the owner's two faucet addresses in `wrangler.toml` and the workflow's shadow-var list) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the faucet is deployed)
 - **Repo/path:** agentlink · apps/submitter (faucet route)
 - **Depends on:** M1-10b
 - **Spec:** 05 §9 (faucet); 03 §4.4; `release-and-deployment.md` §4.5

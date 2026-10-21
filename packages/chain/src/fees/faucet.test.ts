@@ -130,7 +130,8 @@ function mockFetch(chain: MockChain) {
         const tx = parseTransaction(known.raw as ViemHex);
         if (String(tx.to).toLowerCase() === USDC) {
           const a = decodeFunctionData({ abi: erc20Abi, data: tx.data as ViemHex });
-          if (a.functionName === 'approve') chain.allowance = (a.args as readonly bigint[])[1] ?? 0n;
+          if (a.functionName === 'approve')
+            chain.allowance = (a.args as readonly bigint[])[1] ?? 0n;
         }
         return reply({ transactionHash: hash, status: '0x1' });
       }
@@ -161,8 +162,7 @@ function mockFetch(chain: MockChain) {
         const raw = p[0] as ViemHex;
         chain.attempted.push(raw as Hex);
         const isDeposit = String(parseTransaction(raw).to).toLowerCase() === VAULT;
-        const failing =
-          chain.failOn === 'all' || (chain.failOn === 'deposit') === isDeposit;
+        const failing = chain.failOn === 'all' || (chain.failOn === 'deposit') === isDeposit;
         if (failing && chain.failSend === 'network') throw new TypeError('network down');
         if (failing && chain.failSend === 'answer') {
           return replyError({ code: -32000, message: 'nonce too low' });
