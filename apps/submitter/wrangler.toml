@@ -1,0 +1,140 @@
+# The 4thTech submitter Worker and testnet credits faucet (07 §7, 05 §9; M1-10c, D-28, D-88).
+# Deployed only by CI (.github/workflows/deploy-submitter.yml, release-and-deployment.md §4.5); never
+# `wrangler deploy` from a workstation. Always pass --env: `staging` (workers.dev, CI and smoke
+# only) or `production` (submit.agentlink.4thtech.io, the testnet beta, D-88).
+#
+# No secrets here. Per environment the owner sets these Worker secrets with `wrangler secret put`
+# (docs/runbooks/submitter-deploy.md); staging and production never share a key (release §1):
+#   SUBMITTER_IP_KEY               32 random bytes, base64url (the per-IP rate bucket HMAC key)
+#   SUBMITTER_GAS_KEY_<chainId>    the chain's gas key, 0x + 64 lowercase hex (hot key, low balance)
+#   SUBMITTER_FAUCET_KEY_<chainId> the chain's faucet key, 0x + 64 lowercase hex, never the gas key
+#   SUBMITTER_RPC_URLS_<chainId>   optional: comma-separated RPC URLs (may carry a provider key)
+# The deploy workflow skips cleanly until the required ones exist (names only; it never reads a
+# value). No account ID here either: CI passes CLOUDFLARE_ACCOUNT_ID from the GitHub Environment.
+#
+# Vars are reviewed in PRs and asserted by test/smoke-config.test.ts. SUBMITTER_CHAINS and
+# SUBMITTER_FAUCET_CHAINS name Base Sepolia (84532) only: Gnosis Chiado (10200) joins with M1-3j-b,
+# together with its keys and the workflow's required-secret list. Never set a var as a Worker secret
+# too (the deploy fails if one exists: it would shadow the reviewed value).
+#
+# Bindings and logging are NOT inherited by environments, so each one repeats them; the assertions
+# in test/smoke-config.test.ts read this file back for each environment.
+#
+# Logging (07 §7, I-7): the Worker writes nothing to the console; observability, invocation logs,
+# traces, Logpush and Tail Workers are off in every environment, and the deploy workflow reads the
+# live settings back after each deploy.
+#
+# Durable Object migrations are forward-only (release-and-deployment.md §4.5): a release that adds
+# or changes one is marked in its PR with a forward-fix plan.
+
+# Top level: local development only (`wrangler dev`). A deploy without --env creates no public
+# Worker: no workers.dev, no route, and no chain keys exist for this name.
+name = "agentlink-submitter-local"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+workers_dev = false
+preview_urls = false
+send_metrics = false
+logpush = false
+upload_source_maps = false
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+[observability.traces]
+enabled = false
+
+[vars]
+SUBMITTER_CHAINS = "84532"
+SUBMITTER_FAUCET_CHAINS = "84532"
+
+[[durable_objects.bindings]]
+name = "SUBMITTER_QUEUE"
+class_name = "SubmitterQueue"
+
+[[durable_objects.bindings]]
+name = "SUBMITTER_LIMITS"
+class_name = "SubmitterLimits"
+
+[[durable_objects.bindings]]
+name = "SUBMITTER_FAUCET"
+class_name = "SubmitterFaucet"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SubmitterQueue", "SubmitterLimits", "SubmitterFaucet"]
+
+# ---------------------------------------------------------------------------------------------------
+# Staging: workers.dev only, deployed on every merge to main; CI and smoke tests only (D-88).
+[env.staging]
+name = "agentlink-submitter-staging"
+workers_dev = true
+preview_urls = false
+logpush = false
+routes = []
+
+[env.staging.observability]
+enabled = false
+
+[env.staging.observability.logs]
+enabled = false
+invocation_logs = false
+
+[env.staging.observability.traces]
+enabled = false
+
+[env.staging.vars]
+SUBMITTER_CHAINS = "84532"
+SUBMITTER_FAUCET_CHAINS = "84532"
+
+[[env.staging.durable_objects.bindings]]
+name = "SUBMITTER_QUEUE"
+class_name = "SubmitterQueue"
+
+[[env.staging.durable_objects.bindings]]
+name = "SUBMITTER_LIMITS"
+class_name = "SubmitterLimits"
+
+[[env.staging.durable_objects.bindings]]
+name = "SUBMITTER_FAUCET"
+class_name = "SubmitterFaucet"
+
+# ---------------------------------------------------------------------------------------------------
+# Production: the Custom Domain only (release-and-deployment.md §1.1), no workers.dev or preview
+# URLs. The testnet beta (D-88). Deployed automatically once the staging smoke is green (D-52).
+[env.production]
+name = "agentlink-submitter"
+workers_dev = false
+preview_urls = false
+logpush = false
+routes = [{ pattern = "submit.agentlink.4thtech.io", custom_domain = true }]
+
+[env.production.observability]
+enabled = false
+
+[env.production.observability.logs]
+enabled = false
+invocation_logs = false
+
+[env.production.observability.traces]
+enabled = false
+
+[env.production.vars]
+SUBMITTER_CHAINS = "84532"
+SUBMITTER_FAUCET_CHAINS = "84532"
+
+[[env.production.durable_objects.bindings]]
+name = "SUBMITTER_QUEUE"
+class_name = "SubmitterQueue"
+
+[[env.production.durable_objects.bindings]]
+name = "SUBMITTER_LIMITS"
+class_name = "SubmitterLimits"
+
+[[env.production.durable_objects.bindings]]
+name = "SUBMITTER_FAUCET"
+class_name = "SubmitterFaucet"

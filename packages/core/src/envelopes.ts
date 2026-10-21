@@ -194,7 +194,14 @@ export type InboundReason =
    * has not arrived (M1-32-b). It stays `received` and is decided again in later passes; once the
    * wait lapses (TERMS_WAIT_SECONDS from its signed createdAt) it is refused with `terms_refused`.
    */
-  | 'terms_waiting';
+  | 'terms_waiting'
+  /**
+   * A `proof` envelope whose body does not match the on-chain record (04 §3.4 checks, M1-7g-c):
+   * stored as refused after processing, and the contact is flagged. Reported by the proof service.
+   */
+  | 'proof_mismatch'
+  /** As `proof_mismatch`, for a Record whose `parentRecordId` is another signer's (D-109). */
+  | 'proof_parent_mismatch';
 
 export interface InboundReport {
   /** The validated envelope `id` (base64url, 16 bytes); absent when the envelope did not parse. */
@@ -205,7 +212,8 @@ export interface InboundReport {
   readonly contactId?: string;
   /**
    * The contact signed entries that carry different keys, or reused an `id` (04 §3.1.1 steps 5, 8
-   * and 9): the activity feed flags it. Never set for a sender that is not a contact.
+   * and 9), or sent a `proof` body that does not match the chain (04 §3.4): the activity feed flags
+   * it. Never set for a sender that is not a contact.
    */
   readonly flagged: boolean;
 }
