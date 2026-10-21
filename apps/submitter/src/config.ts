@@ -9,7 +9,13 @@
 //   SUBMITTER_RPC_URLS_<chainId> optional: comma-separated RPC URLs (may carry a provider key)
 // Optional var SUBMITTER_MAX_FEE_PER_GAS_WEI: a ceiling on every transaction's maxFeePerGas.
 import { decodeBase64url } from '@4thtech-io/crypto';
-import { FAUCET_MAX_USD_CENTS, getChainConfig, isFaucetChain } from '@4thtech-io/chain';
+import {
+  FAUCET_MAX_USD_CENTS,
+  getChainConfig,
+  isFaucetChain,
+  type FaucetChain,
+  type Hex,
+} from '@4thtech-io/chain';
 import type { EngineSettings } from './engine.js';
 
 export interface Limits {
@@ -173,7 +179,8 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
  * Chiado's smoke test has passed, M1-3j-b) and a testnet in the shipped config. Anything invalid turns the faucet off
  * (null) and leaves the rest of the submitter running.
  *
- * Vars: SUBMITTER_FAUCET_CHAINS and the bounded overrides below.
+ * Vars: SUBMITTER_FAUCET_CHAINS, SUBMITTER_FAUCET_ADDRESS_<chainId> (below) and the bounded
+ * overrides below.
  * Worker secrets (set by the owner with `wrangler secret put`, never in a file; M1-10c):
  *   SUBMITTER_FAUCET_KEY_<chainId>  the chain's faucet key, 0x + 64 hex, separate from its gas key
  *                                   and per environment (D-88); it holds testnet funds only
@@ -254,4 +261,34 @@ export function readFaucetConfig(env: Record<string, unknown>): FaucetConfig | n
     dailyCap: cap,
     ipRequestsPerHour: requests,
   });
+}
+
+const FAUCET_ADDRESS = /^0x[0-9a-f]{40}$/;
+const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
+
+/**
+ * The faucet wallet this environment pins for a chain (M1-10b-b): the var
+ * SUBMITTER_FAUCET_ADDRESS_<chainId>, a lowercase address (public; never a key). Null when absent
+ * or malformed: that chain then has no faucet.
+ */
+export function readFaucetAddress(env: Record<string, unknown>, chainId: number): Hex | null {
+  const raw = env[`SUBMITTER_FAUCET_ADDRESS_${String(chainId)}`];
+  if (typeof raw !== 'string' || !FAUCET_ADDRESS.test(raw) || raw === ZERO_ADDRESS) return null;
+  return raw as Hex;
+}
+
+/**
+ * Faucet key separation across environments (M1-10b-b; D-88; release §4.5): staging and production
+ * each pin their own faucet address in wrangler.toml (test/smoke-config.test.ts asserts they
+ * differ), and the faucet serves only a wallet whose address is its environment's pin. A faucet key
+ * set in the wrong environment, or one shared by both, leaves the faucet unavailable there.
+ */
+export function pinnedFaucet(
+  env: unknown,
+  chainId: number,
+  faucet: FaucetChain | null,
+): FaucetChain | null {
+  if (faucet === null || typeof env !== 'object' || env === null) return null;
+  const pinned = readFaucetAddress(env as Record<string, unknown>, chainId);
+  return pinned !== null && faucet.faucetAddress.toLowerCase() === pinned ? faucet : null;
 }
