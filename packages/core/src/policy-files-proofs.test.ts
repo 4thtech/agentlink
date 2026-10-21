@@ -78,7 +78,7 @@ const withA = (fee: string, eligible = true) =>
   proof(fee, fee, { contact: A, ruleEligible: eligible });
 const ruleFor = (
   contact: string,
-  proofs: Policy['contactRules'][number]['proofs'],
+  proofs: NonNullable<Policy['contactRules'][number]['proofs']>,
 ): Policy['contactRules'][number] => ({ contact, proofs });
 
 interface ProofRow {

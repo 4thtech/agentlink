@@ -110,22 +110,32 @@ export const chainKeySchema = z
 // --- ContactRule (06 §3 "Per-contact rules", G-32) -----------------------------------------------
 
 /**
- * One contact's proof rule. `proofs` holds at least one of `notarize` (replaces `proofs.notarize`
- * for this contact; a global `deny` still wins) and `perActionMaxUSD` (replaces
- * `proofs.perActionMaxUSD`). An absent key is absent: an explicit `undefined` is rejected.
+ * One contact's rule: at least one of `proofs` and `receipts` (D-109).
+ * - `proofs` holds at least one of `notarize` (replaces `proofs.notarize` for this contact; a
+ *   global `deny` still wins) and `perActionMaxUSD` (replaces `proofs.perActionMaxUSD`).
+ * - `receipts` holds exactly `autoDelivered`, which replaces `receipts.autoDelivered` for DELIVERED
+ *   receipts on this contact's records only; never OPENED, ACCEPTED or REJECTED (06 §3, M1-33a).
+ * An absent key is absent: an explicit `undefined` is rejected.
  */
-export const contactRuleSchema = z.strictObject({
-  contact: evmAddress,
-  proofs: z
-    .strictObject({
-      notarize: z.enum(POLICY_RULES).exactOptional(),
-      perActionMaxUSD: usdAmountSchema.exactOptional(),
-    })
-    .refine(
-      (p) => p.notarize !== undefined || p.perActionMaxUSD !== undefined,
-      'a contact rule sets notarize, perActionMaxUSD or both',
-    ),
-});
+export const contactRuleSchema = z
+  .strictObject({
+    contact: evmAddress,
+    proofs: z
+      .strictObject({
+        notarize: z.enum(POLICY_RULES).exactOptional(),
+        perActionMaxUSD: usdAmountSchema.exactOptional(),
+      })
+      .refine(
+        (p) => p.notarize !== undefined || p.perActionMaxUSD !== undefined,
+        'a contact rule sets notarize, perActionMaxUSD or both',
+      )
+      .exactOptional(),
+    receipts: z.strictObject({ autoDelivered: z.boolean() }).exactOptional(),
+  })
+  .refine(
+    (r) => r.proofs !== undefined || r.receipts !== undefined,
+    'a contact rule sets proofs, receipts or both',
+  );
 
 const contactRulesSchema = z
   .array(contactRuleSchema)
@@ -236,7 +246,8 @@ function buildDefaults(): Policy {
       exportFolder: '~/AgentLink/Proofs',
       defaultChain: 'base',
     },
-    receipts: { autoDelivered: true, autoOpened: false },
+    // D-109: a delivery receipt is public, so it is off unless the owner turns it on.
+    receipts: { autoDelivered: false, autoOpened: false },
     commitments: {
       accept: 'approval',
       autoAcceptContacts: [],

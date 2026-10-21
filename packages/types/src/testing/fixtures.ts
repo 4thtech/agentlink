@@ -142,7 +142,7 @@ export const policyDefaultsFromSpec = () => ({
     defaultChain: 'base',
   },
   receipts: {
-    autoDelivered: true,
+    autoDelivered: false,
     autoOpened: false,
   },
   commitments: {

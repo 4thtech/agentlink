@@ -653,6 +653,32 @@ describe('doctor (07 §9.4)', () => {
     expect(good.out.join('\n')).not.toContain('policy recover');
     expect(good.out.join('\n')).toContain('OK       Your rules are in use');
   });
+
+  it('shows the older-default receipts line while it applies, and not after (06 §3, D-109)', async () => {
+    const LINE =
+      'Delivery receipts are on from an older default; they will turn off unless you keep them.';
+    const older = (value: boolean) =>
+      fakeAgent({
+        ownerActions: {
+          loadPolicy: () => Promise.resolve({ mode: 'signed', policy: {}, version: 3 }),
+          receiptsOnFromOlderDefault: () => Promise.resolve(value),
+        },
+      });
+    const before = await harness(older(true)).run(['doctor']);
+    expect(before.out.join('\n')).toContain(LINE);
+    // A notice, not a problem: doctor still passes.
+    expect(before.code).toBe(EXIT_OK);
+    const after = await harness(older(false)).run(['doctor']);
+    expect(after.out.join('\n')).not.toContain('older default');
+    // A runtime that can't tell shows nothing.
+    const failing = fakeAgent({
+      ownerActions: {
+        loadPolicy: () => Promise.resolve({ mode: 'signed', policy: {}, version: 3 }),
+        receiptsOnFromOlderDefault: () => Promise.reject(new Error('unavailable')),
+      },
+    });
+    expect((await harness(failing).run(['doctor'])).out.join('\n')).not.toContain('older default');
+  });
 });
 
 describe('accept and invite argument checks', () => {

@@ -97,7 +97,7 @@ describe('policy defaults (06 §3)', () => {
           "perActionMaxUSD": "1",
         },
         "receipts": {
-          "autoDelivered": true,
+          "autoDelivered": false,
           "autoOpened": false,
         },
       }
@@ -348,6 +348,44 @@ describe('policy rejects (M1-2b acceptance)', () => {
     });
     expectRoundTrip(contactRuleSchema, { contact: CONTACT_A, proofs: { notarize: 'deny' } });
     expectRoundTrip(contactRuleSchema, { contact: CONTACT_A, proofs: { perActionMaxUSD: '0' } });
+  });
+
+  it('a ContactRule receipts part (D-109, M1-33a): strict, with or without proofs', () => {
+    const at = (rule: unknown) => ({ ...policyDefaultsFromSpec(), contactRules: [rule] });
+    // `receipts` alone, `proofs` alone and both are rules; neither is not.
+    expectRoundTrip(contactRuleSchema, { contact: CONTACT_A, receipts: { autoDelivered: true } });
+    expectRoundTrip(contactRuleSchema, { contact: CONTACT_A, receipts: { autoDelivered: false } });
+    expectRoundTrip(contactRuleSchema, {
+      contact: CONTACT_A,
+      proofs: { notarize: 'allow' },
+      receipts: { autoDelivered: true },
+    });
+    expectAccept(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: true } }));
+    expectReject(policySchema, at({ contact: CONTACT_A }));
+    // `proofs`, when present, still needs one of its two keys.
+    expectReject(
+      policySchema,
+      at({ contact: CONTACT_A, proofs: {}, receipts: { autoDelivered: true } }),
+    );
+    // `receipts` holds exactly `autoDelivered`, a boolean; nothing else (never OPENED).
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: {} }));
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: 'yes' } }));
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: 1 } }));
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: null } }));
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: { autoOpened: true } }));
+    expectReject(
+      policySchema,
+      at({ contact: CONTACT_A, receipts: { autoDelivered: true, autoOpened: true } }),
+    );
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: { autoDelivered: true, x: 1 } }));
+    expectReject(policySchema, at({ contact: CONTACT_A, receipts: true }));
+    // An explicit undefined is not "absent".
+    expectReject(contactRuleSchema, { contact: CONTACT_A, receipts: undefined });
+    expectReject(contactRuleSchema, {
+      contact: CONTACT_A,
+      proofs: undefined,
+      receipts: { autoDelivered: true },
+    });
   });
 
   it('257 contact rules, unsorted rules, and two rules for one contact', () => {

@@ -335,6 +335,8 @@ Proof is public by design, so the user is told what others can see, in plain wor
 | Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent." |
 | Opened, accepted or rejected receipt | "This is public: anyone can see that your agent {opened / accepted / rejected} it, and when." |
 | Rules page, delivery confirmations (default off) | "Confirm deliveries publicly: Off (recommended). Turn on for contacts you trust." |
+| Owner re-sign while receipts are on from an older default (CLI, 06 §3, M1-33a) | "Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content." then "Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off." |
+| `agentlink doctor`, same case | "Delivery receipts are on from an older default; they will turn off unless you keep them." |
 | Top-up (each method, once) | "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink." |
 | Proof export | "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content." |
 | Get the Registered badge (§6.13) | "Registering puts your agent's link to you on the public record. Your agent's name is not published." |

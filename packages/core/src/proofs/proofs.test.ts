@@ -9,7 +9,7 @@ import { RECORD_KIND, buildRecord, signRecord, verifyProofPack, type Hex } from 
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy, type Policy, type RecordJson } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from '../client.js';
 import * as core from '../index.js';
 import { computeActionDigest } from '../owner-action.js';
@@ -32,6 +32,13 @@ import {
 } from '../testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from '../testing/owner.js';
 import type { TransportFactory } from '../transport.js';
+
+// Each test here runs two or three real cores end to end (signed envelopes, pairing, owner-signed
+// rules, notarize, receipts). On a loaded CI runner this file runs ~10-40x slower than locally: on
+// main the first acceptance test took 15.3 s against the 20 s default (0.5 s locally), and the
+// three-agent contact-rule test took 20.5 s (0.73 s locally). This file allows 60 s, as the
+// Argon2id files do (repo-reference, M0-10e). Assertions are unchanged.
+vi.setConfig({ testTimeout: 60_000 });
 
 let clock: FakeClock;
 let chain: FakeNotary;
@@ -182,11 +189,21 @@ const proofRows = (agent: Agent) => agent.store.transaction((tx) => tx.select('p
 const ledger = (agent: Agent) => agent.store.transaction((tx) => tx.select('budget_ledger'));
 const onChain = (recordId: string) => chain.records.get(recordId);
 
-async function twoAgents() {
+/**
+ * A and B, paired, A funded. Delivery receipts are off by default (D-109), so unless a test asks
+ * for the defaults, B's owner turns them on (`receipts.autoDelivered: true`): every "no receipt"
+ * check below then proves the refusal, not the default.
+ */
+async function twoAgents({ defaults = false }: { readonly defaults?: boolean } = {}) {
   const a = await openAgent(31, ownerA, 'alice');
   const b = await openAgent(32, ownerB, 'bob');
   await pair(a, b);
   chain.fund(a.id, 10n * FEE_UNITS);
+  if (!defaults) {
+    await setPolicy(b, (p) => {
+      p.receipts.autoDelivered = true;
+    });
+  }
   return { a, b };
 }
 
@@ -197,7 +214,11 @@ beforeEach(() => {
 
 describe('notarize → DELIVERED → OPENED → export → verify (acceptance, testnet-style)', () => {
   it('records, delivers the salt, gets automatic DELIVERED and explicit OPENED, and the pack verifies', async () => {
-    const { a, b } = await twoAgents();
+    const { a, b } = await twoAgents({ defaults: true });
+    // B's owner turned delivery receipts on for A (06 §3 contact rule, D-109).
+    await setPolicy(b, (p) => {
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
     const envelopeId = await sendText(a, b);
 
     const proof = await a.client.notarize({ envelopeId });
@@ -213,7 +234,7 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     expect(stored?.record.kind).toBe(RECORD_KIND.MESSAGE);
     expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
 
-    // The proof envelope reaches B; B checks on-chain, then DELIVERED goes out on its own.
+    // The proof envelope reaches B; B checks on-chain, then DELIVERED goes out under B's rule.
     await deliver(a, b);
     expect(stored?.receiptAt[0]).not.toBe(0n);
     expect(stored?.receiptAt[1]).toBe(0n);
@@ -283,6 +304,58 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     expect(await b.client.getProof({ envelopeId })).toMatchObject({
       recordId: (proof as { recordId: string }).recordId,
     });
+  });
+
+  it('the default rules (D-109): the proof is checked and stored, and no DELIVERED is signed', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const proof = await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+    expect(await b.client.getProof({ envelopeId })).toMatchObject({
+      recordId: (proof as { recordId: string }).recordId,
+    });
+  });
+
+  it('a contact rule turns DELIVERED on for that contact only (06 §3, D-109)', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    chain.fund(c.id, 10n * FEE_UNITS);
+    await setPolicy(b, (p) => {
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
+
+    const fromA = await sendText(a, b);
+    const recordA = (await a.client.notarize({ envelopeId: fromA })) as { recordId: string };
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([
+      expect.objectContaining({ record_id: recordA.recordId, type: 1, signer: b.id }),
+    ]);
+
+    const fromC = await sendText(c, b);
+    const recordC = (await c.client.notarize({ envelopeId: fromC })) as { recordId: string };
+    await deliver(c, b);
+    expect((await receipts(b)).map((r) => r.record_id)).toEqual([recordA.recordId]);
+    expect(onChain(recordC.recordId)?.receiptAt[0]).toBe(0n);
+    expect(chain.calls.acknowledge).toBe(1);
+  });
+
+  it('under failing rules no DELIVERED is signed, even with a contact rule on (G-6)', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(b, (p) => {
+      p.receipts.autoDelivered = true;
+      p.contactRules = [{ contact: a.id, receipts: { autoDelivered: true } }];
+    });
+    // The stored rules go missing after a version was applied: fail closed (06 §3).
+    await b.store.transaction((tx) => tx.delete('policies', {}));
+    expect((await b.client.ownerActions.loadPolicy()).mode).toBe('fail_closed');
+    const envelopeId = await sendText(a, b);
+    await a.client.notarize({ envelopeId });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
   });
 
   it('a second notarize of the same envelope returns the stored record and charges nothing', async () => {
@@ -458,13 +531,14 @@ describe('credits and policy (06 §3, 07 §6.3)', () => {
 
 describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', () => {
   it('no ACCEPTED under the default policy without an owner-signed approval; then exclusive', async () => {
-    const { a, b } = await twoAgents();
+    // The defaults in full (D-109: no automatic DELIVERED either); ACCEPTED is unchanged.
+    const { a, b } = await twoAgents({ defaults: true });
     const envelopeId = await sendText(a, b);
     await a.client.notarize({ envelopeId });
     await deliver(a, b);
     const pending = await b.client.acknowledge({ envelopeId, type: 'accepted' });
     expect(pending.status).toBe('pending_approval');
-    expect((await receipts(b)).map((r) => r.type)).toEqual([1]);
+    expect((await receipts(b)).map((r) => r.type)).toEqual([]);
     const approvalId = (pending as { approvalId: string }).approvalId;
     // An approval ID the owner has not signed does nothing.
     expect(await b.client.acknowledge({ envelopeId, type: 'accepted', approvalId })).toMatchObject({
@@ -475,7 +549,7 @@ describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', (
       status: 'ok',
       receipt: 'ACCEPTED',
     });
-    expect((await receipts(b)).map((r) => r.type).sort()).toEqual([1, 3]);
+    expect((await receipts(b)).map((r) => r.type)).toEqual([3]);
     // REJECTED is exclusive with ACCEPTED.
     expect(await b.client.acknowledge({ envelopeId, type: 'rejected' })).toEqual({
       status: 'rejected',

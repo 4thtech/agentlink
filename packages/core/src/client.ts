@@ -13,7 +13,7 @@ import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
-import { OwnerActions, type PolicyVersionMark } from './owner-actions.js';
+import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
 import { PairingService } from './pairing.js';
@@ -76,6 +76,12 @@ export interface AgentLinkClientOptions {
    * applies and a loaded policy always fails closed (G-6).
    */
   readonly policyMark?: PolicyVersionMark;
+  /**
+   * The receipts-kept marker, a KeyStore item (04 §2.2; 06 §3, D-109; M1-33a). Without it the
+   * owner's choice to keep delivery receipts on from an older default is not remembered, so every
+   * `policy.set` asks again.
+   */
+  readonly receiptsKept?: ReceiptsKeptMark;
   /**
    * The relay transport (07 §4.1; M1-7k): `nostrTransport({connector, addressCheck, nip11})` with the
    * runtime's relay I/O (packages/node supplies it). Without one the client cannot send or publish
@@ -158,6 +164,7 @@ export class AgentLinkClient {
     ctx: CoreContext,
     approvals: ApprovalChannel,
     policyMark: PolicyVersionMark | undefined,
+    receiptsKept: ReceiptsKeptMark | undefined,
     transport: TransportFactory | undefined,
     deliveryAcks: boolean,
     records: RecordLookup | undefined,
@@ -170,7 +177,13 @@ export class AgentLinkClient {
     this.identity = new IdentityService(ctx);
     this.contacts = new ContactBook(ctx);
     this.pairing = new PairingService(ctx, this.identity, this.contacts);
-    this.ownerActions = new OwnerActions(ctx, this.identity, this.contacts, policyMark);
+    this.ownerActions = new OwnerActions(
+      ctx,
+      this.identity,
+      this.contacts,
+      policyMark,
+      receiptsKept,
+    );
     const ownerActions = this.ownerActions;
     // M1-7h: revoke envelopes are applied or dropped (IR-M1-7h-1 F01), and the per-contact rate
     // limit is counted where the contact's envelope is stored (07 §3.2; IR-M1-7h-1 F02).
@@ -458,6 +471,7 @@ export class AgentLinkClient {
       ctx,
       approvals,
       options.policyMark,
+      options.receiptsKept,
       options.transport,
       options.deliveryAcks === true,
       options.records,

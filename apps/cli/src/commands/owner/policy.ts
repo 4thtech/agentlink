@@ -153,7 +153,56 @@ export const POLICY_TEXT = Object.freeze({
     `Sign the rules you just reviewed as your rules (version ${String(version)}), so AgentLink stops using its strictest settings.`,
   recovered: (version: number): string =>
     `OK       Your rules are in use again (version ${String(version)}).`,
+
+  // M1-33a (06 §3 "Existing policies", D-109; 11 §5.6): delivery receipts on from an older default
+  receiptsOlderDefault:
+    'Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content.',
+  keepReceiptsQuestion:
+    'Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off.',
+  receiptsTurnOff: 'Delivery receipts turn off.',
 });
+
+/** The owner's answer about delivery receipts on from an older default (06 §3, D-109). */
+type ReceiptsChoice = 'none' | 'keep' | 'off';
+
+/**
+ * 06 §3 "Existing policies" (D-109; M1-33a): before any `policy.set` signed from `rules`, asks the
+ * owner whether to keep delivery receipts that are on from an older default. Anything but an explicit
+ * `y` turns them off. A core that can't tell asks whenever they are on (the private side).
+ */
+async function receiptsChoice(
+  deps: OwnerCommandDeps,
+  agent: OwnerAgent,
+  output: Output,
+  rules: { readonly policy: Policy; readonly version: number },
+): Promise<ReceiptsChoice> {
+  const older = await Promise.resolve()
+    .then(() => agent.client.ownerActions.receiptsOnFromOlderDefault(rules))
+    .catch(() => rules.policy.receipts.autoDelivered);
+  if (!older) return 'none';
+  output.print(POLICY_TEXT.receiptsOlderDefault);
+  const answer = await deps.ask(POLICY_TEXT.keepReceiptsQuestion);
+  return answer.trim().toLowerCase() === 'y' ? 'keep' : 'off';
+}
+
+/** The policy with the owner's receipts choice applied (a copy; `off` signs `false`). */
+function withReceiptsChoice(policy: Policy, choice: ReceiptsChoice): Policy {
+  return choice === 'off'
+    ? { ...policy, receipts: { ...policy.receipts, autoDelivered: false } }
+    : policy;
+}
+
+/** After the kept policy was applied at `version`: remember the answer (best effort; else asked again). */
+async function rememberKept(
+  agent: OwnerAgent,
+  choice: ReceiptsChoice,
+  version: number,
+): Promise<void> {
+  if (choice !== 'keep') return;
+  await Promise.resolve()
+    .then(() => agent.client.ownerActions.recordReceiptsKept(version))
+    .catch(() => false);
+}
 
 /** The kind of failure, in words (D-100: the command shows only this, never the stored data). */
 const PROBLEM_TEXT: Readonly<Record<PolicyProblem, string>> = Object.freeze({
@@ -197,14 +246,18 @@ const list =
       : none;
 
 function contactRule(item: unknown): string {
-  const { contact, proofs } = item as {
+  const { contact, proofs, receipts } = item as {
     contact: string;
-    proofs: { notarize?: string; perActionMaxUSD?: string };
+    proofs?: { notarize?: string; perActionMaxUSD?: string };
+    receipts?: { autoDelivered: boolean };
   };
   const parts: string[] = [];
-  if (proofs.notarize !== undefined) parts.push(`add proof: ${rule(proofs.notarize)}`);
-  if (proofs.perActionMaxUSD !== undefined) {
+  if (proofs?.notarize !== undefined) parts.push(`add proof: ${rule(proofs.notarize)}`);
+  if (proofs?.perActionMaxUSD !== undefined) {
     parts.push(`each proof at most ${usd(proofs.perActionMaxUSD)}`);
+  }
+  if (receipts !== undefined) {
+    parts.push(`tell the sender a message arrived: ${yesNo(receipts.autoDelivered)}`);
   }
   return `${contact}: ${parts.join(', ')}`;
 }
@@ -473,7 +526,7 @@ async function setFolders(
   summary: string,
   done: string,
 ): Promise<number> {
-  const policy: Policy = {
+  let policy: Policy = {
     ...rules.policy,
     files: { ...rules.policy.files, allowedFolders: [...folders] },
   };
@@ -486,8 +539,17 @@ async function setFolders(
     output.printError(POLICY_TEXT.notShowable);
     return EXIT_FAILED;
   }
-  const signed = await signAndApply(deps, agent, output, policy, (rules.version ?? 0) + 1, summary);
+  // The defaults (no version applied) have delivery receipts off: nothing to ask.
+  const choice =
+    rules.version === undefined
+      ? 'none'
+      : await receiptsChoice(deps, agent, output, { policy: rules.policy, version: rules.version });
+  policy = withReceiptsChoice(policy, choice);
+  const version = (rules.version ?? 0) + 1;
+  const shown = choice === 'off' ? `${summary} ${POLICY_TEXT.receiptsTurnOff}` : summary;
+  const signed = await signAndApply(deps, agent, output, policy, version, shown);
   if (signed !== EXIT_OK) return signed;
+  await rememberKept(agent, choice, version);
   output.print(done);
   return EXIT_OK;
 }
@@ -569,17 +631,31 @@ async function recover(deps: OwnerCommandDeps, agent: OwnerAgent, output: Output
     return EXIT_FAILED;
   }
   // A deep, plain copy of what is reviewed: exactly this document is signed.
-  const policy = JSON.parse(
+  let policy = JSON.parse(
     JSON.stringify(view.stored === undefined ? defaultPolicy() : view.stored.policy),
   ) as Policy;
+  if (reviewLines(policy) === undefined || !policySchema.safeParse(policy).success) {
+    output.printError(POLICY_TEXT.notShowable);
+    return EXIT_FAILED;
+  }
+  output.print(POLICY_TEXT.whatHappened(PROBLEM_TEXT[view.problem]));
+  // 06 §3 (D-109): the stored rules may have delivery receipts on from an older default. Asked
+  // before the review, so the review shows exactly what is signed. The defaults have them off.
+  const choice =
+    view.stored === undefined
+      ? 'none'
+      : await receiptsChoice(deps, agent, output, {
+          policy: view.stored.policy,
+          version: view.stored.version,
+        });
+  policy = withReceiptsChoice(policy, choice);
   const lines = reviewLines(policy);
-  if (lines === undefined || !policySchema.safeParse(policy).success) {
+  if (lines === undefined) {
     output.printError(POLICY_TEXT.notShowable);
     return EXIT_FAILED;
   }
   output.print(
     [
-      POLICY_TEXT.whatHappened(PROBLEM_TEXT[view.problem]),
       '',
       view.stored === undefined ? POLICY_TEXT.reviewDefaults : POLICY_TEXT.reviewStored,
       '',
@@ -601,6 +677,7 @@ async function recover(deps: OwnerCommandDeps, agent: OwnerAgent, output: Output
     POLICY_TEXT.recoverSummary(view.nextVersion),
   );
   if (signed !== EXIT_OK) return signed;
+  await rememberKept(agent, choice, view.nextVersion);
   output.print(POLICY_TEXT.recovered(view.nextVersion));
   return EXIT_OK;
 }

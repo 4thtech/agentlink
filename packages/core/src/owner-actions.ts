@@ -67,6 +67,18 @@ export interface PolicyVersionMark {
   raise(version: number): Promise<number>;
 }
 
+/**
+ * The receipts-kept marker (04 §2.2; 06 §3 "Existing policies"; D-109, decided by Tali in chat on
+ * 2026-10-20; M1-33a): a KeyStore item holding the `policy.set` version at which the owner explicitly
+ * kept `receipts.autoDelivered: true`, or null when there is none. Not secret and grants nothing: it
+ * only records that the owner already answered. `read` throws on a malformed item (read as not
+ * kept); `write` replaces the item and rejects when the write did not stick.
+ */
+export interface ReceiptsKeptMark {
+  read(): Promise<number | null>;
+  write(version: number): Promise<void>;
+}
+
 export type OwnerActionOutcome =
   | {
       readonly status: 'applied';
@@ -207,17 +219,20 @@ export class OwnerActions {
   readonly #identity: IdentityService;
   readonly #contacts: ContactBook;
   readonly #mark: PolicyVersionMark | undefined;
+  readonly #receiptsKept: ReceiptsKeptMark | undefined;
 
   constructor(
     ctx: CoreContext,
     identity: IdentityService,
     contacts: ContactBook,
     mark?: PolicyVersionMark,
+    receiptsKept?: ReceiptsKeptMark,
   ) {
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
     this.#mark = mark;
+    this.#receiptsKept = receiptsKept;
   }
 
   /** The own agent and its card's owner key, or why owner actions cannot apply. */
@@ -638,6 +653,66 @@ export class OwnerActions {
    */
   async loadPolicy(): Promise<EffectivePolicy> {
     return (await this.#inspectPolicy()).effective;
+  }
+
+  /**
+   * 06 §3 "Existing policies" (D-109; M1-33a): true when delivery receipts are on from an older
+   * default, so the next owner-signed `policy.set` must ask before keeping them. That is a policy
+   * with global `receipts.autoDelivered: true` whose version the receipts-kept marker does not
+   * cover (no marker, an unreadable one, or one above the version). Without `rules`, the loaded
+   * policy: only a verified, signed one can be from an older default (the defaults have `false`,
+   * and under fail closed no receipt is signed automatically). With `rules` (the stored policy that
+   * `policy recover` reviews), that policy and version. Read-only.
+   */
+  async receiptsOnFromOlderDefault(rules?: {
+    readonly policy: Policy;
+    readonly version: number;
+  }): Promise<boolean> {
+    let checked = rules;
+    if (checked === undefined) {
+      const effective = await this.loadPolicy();
+      if (effective.mode !== 'signed') return false;
+      checked = { policy: effective.policy as Policy, version: effective.version };
+    }
+    if (checked.policy.receipts.autoDelivered !== true) return false;
+    return !(await this.#keptAt(checked.version));
+  }
+
+  /**
+   * Records that the owner kept delivery receipts on at `version` (06 §3, D-109; M1-33a). Only for
+   * the verified, applied policy at exactly that version with `receipts.autoDelivered: true`, so a
+   * call can never mark a policy the owner did not sign. False when refused, without a marker store,
+   * or when the write failed; the owner is then asked again at the next `policy.set` (the private
+   * side). Grants nothing (I-4): the policy itself already says `true`.
+   */
+  async recordReceiptsKept(version: number): Promise<boolean> {
+    if (this.#receiptsKept === undefined) return false;
+    const effective = await this.loadPolicy();
+    if (
+      effective.mode !== 'signed' ||
+      effective.version !== version ||
+      effective.policy.receipts.autoDelivered !== true
+    ) {
+      return false;
+    }
+    try {
+      await this.#receiptsKept.write(version);
+    } catch {
+      return false;
+    }
+    return this.#keptAt(version);
+  }
+
+  /** True when the marker reads a version at most `version`; anything else is not kept. */
+  async #keptAt(version: number): Promise<boolean> {
+    if (this.#receiptsKept === undefined) return false;
+    let kept: number | null;
+    try {
+      kept = await this.#receiptsKept.read();
+    } catch {
+      return false;
+    }
+    return typeof kept === 'number' && Number.isSafeInteger(kept) && kept >= 0 && kept <= version;
   }
 
   /**

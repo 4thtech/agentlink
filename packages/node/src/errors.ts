@@ -46,6 +46,8 @@ export type NodeKeyStoreErrorCode =
   | 'policy_version_invalid'
   /** The mark did not read back as raised after the write (M1-8g). */
   | 'policy_mark_not_raised'
+  /** M1-33a: the receipts-kept marker did not read back as written; the owner is asked again. */
+  | 'receipts_kept_not_written'
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
   /** M1-8e: the authenticator returned no PRF output; nothing is stored, the owner code stays. */

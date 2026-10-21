@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 150 (M1a 80, M1b 70; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 151 (M1a 80, M1b 71; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 43 (incl. M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -3744,6 +3744,22 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Recipient: a received Record whose `parentRecordId` names another signer's record is flagged (04 §3.4 checks), and no receipt is signed for it. (M1-33c drops and logs it as `proof_parent_mismatch`; the contact flag lands with M1-7g-c.)
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - A parent signed by another agent is refused and nothing is signed or charged; a parent of the same signer is accepted; a failed chain read refuses (fail closed); the recipient-side flag test.
+
+#### M1-33d · Delivery receipt requests and the user's own DELIVERED (new, split from M1-33a, D-109)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/types (`proof` body `receiptRequest`), packages/core (proofs, inbox), apps/cli (tool inputs and summaries, local UI rule)
+- **Depends on:** M1-33a
+- **Spec:** 04 §3.4 (`proof`, receipt request); 06 §2.4, §3 (delivery receipts); 11 §5.6; D-109
+- **Invariants:** I-4, I-5, I-6
+- **Scope (the parts of M1-33a left for this card on 2026-10-20):**
+  - `requestReceipt?` on `agentlink_notarize` and `agentlink_send`; `receiptRequest: "delivered"` in the `proof` body; on the recipient, `receiptRequested: true` on the inbox item and the summary line.
+  - `agentlink_acknowledge` with `delivered` (the user's yes; no owner approval).
+  - `files.deleteAfter: receipt` falls back to `expiry` without a receipt.
+  - The 11 §5.6 lines in the tool summaries for receipt requests and receipts; the local UI's "Confirm deliveries from <name> automatically" as an owner-signed `policy.set` (the contact rule itself landed in M1-33a).
+- **Acceptance (tests first; a `RED (expected):` commit before the fix):**
+  - A `receiptRequest` alone never signs anything; the user's `agentlink_acknowledge {type: "delivered"}` signs exactly one; a malformed `receiptRequest` refuses the body.
+  - No tool can set the contact rule (I-4); the summaries carry the 11 §5.6 lines.
+  - Lands before the first release that ships proofs, or carries a release gate like M1-7g-b.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 

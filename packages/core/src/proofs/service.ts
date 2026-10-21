@@ -14,7 +14,8 @@
 // Recipient side (`processInbound`): a `proof` envelope from a contact is checked on-chain before
 // anything is signed: the record exists, its signer is that contact, its `envelopeHash` is the
 // stored envelope's, its kind is the 05 §3.1 kind of the payload this agent holds, and its recipient
-// commitment opens to this agent with the delivered salt. Then DELIVERED per `receipts.autoDelivered`
+// commitment opens to this agent with the delivered salt. Then DELIVERED per the effective
+// `receipts.autoDelivered` (default off; the contact rule, else the global value; D-109)
 // and the deferred ACCEPTED of an approved accept (07 §2.1 step 4). OPENED only on request;
 // ACCEPTED / REJECTED without terms are commitments (`commitments.accept`, D-31) and exclusive.
 //
@@ -1178,7 +1179,16 @@ export class ProofService implements RecordLookup {
     if (stored?.status !== 'received' || stored.envelope_id !== envelopeId) return 0;
     let signed = 0;
     const effective = await this.#deps.ownerActions.loadPolicy();
-    if (evaluate(effective, { kind: 'receipt.auto', receipt: 'delivered' }) === 'allow') {
+    // The record's signer is this contact (checked above); its contact rule may replace the global
+    // `receipts.autoDelivered` while it is paired and not blocked or revoked (06 §3, D-109).
+    const signer = await this.#counterparty(contactId);
+    const auto = evaluate(effective, {
+      kind: 'receipt.auto',
+      receipt: 'delivered',
+      counterparty:
+        signer === null ? null : { contact: signer.agentId, ruleEligible: signer.eligible },
+    });
+    if (auto === 'allow') {
       if ((await this.#signReceipt(stored, 'DELIVERED')).status === 'ok') signed += 1;
     }
     if (checked.kind === RECORD_KIND.OFFER) signed += await this.#deferred(stored, checked);
