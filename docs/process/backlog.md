@@ -766,11 +766,12 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
 
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
 - **Repo/path:** agentlink · `apps/submitter/src/index.ts`
 - **Depends on:** —
 - **Scope:** Local `wrangler dev` fails from `apps/submitter/src/index.ts`: its `export *` puts non-handler exports such as `MAX_BODY_BYTES` on the Worker entry module, which Wrangler refuses. Keep only the Worker handlers (and Durable Object classes, if any) on the entry module; move the shared constants and helpers behind a separate module that tests and other code import directly.
 - **Acceptance:** `wrangler dev` starts locally from `apps/submitter`; the entry module exports only what the Worker runtime expects; the deploy bundle and every submitter test stay green; no test weakened.
+- Review note (IR #338 L1/L2/L3, 2026-10-21): done in the same PR: the submitter port reads "absent" only for revert data that is exactly the `RecordNotFound()` selector; the misplaced `revertName` doc comment moved back; the verifier maps a `RecordNotFound()` revert to `record_not_found` (any other revert stays `chain_unavailable`).
 
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
