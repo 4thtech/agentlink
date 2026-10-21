@@ -62,10 +62,12 @@ What and when only. Cost estimates are tracked internally.
 
 Design is delivered by the owner in three drops so it never blocks the build. The brief for designers is `11-claude-design-brief.md`. Intake and live status are in `docs/design/README.md`. Until a surface's design has landed, agents build it **functional and unstyled** (semantic HTML, placeholder tokens) and never invent a visual design for it.
 
+*Build-plan deviation (D-116, announced by the owner on 21 Oct 2026):* D1 and a first pass of D2 have been in `docs/design/` since 14 Oct 2026. The surfaces they cover are built **styled** from them now and no longer wait for D2. The design predates later decisions, so it is adjusted first: DESIGN-ADJ-1 lists, per screen, what agents fix in code and what the owner redesigns in Claude Design. `packages/ui` tokens and fonts start in parallel (M1-35a). D3 is not delivered.
+
 | Drop | Contents (11 §) | Needed by | Blocks |
 |---|---|---|---|
 | **D1: brand core and M1 surfaces** | Brand core: mark, wordmark, lockups, favicon and AI-app listing icon (2, D-56); in-chat copy sheet (6.1, the highest priority) and terminal copy (6.10); design tokens (11.7) and core components (8); local settings and approvals app (6.2.1) with its states (9); a simple "how to install" invite placeholder page | **Week 3 of M1** | Nothing hard. M1a comes first, so the copy sheet feeds the M1a tool summaries (M1-9); tokens and the approvals app feed the M1b local UI (M1-11). Until it lands they stay unstyled and use the 11 §5 vocabulary; the M1a gate does not wait for it |
-| **D2: full system and M2 surfaces** | The complete component library; OS app icons, tray icons and PWA icons (2.4); desktop apps for macOS, Windows and Linux (6.2.2); cloud agent pages (6.9); storage, proofs and printed records, registration and domain verification (6.11–6.13); owner console (6.3, desktop and mobile), whose screens are also the desktop dashboard (D-41); verify page (6.4); invite landing (6.5) and browser counterparty view-and-accept (D-35); onboarding (6.6); pay page (6.7) and pricing (6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (13) | **Before the M1 gate** | M2-1, then M2-2 (incl. the pay page, M2-2f), M2-5, M2-6, M2-11 (dashboard) and M2-13 |
+| **D2: full system and M2 surfaces** | The complete component library; OS app icons, tray icons and PWA icons (2.4); desktop apps for macOS, Windows and Linux (6.2.2); cloud agent pages (6.9); storage, proofs and printed records, registration and domain verification (6.11–6.13); owner console (6.3, desktop and mobile), whose screens are also the desktop dashboard (D-41); verify page (6.4); invite landing (6.5) and browser counterparty view-and-accept (D-35); onboarding (6.6); pay page (6.7) and pricing (6.8); clickable prototypes J1, J2, J4, J5, J8; rationale notes (13) | **Before the M1 gate** (first pass landed 14 Oct 2026, D-116) | M2-1, then M2-2 (incl. the pay page, M2-2f), M2-5, M2-6, M2-11 (dashboard) and M2-13 |
 | **D3: launch brand** | Brand final after the trademark check, the marketing site (6.15) and social images (out of scope for beta per 11 §15) | Before public launch (M3) | M3 public launch only |
 
 ## Owner tasks with long lead times
@@ -111,7 +113,8 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M1-8 `@4thtech-io/node` (rest) | node | OwnerKeyStore unlocked by a localhost passkey (PRF) as well; local approval server (in-memory token, host/origin checks) |
 | M1-9 CLI + MCP server (rest) | apps/cli | File and proof tools from 06; `storage connect` (optional), `backup`, `credits`, `verify`, `ui`; Claude Desktop one-click extension |
 | M1-10 Submitter (testnets) + credits faucet | apps/submitter | Simulates, submits, batches; rate limits; health endpoint; faucet endpoint calls `depositFor` with testnet credits (rate-limited per agent) |
-| M1-11 Local approval UI (functional and unstyled; styled from D1 when it lands) | apps/cli | Owner passkey setup, approvals with passkey, storage (drop usage; optional own storage), allowed folders, policies, credits (faucet on testnet), backup |
+| M1-11 Local approval UI (styled from the D1 local screens after DESIGN-ADJ-1, D-116) | apps/cli | Owner passkey setup, approvals with passkey, storage (drop usage; optional own storage), allowed folders, policies, credits (faucet on testnet), backup |
+| M1-35 `packages/ui` from the design (D-116) | packages/ui | Tokens, fonts and the Lucide notice (M1-35a); core components in TypeScript from the 31 specs, classes not inline styles (M1-35b); copy audit against 11 §5 (M1-35c). Feeds the local UI (M1-11), the invite page (M1-19) and verify (M2-5) |
 | M1-12 Skill file + quickstart docs (rest) | skills/, docs | A new user completes J1 from docs alone |
 | M1-13 E2E suite (rest) | e2e | 5 MB file with zero storage setup (encrypted drop), notarize, DELIVERED/OPENED, export + verify pack; J8 with on-chain proof of agreement; prompt-injection suite on file and proof tools (06 §9) |
 | M1-33 Privacy of on-chain proofs, M1 part (D-109) | core, types, apps/cli, docs | Delivery receipts off by default, asked for by the sender and confirmed by the recipient or its rules (M1-33a); the 11 §5.6 disclosure in every proof, receipt, export and top-up surface (M1-33b); `parentRecordId` only ever zero or the agent's own record (M1-33c). Lands before the first release that ships proofs |
@@ -124,7 +127,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 
 | Task | Output | Acceptance |
 |---|---|---|
-| M2-1 Design system + screens from Claude Design D2 (11) → `packages/ui` (needs D2) | Components | Matches design; accessibility AA |
+| M2-1 Design system + screens from Claude Design D2 (11) → `packages/ui` (D2 first pass landed; extends M1-35, D-116) | Components | Matches design; accessibility AA |
 | M2-2 Owner console PWA | apps/console | Passkey + PRF identity, backup to relays, new-device restore, owner link from CLI; activity, threads, approvals, policies (`SignedOwnerAction` in owner-channel envelopes, 04 §2.5.1), proofs, credits |
 | M2-3 Cloud agent template | apps/cloud-agent | `agentlink cloud deploy` and Deploy button both work; DO inbox; remote MCP + OAuth; ChatGPT developer-mode connector and claude.ai connector tested |
 | M2-4 OCCRegistry + verified badge | contracts, chain, console | Register/revoke on testnets; badge shown in contacts |
