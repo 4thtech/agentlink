@@ -1343,7 +1343,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Tests first: after an epoch advance, a receipt deletes the object uploaded under the older epoch; every KeyStore backend passes the shared suite.
 
 #### M1-1g-i · core: per-file `deleteAfter` snapshot at send time (new, IR-M1-1g-h-1 decision a)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#346) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, retention)
 - **Depends on:** M1-1g-h
 - **Spec:** 04 §4 (retention); 06 §3 (`files.deleteAfter`)
@@ -1352,6 +1352,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Record the effective `files.deleteAfter` with each sent file at send time, and have the delete-on-receipt pass (M1-1g-h, which today reads the policy at delete time) honour that snapshot, so switching to `receipt` doesn't retroactively delete older sends.
 - **Acceptance:**
   - Tests first: a file sent under `expiry` is not deleted on receipt after the owner switches to `receipt`; a file sent under `receipt` still is.
+- **As built:** `files.delete_after` (store schema version 4; SQLite migration 4 adds the nullable column) holds the effective `files.deleteAfter` of the send. A row is deleted on receipt only when its snapshot is `receipt` and the current policy still says `receipt` (fail closed counts as `expiry`), so switching back to `expiry` also stops deletion. Rows stored before version 4 (null) are kept until they expire. Also IR-M1-1g-h-2 (Low): the rotating window resumes after the last envelope ID checked instead of a list position.
 
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
 - **Status:** done (4thtech/agentlink#55, merged 2026-10-14; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a

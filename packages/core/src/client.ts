@@ -160,7 +160,7 @@ export class AgentLinkClient {
   readonly #files: FileFetcher;
   readonly #filesPlatform: FilesPlatform | undefined;
   /** Where the next delete-on-receipt pass starts (M1-1g-h; files/retention.ts). */
-  readonly #retentionCursor = { next: 0 };
+  readonly #retentionCursor: { after: string | null } = { after: null };
   readonly #ctx: CoreContext;
 
   private constructor(
@@ -295,7 +295,8 @@ export class AgentLinkClient {
   /**
    * Delete on receipt (M1-1g-h; 04 §4, 06 §3, 07 §5.4): with `files.deleteAfter: receipt` in the
    * effective policy, deletes the stored object of every file of a sent envelope whose DELIVERED
-   * receipt the chain shows, the drop with a DELETE signed at the upload epoch. Under `expiry` (the
+   * receipt the chain shows and that was itself sent under `receipt` (M1-1g-i: the policy at send
+   * time, kept per file), the drop with a DELETE signed at the upload epoch. Under `expiry` (the
    * default, and always while the policy fails closed) it does nothing. `syncInbox` runs it;
    * idempotent, and a failed delete is retried on the next pass.
    */
