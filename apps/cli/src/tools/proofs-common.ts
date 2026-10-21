@@ -240,12 +240,19 @@ export function notarizeOutput(
 ): HandlerOutput {
   const fields = options.fields ?? {};
   const disclosure = proofDisclosure(options.contactName);
+  // M1-33d (06 §2.4, 11 §5.6): a proof that asks for a delivery receipt always says what the
+  // receipt makes public; any other proof says it the first time in a session.
+  const disclose = (text: string): string =>
+    firstProofOfSession(context) ||
+    ((result.status === 'ok' || result.status === 'submitted') && result.receiptRequested === true)
+      ? withDisclosure(text, disclosure)
+      : text;
   switch (result.status) {
     case 'ok': {
       const fee = dollars(result.fee.usd);
       const text =
         fee === undefined ? PROOF_TEXT.recordedNoFee : fill(PROOF_TEXT.recorded, { fee });
-      return ok(firstProofOfSession(context) ? withDisclosure(text, disclosure) : text, {
+      return ok(disclose(text), {
         ...fields,
         ...proofFields(result),
       });
@@ -253,9 +260,7 @@ export function notarizeOutput(
     case 'submitted':
       return fail(
         'submitted',
-        firstProofOfSession(context)
-          ? withDisclosure(PROOF_TEXT.recording, disclosure)
-          : PROOF_TEXT.recording,
+        disclose(PROOF_TEXT.recording),
         PROOF_TEXT.recordingNextStep,
         undefined,
         { ...fields, ...proofFields(result) },

@@ -202,6 +202,9 @@ export const handshakeAckBodySchema = z.strictObject({
  * proof pack's `record`) and `signature` (the Record-signature form, 1 to 4 096 bytes, the pack's
  * `signature`). They come together or not at all; a sender before M1-7g-b sends neither. Unknown
  * keys stay refused, in the body and in `record`.
+ *
+ * `receiptRequest: "delivered"` (M1-33d, D-109; 04 §3.4 "Receipt request"): the sender's user asked
+ * for a delivery receipt. The recipient treats it as the sender's content (I-5): a flag only.
  */
 export const proofBodySchema = z
   .strictObject({
@@ -211,6 +214,9 @@ export const proofBodySchema = z
     salt: bytes32Hex,
     record: recordSchema.exactOptional(),
     signature: recordSignatureSchema.exactOptional(),
+    // M1-33d (D-109): the sender's user asked for a delivery receipt. The only value; any other
+    // value or type is a malformed payload. It asks; it never signs anything by itself.
+    receiptRequest: z.literal('delivered').exactOptional(),
   })
   .refine((b) => (b.record === undefined) === (b.signature === undefined), {
     message: 'record and signature come together',

@@ -110,6 +110,8 @@ export interface InboundPageItem extends PageItemBase {
   readonly senderCode?: string;
   /** True if it had been returned before this call (06 §2.2 "Read state"). */
   readonly read: boolean;
+  /** Ours (M1-33d): the contact asked for a delivery receipt that is not signed yet. A flag only. */
+  readonly receiptRequested?: true;
 }
 
 /** An outbound item (06 §2.2 `OutboundMessage`). */

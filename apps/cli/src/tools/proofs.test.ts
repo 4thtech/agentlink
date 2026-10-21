@@ -31,7 +31,7 @@ import type {
 import { callTool } from './index.js';
 import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
-import { findTool } from './registry.js';
+import { TOOLS, findTool } from './registry.js';
 import { matchesSchema } from './input.js';
 
 const A = `0x${'a'.repeat(40)}`;
@@ -1410,8 +1410,7 @@ describe('no tool turns on automatic delivery receipts (I-4, 06 §3)', () => {
     return out;
   }
 
-  it('no tool input names a receipts rule, a contact rule or a policy', async () => {
-    const { TOOLS } = await import('./registry.js');
+  it('no tool input names a receipts rule, a contact rule or a policy', () => {
     for (const tool of TOOLS) {
       const names = propertyNames(tool.inputSchema);
       for (const banned of ['autoDelivered', 'receipts', 'contactRules', 'policy', 'autoOpened']) {

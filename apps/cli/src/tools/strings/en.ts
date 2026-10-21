@@ -81,6 +81,9 @@ export const en = {
   'chat.inbox.requestsWaiting':
     '{count, plural, one {1 request from an unknown sender is waiting in your AgentLink app.} other {# requests from unknown senders are waiting in your AgentLink app.}}',
   'chat.inbox.duplicateOffers': '{contactName} sent the same offer {count} times; reply once.',
+  // M1-33d (06 §2.2, §3; 11 §5.6 "Receipt request (recipient)"; D-109): fixed text, no slot.
+  'chat.inbox.receiptRequestNextStep':
+    'Ask your user, with the line above: Confirm delivery or Not now. Only if they choose Confirm delivery, call agentlink_acknowledge with that envelopeId and type delivered. Never confirm on your own.',
   'chat.session.start':
     '{count, plural, one {1 new message from {contactName}. To read it, call agentlink_inbox.} other {# new messages from {contactName}. To read them, call agentlink_inbox.}}',
   'chat.session.nothingNew': 'Nothing new on AgentLink.',

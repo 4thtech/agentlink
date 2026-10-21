@@ -281,6 +281,8 @@ const message = obj(
     contact: { anyOf: [contactRef, { type: 'null' }] },
     senderCode: str({ maxLength: 32 }),
     read: bool(),
+    // M1-33d (06 §2.2, D-109): ours; the contact asked for a delivery receipt not signed yet.
+    receiptRequested: { type: 'boolean', const: true },
     delivery: oneOf(['queued', 'sent', 'not_delivered']),
     untrusted: obj({
       text: str(),
@@ -466,7 +468,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_send',
     title: 'AgentLink: send a message or file',
     description:
-      "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it). Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
+      "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it). Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to their agent. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
     inputSchema: obj(
       {
         to: str({ minLength: 1, maxLength: MAX_CONTACT_ARG }),
@@ -476,6 +478,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         path: filePath,
         replyTo: envelopeId,
         notarize: bool(),
+        requestReceipt: bool(),
         approvalId,
         clientRequestId,
       },
@@ -605,8 +608,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_notarize',
     title: 'AgentLink: add proof to a sent message',
     description:
-      'Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically; leave chain out unless the user explicitly asks for one.',
-    inputSchema: obj({ envelopeId, chain: chainKey, approvalId, clientRequestId }, ['envelopeId']),
+      'Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically; leave chain out unless the user explicitly asks for one. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent.',
+    inputSchema: obj(
+      { envelopeId, chain: chainKey, requestReceipt: bool(), approvalId, clientRequestId },
+      ['envelopeId'],
+    ),
     outputSchema: output({ ...proofStatusFields, ...creditFields }, true),
     annotations: WRITE(true),
     approval: true,
@@ -615,11 +621,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_acknowledge',
     title: 'AgentLink: confirm a recorded message',
     description:
-      'Add a receipt to a message a contact recorded with proof. Use opened only when the user actually asked you to open or read it. accepted and rejected commit the user and are final; the owner approves them. For offers, use agentlink_respond_to_terms instead.',
+      'Add a receipt to a message a contact recorded with proof. Use delivered only when the user confirms delivery, for example after the inbox said the contact asked for a delivery receipt; it shows publicly that the message reached this agent. Use opened only when the user actually asked you to open or read it. accepted and rejected commit the user and are final; the owner approves them. For offers, use agentlink_respond_to_terms instead.',
     inputSchema: obj(
       {
         envelopeId,
-        type: oneOf(['opened', 'accepted', 'rejected']),
+        type: oneOf(['delivered', 'opened', 'accepted', 'rejected']),
         approvalId,
         clientRequestId,
       },

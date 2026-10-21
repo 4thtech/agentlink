@@ -289,7 +289,11 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
   {
     path: 'files.deleteAfter',
     label: 'Sent files are deleted after',
-    read: (v) => (v === 'receipt' ? 'the contact received them' : 'they expire'),
+    // 06 §3 (D-109, M1-33d): without a delivery confirmation, deletion falls back to expiry.
+    read: (v) =>
+      v === 'receipt'
+        ? 'the contact confirms delivery (if they never do, when they expire)'
+        : 'they expire',
   },
   { path: 'files.ownerArchive', label: 'Keep a copy of sent files for you', read: yesNo },
   { path: 'envelopes.maxEnvelopeKB', label: 'Largest message', read: (v) => `${String(v)} KB` },

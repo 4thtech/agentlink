@@ -7,6 +7,10 @@
 // `USE_RESPOND_TO_TERMS` and nothing is signed (D-55). This handler maps the result. Summaries carry
 // no contact name: the core's approval summary (which names the contact by its stored name) is never
 // passed through (I-5).
+//
+// `delivered` (M1-33d; 06 §2.4, §3; D-109) is the user's own yes, for example after the inbox said a
+// contact asked for a delivery receipt: no owner approval, as for `opened`, and the core signs at
+// most one per record (I-6). A request alone never reaches here; only the user's answer does.
 import type { AcknowledgeInput } from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
 import {
@@ -86,7 +90,9 @@ export async function acknowledgeHandler(
   if (!isPlainObject(input)) return invalidArgument();
   const { envelopeId, type, approvalId } = input;
   if (typeof envelopeId !== 'string' || typeof type !== 'string') return invalidArgument();
-  if (type !== 'opened' && type !== 'accepted' && type !== 'rejected') return invalidArgument();
+  if (type !== 'delivered' && type !== 'opened' && type !== 'accepted' && type !== 'rejected') {
+    return invalidArgument();
+  }
   const self = await needsIdentity(context);
   if (isOutput(self)) return self;
   const proofs = context.client.proofs;
@@ -109,7 +115,7 @@ export async function acknowledgeHandler(
       const receipt = RECEIPT_WORD[result.receipt];
       if (receipt === undefined) return internalError();
       const fields = { recordId: result.recordId, receipt: result.receipt };
-      // 11 §5.6: opened, accepted and rejected receipts are public (D-109).
+      // 11 §5.6: every receipt is public (D-109); delivered says the item was received.
       const note = receiptDisclosure(type);
       const say = (text: string): string =>
         note === undefined ? text : withDisclosure(text, note);

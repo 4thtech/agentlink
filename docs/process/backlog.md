@@ -3765,7 +3765,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A parent signed by another agent is refused and nothing is signed or charged; a parent of the same signer is accepted; a failed chain read refuses (fail closed); the recipient-side flag test.
 
 #### M1-33d · Delivery receipt requests and the user's own DELIVERED (new, split from M1-33a, D-109)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (the local UI's "Confirm deliveries from <name> automatically" and the `files.deleteAfter: receipt` retention runner stay open, see the PR) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types (`proof` body `receiptRequest`), packages/core (proofs, inbox), apps/cli (tool inputs and summaries, local UI rule)
 - **Depends on:** M1-33a
 - **Spec:** 04 §3.4 (`proof`, receipt request); 06 §2.4, §3 (delivery receipts); 11 §5.6; D-109

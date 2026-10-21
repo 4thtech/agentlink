@@ -34,6 +34,7 @@ import type { ContactBook, ContactView } from './contacts.js';
 import { nowOf, open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { InboxSender } from './inbox.js';
+import { receiptRequestedTx } from './proofs/receipt-request.js';
 import { unknownSenderCodesTx } from './sender-codes.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx, Where } from './store/store.js';
@@ -142,6 +143,11 @@ export interface InboundPageItem extends InboxPageItemBase {
   readonly senderCode?: string;
   /** True if it had been returned before this call (06 §2.2 "Read state"). */
   readonly read: boolean;
+  /**
+   * Ours (M1-33d, D-109): present (true) only on a contact's item whose checked proof asks for a
+   * delivery receipt that this agent has not signed. A flag only: it never signs anything.
+   */
+  readonly receiptRequested?: true;
 }
 
 /** An outbound item (06 §2.2 `OutboundMessage`). Outbound items have no read state. */
@@ -557,5 +563,12 @@ async function buildItem(
     if (row.delivery === null) return undefined;
     return { ...base, direction: 'out', to: who, delivery: row.delivery };
   }
-  return { ...base, direction: 'in', from: who, read: row.read_at !== null };
+  const requested = await ctx.store.transaction((tx) => receiptRequestedTx(tx, row.envelope_id));
+  return {
+    ...base,
+    direction: 'in',
+    from: who,
+    read: row.read_at !== null,
+    ...(requested ? { receiptRequested: true as const } : {}),
+  };
 }
