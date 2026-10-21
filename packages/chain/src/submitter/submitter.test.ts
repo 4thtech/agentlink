@@ -302,6 +302,8 @@ interface MockChain {
   failNetwork: boolean;
   /** Answer eth_estimateGas and eth_call with a JSON-RPC error that carries no revert data. */
   noDataError: boolean;
+  /** Answer getRecord with this revert (any record ID). */
+  getRecordRevert: string | null;
 }
 
 function newChain(): MockChain {
@@ -318,6 +320,7 @@ function newChain(): MockChain {
     methods: [],
     failNetwork: false,
     noDataError: false,
+    getRecordRevert: null,
   };
 }
 
@@ -372,6 +375,18 @@ function mockFetch(chain: MockChain) {
         if (decoded.functionName === 'getRecord') {
           const id = (decoded.args as readonly [Hex])[0];
           const stored = chain.records.get(id);
+          if (chain.getRecordRevert !== null) {
+            const data = encodeErrorResult({
+              abi: NOTARY_CLIENT_ABI,
+              errorName: chain.getRecordRevert as never,
+            });
+            return replyError({ code: 3, message: 'execution reverted', data });
+          }
+          // The deployed Notary reverts RecordNotFound() for an unknown record ID.
+          if (!stored) {
+            const data = encodeErrorResult({ abi: NOTARY_CLIENT_ABI, errorName: 'RecordNotFound' });
+            return replyError({ code: 3, message: 'execution reverted', data });
+          }
           return reply(
             encodeFunctionResult({
               abi: NOTARY_CLIENT_ABI,
@@ -603,6 +618,29 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
     expect(included.outcomes.get(b.id)).toBe('skipped');
     chain.receipts.set(txHash, { status: '0x0', logs: [] });
     expect(await p.inclusion(txHash)).toEqual({ state: 'reverted' });
+  });
+
+  it('simulates a new record although the Notary reverts RecordNotFound for its ID', async () => {
+    // The deployed Notary's getRecord reverts RecordNotFound() for an unknown ID rather than
+    // returning an empty record; the port read that as an RPC error, so every new record made the
+    // queue answer 503 (the staging smoke's simulated notarize).
+    const chain = newChain();
+    const p = port(chain);
+    const item = await recordItem();
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok', gas: chain.estimate });
+    chain.revertWith = { name: 'InsufficientCredits', args: [ZERO_ADDRESS, ZERO_ADDRESS, 1n, 0n] };
+    expect(await p.simulateItem(item)).toEqual({
+      outcome: 'failed',
+      error: 'InsufficientCredits',
+    });
+  });
+
+  it('keeps any other getRecord revert an infrastructure error', async () => {
+    const chain = newChain();
+    chain.getRecordRevert = 'EnforcedPause';
+    const p = port(chain);
+    const item = await recordItem();
+    await expect(p.simulateItem(item)).rejects.toMatchObject({ code: 'rpc_error' });
   });
 
   it('treats an RPC error without revert data as the infrastructure’s, not a failed item', async () => {
