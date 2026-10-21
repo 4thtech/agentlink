@@ -198,10 +198,19 @@ describe('the rotating window is keyed on the last envelope ID (IR-M1-1g-h-2)', 
     expect(own.objects.size).toBe(total);
     // Each send as recorded on-chain by A (only the status and the envelope ID make a candidate);
     // the chain read is the spy below, so no real record is needed.
+    const recordId = (i: number) => `0x${i.toString(16).padStart(64, '0')}`;
+    const salts = await Promise.all(
+      ids.map((_, i) =>
+        a.cipher.seal(
+          { table: 'proofs', column: 'salt', rowKey: JSON.stringify([recordId(i)]) },
+          '',
+        ),
+      ),
+    );
     await a.store.transaction((tx) => {
       ids.forEach((envelopeId, i) =>
         tx.insert('proofs', {
-          record_id: `0x${i.toString(16).padStart(64, '0')}`,
+          record_id: recordId(i),
           envelope_id: envelopeId,
           chain_id: 84532,
           record_json: '{}',
@@ -209,7 +218,7 @@ describe('the rotating window is keyed on the last envelope ID (IR-M1-1g-h-2)', 
           status: 'recorded',
           fee_token: null,
           fee_amount: null,
-          salt: 'sealed',
+          salt: salts[i] as (typeof salts)[number],
           created_at: clock.t,
         }),
       );

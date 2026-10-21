@@ -73,6 +73,8 @@ export interface OutgoingRecord extends Uploaded {
   readonly idx: number;
   readonly entry: FileEntry;
   readonly kind: 'inline' | 'drop' | 's3';
+  /** The `files.deleteAfter` of the policy this send was checked under (M1-1g-i), kept per row. */
+  readonly deleteAfter: 'expiry' | 'receipt';
 }
 
 export type OutgoingOutcome =
@@ -337,6 +339,7 @@ export async function prepareOutgoing(
       records.push({
         idx: i,
         kind,
+        deleteAfter: limits.deleteAfter,
         object: kind === 'inline' ? null : object,
         adapter: kind === 'inline' ? null : adapter,
         entry: {

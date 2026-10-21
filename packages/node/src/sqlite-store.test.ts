@@ -482,7 +482,9 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       ]
     `);
     // Version 3 is unchanged by version 4.
-    expect(digestOf(2)).toMatchInlineSnapshot(`"e1ed945ccd595fde33376a7b00fbd31990cfe23411b175b297a5e7c145370e73"`);
+    expect(digestOf(2)).toMatchInlineSnapshot(
+      `"e1ed945ccd595fde33376a7b00fbd31990cfe23411b175b297a5e7c145370e73"`,
+    );
     // Version 4 (M1-1g-i): files.delete_after, the files.deleteAfter in effect at send time.
     expect(MIGRATIONS[3]?.statements).toMatchInlineSnapshot(`
       [
