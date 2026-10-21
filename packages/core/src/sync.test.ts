@@ -1371,14 +1371,28 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
     const a = await openAgent(1, 'alice', RELAYS_A, net);
     const b = await openAgent(2, 'bob', RELAYS_B, net, { keyStore });
     await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'stored earlier' });
+    expect((await b.client.catchUp()).inbox).toEqual([{ contactId: a.id, unread: 1 }]);
+
     failing = true;
+    // The read-only catch-up still counts what is stored (06 §2.0).
+    expect(await b.client.catchUp()).toEqual({
+      partial: true,
+      inbox: [{ contactId: a.id, unread: 1 }],
+      requests: 0,
+    });
+    // syncInbox: only the fetch fails; what is stored is still processed (here the KeyStore
+    // recovers before the processing step, which needs the keys to open envelopes).
+    const process = b.client.envelopes.processReceived.bind(b.client.envelopes);
+    b.client.envelopes.processReceived = () => {
+      failing = false;
+      return process();
+    };
     const result = await b.client.syncInbox();
     expect(result.partial).toBe(true);
     expect(result.stored).toBe(0);
-    expect(result.items).toEqual([]);
-    expect((await b.client.catchUp()).partial).toBe(true);
-    failing = false;
-    await a.client.sendMessage({ to: b.id, text: 'later' });
-    expect((await b.client.syncInbox()).items).toHaveLength(1);
+    expect(result.items.map((i) => i.payload.body)).toEqual(['stored earlier']);
+    expect(b.lines.join('\n')).toContain('inbox fetch failed');
+    expect(b.lines.join('\n')).not.toContain('keystore unavailable');
   });
 });

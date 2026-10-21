@@ -19,7 +19,9 @@
 //    stores the contact's envelope, `ok` or `refused` (07 §3.2 "Transaction"; `countRateTx`, the
 //    envelope pipeline's RateLimitHook), so envelopes from a contact's new key that arrive with its
 //    card-update, and held envelopes it releases, are counted too (IR-M1-7h-1 F02). Then delivery
-//    acks (02 F-23, behind a flag), then the new inbox items with their wrapper metadata.
+//    acks (02 F-23, behind a flag; staged for the outbox, never published inside the pass,
+//    IR-M1-7h-1 F04 b), then the new inbox items with their wrapper metadata. A KeyStore that
+//    cannot list the own keys fails the fetch only, never the sync (F04 c).
 //
 // `subscribeInbox` (M1-9s; 06 §6, 07 §4.1) is the live form for the MCP background loop: the
 // transport's `subscribe` hands each new wrap to the same step 1 and 2 handler as `syncInbox`
@@ -93,7 +95,10 @@ export interface SyncInboxResult extends FetchSummary {
   readonly reports: readonly InboundReport[];
   /** The requests queue (unknown senders): a count only (06 §2.1). */
   readonly requests: number;
-  /** Delivery acks stored for sending in this pass (02 F-23; 0 while the flag is off). */
+  /**
+   * Delivery acks staged for the outbox in this pass (02 F-23; 0 while the flag is off). The
+   * outbox pass gives them their wraps and publishes them (M1-7h-b).
+   */
   readonly acksSent: number;
 }
 
@@ -489,9 +494,18 @@ export class SyncService {
       throw new CoreError('transport_unavailable', 'Syncing is not available in this setup.');
     }
     // The own list (07 §4.3). routes() also marks it as the only list where AUTH may be signed.
-    const routes = await outbox.routes(undefined);
-    const relays = [...new Set(routes.flatMap((r) => r.relays))];
-    const identities = await this.#identities();
+    // Both read the own keys from the KeyStore. IR-M1-7h-1 F04 c: if that fails, the fetch fails,
+    // never the sync: what is already stored is still processed and counted (fixed text, I-7).
+    let relays: string[];
+    let identities: SyncIdentity[];
+    try {
+      const routes = await outbox.routes(undefined);
+      relays = [...new Set(routes.flatMap((r) => r.relays))];
+      identities = await this.#identities();
+    } catch {
+      this.#ctx.log.warn('inbox fetch failed', {});
+      return { partial: true, stored: 0, rateLimited: [] };
+    }
     const limit = policyLimits(await ownerActions.loadPolicy()).rateLimitPerContactPerHour;
 
     let stored = 0;
