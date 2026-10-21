@@ -190,6 +190,7 @@ function setup(
     recipient?: TestKeys;
     keys?: EnvelopeKeys;
     dedupCacheEntries?: number;
+    learnedIdsPerRelay?: number;
     auth?: boolean;
   } = {},
 ): Setup {
@@ -216,6 +217,9 @@ function setup(
     ...(shared.dedupCacheEntries === undefined
       ? {}
       : { dedupCacheEntries: shared.dedupCacheEntries }),
+    ...(shared.learnedIdsPerRelay === undefined
+      ? {}
+      : { learnedIdsPerRelay: shared.learnedIdsPerRelay }),
   });
   const items: SyncItem[] = [];
   const result: Setup = {
@@ -1809,6 +1813,15 @@ function injectEverywhere(s: Setup, relays: readonly string[], count: number, at
   return wraps;
 }
 
+/**
+ * One older wrap on each of `relays`. Without it a relay whose window holds only second T returns
+ * all of it in one page at one second, which M1-5d reports as a (false-alarm) gap of its own, and a
+ * relay with a gap at T closes no other gap there.
+ */
+function olderEverywhere(s: Setup, relays: readonly string[], at: number) {
+  return injectEverywhere(s, relays, 1, at - HOUR);
+}
+
 describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
   it('closes the gap of a capped relay when a second relay read that second in full', async () => {
     const s = setup();
@@ -1817,12 +1830,13 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(full);
     const T = NOW - 2_000;
     const same = injectEverywhere(s, [capped, full], 8, T);
+    olderEverywhere(s, [capped, full], T);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
       onEnvelope: s.handler(),
     });
-    expect(result.delivered).toBe(8);
+    expect(result.delivered).toBe(9);
     expect(result.gaps).toEqual([]);
     expect(result.partial).toBe(false);
     // One query, on the capped relay only, for exactly the ids it did not show at that second.
@@ -1856,7 +1870,8 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect(MAX_GAP_REQUERIES_PER_PASS).toBe(16);
     expect(MAX_GAP_REQUERY_IDS).toBe(64);
     const seconds = MAX_GAP_REQUERIES_PER_PASS + 4;
-    for (let sec = 0; sec < seconds; sec += 1) injectEverywhere(s, [capped, full], 3, NOW - 100 - sec);
+    for (let sec = 0; sec < seconds; sec += 1)
+      injectEverywhere(s, [capped, full], 3, NOW - 100 - sec);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
@@ -1880,6 +1895,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(full);
     const T = NOW - 3_000;
     injectEverywhere(s, [capped, full], MAX_GAP_REQUERY_IDS + 6, T);
+    olderEverywhere(s, [capped, full], T);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
@@ -1952,6 +1968,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     const T = NOW - 1_500;
     injectEverywhere(s, [capped], 8, T);
     const elsewhere = injectEverywhere(s, [other], 3, T);
+    olderEverywhere(s, [capped, other], T);
     const result = await s.engine.sync({
       relays: [capped, other],
       identities: identity(s),
@@ -1961,7 +1978,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect(rq).toHaveLength(1);
     expect([...reqIds(rq[0])].sort()).toEqual(elsewhere.map((w) => w.event.id).sort());
     expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
-    expect(result.delivered).toBe(8);
+    expect(result.delivered).toBe(9);
   });
 
   it('keeps the gap when the other relay did not complete its pass', async () => {
@@ -1971,6 +1988,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(other);
     const T = NOW - 1_500;
     const same = injectEverywhere(s, [capped, other], 8, T);
+    olderEverywhere(s, [capped, other], T);
     // The handler asks to see a wrap only the other relay showed again: its pass is not complete.
     const retryId = same[7]?.event.id;
     const result = await s.engine.sync({
@@ -1993,6 +2011,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(full);
     const T = NOW - 1_500;
     injectEverywhere(s, [capped, full], 8, T);
+    olderEverywhere(s, [capped, full], T);
     let settled = false;
     const done = s.engine
       .sync({ relays: [capped, full], identities: identity(s), onEnvelope: s.handler() })
@@ -2024,6 +2043,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     });
     s.net.configure(full);
     const same = injectEverywhere(s, [capped, full], 8, T);
+    const older = olderEverywhere(s, [capped, full], T);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
@@ -2031,8 +2051,9 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     });
     expect(idsReqs(s, capped)).toHaveLength(1);
     expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
-    expect(s.items.every((i) => same.some((w) => w.event.id === i.giftWrapId))).toBe(true);
-    expect(result.delivered).toBe(8);
+    const known = [...same, ...older].map((w) => w.event.id);
+    expect(s.items.every((i) => known.includes(i.giftWrapId))).toBe(true);
+    expect(result.delivered).toBe(9);
   });
 
   it('runs no ids re-query in a live subscription', async () => {
@@ -2058,7 +2079,12 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(full);
     const T = NOW - 1_500;
     const same = injectEverywhere(s, [capped, full], 8, T);
-    await s.engine.sync({ relays: [capped, full], identities: identity(s), onEnvelope: s.handler() });
+    olderEverywhere(s, [capped, full], T);
+    await s.engine.sync({
+      relays: [capped, full],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
     const text = s.lines.join('\n');
     expect(text).toContain('"gapsClosed":1');
     expect(text).not.toContain(String(T));
@@ -2069,31 +2095,40 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
 
   it('does not close a gap from a relay it stopped learning ids from (memory bound)', async () => {
     expect(MAX_LEARNED_IDS_PER_RELAY).toBe(2_048);
-    const s = setup();
+    // The bound is injected (learnedIdsPerRelay), so a small one proves it with few inputs.
+    const s = setup({ learnedIdsPerRelay: 6 });
     const [capped, full] = relayUrls('rq-learn-bound', 2) as [string, string];
-    // The full relay also serves more already-seen wraps than the bound (each a cheap duplicate).
-    const seenIds = Array.from({ length: MAX_LEARNED_IDS_PER_RELAY + 1 }, () =>
-      encodeHex(randomBytes(32)),
-    );
-    for (const id of seenIds) s.store.seen.set(`wrap:${id}`, NOW - 10);
     s.net.configure(capped, { maxLimit: 5 });
-    s.net.configure(full, {
-      extraFrames: (subId) =>
-        seenIds.map((id, i) =>
-          JSON.stringify(['EVENT', subId, { ...junkWrap(s.recipient.pubkey, NOW - 50 - (i % 50)), id }]),
-        ),
-    });
+    s.net.configure(full);
     const T = NOW - 1_500;
     injectEverywhere(s, [capped, full], 8, T);
+    olderEverywhere(s, [capped, full], T);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
       onEnvelope: s.handler(),
     });
     expect(result.relays.find((r) => r.relay === full)?.status).toBe('complete');
-    expect(result.delivered).toBe(8);
+    expect(result.delivered).toBe(9);
     expect(idsReqs(s, capped)).toHaveLength(0);
     expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
+  it('closes the same gap with a learned-ids bound the relay stays under', async () => {
+    const s = setup({ learnedIdsPerRelay: 9 });
+    const [capped, full] = relayUrls('rq-learn-under', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(full);
+    const T = NOW - 1_500;
+    injectEverywhere(s, [capped, full], 8, T);
+    olderEverywhere(s, [capped, full], T);
+    const result = await s.engine.sync({
+      relays: [capped, full],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(idsReqs(s, capped)).toHaveLength(1);
+    expect(result.gaps).toEqual([]);
   });
 });
 
