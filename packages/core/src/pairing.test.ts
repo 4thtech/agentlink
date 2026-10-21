@@ -622,7 +622,12 @@ describe('the invite binds the contact id (M1-9ze; 04 §3.6 Accept, 06 §2.1)', 
       const before = await snapshot(b);
       const refused = b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
       await expect(refused).rejects.toMatchObject({ code: 'invite_invalid' });
-      const error = await refused.catch((e: unknown) => e as Error);
+      const error = await refused.then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(Error);
+      if (!(error instanceof Error)) throw new Error('expected the refusal to be an Error');
       // A fixed message: no inbound name, id or key material (I-2, I-5).
       expect(error.message).toBe('The invite link is not valid.');
       for (const leak of ['carol', 'alice', a.id, c.id, fromC.cardSig]) {
