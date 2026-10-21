@@ -1180,4 +1180,14 @@ describe('files.deleteAfter help text (06 §3, D-109, M1-33d)', () => {
     );
     expect(row.read?.('expiry')).toBe('they expire');
   });
+
+  it('says it applies only to files sent while it is on, and when it is checked (M1-1g-j)', () => {
+    const row = POLICY_REVIEW_ROWS.find((r) => r.path === 'files.deleteAfter')!;
+    for (const value of ['receipt', 'expiry']) {
+      const text = row.read?.(value) ?? '';
+      expect(text).toContain('Applies only to files sent while it is on.');
+      expect(text).toContain('Checked once each time old files are cleaned up.');
+      expect(text).toContain('The value kept with a file is the one in force when it is prepared for sending.');
+    }
+  });
 });
