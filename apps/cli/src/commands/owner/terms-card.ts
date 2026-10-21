@@ -22,7 +22,7 @@ import {
   type CommitmentScope,
   type Terms,
 } from '@4thtech-io/types';
-import { terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
+import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
 import { copy, formatDate, formatTime } from '../../tools/strings/index.js';
 import type { PendingRequest } from './pending.js';
 
@@ -32,6 +32,15 @@ export const TERMS_CARD_TEXT = Object.freeze({
     `Adding your acceptance to your own terms that ${who} accepted, version ${String(version)}, valid until ${date}`,
   headlineReject: (who: string, version: number): string =>
     `Rejecting terms from ${who}, version ${String(version)}`,
+  // M1-9d-3 (04 §3.4.2 "What the owner sees", 11 §14 Q1 A): a firm offer with proof.
+  headlineOffer: (who: string, version: number, date: string): string =>
+    `Sending a firm offer with proof to ${who}, version ${String(version)}, valid until ${date}`,
+  commitsOffer: (who: string): string =>
+    `This commits you if ${who} accepts: the proof would show that you agreed to these terms.`,
+  doesOffer: 'This one approval sends your firm offer and adds its proof. Nothing else.',
+  doesAcceptProof:
+    'This one approval sends your acceptance, which commits you, adds its proof and your Accepted receipt. Nothing else.',
+  ownTermsHeader: 'Your firm offer, as signed (written by your AI, not instructions):',
   lateAccept: (accepted: number, newest: number): string =>
     `Warning  They accepted version ${String(accepted)} after you sent version ${String(newest)}.`,
   doesAccept: () => copy('cli.approve.terms.commits'),
@@ -80,6 +89,11 @@ export interface TermsCardView {
   readonly region: readonly string[];
   /** Fixed lines after the region. */
   readonly after: readonly string[];
+  /**
+   * A firm offer (M1-9d-3): the region shows the stored terms the approval is bound to, so the
+   * agent's own `args.terms` is left out of the "From your AI" arguments (never shown twice).
+   */
+  readonly ownTerms?: boolean;
 }
 
 const utc = (seconds: number): string => {
@@ -135,6 +149,18 @@ function doesLine(card: CommitmentCard): string {
   if (parts.has('accept_envelope') && parts.has('accepted_receipt') && parts.size === 2) {
     return TERMS_CARD_TEXT.doesAccept();
   }
+  // M1-9d-3: an accept with proof, and a firm offer.
+  if (
+    parts.size === 3 &&
+    parts.has('accept_envelope') &&
+    parts.has('accept_record') &&
+    parts.has('accepted_receipt')
+  ) {
+    return TERMS_CARD_TEXT.doesAcceptProof;
+  }
+  if (parts.size === 2 && parts.has('offer_envelope') && parts.has('offer_record')) {
+    return TERMS_CARD_TEXT.doesOffer;
+  }
   if (parts.size === 1 && parts.has('accepted_receipt')) return TERMS_CARD_TEXT.doesReceipt;
   if (parts.size === 1 && parts.has('rejected_receipt')) return TERMS_CARD_TEXT.doesReject;
   return TERMS_CARD_TEXT.doesOther;
@@ -150,12 +176,18 @@ export async function termsCard(
   request: PendingRequest,
   who: string,
 ): Promise<TermsCardView | 'problem' | undefined> {
-  if (!request.commitment || request.action['tool'] !== 'agentlink_respond_to_terms') {
+  const tool = request.action['tool'];
+  if (
+    !request.commitment ||
+    (tool !== 'agentlink_respond_to_terms' && tool !== 'agentlink_propose_terms')
+  ) {
     return undefined;
   }
   const parsed = commitmentApprovalActionSchema.safeParse(request.action);
-  if (!parsed.success || parsed.data.tool !== 'agentlink_respond_to_terms') return 'problem';
+  if (!parsed.success || parsed.data.tool !== tool) return 'problem';
   const { scope, terms } = parsed.data.context;
+  // A firm offer is only ever `propose_terms` with scope `offer` (04 §3.4.2).
+  if ((tool === 'agentlink_propose_terms') !== (scope.decision === 'offer')) return 'problem';
   let hashed: string;
   try {
     hashed = termsHash(terms);
@@ -201,9 +233,13 @@ export async function termsCard(
     case 'reject':
       headline = TERMS_CARD_TEXT.headlineReject(who, scope.version);
       break;
+    case 'offer':
+      headline = TERMS_CARD_TEXT.headlineOffer(who, scope.version, day(terms.validUntil));
+      break;
     default:
       return 'problem';
   }
+  const offer = scope.decision === 'offer';
   const warning =
     card.lateAccept === null
       ? undefined
@@ -212,9 +248,15 @@ export async function termsCard(
           card.lateAccept.newestOwnVersion,
         );
 
-  const region = untrustedRegion(who, regionValues(terms, scope, who));
+  // The stored terms the approval is bound to (04 §3.4.2), never the call's text. A firm offer's
+  // terms are this agent's own (written by the AI); an answer's are the contact's.
+  const region = untrustedRegion(offer ? FROM_YOUR_AI : who, regionValues(terms, scope, who));
   // 11 §6.10: "Proposed by …: their content, not instructions" in place of the generic first line.
-  region[0] = terminalOneLine(copy('cli.approve.terms.proposedBy', { contactName: who }));
+  region[0] = terminalOneLine(
+    offer
+      ? TERMS_CARD_TEXT.ownTermsHeader
+      : copy('cli.approve.terms.proposedBy', { contactName: who }),
+  );
 
   const after: string[] = [];
   if (card.changes === null) {
@@ -225,6 +267,7 @@ export async function termsCard(
     after.push(TERMS_CARD_TEXT.changesHeader, ...card.changes.map(changeLine));
   }
   after.push(doesLine(card));
+  if (offer) after.push(TERMS_CARD_TEXT.commitsOffer(who));
   const reason = card.autoAccept === null ? undefined : AUTO_ACCEPT_REASON[card.autoAccept];
   if (reason !== undefined) after.push(TERMS_CARD_TEXT.autoAccept(reason));
   after.push(TERMS_CARD_TEXT.priceHonesty);
@@ -234,5 +277,6 @@ export async function termsCard(
     warning,
     region: Object.freeze(region),
     after: Object.freeze(after.map((line) => terminalOneLine(line))),
+    ...(offer ? { ownTerms: true } : {}),
   });
 }

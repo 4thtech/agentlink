@@ -289,6 +289,15 @@ export class PairingService implements PairingHandler {
       role: 'invitee',
       expiresAt: invite.expiresAt,
     });
+    // M1-9ze: the counterparty staged (and sealed to, below) must be the contact this invite names,
+    // the one step 1 verified and the approval showed. Anything else is refused before any write,
+    // with the fixed invite error: no inbound text or key material in it (I-2, I-5).
+    if (
+      prepared.staged.card.agentEvm !== contact.id ||
+      agentNostrKey(prepared.staged.card) !== agentNostrKey(checked.card)
+    ) {
+      throw new CoreError('invite_invalid', 'The invite link is not valid.');
+    }
     const { pairingId } = prepared.staged;
     const own = await this.#identity.signedCard();
     const inviteId = decodeBase64url(invite.inviteId, { length: INVITE_ID_BYTES });
