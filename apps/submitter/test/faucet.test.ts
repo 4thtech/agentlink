@@ -1,4 +1,4 @@
-// M1-10b: the testnet credits faucet under Miniflare (05 §9; 03 §4.4; audit-rules SUB-7; 04 §7).
+// M1-10b, M1-10b-b: the testnet credits faucet under Miniflare (05 §9; 03 §4.4; audit-rules SUB-7; 04 §7).
 // Every request goes through the Worker's own fetch handler (SELF) with its Durable Objects; the
 // faucet wallet is the FakeFaucet (test/worker-entry.ts). Test limits (vitest.config.ts): 2 claims
 // per IP per day, a global cap of 10 claims per day, 20 faucet requests per IP per hour; one claim
@@ -194,16 +194,31 @@ describe('POST /v1/faucet: claims', () => {
     expect((await claim({ chainId: CHAIN_ID, agent }, ip)).status).toBe(200);
   });
 
-  it('a claim whose broadcast answer was lost is charged: no second credit for that agent', async () => {
+  it('a claim whose broadcast answer was lost is charged; a retry returns that transaction (M1-10b-b)', async () => {
     const agent = newAgent();
     faucet.mode = 'unknown';
     const lost = await claim({ chainId: CHAIN_ID, agent }, newIp());
     expect(lost.status).toBe(503);
     expect(await lost.json()).toEqual({ error: 'unavailable' });
+    const lostCall = faucet.calls.length;
     faucet.mode = 'sent';
     const again = await claim({ chainId: CHAIN_ID, agent }, newIp());
-    expect(again.status).toBe(429);
-    expect(await again.json()).toEqual({ error: 'already_claimed' });
+    expect(again.status).toBe(200);
+    const body = (await again.json()) as Record<string, unknown>;
+    expect(Object.keys(body).sort()).toEqual(['chainId', 'txHash']);
+    expect(body.chainId).toBe(CHAIN_ID);
+    expect(body.txHash).toMatch(/^0x[0-9a-f]{64}$/);
+    // No second credit: the retry sent nothing.
+    expect(faucet.calls.length).toBe(lostCall);
+  });
+
+  it('is unavailable when the faucet key is not the wallet this environment pins (M1-10b-b)', async () => {
+    const other = new FakeFaucet(CHAIN_ID, `0x${'fb'.repeat(20)}` as Hex);
+    fakeFaucets.set(CHAIN_ID, other);
+    const res = await claim({ chainId: CHAIN_ID, agent: newAgent() }, newIp());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'unavailable' });
+    expect(other.calls).toHaveLength(0);
   });
 
   it('is unavailable when the chain has no faucet key', async () => {
