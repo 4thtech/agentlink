@@ -2607,7 +2607,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: a mismatching `proof` body flags its contact; one contact cannot take more than its share of the pending pool.
 
 #### M1-7g-d · core: proof and receipt follow-ups, part 2 (new, split from M1-7g-c)
-- **Status:** in review (PR pending; the optional stored per-contact flag moved to M1-7g-e, owner decides) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#347; the optional stored per-contact flag moved to M1-7g-e, owner decides) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/log (logger), packages/core (proofs, receipts, terms-flow), packages/node (store schema, if the stored flag is added)
 - **Depends on:** M1-7g-c
 - **Spec:** 04 §3.4; 06 §2.4; 07 §2.1, §3, §3.2, §8
