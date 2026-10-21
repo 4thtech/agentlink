@@ -91,6 +91,8 @@ const TEST_SEAM = [
   // M1-1d: the ALF1 sealer with a fixed nonce prefix and chunk size.
   'sealAlf1WithNoncePrefix',
   'createAlf1SealerWithNoncePrefix',
+  // M1-1g-h: the shared KeyStore conformance suite that every KeyStore backend's tests run.
+  'runKeyStoreConformance',
 ];
 
 describe('@4thtech-io/crypto/keystore', () => {

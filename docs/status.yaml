@@ -151,8 +151,8 @@ areas:
         summary: "Large files upload to your own S3-compatible storage in parts and are encrypted on the fly as they upload and decrypted as they download, with a quarantine step before a streamed download is released (D-84); an interrupted upload is always cancelled and leftovers can be cleaned up (M1-6b). Tested against MinIO on every pull request and Cloudflare R2 every day (M1-6a-2). In development: no tool uses it yet."
       - name: "Encrypted drop as the default and storage choice"
         state: done
-        prs: [268, 313]
-        summary: "The 4thTech encrypted drop as the default storage and the choice between it and your own storage (M1-6c). Merged for the next release (0.1.2): a file in the drop can still be deleted after the agent's keys rotate, because the key generation it was uploaded under is kept with it (M1-1g-g, D-108)."
+        prs: [268, 313, 339]
+        summary: "The 4thTech encrypted drop as the default storage and the choice between it and your own storage (M1-6c). Merged for the next release (0.1.2): a file in the drop can still be deleted after the agent's keys rotate, because the key generation it was uploaded under is kept with it (M1-1g-g, D-108). With delete after receipt turned on, the agent deletes a sent file from storage once the contact's delivery receipt is on record, also after a key change (M1-1g-h)."
   - id: chain
     title: "Chain client (@4thtech-io/chain)"
     intro: "In development; not wired into the MCP tools yet."

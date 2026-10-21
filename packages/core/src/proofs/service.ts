@@ -1880,6 +1880,31 @@ export class ProofService implements RecordLookup {
     });
   }
 
+  /**
+   * True when the chain shows the contact's DELIVERED receipt on this agent's own on-chain record
+   * of a sent envelope (M1-1g-h: the `files.deleteAfter: receipt` trigger; 04 §4, 06 §3). Only the
+   * chain counts: the contract accepts a receipt only from the recipient the record commits to.
+   * False without a proofs platform, an own on-chain record, or a chain answer. Never throws.
+   */
+  async deliveredReceiptOnChain(envelopeId: string): Promise<boolean> {
+    if (this.#platform === undefined) return false;
+    const rows = await this.#ctx.store.transaction((tx) =>
+      tx.select('proofs', { envelope_id: envelopeId, status: { in: [...ON_CHAIN] } }),
+    );
+    for (const row of rows) {
+      if (!isRecordRow(row)) continue;
+      const chain = this.#chain(row.chain_id);
+      if (chain === undefined) continue;
+      try {
+        const stored = await chain.state.getRecord(row.record_id as Hex);
+        if ((stored?.receiptAt[RECEIPT_CODE.DELIVERED - 1] ?? 0n) !== 0n) return true;
+      } catch {
+        // No chain answer: not delivered as far as this pass knows; the next pass asks again.
+      }
+    }
+    return false;
+  }
+
   async #find(input: {
     readonly envelopeId?: string;
     readonly recordId?: string;

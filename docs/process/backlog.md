@@ -1330,7 +1330,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Tests first: after an epoch advance, delete-on-receipt for an object uploaded under an older epoch is accepted by the drop; an unretained epoch is refused with the fixed error; the shared conformance cases run against every KeyStore backend that exists.
 
 #### M1-1g-h · core: delete-on-receipt caller for `deleteFileObject`; shared KeyStore conformance (new, M1-1g-g follow-up)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#339) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, receipts), packages/crypto and packages/node (KeyStore conformance)
 - **Depends on:** M1-1g-g, M1-7g
 - **Spec:** 04 §2.1; 07 §5.4 (Upload epoch, D-108)
@@ -1340,6 +1340,17 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - One shared KeyStore conformance suite (epoch and drop-request cases) run against every KeyStore backend, with the deps-check zones packages/node needs.
 - **Acceptance:**
   - Tests first: after an epoch advance, a receipt deletes the object uploaded under the older epoch; every KeyStore backend passes the shared suite.
+
+#### M1-1g-i · core: per-file `deleteAfter` snapshot at send time (new, IR-M1-1g-h-1 decision a)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (files, retention)
+- **Depends on:** M1-1g-h
+- **Spec:** 04 §4 (retention); 06 §3 (`files.deleteAfter`)
+- **Invariants:** I-3, I-7, I-9
+- **Scope:**
+  - Record the effective `files.deleteAfter` with each sent file at send time, and have the delete-on-receipt pass (M1-1g-h, which today reads the policy at delete time) honour that snapshot, so switching to `receipt` doesn't retroactively delete older sends.
+- **Acceptance:**
+  - Tests first: a file sent under `expiry` is not deleted on receipt after the owner switches to `receipt`; a file sent under `receipt` still is.
 
 #### M1-1g-d · crypto: owner-only epoch advance with compare-and-set, and an epoch + 1 public preview (new, IR-M1-7a-1 Q1)
 - **Status:** done (4thtech/agentlink#55, merged 2026-10-14; the Node backends implement the contract with M1-8a, M1-8f) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a

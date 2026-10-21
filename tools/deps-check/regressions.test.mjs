@@ -440,7 +440,7 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
 
   it('is refused by name in test files of zones 04 §3.1.1 does not list: one seam, one rule', () => {
     // packages/core and packages/transport-nostr test files may use it (M1-1g-b, below).
-    expect(src('packages/node', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
+    expect(src('packages/chain', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
     expect(src('apps/cli', forms[0], 'src/a.test.ts').join('\n')).toMatch(RESTRICTED);
   });
 
@@ -460,6 +460,7 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
       'packages/core',
       'packages/transport-nostr',
       'packages/storage',
+      'packages/node',
     ]);
   });
 });
@@ -570,7 +571,12 @@ describe('M1-1g-b (IR-M1-1g-G2-1 R2-L-1): the test seam in package test files (0
   // MemoryKeyStore (core M1-7a, transport-nostr M1-5a) may import it by package name.
   const RESTRICTED = /@4thtech-io\/crypto\/testing may be imported only in test-vectors/;
   const SEAM_SOURCE = /test seam\) may be imported only by test files/;
-  const ZONES_WITH_TESTS = ['packages/core', 'packages/transport-nostr', 'packages/storage'];
+  const ZONES_WITH_TESTS = [
+    'packages/core',
+    'packages/transport-nostr',
+    'packages/storage',
+    'packages/node',
+  ];
   const forms = [
     `import { MemoryKeyStore } from '@4thtech-io/crypto/testing';\n`,
     `export { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';\n`,

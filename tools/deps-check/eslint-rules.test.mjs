@@ -231,7 +231,7 @@ describe('IR-M1-1g-G2-1 M-2: MemoryKeyStore lives in the one crypto test seam', 
   );
 
   it('rejects it by name in a test file of a zone 04 §3.1.1 does not list', async () => {
-    for (const filePath of ['packages/node/src/a.test.ts', 'apps/cli/src/a.test.ts']) {
+    for (const filePath of ['packages/chain/src/a.test.ts', 'apps/cli/src/a.test.ts']) {
       expect(rules(await lint(filePath, byName)), filePath).toContain('no-restricted-imports');
     }
   });
