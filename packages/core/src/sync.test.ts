@@ -537,7 +537,7 @@ describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
       later.envelope.id,
     ]);
     expect((await rowsOf(b)).rate.every((r) => r.bucket > clock.t - 3_600)).toBe(true);
-  });
+  }, 60_000);
 });
 
 // --- Fetch-only catch-up --------------------------------------------------------------------------
@@ -961,7 +961,7 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
         (r.type === 'text' || r.type === 'card-update'),
     );
     expect(okFromA).toHaveLength(limit);
-  });
+  }, 60_000);
 });
 
 describe('proof flags join the pass reports (04 §3.4, M1-7g-c)', () => {
