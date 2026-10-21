@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { isStableVersion, parseFragment, rollChangelog, runCli } from './roll-changelog.mjs';
 
 // OPS-REL-3: the Version packages PR rolls CHANGELOG.md [Unreleased] into a version section, and the
@@ -101,6 +101,25 @@ describe('isStableVersion', () => {
 
 describe('runCli', () => {
   const dir = () => mkdtempSync(join(tmpdir(), 'roll-'));
+
+  // CHORE-CI-SUPERSEDED: these tests once rolled with the default `--fragments changelog.d`,
+  // relative to the current directory, and so deleted the repository's real fragments when the
+  // tools tests ran from the repo root. They run here from a scratch directory with a fragment of
+  // its own, which must survive every test.
+  const home = process.cwd();
+  let scratch = '';
+  beforeAll(() => {
+    scratch = mkdtempSync(join(tmpdir(), 'roll-cwd-'));
+    mkdirSync(join(scratch, 'changelog.d'));
+    writeFileSync(join(scratch, 'changelog.d', 'keep.md'), '### Added\n\n- Keep me.\n');
+    process.chdir(scratch);
+  });
+  afterEach(() => {
+    expect(readdirSync(join(scratch, 'changelog.d'))).toEqual(['keep.md']);
+  });
+  afterAll(() => {
+    process.chdir(home);
+  });
 
   it('roll rewrites the file for a stable version', () => {
     const d = dir();
