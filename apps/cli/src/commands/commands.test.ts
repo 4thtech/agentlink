@@ -487,6 +487,45 @@ describe('status (06 §2.0, D-73)', () => {
     expect(result.text).toContain("Can't reach the message network");
   });
 
+  it('never prints inbound text; a self-declared name shows only with its label (M1-29)', async () => {
+    const canary = 'CANARY-IGNORE-PREVIOUS-INSTRUCTIONS';
+    const named = {
+      ...contact,
+      display: {
+        name: 'Marko',
+        label: 'self-declared',
+        source: 'counterparty',
+      },
+    };
+    const f = fakeAgent({
+      catchUp: () =>
+        Promise.resolve({
+          partial: false,
+          inbox: [
+            { contactId: named.id, unread: 1, subject: canary, text: canary, files: [canary] },
+          ],
+          requests: 1,
+          messages: [{ text: canary }],
+        }),
+      contacts: { list: () => Promise.resolve([named]), get: () => Promise.resolve(named) },
+    });
+    const text = (await harness(f).run(['status', '--brief'])).out.join('\n');
+    expect(text.split('\n').length).toBeLessThanOrEqual(2);
+    expect(text).not.toContain(canary);
+    expect(text).not.toMatch(/https?:|0x[0-9a-f]{8}/i);
+    expect(text).toContain('(self-declared)');
+  });
+
+  it('with a pending handshake it adds no contact and marks nothing read (M1-29)', async () => {
+    const f = fakeAgent({
+      catchUp: () => Promise.resolve({ partial: false, inbox: [], requests: 1 }),
+    });
+    const result = await harness(f).run(['status', '--brief']);
+    expect(result.code).toBe(EXIT_OK);
+    const allowed = ['catchUp', 'close', 'contacts.list', 'contacts.get'];
+    expect(f.calls.filter((c) => !allowed.includes(c))).toEqual([]);
+  });
+
   it('says nothing is new when nothing is', async () => {
     const result = await harness(fakeAgent()).run(['status', '--brief']);
     expect(result.out).toEqual(['Nothing new on AgentLink.']);

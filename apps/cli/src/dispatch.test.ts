@@ -109,8 +109,8 @@ describe('--help (06 §8)', () => {
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
     // M1-9m: three more `policy` lines (show, allow-folder, remove-folder next to set); M1-9m-b:
-    // recover; M1-9h: credits and verify.
-    expect(commandLines).toHaveLength(25);
+    // recover; M1-9h: credits and verify; M1-29: init --hook.
+    expect(commandLines).toHaveLength(26);
   });
 
   it('prints help for no arguments, --help, -h and help', async () => {

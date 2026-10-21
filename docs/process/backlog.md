@@ -2171,7 +2171,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An unverified envelope that reuses another envelope's `id` (different `envelopeHash`, or a bad signature) does not suppress the real one (IR-M1-5a-1 L-3).
 
 #### M1-5d · transport-nostr: more events than a relay's cap within one second (new, IR-M1-5c-1 residual)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
+- **Status:** in review (built: detect and report a gap; later options in 07 §4.2) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M1-5c
 - **Spec:** 07 §4.2 (Sync), §4.3 (relay lists); 04 §3.5; 06 §6
@@ -3114,7 +3114,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (2026-10-21):** blocked on spec gaps (ops, kit format, config location, restore rules). Design proposal: `docs/design/m1-9i-storage-backup.md`. The owner accepted A to E (D-115, 2026-10-21), so this card is narrowed to `apps/cli/src/**` and depends on M1-9i-a and M1-9i-c.
 
 #### M1-9i-s · spec: own storage ops, recovery kit `ALKK`, restore rules (new, split from M1-9i)
-- **Status:** backlog (decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#352; decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S2 (changes 04, 06 and 07; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md, 06-mcp-server.md, 07-sdk-transport-storage.md, 00-README.md (decision row)
 - **Depends on:** D-115 (decided)
 - **Spec:** design proposal §6 (diff-style list)
@@ -4238,7 +4238,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `init` writes no harness config without an explicit confirmation, and owner setup refuses non-TTY input (tests); prompts pass the vocabulary lint.
 
 #### M1-29 · J9 session habit: `status --brief` and optional SessionStart hooks per harness (D-53) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review; the in-harness transcript is pending an owner run · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · apps/cli (`status --brief`, optional `init` offer), docs-site/guide/get-started/ and docs-site/technical/reference/harness-configuration.md (hook snippets)
 - **Depends on:** M1-9a, M1-9c, M1-12a
 - **Spec:** D-53; 06 §6.1, §7, §8; 02 J9; 11 §6.1 (J9 strings); 04 §2.5
