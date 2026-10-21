@@ -16,6 +16,8 @@ import {
   FAKE_ITEM_GAS,
   FakeChain,
   fakeBatchGas,
+  fakeReceiptItem,
+  fakeRecordId,
   fakeRecordItem,
   signerAddress,
 } from './fake-chain.js';
@@ -709,5 +711,121 @@ describe('stuck and dropped transactions (IR-M1-10a-1 M-2)', () => {
     expect(txStatus(t.state, 84532, t.chain.sent[0]?.hash as `0x${string}`)?.items[0]?.status).toBe(
       'skipped',
     );
+  });
+});
+
+describe('receipts covered by the sender’s proof fee (D-114; M1-34-b)', () => {
+  // The recipient: it holds nothing on this chain (no credits, no gas). Receipts carry no fee
+  // (05 §3.3 acknowledge step 5); the sender's proof fee covers up to 3 per record (12 §2).
+  const R = signerAddress(9);
+
+  /** A record the Notary stores: its NOTARIZE fee was charged when it was stored (05 §3.3). */
+  const charged = (t: ReturnType<typeof setup>) => {
+    const recordId = fakeRecordId();
+    t.chain.records.add(recordId);
+    return recordId;
+  };
+
+  const spyLimits = () => {
+    const charges: Map<string, number>[] = [];
+    const hooks: EngineHooks = {
+      chargeSigners: (counts) => {
+        charges.push(new Map(counts));
+        return Promise.resolve(new Set<string>());
+      },
+    };
+    return { charges, hooks };
+  };
+
+  it('accepts the first 3 receipts of a charged record from a recipient that holds nothing; the 4th is refused', async () => {
+    const t = setup();
+    const recordId = charged(t);
+    const first = [1, 2, 3].map((type) => fakeReceiptItem(R, recordId, type));
+    const results = await t.submit(first);
+    expect(results.map((r) => r.status)).toEqual(['submitted', 'submitted', 'submitted']);
+    t.chain.includeAll();
+    await t.poll();
+    const fourth = await t.submit([fakeReceiptItem(R, recordId, 4)]);
+    expect(fourth).toEqual([
+      { id: `${recordId}:4`, recordId, status: 'failed', error: 'receipt_limit' },
+    ]);
+    expect(t.chain.sent).toHaveLength(1);
+    expect(t.chain.itemSimulations).not.toContain(`${recordId}:4`);
+  });
+
+  it('counts receipts in flight and within one request against the cap of 3', async () => {
+    const t = setup();
+    const recordId = charged(t);
+    await t.submit([fakeReceiptItem(R, recordId, 1), fakeReceiptItem(R, recordId, 2)]);
+    // Neither is on-chain yet: both are in flight.
+    const results = await t.submit([
+      fakeReceiptItem(R, recordId, 3),
+      fakeReceiptItem(R, recordId, 4),
+    ]);
+    expect(results.map((r) => [r.status, r.error])).toEqual([
+      ['submitted', undefined],
+      ['failed', 'receipt_limit'],
+    ]);
+  });
+
+  it('refuses REJECTED while ACCEPTED is in flight for the same record (never a doomed batch)', async () => {
+    const t = setup();
+    const recordId = charged(t);
+    await t.submit([fakeReceiptItem(R, recordId, 3)]);
+    const [rejected] = await t.submit([fakeReceiptItem(R, recordId, 4)]);
+    expect(rejected).toMatchObject({ status: 'failed', error: 'ConflictingReceipt' });
+    expect(t.chain.sent).toHaveLength(1);
+  });
+
+  it('a replay of a receipt type already set is skipped, not refused, even at the cap', async () => {
+    const t = setup();
+    const recordId = charged(t);
+    for (const type of [1, 2, 3]) t.chain.onChain.add(`${recordId}:${String(type)}`);
+    const results = await t.submit([fakeReceiptItem(R, recordId, 1)]);
+    expect(results.map((r) => r.status)).toEqual(['skipped']);
+    expect(t.chain.sent).toHaveLength(0);
+  });
+
+  it('a record whose fee was not charged (the Notary does not store it) gets no receipt', async () => {
+    const t = setup();
+    const { charges, hooks } = spyLimits();
+    const recordId = fakeRecordId(); // never stored, so never charged
+    const results = await t.submit([fakeReceiptItem(R, recordId, 1)], NOW, hooks);
+    expect(results).toEqual([
+      { id: `${recordId}:1`, recordId, status: 'failed', error: 'RecordNotFound' },
+    ]);
+    expect(t.chain.sent).toHaveLength(0);
+    expect(t.chain.itemSimulations).toEqual([]);
+    // Nothing admitted: the recipient's signer limit is not charged either.
+    expect(charges).toEqual([]);
+  });
+
+  it('reads each record once per request and charges the recipient’s limit only for admitted receipts', async () => {
+    const t = setup();
+    const { charges, hooks } = spyLimits();
+    const recordId = charged(t);
+    await t.submit(
+      [1, 2, 3, 4].map((type) => fakeReceiptItem(R, recordId, type)),
+      NOW,
+      hooks,
+    );
+    expect(t.chain.recordReads).toEqual([recordId]);
+    expect(charges).toEqual([new Map([[R, 3]])]);
+  });
+
+  it('a failed allowance read answers unavailable and sends nothing (no signer cools off)', async () => {
+    const t = setup();
+    const recordId = charged(t);
+    t.chain.recordReadFails = true;
+    await expect(t.submit([fakeReceiptItem(R, recordId, 1)])).rejects.toThrow();
+    expect(t.chain.sent).toHaveLength(0);
+    expect(t.state.soloUntil.size).toBe(0);
+  });
+
+  it('records are not affected: a record item is never read as a receipt allowance', async () => {
+    const t = setup();
+    await t.submit([fakeRecordItem(A)]);
+    expect(t.chain.recordReads).toEqual([]);
+    expect(t.chain.sent).toHaveLength(1);
   });
 });

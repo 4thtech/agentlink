@@ -1064,16 +1064,59 @@ describe('acknowledge: receipts confirmed by chain reads, both ways', () => {
     expect(out).toMatchObject({ status: 'recorded', via: 'submitter', id: `${recordId}:1` });
   });
 
-  it('a lying submitter fails over to direct acknowledge', async () => {
+  it('a lying submitter fails over to direct acknowledge only when receipts may pay direct (D-114)', async () => {
     const ledger = new Ledger();
     const recordId = await onChainRecord(ledger);
     ledger.native.set(AGENT, 10n ** 17n);
     const rc = await signedReceipt(ledger, recordId);
     const out = await submitterFor(ledger, [fakeSubmitter(ledger, 'silent_drop')], {
       direct: { signer: directSigner(), broadcast: ledger.broadcast },
+      directReceipts: true,
     }).acknowledge(rc);
     expect(out).toMatchObject({ status: 'recorded', via: 'direct' });
     expect(ledger.simulations.map((s) => s.functionName)).toContain('acknowledge');
+  });
+
+  it.each(['down', 'silent_drop'] as const)(
+    'a %s submitter leaves the receipt pending: direct mode never pays for it unasked (D-114)',
+    async (behaviour) => {
+      const ledger = new Ledger();
+      const recordId = await onChainRecord(ledger);
+      // The recipient's account could pay the network cost, and direct mode is configured.
+      ledger.native.set(AGENT, 10n ** 17n);
+      const signer = directSigner();
+      const rc = await signedReceipt(ledger, recordId);
+      const out = await submitterFor(ledger, [fakeSubmitter(ledger, behaviour)], {
+        direct: { signer, broadcast: ledger.broadcast },
+      }).acknowledge(rc);
+      expect(out).toMatchObject({ status: 'pending', id: `${recordId}:1` });
+      // Nothing was signed or sent from the recipient's own account.
+      expect(signer.signed).toBe(0);
+      expect(ledger.simulations.map((s) => s.functionName)).not.toContain('acknowledge');
+      expect(ledger.native.get(AGENT)).toBe(10n ** 17n);
+    },
+  );
+
+  it('a receipt held back by an unreachable submitter lands unchanged on a later post (D-114)', async () => {
+    const ledger = new Ledger();
+    const recordId = await onChainRecord(ledger);
+    const rc = await signedReceipt(ledger, recordId);
+    const down = fakeSubmitter(ledger, 'down');
+    expect((await submitterFor(ledger, [down]).acknowledge(rc)).status).toBe('pending');
+    const up = fakeSubmitter(ledger, 'honest');
+    const later = await submitterFor(ledger, [up]).acknowledge(rc);
+    expect(later).toMatchObject({ status: 'recorded', via: 'submitter' });
+    expect(up.sent[0]).toEqual({ receipt: rc.receipt, signature: rc.signature });
+  });
+
+  it('a receipt from a recipient with no credits on the network goes through the submitter (D-114)', async () => {
+    const ledger = new Ledger();
+    const recordId = await onChainRecord(ledger);
+    expect(ledger.credits.size).toBe(0);
+    const rc = await signedReceipt(ledger, recordId);
+    const out = await submitterFor(ledger, [fakeSubmitter(ledger, 'honest')]).acknowledge(rc);
+    expect(out).toMatchObject({ status: 'recorded', via: 'submitter' });
+    expect(ledger.credits.size).toBe(0);
   });
 
   it('a receipt type already set is success; the conflicting type is a conflict', async () => {
