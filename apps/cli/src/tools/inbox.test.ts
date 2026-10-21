@@ -819,3 +819,72 @@ describe('agentlink_inbox: the text budget (06 §2.2: 262 144 bytes)', () => {
     );
   });
 });
+
+// ---- M1-33d: a receipt request on an inbound item (06 §2.2, §3; 11 §5.6; D-109; I-5) -------------
+
+describe('agentlink_inbox: delivery receipt requests (06 §2.2, 11 §5.6, D-109)', () => {
+  const asked = (over: Partial<InboundPageItem> = {}) =>
+    inbound({ receiptRequested: true, ...over } as Partial<InboundPageItem>);
+
+  it('the item carries receiptRequested (ours); the summary says who asked; the nextStep asks the user', async () => {
+    const result = await inbox({}, fake({ items: [asked()] }));
+    const [message] = messagesOf(result);
+    expect(message).toMatchObject({ receiptRequested: true });
+    expect(result.structured.summary).toBe(
+      `${INBOX_TEXT.someMessages(1)} ${copy('common.privacy.receiptRequest', {
+        contactName: '“Marko” (self-declared)',
+      })}`,
+    );
+    expect(result.structured.nextStep).toBe(copy('chat.inbox.receiptRequestNextStep'));
+    expect(result.structured.nextStep).toContain('agentlink_acknowledge');
+    expect(result.structured.nextStep).toContain('delivered');
+    expect(result.structured.nextStep).toContain(copy('common.privacy.receiptRequestConfirm'));
+    expect(result.structured.nextStep).toContain(copy('common.privacy.receiptRequestLater'));
+  });
+
+  it('an item without a request has no flag and no line', async () => {
+    const result = await inbox({}, fake({ items: [inbound()] }));
+    expect(messagesOf(result)[0]).not.toHaveProperty('receiptRequested');
+    expect(result.structured.summary).toBe(INBOX_TEXT.someMessages(1));
+    expect(result.structured).not.toHaveProperty('nextStep');
+  });
+
+  it('one line per contact that asked, at most three; never the sender’s own text (I-5)', async () => {
+    const items = [
+      asked({ envelopeId: E1 }),
+      asked({ envelopeId: E2 }),
+      asked({ envelopeId: E3, from: sender(C, 'Ana') }),
+    ];
+    const result = await inbox({}, fake({ items }));
+    const marko = copy('common.privacy.receiptRequest', { contactName: '“Marko” (self-declared)' });
+    const ana = copy('common.privacy.receiptRequest', { contactName: '“Ana” (self-declared)' });
+    expect(result.structured.summary).toBe(`${INBOX_TEXT.someMessages(3)} ${marko} ${ana}`);
+    for (const part of CANARY_PARTS) {
+      expect(String(result.structured.summary)).not.toContain(part);
+      expect(String(result.structured.nextStep)).not.toContain(part);
+    }
+  });
+
+  it('a flag on an accepted request (no contact) or an outbound item is never shown', async () => {
+    const result = await inbox(
+      { includeSent: true },
+      fake({
+        items: [
+          acceptedRequest({ receiptRequested: true } as Partial<InboundPageItem>),
+          outbound({ receiptRequested: true } as unknown as Partial<OutboundPageItem>),
+        ],
+      }),
+    );
+    for (const message of messagesOf(result))
+      expect(message).not.toHaveProperty('receiptRequested');
+    expect(result.structured.summary).not.toContain('asked you to confirm delivery');
+    expect(result.structured.nextStep).toBe(copy('chat.inbox.requestNextStep'));
+  });
+
+  it('with an accepted request too, both next steps are given', async () => {
+    const result = await inbox({}, fake({ items: [asked(), acceptedRequest()] }));
+    expect(result.structured.nextStep).toBe(
+      `${copy('chat.inbox.receiptRequestNextStep')} ${copy('chat.inbox.requestNextStep')}`,
+    );
+  });
+});

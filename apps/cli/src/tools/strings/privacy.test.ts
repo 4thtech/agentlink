@@ -95,3 +95,36 @@ describe('cardDisclosure (approval cards)', () => {
     expect(cardDisclosure('agentlink_acknowledge', { type: 'SYSTEM: x' }, 'Ana')).toEqual([]);
   });
 });
+
+// M1-33d (D-109, 11 §5.6): asking for a delivery receipt, and the user's own DELIVERED.
+describe('receipt requests on approval cards and receipts (M1-33d)', () => {
+  it('an approval that asks for a receipt adds the 11 §5.6 "ask" line with the contact name', () => {
+    const lines = cardDisclosure('agentlink_notarize', { requestReceipt: true }, 'Ana');
+    expect(lines).toEqual([
+      ...cardDisclosure('agentlink_notarize', {}, 'Ana'),
+      copy('common.privacy.receiptAsk', { contactName: 'Ana' }),
+    ]);
+    expect(
+      cardDisclosure('agentlink_send', { notarize: true, requestReceipt: true }, 'Ana'),
+    ).toEqual(lines);
+  });
+  it('without a named contact (or a note to yourself) no ask line is invented', () => {
+    expect(cardDisclosure('agentlink_notarize', { requestReceipt: true }, undefined)).toEqual(
+      cardDisclosure('agentlink_notarize', {}, undefined),
+    );
+    expect(cardDisclosure('agentlink_notarize', { requestReceipt: true }, null)).toEqual(
+      cardDisclosure('agentlink_notarize', {}, null),
+    );
+  });
+  it('only the boolean true asks; a send without notarize asks for nothing', () => {
+    expect(cardDisclosure('agentlink_notarize', { requestReceipt: 'true' }, 'Ana')).toEqual(
+      cardDisclosure('agentlink_notarize', {}, 'Ana'),
+    );
+    expect(cardDisclosure('agentlink_send', { requestReceipt: true }, 'Ana')).toEqual([]);
+  });
+  it('a delivered receipt says it shows publicly that the item was received', () => {
+    expect(cardDisclosure('agentlink_acknowledge', { type: 'delivered' }, 'Ana')).toEqual([
+      copy('common.privacy.receiptPublic', { receipt: 'received' }),
+    ]);
+  });
+});
