@@ -3154,7 +3154,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** signing and rejection vectors per op (unknown key, bad `id`, endpoint not in canonical form, lifetime above 600 s); a tampered `own_storage` row or a credential digest mismatch reads `broken`; an old row and credential put back after `storage.remove` read `broken`; a row older than 600 s still reads `ready`; a `broken` own storage makes `agentlink_send` return `needs_setup`, never the drop; tests first (`RED (expected):` commit).
 
 #### M1-9i-b · crypto: recovery kit `ALKK` v1, export and import controls, vectors (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (ALKK format, vectors and conformance tests; `credentialDigest` and the three control types still open) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto/src/recovery-kit.ts (new), packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), test-vectors/recovery-kit/, tools/vectors/generate_recovery_kit.py
 - **Depends on:** M1-9i-s
 - **Spec:** 04 §2.3.3 (new), §2.3.2, §2.8 (`password` kind 1), §4 (STREAM)
