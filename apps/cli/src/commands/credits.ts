@@ -8,8 +8,10 @@
 //   user, and no network is ever chosen by them (D-40).
 // - `--topup`: the 07 §6.3 selection for adding proof (`selectPayingChain` over the automatically
 //   selectable chains, cheapest first, M1-26). Enough credits: says so. Not enough: the amount to
-//   add in dollars. Then the deposit page (06 §2.1 `topUpUrl`, our own origin, no amount, network
-//   or token in it) and the agent ID to enter there. No other URL is ever printed, and no key.
+//   add in dollars. Then the top-up link (06 §2.1 `topUpUrl`, D-113: `https://{payHost}/#v=1&a=
+//   <agent address>&usd=<suggested amount>`, host from the shipped config), the agent ID as a
+//   terminal QR code, and the browser opened on the link when stdout is a terminal. No other URL
+//   is ever printed, and no key. The link is shown to the user only; it is never logged.
 import * as chain from '@4thtech-io/chain';
 import { nodeRpcFetch } from '@4thtech-io/node';
 import {
@@ -20,7 +22,10 @@ import {
   type CommandHandler,
 } from '../dispatch.js';
 import type { AccountView } from '../tools/context.js';
-import { TOP_UP_ORIGIN, dollars } from '../tools/proofs-common.js';
+import { buildTopUpLink, suggestTopUpUsd } from '@4thtech-io/core';
+import { renderQr } from '../terminal/qr.js';
+import { openInBrowser } from '../runtime/open-browser.js';
+import { dollars } from '../tools/proofs-common.js';
 import { topUpDisclosure } from '../tools/strings/privacy.js';
 import { createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 
@@ -34,6 +39,10 @@ export interface CreditsDeps extends CommandDeps {
   readonly topUpCheck: TopUpCheck;
   /** True while every shipped proof network is a test network (the testnet beta). */
   readonly testnetOnly: () => boolean;
+  /** The pay host from the shipped config; undefined means the core's shipped default (D-113). */
+  readonly payHost?: string;
+  /** Opens the link in the user's browser; true when it was handed over. Never throws. */
+  readonly openBrowser: (url: string) => Promise<boolean>;
 }
 
 export const CREDITS_TEXT = Object.freeze({
@@ -45,7 +54,10 @@ export const CREDITS_TEXT = Object.freeze({
   enough: 'You have enough credits to add proof ({fee} each).',
   needs: 'Add at least {usd} in credits to add proof ({fee} each).',
   unavailable: "Can't check right now what to add: the public record didn't answer.",
-  topUpHow: 'To add credits, open {url} and enter your agent ID: {agentId}',
+  topUpHow: 'To add credits, open this link:',
+  topUpNoLink: 'To add credits, open the AgentLink app.',
+  openedBrowser: 'Opened it in your browser.',
+  qrIntro: 'Or scan this to copy your agent ID to your phone:',
   topUpHelp: 'To see how much to add, run `agentlink credits --topup`.',
   noProofs:
     "Proofs aren't available in this version of AgentLink, so there are no credits to show.",
@@ -134,6 +146,7 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
       if (topup) {
         lines.push('');
         const selection = await deps.topUpCheck(agentId).catch(() => undefined);
+        let suggested: string | undefined;
         if (selection === undefined || selection.status === 'unavailable') {
           lines.push(CREDITS_TEXT.unavailable);
           exit = EXIT_FAILED;
@@ -147,6 +160,7 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
         } else {
           const add = dollars(selection.topUp.usd);
           const each = dollars(selection.topUp.feeUsd) ?? fee;
+          if (add !== undefined) suggested = suggestTopUpUsd(selection.topUp.usd);
           lines.push(
             add === undefined
               ? CREDITS_TEXT.unavailable
@@ -155,7 +169,21 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
                 : fill(CREDITS_TEXT.needs, { usd: add, fee: each }),
           );
         }
-        lines.push(fill(CREDITS_TEXT.topUpHow, { url: `${TOP_UP_ORIGIN}/`, agentId }));
+        const link = buildTopUpLink({
+          agentAddress: agentId,
+          ...(suggested === undefined ? {} : { usd: suggested }),
+          ...(deps.payHost === undefined ? {} : { payHost: deps.payHost }),
+        });
+        if (link === undefined) {
+          lines.push(CREDITS_TEXT.topUpNoLink);
+        } else {
+          lines.push(CREDITS_TEXT.topUpHow, link);
+          if (context.terminal.stdoutIsTTY) {
+            const opened = await deps.openBrowser(link).catch(() => false);
+            if (opened) lines.push(CREDITS_TEXT.openedBrowser);
+          }
+        }
+        lines.push('', CREDITS_TEXT.qrIntro, ...renderQr(agentId));
         // 11 §5.6: each top-up method says the paying account is publicly linked (D-109).
         lines.push(topUpDisclosure());
       } else {
@@ -172,6 +200,7 @@ export function nodeCreditsDeps(over: Partial<CreditsDeps> = {}): CreditsDeps {
     ...createDeps(),
     topUpCheck: nodeTopUpCheck(),
     testnetOnly: () => chain.chainRegistry().every((c) => c.testnet),
+    openBrowser: openInBrowser,
     ...over,
   });
 }

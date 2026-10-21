@@ -35,13 +35,13 @@ describe('qrMatrix', () => {
     expect(m[21]?.[8]).toBe(true);
     // The version 3 alignment pattern is centred at (22, 22).
     expect(m[22]?.[22]).toBe(true);
-    expect(m[22]?.[20]).toBe(false);
+    expect(m[22]?.[21]).toBe(false);
     expect(m[20]?.[20]).toBe(true);
   });
 
   it('carries valid format information for error level L (BCH 15,5)', () => {
     const m = qrMatrix(ID);
-    // Read the first copy: bits 14..0 along row 8 and column 8.
+    // Read the first copy: bit 0 at (8, 0) up to bit 14 at (0, 8).
     const cells: [number, number][] = [
       [8, 0],
       [8, 1],
@@ -60,7 +60,9 @@ describe('qrMatrix', () => {
       [0, 8],
     ];
     let value = 0;
-    for (const [r, c] of cells) value = (value << 1) | (m[r]?.[c] ? 1 : 0);
+    cells.forEach(([r, c], k) => {
+      value |= (m[r]?.[c] ? 1 : 0) << k;
+    });
     const data = (value ^ 0x5412) >> 10;
     // Error level L is 01; the mask pattern is the low three bits.
     expect(data >> 3).toBe(1);
@@ -68,6 +70,11 @@ describe('qrMatrix', () => {
     let rem = value ^ 0x5412;
     for (let i = 14; i >= 10; i--) if ((rem >> i) & 1) rem ^= 0x537 << (i - 10);
     expect(rem).toBe(0);
+    // The second copy holds the same bits.
+    let second = 0;
+    for (let i = 0; i < 8; i++) second |= (m[8]?.[28 - i] ? 1 : 0) << i;
+    for (let i = 8; i < 15; i++) second |= (m[14 + i]?.[8] ? 1 : 0) << i;
+    expect(second).toBe(value);
   });
 
   it('is deterministic and depends on the input', () => {
