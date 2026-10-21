@@ -393,17 +393,28 @@ jobs:
         run: |
           set -euo pipefail
           # READBACK-SETTINGS-BEGIN
+          # Fails closed (IR-OPS-PRIV-1-1): `result` must be an object with `logpush` false and
+          # `observability.enabled` false, both present. Optional in the script-settings API, and
+          # then off: `observability.logs` and `.traces` (absent, they follow `observability.enabled`),
+          # `invocation_logs` and `destinations` inside them, `tail_consumers` (null when there are
+          # none) and `streaming_tail_consumers`. A field that is present must have the expected type;
+          # anything else, including a jq error on an odd shape, fails the deploy.
           if ! jq -e '
+            def none: . == null or (type == "array" and length == 0);
+            def unset($k; f): (has($k) | not) or (.[$k] | f);
+            def part_off($extra):
+              . == null or (type == "object" and .enabled == false
+                and unset("destinations"; none)
+                and (($extra | not) or unset("invocation_logs"; . == false)));
             .success == true
-            and ((.result.logpush // false) == false)
-            and ((.result.observability.enabled // false) == false)
-            and ((.result.observability.logs.enabled // false) == false)
-            and ((.result.observability.logs.invocation_logs // false) == false)
-            and ((.result.observability.traces.enabled // false) == false)
-            and (((.result.tail_consumers // []) | length) == 0)
-            and (((.result.streaming_tail_consumers // []) | length) == 0)
-            and (((.result.observability.logs.destinations // []) | length) == 0)
-            and (((.result.observability.traces.destinations // []) | length) == 0)
+            and (.result | type) == "object"
+            and (.result | has("logpush") and .logpush == false)
+            and (.result.observability | type) == "object"
+            and (.result.observability | has("enabled") and .enabled == false)
+            and (.result.observability | unset("logs"; part_off(true)))
+            and (.result.observability | unset("traces"; part_off(false)))
+            and (.result | unset("tail_consumers"; none))
+            and (.result | unset("streaming_tail_consumers"; none))
           ' "$SETTINGS_JSON" > /dev/null; then
             echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the submitter (07 §7, I-7)."
             exit 1
@@ -710,17 +721,28 @@ jobs:
         run: |
           set -euo pipefail
           # READBACK-SETTINGS-BEGIN
+          # Fails closed (IR-OPS-PRIV-1-1): `result` must be an object with `logpush` false and
+          # `observability.enabled` false, both present. Optional in the script-settings API, and
+          # then off: `observability.logs` and `.traces` (absent, they follow `observability.enabled`),
+          # `invocation_logs` and `destinations` inside them, `tail_consumers` (null when there are
+          # none) and `streaming_tail_consumers`. A field that is present must have the expected type;
+          # anything else, including a jq error on an odd shape, fails the deploy.
           if ! jq -e '
+            def none: . == null or (type == "array" and length == 0);
+            def unset($k; f): (has($k) | not) or (.[$k] | f);
+            def part_off($extra):
+              . == null or (type == "object" and .enabled == false
+                and unset("destinations"; none)
+                and (($extra | not) or unset("invocation_logs"; . == false)));
             .success == true
-            and ((.result.logpush // false) == false)
-            and ((.result.observability.enabled // false) == false)
-            and ((.result.observability.logs.enabled // false) == false)
-            and ((.result.observability.logs.invocation_logs // false) == false)
-            and ((.result.observability.traces.enabled // false) == false)
-            and (((.result.tail_consumers // []) | length) == 0)
-            and (((.result.streaming_tail_consumers // []) | length) == 0)
-            and (((.result.observability.logs.destinations // []) | length) == 0)
-            and (((.result.observability.traces.destinations // []) | length) == 0)
+            and (.result | type) == "object"
+            and (.result | has("logpush") and .logpush == false)
+            and (.result.observability | type) == "object"
+            and (.result.observability | has("enabled") and .enabled == false)
+            and (.result.observability | unset("logs"; part_off(true)))
+            and (.result.observability | unset("traces"; part_off(false)))
+            and (.result | unset("tail_consumers"; none))
+            and (.result | unset("streaming_tail_consumers"; none))
           ' "$SETTINGS_JSON" > /dev/null; then
             echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the submitter (07 §7, I-7)."
             exit 1
