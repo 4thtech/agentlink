@@ -3114,7 +3114,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Note (2026-10-21):** blocked on spec gaps (ops, kit format, config location, restore rules). Design proposal: `docs/design/m1-9i-storage-backup.md`. The owner accepted A to E (D-115, 2026-10-21), so this card is narrowed to `apps/cli/src/**` and depends on M1-9i-a and M1-9i-c.
 
 #### M1-9i-s · spec: own storage ops, recovery kit `ALKK`, restore rules (new, split from M1-9i)
-- **Status:** in review (decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S2 (changes 04, 06 and 07; owner "merge") · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#352; decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S2 (changes 04, 06 and 07; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md, 06-mcp-server.md, 07-sdk-transport-storage.md, 00-README.md (decision row)
 - **Depends on:** D-115 (decided)
 - **Spec:** design proposal §6 (diff-style list)
