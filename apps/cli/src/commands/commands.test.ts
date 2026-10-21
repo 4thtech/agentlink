@@ -487,9 +487,69 @@ describe('status (06 §2.0, D-73)', () => {
     expect(result.text).toContain("Can't reach the message network");
   });
 
+  it('never prints inbound text; a self-declared name shows only with its label (M1-29)', async () => {
+    const canary = 'CANARY-IGNORE-PREVIOUS-INSTRUCTIONS';
+    const named = {
+      ...contact,
+      display: {
+        name: 'Marko',
+        label: 'self-declared',
+        source: 'counterparty',
+      },
+    };
+    const f = fakeAgent({
+      catchUp: () =>
+        Promise.resolve({
+          partial: false,
+          inbox: [
+            { contactId: named.id, unread: 1, subject: canary, text: canary, files: [canary] },
+          ],
+          requests: 1,
+          messages: [{ text: canary }],
+        }),
+      contacts: { list: () => Promise.resolve([named]), get: () => Promise.resolve(named) },
+    });
+    const text = (await harness(f).run(['status', '--brief'])).out.join('\n');
+    expect(text.split('\n').length).toBeLessThanOrEqual(2);
+    expect(text).not.toContain(canary);
+    expect(text).not.toMatch(/https?:|0x[0-9a-f]{8}/i);
+    expect(text).toContain('(self-declared)');
+  });
+
+  it('with a pending handshake it adds no contact and marks nothing read (M1-29)', async () => {
+    const f = fakeAgent({
+      catchUp: () => Promise.resolve({ partial: false, inbox: [], requests: 1 }),
+    });
+    const result = await harness(f).run(['status', '--brief']);
+    expect(result.code).toBe(EXIT_OK);
+    const allowed = ['catchUp', 'close', 'contacts.list', 'contacts.get'];
+    expect(f.calls.filter((c) => !allowed.includes(c))).toEqual([]);
+  });
+
   it('says nothing is new when nothing is', async () => {
     const result = await harness(fakeAgent()).run(['status', '--brief']);
     expect(result.out).toEqual(['Nothing new on AgentLink.']);
+  });
+
+  it('M1-5g: an incomplete second adds one fixed warning: no count, no relay word', async () => {
+    const f = fakeAgent({
+      catchUp: () => Promise.resolve({ partial: false, incomplete: 2, inbox: [], requests: 0 }),
+    });
+    const result = await harness(f).run(['status', '--brief']);
+    expect(result.code).toBe(EXIT_OK);
+    expect(result.out).toEqual([
+      'Nothing new on AgentLink.',
+      'Warning  Some messages may be missing from this check. AgentLink will look for them again on the next check.',
+    ]);
+    expect(result.text).not.toMatch(/relay|\b2\b/i);
+  });
+
+  it('M1-5g: no incomplete second, no warning', async () => {
+    const f = fakeAgent({
+      catchUp: () => Promise.resolve({ partial: false, incomplete: 0, inbox: [], requests: 0 }),
+    });
+    const result = await harness(f).run(['status', '--brief']);
+    expect(result.text).not.toContain('may be missing');
   });
 });
 

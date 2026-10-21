@@ -112,6 +112,9 @@ export const TEXT = Object.freeze({
   statusOffline:
     "Warning  Can't reach the message network, so this shows only what is already stored.",
   statusPartial: 'Warning  Some relays did not answer, so this may be incomplete.',
+  // M1-5g: a relay returned a second at its cap. Fixed text: no count, relay or time (I-5, I-7).
+  statusIncomplete:
+    'Warning  Some messages may be missing from this check. AgentLink will look for them again on the next check.',
   requestRow: '{index}. Request from an unknown sender',
   requestId: 'Request ID: {requestId}',
   requestIdUnavailable: 'Request ID: unavailable',

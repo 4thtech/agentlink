@@ -8,7 +8,8 @@
 // - Counts (`counts`) read the store only. They serve the fetch-only catch-up (M1-7h addendum,
 //   D-73): unread is the contact's unread messages of the types an inbox page returns (PAGE_TYPES) plus the `received` rows whose verified `from` is
 //   that contact's current agent key, so a catch-up can count what it fetched without processing it
-//   (06 §2.0). Unknown senders are a count only.
+//   (06 §2.0). A `received` row whose type is known and is not such a message (an `ack`, say) is
+//   left out (IR-M1-7h-1 F04 a). Unknown senders are a count only.
 //
 // I-5: payloads are untrusted and returned only as data for the wrapper; nothing from them reaches a
 // log line or an error. I-7: logs carry counts only.
@@ -23,6 +24,7 @@ import {
   type InboxPage,
   type InboxPageQuery,
 } from './inbox-page.js';
+import { UNOPENED_TYPE } from './envelopes.js';
 import type { RequestsQueue } from './requests.js';
 
 export {
@@ -195,8 +197,10 @@ export class InboxService {
   /**
    * Unread counts by paired contact and the requests count, from the store alone: no envelope is
    * opened or processed and nothing is written (06 §2.0). A `received` row counts for the contact
-   * whose current agent key signed it (its signature passed 04 §3.1.1 step 4 when it was stored);
-   * its type is not known until it is processed, so it counts as one unread item.
+   * whose current agent key signed it (its signature passed 04 §3.1.1 step 4 when it was stored)
+   * while its type is not known (UNOPENED_TYPE) or is one the page returns: an unopened row counts
+   * as one unread item, and one whose type is known not to be a message never counts (IR-M1-7h-1
+   * F04 a: a peer's acks do not raise the counts).
    *
    * A processed row counts only if the inbox page can return it (PAGE_TYPES, M1-9p-b;
    * IR-M1-7h-c-1): a `proof` or another type the page never returns would otherwise leave an unread
@@ -223,6 +227,7 @@ export class InboxService {
             direction: 'in',
             state: 'received',
             from_key: contact.agent_nostr,
+            type: { in: [UNOPENED_TYPE, ...PAGE_TYPES] },
             // A terms offer waiting for a version it links to is not unread until the chain
             // takes it (M1-32-b, IR-M1-32-b-1 F01).
             refused_reason: null,

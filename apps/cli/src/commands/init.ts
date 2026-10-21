@@ -43,11 +43,17 @@ import {
   harnessById,
   isHarnessId,
   planHarness,
+  planSessionHook,
+  applySessionHook,
+  resolveInstalledCli,
+  HOOK_HARNESS,
+  HOOK_SETTINGS_DISPLAY,
   resolveConfigTarget,
   type ConfigTarget,
   type HarnessContext,
   type HarnessDef,
   type HarnessPlan,
+  type HookPlan,
 } from '../harness/index.js';
 import {
   DEFAULT_AGENT_NAME,
@@ -75,6 +81,11 @@ export interface InitDeps {
   readonly platform?: NodeJS.Platform;
   /** Who must own the config folders and files (tests only). */
   readonly uid?: number;
+  /**
+   * `"<node>" "<script>"` of the installed program for `--hook` (M1-29), or undefined when only a
+   * temporary or unsafe copy is running (installed-cli.ts).
+   */
+  readonly installedCli?: () => Promise<string | undefined>;
 }
 
 export function nodeInitDeps(): InitDeps {
@@ -95,8 +106,25 @@ export function nodeInitDeps(): InitDeps {
       }
     },
     clock: () => Math.floor(Date.now() / 1000),
+    installedCli: () => resolveInstalledCli(process.argv[1], process.execPath),
   };
 }
+
+/** Fixed text of `init --hook` (M1-29). Nothing from a file or the user is inserted. */
+export const HOOK_TEXT = Object.freeze({
+  intro:
+    'This adds a start-of-session note to Claude Code: a line or two saying who has written to you. It runs the AgentLink program installed on this computer. It never reads message text and changes nothing.',
+  noInstall:
+    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run `agentlink init --hook` again. Nothing was changed.',
+  notFound: "Problem  AgentLink didn't find Claude Code on this computer. Nothing was changed.",
+  present: 'OK       The AgentLink start-of-session note is already set up in Claude Code',
+  conflict:
+    'Claude Code already has a different AgentLink start-of-session hook, so AgentLink left it as it is. Nothing was changed there.',
+  updated: 'OK       Claude Code updated. Backup of the old file: {backup}',
+  created: 'OK       Claude Code start-of-session note set up',
+  restart: 'Warning Claude Code needs a restart. Quit and reopen Claude Code.',
+  rerun: 'Then run: agentlink init --hook{agentFlag} --confirm {code}',
+});
 
 /** Fixed text that has no entry in the copy sheet yet (no value from a file or the user is inserted). */
 export const INIT_TEXT = Object.freeze({
@@ -208,6 +236,104 @@ async function createIdentity(deps: InitDeps, name: string): Promise<void> {
   );
 }
 
+/**
+ * `init --hook` (M1-29; 06 §7, D-53): adds the SessionStart hook to Claude Code's settings, as its own
+ * opt-in. Same rules as the MCP entry: the exact diff first, a y/N in a terminal the owner opened, or
+ * a one-time code when run by an agent; a code for the MCP entry never confirms it. Needs no keychain
+ * and creates no identity.
+ */
+async function runHookOptIn(
+  context: CommandContext,
+  deps: InitDeps,
+  name: string,
+  confirmValue: string | undefined,
+): Promise<number> {
+  const { output, terminal } = context;
+  const prefix = deps.installedCli === undefined ? undefined : await deps.installedCli();
+  if (prefix === undefined) {
+    output.printError(HOOK_TEXT.noInstall);
+    return EXIT_FAILED;
+  }
+  const command = `${prefix} status --brief${name === DEFAULT_AGENT_NAME ? '' : ` --agent ${name}`}`;
+  const harnessContext: HarnessContext = {
+    home: deps.home,
+    env: terminal.env,
+    ...(deps.platform === undefined ? {} : { platform: deps.platform }),
+    now: deps.clock(),
+    ...(deps.uid === undefined ? {} : { uid: deps.uid }),
+  };
+  if (context.parsed.values['harness'] === undefined) {
+    const found = await detectHarnesses(harnessContext);
+    if (!found.some((h) => h.id === HOOK_HARNESS.id)) {
+      output.printError(HOOK_TEXT.notFound);
+      return EXIT_FAILED;
+    }
+  }
+  const plan: HookPlan = await planSessionHook(harnessContext, command);
+  switch (plan.status) {
+    case 'present':
+      output.print(HOOK_TEXT.present);
+      return EXIT_OK;
+    case 'conflict':
+      output.print(HOOK_TEXT.conflict);
+      return EXIT_OK;
+    case 'blocked':
+      output.printError(withApp(HARNESS_MESSAGES[plan.reason], HOOK_HARNESS.appName));
+      return EXIT_FAILED;
+    case 'change':
+      break;
+  }
+
+  const code = (() => {
+    const digest = encodeHex(
+      sha256(
+        new TextEncoder().encode(
+          `agentlink-init-hook-v1 ${name} ${hashText(HOOK_SETTINGS_DISPLAY)} ${hashText(plan.text)}`,
+        ),
+      ),
+    );
+    return `${digest.slice(0, 4)}-${digest.slice(4, 8)}`;
+  })();
+  const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
+  const agentFlag = name === DEFAULT_AGENT_NAME ? '' : ` --agent ${name}`;
+
+  // Nothing has been written yet. Show the exact change first.
+  output.print(HOOK_TEXT.intro);
+  output.print('');
+  output.print(copy('cli.init.changesFor', { appName: HOOK_HARNESS.appName }));
+  for (const line of plan.diff) output.print(sanitizeTerminalText(line));
+
+  if (interactive) {
+    output.print('');
+    output.print(copy('cli.init.apply'));
+    if (!/^\s*y(es)?\s*$/i.test(await deps.readLine())) {
+      output.print(copy('cli.init.cancelled'));
+      return EXIT_OK;
+    }
+  } else if (confirmValue === undefined) {
+    output.print('');
+    output.print(copy('cli.init.agentConfirm', { code }));
+    output.print(HOOK_TEXT.rerun.replace('{agentFlag}', agentFlag).replace('{code}', code));
+    return EXIT_OK;
+  } else if (confirmValue.replace('-', '').toLowerCase() !== code.replace('-', '')) {
+    output.printError(INIT_TEXT.codeMismatch);
+    return EXIT_FAILED;
+  }
+
+  try {
+    const { backup } = await applySessionHook(plan, harnessContext);
+    output.print(
+      backup === undefined ? HOOK_TEXT.created : HOOK_TEXT.updated.replace('{backup}', backup),
+    );
+    output.print(HOOK_TEXT.restart);
+    return EXIT_OK;
+  } catch (error) {
+    if (!(error instanceof HarnessError)) throw error;
+    output.printError(withApp(HARNESS_MESSAGES[error.code], HOOK_HARNESS.appName));
+    return EXIT_FAILED;
+  }
+}
+
 /** The `init` command handler. */
 export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandler {
   return async (context) => {
@@ -250,6 +376,17 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     ) {
       output.printError(DISPATCH_TEXT.badArguments);
       return EXIT_USAGE;
+    }
+    if (parsed.values['hook'] === true) {
+      // `--hook` is Claude Code only and takes neither `--config` nor `--harness none`.
+      if (
+        configValue !== undefined ||
+        (harnessValue !== undefined && harnessValue !== 'claude-code')
+      ) {
+        output.printError(DISPATCH_TEXT.badArguments);
+        return EXIT_USAGE;
+      }
+      return runHookOptIn(context, deps, name, confirmValue);
     }
     const chosen: HarnessDef | undefined =
       typeof harnessValue === 'string' && isHarnessId(harnessValue)

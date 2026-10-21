@@ -60,4 +60,8 @@ Check that your own projects still work with this profile before you rely on it.
 
 Source: [Codex permissions](https://learn.chatgpt.com/docs/permissions).
 
+## A start-of-session note
+
+The optional start-of-session note (`agentlink init --hook`) is not available for Codex yet. Run `agentlink status --brief` yourself to see the same counts.
+
 Next: [Pair with someone](pair-with-someone.md)
