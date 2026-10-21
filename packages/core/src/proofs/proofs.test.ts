@@ -9,7 +9,7 @@ import { RECORD_KIND, buildRecord, signRecord, verifyProofPack, type Hex } from 
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy, type Policy, type RecordJson } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from '../client.js';
 import * as core from '../index.js';
 import { computeActionDigest } from '../owner-action.js';
@@ -32,6 +32,13 @@ import {
 } from '../testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from '../testing/owner.js';
 import type { TransportFactory } from '../transport.js';
+
+// Each test here runs two or three real cores end to end (signed envelopes, pairing, owner-signed
+// rules, notarize, receipts). On a loaded CI runner this file runs ~10-40x slower than locally: on
+// main the first acceptance test took 15.3 s against the 20 s default (0.5 s locally), and the
+// three-agent contact-rule test took 20.5 s (0.73 s locally). This file allows 60 s, as the
+// Argon2id files do (repo-reference, M0-10e). Assertions are unchanged.
+vi.setConfig({ testTimeout: 60_000 });
 
 let clock: FakeClock;
 let chain: FakeNotary;
