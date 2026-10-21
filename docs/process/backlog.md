@@ -416,6 +416,17 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - No assertion changes; the suite passes repeatedly on the Windows runner.
 
+#### CHORE-WIN-RELAY-IO · Windows node-os: relay-io.test.ts hook timed out in 10000ms (new, CI flake)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test timeout; the `packages/node` path itself is S2 by path, so the PR is derived S2 unless the owner lowers it, `audit-rules.md` §2)
+- **Repo/path:** agentlink · packages/node (src/relay-io.test.ts), CI job node-os
+- **Depends on:** M0-10e, M0-10f
+- **Spec:** `audit-rules.md` §2; `ci-cd.md`; `repo-reference.md` (M0-10e timeout policy)
+- **Invariants:** —
+- **Scope:**
+  - Seen 2026-10-21 on the push run for #326 (run 39547945275) on Windows `node-os`: `packages/node` `src/relay-io.test.ts` hook timed out in 10000ms; the re-run passed. Find the slow hook and fix it, or give the file a measured per-file timeout (M0-10e policy: never lower a limit, record the measurement).
+- **Acceptance:**
+  - No assertion changes; the suite passes repeatedly on the Windows runner.
+
 #### M0-11 · Curator project context (new)
 - **Status:** done (setup) · **Size:** S · **Tier:** Owner · **Security:** S0
 - **Repo/path:** owner's Curator (project `agentlink`, domain `projects`); agentlink · .curator-project
