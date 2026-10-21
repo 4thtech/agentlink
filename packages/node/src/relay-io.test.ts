@@ -36,6 +36,14 @@ const OTHER_HOST = 'other.agentlink.test';
 let certificate: TestCertificate;
 const relays: TestRelay[] = [];
 
+// CHORE-WIN-RELAY-IO: this hook spawns `openssl` once for the throwaway certificate. Measured: about
+// 0.04 s on macOS, but on the Windows node-os runner (Git for Windows openssl.exe, cold start, with
+// the Argon2id keystore and SQLite suites running in parallel) it exceeded Vitest's 10 s default
+// hook timeout (run 39547945275, attempt 1: the file failed at 10.5 s with all 42 tests skipped),
+// while the re-run took 7.6 s for the whole file, hook included. 60 s is about 6x the worst seen,
+// the same hook limit as tools/ (repo-reference.md, M0-10e: a measured longer limit, never lower).
+const CERTIFICATE_HOOK_TIMEOUT_MS = 60_000;
+
 beforeAll(() => {
   certificate = makeTestCertificate([
     RELAY_HOST,
@@ -43,7 +51,7 @@ beforeAll(() => {
     'relay-b.nostr-test.dev',
     'relay-c.nostr-test.dev',
   ]);
-});
+}, CERTIFICATE_HOOK_TIMEOUT_MS);
 
 afterEach(async () => {
   vi.restoreAllMocks();
