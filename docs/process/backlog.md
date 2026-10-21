@@ -758,6 +758,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Seen 2026-10-21 on the #326 push run 39547945275: the Windows `node-os` job failed with a hook in `packages/node/src/relay-io.test.ts` that timed out at 10000 ms; the re-run passed. Find the slow hook, then fix it or give it a measured per-file timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout. Found: the file's `beforeAll`, which spawns `openssl` once for the test certificate (about 0.04 s on macOS; on Windows attempt 1 it passed the 10 s default hook timeout, the re-run took 7.6 s for the whole file). It now has a 60 s hook timeout. `safe-fetch.test.ts` and `rpc-fetch.test.ts` spawn `openssl` the same way in their `beforeAll` and have not failed yet; a package-wide `hookTimeout` in `packages/node/vitest.config.ts` would cover all three (follow-up if they flake).
 - **Acceptance:** the PR names the slow hook with its measured Windows duration; the fix or the per-file timeout lands with that measurement; no test or gate weakened.
 
+#### CHORE-DROP-5MB-FLAKE · packages/storage drop.worker.test.ts: 5 MB round trip timed out at 90 s in merge-group CI (new, flake 2026-10-21)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only)
+- **Repo/path:** agentlink · `packages/storage/src/drop.worker.test.ts`
+- **Depends on:** —
+- **Scope:** Merge-group runs 39604257053 and 39600881141 ejected PRs: "5 MB round trip (single PUT)" timed out at 90000 ms (the 6 MiB test took 34.6 and 35.9 s, the small round trip 15.4 s). Locally the test takes 2.9 s (encrypt and upload 1.5 s, download and decrypt 0.7 s, two SHA-256 of the file 0.7 s: pure JS in workerd, CPU-bound), so the cause is a CPU-starved runner while turbo runs all packages in parallel, not Miniflare startup or chunking. Both large round trips now share a measured 300 s per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). The payload stays 5 MB (card M1-6c) and no assertion changed. No retries.
+- **Acceptance:** the PR cites the local and CI timings; no test or gate weakened.
+
 #### CHORE-CI-SUPERSEDED · A deploy or release whose CI was superseded ends skipped, and main's head still deploys (new, 2026-10-21)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml`, `.github/workflows/deploy-submitter.yml`, `.github/workflows/deploy-drop.yml`, `tools/release/**`
