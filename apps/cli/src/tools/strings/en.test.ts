@@ -41,6 +41,7 @@ const SAMPLES: Record<string, string | number> = {
   approved: 3,
   denied: 1,
   total: 4,
+  receipt: 'opened',
 };
 
 function sampleParams(key: CopyKey): CopyParams {
