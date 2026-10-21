@@ -262,11 +262,11 @@ function contactRule(item: unknown): string {
   return `${contact}: ${parts.join(', ')}`;
 }
 
-const DELETE_AFTER_NOTES: readonly string[] = Object.freeze([
-  'Applies only to files sent while it is on.',
+const deleteAfterNotes = (v: Leaf): readonly string[] => [
+  `${v === 'receipt' ? 'Applies' : 'Delete on delivery applies'} only to files sent while it is on, and only while it stays on.`,
   'Checked once each time old files are cleaned up.',
   'The value kept with a file is the one in force when it is prepared for sending.',
-]);
+];
 
 /** Every rule of the 06 §3 document, in order: the review shows the policy in full (D-100). */
 export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
@@ -303,7 +303,7 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
         v === 'receipt'
           ? 'the contact confirms delivery (if they never do, when they expire)'
           : 'they expire'
-      }\n    ${DELETE_AFTER_NOTES.join('\n    ')}`,
+      }\n    ${deleteAfterNotes(v).join('\n    ')}`,
   },
   { path: 'files.ownerArchive', label: 'Keep a copy of sent files for you', read: yesNo },
   { path: 'envelopes.maxEnvelopeKB', label: 'Largest message', read: (v) => `${String(v)} KB` },
