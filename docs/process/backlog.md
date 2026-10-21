@@ -68,8 +68,8 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 158 (M1a 80, M1b 78; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
-| M2 Console, desktop apps, self-host, design | 43 (incl. M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
+| M1 Local beta | 160 (M1a 80, M1b 80; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M2 Console, desktop apps, self-host, design | 44 (incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
@@ -1001,7 +1001,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
 
 #### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
-- **Status:** ready · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#362; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
 - **Depends on:** — (runs in parallel with M1-35a)
 - **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
@@ -2242,6 +2242,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A stored give_up_at later than the bound is ignored.
   - Existing M1-5b and M1-5c tests stay green; no test is weakened.
   - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
+
+#### M1-5g · core: sync carries the transport's incomplete flag up to the user (new, IR-M1-5d-1 M-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
+- **Repo/path:** agentlink · packages/core (inbox sync), apps/cli (`agentlink_inbox`, `agentlink_status`)
+- **Depends on:** M1-5d
+- **Spec:** 07 §4.2 (Sync); 06 §2.1; 04 §3.5
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - The transport reports a second that a relay returned at its cap as a sync gap (M1-5d). Core sync drops it today. Carry it as a fixed incomplete flag or a count (never relay text, never an event ID) through the inbox result and the MCP tool to the user, in the plain words of 11 §5.
+  - Do not retry in a loop and do not advance the saved position past the incomplete second.
+- **Acceptance:**
+  - Tests first (RED commit): a fake relay that caps results gives an inbox result with the incomplete flag; a normal sync gives none; the flag carries no relay text and no event ID; the tool summary says some messages may be missing and will be tried again.
+  - Existing M1-5c and M1-5d tests stay green; no test is weakened.
 
 ### Storage (`@4thtech-io/storage`)
 
@@ -4261,6 +4274,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.
 - **Acceptance:** RED commit; test with a mismatching invite is refused and writes nothing; the matching case passes.
 
+#### M1-9zf · core: invite acceptance binds the counterparty's owner fingerprint or card hash (new, IR-M1-9ze-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
+- **Depends on:** M1-9ze
+- **Spec:** 04 §3.3 (pairing); 06 §2.1 (`accept_invite`)
+- **Invariants:** I-2, I-5
+- **Scope:** when an invite is accepted, bind the staged counterparty to the `ownerFingerprint` or the `agentCardJcsHash` the invite carries (as the spec chooses), so a card that matches the contact id but belongs to another owner is refused with no state change. Source: IR-M1-9ze-1.
+- **Acceptance:** RED commit; a test with a matching contact id but a different owner fingerprint or card hash is refused and writes nothing; the matching case passes; no test is weakened.
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
@@ -5018,6 +5040,15 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Pay page progress from public RPC reads; "Save a payment record" built in the browser; top-ups in the console fee history; the agent's one-time "credits arrived" line in the next status summary if the owner agrees.
 - **Acceptance:**
   - No payment data is sent to or stored by any 4thTech service; the record names no network outside Advanced.
+
+#### M2-19 · transport-nostr: bounded `ids` re-query for a relay-cap gap (new, IR-M1-5d-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2
+- **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
+- **Depends on:** M1-5d, M1-5g
+- **Spec:** 07 §4.2 (Sync); 04 §3.5
+- **Invariants:** I-3, I-5
+- **Scope:** for a second a relay returned at its cap (M1-5d), do one bounded re-query by `ids` learned from the agent's other relays, with a fixed cap on queries and ids per gap, so the gap closes where another relay holds the events. NIP-77 negentropy is a later step, only for relays that support it.
+- **Acceptance:** tests first: a capped relay plus a second relay that holds the missing events closes the gap; the re-query count and id count stay within the fixed bounds; a gap no relay can close stays reported as incomplete (M1-5g).
 
 #### M2-GATE · Milestone 2 gate: internal audit and external testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2

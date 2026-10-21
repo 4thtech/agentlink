@@ -50,7 +50,7 @@ The owner exported the brand and the application design again. Compared byte for
 
 **Owner, in chat, 2026-10-21:** "Please write in the build plan because this was built from the beginning And for some reason we did not know that it existed", and "The design must be adjusted. It was built before we fine-tuned everything."
 
-D1 and the D2 first pass are the visual basis. They were designed on 14 Oct 2026, before later decisions, so each surface is adjusted before or while it is built. Card **DESIGN-ADJ-1** (Opus, S0) writes `docs/design/adjustments.md`: per screen, what is outdated, missing or to remove, each item marked **(a) agents fix in code** (copy, small flow changes) or **(b) owner redesigns in Claude Design** (layout, new screens), with a paste-ready brief per (b) item. Decisions that may affect screens and copy: D-56 onward, especially D-96…D-115:
+D1 and the D2 first pass are the visual basis. They were designed on 14 Oct 2026, before later decisions, so each surface is adjusted before or while it is built. Card **DESIGN-ADJ-1** (Opus, S0) writes `docs/design/adjustments.md`: per screen, what is outdated, missing or to remove, each item marked **(a) agents fix in code** (copy, small flow changes) or **(b) owner redesigns in Claude Design** (layout, new screens), with a paste-ready brief per (b) item: **[`adjustments.md`](adjustments.md)** (in review). Decisions that may affect screens and copy: D-56 onward, especially D-96…D-115:
 
 - D-109: delivery receipts off by default, a receipt request and confirm UI, and the 11 §5.6 proof privacy disclosure lines;
 - D-111…D-114: top-up direction (crypto first, card last), messages and files free, the top-up link format, who pays for receipts;
