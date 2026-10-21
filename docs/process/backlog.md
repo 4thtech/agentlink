@@ -3766,7 +3766,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Follow-ups from IR-M1-13a-ACCEPT-1 (S2, backlog):** (a) Low: two concurrent `agentlink_accept_invite` calls without `approvalId` can both miss `findOpen` and create two requests (pre-existing; a double use stays impossible through the compare-and-set claim); make lookup and insert one store transaction. (b) The CLI `agentlink accept` without a TTY (`apps/cli/src/commands/accept.ts`) applies the same reuse rule: pending → print the same ID; approved → print "run again with `--approval <id>`", never use it automatically.
 
 #### M1-13c · e2e: files, proof and proof of agreement (new, split from M1-13a)
-- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#358) · **Size:** L · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · e2e/, .github/workflows/e2e.yml
 - **Depends on:** M1-13a (runner and API-key secrets as in D-73 (9)), M1-22, M1-9d, M1-10c, M1-11a, M1-12c, M1-27b
 - **Spec:** 10 M1-13; 06 §3, §9; 02 F-43, F-51, J2–J5, J8; 04 §3.4 (proof of agreement); 07 §6.3; D-31, D-32, D-40
@@ -3781,6 +3781,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - J3 (02): an agent with no credits is refused with `needs_credits`, takes the faucet link, receives testnet credits and retries successfully, with no chain chosen by hand (D-40). Added 2026-10-18: no other card covered J3 end to end before M1-GATE.
   - J5 (02): a third party who has only the exported proof pack runs `agentlink verify` (M1-9h) and gets a pass; a tampered pack fails with its specific reason. Added 2026-10-18: no other card covered J5 end to end before M1-GATE.
 - Review note (IR-M1-27a-2, 2026-10-17): the SDK client signs the drop request URL in its normalised form.
+- Delivered (2026-10-21): `e2e/test/files-and-proof.test.ts` (deterministic, in the e2e job: J2, J3, J5, D-109 defaults and contact rule, zero-access audit; fakes: `FakeNotary`, an in-memory drop) and `e2e/test/live-files-and-proof.test.ts` (opt-in live run on Base Sepolia through `e2e-live` in `e2e.yml`, manual dispatch on `main`, environment `e2e-live`, no secret). Chiado is not covered live (not auto-selected, no faucet yet).
+- **Open finding (product gap, needs its own card):** the terms tools refuse `notarize` with `NOTARIZE_UNAVAILABLE` (`packages/core/src/terms-flow.ts`, "records are M1-7i"; M1-7i shipped as the policy-rules card) and `agentlink_notarize` refuses an offer (`USE_TERMS_TOOLS`), so nothing records an offer or an accept and the proof of agreement of J8 (both shapes, the ACCEPTED receipt after owner approval, the exported pack, one approval each) cannot be reached through the tools. The receiving half is tested in `packages/core`. The two J8 proof tests are `it.fails` in `files-proof-scenario.ts` (they pass while the gap is open and turn red the day it closes); a plain test pins the current `NOTARIZE_UNAVAILABLE` refusal. This card's J8 acceptance stays open until that card lands.
 
 #### M1-13b · prompt-injection suite
 - **Status:** in review (4thtech/agentlink#359) · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1a
