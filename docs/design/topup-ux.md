@@ -105,7 +105,7 @@ The agent takes the complexity away; the user does one step.
 ## 5. Top-up link format (M1-26-d; accepted by the owner as proposed, 2026-10-21, D-113)
 
 ```
-https://pay.agentlink.4thtech.io/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, optional>
+https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, optional>
 ```
 
 - **Fragment, not query.** The agent's address and the amount stay after `#`, so they never reach the pay host's server or logs (like invite and verify links, 08 §4).
