@@ -133,6 +133,37 @@ Global config, `~/.gemini/config/mcp_config.json` (not the Gemini CLI file `~/.g
 
 Sources: [Antigravity MCP](https://antigravity.google/docs/mcp) (checked 2026-10-16: global `~/.gemini/config/mcp_config.json`, `mcpServers` with `command` and `args`). Documentation-verified; not yet tried in the app.
 
+## Optional SessionStart hook
+
+`agentlink init --hook [--agent <name>]` adds a start-of-session hook to Claude Code's user settings (`~/.claude/settings.json`). It is a separate opt-in from the `agentlink` entry: plain `init` never writes it, and no MCP tool installs or changes hooks. It follows the same rules as the entry: the exact diff is shown first, an interactive terminal asks `y/N`, an agent run prints the diff and a one-time code (`init --hook --confirm <code>`; a code from the entry's diff never matches), the old file is backed up, and a settings file that is not valid JSON, or not in a form that can be changed exactly, is left alone with no write. `CLAUDE_CONFIG_DIR` is not followed: when it is set, nothing is written.
+
+The hook runs code at every session start, so it points at the absolute path of the installed program and never at `npx`, which could fetch a newer package. `init --hook` refuses while only a temporary `npx` copy is running; run `npm install -g @4thtech-io/agentlink` first. It writes:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"<absolute path to node>\" \"<absolute path to the installed agentlink.js>\" status --brief",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`status --brief` prints one or two lines: unread counts, the number of requests from unknown senders and contact names (an alias you set, or a restricted name with its label). It never prints message text, and it only fetches and stores incoming messages. It marks nothing read, adds no contact, answers nothing and signs nothing, needs no owner presence, and finishes within 3 seconds. Claude Code adds its output to the session.
+
+Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks) (`SessionStart`, `matcher`, `type: "command"`, `timeout` in seconds, standard output added to the session).
+
+Codex, Gemini CLI, OpenCode and Antigravity: not available. AgentLink has not verified a session-start hook for them in this release, so `init --hook` accepts Claude Code only. Run `agentlink status --brief` by hand, or ask your AI to call `agentlink_status`.
+
 ## Default message network
 
 Messages travel over public Nostr relays that see only ciphertext (I-3). The default set, in this order, is `wss://nos.lol`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.mom` (D-75). The list lives in one place, `DEFAULT_RELAYS` in `@4thtech-io/transport-nostr`. Changing an agent's relay list is not available yet.
