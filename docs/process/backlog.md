@@ -777,7 +777,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (IR-OPS-REL-4-1 L1..L5, 2026-10-17): validate changelog fragments in CI (format and section); align `versioning.md` wording with the check.
 
 #### OPS-PRIV-1 · Submitter and service logging off, with a deploy check (new, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy configuration)
+- **Status:** in review (branch `ops-priv-1-relay-no-logging`) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy configuration)
 - **Repo/path:** agentlink · `apps/submitter/wrangler.toml` (when it lands with M1-10c), `apps/drop/wrangler.toml`, the deploy workflows, `docs/runbooks/`
 - **Depends on:** M1-10c (submitter deploy pipeline)
 - **Spec:** 07 §7 (privacy invariant); 04 §4, §5.1; D-109. Ongoing: applies to every 4thTech service and any relay 4thTech runs

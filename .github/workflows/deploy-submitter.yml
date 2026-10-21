@@ -401,11 +401,14 @@ jobs:
             and ((.result.observability.logs.invocation_logs // false) == false)
             and ((.result.observability.traces.enabled // false) == false)
             and (((.result.tail_consumers // []) | length) == 0)
+            and (((.result.streaming_tail_consumers // []) | length) == 0)
+            and (((.result.observability.logs.destinations // []) | length) == 0)
+            and (((.result.observability.traces.destinations // []) | length) == 0)
           ' "$SETTINGS_JSON" > /dev/null; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces and Tail Workers must stay off for the submitter (07 §7, I-7)."
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the submitter (07 §7, I-7)."
             exit 1
           fi
-          echo "Logging settings read back: Logpush, observability, invocation logs, traces and Tail Workers are off."
+          echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
           # READBACK-SETTINGS-END
 
   smoke-staging:
@@ -715,11 +718,14 @@ jobs:
             and ((.result.observability.logs.invocation_logs // false) == false)
             and ((.result.observability.traces.enabled // false) == false)
             and (((.result.tail_consumers // []) | length) == 0)
+            and (((.result.streaming_tail_consumers // []) | length) == 0)
+            and (((.result.observability.logs.destinations // []) | length) == 0)
+            and (((.result.observability.traces.destinations // []) | length) == 0)
           ' "$SETTINGS_JSON" > /dev/null; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces and Tail Workers must stay off for the submitter (07 §7, I-7)."
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the submitter (07 §7, I-7)."
             exit 1
           fi
-          echo "Logging settings read back: Logpush, observability, invocation logs, traces and Tail Workers are off."
+          echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
           # READBACK-SETTINGS-END
 
       # Any failure after the deploy started rolls back. Durable Object migrations are forward-only

@@ -4,7 +4,7 @@
 Bring the submitter Worker and its testnet credits faucet (`apps/submitter`) live: staging on `workers.dev` for CI and smoke tests, production on `submit.agentlink.4thtech.io` as the testnet beta (D-88). Agents built the pipeline (`.github/workflows/deploy-submitter.yml`, M1-10c); only the owner creates and holds the keys.
 
 ## When to use
-Once, before the first submitter deploy, and again when a key is rotated, a chain is added (Gnosis Chiado with M1-3j-b) or a wallet runs low. Not for the encrypted drop (`deploy-drop.yml`, M1-27b).
+Once, before the first submitter deploy, and again when a key is rotated, a chain is added (Gnosis Chiado with M1-3j-b) or a wallet runs low. Not for the encrypted drop (`deploy-drop.yml`, M1-27b), except Part E (account-level logging check), which covers the drop too.
 
 ## Who runs it
 The owner (Tali). Agents never run `wrangler secret put`, never see a key and never approve a deployment (AGENTS.md hard rules, `release-and-deployment.md` §1, §6). Parts A, C and D work in a phone browser; Part B needs a computer with a terminal.
@@ -110,13 +110,26 @@ All four wallets are on **Base Sepolia only**. Testnet funds have no value; keep
 19. When the run is green, open <https://submit.agentlink.4thtech.io/v1/health>. Expected: `"ok":true` and chain `84532` with `"available":true`.
 20. After a second deploy (any later merge, or step 17 again), rehearse the rollback once for the M1-10c acceptance: step 17 with **rehearse-rollback** ticked. The job `rollback-rehearsal` rolls staging back, checks it and rolls forward.
 
+**Part E · Account-level logging check (phone browser; OPS-PRIV-1, 07 §7, D-109)**
+
+CI reads back each Worker's own settings after every deploy, but its narrow API tokens cannot see account- and zone-level logging. The owner checks these for every relay Worker (`agentlink-submitter`, `agentlink-submitter-staging`, `agentlink-drop`, `agentlink-drop-staging`) once before the first production deploy, after any change to the account's logging or analytics setup, and at each milestone release (record "account logging checked" in the deploy record, `release-and-deployment.md` §5.2). Menu names are Cloudflare's; if a link opens the wrong place, use the menu path.
+
+21. **Account Logpush:** <https://dash.cloudflare.com/?to=/:account/logs> (Analytics & Logs → Logpush). No job uses the **Workers Trace Events** dataset; if one exists for another Worker, its filter must exclude the four Workers above.
+22. **Zone Logpush and log exports for `4thtech.io`:** <https://dash.cloudflare.com/?to=/:account/:zone/analytics/logs> (pick `4thtech.io`; Analytics & Logs → Logpush). No **HTTP requests** job (or any other job that records client IPs or URLs) covers `submit.agentlink.4thtech.io` or `drop.agentlink.4thtech.io`; a job for other hostnames must filter these two out.
+23. **Workers observability destinations:** <https://dash.cloudflare.com/?to=/:account/workers-and-pages/observability> (Workers & Pages → Observability). No export destination (OpenTelemetry or other) is set up for logs or traces of these Workers.
+24. **Each Worker's settings:** <https://dash.cloudflare.com/?to=/:account/workers-and-pages> → the Worker → **Settings** → **Observability**: Workers Logs off, Traces off, Logpush off, no Tail Workers. (CI checks this too; this is the owner's spot check.)
+25. **No live tailing:** never open **Real-time logs** / `wrangler tail` on these Workers, and never grant an agent or CI token the permission to do so. Live tails store nothing but would show requests, IPs and paths to whoever watches.
+
+Residual (04 §4): Cloudflare, as the infrastructure operator, still sees request metadata, and the zone's Security Events show the IPs of requests a WAF rule blocks (the drop's rate-limit rule). These cannot be turned off and are not logged by us.
+
 ### What CI does (for reference)
 
-`deploy-submitter.yml` waits for green `ci-gate` and `security-gate`, bundles once without credentials, then deploys staging (`agentlink-submitter-staging` on `workers.dev`) after checking the Worker secret **names**. `smoke-staging` (no credentials) checks `/v1/health` with every chain available, a simulated notarize on each chain (a fresh agent with no credits and `maxFee` 0: the Notary's simulation reverts, nothing is sent, no gas is spent), and that the faucet refuses a mainnet chain ID. Production (`agentlink-submitter` on `submit.agentlink.4thtech.io`) then deploys the same bytes, is health-checked over HTTP, has its logging settings read back, and on failure is rolled back with `wrangler rollback` and frozen (`DEPLOY_FREEZE`). The run summary holds the deploy record draft.
+`deploy-submitter.yml` waits for green `ci-gate` and `security-gate`, bundles once without credentials, then deploys staging (`agentlink-submitter-staging` on `workers.dev`) after checking the Worker secret **names**. `smoke-staging` (no credentials) checks `/v1/health` with every chain available, a simulated notarize on each chain (a fresh agent with no credits and `maxFee` 0: the Notary's simulation reverts, nothing is sent, no gas is spent), and that the faucet refuses a mainnet chain ID. Production (`agentlink-submitter` on `submit.agentlink.4thtech.io`) then deploys the same bytes, is health-checked over HTTP, has its logging settings read back (Logpush, observability, invocation logs, traces, log and trace export destinations, Tail Workers and streaming Tail Workers all off; the drop's workflow does the same, OPS-PRIV-1), and on failure is rolled back with `wrangler rollback` and frozen (`DEPLOY_FREEZE`). The run summary holds the deploy record draft.
 
 ## Verify
 - `https://submit.agentlink.4thtech.io/v1/health` answers 200 with `"ok":true` and every chain `"available":true`.
 - The run summary of the green run shows the deploy record draft: version deployed, rollback target, health check `success`, logging read-back `success`.
+- Part E done: no account or zone Logpush job, export destination or Tail Worker covers the relay Workers; the deploy record says "account logging checked" with the date.
 - A run where a required secret is missing shows the notice `Worker secrets not set on agentlink-submitter…: <names>` and stays green without deploying.
 
 ## If it fails
