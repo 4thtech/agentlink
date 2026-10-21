@@ -2624,7 +2624,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: a mismatching `proof` body flags its contact; one contact cannot take more than its share of the pending pool.
 
 #### M1-7g-d · core: proof and receipt follow-ups, part 2 (new, split from M1-7g-c)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#347; the optional stored per-contact flag moved to M1-7g-e, owner decides) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/log (logger), packages/core (proofs, receipts, terms-flow), packages/node (store schema, if the stored flag is added)
 - **Depends on:** M1-7g-c
 - **Spec:** 04 §3.4; 06 §2.4; 07 §2.1, §3, §3.2, §8
@@ -2636,6 +2636,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Optional: a stored per-contact flag (a schema migration) in place of, or next to, the refused row and pass report of M1-7g-c. The owner decides whether to add it.
 - **Acceptance:**
   - Tests first: an unlisted code is not logged; `confirm` produces a signed `ACCEPTED` receipt; one contact cannot take more than its share of the waiting pool; if the stored flag is added, a mismatch sets it and no MCP tool clears it (I-4).
+
+#### M1-7g-e · core: stored per-contact proof flag (new, split from M1-7g-d; owner decides)
+- **Status:** backlog (owner decides whether to build it) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (proofs, inbox), packages/node (store schema)
+- **Depends on:** M1-7g-c
+- **Spec:** 04 §3.4; 07 §3.2
+- **Invariants:** I-4, I-5
+- **Scope:** A stored per-contact flag (a schema migration) in place of, or next to, the refused row and pass report of M1-7g-c. Build only if the owner decides to add it.
+- **Acceptance:** Tests first: a mismatch sets the flag; no MCP tool clears it (I-4).
 
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
 - **Status:** done (4thtech/agentlink#106, merged 2026-10-15; follow-ups in M1-7h-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
