@@ -3,8 +3,10 @@
 // the status-file subset, without block scalars), and a workflow's `run:` keys are the only part
 // these checks need, so this reads exactly those and fails closed on any form it does not know:
 //   `run: <plain scalar>`, `run: "<quoted>"`, `run: '<quoted>'`, and block scalars `run: |` / `>`
-//   (with an optional chomping indicator), as a mapping key or a sequence entry (`- run: ...`).
-// Anything else after `run:` (an empty value, a multi-line plain scalar, a flow form) throws.
+//   (with an optional chomping indicator; a `>` block is folded with spaces), as a mapping key or
+//   a sequence entry (`- run: ...`).
+// Anything else after `run:` (an empty value, a plain scalar continued on a more-indented line, a
+// flow form) throws.
 
 const RUN_KEY = /^( *)(- +)?run:(?:[ \t]+(.*))?$/;
 
@@ -29,7 +31,10 @@ export function runScripts(source) {
         .filter((l) => l.trim() !== '')
         .map((l) => l.length - l.trimStart().length);
       const strip = indents.length > 0 ? Math.min(...indents) : 0;
-      scripts.push({ line: i + 1, script: body.map((l) => l.slice(strip)).join('\n') });
+      const text = body.map((l) => l.slice(strip)).join('\n');
+      // A folded (`>`) block joins its lines with spaces; a blank line stays a line break.
+      const script = value.startsWith('>') ? text.replace(/([^\n])\n(?=[^\n])/g, '$1 ') : text;
+      scripts.push({ line: i + 1, script });
       i = j - 1;
     } else if (value.startsWith('"') || value.startsWith("'")) {
       const quote = value[0];
@@ -38,6 +43,11 @@ export function runScripts(source) {
       }
       scripts.push({ line: i + 1, script: value.slice(1, -1) });
     } else if (value !== '' && !/^[[{&*!%@`]/.test(value)) {
+      // A plain scalar may continue on more-indented lines; refuse that instead of reading half.
+      const next = lines[i + 1] ?? '';
+      if (next.trim() !== '' && next.length - next.trimStart().length > keyColumn) {
+        throw new Error(`workflow line ${String(i + 2)}: unsupported multi-line plain run value`);
+      }
       scripts.push({ line: i + 1, script: value.replace(/\s+#.*$/, '') });
     } else {
       throw new Error(`workflow line ${String(i + 1)}: unsupported run value`);
