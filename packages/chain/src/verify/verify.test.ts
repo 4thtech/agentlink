@@ -24,6 +24,7 @@ import {
 import {
   decodeFunctionData,
   encodeAbiParameters,
+  encodeErrorResult,
   encodeEventTopics,
   encodeFunctionResult,
   parseAbi,
@@ -348,6 +349,11 @@ interface FakeChain {
   /** The RPC fails (503) for eth_getTransactionReceipt only. */
   txDown?: boolean;
   down?: boolean;
+  /**
+   * getRecord reverts with this raw data for an ID it does not hold (at that tag), as the deployed
+   * Notary does with RecordNotFound(); default: it answers the empty struct.
+   */
+  missingRevert?: string;
 }
 
 type RpcCall = { method: string; to?: string; fn?: string; tag?: string };
@@ -402,7 +408,18 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
       const [recordId] = args as unknown as [string];
       const source =
         tag === 'finalized' ? (chain.finalizedRecords ?? chain.records) : chain.records;
-      const state = source?.get(recordId) ?? EMPTY_STATE;
+      const held = source?.get(recordId);
+      if (held === undefined && chain.missingRevert !== undefined) {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id,
+            error: { code: 3, message: 'execution reverted', data: chain.missingRevert },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      const state = held ?? EMPTY_STATE;
       return answer(
         encodeFunctionResult({
           abi: NOTARY_CLIENT_ABI,
@@ -1020,6 +1037,43 @@ describe('verifyProofPack: finality (IR-M1-4d-1 M-3)', () => {
     const { reader, calls } = chainFor(base(), {});
     expectFailure(await verify(f.pack, [reader]), 'record_not_found');
     expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
+  });
+
+  // IR #338 L3: the deployed Notary reverts RecordNotFound() for an unknown ID. That revert, and
+  // only that one, is "no record here"; it must never verify, and it is not an outage.
+  const RECORD_NOT_FOUND = encodeErrorResult({
+    abi: NOTARY_CLIENT_ABI,
+    errorName: 'RecordNotFound',
+  } as never);
+
+  it('a RecordNotFound revert at every block is record_not_found, not chain_unavailable', async () => {
+    const f = await eoaFixture();
+    const { reader, calls } = chainFor(base(), { missingRevert: RECORD_NOT_FOUND });
+    expectFailure(await verify(f.pack, [reader]), 'record_not_found');
+    expect(calls.map((c) => c.tag)).toEqual(['finalized', 'latest']);
+  });
+
+  it('a RecordNotFound revert at finalized reads latest, where the record is', async () => {
+    const f = await eoaFixture();
+    const { reader, calls } = chainFor(base(), {
+      records: new Map([[f.recordId, f.state]]),
+      finalizedRecords: new Map(),
+      missingRevert: RECORD_NOT_FOUND,
+    });
+    const result = await verify(f.pack, [reader]);
+    expect(result.valid && result.finality).toBe('latest');
+    expect(calls.filter((c) => c.fn === 'getRecord').map((c) => c.tag)).toEqual([
+      'finalized',
+      'latest',
+    ]);
+  });
+
+  it('any other getRecord revert stays chain_unavailable', async () => {
+    const f = await eoaFixture();
+    for (const data of ['0x', '0xdeadbeef']) {
+      const { reader } = chainFor(base(), { missingRevert: data });
+      expectFailure(await verify(f.pack, [reader]), 'chain_unavailable');
+    }
   });
 });
 
