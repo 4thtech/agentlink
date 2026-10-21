@@ -7,7 +7,7 @@ The owner (Tali) designs the brand and the app in **Claude Design**, following t
 | Drop | Contents | Needed by | Status | Where |
 |---|---|---|---|---|
 | **D1** | Brand core (11 §2, D-56): chosen direction, mark, wordmark, lockups, favicon, Claude Desktop extension / MCP server icon. In-chat copy sheet (§6.1) and terminal copy (§6.10); tokens (§11.7) and core components (§8); local settings and approvals app (§6.2.1, local web UI) with storage (§6.11) and the proof list (§6.12), with its states (§9); invite placeholder page. Optional, if the owner wants them early: desktop-app-ready versions of the local approval screens (approval, commitment approval, first run) | Week 3 of M1 | ✅ delivered, partial points (14 Oct 2026) | [`d1/`](d1/MANIFEST.md), [`brand/`](brand/MANIFEST.md) |
-| **D2** | Full component library (incl. terms card, terms diff, printed record); OS app icons, tray and menu-bar icons, PWA and Web Push icons (§2.4); owner console (§6.3, desktop and mobile), whose screens also serve as the desktop app's dashboard (D-41); desktop apps for macOS, Windows and Linux (§6.2.2: tray menu, native approval window, biometric prompt states, AI app auto-setup, updates, per-OS chrome); cloud agent pages (§6.9); verify (§6.4, incl. proof of agreement and print); invite landing (§6.5) with one-link install and browser view-and-accept (D-35); onboarding (§6.6, leading with "paste this to your agent"); pay page (§6.7, separate origin) and pricing (§6.8); storage connectors (§6.11); registration and domain verification (§6.13); J8 negotiation screens; prototypes J1, J2, J4, J5, J8; rationale notes | Before the M1 gate | 🟡 partial, first pass (14 Oct 2026) | [`d2/`](d2/MANIFEST.md), [`brand/`](brand/MANIFEST.md) |
+| **D2** | Full component library (incl. terms card, terms diff, printed record); OS app icons, tray and menu-bar icons, PWA and Web Push icons (§2.4); owner console (§6.3, desktop and mobile), whose screens also serve as the desktop app's dashboard (D-41); desktop apps for macOS, Windows and Linux (§6.2.2: tray menu, native approval window, biometric prompt states, AI app auto-setup, updates, per-OS chrome); cloud agent pages (§6.9); verify (§6.4, incl. proof of agreement and print); invite landing (§6.5) with one-link install and browser view-and-accept (D-35); onboarding (§6.6, leading with "paste this to your agent"); pay page (§6.7, separate origin) and pricing (§6.8); storage connectors (§6.11); registration and domain verification (§6.13); J8 negotiation screens; prototypes J1, J2, J4, J5, J8; rationale notes | Before the M1 gate | 🟡 first pass landed (14 Oct 2026); predates later decisions, needs adjustment (D-116, DESIGN-ADJ-1) | [`d2/`](d2/MANIFEST.md), [`brand/`](brand/MANIFEST.md) |
 | **D3** | Brand final after the trademark check (M1-24); marketing site for the production domain (§6.15); social and README images | Before M3 public launch | ⏳ pending (social images arrived early, in `brand/social/`) | [`brand/`](brand/MANIFEST.md) |
 
 ### Intake of 14 Oct 2026
@@ -40,11 +40,55 @@ The owner exported the brand (`agentlink-brand`) and the application design (`ag
 
 ### Re-export of 15 Oct 2026 (DESIGN-D2 intake check)
 
-The owner exported the brand and the application design again. Compared byte for byte with `docs/design/`, the application design (`agentlink-app-design`) is **identical** to the 14 Oct intake, so **no surface gained a design**: the Status table and the tables above stand, DESIGN-D2 stays partial, and the surfaces marked missing or partial stay functional and unstyled. The only new files are the logo and social JPG renderings, now in `brand/logo/jpg/` and `brand/social/` (see `brand/MANIFEST.md`). The production-domain and trademark check (M1-24) is still pending, so the brand is not final.
+The owner exported the brand and the application design again. Compared byte for byte with `docs/design/`, the application design (`agentlink-app-design`) is **identical** to the 14 Oct intake, so **no surface gained a design**: the Status table and the tables above stand and DESIGN-D2 stays partial. *Superseded by D-116 (21 Oct 2026):* surfaces with a delivered or partial screen are built styled from it, after DESIGN-ADJ-1; only surfaces with no screen stay functional and unstyled. The only new files are the logo and social JPG renderings, now in `brand/logo/jpg/` and `brand/social/` (see `brand/MANIFEST.md`). The production-domain and trademark check (M1-24) is still pending, so the brand is not final.
 
 **Drift from 11.** The drop was designed from an older handoff text than `claude-design-handoff.md` here (pairing safety-code timing, scope of "Remember for this contact", per-contact proof rules, invite answered twice). **11 wins**; the differences are listed in `d1/MANIFEST.md`. The D2 vocabulary check (hits such as "owner key" in the console) is in `d2/MANIFEST.md`.
 
-**Intake cards.** DESIGN-D1's acceptance is met (drop recorded), so M1-9g, M1-11b and the M1-19 restyle no longer wait on design (their other dependencies still apply). DESIGN-D2 is partial: M2-1a can start from the delivered tokens and components; M2-1b, M2-5a/b and M2-11g build only the surfaces listed as delivered and keep the rest functional and unstyled until the owner delivers or waives the missing items.
+**Intake cards.** DESIGN-D1's acceptance is met (drop recorded), so M1-9g, M1-11b and the M1-19 restyle no longer wait on design (their other dependencies still apply). DESIGN-D2's first pass has landed (D-116): UI cards build every surface that has a screen below, styled, once DESIGN-ADJ-1 has listed its adjustments; surfaces with no screen stay functional and unstyled until the owner delivers or waives them.
+
+## Design adjustment (D-116)
+
+**Owner, in chat, 2026-10-21:** "Please write in the build plan because this was built from the beginning And for some reason we did not know that it existed", and "The design must be adjusted. It was built before we fine-tuned everything."
+
+D1 and the D2 first pass are the visual basis. They were designed on 14 Oct 2026, before later decisions, so each surface is adjusted before or while it is built. Card **DESIGN-ADJ-1** (Opus, S0) writes `docs/design/adjustments.md`: per screen, what is outdated, missing or to remove, each item marked **(a) agents fix in code** (copy, small flow changes) or **(b) owner redesigns in Claude Design** (layout, new screens), with a paste-ready brief per (b) item: **[`adjustments.md`](adjustments.md)** (in review). Decisions that may affect screens and copy: D-56 onward, especially D-96…D-115:
+
+- D-109: delivery receipts off by default, a receipt request and confirm UI, and the 11 §5.6 proof privacy disclosure lines;
+- D-111…D-114: top-up direction (crypto first, card last), messages and files free, the top-up link format, who pays for receipts;
+- the pay page and top-up link are gated off until the pay page ships (`PAY_PAGE.live`, M1-26-e);
+- D-115: backup and restore (`ALKK` recovery kit, fresh recovery code, restore never overwrites, storage reconnected after restore);
+- D-39, D-40: networks only under Advanced, the funded network chosen automatically.
+
+`packages/ui` tokens and fonts (M1-35a) start in parallel; the other UI cards wait for DESIGN-ADJ-1.
+
+**Production rules.** The `.dc.html` screens and `d2/source/screens/support.js` are previews: they never ship. Production is rebuilt in TypeScript in `packages/ui` with classes, because the 08 §4 CSP forbids inline styles. The PNGs are the visual reference. The Lucide ISC notice ships with the first Lucide path (M1-35a).
+
+### Screen index
+
+Source previews are in `d2/source/screens/<Name>.dc.html`; PNGs as listed. "Card" is the card that builds the surface.
+
+| Surface | Screens (preview name → PNG) | Card |
+|---|---|---|
+| Tokens, fonts, icons | `d1/tokens/`, `d1/design-system/`, `brand/icons/ui/` | M1-35a |
+| Core components (31 specs) | `d1/components/*.md`, `d1/components/reference/`; `d1/screens/components/approval-card--all-states` | M1-35b (M2-1b for D2-only parts) |
+| Copy | `d1/copy/strings.en.json`, `in-chat.md`, `terminal.md`; Chat-copy, Terminal-copy → `d1/screens/copy/` | M1-35c |
+| Local UI: first run | Local-firstrun → `d1/screens/local/first-run--protect-approvals`; Local-recovery → `first-run--recovery-kit` | M1-11b |
+| Local UI: approvals, states | Local-approvals → `approvals--pending`; Local-states → `shared-states--all`; Approval-light, Approval-contrast, Approval-states, Commitment-mobile → `d1/screens/mobile/` | M1-11b |
+| Local UI: settings | Local-activity, Local-contacts, Local-files, Local-storage, Local-proofs (`proofs-credits`), Local-rules, Local-backup (`backup--restoring`), Local-advanced → `d1/screens/local/` | M1-11c |
+| Invite landing | Invite-landing → `d2/screens/invite/invite-landing--default--light--360` | M1-19-c (M2-5b later) |
+| Browser view-and-accept | Accept-browser → `d2/screens/accept/` | M2-13 |
+| Verify, proof detail, printed record | Verify → `d2/screens/verify/`; Proof-detail → `d2/screens/desktop-macos/proof-of-agreement--recorded`; Print-record → `d2/screens/print/` | M2-5a |
+| Onboarding | Onboarding → `d2/screens/onboarding/` | M2-8 |
+| Pay, pricing | Pay → `d2/screens/pay/`; Pricing → `d2/screens/pricing/` | M2-2f, M2-18b–d; pricing with M2-8 |
+| Owner console | Console-signin, Console-home, Console-mobile-home, Console-negotiation, Console-agents, Console-credits, Console-settings → `d2/screens/console/` | M2-2a–e, M2-12 |
+| Cloud agent | Cloud-setup, Cloud-signin, Cloud-status → `d2/screens/cloud/` | M2-3 |
+| Desktop (M2, D-31…D-41) | Desktop-tray, Desktop-approval-mac, -windows, -touchid, Desktop-welcome, Desktop-firstrun-setup, Desktop-dashboard-windows, Desktop-linux, Desktop-settings → `d1/screens/desktop-*`, `d2/screens/desktop*` | M2-11b–g |
+| Gallery | Main, `index.html` (preview only) | — |
+
+### Known gaps and copy issues
+
+- **Gaps:** no clickable prototypes (J1, J2, J4, J5, J8) or rationale notes; light and increased-contrast themes sparse (approval card only); verify shows the valid result only; printed record A4 only; no Windows Hello states; open questions Q2, Q6, Q8 not shown; standalone specs missing for the negotiation thread, proof-of-agreement summary, printed record, biometric sheet, config diff, OAuth consent card and update banner; D3 (marketing site, final brand) not present. Missing because of later decisions (DESIGN-ADJ-1 confirms): receipt request and confirm UI (D-109), the 11 §5.6 disclosure lines, top-up gated off, backup and restore per D-115, own storage connect.
+- **Copy, fix before building:** Pay "If your exchange asks for a network, choose Base (cheapest)" names a network in the default UI (D-40, 11 §5); verify and proof detail show raw `0x…` record IDs in the default view (move to Advanced or detail); `strings.en.json` needs a full 11 §5 audit (M1-35c); "owner key" and similar hits in the console (`d2/MANIFEST.md`).
+- **Licence:** the Lucide ISC notice is not in the reference bundle and must ship with `packages/ui` (M1-35a). Geist and Geist Mono are SIL OFL 1.1 (`d1/tokens/fonts/OFL.txt`).
 
 **Design briefs.** Briefs for flows the owner has set a direction for, ahead of their design drop: [`topup-ux.md`](topup-ux.md), adding credits on the pay page (D-111, direction only).
 
@@ -52,7 +96,7 @@ When a drop lands, the orchestrator records it here: the date, the links or file
 
 ## Rules for agents
 
-1. **No design yet means functional and unstyled.** Use semantic HTML, accessible markup (WCAG 2.2 AA, keyboard navigation, visible focus) and placeholder CSS variables. **Never invent a visual design**, colour scheme, icon or brand for a surface whose drop hasn't landed.
+1. **Check the Status and the screen index first.** This file is the only design status (D-116, LL-16). A surface with a screen in the index is built **styled** from it, after DESIGN-ADJ-1, using `packages/ui`. Only a surface with no screen is built functional and unstyled: semantic HTML, accessible markup (WCAG 2.2 AA, keyboard navigation, visible focus) and placeholder CSS variables. **Never invent a visual design**, colour scheme, icon or brand for it.
 2. **Copy.** Until the D1 copy sheet lands, user-facing strings follow the vocabulary in 11 §5 and live in externalized string files, so they can be swapped without code changes. The product name is `{productName}` in strings, never hard-coded in images.
 3. **Implementation target** (11 §11.7):
    - tokens become CSS variables plus JSON in `packages/ui`;
