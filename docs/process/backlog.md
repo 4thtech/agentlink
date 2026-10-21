@@ -1782,7 +1782,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The native-xDAI fee configuration reads back as configured; Chiado addresses published in the next prerelease.
 
 #### M1-3j-b · enable Chiado in automatic selection after smoke test and faucet (new, M1-3j review)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#373, merged 2026-10-21; enabling Chiado itself is M1-3j-c) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`NOT_AUTO_SELECTED` in clients/registry.ts, faucet allowlist), apps/submitter (faucet config), apps/cli (default proof chains)
 - **Depends on:** M1-3j (Chiado deployed, `@4thtech-io/occ-v2-abi` v0.1.0-testnet.3 imported), the Chiado smoke test, M1-10b-b, M1-10c
 - **Spec:** 07 §6.3; 05 §9; D-40, D-46
@@ -2251,7 +2251,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
 
 #### M1-5g · core: sync carries the transport's incomplete flag up to the user (new, IR-M1-5d-1 M-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
+- **Status:** done (4thtech/agentlink#366, merged 2026-10-21) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/core (inbox sync), apps/cli (`agentlink_inbox`, `agentlink_status`)
 - **Depends on:** M1-5d
 - **Spec:** 07 §4.2 (Sync); 06 §2.1; 04 §3.5
@@ -3376,7 +3376,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** the proof lines of the M1-9d acceptance, as tool-layer tests: `agentlink_notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`; `agentlink_notarize` on an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS` with no record submitted; `agentlink_acknowledge` `accepted` on a record with terms → `USE_RESPOND_TO_TERMS`; export with the content key creates an approval and writes nothing before it; `agentlink_verify_proof_pack` outside the D-87 folders → `PATH_NOT_ALLOWED` with the file never opened; the name canary returns `signerName` only restricted, with `signerLabel`; schema and behaviour test per `status` value of each tool; RED commit.
 
 #### M1-9d-3 · Terms tools: firm offers and recorded accepts (new, from IR-M1-13c-1)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (commitments and paid actions, D-31, D-55) · **Phase:** M1b · **Blocks:** M1 GATE (J8)
+- **Status:** done (4thtech/agentlink#363, merged 2026-10-21) · **Size:** M · **Tier:** Opus · **Security:** S2 (commitments and paid actions, D-31, D-55) · **Phase:** M1b · **Blocks:** M1 GATE (J8)
 - **Repo/path:** agentlink · packages/core (`src/terms-flow.ts`, `src/proofs/service.ts`), apps/cli (`src/tools/propose-terms.ts`, `respond-to-terms.ts`, `terms-common.ts`)
 - **Depends on:** M1-32 (done), M1-7g, M1-7g-d (done: the deferred ACCEPTED receipt), M1-9d-2 (done); D-114 (the submitter side of receipts is M1-34-b, not this card)
 - **Spec:** 06 §2.2a, §2.4, §3 "Commitments"; 04 §3.4, §3.4.2; 05 §3.1 (kinds `OFFER`, `ACCEPT`), 05 §3.3; 07 §2.1, §6.3, §8; 02 J8; 11 §5, §5.6; D-31, D-55, D-109, D-111, D-114
@@ -4322,7 +4322,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
 
 #### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#353, merged 2026-10-21) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
 - **Depends on:** M1-9zb
 - **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.

@@ -82,6 +82,10 @@ areas:
         state: done
         prs: [222, 228]
         summary: "The owner seed sealed under a passkey's PRF output (`ALKP`) or a generated recovery code (`ALKR`), with the vectors in Node, three browsers and workerd (D-82). The console and localhost passkey flows that use them follow."
+      - name: "Recovery kit (ALKK v1)"
+        state: in-progress
+        prs: [367]
+        summary: "The recovery kit file format, an encrypted file holding the owner key and agent identities under a generated recovery code, is merged with its independent vectors in every runtime (M1-9i-b). In development: no command writes or reads a kit yet."
       - name: "Key interfaces, NIP-44 v2, gift wrap"
         state: done
         prs: [41, 42, 55]
@@ -191,8 +195,8 @@ areas:
         summary: "Building, signing and verifying envelopes in the specified order; the owner can always read; held envelopes across a contact's key rotation."
       - name: "Invites and pairing"
         state: done
-        prs: [78]
-        summary: "Single-use invite links, the handshake and ack with the commit-then-reveal safety code."
+        prs: [78, 353]
+        summary: "Single-use invite links, the handshake and ack with the commit-then-reveal safety code. Accepting an invite is refused unless the agent it pairs with is the one the invite names (M1-9ze)."
       - name: "Safety code checked"
         state: done
         prs: [80, 85]
@@ -227,8 +231,8 @@ areas:
         summary: "Sending a message to a paired contact, stored with its delivery rows before anything is published, retried from the outbox, with one publisher per row when several processes share the agent (M1-7k). Stale staged pairing messages are bounded at 24 h, and a publisher lease keeps one process per agent on the relay connections (M1-7k-b)."
       - name: "Inbox sync, delivery acknowledgements, owner card update"
         state: done
-        prs: [106, 130, 131]
-        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h). The inbox page read marks items read, and the unread counts match what the page can return (M1-7h-c, M1-9p-b). Owner-signed revocations of contacts and of the agent itself are applied; a contact's revocation also voids pending approvals and open commitment parts with that contact, and delivery acknowledgements are queued for the delivery pass instead of sent during a sync (M1-7h-b). The owner card update (M1-7j, M1b) follows."
+        prs: [106, 130, 131, 366]
+        summary: "Inbox sync with a per-contact rate limit, opt-in delivery acknowledgements and a fetch-only catch-up for read-only status (M1-7h). The inbox page read marks items read, and the unread counts match what the page can return (M1-7h-c, M1-9p-b). Owner-signed revocations of contacts and of the agent itself are applied; a contact's revocation also voids pending approvals and open commitment parts with that contact, and delivery acknowledgements are queued for the delivery pass instead of sent during a sync (M1-7h-b). When a relay returns its maximum number of messages and the inbox may be incomplete, `status` and the inbox say so in one fixed line (M1-5g). The owner card update (M1-7j, M1b) follows."
       - name: "Live relay subscriptions"
         state: done
         prs: [204]
@@ -243,8 +247,8 @@ areas:
         summary: "One checked way to fetch a URL and to open a file inside an allowed folder, with a file-name cleaner (M1-15). Not wired into any tool yet."
       - name: "Terms and one approval per agreement"
         state: done
-        prs: [126, 134]
-        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). The deferred Accepted receipt has landed (M1-7g-d); firm offers and recorded accepts, each under one owner approval with the proof fee on the same request, are in review (M1-9d-3)."
+        prs: [126, 134, 363]
+        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). The deferred Accepted receipt has landed (M1-7g-d); firm offers and recorded accepts, each under one owner approval with the proof fee on the same request, are merged for the next release (M1-9d-3). Counters and rejects with proof are still refused."
       - name: "Agent profile signatures"
         state: done
         prs: [300]
@@ -342,8 +346,8 @@ areas:
         summary: "A docs-site page that walks a new user through adding AgentLink to their AI tool (DOCS-SETUP)."
       - name: "Submitter and test-credits faucet"
         state: done
-        prs: [293, 298, 327, 330, 332, 338, 342, 349]
-        summary: "The submitter Worker records signed proofs on the agent's behalf, resubmits items apart after a shared failure and repairs nonce gaps (M1-10a, M1-10a-b). It is live in production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta: Base Sepolia, health ok), deployed through its CI pipeline with owner approval: staging, a smoke test that sends nothing, production with automatic rollback and the deploy freeze (M1-10c). Proofs work end to end on the testnet. Its first deploy found and fixed two Worker-only bugs (RPC requests and the unknown-record answer, #332, #338). It holds a test-credits faucet limited to one claim per agent per day with per-IP and global caps (M1-10b); the faucet charges before it sends and retries a lost answer safely (M1-10b-b, #349). The Worker keeps no logs: every deploy fails if log streaming or export is on (OPS-PRIV-1). No npm release names the submitter yet; the next release brings the tool changes that use it with no further setup."
+        prs: [293, 298, 327, 330, 332, 338, 342, 349, 372]
+        summary: "The submitter Worker records signed proofs on the agent's behalf, resubmits items apart after a shared failure and repairs nonce gaps (M1-10a, M1-10a-b). It is live in production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta: Base Sepolia, health ok), deployed through its CI pipeline with owner approval: staging, a smoke test that sends nothing, production with automatic rollback and the deploy freeze (M1-10c). Proofs work end to end on the testnet. Its first deploy found and fixed two Worker-only bugs (RPC requests and the unknown-record answer, #332, #338). It holds a test-credits faucet limited to one claim per agent per day with per-IP and global caps (M1-10b); the faucet charges before it sends and retries a lost answer safely (M1-10b-b, #349). It refuses a claim while an earlier faucet transaction is still pending and caps the gas of every faucet transaction (M1-10b-c, #372). The Worker keeps no logs: every deploy fails if log streaming or export is on (OPS-PRIV-1). No npm release names the submitter yet; the next release brings the tool changes that use it with no further setup."
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2."
@@ -371,8 +375,8 @@ areas:
         summary: "The contracts release v0.1.0-testnet.3 exports the interface ABIs, the Base Sepolia and Gnosis Chiado addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83)."
       - name: "Gnosis Chiado deployment"
         state: done
-        prs: ["contracts#24"]
-        summary: "Deployed on the Gnosis Chiado testnet on 19 Oct 2026 at the same addresses as Base Sepolia; the live smoke test passed on 21 Oct 2026. Chiado is still not in automatic network selection (M1-3j-b)."
+        prs: [373, "contracts#24"]
+        summary: "Deployed on the Gnosis Chiado testnet on 19 Oct 2026 at the same addresses as Base Sepolia; the live smoke test passed on 21 Oct 2026. Automatic network selection now includes Chiado only once the testnet faucet serves it, which it does not yet (M1-3j-b), so Chiado is not chosen automatically."
       - name: "Pre-audit fixes"
         state: planned
         summary: "Follow-ups for M1b; mainnet follows the external audit (M3)."
@@ -423,7 +427,7 @@ deploy:
   testnet:
     state: deployed
     network: "Base Sepolia"
-    note: "OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) but not yet chosen automatically."
+    note: "OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) but not chosen automatically until the faucet serves it (M1-3j-b)."
   mainnet:
     state: planned
     note: "After the external audit (M3). Not deployed."
@@ -432,7 +436,7 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). No released CLI version uses it yet. The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "M1b is in progress. v0.1.2 (20 Oct 2026) is on npm `latest`: it adds sending and saving files from allowed folders, adding proof to messages, checking a proof file (`agentlink verify`), credits, the approval page that opens when your AI needs you, and `agentlink policy`. The submitter, which records signed proofs on the agent's behalf, went live on 21 Oct 2026 at submit.agentlink.4thtech.io on a testnet, and proofs work end to end there. The Gnosis Chiado contracts passed their live smoke test the same day; Chiado is not chosen automatically yet. The encrypted drop is live (19 Oct 2026). Merged on main for the next release, not in v0.1.2: delivery receipts off by default with receipt requests, the plain notices on what a proof makes public, a flag on a contact whose proof does not match the chain, deleting a sent file once the receipt arrives, paid tools choosing the funded network on their own, and the testnet faucet hardening. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: the designed approval page, sending files through the drop from the tools, adding credits through a pay page, and the 0.2.0 release."
+inProgress: "M1b is in progress. v0.1.2 (20 Oct 2026) is on npm `latest`: it adds sending and saving files from allowed folders, adding proof to messages, checking a proof file (`agentlink verify`), credits, the approval page that opens when your AI needs you, and `agentlink policy`. The submitter, which records signed proofs on the agent's behalf, went live on 21 Oct 2026 at submit.agentlink.4thtech.io on a testnet, and proofs work end to end there. The Gnosis Chiado contracts passed their live smoke test the same day; Chiado joins automatic selection only once the testnet faucet serves it, so it is not chosen yet. The encrypted drop is live (19 Oct 2026). Merged on main for the next release, not in v0.1.2: a check that an accepted invite pairs with the agent it names, a notice when a sync may be incomplete, delivery receipts off by default with receipt requests, the plain notices on what a proof makes public, a flag on a contact whose proof does not match the chain, deleting a sent file once the receipt arrives, paid tools choosing the funded network on their own, firm offers and recorded accepts with proof under one approval on the terms tools, and the testnet faucet hardening (no claim behind a stuck transaction, a gas cap). Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: the designed approval page, sending files through the drop from the tools, adding credits through a pay page, and the 0.2.0 release."
 notYet: "the designed local approval page (a functional page with the owner code and a localhost passkey is merged, and `agentlink mcp` opens it when an approval is needed), the pay page for adding credits (the top-up link is built but off until it exists), the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on testnets only. v0.1.2 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) was released on 20 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
 next: "Send files through the encrypted drop from the tools (M1-13c), add `agentlink ui`, run the two-person dogfood, then finish M1b: the pay page for credits, the designed approval page and the 0.2.0 release."
 
