@@ -1999,8 +1999,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: with credits on one shipped chain only, a paid call uses that chain without any chain input; `agentlink_status` `prices` and `credits` follow the same selection; no chain name outside `advanced`.
 
-#### M1-26-d · owner decision: top-up link format (new, DECISION NEEDED)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+#### M1-26-d · owner decision: top-up link format (new, decided D-113)
+- **Status:** done (decided by the owner 2026-10-21, D-113; PR #336) · **Size:** XS · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/08 §1
 - **Depends on:** —
 - **Spec:** 08 §1; 06 §2.1 (`topUpUrl`), §2.4 (`needs_credits`)
@@ -2008,14 +2008,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - The owner decides the format of the top-up link (08 §1) that `needs_credits` and `agentlink_status` `topUpUrl` carry: which page, and which of amount and agent address it names.
   - Record the decision in 00 and update 08 §1; M1-26-c builds on it.
-  - Recommendation (D-111, `docs/design/topup-ux.md` §5): `https://{payHost}/#v=1&a=<agent address>&usd=<suggested amount>`, everything in the fragment, no network or token, `usd` optional.
+  - Decided (D-113; the recommendation in `docs/design/topup-ux.md` §5 accepted): `https://{payHost}/#v=1&a=<agent address>&usd=<suggested amount>`, everything in the fragment, no network or token, `usd` optional.
 - **Acceptance:**
   - A decision-log entry and 08 §1 updated.
 
 #### M1-26-e · top-up link in the tools and CLI (new, D-111)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
 - **Repo/path:** agentlink · packages/core, apps/cli
-- **Depends on:** M1-26-d, M1-26-c
+- **Depends on:** M1-26-d (decided, D-113), M1-26-c
 - **Spec:** 06 §2.4 (`needs_credits`), §8 (`credits --topup`); 08 §1
 - **Invariants:** I-5
 - **Scope:**

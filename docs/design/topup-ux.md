@@ -102,10 +102,10 @@ The agent takes the complexity away; the user does one step.
 - **Local UI and console.** Proofs & credits → "Add credits" opens the same link (08 §1, §2.2; console in M2).
 - **Afterwards.** `agentlink_status` shows the new balance; the agent says "Credits added. Shall I record the proof now?" (J3, 11 §8).
 
-## 5. Top-up link format (M1-26-d; recommendation, owner decides)
+## 5. Top-up link format (M1-26-d; accepted by the owner as proposed, 2026-10-21, D-113)
 
 ```
-https://pay.agentlink.4thtech.io/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, optional>
+https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, optional>
 ```
 
 - **Fragment, not query.** The agent's address and the amount stay after `#`, so they never reach the pay host's server or logs (like invite and verify links, 08 §4).
@@ -128,7 +128,7 @@ https://pay.agentlink.4thtech.io/#v=1&a=<agent address, 0x + 40 lowercase hex>&u
 | 2 | Whether the card path waits for the entity | **Decided:** card is the last step, after D-15 |
 | 3 | Wording for the connect method ("wallet" or not) | No "wallet" in our label (§3b) |
 | 4 | Two-step `depositFor` under Advanced; a later contract deposit that credits a named agent from one signature | Offer `depositFor` under Advanced; contract change only after M3 if users ask |
-| 5 | Top-up link format (M1-26-d) | §5 |
+| 5 | Top-up link format (M1-26-d) | §5 (**accepted**, D-113) |
 | 6 | Minimums per method (exchange and connect: the gasless minimum, proposed $5; card: the provider's) | As proposed |
 | 7 | Agent tells the user when credits arrive | Yes, once |
 | 8 | **Who pays for receipts** when the recipient has no credits on the record's network (M1-34); must be user-paid | See §8 |
