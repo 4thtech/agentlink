@@ -3184,7 +3184,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** secret entries stay in wiped memory buffers and only store snapshots go to a caller sink (the 0600 quarantine file), committed only after every check passes; nothing is parsed or written before the final chunk authenticates (a test truncating the last chunk leaves no file and no state); vector suite `recovery-kit` registered and passing in every runtime it declares; tamper, truncation, reorder, wrong code, wrong version, cross-type, duplicate agent name and oversize cases fail with one generic error and no partial output; tests first.
 
 #### M1-9i-b2 · crypto: `credentialDigest` and the export, import and storage credential controls (new, split from M1-9i-b)
-- **Status:** in review (PR pending) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#376) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), packages/crypto/src (`credentialDigest`), test-vectors/recovery-kit/ (`credentialDigest` vectors), tools/vectors/generate_recovery_kit.py
 - **Depends on:** M1-9i-b
 - **Spec:** 04 §2.2 (`s3:<id>` item), §2.3.3 ("Export: who sees the seeds", restore step 5), §2.5.1 (`storage.set` `credentialDigest`)
