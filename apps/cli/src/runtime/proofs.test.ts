@@ -151,10 +151,17 @@ describe('savePack', () => {
 });
 
 describe('nodeProofs: the default chain set (M1-3j-b)', () => {
-  it('does not route automatic selection to Gnosis Chiado (10200) before its smoke test and faucet', () => {
+  it('routes automatic selection to exactly the chains the testnet faucet serves', () => {
+    // Gnosis Chiado (10200) joins once the faucet allowlist names it; today that is Base Sepolia only.
     const proofs = nodeProofs();
     const ids = proofs?.platform.chains.map((c) => c.config.chainId) ?? [];
-    expect(ids).toEqual([84532]);
+    expect(ids).toEqual(
+      chain
+        .chainRegistry()
+        .filter((c) => chain.isFaucetChain(c.chainId))
+        .map((c) => c.chainId),
+    );
+    expect(ids).toContain(84532);
   });
 });
 
