@@ -125,7 +125,17 @@ describe('runCli', () => {
     const d = dir();
     const file = join(d, 'CHANGELOG.md');
     writeFileSync(file, FIXTURE);
-    runCli(['roll', '--file', file, '--version', '0.2.0', '--date', '2026-11-01']);
+    runCli([
+      'roll',
+      '--file',
+      file,
+      '--fragments',
+      join(d, 'changelog.d'),
+      '--version',
+      '0.2.0',
+      '--date',
+      '2026-11-01',
+    ]);
     expect(readFileSync(file, 'utf8')).toContain('## [0.2.0] - 2026-11-01');
   });
 
@@ -133,7 +143,15 @@ describe('runCli', () => {
     const d = dir();
     const file = join(d, 'CHANGELOG.md');
     writeFileSync(file, FIXTURE);
-    runCli(['roll', '--file', file, '--version', '0.2.0-next.1']);
+    runCli([
+      'roll',
+      '--file',
+      file,
+      '--fragments',
+      join(d, 'changelog.d'),
+      '--version',
+      '0.2.0-next.1',
+    ]);
     expect(readFileSync(file, 'utf8')).toBe(FIXTURE);
   });
 
@@ -141,14 +159,16 @@ describe('runCli', () => {
     const d = dir();
     const file = join(d, 'CHANGELOG.md');
     writeFileSync(file, '# C\n\n## [Unreleased]\n\n## [0.1.0] - 2026-10-16\n\n- x\n');
-    expect(() => runCli(['roll', '--file', file, '--version', '0.2.0'])).toThrow(/empty/i);
+    expect(() =>
+      runCli(['roll', '--file', file, '--fragments', join(d, 'changelog.d'), '--version', '0.2.0']),
+    ).toThrow(/empty/i);
   });
 
   it('roll is a no-op when the version section already exists', () => {
     const d = dir();
     const file = join(d, 'CHANGELOG.md');
     writeFileSync(file, FIXTURE);
-    runCli(['roll', '--file', file, '--version', '0.1.0']);
+    runCli(['roll', '--file', file, '--fragments', join(d, 'changelog.d'), '--version', '0.1.0']);
     expect(readFileSync(file, 'utf8')).toBe(FIXTURE);
   });
 });
