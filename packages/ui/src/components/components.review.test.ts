@@ -25,7 +25,7 @@ describe('IR-M1-35b-1', () => {
     const named = html(
       h(ui.ApprovalCard, { ...approval, receiptRequest: { contact: { name: 'Marko' } } }),
     );
-    expect(named).toContain('Ask “Marko” to confirm delivery?');
+    expect(named).toContain('Ask “Marko” (Self-declared) to confirm delivery?');
   });
 
   it('2: labels a declared name Self-declared by default, but not an alias', () => {
@@ -85,5 +85,32 @@ describe('IR-M1-35b-1', () => {
     ]) {
       expect(href(bad), bad).toBe('#');
     }
+  });
+
+  it('IR-2 1: a nav href with a tab or line break is refused', () => {
+    const href = (value: string): string | undefined =>
+      /href="([^"]*)"/.exec(
+        html(h(ui.AppShell, { nav: [{ icon: 'users', label: 'X', href: value }] })),
+      )?.[1];
+    for (const bad of ['/\t/evil.example', '/\n/evil.example', '/\r/evil.example', 'https:\t//x']) {
+      expect(href(bad), JSON.stringify(bad)).toBe('#');
+    }
+  });
+
+  it('IR-2 2: a declared name shows (Self-declared) in the receipt line and the remember row', () => {
+    const out = html(
+      h(ui.ApprovalCard, {
+        ...approval,
+        receiptRequest: { contact: { name: 'Marko' } },
+        remember: { reason: 'ask-me', contact: { name: 'Marko' }, rule: 'r' },
+      }),
+    );
+    expect(out).toContain('Ask “Marko” (Self-declared) to confirm delivery?');
+    expect(out).toContain('“Marko” (Self-declared)</span>');
+    const alias = html(
+      h(ui.ApprovalCard, { ...approval, receiptRequest: { contact: { alias: 'Marko' } } }),
+    );
+    expect(alias).toContain('Ask Marko to confirm delivery?');
+    expect(alias).not.toContain('Self-declared');
   });
 });

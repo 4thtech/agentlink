@@ -17,6 +17,8 @@ export interface NavItem {
 /** A nav link goes to this app (`/…`), a fragment (`#…`) or an https address; anything else is `#`. */
 function safeHref(href: string | undefined): string {
   if (href === undefined) return '#';
+  // Browsers drop tabs and line breaks inside a URL, so "/<tab>/host" would become "//host".
+  if (/[\t\n\r]/.test(href)) return '#';
   if (href.startsWith('#') || href.startsWith('https:')) return href;
   if (href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/\\')) return href;
   return '#';

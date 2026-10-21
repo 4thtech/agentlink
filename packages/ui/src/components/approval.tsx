@@ -24,6 +24,12 @@ const TYPE: Readonly<Record<ApprovalType, readonly [icon: string, word: string]>
 export type RememberReason =
   'ask-me' | 'per-proof-limit' | 'daily-budget' | 'new-contact' | 'file' | 'commitment';
 
+/** The name rule, plus "(Self-declared)" for a name the contact chose for itself (11 §5.2). */
+function nameWithLabel(contact: ContactNameInput): string {
+  const n = formatContactName(contact);
+  return n.kind === 'restricted' ? `${n.text} (Self-declared)` : n.text;
+}
+
 function ApprovalFooter(): ReactElement {
   return (
     <p className="al-approval-foot al-text-caption">
@@ -206,7 +212,7 @@ export function ApprovalCard({
       ) : null}
       {receiptRequest === undefined ? null : (
         <p className="al-disclosure-line al-text-body-sm">
-          {`Ask ${formatContactName(receiptRequest.contact).text} to confirm delivery? If they do, anyone can see that this went to their agent.`}
+          {`Ask ${nameWithLabel(receiptRequest.contact)} to confirm delivery? If they do, anyone can see that this went to their agent.`}
         </p>
       )}
       {children === undefined ? null : <div className="al-approval-extra">{children}</div>}
@@ -219,7 +225,7 @@ export function ApprovalCard({
           />
           <span>
             Remember for this contact
-            <span className="al-text-body-sm">{formatContactName(remember.contact).text}</span>
+            <span className="al-text-body-sm">{nameWithLabel(remember.contact)}</span>
             <span className="al-text-body-sm al-muted">{remember.rule}</span>
           </span>
         </label>
