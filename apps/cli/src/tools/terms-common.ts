@@ -15,15 +15,18 @@ import {
   type CommitmentCard,
   type ProposeTermsResult,
   type TermsCode,
+  type TermsProof,
 } from '@4thtech-io/core';
 import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { approvalStateOf } from './get-approval.js';
 import { INVITE_TEXT } from './invite-common.js';
+import { needsCredits, notarizeOutput, proofRefusal, proofThrown } from './proofs-common.js';
 import {
   fail,
   internalError,
   invalidArgument,
+  ok,
   pendingApproval,
   type HandlerOutput,
 } from './result.js';
@@ -33,11 +36,16 @@ import { TOOL_TEXT, noOwnerCard } from './text.js';
 import { removeInvisible } from './untrusted.js';
 
 export const TERMS_TEXT = Object.freeze({
-  // M1-9d-2: `notarize` on the terms tools, while the core cannot record offers or answers yet.
-  notarizeUnavailable:
-    "Adding proof to offers and answers isn't available in this version yet, so nothing was sent.",
+  // M1-9d-3: `notarize` where no proof can be added: no proof support on this machine, or a
+  // counter or a rejection with proof (not available in this version).
+  notarizeUnavailable: "Adding proof to this isn't available here, so nothing was sent.",
   notarizeUnavailableNextStep:
-    'Call again without notarize to send it without proof, or tell the user this comes in a later version.',
+    'Call again without notarize to send it without proof. Proof works on a firm offer (agentlink_propose_terms) and on an acceptance.',
+  // M1-9d-3: the terms went out, only their proof did not (as agentlink_send, IR-M1-9d-2 M2).
+  proofFailed: 'Its proof was not added.',
+  proofFailedNextStep:
+    'The terms are already sent. Call the same tool again with the same arguments and approvalId to add the proof; if it keeps failing, tell the user.',
+  noCreditsSentNothing: 'Nothing was sent.',
   // Refusals (06 §2.2a; 04 §3.4.2). Nothing was sent or recorded in any of them.
   useRespond:
     'That offer is not your own newest unanswered offer to this contact, so nothing was sent.',
@@ -77,7 +85,15 @@ export const TERMS_TEXT = Object.freeze({
   askConfirm: (version: number, name: string): string =>
     `${name} accepted your terms (version ${String(version)}) and recorded it. Adding your acceptance makes this a proof of agreement and commits you.`,
   askFirmOffer: (name: string): string =>
-    `Sending a firm offer with proof to ${name} commits you if they accept.`,
+    `Sending a firm offer with proof to ${name} commits you if they accept. One approval covers the offer and its proof.`,
+  firmOfferSent: (version: number, name: string, date: string): string =>
+    `Sent version ${String(version)} of your terms as a firm offer. ${copy(
+      'chat.commitment.waiting',
+      {
+        contactName: name,
+        date,
+      },
+    )}`,
   askLate: (version: number, newVersion: number, name: string): string =>
     `${name} accepted version ${String(version)} after you sent version ${String(newVersion)}. The owner reviews it before your acceptance is added.`,
 });
@@ -143,9 +159,12 @@ export function termsRefusal(
     case 'IDEMPOTENCY_KEY_REUSED':
       // The same wording and code as agentlink_send (06 §1 rule 6).
       return fail('rejected', SEND_TEXT.keyReused, SEND_TEXT.keyReusedNextStep, code);
+    case 'CHAIN_UNAVAILABLE':
+    case 'CARD_EXPIRED':
+      // The proof could not be priced or would not verify (M1-9d-3): nothing was sent or asked.
+      return proofRefusal(code);
     case 'NOTARIZE_UNAVAILABLE':
-      // The core does not record offers or answers yet (firm offers, recorded accepts): nothing
-      // was sent or signed (M1-9d-2).
+      // No proof platform, or a counter or reject with notarize: nothing was sent (M1-9d-3).
       return fail(
         'error',
         TERMS_TEXT.notarizeUnavailable,
@@ -156,6 +175,105 @@ export function termsRefusal(
       // A code this version does not know: fixed text, never undefined (IR-M1-9p-1 F03).
       return internalError();
   }
+}
+
+/** ProofStatus statuses (06 §2.4) of a terms result's `proof`. */
+const PROOF_STATUSES: ReadonlySet<string> = new Set([
+  'ok',
+  'pending_approval',
+  'needs_credits',
+  'submitted',
+  'error',
+]);
+const PROOF_PENDING: ReadonlySet<string> = new Set(['ok', 'needs_credits', 'submitted']);
+
+/** The ProofStatus fields of a proof tool output, for the `proof` of a terms result. */
+function proofObject(result: Readonly<Record<string, unknown>>): Record<string, unknown> {
+  const { status, advanced, recordId, fee, receipts } = result;
+  return {
+    status: typeof status === 'string' && PROOF_STATUSES.has(status) ? status : 'error',
+    ...(advanced === undefined ? {} : { advanced }),
+    ...(recordId === undefined ? {} : { recordId }),
+    ...(fee === undefined ? {} : { fee }),
+    receipts: Array.isArray(receipts) ? receipts : [],
+  };
+}
+
+/**
+ * `needs_credits` before anything was sent or asked (06 §2.4, D-111; M1-9d-3): the fixed credits
+ * text with the top-up link and agent ID in `nextStep`, and `proof`. The terms tools' output has no
+ * `agentAddress` or `topUpUrl` field, and the link is not a local-UI `url` (result.ts), so neither
+ * is set.
+ */
+export function termsNeedsCredits(
+  agentId: string,
+  route: { readonly feeUsd?: string } | undefined,
+): HandlerOutput {
+  const out = needsCredits(agentId, route).result;
+  return {
+    result: {
+      status: out.status,
+      summary: `${out.summary} ${TERMS_TEXT.noCreditsSentNothing}`,
+      ...(out.nextStep === undefined ? {} : { nextStep: out.nextStep }),
+      proof: { status: 'needs_credits', receipts: [] },
+    },
+  };
+}
+
+/**
+ * A sent terms result with its Record (06 §2.2a `proof`; M1-9d-3), folded as agentlink_send folds
+ * its proof: the result's status is the proof's when it is not `ok`, the summary adds the proof's
+ * fixed text, and a proof that failed after the terms went out is fixed text with a fixed code,
+ * never INTERNAL and never "nothing was sent". `fields` are the terms fields.
+ */
+export function termsWithProof(
+  summary: string,
+  fields: Readonly<Record<string, unknown>>,
+  proof: TermsProof | undefined,
+  context: ToolContext,
+  agentId: string,
+  contactName: string | undefined,
+): HandlerOutput {
+  if (proof === undefined) return ok(summary, fields);
+  let out: HandlerOutput;
+  try {
+    out = notarizeOutput(proof, context, agentId, {
+      ...(contactName === undefined ? {} : { contactName }),
+    });
+  } catch (error) {
+    try {
+      out = proofThrown(error);
+    } catch {
+      out = { result: { status: 'error', summary: '', code: 'PROOF_FAILED' } };
+    }
+  }
+  if (!PROOF_PENDING.has(out.result.status)) {
+    const code =
+      typeof out.result.code === 'string' && out.result.code !== 'INTERNAL'
+        ? out.result.code
+        : 'PROOF_FAILED';
+    return {
+      result: {
+        ...fields,
+        status: 'error',
+        summary: `${summary} ${TERMS_TEXT.proofFailed}`,
+        nextStep: TERMS_TEXT.proofFailedNextStep,
+        code,
+        proof: { ...proofObject(out.result), status: 'error' },
+      },
+    };
+  }
+  const { status, summary: proofSummary, nextStep, code } = out.result;
+  return {
+    result: {
+      ...fields,
+      status,
+      summary: `${summary} ${String(proofSummary)}`,
+      ...(nextStep === undefined ? {} : { nextStep }),
+      ...(code === undefined ? {} : { code }),
+      proof: proofObject(out.result),
+    },
+  };
 }
 
 /** Another call holds this clientRequestId: nothing more was done (as agentlink_send; 07 §3.3). */
