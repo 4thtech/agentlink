@@ -659,16 +659,23 @@ describe('production health check (M1-27b-c)', () => {
   });
 
   it('fails fast (10 attempts) for a curl error outside the TLS window codes (M1-27b-d)', () => {
-    // Only curl exits 6, 7 and 35 (DNS, connection, TLS handshake; release-and-deployment.md §4.5)
-    // get the long window. A timeout (28), an empty reply (52) or a certificate that does not
-    // verify (60) counts toward the 10 attempts.
-    for (const exit of [28, 52, 60]) {
+    // Only curl exits 6, 7, 28 and 35 (DNS, connection, timeout, TLS handshake;
+    // release-and-deployment.md §4.5) get the long window. An empty reply (52) or a certificate
+    // that does not verify (60) counts toward the 10 attempts.
+    for (const exit of [52, 60]) {
       const result = run({ curl: [['000', exit]] });
       expect(result.ok).toBe(false);
       expect(result.curlCalls).toBe(20);
       expect(result.output).toMatch(/::error::The production health check failed/);
       expect(result.output).not.toMatch(/no TLS or connection yet/);
     }
+  });
+
+  it('keeps waiting past 10 attempts on a timeout (curl exit 28) while the handshake hangs', () => {
+    const result = run({ curl: [...pairs(['000', 28], ['000', 28], 15), ['200', 0], ['401', 0]] });
+    expect(result.ok, result.output).toBe(true);
+    expect(result.curlCalls).toBe(32);
+    expect(result.output).toMatch(/no TLS or connection yet/);
   });
 
   it('documents exactly the curl exits the workflow gives the long window (M1-27b-d)', () => {

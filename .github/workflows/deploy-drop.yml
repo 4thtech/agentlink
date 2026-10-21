@@ -29,7 +29,7 @@
 #                      rule and the logging settings, and on any failure rolls back automatically
 #                      with `wrangler rollback`. Writes the deploy record draft to the run summary.
 #                      The health check waits up to 15 minutes while there is no TLS or connection
-#                      yet (curl exit 6, 7 or 35: a new Custom Domain's certificate); an unhealthy
+#                      yet (curl exit 6, 7, 28 or 35: a new Custom Domain's certificate); an unhealthy
 #                      HTTP answer or any other curl error fails after 10 attempts. A rollback Cloudflare refuses across a binding or storage change
 #                      is reported as impossible: the new version stays live (M1-27b-c).
 #   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying; fails loudly,
@@ -617,7 +617,8 @@ jobs:
       # the Worker loaded its configuration (a missing or invalid DROP_URL_KEY answers 503).
       # M1-27b-c: the first deploy to a new Custom Domain met a TLS handshake failure (curl exit 35)
       # for minutes while Cloudflare provisioned the edge certificate. No HTTP answer at all
-      # (HTTP 000) with curl exit 6, 7 or 35 (DNS, connection, TLS handshake) waits up to 15 minutes;
+      # (HTTP 000) with curl exit 6, 7, 28 or 35 (DNS, connection, timeout, TLS handshake) waits up to
+      # 15 minutes;
       # a real answer that is not the healthy pair, or any other curl error, fails after 10 attempts.
       # M1-27b-d: release-and-deployment.md §4.5 lists exactly connect_exits (tested).
       - name: Health check
@@ -632,7 +633,7 @@ jobs:
           answer_limit=10    # attempts with an HTTP answer that is not the healthy pair, or another curl error
           connect_limit=60   # attempts in all (15 s apart)
           connect_window=900 # seconds without TLS or a connection (HTTP 000 with a curl exit below)
-          connect_exits="6 7 35" # DNS, connection, TLS handshake: the only exits with the long window
+          connect_exits="6 7 28 35" # DNS, connection, timeout (a handshake can hang), TLS handshake
           started=$SECONDS
           answered=0
           attempt=0
