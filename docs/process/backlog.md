@@ -3091,7 +3091,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `OWNER_ACTION_OPS` and `OWNER_ACTION_MAX_LIFETIME_SECONDS` gain `storage.set`, `storage.remove`, `backup.export` (600 s); strict params schemas; `STORAGE_PROVIDERS`, `BACKUP_KIT_CONTENTS`.
   - Core apply: nonce plus `own_storage` upsert or delete in one transaction; `backup.export` records the nonce row only.
   - `ownStorage.load()` → `none | ready | broken`; `broken` counts as configured, so `files.storage: auto` never falls back to the drop.
-  - Anti-rollback `storage-mark` (`{v, seq, active}`), raised under the inter-process lock after each apply; load requires the row's `id` = `active`. Reload re-verifies signature and schema only, never the 600 s expiry (as for `policy.set`).
+  - Anti-rollback `storage-mark` (`{v, active}`), raised under the inter-process lock after each apply; load requires the row's `id` = `active`. Reload re-verifies signature and schema only, never the 600 s expiry (as for `policy.set`).
 - **Acceptance:** signing and rejection vectors per op (unknown key, bad `id`, endpoint not in canonical form, lifetime above 600 s); a tampered `own_storage` row or a credential digest mismatch reads `broken`; an old row and credential put back after `storage.remove` read `broken`; a row older than 600 s still reads `ready`; a `broken` own storage makes `agentlink_send` return `needs_setup`, never the drop; tests first (`RED (expected):` commit).
 
 #### M1-9i-b · crypto: recovery kit `ALKK` v1, export and import controls, vectors (new, split from M1-9i)
