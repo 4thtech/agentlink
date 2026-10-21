@@ -1966,7 +1966,9 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(capped, { maxLimit: 5 });
     s.net.configure(other);
     const T = NOW - 1_500;
-    injectEverywhere(s, [capped], 8, T);
+    // The other relay holds everything the capped relay shows, plus 3 wraps the capped one lacks.
+    injectEverywhere(s, [capped, other], 5, T);
+    injectEverywhere(s, [capped], 3, T);
     const elsewhere = injectEverywhere(s, [other], 3, T);
     olderEverywhere(s, [capped, other], T);
     const result = await s.engine.sync({
@@ -1979,6 +1981,78 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect([...reqIds(rq[0])].sort()).toEqual(elsewhere.map((w) => w.event.id).sort());
     expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
     expect(result.delivered).toBe(9);
+  });
+
+  // --- IR-M2-19-1 H-1: "no gap at T" on the other relay is not proof it read T in full ---------
+
+  it('keeps the gap when the other relay is capped below MIN_GAP_EVENTS (cap 1)', async () => {
+    const s = setup();
+    const [capped, tiny] = relayUrls('rq-cap-one', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(tiny, { maxLimit: 1, newestFirst: true });
+    const T = NOW - 1_500;
+    injectEverywhere(s, [capped, tiny], 8, T);
+    const result = await s.engine.sync({
+      relays: [capped, tiny],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.delivered).toBeLessThan(8);
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
+  it('keeps the gap when the other relay ignores `until` (its walk ends early)', async () => {
+    const s = setup();
+    const [capped, loose] = relayUrls('rq-ignores-until', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(loose, { ignoreLimit: true, maxLimit: 9 });
+    const T = NOW - 1_500;
+    injectEverywhere(s, [capped, loose], 1, T + 10);
+    injectEverywhere(s, [capped, loose], 8, T);
+    const result = await s.engine.sync({
+      relays: [capped, loose],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.relays.find((r) => r.relay === loose)?.status).toBe('complete');
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
+  it("keeps the gap when the second is the other relay's `since` (its walk may cut there)", async () => {
+    const s = setup();
+    const [capped, edge] = relayUrls('rq-at-since', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(edge, { maxLimit: 6 });
+    const T = NOW - 500 - SYNC_LOOKBACK_SECONDS - SYNC_SKEW_SECONDS;
+    s.store.cursors.set(edge, NOW - 500); // the edge relay's window starts exactly at T
+    injectEverywhere(s, [capped, edge], 8, T);
+    const result = await s.engine.sync({
+      relays: [capped, edge],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
+  it('keeps the gap when the other relay lacks a wrap the capped relay showed at that second', async () => {
+    const s = setup();
+    const [capped, other] = relayUrls('rq-not-superset', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(other);
+    const T = NOW - 1_500;
+    injectEverywhere(s, [capped], 1, T); // shown by the capped relay, absent from the other
+    injectEverywhere(s, [capped, other], 7, T);
+    olderEverywhere(s, [capped, other], T);
+    const result = await s.engine.sync({
+      relays: [capped, other],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
   });
 
   it('keeps the gap when the other relay did not complete its pass', async () => {
