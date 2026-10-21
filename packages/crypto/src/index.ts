@@ -257,6 +257,19 @@ export {
   type PasskeyBlobHeader,
   type RecoveryCodeSecret,
 } from './owner-seed-wrap.js';
+// M1-9i-b (04 §2.3.3, D-115): the public header of a recovery kit `ALKK` (owner key, read before the
+// code is asked for), its constants and types. Sealing and opening are in @4thtech-io/crypto/keystore.
+export {
+  RECOVERY_KIT_DEFAULT_CHUNK_SIZE,
+  RECOVERY_KIT_HEADER_LENGTH,
+  RECOVERY_KIT_ITEM_NAMES,
+  RECOVERY_KIT_LIMITS,
+  RECOVERY_KIT_MAX_CHUNK_SIZE,
+  readRecoveryKitHeader,
+  type RecoveryKitContents,
+  type RecoveryKitHeader,
+  type RecoveryKitItemName,
+} from './recovery-kit.js';
 // M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
 // produce digits, IR-M1-1f-1 L-7), and the public constants of the
 // file KeyStore and owner wrap (04 §2.8). Argon2id, password() and the ALKS / ALKO seal and open
