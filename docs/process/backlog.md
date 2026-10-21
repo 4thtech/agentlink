@@ -3723,7 +3723,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Older policies (D-109, owner decision 2026-10-20): a policy signed under the old default with `autoDelivered: true`, re-signed for any other change, ends with `autoDelivered: false` unless the owner explicitly keeps `true`; while it remains `true` from the old default, `agentlink doctor` shows "Delivery receipts are on from an older default; they will turn off unless you keep them." (one test each).
 
 #### M1-33b · Proof privacy disclosure in tools, CLI, local UI and docs (new, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (tool summaries, approval cards, CLI output, local UI), docs-site/guide
 - **Depends on:** M1-9d-2, M1-33a
 - **Spec:** 11 §5.6; 06 §2.4 (What a proof makes public); 07 §8 (what sharing a pack reveals); 12 §4.4; D-109

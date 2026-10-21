@@ -1,0 +1,61 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`11 §5.6 strings > render with a name and each receipt word 1`] = `"If Ana confirms delivery, it also becomes public that it went to their agent."`;
+
+exports[`11 §5.6 strings > render with a name and each receipt word 2`] = `"Ask Ana to confirm delivery? If they do, anyone can see that this went to their agent."`;
+
+exports[`11 §5.6 strings > render with a name and each receipt word 3`] = `"Ana asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content."`;
+
+exports[`11 §5.6 strings > render with a name and each receipt word 4`] = `"Confirm deliveries from Ana automatically? Each confirmation shows publicly that their proof reached your agent."`;
+
+exports[`11 §5.6 strings > render with a name and each receipt word 5`] = `"This is public: anyone can see that your agent opened it, and when."`;
+
+exports[`11 §5.6 strings > render with a name and each receipt word 6`] = `"This is public: anyone can see that your agent accepted it, and when."`;
+
+exports[`11 §5.6 strings > render with a name and each receipt word 7`] = `"This is public: anyone can see that your agent rejected it, and when."`;
+
+exports[`cardDisclosure (approval cards) > says what a proof makes public on every approval that adds proof 1`] = `
+[
+  "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  "If Ana confirms delivery, it also becomes public that it went to their agent.",
+]
+`;
+
+exports[`cardDisclosure (approval cards) > says what a proof makes public on every approval that adds proof 2`] = `
+[
+  "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  "If Ana confirms delivery, it also becomes public that it went to their agent.",
+]
+`;
+
+exports[`cardDisclosure (approval cards) > says what a proof makes public on every approval that adds proof 3`] = `
+[
+  "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  "If Ana confirms delivery, it also becomes public that it went to their agent.",
+]
+`;
+
+exports[`cardDisclosure (approval cards) > says what a proof makes public on every approval that adds proof 4`] = `
+[
+  "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  "If Ana confirms delivery, it also becomes public that it went to their agent.",
+]
+`;
+
+exports[`cardDisclosure (approval cards) > says what a receipt makes public, by type 1`] = `
+[
+  "This is public: anyone can see that your agent opened it, and when.",
+]
+`;
+
+exports[`cardDisclosure (approval cards) > says what a receipt makes public, by type 2`] = `
+[
+  "This is public: anyone can see that your agent accepted it, and when.",
+]
+`;
+
+exports[`cardDisclosure (approval cards) > says what an export shows 1`] = `
+[
+  "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.",
+]
+`;

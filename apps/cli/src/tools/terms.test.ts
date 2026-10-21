@@ -3,6 +3,7 @@
 // called, the mapping of every core result and refusal to fixed text, the pending_approval shape
 // (fixed M1a nextStep, no URL) and the injection rules. The round trip over real cores, the MCP
 // protocol and the owner's `approve` is in test/terms-tools-mcp.test.ts.
+import { proofDisclosure, withDisclosure } from './strings/privacy.js';
 import {
   CoreError,
   type CommitmentCard,
@@ -314,7 +315,10 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
       status: 'pending_approval',
       approvalId: APPROVAL,
       decision: 'accept',
-      summary: TERMS_TEXT.askAccept(3, '“Marko” (self-declared)'),
+      summary: withDisclosure(
+        TERMS_TEXT.askAccept(3, '“Marko” (self-declared)'),
+        proofDisclosure(),
+      ),
       nextStep: nextStepOf(APPROVAL),
     });
     expect(client.responded).toEqual([{ envelopeId: ENVELOPE, decision: 'accept' }]);
@@ -341,7 +345,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
           }),
       });
       const result = await respond({ envelopeId: ENVELOPE, decision: 'accept' }, client);
-      expect(result.structured.summary).toBe(summary);
+      expect(result.structured.summary).toBe(withDisclosure(summary, proofDisclosure()));
     }
   });
 

@@ -112,6 +112,32 @@ export const en = {
   'chat.approval.expired': 'This request expired. Ask again to get a fresh approval link.',
   'chat.approval.decidedElsewhere': 'Already approved on your phone.',
 
+  // ---- What a proof makes public (11 §5.6, D-109; M1-33b) ---------------------------------
+  // Fixed text. The only slots are the name-rule contact name and a fixed receipt word.
+  'common.privacy.proof':
+    "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says.",
+  'common.privacy.proofReceipt':
+    'If {contactName} confirms delivery, it also becomes public that it went to their agent.',
+  // Where the recipient is not named (the proof tool alone): same meaning, no name.
+  'common.privacy.proofReceiptGeneric':
+    'If the recipient confirms delivery, it also becomes public that it went to their agent.',
+  'common.privacy.receiptAsk':
+    'Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent.',
+  'common.privacy.receiptRequest':
+    '{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content.',
+  'common.privacy.receiptRequestConfirm': 'Confirm delivery',
+  'common.privacy.receiptRequestLater': 'Not now',
+  'common.privacy.receiptAuto':
+    'Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent.',
+  'common.privacy.receiptPublic':
+    'This is public: anyone can see that your agent {receipt} it, and when.',
+  'common.privacy.topUp':
+    'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+  'common.privacy.export':
+    'This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content.',
+  'common.privacy.registered':
+    "Registering puts your agent's link to you on the public record. Your agent's name is not published.",
+
   // ---- Permission prompt titles (proposed in D1; engineering confirms) ---------------------
   'tool.title.agentlink_send': 'AgentLink: send a message or file',
   'tool.title.agentlink_inbox': 'AgentLink: check new messages',

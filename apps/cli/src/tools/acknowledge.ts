@@ -16,6 +16,7 @@ import {
   notAvailable,
   proofThrown,
 } from './proofs-common.js';
+import { receiptDisclosure, withDisclosure } from './strings/privacy.js';
 import { fail, internalError, ok, pendingApproval, type HandlerOutput } from './result.js';
 
 export const ACK_TEXT = Object.freeze({
@@ -108,18 +109,26 @@ export async function acknowledgeHandler(
       const receipt = RECEIPT_WORD[result.receipt];
       if (receipt === undefined) return internalError();
       const fields = { recordId: result.recordId, receipt: result.receipt };
+      // 11 §5.6: opened, accepted and rejected receipts are public (D-109).
+      const note = receiptDisclosure(type);
+      const say = (text: string): string =>
+        note === undefined ? text : withDisclosure(text, note);
       return result.onChain
-        ? ok(ACK_TEXT.recorded.replace('{receipt}', receipt), fields)
+        ? ok(say(ACK_TEXT.recorded.replace('{receipt}', receipt)), fields)
         : fail(
             'submitted',
-            ACK_TEXT.recording.replace('{receipt}', receipt),
+            say(ACK_TEXT.recording.replace('{receipt}', receipt)),
             ACK_TEXT.recordingNextStep,
             undefined,
             fields,
           );
     }
     case 'pending_approval':
-      return pendingApproval(context, result.approvalId, ACK_TEXT.approval);
+      return pendingApproval(
+        context,
+        result.approvalId,
+        withDisclosure(ACK_TEXT.approval, receiptDisclosure(type) ?? ''),
+      );
     case 'rejected':
       return refusal(result.code);
     default:

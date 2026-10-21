@@ -36,6 +36,7 @@ import {
   termsInProgress,
   termsRefusal,
 } from './terms-common.js';
+import { proofDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
 
 interface ProposeInput {
@@ -107,7 +108,11 @@ export async function proposeTermsHandler(
       return termsRefusal(result.code, false);
     case 'pending_approval':
       // A firm offer (M1-9d); unreachable in M1a, handled so the result is never undefined.
-      return pendingApproval(context, result.approvalId, TERMS_TEXT.askFirmOffer(nameOf(ref)));
+      return pendingApproval(
+        context,
+        result.approvalId,
+        withDisclosure(TERMS_TEXT.askFirmOffer(nameOf(ref)), proofDisclosure(nameOf(ref))),
+      );
     case 'in_progress':
       return termsInProgress();
     case 'approval_state':

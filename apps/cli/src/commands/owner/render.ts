@@ -25,6 +25,7 @@ import { RESTRICTED_NAME_FALLBACK, isUsdAmount, parseUsd } from '@4thtech-io/typ
 import { isApprovalId } from '../../approval/next-step.js';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
 import { formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';
+import { cardDisclosure } from '../../tools/strings/privacy.js';
 import type { PendingRequest } from './pending.js';
 import { OWNER_TEXT } from './strings.js';
 import { termsCard, type TermsCardView } from './terms-card.js';
@@ -183,6 +184,9 @@ export function cardLines(request: PendingRequest, facts: CardFacts, index?: num
     `Expires:  ${facts.expires}`,
   );
   if (terms !== undefined) lines.push(...terms.after);
+  // 11 §5.6: say what the proof or receipt makes public, from the stored action (never AI text).
+  const tool = request.action['tool'];
+  if (typeof tool === 'string') lines.push(...cardDisclosure(tool, args, facts.who));
   lines.push(OWNER_TEXT.consequence, OWNER_TEXT.cannotApprove);
   return lines;
 }

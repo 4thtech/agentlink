@@ -81,3 +81,26 @@ describe('accept-invite approval: who is inviting (M1-9zb)', () => {
     expect(facts.who).toBe('Someone who is not in your contacts yet');
   });
 });
+
+describe('approval cards say what a proof or receipt makes public (M1-33b, 11 §5.6)', () => {
+  const facts = {
+    who: 'Ana',
+    what: 'Record a proof',
+    cost: '$0.10',
+    expires: '12 Oct 2026 14:02 UTC',
+    summary: 's',
+  };
+  const card = (tool: string, args: Record<string, unknown>) =>
+    cardLines({ ...request, action: { tool, args } } as unknown as PendingRequest, facts);
+
+  it('shows the proof lines on a proof approval, before the closing lines', () => {
+    expect(card('agentlink_notarize', {})).toMatchSnapshot();
+  });
+  it('shows the receipt line, and the export line', () => {
+    expect(card('agentlink_acknowledge', { type: 'opened' })).toMatchSnapshot();
+    expect(card('agentlink_export_proof_pack', { includeContentKey: true })).toMatchSnapshot();
+  });
+  it('adds nothing for a send without proof', () => {
+    expect(card('agentlink_send', { text: 'hi' }).join('\n')).not.toContain('public');
+  });
+});
