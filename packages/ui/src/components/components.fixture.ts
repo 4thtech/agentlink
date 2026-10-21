@@ -4,9 +4,14 @@
 import { createElement as h, type ReactElement } from 'react';
 import * as ui from './index.js';
 
+/** U+202E, written as a code so no bidi character sits in this source file. */
+export const BIDI = String.fromCharCode(0x202e);
+
 /** Hostile text: markup, script, attribute breakers, a bidi override and a link. */
 export const XSS =
-  '<img src=x onerror=alert(1)><script>alert(1)</script>"\'><svg onload=alert(2)> ‮evil https://evil.example/path?x=1';
+  '<img src=x onerror=alert(1)><script>alert(1)</script>"\'><svg onload=alert(2)> ' +
+  BIDI +
+  'evil https://evil.example/path?x=1';
 
 const termsRows = [
   { field: 'Price', old: '$100', new: '$120' },

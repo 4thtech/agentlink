@@ -3,10 +3,12 @@
 import { createElement as h } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { fixtures, XSS } from './components.fixture.js';
+import { BIDI, fixtures, XSS } from './components.fixture.js';
 import * as ui from './index.js';
 
-const html = (el: Parameters<typeof renderToStaticMarkup>[0]): string => renderToStaticMarkup(el);
+// React escapes an apostrophe as &#x27;; the copy is compared with the plain character.
+const html = (el: Parameters<typeof renderToStaticMarkup>[0]): string =>
+  renderToStaticMarkup(el).replaceAll('&#x27;', "'");
 
 describe('the 31 components (D-116)', () => {
   const names = [
@@ -89,7 +91,7 @@ describe('formatContactName: the 11 §5.2 name rule', () => {
     ['reserved word, any case', 'the OWNER'],
     ['mixed script', 'Mаrko'],
     ['markup', '<b>Marko</b>'],
-    ['bidi override', 'Ma‮rko'],
+    ['bidi override', `Ma${BIDI}rko`],
     ['nothing usable', ''],
   ])('falls back to the fingerprint for %s', (_label, name) => {
     expect(ui.formatContactName({ name, fingerprint: '7F3A·19C2' })).toEqual({
@@ -153,7 +155,7 @@ describe('UntrustedContent (I-5)', () => {
       expect(out).not.toContain('<img');
       expect(out).not.toContain('<script');
       expect(out).not.toContain('<svg onload');
-      expect(out).not.toContain('‮');
+      expect(out).not.toContain(BIDI);
     }
   });
   it('names an unknown sender as one (X-7), not as a contact', () => {
@@ -340,8 +342,13 @@ describe('CostChip and CreditsMeter (C-6, X-4, X-6)', () => {
 
 describe('FileCard (C-7)', () => {
   it('sanitizes the name and never uses it as a heading', () => {
-    const out = html(h(ui.FileCard, { name: `a‮b\u0000${'x'.repeat(200)}.pdf`, size: '1 MB' }));
-    expect(out).not.toContain('‮');
+    const out = html(
+      h(ui.FileCard, {
+        name: `a${BIDI}b${String.fromCharCode(0)}${'x'.repeat(200)}.pdf`,
+        size: '1 MB',
+      }),
+    );
+    expect(out).not.toContain(BIDI);
     expect(out).not.toContain('\u0000');
     expect(out).not.toMatch(/<h[1-6]/);
     expect(out.match(/x+/)?.[0].length).toBeLessThanOrEqual(80);
