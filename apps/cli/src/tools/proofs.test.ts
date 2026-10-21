@@ -1146,7 +1146,13 @@ describe('no network name, token name or chain prompt outside Advanced in any pr
 
 describe('proof privacy disclosure (11 §5.6, D-109)', () => {
   const PROOF_LINE = copy('common.privacy.proof');
-  const pending = { status: 'pending_approval', approvalId: APPROVAL, summary: 'x' } as const;
+  const pending = {
+    status: 'pending_approval',
+    approvalId: APPROVAL,
+    actionDigest: 'd'.repeat(64),
+    summary: 'x',
+    expiresAt: 1_760_700_000,
+  } as const;
 
   it('notarize: the approval and the first recorded proof of a session say what is public, once', async () => {
     const { client } = fake({
