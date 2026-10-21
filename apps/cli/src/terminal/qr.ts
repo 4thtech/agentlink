@@ -10,7 +10,7 @@ const SIZE = 29;
 const DATA_CODEWORDS = 55;
 const ECC_CODEWORDS = 15;
 const MAX_BYTES = 53;
-const QUIET = 2;
+const QUIET = 4;
 
 // ---- Reed-Solomon over GF(256), polynomial 0x11d --------------------------------------------------
 const EXP = new Uint8Array(512);
@@ -166,23 +166,23 @@ function placeFormat(modules: Grid, mask: number): void {
   const m = (r: number, c: number, v: boolean): void => {
     (modules[r] as boolean[])[c] = v;
   };
-  // First copy, around the top-left finder: bit 0 (the least significant) at (8, 0).
+  // First copy, around the top-left finder: bit 0 (the least significant) at row 0, column 8 (ISO 18004 7.9).
   const first: [number, number][] = [
-    [8, 0],
-    [8, 1],
-    [8, 2],
-    [8, 3],
-    [8, 4],
-    [8, 5],
-    [8, 7],
-    [8, 8],
-    [7, 8],
-    [5, 8],
-    [4, 8],
-    [3, 8],
-    [2, 8],
-    [1, 8],
     [0, 8],
+    [1, 8],
+    [2, 8],
+    [3, 8],
+    [4, 8],
+    [5, 8],
+    [7, 8],
+    [8, 8],
+    [8, 7],
+    [8, 5],
+    [8, 4],
+    [8, 3],
+    [8, 2],
+    [8, 1],
+    [8, 0],
   ];
   first.forEach(([r, c], i) => m(r, c, bit(i)));
   // Second copy: bits 0..7 along row 8 from the right edge, bits 8..14 down column 8 below the
@@ -237,8 +237,11 @@ function penalty(modules: Grid): number {
   return score;
 }
 
-/** The QR symbol for `text` (at most 53 bytes) as rows of dark/light modules. */
-export function qrMatrix(text: string): boolean[][] {
+/**
+ * The QR symbol for `text` (at most 53 bytes) as rows of dark/light modules. `forceMask` (0-7) is
+ * for tests; normally the mask with the lowest penalty is used.
+ */
+export function qrMatrix(text: string, forceMask?: number): boolean[][] {
   const words = codewords(text);
   const { modules: base, reserved } = emptyGrid();
   placeFunctionPatterns(base, reserved);
@@ -255,7 +258,7 @@ export function qrMatrix(text: string): boolean[][] {
       }
     }
     placeFormat(modules, mask);
-    const score = penalty(modules);
+    const score = forceMask === undefined ? penalty(modules) : mask === forceMask ? 0 : Infinity;
     if (score < bestScore) {
       bestScore = score;
       best = modules;
@@ -265,26 +268,27 @@ export function qrMatrix(text: string): boolean[][] {
 }
 
 /**
- * The code as text lines, two modules per line (half blocks), with a 2-module quiet zone. Light
- * modules are the filled blocks, so it reads as a dark code on a light panel on a dark terminal.
- * Plain characters only: no escape codes.
+ * The code as text lines, two modules per line (half blocks), with the 4-module quiet zone the
+ * standard asks for. Dark modules are the filled blocks and light modules are blanks, so it scans
+ * on a light-background terminal; most readers also accept the inverted look on a dark one. Plain
+ * characters only: no escape codes.
  */
 export function renderQr(text: string): string[] {
   const m = qrMatrix(text);
   const total = SIZE + 2 * QUIET;
-  const light = (r: number, c: number): boolean => {
+  const dark = (r: number, c: number): boolean => {
     const rr = r - QUIET;
     const cc = c - QUIET;
-    if (rr < 0 || cc < 0 || rr >= SIZE || cc >= SIZE) return true;
-    return !(m[rr] as boolean[])[cc];
+    if (rr < 0 || cc < 0 || rr >= SIZE || cc >= SIZE) return false;
+    return (m[rr] as boolean[])[cc] as boolean;
   };
   const lines: string[] = [];
   for (let r = 0; r < total; r += 2) {
     let line = '';
     for (let c = 0; c < total; c++) {
-      const top = light(r, c);
-      const bottom = r + 1 < total ? light(r + 1, c) : true;
-      line += top && bottom ? '█' : top ? '▀' : bottom ? '▄' : ' ';
+      const top = dark(r, c);
+      const bottom = r + 1 < total ? dark(r + 1, c) : false;
+      line += top && bottom ? '\u2588' : top ? '\u2580' : bottom ? '\u2584' : ' ';
     }
     lines.push(line);
   }
