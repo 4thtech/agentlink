@@ -86,7 +86,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `sync_cursors` | relay_url, last_seen |
 | `outbox`, `outbox_staged`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `publisher_lease` | Delivery (§3.2) |
 | `idempotency` | Tool results by `clientRequestId` (§3.3) |
-| `owner_action_nonces`, `revoked_agents` | Owner authority (§3.4) |
+| `owner_action_nonces`, `revoked_agents`, `own_storage` | Owner authority (§3.4) |
 | `budget_ledger`, `budget_state`, `commitment_parts` | Money and commitments (§3.5) |
 
 **At rest:** all sensitive columns (decrypted payloads, contact names, file names, URLs, file keys, salts, invite proof keys, policies' parameters, stored tool results) are encrypted with a local **store key** (random, kept in the keychain, or in the file KeyStore on headless machines, §9). Non-sensitive columns (IDs, timestamps, statuses, and fee amounts, which the public record shows) stay in clear for indexing. Without the store key, the database reveals only activity timing and counts.
@@ -324,6 +324,21 @@ Every mutating call runs: **policy check → (approval) → action → store →
   - **Broken ledger.** When `budget_state.status` is `broken`, the apply transaction also starts a fresh ledger (§3.5).
 - **`approvals`**: signed_decision (`approval.decide`, or the covering `approval.decideBatch`, never for a commitment, 04 §2.5.2) and signed_cancel (`approval.cancel`), each verified again before use (04 §2.5.1, §3.4.2).
 - **`contacts.safety_check`**: the `contact.check` (§3, pairing columns).
+
+**`own_storage`** (M1-9i, D-115): the agent's own S3-compatible storage (§5.2), as the owner signed it.
+
+| Column | Type and meaning |
+|---|---|
+| id | `id`: the `storage.set` `id`, 16 lowercase hex; it names the KeyStore item `s3:<id>` (04 §2.2) |
+| signed_json | `enc`: the applied `storage.set` (04 §2.5.1), verbatim; encrypted because the endpoint and bucket identify the user's account |
+| applied_at | `int` |
+
+- **Rows.** At most one in M1. A newer `storage.set` replaces it; `storage.remove` deletes it.
+- **Transaction.** The nonce check, the nonce insert and the upsert (`storage.set`) or delete (`storage.remove`) are one store transaction (04 §2.5.1). `backup.export` writes only its nonce row, which is the audit record (04 §2.3.3).
+- **Anti-rollback.** After the commit, the core sets the KeyStore item `storage-mark` (04 §2.2) under the inter-process lock (06 §6) and reads it back. The store commits first, as for `policies`.
+- **Load** (`ownStorage.load()`): `none` when there is no row and `storage-mark` names no active `id`; `ready` when the row's `storage.set` verifies (encoding, `sig`, `agent`, `owner`, schema; never expiry), its `id` equals `active` in `storage-mark`, and the item `s3:<id>` exists with a matching `credentialDigest`; `broken` otherwise: a row that does not verify, a missing or mismatched item, a row with `active` = `null`, no row while `active` is set, or a malformed mark. A mismatch is never repaired from the stored row.
+- **At rest.** signed_json `enc`; id and applied_at in clear. No credential is ever in the store.
+- **On failure.** `broken`, never the drop (§5.6).
 
 **`revoked_agents`**: the revoked-agent set (04 §3.4.1, D-58), for contacts and the own agent.
 
@@ -610,7 +625,7 @@ type StoredObject = { kind: string; locator: string; size: number; sha256: strin
 - Multipart upload for files > 64 MB; streaming encryption so large files never fully load into memory.
 - Presigned GET valid until `expiresAt` (max 7 days per SigV4; shorter with temporary credentials). The recipient can ask for a fresh link (`request` envelope, `kind: refresh-link`); the sender's core answers when online.
 - Lifecycle: the CLI's `storage connect` offers to set a bucket lifecycle rule deleting `agentlink/` objects after 30 days, and aborting incomplete multipart uploads under `agentlink/` after 1 day, as a safety net; the bucket's other rules are kept (M1-6b).
-- Credentials (access key ID + secret) stored in the OS keychain (local) or Worker secrets (cloud). Recommended: a bucket-scoped key with only `PutObject`, `GetObject`, `DeleteObject`, `AbortMultipartUpload` and `ListBucketMultipartUploads` (the last two let a failed or interrupted multipart upload be cancelled and cleaned up, M1-6b; on AWS IAM they are separate actions, so without them an abort is refused). Setting the lifecycle rule needs the bucket-level `PutLifecycleConfiguration` (and `GetLifecycleConfiguration` to read it back), which this key does not include; when the key lacks it, `storage connect` explains how to add the rule in the provider console instead.
+- Credentials (access key ID + secret) stored in the KeyStore item `s3:<id>` (04 §2.2; the OS keychain or the file KeyStore), bound to the owner-signed `storage.set` by `credentialDigest` (04 §2.5.1), or in Worker secrets (cloud). Temporary credentials are refused in M1. Not part of the recovery kit (04 §2.3.3, D-115 D). The non-secret config (provider, endpoint, bucket, region) lives only in the signed `storage.set`, kept in `own_storage` (§3.4), never in `config.json` (§9.1: unsigned, it may only make the agent fail to open). Recommended: a bucket-scoped key with only `PutObject`, `GetObject`, `DeleteObject`, `AbortMultipartUpload` and `ListBucketMultipartUploads` (the last two let a failed or interrupted multipart upload be cancelled and cleaned up, M1-6b; on AWS IAM they are separate actions, so without them an abort is refused). Setting the lifecycle rule needs the bucket-level `PutLifecycleConfiguration` (and `GetLifecycleConfiguration` to read it back), which this key does not include; when the key lacks it, `storage connect` explains how to add the rule in the provider console instead.
 - **Guided setup** (`agentlink storage connect` and local UI): provider picker → step-by-step instructions with links → test upload/download/delete → save.
 
 ### 5.3 Inline adapter (P0)
@@ -668,6 +683,8 @@ Applied by the core for every file (06 §3 `files.storage`):
 5. Otherwise → `needs_setup`, naming the limit and the own-storage option.
 
 Own storage means the S3-compatible adapter, or a consumer connector from M2. `agentlink_status` reports the result as `storage.mode` (06 §2.1).
+
+Own storage counts as configured when a `storage.set` row exists, also when it is `broken` (signature, credentials missing or mismatched, or the row and `storage-mark` disagree; §3.4). A broken own storage makes the tool return `needs_setup` (core refusal `needs_storage`) naming `agentlink storage connect`, never the drop (M1-9i, D-115). The runtime builds the S3 adapter only for `ready`; for `broken` it passes an adapter stub that refuses every call (`credentials_unavailable`), so `files.storage: auto` never falls back to the drop. `doctor` reports `broken` with the fix, naming no endpoint, bucket or key. The credentials are read from the KeyStore item at each use and never become log fields (I-7). *Open:* how `agentlink_status` shows `broken` is not fixed by D-115: 06 §2.1 `storage.mode` is `drop | own`, and adding a value changes the frozen tool output schema; the M1-9i CLI card proposes it.
 
 ### 5.7 Later adapters
 
@@ -904,7 +921,7 @@ The expiry and nonce checks of 04 §2.5.1 applied once, when the core used the a
 | No usable keychain, `--keystore file` or "yes" to the question, in an interactive terminal with no harness marker set | File KeyStore at `~/.agentlink/keystore/<agentId>.alks`. Agent identity only; the owner step is separate (§9.3) |
 | No usable keychain, opt-in without a TTY or with a harness marker set | `needs_setup` (reason `no_keychain`), naming the command the user runs in their own terminal. This is a UX guard; a faked terminal gets past it (04 §2.8) |
 
-`init` records the backend in the agent's local config (`keyStore: "keychain" | "file"`). Every later start uses only the recorded backend: no fallback, no switch and no new identity when the other backend appears or the file is missing. Moving an agent between backends goes through `backup export` / `restore` (†, 06 §8, M1b); a dedicated move command is out of scope for now. The recorded value is not owner-signed. Changing it can only make the agent fail to start; it can never weaken the key protection.
+`init` records the backend in the agent's local config (`keyStore: "keychain" | "file"`). Every later start uses only the recorded backend: no fallback, no switch and no new identity when the other backend appears or the file is missing. Moving an agent between backends goes through `backup export` / `restore` (†, 06 §8, M1b; 04 §2.3.3, step 4: restore uses the backend this machine selects); a dedicated move command is out of scope for now. The recorded value is not owner-signed. Changing it can only make the agent fail to start; it can never weaken the key protection.
 
 ### 9.2 Unlocking a file KeyStore
 
@@ -963,4 +980,12 @@ No "wallet", "seed phrase", "private key" or "encryption key" in default output.
 | `needs_setup` `keystore_locked` (agent relays it) | "AgentLink can't unlock your agent's identity on this machine. Set AGENTLINK_KEYSTORE_PASSPHRASE_FILE to the file that holds your unlock code, then restart your AI app." While unlocking: "AgentLink is starting up. Try again in a few seconds." |
 | `doctor`, file backend | "Agent identity: passphrase-locked file (no system keychain). Unlocked from: secret file." |
 | `doctor` warnings | "Unlocked from an environment variable, which leaks more easily than a secret file." · "The unlock code is stored on the same disk as the file, so a copy of this disk is not protected." (shown when the passphrase file is on the same filesystem as the keystore and not on tmpfs) · "Your owner key is on this machine. Approving from your own device is safer." · "AGENTLINK_OWNER_PASSPHRASE is set and ignored: approvals always ask in your terminal." |
+| `backup export`, before the code (M1-9i, D-115; proposed) | "This recovery kit restores your agent, its contacts and its history on another computer. Anyone with the kit and its recovery code can act as your agent and read its history, so keep them apart: the kit in your backups, the code in your password manager." With `--identity-only`, "and its history" is left out |
+| `backup export`, the code (M1-9i, D-115; proposed) | "Your recovery code: {code}. It's shown only this once and only opens this kit. Type its last four characters to continue." After confirmation the screen is cleared |
+| `backup restore`, before the code (M1-9i, D-115; proposed) | "This recovery kit belongs to owner {fingerprint}. Enter its recovery code to see which agents it holds." Then, after the agents are listed: "Restore these agents on this computer? [y/N]" |
+| `backup restore`, after (M1-9i, D-115; proposed) | "Restored. Your owner fingerprint: {fingerprint}. Stop the agent on your old computer now: two running copies act as the same agent. If you used your own storage, connect it again with `agentlink storage connect`." |
+| `backup restore` refused (M1-9i, D-115; proposed) | "An agent with this identity is already on this computer. AgentLink won't replace it." · "This computer has a different owner. Restore into a new user account or on a clean computer." |
+| `storage connect` (M1-9i, D-115; proposed) | "Paste the access key ID and secret access key for this bucket. They stay on this computer and are never shown again." · After the test: "Your storage works. Files over the free limit now go to your own bucket." |
+| `storage disconnect` (M1-9i, D-115; proposed) | "Your own storage is disconnected and its access key is removed from this computer. Files you already sent stay in your bucket until their links expire." |
+| Own storage broken (`needs_setup`, agent relays it; M1-9i, D-115; proposed) | "Your own storage isn't working on this computer, so I didn't send the file. Run `agentlink storage connect` in your own terminal to connect it again." |
 | Approval needed on a headless machine (M1a) | "Approval needed. In your own terminal, run `agentlink approve {approvalId}`. Your AI can't approve for you." |
