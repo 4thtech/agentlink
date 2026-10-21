@@ -1075,11 +1075,15 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     expectOurTextClean(r);
   });
 
-  it('needs_credits before anything is sent: the top-up link in `url`, nothing else from the route', async () => {
+  it('needs_credits before anything is sent: the top-up link and agent ID in nextStep, nothing else from the route', async () => {
     const { client } = fake({ propose: () => ({ status: 'needs_credits', topUp }) });
     const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client);
     expect(r.structured.status).toBe('needs_credits');
-    expect(r.structured.url).toBe(`${PAY_ORIGIN}/`);
+    // The terms tools' output has no agentAddress or topUpUrl field (no tool-surface change), and
+    // `url` is reserved for the local approval UI's origins: the link travels in nextStep.
+    expect(r.structured.url).toBeUndefined();
+    expect(r.structured.nextStep).toContain(`${PAY_ORIGIN}/`);
+    expect(r.structured.summary).toContain('Nothing was sent.');
     expect(r.structured.nextStep).toContain(A);
     expect(r.structured.summary).toContain('$0.10');
     expect(r.structured).toMatchObject({ proof: { status: 'needs_credits', receipts: [] } });

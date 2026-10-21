@@ -282,9 +282,7 @@ describe('J8 shape 1: a firm offer (scope offer), accepted with one approval eac
       signer: a.id,
       ownerApproval: { status: 'signed', approver: 'signer', decision: 'offer' },
     });
-    expect(field<{ type: string }[]>(checked, 'receipts').map((r) => r.type)).toContain(
-      'ACCEPTED',
-    );
+    expect(field<{ type: string }[]>(checked, 'receipts').map((r) => r.type)).toContain('ACCEPTED');
 
     // Bob's pack of the same record carries his approval of the accept.
     const theirs = await b.client.exportProofPack({ envelopeId: offerId });
@@ -402,9 +400,7 @@ describe('J8 shape 2: a recorded accept (kind ACCEPT), confirmed with one approv
       signer: b.id,
       ownerApproval: { status: 'signed', approver: 'signer', decision: 'accept' },
     });
-    expect(field<{ type: string }[]>(checked, 'receipts').map((r) => r.type)).toContain(
-      'ACCEPTED',
-    );
+    expect(field<{ type: string }[]>(checked, 'receipts').map((r) => r.type)).toContain('ACCEPTED');
     // Alice's pack of Bob's record carries her `confirm`.
     const hers = field<Loose>(await a.client.exportProofPack({ envelopeId: acceptId }), 'pack');
     expect(await verify(hers)).toMatchObject({
@@ -430,6 +426,34 @@ describe('credits, policy and approvals for terms with notarize (06 §2.4, §3; 
     expect((await a.client.proposeTerms({ to: b.id, terms: terms(), notarize: true })).status).toBe(
       'pending_approval',
     );
+  });
+
+  it('credits gone after the approval: the accept goes out, its Record runs on the next call with the same approval', async () => {
+    const { a, b } = await twoAgents();
+    const offered = await a.client.proposeTerms({ to: b.id, terms: terms('130.00') });
+    const offerId = field<string>(offered, 'envelopeId');
+    await deliver(a, b);
+    const args = { envelopeId: offerId, decision: 'accept' as const, notarize: true };
+    const pending = await b.client.respondToTerms(args);
+    const approvalId = field<string>(pending, 'approvalId');
+    await approve(b, approvalId);
+    chain.fund(b.id, 0n);
+    const first = await b.client.respondToTerms({ ...args, approvalId });
+    expect(first).toMatchObject({ status: 'ok', proof: { status: 'needs_credits' } });
+    expect(await outOfType(b, 'accept')).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(0);
+    chain.fund(b.id, 10n * FEE_UNITS);
+    const second = await b.client.respondToTerms({ ...args, approvalId });
+    expect(second).toMatchObject({ status: 'ok', proof: { status: 'ok' } });
+    expect(await outOfType(b, 'accept')).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(1);
+    // Every part has run now: a repeat is APPROVAL_USED, and nothing more is signed or charged.
+    expect(await b.client.respondToTerms({ ...args, approvalId })).toMatchObject({
+      status: 'rejected',
+      code: 'APPROVAL_USED',
+    });
+    expect(chain.calls.notarize).toBe(1);
+    expect(await approvals(b)).toHaveLength(1);
   });
 
   it('an approval covers its own arguments only: other terms get a new request and nothing is sent', async () => {

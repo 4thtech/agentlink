@@ -19,7 +19,14 @@
 //   item, before anything is published. A claimed part is only ever republished, never re-signed.
 // - The receipt parts (ACCEPTED / REJECTED, and the deferred receipt of 07 §2.1 step 4) are signed
 //   by M1-7g (M1b): this module creates them, keeps their state, and gives M1-7g the lookup and the
-//   atomic claim. Records (`notarize`, firm offers) are M1-7i: `notarize` is refused for now.
+//   atomic claim.
+// - Records (M1-9d-3; 04 §3.4.2; 06 §2.2a): `notarize` on `propose` is a firm offer (scope
+//   `offer`, `answers: null`): one `offer` envelope and its OFFER Record. `notarize` on an `accept`
+//   adds its ACCEPT Record, left out (nothing charged) when the offer is already recorded. The
+//   proof service (CommitmentRecorder) quotes the fee before the owner is asked, so the fee and any
+//   proof trigger sit on the same single request (`needs_credits` first, nothing sent), and signs
+//   the Record after the envelope, claiming the Record part in the transaction that stores it and
+//   reserves its fee. `counter` and `reject` with `notarize` stay refused (NOTARIZE_UNAVAILABLE).
 // - With a `clientRequestId`, propose() and respond() are idempotent as sendMessage is (06 §1 rule
 //   6, 07 §3.3; M1-32-b): a repeat returns the original result and sends nothing; another request
 //   under the same key is IDEMPOTENCY_KEY_REUSED. Every effect transaction (the envelope, the
@@ -46,11 +53,13 @@ import {
   nextTermsLink,
   termsFromInput,
   termsNoteSchema,
+  type ApprovalFee,
   type CommitmentDecision,
   type CommitmentScope,
   type ContactDisplayName,
   type Terms,
 } from '@4thtech-io/types';
+import type { TopUpRoute } from '@4thtech-io/chain';
 import {
   insertCommitmentPartsTx,
   voidPendingScopeTx,
@@ -80,6 +89,7 @@ import type { IdentityService } from './identity.js';
 import { agentNostrKey } from './card.js';
 import { renderContactName } from './names.js';
 import type { OutboxService } from './outbox.js';
+import type { CommitmentRecordResult, ProofRejected } from './proofs/service.js';
 import { computeActionDigest, verifyStoredOwnerAction } from './owner-action.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
@@ -120,8 +130,15 @@ export type TermsCode =
   | 'APPROVAL_USED'
   | 'APPROVAL_VOID'
   | 'POLICY_DENIED'
-  /** `notarize` (records, firm offers) needs the proof flow (M1-7i, M1b). Nothing is sent. */
+  /**
+   * `notarize` where no Record can be made: no proof platform on this machine, or a `counter` or
+   * `reject` with `notarize` (not built; M1-9d-3). Nothing is sent.
+   */
   | 'NOTARIZE_UNAVAILABLE'
+  /** The proof network could not be asked for a fee (07 §6.3). Nothing is sent or requested. */
+  | 'CHAIN_UNAVAILABLE'
+  /** This agent's profile expires before a Record could land (07 §8). Nothing is sent. */
+  | 'CARD_EXPIRED'
   /** The same clientRequestId with a different request (06 §1 rule 6, 07 §3.3). Nothing runs. */
   | typeof IDEMPOTENCY_KEY_REUSED;
 
@@ -135,6 +152,40 @@ export interface KnownRecord {
 /** Record lookup (M1-7g, M1b). Without one, no record is known. */
 export interface RecordLookup {
   recordOf(envelopeHash: string): Promise<KnownRecord | undefined>;
+}
+
+/** A terms Record's fee and what the proofs policy says of it, before the owner is asked. */
+export type CommitmentQuote =
+  | {
+      readonly status: 'ok';
+      readonly fee: ApprovalFee;
+      /** The proofs policy (06 §3): `approval` joins the commitment's single request. */
+      readonly decision: 'allow' | 'approval';
+      /** The proof triggers that asked (policy key paths), empty under `allow`. */
+      readonly triggers: readonly string[];
+    }
+  | { readonly status: 'needs_credits'; readonly topUp?: TopUpRoute }
+  | ProofRejected;
+
+/** The proof service, for the Record part of a commitment (M1-9d-3; 04 §3.4.2). */
+export interface CommitmentRecorder {
+  quoteCommitment(input: { readonly counterparty: string }): Promise<CommitmentQuote>;
+  recordCommitment(input: {
+    readonly envelopeId: string;
+    readonly approvalId: string;
+    readonly maxFeeUsd: string;
+    readonly ownerApproved: boolean;
+    readonly claimTx: (tx: StoreTx, recordId: string, itemJson: string) => boolean;
+  }): Promise<CommitmentRecordResult>;
+}
+
+/** The ProofStatus of a terms result's Record (06 §2.2a `proof`). */
+export type TermsProof = CommitmentRecordResult;
+
+/** No funded network for the Record (06 §2.4, D-111): nothing was sent or requested. */
+export interface TermsNeedsCredits {
+  readonly status: 'needs_credits';
+  readonly topUp?: TopUpRoute;
 }
 
 export interface ProposeTermsInput {
@@ -230,7 +281,8 @@ export interface CommitmentCard {
   } | null;
   readonly validUntil: number;
   readonly expiresAt: number;
-  readonly fee: null;
+  /** The Record's fee the approval covers (`maxFeeUsd`), or null when nothing is recorded. */
+  readonly fee: ApprovalFee | null;
   /** The terms fingerprint, under Advanced (11 §8). */
   readonly fingerprint: string;
 }
@@ -247,10 +299,12 @@ export interface TermsSent {
   readonly version: number;
   readonly termsHash: string;
   readonly validUntil: number;
+  /** A firm offer's Record (M1-9d-3). */
+  readonly proof?: TermsProof;
 }
 
 /** One run of a propose call: what is kept for its clientRequestId. */
-type ProposeOutcome = TermsSent | TermsRejected | TermsPending;
+type ProposeOutcome = TermsSent | TermsRejected | TermsPending | TermsNeedsCredits;
 
 export type ProposeTermsResult = ProposeOutcome | TermsInProgress | TermsApprovalState;
 
@@ -263,10 +317,12 @@ export interface TermsResponded {
   readonly termsHash: string;
   readonly envelopeId?: string;
   readonly receipt?: ReceiptState;
+  /** A recorded accept's Record (M1-9d-3). */
+  readonly proof?: TermsProof;
 }
 
 /** One run of a respond call: what is kept for its clientRequestId. */
-type RespondOutcome = TermsResponded | TermsRejected | TermsPending;
+type RespondOutcome = TermsResponded | TermsRejected | TermsPending | TermsNeedsCredits;
 
 export type RespondToTermsResult = RespondOutcome | TermsInProgress | TermsApprovalState;
 
@@ -317,6 +373,8 @@ export interface TermsDeps {
   readonly ownerActions: OwnerActions;
   readonly approvals: ApprovalService;
   readonly records?: RecordLookup;
+  /** Records for `notarize` (M1-9d-3). Without it, `notarize` is NOTARIZE_UNAVAILABLE. */
+  readonly recorder?: CommitmentRecorder;
   /** `clientRequestId` idempotency (07 §3.3). Without it a call with a clientRequestId fails closed. */
   readonly idempotency?: IdempotencyService;
 }
@@ -414,10 +472,47 @@ function supersededInStore(
 /** A stored commitment: the approval row, its parsed action, scope and terms. */
 interface StoredCommitment {
   readonly row: Row<'approvals'>;
+  readonly tool: typeof PROPOSE_TERMS_TOOL | typeof RESPOND_TO_TERMS_TOOL;
   readonly action: Record<string, unknown>;
   readonly scope: CommitmentScope;
   readonly terms: Terms;
-  readonly args: { envelopeId?: string; decision?: string; notarize?: boolean };
+  readonly fee: ApprovalFee | null;
+  readonly args: {
+    envelopeId?: string;
+    decision?: string;
+    notarize?: boolean;
+    to?: string;
+    terms?: unknown;
+    revises?: string;
+  };
+}
+
+/** A quote mapped to what the terms call returns when it does not run (nothing sent). */
+function quoteRefusal(
+  quote: Exclude<CommitmentQuote, { status: 'ok' }>,
+): TermsRejected | TermsNeedsCredits {
+  if (quote.status === 'needs_credits') {
+    return quote.topUp === undefined
+      ? { status: 'needs_credits' }
+      : { status: 'needs_credits', topUp: quote.topUp };
+  }
+  switch (quote.code) {
+    case 'POLICY_DENIED':
+      return rejected('POLICY_DENIED');
+    case 'CARD_EXPIRED':
+      return rejected('CARD_EXPIRED');
+    case 'PROOFS_UNAVAILABLE':
+      return rejected('NOTARIZE_UNAVAILABLE');
+    default:
+      return rejected('CHAIN_UNAVAILABLE');
+  }
+}
+
+/** The approval's triggers (sorted, unique): the commitment rule and any proof rule that asked. */
+function triggersOf(commitmentAsked: boolean, proofTriggers: readonly string[]): string[] {
+  const all = new Set<string>(proofTriggers);
+  if (commitmentAsked || all.size === 0) all.add(COMMITMENT_TRIGGER);
+  return [...all].sort();
 }
 
 /** The call a scope answers: what must match the stored action (04 §3.4.2). */
@@ -426,7 +521,7 @@ interface CommitCall {
   readonly decision: RespondDecision;
   readonly notarize: boolean;
   /** The call's idempotency execution: every effect transaction carries its lease (07 §3.3). */
-  readonly run?: IdempotencyRun;
+  readonly run?: IdempotencyRun | undefined;
 }
 
 /** A commitment about to be scoped: the answered record and what the decision needs. */
@@ -443,6 +538,10 @@ interface CommitPlan {
   /** The parts this scope covers (an accept that already ran leaves only the receipt). */
   readonly parts: readonly CommitmentPart[];
   readonly snapshot: TermsSnapshot;
+  /** The Record's fee when the scope covers a Record part (M1-9d-3), else null. */
+  readonly fee: ApprovalFee | null;
+  /** The proof triggers that asked for the owner (06 §3), joined to this request. */
+  readonly proofTriggers: readonly string[];
 }
 
 export class TermsService {
@@ -537,7 +636,12 @@ export class TermsService {
           }
           throw error;
         }
-        await idempotency.finish(start.run, done);
+        // `needs_credits` sent and asked nothing: not kept, so the call runs after a top-up.
+        await idempotency.finish(
+          start.run,
+          done,
+          done.status === 'needs_credits' ? { keep: false } : {},
+        );
         return done;
       }
     }
@@ -647,7 +751,8 @@ export class TermsService {
     if (!keyFieldsValid(input as unknown as Record<string, unknown>)) {
       return rejected('INVALID_ARGUMENT');
     }
-    if (input.notarize === true) return rejected('NOTARIZE_UNAVAILABLE');
+    const notarize = input.notarize === true;
+    if (notarize && this.#deps.recorder === undefined) return rejected('NOTARIZE_UNAVAILABLE');
     // `args` as for `action.args` (04 §3.4.1): defaults applied, without approvalId and
     // clientRequestId. The terms are the caller's TermsInput as given.
     const args = {
@@ -655,14 +760,14 @@ export class TermsService {
       terms: input.terms,
       revises: input.revises ?? null,
       note: note.note,
-      notarize: false,
+      notarize,
     };
     return this.#idempotent(
       PROPOSE_TERMS_TOOL,
       input,
       args,
-      (run) => this.#proposeRun(input, note.note, run),
-      (run) => this.#resumeOffer(run),
+      (run) => (notarize ? this.#proposeFirm(input, run) : this.#proposeRun(input, note.note, run)),
+      (run) => (notarize ? this.#resumeFirm(input, run) : this.#resumeOffer(run)),
     );
   }
 
@@ -828,7 +933,10 @@ export class TermsService {
     if (!keyFieldsValid(input as unknown as Record<string, unknown>)) {
       return rejected('INVALID_ARGUMENT');
     }
-    if (notarize) return rejected('NOTARIZE_UNAVAILABLE');
+    // A recorded accept (M1-9d-3); a recorded counter or reject is not built (nothing sent).
+    if (notarize && (decision !== 'accept' || this.#deps.recorder === undefined)) {
+      return rejected('NOTARIZE_UNAVAILABLE');
+    }
     // `args` as for `action.args` (04 §3.4.1): defaults applied, without approvalId and
     // clientRequestId (the approvalId is part of the key instead).
     const args = {
@@ -836,7 +944,7 @@ export class TermsService {
       decision,
       terms: input.terms ?? null,
       note: note.note,
-      notarize: false,
+      notarize,
     };
     return this.#idempotent(
       RESPOND_TO_TERMS_TOOL,
@@ -865,7 +973,12 @@ export class TermsService {
     run: IdempotencyRun,
   ): Promise<RespondOutcome> {
     const self = (await this.#self()).agentId;
-    const call: CommitCall = { envelopeId: input.envelopeId, decision, notarize: false, run };
+    const call: CommitCall = {
+      envelopeId: input.envelopeId,
+      decision,
+      notarize: input.notarize === true,
+      run,
+    };
     const approvalId =
       [...run.effects].reverse().find((e) => APPROVAL_EFFECT.test(e) && !isEnvelopeId(e)) ??
       (decision === 'accept' ? input.approvalId : undefined);
@@ -912,7 +1025,7 @@ export class TermsService {
     const call: CommitCall = {
       envelopeId: input.envelopeId,
       decision,
-      notarize: false,
+      notarize: input.notarize === true,
       ...(run === undefined ? {} : { run }),
     };
     if (input.approvalId !== undefined && decision === 'accept') {
@@ -968,6 +1081,8 @@ export class TermsService {
         superseded: newestOwnAbove(n, self, rec.terms.version) !== null,
         parts: commitmentParts({ decision: 'confirm', notarize: false }),
         snapshot,
+        fee: null,
+        proofTriggers: [],
       });
     }
     if (rec.type !== 'offer' || rec.direction !== 'in') return rejected('INVALID_ARGUMENT');
@@ -1041,7 +1156,31 @@ export class TermsService {
     } else if (now > rec.terms.validUntil) {
       return rejected('TERMS_EXPIRED');
     }
-    const parts = commitmentParts({ decision: 'accept', notarize: false });
+    // With `notarize`, the accept's Record runs only if the offer has no record (04 §3.4.2), and
+    // only once: an accept already sent and recorded needs none (M1-9d-3).
+    let record = false;
+    if (call.notarize) {
+      record = !(await this.#offerRecorded(rec.envelopeHash, contactId));
+      if (record && acceptRan) {
+        const own = (n?.records ?? []).find(
+          (r) => r.direction === 'out' && r.type === 'accept' && r.replyTo === rec.envelopeId,
+        );
+        const known =
+          own === undefined ? undefined : await this.#deps.records?.recordOf(own.envelopeHash);
+        if (known?.kind === 'ACCEPT' && known.signer === self) record = false;
+      }
+    }
+    let fee: ApprovalFee | null = null;
+    let proofTriggers: readonly string[] = [];
+    if (record) {
+      const quote = await this.#deps.recorder!.quoteCommitment({ counterparty: contactId });
+      if (quote.status !== 'ok') return quoteRefusal(quote);
+      fee = quote.fee;
+      proofTriggers = quote.triggers;
+    }
+    const parts = commitmentParts({ decision: 'accept', notarize: call.notarize }).filter(
+      (p) => (p !== 'accept_envelope' || !acceptRan) && (p !== 'accept_record' || record),
+    );
     return this.#commit({
       call,
       decision: 'accept',
@@ -1051,8 +1190,10 @@ export class TermsService {
       termsHash: rec.termsHash,
       validUntil: rec.terms.validUntil,
       superseded: false,
-      parts: acceptRan ? parts.filter((p) => p !== 'accept_envelope') : parts,
+      parts,
       snapshot,
+      fee,
+      proofTriggers,
     });
   }
 
@@ -1108,15 +1249,19 @@ export class TermsService {
       version: plan.terms.version,
       termsHash: plan.termsHash,
       answers: { envelopeId: plan.answered.envelopeId, envelopeHash: plan.answered.envelopeHash },
-      notarize: false,
-      maxFeeUsd: null,
+      notarize: plan.call.notarize,
+      maxFeeUsd: plan.fee?.usd ?? null,
       createdAt: now,
       expiresAt: Math.min(plan.validUntil, now + COMMITMENT_SCOPE_SECONDS),
     });
     return scope.success ? scope.data : undefined;
   }
 
-  #actionOf(plan: CommitPlan, scope: CommitmentScope): Record<string, unknown> {
+  #actionOf(
+    plan: CommitPlan,
+    scope: CommitmentScope,
+    commitmentAsked: boolean,
+  ): Record<string, unknown> {
     return {
       tool: RESPOND_TO_TERMS_TOOL,
       args: {
@@ -1124,7 +1269,12 @@ export class TermsService {
         decision: plan.call.decision,
         notarize: plan.call.notarize,
       },
-      context: { triggers: [COMMITMENT_TRIGGER], scope, terms: plan.terms, fee: null },
+      context: {
+        triggers: triggersOf(commitmentAsked, plan.proofTriggers),
+        scope,
+        terms: plan.terms,
+        fee: plan.fee,
+      },
     };
   }
 
@@ -1154,10 +1304,12 @@ export class TermsService {
     if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
     // A denial creates nothing: no request, no grant, no envelope (06 §3).
     if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
-    const action = this.#actionOf(plan, scope);
+    // A proof rule that asks joins the same single request (04 §3.4.2 "One request per call").
+    const ask = evaluation.decision === 'approval' || plan.proofTriggers.length > 0;
+    const action = this.#actionOf(plan, scope, evaluation.decision === 'approval');
     const scopeKey = plan.answered.envelopeId;
     const parts = partRows(plan.parts);
-    if (evaluation.decision === 'approval') {
+    if (ask) {
       const pending = await this.#deps.approvals.request(
         {
           action,
@@ -1167,7 +1319,11 @@ export class TermsService {
         },
         plan.call.run === undefined ? {} : { run: plan.call.run },
       );
-      const card = this.#card(plan, scope, evaluation.autoAccept);
+      const card = this.#card(
+        plan,
+        scope,
+        evaluation.decision === 'approval' ? evaluation.autoAccept : null,
+      );
       return { ...pending, card };
     }
     // allow: a policy grant with the same scope (04 §3.4.2), then its parts run now.
@@ -1253,9 +1409,11 @@ export class TermsService {
     if (canonicalize(context.scope as never) !== row.scope_json) return undefined;
     return {
       row,
+      tool: parsed.data.tool,
       action: action as Record<string, unknown>,
       scope: context.scope,
       terms: context.terms,
+      fee: context.fee,
       args: parsed.data.args as StoredCommitment['args'],
     };
   }
@@ -1413,6 +1571,7 @@ export class TermsService {
     if (stored.scope.agentId !== self) return rejected('APPROVAL_VOID');
     const a = stored.args;
     if (
+      stored.tool !== RESPOND_TO_TERMS_TOOL ||
       a.envelopeId !== call.envelopeId ||
       a.decision !== call.decision ||
       a.notarize !== call.notarize
@@ -1442,11 +1601,19 @@ export class TermsService {
     if (self.agentId !== selfId || stored.scope.agentId !== selfId)
       return rejected('APPROVAL_VOID');
     const { scope } = stored;
+    // A firm offer runs only through propose (#runOfferScope).
+    if (scope.decision === 'offer' || stored.tool !== RESPOND_TO_TERMS_TOOL) {
+      return rejected('APPROVAL_VOID');
+    }
     const parts = await this.#ctx.store.transaction((tx) =>
       tx.select('commitment_parts', { approval_id: approvalId }),
     );
     const envelopePart = parts.find((p) => p.part === 'envelope');
     const receiptPart = parts.find((p) => p.part === 'receipt');
+    const recordPart = parts.find((p) => p.part === 'record');
+    // The Record part (M1-9d-3) not yet on-chain: unclaimed (it runs), or claimed (its stored item
+    // is resent unchanged and reported, never signed again; 04 §3.4.2, §5).
+    const recordOpen = recordPart?.state === 'unclaimed' || recordPart?.state === 'claimed';
     const receipt = (): ReceiptState | undefined =>
       receiptPart === undefined || receiptPart.state === 'void'
         ? undefined
@@ -1455,7 +1622,7 @@ export class TermsService {
             status: receiptPart.state === 'done' ? 'recorded' : 'waiting_for_record',
             until: scope.expiresAt,
           };
-    const ok = (envelopeId?: string): RespondOutcome => {
+    const ok = (envelopeId?: string, proof?: TermsProof): RespondOutcome => {
       const rc = receipt();
       return {
         status: 'ok',
@@ -1466,6 +1633,7 @@ export class TermsService {
         termsHash: scope.termsHash,
         ...(envelopeId === undefined ? {} : { envelopeId }),
         ...(rc === undefined ? {} : { receipt: rc }),
+        ...(proof === undefined ? {} : { proof }),
       };
     };
     // The state of the original response, for a call that did not claim the part (04 §3.4.2).
@@ -1476,8 +1644,9 @@ export class TermsService {
         ...(rc === undefined ? {} : { receipt: rc }),
       });
     };
-    // Already sent: a repeat call never sends or signs a part twice (04 §3.4.2).
-    if (envelopePart?.state === 'done') return used(envelopePart.item_ref);
+    // Already sent: a repeat call never sends or signs a part twice (04 §3.4.2). A Record part
+    // that has not run yet (no credits then, say) still runs, under the checks below.
+    if (envelopePart?.state === 'done' && !recordOpen) return used(envelopePart.item_ref);
     // Claimed by an earlier or a concurrent call, its delivery not yet confirmed: only the call
     // whose claim committed reports `ok` (a takeover of that same request is resumed from its
     // stored effects). This call republishes the same signed envelope, never a new one, and reports
@@ -1486,7 +1655,7 @@ export class TermsService {
       const id = envelopePart.item_ref;
       await this.#publish(id);
       await this.#markEnvelopeDone(approvalId, id);
-      return used(id);
+      if (!recordOpen) return used(id);
     }
     const policy = await this.#policy();
     const facts: CommitmentFacts = {
@@ -1530,6 +1699,22 @@ export class TermsService {
     if (voidRule !== undefined) {
       await this.#voidParts(approvalId, voidRule.reason);
       return rejected(voidRule.code);
+    }
+    // The accept already went out under this scope: only its Record part is left (M1-9d-3).
+    if (envelopePart !== undefined && envelopePart.state !== 'unclaimed' && recordOpen) {
+      const id = envelopePart.item_ref;
+      if (envelopePart.state === 'void' || id === null) {
+        return rejected(envelopePart.void_reason === 'expired' ? 'TERMS_EXPIRED' : 'APPROVAL_VOID');
+      }
+      const proof = await this.#recordPart(approvalId, stored, id);
+      return proof === 'lost' ? used(id) : ok(id, proof);
+    }
+    if (envelopePart === undefined && recordPart !== undefined) {
+      // An accept sent under an earlier scope, recorded under this one (M1-9d-3).
+      const sentAccept = await this.#sentAcceptOf(selfId, scope);
+      if (!recordOpen || sentAccept === undefined) return used(sentAccept);
+      const proof = await this.#recordPart(approvalId, stored, sentAccept);
+      return proof === 'lost' ? used(sentAccept) : ok(sentAccept, proof);
     }
     if (envelopePart === undefined) {
       // A receipt-only scope: nothing is sent. The first call with the approval reports the
@@ -1627,7 +1812,9 @@ export class TermsService {
       return used(now2?.item_ref);
     }
     await this.#markEnvelopeDone(approvalId, sent.envelopeId);
-    return ok(sent.envelopeId);
+    if (recordPart === undefined) return ok(sent.envelopeId);
+    const proof = await this.#recordPart(approvalId, stored, sent.envelopeId);
+    return ok(sent.envelopeId, proof === 'lost' ? undefined : proof);
   }
 
   /** `claimed` → `done` once the stored envelope is `sent` (07 §3.5). */
@@ -1642,6 +1829,557 @@ export class TermsService {
         { state: 'done', done_at: now, updated_at: now },
       );
     });
+  }
+
+  // --- Records under a commitment (M1-9d-3; 04 §3.4.2; 06 §2.2a) -------------------------------
+
+  /** Whether the contact's OFFER record of this envelope is known (verified, M1-7g). */
+  async #offerRecorded(envelopeHash: string, contactId: string): Promise<boolean> {
+    const known = await this.#deps.records?.recordOf(envelopeHash);
+    return known?.kind === 'OFFER' && known.signer === contactId;
+  }
+
+  /** The `accept` this agent sent for the envelope a scope answers, if any. */
+  async #sentAcceptOf(self: string, scope: CommitmentScope): Promise<string | undefined> {
+    if (scope.answers === null) return undefined;
+    const snapshot = await loadTermsSnapshot(this.#ctx, self, scope.counterparty.agentId);
+    const entry = snapshot.byEnvelope.get(scope.answers.envelopeId);
+    const n = entry === undefined ? undefined : snapshot.negotiations.get(entry.key);
+    return (n?.records ?? []).find(
+      (r) =>
+        r.direction === 'out' && r.type === 'accept' && r.replyTo === scope.answers!.envelopeId,
+    )?.envelopeId;
+  }
+
+  /**
+   * The Record part of a scope, for the envelope its envelope part sent (04 §3.4.2): at most once.
+   * The proof service claims the part in the transaction that stores the signed Record and
+   * reserves its fee, never above the scope's `maxFeeUsd`. An accept's Record is left out (the part
+   * void, nothing charged) when the offer has a record by now. `lost`: a concurrent call claimed it.
+   */
+  async #recordPart(
+    approvalId: string,
+    stored: StoredCommitment,
+    envelopeId: string,
+  ): Promise<TermsProof | 'lost' | undefined> {
+    const { scope } = stored;
+    const recorder = this.#deps.recorder;
+    const voidRecord = async () =>
+      this.#ctx.store.transaction((tx) => {
+        tx.update(
+          'commitment_parts',
+          { approval_id: approvalId, part: 'record', state: 'unclaimed' },
+          { state: 'void', void_reason: 'void', updated_at: nowOf(this.#ctx) },
+        );
+      });
+    if (
+      scope.decision === 'accept' &&
+      scope.answers !== null &&
+      (await this.#offerRecorded(scope.answers.envelopeHash, scope.counterparty.agentId))
+    ) {
+      await voidRecord();
+      return undefined;
+    }
+    if (recorder === undefined || scope.maxFeeUsd === null) {
+      await voidRecord();
+      return undefined;
+    }
+    const now = nowOf(this.#ctx);
+    const result = await recorder.recordCommitment({
+      envelopeId,
+      approvalId,
+      maxFeeUsd: scope.maxFeeUsd,
+      ownerApproved: stored.row.source === 'owner',
+      claimTx: (tx, recordId, itemJson) =>
+        tx.update(
+          'commitment_parts',
+          { approval_id: approvalId, part: 'record', state: 'unclaimed' },
+          {
+            state: 'claimed',
+            item_ref: recordId,
+            item_json: itemJson,
+            claimed_at: now,
+            updated_at: now,
+          },
+        ) === 1,
+    });
+    if (result.status === 'rejected' && result.code === 'POLICY_CHANGED') {
+      const part = await this.#ctx.store.transaction((tx) =>
+        tx.get('commitment_parts', { approval_id: approvalId, part: 'record' }),
+      );
+      if (part?.state === 'claimed' || part?.state === 'done') return 'lost';
+    }
+    if (result.status === 'ok') {
+      const done = nowOf(this.#ctx);
+      await this.#ctx.store.transaction((tx) => {
+        tx.update(
+          'commitment_parts',
+          { approval_id: approvalId, part: 'record', state: 'claimed', item_ref: result.recordId },
+          { state: 'done', done_at: done, updated_at: done },
+        );
+      });
+    }
+    this.#ctx.log.info('terms record', { status: result.status });
+    return result;
+  }
+
+  /** The negotiation with `termsId` in a snapshot (one per termsId and pair). */
+  #negotiationOf(snapshot: TermsSnapshot, termsId: string): Negotiation | undefined {
+    for (const n of snapshot.negotiations.values()) if (n.termsId === termsId) return n;
+    return undefined;
+  }
+
+  /** The thread a new negotiation with this contact goes in, as for an unrecorded offer. */
+  async #threadWith(contactId: string): Promise<string> {
+    const existing = await this.#ctx.store.transaction(
+      (tx) =>
+        tx.select(
+          'envelopes',
+          { contact_id: contactId, state: 'ok' },
+          {
+            orderBy: [
+              ['created_at', 'desc'],
+              ['envelope_id', 'asc'],
+            ],
+            limit: 1,
+          },
+        )[0]?.thread_id,
+    );
+    return existing ?? encodeBase64url(randomBytes(BYTE_LENGTHS.thread));
+  }
+
+  /**
+   * Whether `revises` (or none, for version 1) still names the slot a firm offer was built for: the
+   * caller's own newest unanswered, unlocked offer (as #proposeRun checks), with the same next link.
+   */
+  #offerSlot(
+    snapshot: TermsSnapshot,
+    self: string,
+    terms: Terms,
+  ): { readonly replyTo: string | null } | undefined {
+    const n = this.#negotiationOf(snapshot, terms.termsId);
+    if (terms.version === 1) {
+      return n === undefined ? { replyTo: null } : undefined;
+    }
+    if (n === undefined) return undefined;
+    const own = newestOffer(n);
+    const answered =
+      own !== undefined &&
+      n.records.some(
+        (r) => r.direction === 'in' && r.type !== 'offer' && r.replyTo === own.envelopeId,
+      );
+    if (
+      own === undefined ||
+      own.direction !== 'out' ||
+      own.type !== 'offer' ||
+      isLocked(n, own.terms.version) ||
+      answered
+    ) {
+      return undefined;
+    }
+    const link = nextTermsLink(n.state, self);
+    if (link.version !== terms.version || link.previousTermsHash !== terms.previousTermsHash) {
+      return undefined;
+    }
+    return { replyTo: link.replyTo };
+  }
+
+  /**
+   * `agentlink_propose_terms` with `notarize`: a firm offer (04 §3.4.2 scope `offer`). The terms
+   * are built from the store now and bound to one scope with the Record's fee; nothing is sent
+   * until the owner approves (or a `commitments.accept: allow` grant runs it at once). The call
+   * with the `approvalId` and the same arguments runs it from the STORED terms; other arguments get
+   * a new request.
+   */
+  async #proposeFirm(
+    input: ProposeTermsInput,
+    run: IdempotencyRun | undefined,
+  ): Promise<ProposeOutcome> {
+    const self = await this.#self();
+    if (input.approvalId !== undefined) {
+      const stored = await this.#stored(input.approvalId);
+      if (stored === undefined || stored.scope.agentId !== self.agentId) {
+        return rejected('APPROVAL_VOID');
+      }
+      const a = stored.args;
+      if (
+        stored.tool === PROPOSE_TERMS_TOOL &&
+        a.to === input.to &&
+        a.revises === input.revises &&
+        canonicalize(a.terms as never) === canonicalize(input.terms as never)
+      ) {
+        return this.#runOfferScope(input.approvalId, run, self.agentId);
+      }
+    }
+    const to = input.to;
+    for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
+      await this.#deps.identity.assertCanSend();
+      if (to === self.agentId) return rejected('INVALID_ARGUMENT');
+      const contact = await this.#activeContact(to);
+      const snapshot = await loadTermsSnapshot(this.#ctx, self.agentId, to);
+      const now = nowOf(this.#ctx);
+      let termsId: string;
+      let link: { version: number; previousTermsHash: string | null };
+      let thread: string;
+      if (input.revises === undefined) {
+        termsId = encodeBase64url(randomBytes(BYTE_LENGTHS.termsId));
+        link = { version: 1, previousTermsHash: null };
+        thread = await this.#threadWith(to);
+      } else {
+        const entry = snapshot.byEnvelope.get(input.revises);
+        const n = entry === undefined ? undefined : snapshot.negotiations.get(entry.key);
+        const own = entry?.record;
+        if (own === undefined || n === undefined || newestOffer(n)?.envelopeId !== own.envelopeId) {
+          return rejected('USE_RESPOND_TO_TERMS');
+        }
+        termsId = n.termsId;
+        link = nextTermsLink(n.state, self.agentId);
+        thread = own.thread;
+      }
+      const built = termsFromInput(input.terms, {
+        termsId,
+        version: link.version,
+        previousTermsHash: link.previousTermsHash,
+        self: self.agentId,
+        counterparty: to,
+        now,
+      });
+      if (!built.success) return rejected('INVALID_ARGUMENT');
+      const terms = built.data;
+      // The same slot rules as an unrecorded revision (USE_RESPOND_TO_TERMS otherwise).
+      if (this.#offerSlot(snapshot, self.agentId, terms) === undefined) {
+        return input.revises === undefined
+          ? rejected('TERMS_SUPERSEDED')
+          : rejected('USE_RESPOND_TO_TERMS');
+      }
+      // The fee first: no credits means nothing is sent and the owner is not asked (D-111).
+      const quote = await this.#deps.recorder!.quoteCommitment({ counterparty: to });
+      if (quote.status !== 'ok') return quoteRefusal(quote);
+      const termsHash = termsHashOf(terms);
+      const scope = commitmentScopeSchema.safeParse({
+        v: 1,
+        kind: 'agentlink/commitment',
+        agentId: self.agentId,
+        decision: 'offer',
+        counterparty: { agentId: contact.id, ownerKey: contact.card.ownerNostr.slice(2) },
+        thread,
+        termsId: terms.termsId,
+        version: terms.version,
+        termsHash,
+        answers: null,
+        notarize: true,
+        maxFeeUsd: quote.fee.usd,
+        createdAt: now,
+        expiresAt: Math.min(terms.validUntil, now + COMMITMENT_SCOPE_SECONDS),
+      });
+      if (!scope.success) return rejected('TERMS_EXPIRED');
+      const facts: CommitmentFacts = {
+        kind: 'terms',
+        self: self.agentId,
+        scope: scope.data,
+        terms,
+        supersededByOwnNewer: false,
+      };
+      const evaluation = evaluateCommitment(await this.#policy(), facts);
+      if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
+      if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
+      const commitmentAsked = evaluation.decision === 'approval';
+      const action = {
+        tool: PROPOSE_TERMS_TOOL,
+        args: {
+          to,
+          terms: input.terms,
+          ...(input.revises === undefined ? {} : { revises: input.revises }),
+          notarize: true,
+        },
+        context: {
+          triggers: triggersOf(commitmentAsked, quote.triggers),
+          scope: scope.data,
+          terms,
+          fee: quote.fee,
+        },
+      };
+      // One live scope per firm offer: this agent, the negotiation key and the version (04 §3.4.2).
+      const scopeKey = `offer:${to}:${terms.termsId}:${String(terms.version)}`;
+      const parts = partRows(['offer_envelope', 'offer_record']);
+      const who = renderContactName(contact.display);
+      const summary = `Send version ${String(terms.version)} of your terms to ${who} as a firm offer with proof`;
+      if (commitmentAsked || quote.triggers.length > 0) {
+        const pending = await this.#deps.approvals.request(
+          { action, summary, commitment: { scopeKey, parts } },
+          run === undefined ? {} : { run },
+        );
+        const card = this.#offerCard(
+          contact,
+          scope.data,
+          terms,
+          snapshot,
+          commitmentAsked ? evaluation.autoAccept : null,
+          quote.fee,
+        );
+        return { ...pending, card };
+      }
+      if (evaluation.decision !== 'allow') return rejected('APPROVAL_VOID');
+      const approvalId = await this.#insertGrant(
+        action,
+        scope.data,
+        scopeKey,
+        parts,
+        evaluation.grant.policyHash,
+        summary,
+        run,
+      );
+      const r = await this.#runOfferScope(approvalId, run, self.agentId);
+      if (r.status !== 'rejected' || r.code !== 'TERMS_SUPERSEDED') return r;
+    }
+    return rejected('TERMS_SUPERSEDED');
+  }
+
+  /**
+   * A takeover of a firm-offer call with stored effects (07 §3.3 "Resume"): through its scope,
+   * whose parts run at most once; never a second offer.
+   */
+  async #resumeFirm(input: ProposeTermsInput, run: IdempotencyRun): Promise<ProposeOutcome> {
+    const self = (await this.#self()).agentId;
+    const approvalId =
+      [...run.effects].reverse().find((e) => APPROVAL_EFFECT.test(e) && !isEnvelopeId(e)) ??
+      input.approvalId;
+    if (approvalId === undefined) return this.#resumeOffer(run);
+    const r = await this.#runOfferScope(approvalId, run, self);
+    if (r.status === 'rejected' && r.code === 'APPROVAL_USED' && r.envelopeId !== undefined) {
+      return this.#resumeOffer(run).catch(() => r);
+    }
+    return r;
+  }
+
+  /** Runs the parts of a stored firm offer that have not run, each at most once. */
+  async #runOfferScope(
+    approvalId: string,
+    run: IdempotencyRun | undefined,
+    selfId: string,
+  ): Promise<ProposeOutcome> {
+    for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
+      const r = await this.#runOfferScopeOnce(approvalId, run, selfId);
+      if (r !== 'stale') return r;
+    }
+    return rejected('TERMS_SUPERSEDED');
+  }
+
+  async #runOfferScopeOnce(
+    approvalId: string,
+    run: IdempotencyRun | undefined,
+    selfId: string,
+  ): Promise<ProposeOutcome | 'stale'> {
+    const stored = await this.#stored(approvalId);
+    if (stored === undefined || stored.tool !== PROPOSE_TERMS_TOOL) {
+      return rejected('APPROVAL_VOID');
+    }
+    const self = await this.#self();
+    const { scope, terms } = stored;
+    if (self.agentId !== selfId || scope.agentId !== selfId || scope.decision !== 'offer') {
+      return rejected('APPROVAL_VOID');
+    }
+    const parts = await this.#ctx.store.transaction((tx) =>
+      tx.select('commitment_parts', { approval_id: approvalId }),
+    );
+    const envelopePart = parts.find((p) => p.part === 'envelope');
+    const recordPart = parts.find((p) => p.part === 'record');
+    if (envelopePart === undefined || recordPart === undefined) return rejected('APPROVAL_VOID');
+    // Not yet on-chain: unclaimed (it runs) or claimed (resent unchanged, never signed again).
+    const recordOpen = recordPart.state === 'unclaimed' || recordPart.state === 'claimed';
+    const sent = (envelopeId: string, proof?: TermsProof): TermsSent => ({
+      status: 'ok',
+      envelopeId,
+      thread: scope.thread,
+      termsId: scope.termsId,
+      version: scope.version,
+      termsHash: scope.termsHash,
+      validUntil: terms.validUntil,
+      ...(proof === undefined ? {} : { proof }),
+    });
+    const used = (envelopeId: string | null | undefined): TermsRejected =>
+      rejected(
+        'APPROVAL_USED',
+        envelopeId === null || envelopeId === undefined ? {} : { envelopeId },
+      );
+    // Already sent and recorded (or the Record is void): never a part twice (04 §3.4.2).
+    if (envelopePart.state === 'done' && !recordOpen) return used(envelopePart.item_ref);
+    if (envelopePart.state === 'claimed' && envelopePart.item_ref !== null) {
+      await this.#publish(envelopePart.item_ref);
+      await this.#markEnvelopeDone(approvalId, envelopePart.item_ref);
+      if (!recordOpen) return used(envelopePart.item_ref);
+    }
+    const facts: CommitmentFacts = {
+      kind: 'terms',
+      self: selfId,
+      scope,
+      terms,
+      supersededByOwnNewer: false,
+    };
+    const authority = await this.#authority(stored, self, await this.#policy(), facts);
+    if (authority === 'pending') {
+      const card = await this.commitmentCard(approvalId);
+      let summary: string;
+      try {
+        summary = await open(this.#ctx, 'approvals', 'summary', [approvalId], stored.row.summary);
+      } catch {
+        return rejected('APPROVAL_VOID');
+      }
+      if (card === undefined) return rejected('APPROVAL_VOID');
+      return {
+        status: 'pending_approval',
+        approvalId,
+        actionDigest: computeActionDigest(stored.action),
+        summary,
+        expiresAt: stored.row.expires_at,
+        card,
+      };
+    }
+    if (authority !== 'ok') {
+      await this.#voidParts(approvalId, 'void');
+      return rejected(authority === 'ask_owner' ? 'APPROVAL_VOID' : authority);
+    }
+    const envelopeUnrun = envelopePart.state === 'unclaimed';
+    const voidRule = await this.#offerVoidRule(stored, selfId);
+    if (voidRule !== undefined) {
+      await this.#voidParts(approvalId, voidRule.reason);
+      return rejected(voidRule.code);
+    }
+    if (envelopePart.state === 'void') {
+      return rejected(envelopePart.void_reason === 'expired' ? 'TERMS_EXPIRED' : 'APPROVAL_VOID');
+    }
+    let envelopeId: string;
+    if (envelopeUnrun) {
+      const snapshot = await loadTermsSnapshot(this.#ctx, selfId, scope.counterparty.agentId);
+      // Void rule 1 (04 §3.4.2): before the offer is sent, its slot must still be the same.
+      const slot = this.#offerSlot(snapshot, selfId, terms);
+      if (slot === undefined) {
+        await this.#voidParts(approvalId, 'superseded');
+        return rejected('TERMS_SUPERSEDED');
+      }
+      const now = nowOf(this.#ctx);
+      const scopeKey = stored.row.scope_key;
+      const out = await this.#sendEnvelope({
+        to: scope.counterparty.agentId,
+        payload: {
+          type: 'offer',
+          body: { terms, termsHash: scope.termsHash, note: null },
+          replyTo: slot.replyTo,
+          files: [],
+        },
+        thread: scope.thread,
+        snapshot,
+        run,
+        claimTx: (tx, id, json) => {
+          if (scopeKey !== null) {
+            for (const other of tx.select('approvals', { scope_key: scopeKey })) {
+              if (other.approval_id === approvalId) continue;
+              const taken = tx.count('commitment_parts', {
+                approval_id: other.approval_id,
+                part: 'envelope',
+                state: { in: ['claimed', 'done'] },
+              });
+              if (taken > 0) return false;
+            }
+          }
+          return (
+            tx.update(
+              'commitment_parts',
+              { approval_id: approvalId, part: 'envelope', state: 'unclaimed' },
+              { state: 'claimed', item_ref: id, item_json: json, claimed_at: now, updated_at: now },
+            ) === 1
+          );
+        },
+      });
+      if (out.kind === 'stale') return 'stale';
+      if (out.kind === 'denied') return rejected('POLICY_DENIED');
+      if (out.kind !== 'sent') {
+        const now2 = await this.#ctx.store.transaction((tx) =>
+          tx.get('commitment_parts', { approval_id: approvalId, part: 'envelope' }),
+        );
+        if (now2?.state === 'claimed' && now2.item_ref !== null) {
+          await this.#publish(now2.item_ref);
+          await this.#markEnvelopeDone(approvalId, now2.item_ref);
+        }
+        return used(now2?.item_ref);
+      }
+      await this.#markEnvelopeDone(approvalId, out.envelopeId);
+      envelopeId = out.envelopeId;
+    } else {
+      if (envelopePart.item_ref === null) return rejected('APPROVAL_VOID');
+      envelopeId = envelopePart.item_ref;
+    }
+    const proof = await this.#recordPart(approvalId, stored, envelopeId);
+    if (proof === 'lost') return used(envelopeId);
+    return sent(envelopeId, proof);
+  }
+
+  /**
+   * Void rules 2, 3 and 5 for a firm offer (04 §3.4.2; rule 1 is the slot check before sending):
+   * the scope's expiry, the contact (status, owner key, card) and the stored terms binding.
+   */
+  async #offerVoidRule(
+    stored: StoredCommitment,
+    self: string,
+  ): Promise<{ code: TermsCode; reason: 'expired' | 'void' } | undefined> {
+    const { scope } = stored;
+    if (nowOf(this.#ctx) > scope.expiresAt) return { code: 'TERMS_EXPIRED', reason: 'expired' };
+    const voided = { code: 'APPROVAL_VOID' as const, reason: 'void' as const };
+    let contact: ContactView;
+    try {
+      contact = await this.#deps.contacts.get(scope.counterparty.agentId);
+    } catch {
+      return voided;
+    }
+    if (
+      contact.status !== 'active' ||
+      contact.pairing !== 'complete' ||
+      contact.card.ownerNostr.slice(2) !== scope.counterparty.ownerKey ||
+      contact.card.issuedAt > scope.createdAt
+    ) {
+      return voided;
+    }
+    if (
+      !checkCommitmentBinding(self, scope, stored.terms).ok ||
+      termsHashOf(stored.terms) !== scope.termsHash
+    ) {
+      return voided;
+    }
+    return undefined;
+  }
+
+  /** The card of a firm offer (11 §6.10): our own terms, the changes from our previous version. */
+  #offerCard(
+    contact: ContactView,
+    scope: CommitmentScope,
+    terms: Terms,
+    snapshot: TermsSnapshot,
+    autoAccept: AutoAcceptMiss | null,
+    fee: ApprovalFee | null,
+  ): CommitmentCard {
+    const n = this.#negotiationOf(snapshot, terms.termsId);
+    const open = (r: TermsRecord) => (offerState(n, r.envelopeId) === 'open' ? 0 : 1);
+    const previous = (n?.records ?? [])
+      .filter((r) => r.type === 'offer' && r.terms.version < terms.version)
+      .sort((a, b) => b.terms.version - a.terms.version || open(a) - open(b))[0];
+    return {
+      decision: 'offer',
+      counterparty: {
+        agentId: contact.id,
+        display: contact.display,
+        shown: renderContactName(contact.display),
+      },
+      version: terms.version,
+      terms,
+      changes: previous === undefined ? null : termsChanges(previous.terms, terms),
+      parts: commitmentParts({ decision: 'offer', notarize: true }),
+      autoAccept,
+      lateAccept: null,
+      validUntil: terms.validUntil,
+      expiresAt: scope.expiresAt,
+      fee,
+      fingerprint: scope.termsHash,
+    };
   }
 
   // --- card, listing, deferred receipt, expiry -----------------------------------------------------
@@ -1673,8 +2411,8 @@ export class TermsService {
       version: plan.terms.version,
       terms: plan.terms,
       changes: previous === undefined ? null : termsChanges(previous.terms, plan.terms),
-      parts: commitmentParts({ decision: plan.decision, notarize: false }).filter((p) =>
-        plan.parts.includes(p),
+      parts: commitmentParts({ decision: plan.decision, notarize: plan.call.notarize }).filter(
+        (p) => plan.parts.includes(p),
       ),
       autoAccept,
       lateAccept:
@@ -1683,7 +2421,7 @@ export class TermsService {
           : { acceptedVersion: plan.terms.version, newestOwnVersion: newerOwn },
       validUntil: plan.validUntil,
       expiresAt: scope.expiresAt,
-      fee: null,
+      fee: plan.fee,
       fingerprint: scope.termsHash,
     };
   }
@@ -1701,6 +2439,23 @@ export class TermsService {
       return undefined;
     }
     const snapshot = await loadTermsSnapshot(this.#ctx, self, contact.id);
+    if (scope.decision === 'offer') {
+      const e = evaluateCommitment(await this.#policy(), {
+        kind: 'terms',
+        self,
+        scope,
+        terms: stored.terms,
+        supersededByOwnNewer: false,
+      });
+      return this.#offerCard(
+        contact,
+        scope,
+        stored.terms,
+        snapshot,
+        e.decision === 'approval' ? e.autoAccept : null,
+        stored.fee,
+      );
+    }
     const answered =
       scope.answers === null ? undefined : snapshot.byEnvelope.get(scope.answers.envelopeId);
     if (answered === undefined) return undefined;
@@ -1726,7 +2481,7 @@ export class TermsService {
       call: {
         envelopeId: stored.args.envelopeId ?? '',
         decision: (stored.args.decision ?? 'accept') as RespondDecision,
-        notarize: false,
+        notarize: scope.notarize,
       },
       decision: scope.decision,
       contact,
@@ -1737,6 +2492,8 @@ export class TermsService {
       superseded,
       parts: commitmentParts(scope).filter((p) => kinds.has(partRows([p])[0]!)),
       snapshot,
+      fee: stored.fee,
+      proofTriggers: [],
     };
     return this.#card(plan, scope, e.decision === 'approval' ? e.autoAccept : null);
   }

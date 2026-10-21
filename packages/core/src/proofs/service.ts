@@ -68,6 +68,7 @@ import type { Logger } from '@4thtech-io/log';
 import {
   RECEIPT_TYPE_NAMES,
   RECORD_KINDS as RECORD_KIND,
+  compareUsd,
   payloadSchema,
   proofBodySchema,
   proofPackSchema,
@@ -102,7 +103,13 @@ import {
 } from '../policy-engine.js';
 import type { Row } from '../store/schema.js';
 import type { StoreTx } from '../store/store.js';
-import type { KnownRecord, RecordLookup, TermsService } from '../terms-flow.js';
+import type {
+  CommitmentQuote,
+  CommitmentRecorder,
+  KnownRecord,
+  RecordLookup,
+  TermsService,
+} from '../terms-flow.js';
 import type { ProofChain, ProofKit, ProofsPlatform } from './platform.js';
 import { RECEIPT_REQUEST, receiptRequestKey, senderRequestedTx } from './receipt-request.js';
 
@@ -222,7 +229,12 @@ export type ProofCode =
   | 'APPROVAL_INVALID'
   | 'POLICY_CHANGED'
   /** `parentRecordId` is not zero and not a record the chain shows this agent signed (D-109). */
-  | 'PARENT_NOT_OWN';
+  | 'PARENT_NOT_OWN'
+  /**
+   * A terms Record (M1-9d-3): the fee now quoted is above the commitment's `maxFeeUsd`, so the
+   * approval does not cover it (04 §3.4.2). Nothing is signed or charged.
+   */
+  | 'FEE_ABOVE_APPROVED';
 
 /** What one `processInbound` pass did (M1-7g-c). */
 export interface ProofInboundResult {
@@ -438,7 +450,10 @@ function proofTriggers(triggers: readonly ProofTrigger[]): string[] {
   return [...out].sort();
 }
 
-export class ProofService implements RecordLookup {
+/** A terms Record's outcome (M1-9d-3): as `notarize`, never a separate approval. */
+export type CommitmentRecordResult = Exclude<NotarizeResult, PendingApproval>;
+
+export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #ctx: CoreContext;
   readonly #log: Logger;
   readonly #deps: ProofServiceDeps;
@@ -614,6 +629,160 @@ export class ProofService implements RecordLookup {
     return this.#submit(stored);
   }
 
+  // --- terms Records under a commitment scope (M1-9d-3; 04 §3.4.2; 06 §2.2a) ---------------------
+
+  /**
+   * The fee a terms Record would cost now and what the proofs policy says of it, before the terms
+   * flow asks the owner (04 §3.4.2 "One request per call": the fee and any proof trigger join the
+   * commitment's single request). Chain chosen automatically (07 §6.3); nothing funded is
+   * `needs_credits` with the top-up route, before anything is sent or requested. Signs nothing.
+   */
+  async quoteCommitment(input: { readonly counterparty: string }): Promise<CommitmentQuote> {
+    if (this.#platform === undefined) return rejected('PROOFS_UNAVAILABLE');
+    const self = await this.#self();
+    const now = nowOf(this.#ctx);
+    // The verifier refuses a card that expired before the record's chain time (07 §8).
+    const expiresAt = self.card.expiresAt ?? 0;
+    if (expiresAt !== 0 && expiresAt <= now + RECORD_DEADLINE_SECONDS) {
+      return rejected('CARD_EXPIRED');
+    }
+    const effective = await this.#deps.ownerActions.loadPolicy();
+    const priced = await this.#price(self.agentId, effective);
+    if (priced.status !== 'ok') return priced;
+    const counterparty = await this.#counterparty(input.counterparty);
+    if (counterparty === null) return rejected('POLICY_DENIED');
+    const action: ProofAction = {
+      kind: 'proof',
+      feeUsd: priced.fee.usd,
+      maxFeeUsd: priced.fee.usd,
+      counterparty: { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
+    };
+    const pre = await this.#ctx.store.transaction((tx) =>
+      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx) }),
+    );
+    if (pre.decision === 'deny') return rejected('POLICY_DENIED');
+    return Object.freeze({
+      status: 'ok',
+      fee: priced.fee,
+      decision: pre.decision,
+      triggers: pre.decision === 'approval' ? proofTriggers(pre.triggers) : [],
+    });
+  }
+
+  /**
+   * Records a terms envelope this agent sent (the `offer` of a firm offer, kind OFFER; an `accept`,
+   * kind ACCEPT) as the Record part of a commitment scope (04 §3.4.2). The scope's single approval
+   * covers it, so no proof approval is asked here: the fee must be within `maxFeeUsd`, and the
+   * proofs policy and budget are checked again in the transaction that stores the signed Record,
+   * reserves its fee and claims the part (`claimTx`), before anything is submitted. A Record already
+   * stored for the envelope is resent unchanged or reported, never signed again (04 §5).
+   */
+  async recordCommitment(input: {
+    readonly envelopeId: string;
+    readonly approvalId: string;
+    readonly maxFeeUsd: string;
+    /** The owner signed this scope (a policy grant is not an owner approval of the fee). */
+    readonly ownerApproved: boolean;
+    readonly claimTx: (tx: StoreTx, recordId: string, itemJson: string) => boolean;
+  }): Promise<CommitmentRecordResult> {
+    if (this.#platform === undefined) return rejected('PROOFS_UNAVAILABLE');
+    const self = await this.#self();
+    const row = await this.#envelope(input.envelopeId);
+    if (row === undefined || row.direction !== 'out' || row.state !== 'ok') {
+      return rejected('ENVELOPE_NOT_FOUND');
+    }
+    const payload = await this.#payload(row);
+    if (payload === undefined || (payload.type !== 'offer' && payload.type !== 'accept')) {
+      return rejected('ENVELOPE_NOT_FOUND');
+    }
+    const kind = this.#kit.recordKindForPayload(payload);
+    if (kind === null) return rejected('NOT_NOTARIZABLE');
+    // Already recorded, or signed and not landed: never sign a second Record (04 §5).
+    const existing = await this.#ownRows(input.envelopeId);
+    const live = existing.find((r) => r.status !== 'replaced' && r.status !== 'released');
+    if (live !== undefined) return this.#continue(live);
+
+    await this.#deps.identity.assertCanSend();
+    const now = nowOf(this.#ctx);
+    const deadline = now + RECORD_DEADLINE_SECONDS;
+    const signer = await this.#deps.contacts.proofSigner(row.from_key);
+    const expiresAt = signer?.agentCard.expiresAt ?? 0;
+    if (expiresAt !== 0 && expiresAt <= deadline) return rejected('CARD_EXPIRED');
+
+    const effective = await this.#deps.ownerActions.loadPolicy();
+    const priced = await this.#price(self.agentId, effective);
+    if (priced.status !== 'ok') return priced;
+    const { fee, chain, quote } = priced;
+    // The approval covers a fee of at most maxFeeUsd (04 §3.4.2), never more.
+    if (compareUsd(fee.usd, input.maxFeeUsd) > 0) return rejected('FEE_ABOVE_APPROVED');
+    const counterparty = row.contact_id === null ? null : await this.#counterparty(row.contact_id);
+    if (counterparty === null) return rejected('ENVELOPE_NOT_FOUND');
+    const action: ProofAction = {
+      kind: 'proof',
+      feeUsd: fee.usd,
+      maxFeeUsd: fee.usd,
+      counterparty: { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
+    };
+    const built = this.#kit.buildRecord({
+      chainId: chain.config.chainId,
+      notary: chain.config.contracts.notary,
+      signer: self.agentId,
+      envelopeHash: row.envelope_hash,
+      recipient: row.contact_id,
+      kind: kind as RecordKind,
+      feeToken: fee.token,
+      maxFee: quote.total,
+      deadline,
+    });
+    const signature = await this.#kit.signRecord(this.#ctx.keyStore, built);
+    const stored = await this.#storeSigned({
+      built,
+      signature,
+      envelopeId: input.envelopeId,
+      fee,
+      effective,
+      action,
+      approvalId: input.approvalId,
+      ownerApproved: input.ownerApproved,
+      claim: (tx, next) => input.claimTx(tx, next.record_id, next.record_json),
+      replaces: undefined,
+    });
+    if (stored === undefined) return rejected('POLICY_CHANGED');
+    return this.#submit(stored);
+  }
+
+  /** The automatic chain choice and its fee (07 §6.3), as `notarize` makes it, without override. */
+  async #price(
+    payer: string,
+    effective: EffectivePolicy,
+  ): Promise<
+    | {
+        readonly status: 'ok';
+        readonly fee: ApprovalFee;
+        readonly chain: ProofChain;
+        readonly quote: Extract<ChainSelection, { status: 'ok' }>['quote'];
+      }
+    | { readonly status: 'needs_credits'; readonly topUp?: TopUpRoute }
+    | ProofRejected
+  > {
+    const defaultChain =
+      effective.mode === 'fail_closed' ? undefined : effective.policy.proofs.defaultChain;
+    const selection = await this.#select(payer, defaultChain, undefined);
+    if (selection.status === 'needs_credits') {
+      return Object.freeze({ status: 'needs_credits', topUp: selection.topUp });
+    }
+    if (selection.status !== 'ok') return rejected('CHAIN_UNAVAILABLE');
+    const chain = this.#chain(selection.chainId);
+    if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
+    const token = (selection.quote.tokenAddress ?? ZERO_ADDRESS).toLowerCase();
+    const decimals = chain.config.feeTokens.find(
+      (t) => t.symbol === selection.quote.token,
+    )?.decimals;
+    if (decimals === undefined) return rejected('CHAIN_UNAVAILABLE');
+    const fee = feeContextFromQuote({ token, amount: selection.quote.total, decimals });
+    return { status: 'ok', fee, chain, quote: selection.quote };
+  }
+
   /**
    * The sender side of the `parentRecordId` rule (D-109; 05 §3.1, 04 §5.1): the chain must show a
    * record with this ID whose signer is this agent. Absent or another signer's is `PARENT_NOT_OWN`;
@@ -643,7 +812,13 @@ export class ProofService implements RecordLookup {
     readonly effective: EffectivePolicy;
     readonly action: ProofAction;
     readonly approvalId: string | null;
-    readonly claim: ((tx: StoreTx) => boolean) | undefined;
+    /**
+     * Runs first in the storing transaction, with the row about to be stored (a commitment's Record
+     * part is claimed here, M1-9d-3); false stores nothing.
+     */
+    readonly claim: ((tx: StoreTx, row: Row<'proofs'>) => boolean) | undefined;
+    /** The owner approved this exact fee (default: an approval is named). A grant is not one. */
+    readonly ownerApproved?: boolean;
     /** The row and ledger entry of the Record this one replaces (04 §5). */
     readonly replaces: { readonly recordId: string } | undefined;
     /** Keep the sender's receipt-request marker with this Record (M1-33d). */
@@ -673,7 +848,7 @@ export class ProofService implements RecordLookup {
         : undefined;
     try {
       await this.#ctx.store.transaction((tx) => {
-        if (input.claim !== undefined && !input.claim(tx)) throw new Abort();
+        if (input.claim !== undefined && !input.claim(tx, row)) throw new Abort();
         let replacedEntry: string | undefined;
         if (input.replaces !== undefined) {
           const old = tx.select('budget_ledger', { record_id: input.replaces.recordId })[0];
@@ -700,7 +875,7 @@ export class ProofService implements RecordLookup {
             approvalId: input.approvalId,
             deadline: built.record.deadline,
           },
-          ownerApproved: input.approvalId !== null,
+          ownerApproved: input.ownerApproved ?? input.approvalId !== null,
         });
         // Policy or budget moved between the check and this transaction: nothing is kept.
         if (!check.reserved) throw new Abort();
@@ -735,7 +910,7 @@ export class ProofService implements RecordLookup {
   }
 
   /** A stored own row: resend it if it has not landed, or report it. */
-  async #continue(row: Row<'proofs'>): Promise<NotarizeResult> {
+  async #continue(row: Row<'proofs'>): Promise<CommitmentRecordResult> {
     if (ON_CHAIN.includes(row.status)) {
       if (row.status === 'recorded') await this.#announce(row);
       return this.#resultOf(row, true);
@@ -750,7 +925,7 @@ export class ProofService implements RecordLookup {
   }
 
   /** Submits the stored signed item (07 §6.2): the same bytes every time (04 §5). */
-  async #submit(row: Row<'proofs'>): Promise<NotarizeResult> {
+  async #submit(row: Row<'proofs'>): Promise<CommitmentRecordResult> {
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
     const item = parseJson(row.record_json) as unknown as SignedItem;
@@ -787,7 +962,7 @@ export class ProofService implements RecordLookup {
     }
   }
 
-  async #setStatus(row: Row<'proofs'>, status: OwnStatus): Promise<NotarizeResult> {
+  async #setStatus(row: Row<'proofs'>, status: OwnStatus): Promise<CommitmentRecordResult> {
     await this.#ctx.store.transaction((tx) =>
       tx.update('proofs', { record_id: row.record_id, status: { in: [...LIVE] } }, { status }),
     );
@@ -806,6 +981,12 @@ export class ProofService implements RecordLookup {
       );
       if (usd !== undefined)
         settleProofCharged(tx, { recordId: row.record_id, chargedUsd: usd, now });
+      // A commitment's Record part (M1-9d-3; 04 §3.4.2): `claimed` → `done` once the chain shows it.
+      tx.update(
+        'commitment_parts',
+        { part: 'record', item_ref: row.record_id, state: 'claimed' },
+        { state: 'done', done_at: now, updated_at: now },
+      );
     });
     this.#selector?.clear();
   }
@@ -824,7 +1005,7 @@ export class ProofService implements RecordLookup {
     });
   }
 
-  #resultOf(row: Row<'proofs'>, confirmed: boolean): NotarizeResult {
+  #resultOf(row: Row<'proofs'>, confirmed: boolean): CommitmentRecordResult {
     const chain = this.#chain(row.chain_id);
     const fee = this.#feeOf(row);
     const base = {
@@ -1003,12 +1184,16 @@ export class ProofService implements RecordLookup {
       (tx) => tx.select('budget_ledger', { record_id: row.record_id, state: 'reserved' })[0],
     );
     if (entry === undefined) return undefined;
-    // A Record approved outside a commitment is not replaced after its approval's expiresAt.
+    // An approved Record is not replaced after its approval's expiresAt (for a commitment, the
+    // scope's: the row's expires_at never outlives it, 04 §3.4.2).
+    let ownerApproved = false;
     if (entry.approval_id !== null) {
       const approval = await this.#ctx.store.transaction((tx) =>
         tx.get('approvals', { approval_id: entry.approval_id as string }),
       );
       if (approval === undefined || now > approval.expires_at) return undefined;
+      // A policy grant is a ledger row, never the owner's approval of a fee (04 §3.4.2).
+      ownerApproved = approval.source === 'owner';
     }
     const envelope = await this.#envelope(row.envelope_id);
     if (envelope === undefined) return undefined;
@@ -1047,7 +1232,29 @@ export class ProofService implements RecordLookup {
             : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
       },
       approvalId: entry.approval_id,
-      claim: undefined,
+      ownerApproved,
+      // A commitment's Record part follows its stored item (04 §3.4.2 "A signed item that did not
+      // land"): same part, still `claimed`, the replacement in the old item's place.
+      claim: (tx, next) => {
+        const part = tx.select('commitment_parts', {
+          part: 'record',
+          item_ref: row.record_id,
+          state: 'claimed',
+        })[0];
+        if (part !== undefined) {
+          tx.update(
+            'commitment_parts',
+            { approval_id: part.approval_id, part: 'record', item_ref: row.record_id },
+            {
+              item_ref: next.record_id,
+              item_json: next.record_json,
+              replacements: part.replacements + 1,
+              updated_at: now,
+            },
+          );
+        }
+        return true;
+      },
       replaces: { recordId: row.record_id },
     });
     if (stored === undefined) return undefined;

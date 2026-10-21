@@ -3301,7 +3301,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split (2026-10-19):** M1-9d-1 (`agentlink_send` `path`, `agentlink_fetch_file`, `agentlink_status` `storage`) is in review; M1-9d-2 (`notarize`, `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, the proof-pack tools, receipts, `credits`, `agentAddress`, `topUpUrl`, `prices`) follows. M1-9d-1 notes: `expiresInDays` on send is not exposed yet (the core uses `files.defaultExpiryDays`); a send with `path` and no `text` or `body` carries an empty text; the `needs_setup` next steps name no local settings link, because neither `agentlink policy` (M1-9m) nor the settings page has landed, so owners cannot yet allow a folder; the drop fetch is the global fetch held to the drop's https origin with redirects off (an SSRF-safe non-GET fetch in `@4thtech-io/node` would be the stricter form). Map any chain wording at the tool layer in M1-9d-2; add `aws4fetch` to the CLI when own S3 storage is wired.
 
 #### M1-9d-2 · MCP server: proof tools (new, split from M1-9d, D-101)
-- **Status:** done (4thtech/agentlink#308, merged 2026-10-19) · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#308, merged 2026-10-19); `notarize` on the terms tools did not land here (the core refused it with `NOTARIZE_UNAVAILABLE`) and moved to M1-9d-3 (IR-M1-13c-1) · **Size:** L · **Tier:** Opus · **Security:** S2 (key disclosure and paid actions, D-101) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/**`)
 - **Depends on:** M1-9d-1 (done); M1-4d-c (D-96 code and wording); D-95 (interim `record_only`); M1-26 (done); M1-10a (done); M1-9o, M1-9p, M1-9q (copy templates; file and proof templates through M1-9g)
 - **Spec:** 06 §2.0, §2.1 (`credits`, `prices`), §2.2 (`notarize`), §2.2a (receipts and `notarize`), §2.4, §9; 07 §8; 04 §3.4.2; 12 §4.3; D-53, D-55, D-87, D-95, D-96; G-25, G-43
@@ -3317,6 +3317,21 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Register the proof tools against the 06 §2.0 table in M1-9e's rules, with an explicit, justified allowlist entry for `export`; never loosen a rule.
   - Map `@4thtech-io/chain` error codes to 11 §5 copy; never pass chain or contract wording through.
 - **Acceptance:** the proof lines of the M1-9d acceptance, as tool-layer tests: `agentlink_notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`; `agentlink_notarize` on an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS` with no record submitted; `agentlink_acknowledge` `accepted` on a record with terms → `USE_RESPOND_TO_TERMS`; export with the content key creates an approval and writes nothing before it; `agentlink_verify_proof_pack` outside the D-87 folders → `PATH_NOT_ALLOWED` with the file never opened; the name canary returns `signerName` only restricted, with `signerLabel`; schema and behaviour test per `status` value of each tool; RED commit.
+
+#### M1-9d-3 · Terms tools: firm offers and recorded accepts (new, from IR-M1-13c-1)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (commitments and paid actions, D-31, D-55) · **Phase:** M1b · **Blocks:** M1 GATE (J8)
+- **Repo/path:** agentlink · packages/core (`src/terms-flow.ts`, `src/proofs/service.ts`), apps/cli (`src/tools/propose-terms.ts`, `respond-to-terms.ts`, `terms-common.ts`)
+- **Depends on:** M1-32 (done), M1-7g, M1-7g-d (done: the deferred ACCEPTED receipt), M1-9d-2 (done); D-114 (the submitter side of receipts is M1-34-b, not this card)
+- **Spec:** 06 §2.2a, §2.4, §3 "Commitments"; 04 §3.4, §3.4.2; 05 §3.1 (kinds `OFFER`, `ACCEPT`), 05 §3.3; 07 §2.1, §6.3, §8; 02 J8; 11 §5, §5.6; D-31, D-55, D-109, D-111, D-114
+- **Invariants:** I-4, I-5, I-6, I-7
+- **Finding:** IR-M1-13c-1 (verified by an independent reviewer): the terms tools refused `notarize` with `NOTARIZE_UNAVAILABLE` and `agentlink_notarize` refuses offers with `USE_TERMS_TOOLS`, so no offer or accept was ever recorded and the proof of agreement of J8 could not be reached. M1-9d-2 listed it in scope; the code comment pointed to M1-7i (the policy-rules card).
+- **Scope:**
+  - `agentlink_propose_terms` with `notarize`: a firm offer (scope `offer`, `answers: null`), one `offer` envelope and its `OFFER` Record under exactly one commitment approval (fee on the same card, 04 §3.4.2 "One request per call"); never covered by the auto-accept limits.
+  - `agentlink_respond_to_terms` `accept` with `notarize`: the `accept` envelope, its `ACCEPT` Record and the `ACCEPTED` receipt part under one approval; the Record part is left out (nothing charged) when the offer is already recorded.
+  - The existing credits flow: `needs_credits` before the owner is asked, nothing sent; automatic network choice (07 §6.3); the fee bound by `maxFeeUsd`; the Record part claimed in the transaction that stores the signed Record and reserves its fee.
+  - `counter` and `reject` with `notarize` stay refused (`NOTARIZE_UNAVAILABLE`, nothing sent).
+  - Fix the stale terms-flow comment (M1-7i).
+- **Acceptance:** core tests, two real cores against the in-memory Notary: both J8 shapes end with an `ACCEPTED` receipt on-chain and an exported pack that verifies with the owner's signed approval; one owner approval per side; zero credits gives `needs_credits` with nothing sent or asked; a changed argument gets a new approval; a repeat with the same `approvalId` signs and charges nothing more; summaries carry no terms text (I-5); RED commit. The e2e `it.fails` J8 tests of M1-13c flip to plain tests once both land.
 
 #### M1-9e · MCP conformance and tool-surface guard
 - **Status:** done (4thtech/agentlink#143, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
