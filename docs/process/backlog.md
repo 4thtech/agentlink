@@ -2171,7 +2171,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An unverified envelope that reuses another envelope's `id` (different `envelopeHash`, or a bad signature) does not suppress the real one (IR-M1-5a-1 L-3).
 
 #### M1-5d · transport-nostr: more events than a relay's cap within one second (new, IR-M1-5c-1 residual)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
+- **Status:** in review (built: detect and report a gap; later options in 07 §4.2) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M1-5c
 - **Spec:** 07 §4.2 (Sync), §4.3 (relay lists); 04 §3.5; 06 §6

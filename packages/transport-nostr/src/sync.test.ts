@@ -1645,6 +1645,150 @@ describe('a saturated second (IR-M1-5c-1 H-1b)', () => {
   });
 });
 
+// --- M1-5d: more events than a relay's cap within one second -------------------------------------
+
+describe('more events than the relay cap within one second (M1-5d)', () => {
+  it('reports the overflowing second of a capped relay with a fixed reason, and still moves on', async () => {
+    const s = setup();
+    const [relay] = relayUrls('gap-one', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const T = NOW - 1_000;
+    const same = Array.from({ length: 8 }, () => makeWrap(s.recipient, { createdAt: T }));
+    const older = makeWrap(s.recipient, { createdAt: T - 3 * HOUR });
+    for (const w of same) s.net.inject(relay, w.event);
+    s.net.inject(relay, older.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    // Only the cap of that second can be read from this relay; the rest is reported, not dropped.
+    expect(ids(s)).toContain(older.event.id);
+    expect(s.items).toHaveLength(6);
+    expect(result.gaps).toEqual([{ relay, second: T, reason: 'relay_cap' }]);
+    // Reading the same relay again cannot fetch it, so the pass is not held for it (a junk flood
+    // must not stall the cursor, H-1b).
+    expect(result.partial).toBe(false);
+    expect(s.store.cursors.get(relay)).toBe(NOW);
+  });
+
+  it('reports a saturated second even when nothing older lies in the window', async () => {
+    const s = setup();
+    const [relay] = relayUrls('gap-alone', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const T = NOW - 2 * HOUR;
+    for (let i = 0; i < 7; i += 1) {
+      s.net.inject(relay, makeWrap(s.recipient, { createdAt: T }).event);
+    }
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(s.items).toHaveLength(5);
+    expect(result.gaps).toEqual([{ relay, second: T, reason: 'relay_cap' }]);
+  });
+
+  it('delivers every wrap of the second across the relay list, and names only the capped relay', async () => {
+    const s = setup();
+    const [capped, full] = relayUrls('gap-two', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(full);
+    const T = NOW - 1_000;
+    const same = Array.from({ length: 9 }, () => makeWrap(s.recipient, { createdAt: T }));
+    const older = makeWrap(s.recipient, { createdAt: T - 5 * HOUR });
+    for (const w of [...same, older]) {
+      s.net.inject(capped, w.event);
+      s.net.inject(full, w.event);
+    }
+    const result = await s.engine.sync({
+      relays: [capped, full],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect([...ids(s)].sort()).toEqual([...same, older].map((w) => w.event.id).sort());
+    expect(result.delivered).toBe(10);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+    expect(result.partial).toBe(false);
+  });
+
+  it('reports no gap for a capped relay whose seconds each hold fewer events than its cap', async () => {
+    const s = setup();
+    const [relay] = relayUrls('gap-none', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const wraps = Array.from({ length: 23 }, (_, i) =>
+      makeWrap(s.recipient, { createdAt: NOW - 600 - Math.floor(i / 2) * 60 }),
+    );
+    for (const w of wraps) s.net.inject(relay, w.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.delivered).toBe(23);
+    expect(result.gaps ?? []).toEqual([]);
+  });
+
+  it('reports no gap for a single wrap or an empty relay', async () => {
+    const s = setup();
+    const [one, empty] = relayUrls('gap-single', 2) as [string, string];
+    s.net.configure(one);
+    s.net.configure(empty);
+    s.net.inject(one, makeWrap(s.recipient, { createdAt: NOW - HOUR }).event);
+    const result = await s.engine.sync({
+      relays: [one, empty],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.delivered).toBe(1);
+    expect(result.gaps ?? []).toEqual([]);
+  });
+
+  it('bounds the reported seconds by the page bound, and logs only their count', async () => {
+    const s = setup();
+    const [relay] = relayUrls('gap-many', 1) as [string];
+    s.net.configure(relay, { maxLimit: 2 });
+    for (let sec = 0; sec < 40; sec += 1) {
+      for (let k = 0; k < 3; k += 1) {
+        s.net.inject(relay, junkWrap(s.recipient.pubkey, NOW - 100 - sec) as unknown as NostrEvent);
+      }
+    }
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    const gaps = result.gaps ?? [];
+    expect(gaps.length).toBe(40);
+    expect(gaps.length).toBeLessThanOrEqual(MAX_PAGES_PER_PASS);
+    expect(gaps.every((g) => g.relay === relay && g.reason === 'relay_cap')).toBe(true);
+    expect(new Set(gaps.map((g) => g.second)).size).toBe(40);
+    const text = s.lines.join('\n');
+    expect(text).toContain('"gaps":40');
+    for (const g of gaps) expect(text).not.toContain(String(g.second));
+  });
+
+  it('logs the count of reported seconds of a live subscription, never the seconds', async () => {
+    const s = setup();
+    const [relay] = relayUrls('gap-live', 1) as [string];
+    s.net.configure(relay, { maxLimit: 5 });
+    const T = NOW - 1_000;
+    for (let i = 0; i < 8; i += 1) {
+      s.net.inject(relay, makeWrap(s.recipient, { createdAt: T }).event);
+    }
+    const unsubscribe = s.engine.subscribe({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    await unsubscribe();
+    const text = s.lines.join('\n');
+    expect(text).toContain('relay second over cap');
+    expect(text).not.toContain(String(T));
+  });
+});
+
 describe('a bound drop shared between relays (L-2)', () => {
   it("holds the cursor of a relay that waited on another relay's over-bound drop", async () => {
     const s = setup();
