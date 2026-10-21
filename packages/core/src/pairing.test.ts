@@ -25,7 +25,7 @@ import {
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
 import type { Invite } from '@4thtech-io/types';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SignedCard } from './card.js';
 import { AgentLinkClient } from './client.js';
 import type { InboundReport } from './envelopes.js';
@@ -590,6 +590,71 @@ async function bodyOf(x: Agent, id: string): Promise<Record<string, JsonValue>> 
   );
   return (parseJson(text) as { body: Record<string, JsonValue> }).body;
 }
+
+describe('the invite binds the contact id (M1-9ze; 04 §3.6 Accept, 06 §2.1)', () => {
+  /** Everything an accept could write on B: a refused accept must leave all of it unchanged. */
+  const snapshot = (x: Agent) =>
+    x.store.transaction((tx) => [
+      tx.select('pairings'),
+      tx.select('envelopes'),
+      tx.select('contacts'),
+      tx.select('invites'),
+    ]);
+
+  it('refuses, writing nothing, when the staged counterparty is not the contact the invite names', async () => {
+    const c = await agent(3, ownerC, 'carol');
+    const invite = await a.client.pairing.createInvite();
+    const fromC = await decodeInviteLink((await c.client.pairing.createInvite()).inviteUrl);
+    const contacts = b.client.contacts;
+    const original = contacts.prepareStage.bind(contacts);
+    // A stand-in for any path that stages a card other than the one the invite carried.
+    const spy = vi.spyOn(contacts, 'prepareStage').mockImplementation((input) =>
+      original({
+        ...input,
+        card: fromC.card,
+        cardSig: fromC.cardSig,
+        cardAgentSig: fromC.cardAgentSig,
+        name: fromC.name,
+        relays: fromC.relays,
+      }),
+    );
+    try {
+      const before = await snapshot(b);
+      const refused = b.client.pairing.acceptInvite({ link: invite.inviteUrl, allowed: true });
+      await expect(refused).rejects.toMatchObject({ code: 'invite_invalid' });
+      const error = await refused.catch((e: unknown) => e as Error);
+      // A fixed message: no inbound name, id or key material (I-2, I-5).
+      expect(error.message).toBe('The invite link is not valid.');
+      for (const leak of ['carol', 'alice', a.id, c.id, fromC.cardSig]) {
+        expect(error.message).not.toContain(leak);
+      }
+      expect(spy).toHaveBeenCalledOnce();
+      expect(await snapshot(b)).toEqual(before);
+      expect(b.lines.join('\n')).not.toContain('pairing started');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('accepts when the staged counterparty is the contact the invite names', async () => {
+    const invite = await a.client.pairing.createInvite();
+    const contacts = b.client.contacts;
+    const spy = vi.spyOn(contacts, 'prepareStage');
+    try {
+      const accepted = await b.client.pairing.acceptInvite({
+        link: invite.inviteUrl,
+        allowed: true,
+      });
+      expect(accepted.status).toBe('pending');
+      expect(accepted.contact.id).toBe(a.id);
+      const staged = await spy.mock.results[0]?.value;
+      expect(staged.staged.card.agentEvm).toBe(a.id);
+      expect(await count(b, 'pairings')).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
 
 describe('re-pair and crossed invites (04 §2.9)', () => {
   it('a verified invite with an existing contact real card, never acked, changes nothing', async () => {
