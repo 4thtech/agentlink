@@ -11,6 +11,7 @@
 //   host. Address and amount sit in the fragment; no network or token is in it. The host is never
 //   read from a route, a result or any inbound text. The agent address also travels as its own
 //   field (`agentAddress`).
+import { PAY_PAGE, type PayPageConfig } from '@4thtech-io/chain';
 import {
   CoreError,
   buildTopUpLink,
@@ -42,20 +43,21 @@ export function dollars(usd: unknown): string | undefined {
 }
 
 /**
- * The top-up link (06 §2.1, D-113). `shortfallUsd` (a checked USD decimal) sets the suggested
- * amount per 08 §1; without it the link has no `usd`. `payHost` is the shipped config (the core's
- * default) unless a caller passes its own configured host. Undefined for a malformed agent ID.
+ * The top-up link (06 §2.1, D-113). Undefined while the pay page is not live (the shipped config
+ * says so until the page exists) or when the agent ID is malformed. `shortfallUsd` (a checked USD
+ * decimal) sets the suggested amount per 08 §1; without it the link has no `usd`.
  */
 export function topUpUrl(
   agentId: string,
   shortfallUsd?: string,
-  payHost?: string,
+  payPage: PayPageConfig = PAY_PAGE,
 ): string | undefined {
+  if (!payPage.live) return undefined;
   const usd = shortfallUsd === undefined ? undefined : suggestTopUpUsd(shortfallUsd);
   return buildTopUpLink({
     agentAddress: agentId,
+    payHost: payPage.host,
     ...(usd === undefined ? {} : { usd }),
-    ...(payHost === undefined ? {} : { payHost }),
   });
 }
 
@@ -73,7 +75,7 @@ export const PROOF_TEXT = Object.freeze({
     'Adding proof needs credits. Tell the user to add credits here: {url}. {covers}Messages and files stay free. Then call this tool again.',
   covers: '$5 covers {n} proofs. ',
   needsCreditsNoLink:
-    'Tell the user to add credits in the AgentLink app (messages and files stay free). Then call this tool again.',
+    'Tell the user there are not enough credits to add proof, and that adding credits is not available yet in this version of AgentLink (messages and files stay free). Do not give a link.',
   approval: "Adding proof needs the owner's approval, so nothing was recorded yet.",
   failed: "The proof couldn't be recorded.",
   failedNextStep:
@@ -130,9 +132,10 @@ export function needsCredits(
   agentId: string,
   route: { readonly feeUsd?: string; readonly usd?: string } | undefined,
   fields: Readonly<Record<string, unknown>> = {},
+  payPage: PayPageConfig = PAY_PAGE,
 ): HandlerOutput {
   const shortfall = dollars(route?.usd) === undefined ? undefined : route?.usd;
-  const url = topUpUrl(agentId, shortfall);
+  const url = topUpUrl(agentId, shortfall, payPage);
   const fee = dollars(route?.feeUsd);
   const summary =
     fee === undefined ? PROOF_TEXT.needsCreditsNoFee : fill(PROOF_TEXT.needsCredits, { fee });
@@ -146,7 +149,8 @@ export function needsCredits(
         ? fill(PROOF_TEXT.needsCreditsNextStepNoAmount, { url, covers })
         : fill(PROOF_TEXT.needsCreditsNextStep, { usd: add, url, covers });
   // 11 §5.6: the top-up method says the paying account is publicly linked (D-109).
-  return fail('needs_credits', summary, withDisclosure(nextStep, topUpDisclosure()), undefined, {
+  const stepText = url === undefined ? nextStep : withDisclosure(nextStep, topUpDisclosure());
+  return fail('needs_credits', summary, stepText, undefined, {
     ...fields,
     agentAddress: agentId,
     ...(url === undefined ? {} : { topUpUrl: url }),
@@ -301,11 +305,16 @@ export function notarizeOutput(
         { ...fields, ...proofFields(result) },
       );
     case 'needs_credits':
-      return needsCredits(agentId, result.topUp, {
-        ...fields,
-        ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
-        receipts: [],
-      });
+      return needsCredits(
+        agentId,
+        result.topUp,
+        {
+          ...fields,
+          ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
+          receipts: [],
+        },
+        context.payPage,
+      );
     case 'error':
       return fail('error', PROOF_TEXT.failed, PROOF_TEXT.failedNextStep, result.code, {
         ...fields,
@@ -335,7 +344,11 @@ export function notarizeOutput(
 }
 
 /** The ProofStatus of a stored proof (06 §2.4 `agentlink_get_proof`), by its stored status. */
-export function proofViewOutput(view: ProofView, agentId: string): HandlerOutput {
+export function proofViewOutput(
+  view: ProofView,
+  agentId: string,
+  payPage?: PayPageConfig,
+): HandlerOutput {
   const fields = proofFields(view);
   switch (view.status) {
     case 'recorded':
@@ -363,6 +376,7 @@ export function proofViewOutput(view: ProofView, agentId: string): HandlerOutput
         agentId,
         view.fee === undefined ? undefined : { feeUsd: view.fee.usd },
         fields,
+        payPage,
       );
     case 'failed':
     case 'released':

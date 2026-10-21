@@ -6,14 +6,13 @@
 // - Everything after the `#`: the address and the amount never reach the pay host's server or any
 //   CDN log (zero access, 04 §1). The link names no network and no token (D-40).
 // - `{payHost}` is configuration: the shipped testing host until the production domain is decided
-//   (M2-10, D-28, D-56), passed in by the caller from its shipped config. It is never read from
-//   inbound content, a tool argument or an RPC answer. This module never logs and never reads the
+//   (M2-10, D-28, D-56), passed in by the caller from the chain package's shipped config
+//   (`PAY_PAGE`); this module carries no host of its own. It is never read from inbound content, a
+//   tool argument or an RPC answer. This module never logs and never reads the
 //   environment.
 // - The builder is strict and returns undefined instead of a link when anything is malformed.
 //   The address is the agent's own public address; no key or secret is ever an input.
 
-/** The shipped testing host of the pay page (D-28). Not final: the production domain is M2-10. */
-export const TOP_UP_PAY_HOST = 'pay.agentlink.4thtech.io';
 /** The pay page's amount presets in US dollars (docs/design/topup-ux.md §2). */
 export const TOP_UP_PRESETS_USD: readonly number[] = Object.freeze([5, 10, 25]);
 /** The smallest suggested amount: the gasless top-up minimum (12 §4.1, proposed $5). */
@@ -34,8 +33,8 @@ export interface TopUpLinkInput {
   readonly agentAddress: string;
   /** The suggested amount in US dollars (see `suggestTopUpUsd`); optional. */
   readonly usd?: string;
-  /** The pay host from the shipped config; defaults to the shipped testing host. */
-  readonly payHost?: string;
+  /** The pay host from the shipped config (the chain package's `PAY_PAGE.host`). */
+  readonly payHost: string;
 }
 
 /** `usd` as micro-dollars when it is a valid amount within the limits, else undefined. */
@@ -53,7 +52,7 @@ function amountMicro(usd: string): bigint | undefined {
  * malformed amount is refused, never dropped silently, so a caller's mistake cannot go unseen.
  */
 export function buildTopUpLink(input: TopUpLinkInput): string | undefined {
-  const host = input.payHost ?? TOP_UP_PAY_HOST;
+  const host = input.payHost;
   if (!PAY_HOST.test(host)) return undefined;
   if (!AGENT_ADDRESS.test(input.agentAddress)) return undefined;
   if (input.usd !== undefined && amountMicro(input.usd) === undefined) return undefined;

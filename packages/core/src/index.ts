@@ -67,7 +67,6 @@ export {
 export {
   TOP_UP_MAX_USD,
   TOP_UP_MIN_USD,
-  TOP_UP_PAY_HOST,
   TOP_UP_PRESETS_USD,
   buildTopUpLink,
   suggestTopUpUsd,

@@ -287,7 +287,11 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
     expect(r1.text).toContain(link);
     // Both are terminals but an AI app marked the environment.
     const marked = setup({ topUp: (id) => Promise.resolve(needs(id)) });
-    await marked.run(['credits', '--topup'], { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } });
+    await marked.run(['credits', '--topup'], {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      env: { CLAUDECODE: '1' },
+    });
     expect(marked.opened).toEqual([]);
   });
 

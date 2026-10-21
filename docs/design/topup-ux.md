@@ -112,7 +112,7 @@ https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<amount, opt
 - **No network and no token** in the link (D-40). The page detects and chooses.
 - **`usd`** is the suggested amount: the shortfall rounded up to the first preset, at least the minimum. The user can change it.
 - **Checked in the browser.** Exact format, `v=1` only, unknown keys ignored, a malformed address shows "This link is damaged" and no payment method. The page shows the short Agent ID and "Check this matches the Agent ID in your AgentLink app." (11 §6.7).
-- **Host.** The testing host (D-28) until the production domain (M2-10) is decided; the host comes from the chain config, never from inbound content.
+- **Host.** The testing host (D-28) until the production domain (M2-10) is decided; the host comes from the chain config, never from inbound content. The config carries a `live` flag (default off until the page is deployed); no link, QR code or browser open is given while it is off.
 
 ## 6. Status, progress and payment records
 

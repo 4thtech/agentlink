@@ -23,6 +23,7 @@ import {
 } from '../dispatch.js';
 import type { AccountView } from '../tools/context.js';
 import { buildTopUpLink, suggestTopUpUsd } from '@4thtech-io/core';
+import { harnessMarkerSet, isInteractive } from '../runtime/guards.js';
 import { renderQr } from '../terminal/qr.js';
 import { openInBrowser } from '../runtime/open-browser.js';
 import { dollars } from '../tools/proofs-common.js';
@@ -39,8 +40,8 @@ export interface CreditsDeps extends CommandDeps {
   readonly topUpCheck: TopUpCheck;
   /** True while every shipped proof network is a test network (the testnet beta). */
   readonly testnetOnly: () => boolean;
-  /** The pay host from the shipped config; undefined means the core's shipped default (D-113). */
-  readonly payHost?: string;
+  /** The shipped pay page config (the chain package's `PAY_PAGE`); links only when `live`. */
+  readonly payPage: chain.PayPageConfig;
   /** Opens the link in the user's browser; true when it was handed over. Never throws. */
   readonly openBrowser: (url: string) => Promise<boolean>;
 }
@@ -55,7 +56,8 @@ export const CREDITS_TEXT = Object.freeze({
   needs: 'Add at least {usd} in credits to add proof ({fee} each).',
   unavailable: "Can't check right now what to add: the public record didn't answer.",
   topUpHow: 'To add credits, open this link:',
-  topUpNoLink: 'To add credits, open the AgentLink app.',
+  topUpNoLink: "Can't make the link to add credits right now.",
+  topUpNotLive: 'Adding credits is not available yet in this version of AgentLink.',
   openedBrowser: 'Opened it in your browser.',
   qrIntro: 'Or scan this to copy your agent ID to your phone:',
   topUpHelp: 'To see how much to add, run `agentlink credits --topup`.',
@@ -147,6 +149,7 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
         lines.push('');
         const selection = await deps.topUpCheck(agentId).catch(() => undefined);
         let suggested: string | undefined;
+        let needsMore = false;
         if (selection === undefined || selection.status === 'unavailable') {
           lines.push(CREDITS_TEXT.unavailable);
           exit = EXIT_FAILED;
@@ -161,6 +164,7 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
           const add = dollars(selection.topUp.usd);
           const each = dollars(selection.topUp.feeUsd) ?? fee;
           if (add !== undefined) suggested = suggestTopUpUsd(selection.topUp.usd);
+          needsMore = add !== undefined;
           lines.push(
             add === undefined
               ? CREDITS_TEXT.unavailable
@@ -169,23 +173,32 @@ export function createCreditsHandler(deps: CreditsDeps): CommandHandler {
                 : fill(CREDITS_TEXT.needs, { usd: add, fee: each }),
           );
         }
-        const link = buildTopUpLink({
-          agentAddress: agentId,
-          ...(suggested === undefined ? {} : { usd: suggested }),
-          ...(deps.payHost === undefined ? {} : { payHost: deps.payHost }),
-        });
-        if (link === undefined) {
-          lines.push(CREDITS_TEXT.topUpNoLink);
+        if (!deps.payPage.live) {
+          // The pay page does not exist yet: no link, no QR code, no browser.
+          lines.push(CREDITS_TEXT.topUpNotLive);
         } else {
-          lines.push(CREDITS_TEXT.topUpHow, link);
-          if (context.terminal.stdoutIsTTY) {
-            const opened = await deps.openBrowser(link).catch(() => false);
-            if (opened) lines.push(CREDITS_TEXT.openedBrowser);
+          const link = buildTopUpLink({
+            agentAddress: agentId,
+            payHost: deps.payPage.host,
+            ...(suggested === undefined ? {} : { usd: suggested }),
+          });
+          if (link === undefined) {
+            lines.push(CREDITS_TEXT.topUpNoLink);
+          } else {
+            lines.push(CREDITS_TEXT.topUpHow, link);
+            // Only when credits are needed, and only for a person at a terminal: an AI app that
+            // runs this command with a pty must not open the user's browser.
+            const person =
+              isInteractive(context.terminal) && !harnessMarkerSet(context.terminal.env);
+            if (needsMore && person) {
+              const opened = await deps.openBrowser(link).catch(() => false);
+              if (opened) lines.push(CREDITS_TEXT.openedBrowser);
+            }
           }
+          lines.push('', CREDITS_TEXT.qrIntro, ...renderQr(agentId));
+          // 11 §5.6: each top-up method says the paying account is publicly linked (D-109).
+          lines.push(topUpDisclosure());
         }
-        lines.push('', CREDITS_TEXT.qrIntro, ...renderQr(agentId));
-        // 11 §5.6: each top-up method says the paying account is publicly linked (D-109).
-        lines.push(topUpDisclosure());
       } else {
         lines.push(CREDITS_TEXT.topUpHelp);
       }
@@ -201,6 +214,7 @@ export function nodeCreditsDeps(over: Partial<CreditsDeps> = {}): CreditsDeps {
     topUpCheck: nodeTopUpCheck(),
     testnetOnly: () => chain.chainRegistry().every((c) => c.testnet),
     openBrowser: openInBrowser,
+    payPage: chain.PAY_PAGE,
     ...over,
   });
 }

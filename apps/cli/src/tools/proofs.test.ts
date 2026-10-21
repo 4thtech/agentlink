@@ -363,7 +363,7 @@ describe('agentlink_notarize (06 §2.4)', () => {
         topUp: {
           chainId: 84532,
           chain: 'base-sepolia',
-          token: 'USDC',
+          token: 'USDC' as const,
           usd: '1.00',
           feeUsd: '0.10',
           agentAddress: A as `0x${string}`,
@@ -404,7 +404,7 @@ describe('agentlink_notarize (06 §2.4)', () => {
         topUp: {
           chainId: 84532,
           chain: 'base-sepolia',
-          token: 'USDC',
+          token: 'USDC' as const,
           usd: '12',
           feeUsd: '0.10',
           agentAddress: A as `0x${string}`,
@@ -423,7 +423,7 @@ describe('agentlink_notarize (06 §2.4)', () => {
     const route = {
       chainId: 84532,
       chain: 'base-sepolia',
-      token: 'USDC',
+      token: 'USDC' as const,
       usd: '1.00',
       feeUsd: '0.10',
       agentAddress: A as `0x${string}`,
@@ -442,10 +442,9 @@ describe('agentlink_notarize (06 §2.4)', () => {
     expect(dump(r)).not.toMatch(/wallet|\bgas\b|transaction|USDC|sepolia/i);
 
     // The same when the context says nothing about the pay page (the shipped default).
-    const r2 = await callTool('agentlink_notarize', { envelopeId: ENVELOPE }, {
-      ...context(client),
-      payPage: undefined,
-    } as ToolContext);
+    const noPayPage: ToolContext = context(client);
+    delete (noPayPage as { payPage?: unknown }).payPage;
+    const r2 = await callTool('agentlink_notarize', { envelopeId: ENVELOPE }, noPayPage);
     expect(r2.structured['topUpUrl']).toBeUndefined();
 
     // A stored needs_credits proof and the status call follow the same rule.
@@ -1048,7 +1047,7 @@ describe('notarize on agentlink_send (06 §2.2: the proofs policy as for agentli
         topUp: {
           chainId: 84532,
           chain: 'base-sepolia',
-          token: 'USDC',
+          token: 'USDC' as const,
           usd: '1.00',
           feeUsd: '0.10',
           agentAddress: A as `0x${string}`,
@@ -1302,7 +1301,7 @@ describe('proof privacy disclosure (11 §5.6, D-109)', () => {
         topUp: {
           chainId: 84532,
           chain: 'base-sepolia',
-          token: 'USDC',
+          token: 'USDC' as const,
           usd: '1.00',
           feeUsd: '0.10',
           agentAddress: A as `0x${string}`,
