@@ -70,7 +70,8 @@ body        STREAM chunks
   2. `owner/seed`: 32 bytes;
   3. per agent, in manifest order: `agent/<agentId>/item/<name>` for each KeyStore item except `s3:*` (OWNER DECISION D), so `seed`, `store-key`, `policy-version`, `receipts-kept`; then `agent/<agentId>/store`: the store snapshot (§2.3).
 - **Checks after decryption.** The owner seed must derive `ownerNostr` (header and manifest); each agent seed must derive its `agentId` (§2.9), and the snapshot's `identity.agent_id` must equal it; its stored card must name `ownerNostr`. Any failure: one generic error, everything wiped, nothing written.
-- **Caps.** Header and plaintext: each agent store snapshot ≤ 1 GiB (proposed), the whole kit ≤ 4 GiB; at most 16 agents. Read is streamed into a private temporary file under the same rules as file quarantine (04 §4, D-84), never whole into memory.
+- **Caps.** Each agent store snapshot ≤ 1 GiB (proposed), the whole kit ≤ 4 GiB; at most 16 agents; every non-store entry ≤ 64 KiB, as `ALKS`.
+- **Secret entries never touch disk (IR-DESIGN-M1-9i-1 M1).** `manifest`, `owner/seed` and every `agent/<agentId>/item/<name>` stay only in `Uint8Array` memory buffers, wiped after use and on every failure; they are never written to a temporary file, never become JS strings, and never reach an error or log. Only the `agent/<agentId>/store` values may be streamed to a private temporary file (the 04 §4 quarantine rules, D-84: created exclusively without following links, mode 0600, stale ones removed at start-up). **Nothing is parsed or acted on before the final chunk authenticates:** the reader buffers secret entries and quarantines store bytes while decrypting, then, only after the final chunk's tag verifies, parses the entry list, runs the checks below and lets restore write anything. Any failure wipes the buffers and deletes the temporary files.
 - **Type separation.** `ALKK` refuses `ALKP`, `ALKR`, `ALKO`, `ALKS` and `ALF1` before the KDF, and each of those refuses `ALKK` (cross-type vectors).
 - **Versioning.** As 04 "Both formats": readers refuse any `version` ≠ 1 before the KDF; v2 needs a spec change, a decision and new vectors. Writers write v1 only. The manifest's `v` is part of v1, not a second version axis.
 - **Primitives.** All through `@4thtech-io/crypto` (Argon2id and HKDF from `@noble/hashes`, AES-GCM through the existing STREAM code of M1-1d). Callers never call a primitive (AGENTS.md, I-8).
@@ -79,9 +80,10 @@ body        STREAM chunks
 
 **Recommended: A1, `full` by default, `--identity-only` as an option.** I-10 and the card's acceptance say "identity, contacts and history". The store keeps only message payloads (≤ ~17 KB each) and metadata; file contents are not in it (they are files in the inbox folder, backed up like any file). A typical store is a few MB.
 
-- *Snapshot.* `VACUUM INTO` a private temporary file under the agent's inter-process lock (06 §6), so the snapshot is consistent and never torn. Its `enc` columns stay sealed under the store key, which travels with it.
+- *Snapshot (IR-DESIGN-M1-9i-1 M2).* Under one hold of the agent's inter-process lock (06 §6), the same lock that guards raising `policy-version` and writing `receipts-kept` (04 §2.2): read the KeyStore items `policy-version` and `receipts-kept`, then `VACUUM INTO` a private temporary file, then release the lock. The marks and the store in the kit are therefore one consistent cut, so a restored policy loads at its mark instead of failing closed with `mark_mismatch`. Its `enc` columns stay sealed under the store key, which travels with it.
 - *`identity` mode.* The same snapshot with message, file, outbox, idempotency and held-envelope rows deleted before sealing (tables named in M1-9i-a against 07 §3). Contacts, pairings, policies, the policy and receipts marks, approvals, nonces, the budget ledger and revocations stay, because the restored agent needs them to keep working.
 - *Privacy trade-off.* A `full` kit plus its code opens all history. The kit is as sensitive as the machine itself; the export copy says so and suggests storing kit and code apart.
+- *Clear header links the kit to its owner (IR-DESIGN-M1-9i-1 L3).* `ownerNostr` is in the clear header, so anyone who finds a kit file can tell whose it is (the owner key is shared with every contact through the card). It reveals nothing else. The gain is that restore can show the owner fingerprint and refuse a different owner before the KDF. Alternative: move it into the encrypted manifest only; restore then checks the owner after the code is typed.
 - *A2 (alternative):* identity and contacts only, history never in the kit. Smaller and lower-impact if leaked, but I-10 and the acceptance test then fail for history; history would need a separate export later.
 
 ### 2.4 One code per kit (OWNER DECISION B)
@@ -105,7 +107,7 @@ No caller ever holds a raw seed. A new **`KeyExportControl`** in `keystore-api.t
 
 | What | Where | Why |
 |---|---|---|
-| endpoint, bucket, region, provider, `id` | Only in the signed `storage.set`, kept verbatim in a new store table `own_storage` (07 §3.4 style): `id` (`id`, clear), `signed_json` (`enc`: the endpoint and bucket identify the user's account), `applied_at` (`int`). At most one row in M1 | Signed and re-verified on load like the policy, so a store or file edit cannot redirect uploads (I-4) |
+| endpoint, bucket, region, provider, `id` | Only in the signed `storage.set`, kept verbatim in a new store table `own_storage` (07 §3.4 style): `id` (`id`, clear), `signed_json` (`enc`: the endpoint and bucket identify the user's account), `applied_at` (`int`). At most one row in M1. Anti-rollback: the agent KeyStore item `storage-mark` (§3.3) | Signed and re-verified on load like the policy, so a store or file edit cannot redirect uploads (I-4) |
 | access key ID, secret access key | KeyStore item `s3:<id>`: keychain account `<agentId>:s3:<id>`, or the `ALKS` entry `s3:<id>` (04 §2.2, §2.8; no format change). Value: JCS JSON `{"v":1,"salt","accessKeyId","secretAccessKey"}`, UTF-8 bytes, kept as `Uint8Array`; `salt` 16 CSPRNG bytes base64url | Keychain is where every agent secret lives (07 §5.2) |
 | `config.json` | Nothing | Unsigned (07 §9.1): it may only make the agent fail to open |
 | Temporary credentials (`sessionToken`) | Refused in M1 | They expire within hours; the agent cannot refresh them |
@@ -120,9 +122,13 @@ No caller ever holds a raw seed. A new **`KeyExportControl`** in `keystore-api.t
 
 A new core read, `ownStorage.load()`, returns one of:
 
-- `none`: no row;
+- `none`: no row, and the `storage-mark` names no active `id`;
 - `ready {config, credentials provider}`: the row's `storage.set` verifies (`sig`, `agent`, `owner`, schema), the item `s3:<id>` exists and its digest matches;
-- `broken {reason}`: a row exists but does not verify, or the item is missing or does not match.
+- `broken {reason}`: a row exists but does not verify, the item is missing or does not match, or the row and the `storage-mark` disagree.
+
+**Anti-rollback (IR-DESIGN-M1-9i-1 L2).** An old signed `storage.set` row plus its old credential item, put back after a `storage.remove` or a newer connect, would still verify. So the agent KeyStore item `storage-mark` (keychain `<agentId>:storage-mark`, `ALKS` entry `storage-mark`), raised under the agent's inter-process lock after each apply and read back, holds JCS JSON `{"v":1,"seq","active"}`: `seq` the count of applied `storage.set` and `storage.remove` actions (canonical decimal as for `policy-version`), `active` the active `id` or `null`. Each apply increments `seq`. On load, the row's `id` must equal `active`; a row with `active` = `null`, or no row with `active` set, reads `broken`. A malformed mark fails closed (`broken`), never `none`. The mark travels in the kit with the other items, and is cleared to `active: null` on restore when credentials are not restored (D1). Residual as for `policy-version`: a same-user process can roll back both (G-1).
+
+**Reload ignores expiry.** As for a stored `policy.set` (04 §2.5.1 "Stored objects are re-verified, not trusted"), freshness and nonce checks apply once, at apply. On every later load the row is re-verified for encoding, `sig`, `agent`, `owner` and schema only; the 600 s `L(op)` and `expiresAt` are not checked again, so a connect keeps working after 10 minutes.
 
 The runtime (CLI and MCP server, `src/runtime`) builds `FilesPlatform.ownStorage` with `createS3Adapter` only for `ready`. `outgoing.ts` already passes `ownStorageConfigured: own !== undefined`; it must also be `true` for `broken`, with an adapter stub that refuses every call (`credentials_unavailable`), so `files.storage: auto` never falls back to the drop when own storage was configured (07 §5.6 step 3). `agentlink_status` `storage.mode` and `doctor` report `broken` with the fix, naming no endpoint, bucket or key. The credentials provider reads the item at each use; the values never become log fields (I-7, canary test).
 
@@ -152,8 +158,9 @@ Interactive terminal, no harness marker. Provider picker → instructions → en
 |---|---|
 | An agent with the same `agentId` | Refuse that agent. Nothing for it is written |
 | An agent folder with the same name, different `agentId` | Refuse unless `--agent <newname>` renames it on restore |
-| The same owner (an owner item, and a local card names `ownerNostr`) | Keep the existing owner item and code; no re-wrap; restore only the agents |
-| An owner item, but no local card names an owner | Refuse (cannot prove it is the same owner without asking for its code; D-78 one owner per OS user) |
+| An owner item exists | Ask for the **existing owner code** at the prompt (three tries). If it opens the item to exactly `ownerNostr`, keep the item and its code, no re-wrap, and restore only the agents. Otherwise refuse and write nothing. A card naming `ownerNostr` is never enough on its own: cards are public, so a same-user process could plant one beside an owner item it controls (IR-DESIGN-M1-9i-1 L1) |
+| An owner item exists and the owner does not have its code | Refuse; the copy explains that a lost code on a machine with an owner needs a clean OS user or a clean machine (C2 would cover this later) |
+| No owner item | Write the owner seed under a new generated owner code (§4.1 step 6) |
 | A different owner | Refuse; restore into a new OS user or a clean machine |
 
 *C2 (alternative):* a `--replace` flag that, after the current owner code is typed, moves the existing agent folder, `.alks` and keychain items to `~/.agentlink/replaced-<timestamp>/` and restores over them. Useful when a machine is half broken, but it adds a destructive path an agent could talk a user into; build it later if needed.
@@ -216,7 +223,7 @@ Interactive terminal, no harness marker. Provider picker → instructions → en
 - `- Credentials (access key ID + secret) stored in the OS keychain (local) or Worker secrets (cloud).`
 - `+ Credentials (access key ID + secret) stored in the KeyStore item \`s3:<id>\` (04 §2.2; the OS keychain or the file KeyStore), bound to the owner-signed \`storage.set\` by \`credentialDigest\` (04 §2.5.1), or in Worker secrets (cloud). Temporary credentials are refused in M1. Not part of the recovery kit.`
 
-**07 §5.6**: add "Own storage counts as configured when a `storage.set` row exists, also when it is `broken` (signature, credentials missing or mismatched); a broken own storage returns `needs_setup` naming `agentlink storage connect`, never the drop."
+**07 §5.6**: add "Own storage counts as configured when a `storage.set` row exists, also when it is `broken` (signature, credentials missing or mismatched); a broken own storage makes the tool return `needs_setup` (core refusal `needs_storage`) naming `agentlink storage connect`, never the drop."
 
 **07 §9.1**: "Moving an agent between backends goes through `backup export` / `restore`" → append "(04 §2.3.3, step 4: restore uses the backend this machine selects)".
 
@@ -228,14 +235,14 @@ Order follows D-82: spec → vectors → implementation.
 
 | Card | Tier, class | Owns (disjoint) | Depends on |
 |---|---|---|---|
-| **M1-9i-s** spec text | Sonnet, S1 | `docs/foundation/04-*.md`, `06-*.md`, `07-*.md`, `00-README.md` (decision row) | owner decisions A to E |
-| **M1-9i-a** types and core ops | Opus, S2 | `packages/types/src/{constants,owner-action}.ts` and tests; `packages/core/src/{owner-action,owner-actions}.ts`, new `packages/core/src/own-storage.ts`, the store migration and `Store` contract for `own_storage`; `packages/core/src/files/outgoing.ts` (`broken` counts as configured); owner-action vectors for the three ops | M1-9i-s |
+| **M1-9i-s** spec text | Opus, S1 (new crypto format text) | `docs/foundation/04-*.md`, `06-*.md`, `07-*.md`, `00-README.md` (decision row) | owner decisions A to E |
+| **M1-9i-a** types and core ops | Opus, S2 | `packages/types/src/{constants,owner-action}.ts` and tests; `packages/core/src/{owner-action,owner-actions}.ts`, new `packages/core/src/own-storage.ts`, the store migration and `Store` contract for `own_storage`; `packages/core/src/files/outgoing.ts` (`broken` counts as configured); owner-action vectors for the three ops; the `storage-mark` read and raise | M1-9i-s, M1-9i-b (`credentialDigest`) |
 | **M1-9i-b** crypto kit format and vectors | Opus, S2 | `packages/crypto/src/recovery-kit.ts` (new), `KeyExportControl`, `KeyImportControl`, `StorageCredentialControl` types in `keystore-api.ts`, `credentialDigest`; `test-vectors/recovery-kit/`, `tools/vectors/generate_recovery_kit.py` (independent of the TypeScript) | M1-9i-s |
 | **M1-9i-c** node backends: export, import, credential items | Opus, S2 | `packages/node/src/**` (keychain and file backends implement the three controls; `s3:<id>` items; restore's owner `ALKO` write via `owner-next`) | M1-9i-b |
 | **M1-9i** (existing, narrowed) CLI commands | Opus, S2 | `apps/cli/src/**`: `storage connect | disconnect`, `backup export | restore`, runtime wiring of `ownStorage.load()`, `doctor` lines, strings; `init`'s kit offer (from M1-9h) | M1-9i-a, M1-9i-c, M1-6b |
 | **M1-9i-d** docs | Sonnet, S0 | README Status, `docs/status.yaml` and generated blocks, quickstart and a restore runbook in `docs/runbooks/`, `changelog.d/` | M1-9i |
 
-M1-9i-a and M1-9i-b can run in parallel after the spec. Every S2 card: tests first with a `RED (expected):` commit, independent Opus audit, Tali's "merge".
+After the spec: M1-9i-b first (it exports `credentialDigest`), then M1-9i-a and M1-9i-c in parallel. Every S2 card: tests first with a `RED (expected):` commit, independent Opus audit, Tali's "merge".
 
 ## 8. Owner decisions
 
