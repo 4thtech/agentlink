@@ -2216,8 +2216,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Existing M1-5b and M1-5c tests stay green; no test is weakened.
   - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
 
-### Storage (`@4thtech-io/storage`)
-
 #### M1-5g · core: sync carries the transport's incomplete flag up to the user (new, IR-M1-5d-1 M-1)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/core (inbox sync), apps/cli (`agentlink_inbox`, `agentlink_status`)
@@ -2230,6 +2228,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first (RED commit): a fake relay that caps results gives an inbox result with the incomplete flag; a normal sync gives none; the flag carries no relay text and no event ID; the tool summary says some messages may be missing and will be tried again.
   - Existing M1-5c and M1-5d tests stay green; no test is weakened.
+
+### Storage (`@4thtech-io/storage`)
 
 #### M1-6a · storage: adapter interface, inline adapter, S3 adapter
 - **Status:** done (4thtech/agentlink#216) · **Size:** M · **Tier:** Sonnet · **Security:** S2 (`packages/*`; card said S1) · **Phase:** M1b
