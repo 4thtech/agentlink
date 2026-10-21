@@ -1329,7 +1329,8 @@ async function sendProofEnvelope(from: Agent, to: Agent, body: ProofBodyIn) {
   await from.store.transaction((tx) => tx.insert('envelopes', row));
   await to.client.envelopes.receive({ envelope: built.envelope });
   const reports = await to.client.envelopes.processReceived();
-  await to.client.proofs.processInbound(reports);
+  const result = await to.client.proofs.processInbound(reports);
+  return { proofEnvelopeId: built.envelope.id, reports, result };
 }
 
 async function sendOffer(a: Agent, b: Agent): Promise<string> {
@@ -1626,7 +1627,7 @@ describe('the sender sets parentRecordId only to zero or its own record (D-109, 
   });
 });
 
-describe('the recipient drops a Record whose parent is another signer’s (04 §3.4 parent check; contact flag pending M1-7g-c)', () => {
+describe('the recipient drops a Record whose parent is another signer’s (04 §3.4 parent check)', () => {
   async function received(parent: (ctx: { a: Agent; b: Agent }) => Promise<string>) {
     const { a, b } = await twoAgents();
     chain.fund(b.id, 10n * FEE_UNITS);
@@ -1714,5 +1715,200 @@ describe('the recipient drops a Record whose parent is another signer’s (04 §
     expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toMatchObject({
       recordId: out.rec.recordId,
     });
+  });
+});
+
+describe('a proof body that does not match the chain flags its contact (04 §3.4, M1-7g-c)', () => {
+  const envelopeRow = (agent: Agent, envelopeId: string) =>
+    agent.store.transaction((tx) => tx.get('envelopes', { envelope_id: envelopeId }));
+
+  /** The flag report for one proof envelope: fixed codes and validated IDs only (I-5). */
+  const flagOf = (proofEnvelopeId: string, contactId: string, reason: string) => ({
+    envelopeId: proofEnvelopeId,
+    outcome: 'refused',
+    reason,
+    contactId,
+    flagged: true,
+  });
+
+  it('a mismatching body flags the contact and stores the proof envelope as refused', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const body = bodyOf(rec, envelopeId);
+    (body.record as RecordJson).envelopeHash = `0x${'e1'.repeat(32)}`;
+    const sent = await sendProofEnvelope(a, b, body);
+    expect(sent.result.reports).toEqual([flagOf(sent.proofEnvelopeId, a.id, 'proof_mismatch')]);
+    // Exactly the fixed keys: nothing from the body or the chain answer (I-5, I-7).
+    for (const r of sent.result.reports) {
+      expect(Object.keys(r).sort()).toEqual(
+        ['contactId', 'envelopeId', 'flagged', 'outcome', 'reason'].sort(),
+      );
+    }
+    const row = await envelopeRow(b, sent.proofEnvelopeId);
+    expect(row).toMatchObject({
+      state: 'refused',
+      refused_reason: 'proof_mismatch',
+      contact_id: a.id,
+      payload_json: null,
+      envelope_json: null,
+    });
+    expect(row?.refused_at).toBe(clock.t);
+    expect(await receipts(b)).toEqual([]);
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+  });
+
+  it('a legacy body naming the wrong record flags the contact too', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const real = await recordDirectly(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const sent = await sendProofEnvelope(a, b, {
+      envelopeId,
+      recordId: real.recordId,
+      salt: `0x${'77'.repeat(32)}`,
+    });
+    expect(sent.result.reports).toEqual([flagOf(sent.proofEnvelopeId, a.id, 'proof_mismatch')]);
+  });
+
+  it('a parent signed by another agent flags the contact with proof_parent_mismatch', async () => {
+    const { a, b } = await twoAgents();
+    chain.fund(b.id, 10n * FEE_UNITS);
+    const reply = await sendText(b, a, 'a reply');
+    const parent = ((await b.client.notarize({ envelopeId: reply })) as { recordId: Hex }).recordId;
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, {
+      parentRecordId: parent,
+    });
+    const sent = await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(sent.result.reports).toEqual([
+      flagOf(sent.proofEnvelopeId, a.id, 'proof_parent_mismatch'),
+    ]);
+    expect(await envelopeRow(b, sent.proofEnvelopeId)).toMatchObject({
+      state: 'refused',
+      refused_reason: 'proof_parent_mismatch',
+    });
+  });
+
+  it('a matching body and a failed chain read flag nothing', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const ok = await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(ok.result.reports).toEqual([]);
+    expect((await envelopeRow(b, ok.proofEnvelopeId))?.state).toBe('ok');
+
+    const other = await sendText(a, b, 'a second message');
+    const rec2 = await signedRecordOf(a, b, other, RECORD_KIND.MESSAGE);
+    chain.readsFail = true;
+    const pend = await sendProofEnvelope(a, b, bodyOf(rec2, other));
+    expect(pend.result.reports).toEqual([]);
+    expect((await envelopeRow(b, pend.proofEnvelopeId))?.state).toBe('ok');
+    expect(await pendingRows(b)).toHaveLength(1);
+  });
+
+  it('a pending body found to mismatch at a later sync flags the contact in that pass', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { put: false });
+    chain.put({ ...rec.built.record, deadline: rec.built.record.deadline + 1 });
+    chain.readsFail = true;
+    const sent = await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(sent.result.reports).toEqual([]);
+    chain.readsFail = false;
+    const later = await b.client.proofs.processInbound([]);
+    expect(later.reports).toEqual([flagOf(sent.proofEnvelopeId, a.id, 'proof_mismatch')]);
+    expect(await pendingRows(b)).toEqual([]);
+    // Checked once: the refused envelope is not checked or flagged again.
+    expect((await b.client.proofs.processInbound(sent.reports)).reports).toEqual([]);
+  });
+
+  it('the flag is not something a tool can clear: the refused proof envelope stays refused', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const real = await recordDirectly(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const sent = await sendProofEnvelope(a, b, {
+      envelopeId,
+      recordId: real.recordId,
+      salt: `0x${'77'.repeat(32)}`,
+    });
+    // Re-processing the same reports (a restart) neither stores the proof nor clears the refusal.
+    const again = await b.client.proofs.processInbound(sent.reports);
+    expect(again).toEqual({ signed: 0, reports: [] });
+    expect((await envelopeRow(b, sent.proofEnvelopeId))?.state).toBe('refused');
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+  });
+});
+
+describe('each contact has a share of the pending pool (04 §3.4, M1-7g-c)', () => {
+  /** `count` pending bodies attributed to `contactId` (white-box rows standing in for real ones). */
+  async function fill(agent: Agent, contactId: string, count: number, tag: string) {
+    const template = await agent.store.transaction(
+      (tx) => tx.select('envelopes', { direction: 'in', contact_id: contactId })[0],
+    );
+    if (template === undefined) throw new Error('test: no envelope from that contact');
+    const empty = await agent.cipher.seal(
+      { table: 'proofs', column: 'salt', rowKey: JSON.stringify(['filler']) },
+      '',
+    );
+    await agent.store.transaction((tx) => {
+      for (let i = 0; i < count; i += 1) {
+        const id = `${tag}${String(i)}`;
+        tx.insert('envelopes', {
+          ...template,
+          envelope_id: id,
+          envelope_hash: `${tag}hash${String(i)}`,
+          type: 'proof',
+        });
+        tx.insert('proofs', {
+          record_id: `pending:${id}`,
+          envelope_id: template.envelope_id,
+          chain_id: chain.config.chainId,
+          record_json: '{}',
+          tx_hash: null,
+          status: PENDING,
+          fee_token: null,
+          fee_amount: null,
+          salt: empty,
+          created_at: clock.t,
+        });
+      }
+    });
+  }
+
+  it('a contact at its share of 32 cannot add a pending body; another contact still can', async () => {
+    const { a, b } = await twoAgents();
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    chain.fund(c.id, 10n * FEE_UNITS);
+    const fromA = await sendText(a, b);
+    const fromC = await sendText(c, b, 'from carol');
+    await fill(b, a.id, 32, 'fillerA');
+
+    chain.readsFail = true;
+    await a.client.notarize({ envelopeId: fromA });
+    await deliver(a, b);
+    expect(logged(b, 'proof_unchecked')).toBe(true);
+    expect((await pendingRows(b)).some((r) => r.envelope_id === fromA)).toBe(false);
+
+    await c.client.notarize({ envelopeId: fromC });
+    await deliver(c, b);
+    expect((await pendingRows(b)).some((r) => r.envelope_id === fromC)).toBe(true);
+
+    chain.readsFail = false;
+    await b.client.proofs.processInbound([]);
+    expect(await b.client.getProof({ envelopeId: fromA })).toBeUndefined();
+    expect(await b.client.getProof({ envelopeId: fromC })).toBeDefined();
+    expect(core.PROOF_PENDING_PER_CONTACT).toBe(32);
+  });
+
+  it('below its share a contact keeps adding pending bodies', async () => {
+    const { a, b } = await twoAgents();
+    const fromA = await sendText(a, b);
+    await fill(b, a.id, 31, 'fillerA');
+    chain.readsFail = true;
+    await a.client.notarize({ envelopeId: fromA });
+    await deliver(a, b);
+    expect((await pendingRows(b)).some((r) => r.envelope_id === fromA)).toBe(true);
+    expect(logged(b, 'proof_unchecked')).toBe(false);
   });
 });
