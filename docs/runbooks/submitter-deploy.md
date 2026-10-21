@@ -39,12 +39,13 @@ Keys are never pasted into GitHub, chat, the sync repo, the Curator or a PR. Eve
    ```bash
    newkey() {  # usage: newkey <SECRET_NAME> <staging|production>
      local w; w="$(cast wallet new --json)" || return 1
-     printf '%s address: %s\n' "$1 ($2)" "$(jq -r '.[0].address' <<<"$w")"
-     jq -r '.[0].private_key' <<<"$w" | tr -d '\n' | pnpm exec wrangler secret put "$1" --env "$2" --config wrangler.toml
+     printf '%s address: %s\n' "$1 ($2)" "$(jq -r '.data[0].address' <<<"$w")"
+     jq -r '.data[0].private_key' <<<"$w" | tr -d '\n' | pnpm exec wrangler secret put "$1" --env "$2" --config wrangler.toml
      unset w
    }
    ```
-   It needs Foundry's `cast` and `jq`. **Not verified by the builder** (no Foundry on the build machine): the jq paths assume `cast wallet new --json` prints `[{"address":"0x…","private_key":"0x…"}]`, as current Foundry releases do. Check this once without creating a real key, for example `cast wallet new --json | jq 'map(keys)'` must print `[["address","private_key"]]` (that wallet is never used). If the field names differ, adjust the two jq paths. The key must be `0x` + 64 **lowercase** hex characters; `cast` prints it that way.
+   It needs Foundry's `cast` and `jq`. After `foundryup`, open a new terminal or run `export PATH="$HOME/.foundry/bin:$PATH"`, otherwise `cast` is not found. The jq paths were verified with Foundry cast 1.8.5, where `cast wallet new --json` prints an envelope: `{"schema_version":…,"success":true,"data":[{"address":"0x…","public_key":"0x…","private_key":"0x…"}],"errors":[],"warnings":[]}`. To re-check after a Foundry upgrade, without creating a real key: `cast wallet new --json | jq -c '.data | map(keys)'` must print `[["address","private_key","public_key"]]` (that wallet is never used). If the field names differ, adjust the two jq paths. The key must be `0x` + 64 **lowercase** hex characters; `cast` prints it that way.
+   If `pnpm` is not installed globally, either enable it through corepack (`corepack enable pnpm`; the root `package.json` pins the version) or replace `pnpm exec wrangler` with `npx --yes wrangler@4.149.0` (the `wrangler` devDependency in `apps/submitter/package.json`) in step 4 and in the helper.
 6. **Staging gas** wallet. Write down the printed address as "staging gas" (public, needed in Part C):
    ```bash
    newkey SUBMITTER_GAS_KEY_84532 staging
