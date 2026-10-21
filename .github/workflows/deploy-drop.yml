@@ -29,8 +29,8 @@
 #                      rule and the logging settings, and on any failure rolls back automatically
 #                      with `wrangler rollback`. Writes the deploy record draft to the run summary.
 #                      The health check waits up to 15 minutes while there is no TLS or connection
-#                      yet (a new Custom Domain's certificate); an unhealthy HTTP answer fails after
-#                      10 attempts. A rollback Cloudflare refuses across a binding or storage change
+#                      yet (curl exit 6, 7, 28 or 35: a new Custom Domain's certificate); an unhealthy
+#                      HTTP answer or any other curl error fails after 10 attempts. A rollback Cloudflare refuses across a binding or storage change
 #                      is reported as impossible: the new version stays live (M1-27b-c).
 #   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying; fails loudly,
 #                      naming the owner fix, when its token cannot set the variable.
@@ -617,8 +617,10 @@ jobs:
       # the Worker loaded its configuration (a missing or invalid DROP_URL_KEY answers 503).
       # M1-27b-c: the first deploy to a new Custom Domain met a TLS handshake failure (curl exit 35)
       # for minutes while Cloudflare provisioned the edge certificate. No HTTP answer at all
-      # (HTTP 000) waits up to 15 minutes; a real answer that is not the healthy pair fails after 10
-      # attempts, as before.
+      # (HTTP 000) with curl exit 6, 7, 28 or 35 (DNS, connection, timeout, TLS handshake) waits up to
+      # 15 minutes;
+      # a real answer that is not the healthy pair, or any other curl error, fails after 10 attempts.
+      # M1-27b-d: release-and-deployment.md §4.5 lists exactly connect_exits (tested).
       - name: Health check
         id: health
         if: steps.ready.outputs.ready == 'true'
@@ -628,9 +630,10 @@ jobs:
           set -euo pipefail
           # HEALTH-CHECK-BEGIN
           # Healthy: /v1/health answers 200 {"ok":true} and an unsigned upload answers 401.
-          answer_limit=10    # attempts with a real HTTP answer that is not the healthy pair
+          answer_limit=10    # attempts with an HTTP answer that is not the healthy pair, or another curl error
           connect_limit=60   # attempts in all (15 s apart)
-          connect_window=900 # seconds without TLS or a connection (curl exit 35, 6, 7: HTTP 000)
+          connect_window=900 # seconds without TLS or a connection (HTTP 000 with a curl exit below)
+          connect_exits="6 7 28 35" # DNS, connection, timeout (a handshake can hang), TLS handshake
           started=$SECONDS
           answered=0
           attempt=0
@@ -644,13 +647,18 @@ jobs:
               echo "Healthy: /v1/health 200, unsigned upload 401 (attempt $attempt)."
               exit 0
             fi
-            if [[ "$health" =~ ^[1-5][0-9][0-9]$ ]] || [[ "$config" =~ ^[1-5][0-9][0-9]$ ]]; then
+            no_connection=false
+            if ! [[ "$health" =~ ^[1-5][0-9][0-9]$ ]] && ! [[ "$config" =~ ^[1-5][0-9][0-9]$ ]] \
+              && [[ " $connect_exits " == *" $health_exit "* ]] && [[ " $connect_exits " == *" $config_exit "* ]]; then
+              no_connection=true
+            fi
+            if [ "$no_connection" = false ]; then
               answered=$((answered + 1))
               if [ "$answered" -ge "$answer_limit" ]; then
-                echo "::error::The production health check failed: /v1/health $health, unsigned upload $config after $answered attempts that got an HTTP answer."
+                echo "::error::The production health check failed: /v1/health ${health:-000}, unsigned upload ${config:-000} (curl exit $health_exit and $config_exit) after $answered attempts with an HTTP answer or a curl error other than $connect_exits."
                 exit 1
               fi
-              echo "Attempt $attempt: /v1/health $health, unsigned upload $config; retrying in 15 s."
+              echo "Attempt $attempt: /v1/health ${health:-000}, unsigned upload ${config:-000} (curl exit $health_exit and $config_exit); retrying in 15 s."
             else
               elapsed=$((SECONDS - started))
               if [ "$attempt" -ge "$connect_limit" ] || [ "$elapsed" -ge "$connect_window" ]; then
@@ -757,7 +765,8 @@ jobs:
             printf '%s\n' "$rolled"
             # M1-27b-c: Cloudflare refuses a version whose Durable Object or other bindings this
             # deploy changed ("cannot be deployed because it has a resource that was modified").
-            if grep -qiE 'resource that was modified|cannot be deployed because' <<<"$rolled"; then
+            # M1-27b-d: only that whole phrase counts; any other refusal is a failed rollback.
+            if grep -qiF 'cannot be deployed because it has a resource that was modified' <<<"$rolled"; then
               message="Rollback impossible across a binding/storage change: Cloudflare refuses $PREVIOUS because it depends on a Durable Object or binding that this deploy changed. The new version stays live; DEPLOY_FREEZE is set by the freeze job; owner action required (forward fix, release-and-deployment.md §8)."
               echo "::error::$message"
               echo "result=impossible-binding-change" >> "$GITHUB_OUTPUT"
