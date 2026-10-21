@@ -370,7 +370,7 @@ describe('proposeTerms: the core fills the chain fields (06 §2.2a, 04 §3.4)', 
     expect(a.spy.published).toHaveLength(0);
   });
 
-  it('refuses notarize (firm offers wait for the proof flow) and note with notarize', async () => {
+  it('refuses notarize without the proof platform (NOTARIZE_UNAVAILABLE) and note with notarize', async () => {
     const a = await openAgent(1, ownerA, 'alice');
     const b = await openAgent(2, ownerB, 'bob');
     await pair(a, b);

@@ -1,6 +1,6 @@
 # Folders for sending files
 
-> **Status: In the next release (not in v0.1.1).** The `agentlink policy` command for allowing folders is built and comes with the next release, together with sending files through your agent ([Files](files.md)). A settings page for the same rules arrives with the local settings page.
+> **Status: Available since v0.1.2.** The `agentlink policy` command for allowing folders comes together with sending files through your agent ([Files](files.md)). A settings page for the same rules arrives with the local settings page.
 
 **Purpose:** choose the folders your agent may send files from.
 

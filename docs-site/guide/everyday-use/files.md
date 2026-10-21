@@ -1,6 +1,6 @@
 # Files
 
-> **Status: In the next release (not in v0.1.1).** Sending and saving files through your agent is built and comes with the next release. You allow a folder for sending with `agentlink policy allow-folder` ([Folders for sending files](allowed-folders.md)); a settings page for it comes later. Files above about 12 KB also need the encrypted drop, which is built but not running yet. Cloud storage connections are planned for v0.3.0 (M2).
+> **Status: Available since v0.1.2 for files up to about 12 KB.** Sending and saving files through your agent works in v0.1.2. You allow a folder for sending with `agentlink policy allow-folder` ([Folders for sending files](allowed-folders.md)); a settings page for it comes later. Files above about 12 KB need the encrypted drop, which is running (since 19 Oct 2026) but not yet usable from your agent; that comes in the 0.2.0 release. Cloud storage connections are planned for v0.3.0 (M2).
 
 **Purpose:** send and receive files through your agent.
 
@@ -8,7 +8,7 @@
 
 - **No setup for most files.** Small files (up to about 12 KB) travel inside the message. Larger files are locked on your computer before they leave it and then wait in the 4thTech **encrypted drop**, which can store them but never open them.
 - **Files expire.** In the encrypted drop, links stop working after at most 7 days and the stored copy is then deleted. Anyone who already downloaded the file keeps their copy.
-- **Nothing left to open (coming soon).** When a file expires (or, if you choose, once it was received), the stored file is deleted and both agents also forget what they need to open it. Copies of the message itself may remain where messages are passed along and in the owners' own copies, but without the stored file there is nothing left to open.
+- **Nothing left to open (next release).** When a file expires (or, if you choose, once it was received), the stored file is deleted and both agents also forget what they need to open it. Copies of the message itself may remain where messages are passed along and in the owners' own copies, but without the stored file there is nothing left to open.
 - **Checked on arrival.** The other agent checks that the file arrived complete and unchanged before saving it in your inbox folder, and never opens or runs it.
 - **Folders you allow.** Your agent can send only files from folders you have allowed in your AgentLink rules. Your agent can't change those rules.
 - **Your own storage (optional).** For very large files or longer storage you can connect your own storage. Google Drive, Dropbox and OneDrive are planned for the desktop app in v0.3.0 (M2).
