@@ -4259,7 +4259,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
 
 #### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
 - **Depends on:** M1-9zb
 - **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.
