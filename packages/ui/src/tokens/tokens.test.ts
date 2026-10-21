@@ -322,8 +322,11 @@ describe('package contents', () => {
     expect(notices).toContain('SIL Open Font License');
     const pkg = JSON.parse(sources['../../package.json'] as string) as {
       files: string[];
+      sideEffects: unknown;
       exports: Record<string, unknown>;
     };
+    // Bundlers must keep a bare `import '@4thtech-io/ui/tokens.css'`.
+    expect(pkg.sideEffects).toEqual(['*.css']);
     for (const f of ['fonts', 'THIRD-PARTY-NOTICES.md', 'src/tokens/tokens.css']) {
       expect(pkg.files).toContain(f);
     }
