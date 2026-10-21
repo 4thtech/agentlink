@@ -67,6 +67,9 @@ on:
       - "package.json"
       - ".nvmrc"
       - ".github/actions/setup-node-pnpm/**"
+      # Every repo-local script a step runs (tools/release/deploy-path-triggers.test.mjs).
+      - ".github/scripts/worker-logging-settings.jq"
+      - "tools/release/wait-for-ci.mjs"
       - ".github/workflows/deploy-drop.yml"
   workflow_dispatch:
     inputs:

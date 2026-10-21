@@ -758,6 +758,20 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Seen 2026-10-21 on the #326 push run 39547945275: the Windows `node-os` job failed with a hook in `packages/node/src/relay-io.test.ts` that timed out at 10000 ms; the re-run passed. Find the slow hook, then fix it or give it a measured per-file timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout.
 - **Acceptance:** the PR names the slow hook with its measured Windows duration; the fix or the per-file timeout lands with that measurement; no test or gate weakened.
 
+#### CHORE-DEPLOY-PATH-TRIGGERS · Deploy workflows start when a script they run changes (new, 2026-10-21)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/deploy-submitter.yml`, `.github/workflows/deploy-drop.yml`, `tools/release/deploy-path-triggers.test.mjs`
+- **Depends on:** OPS-PRIV-1
+- **Scope:** PR #335 changed only `.github/scripts/worker-logging-settings.jq`, which both deploy workflows run in their logging read-back, and neither deploy started: their `on.push.paths` did not list it (nor `tools/release/wait-for-ci.mjs`). Add both to each filter and a test that fails when a workflow with a push `paths` filter runs a repo-local script (or local action) the filter does not cover.
+- **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
+
+#### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
+- **Repo/path:** agentlink · `apps/submitter/src/index.ts`
+- **Depends on:** —
+- **Scope:** Local `wrangler dev` fails from `apps/submitter/src/index.ts`: its `export *` puts non-handler exports such as `MAX_BODY_BYTES` on the Worker entry module, which Wrangler refuses. Keep only the Worker handlers (and Durable Object classes, if any) on the entry module; move the shared constants and helpers behind a separate module that tests and other code import directly.
+- **Acceptance:** `wrangler dev` starts locally from `apps/submitter`; the entry module exports only what the Worker runtime expects; the deploy bundle and every submitter test stay green; no test weakened.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
@@ -3793,6 +3807,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - The rule is set only with owner presence and an owner signature; no MCP tool can set it (I-4).
   - Other fields of an existing rule for the contact stay as they are; a refused `policy.set` is reported and changes nothing.
+
+#### M1-33d-b · Receipt request follow-ups from IR-M1-33d-1 (new, split from M1-33d on #333, D-109)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (proofs, inbox), apps/cli (tool summaries), docs-site/guide
+- **Depends on:** M1-33d
+- **Spec:** 04 §3.4 (`proof`, receipt request); 06 §2.4, §3 (delivery receipts); 11 §5.6; D-109
+- **Invariants:** I-4, I-5, I-6
+- **Scope (the follow-ups of IR-M1-33d-1):**
+  - A concurrency test for `agentlink_acknowledge {type: "delivered"}`: two concurrent acknowledgements of the same record sign at most one DELIVERED.
+  - `requestReceipt` on an envelope that is already notarized: the result and the summary say the receipt request was not added (the proof exists already), so the agent cannot claim it asked.
+  - Guide wording: the recipient "confirms only if you choose" (11 §5.6), in the guide pages that describe receipt requests.
+  - Inbox page: remove the N+1 database transaction (one read per page, not one per item).
+- **Acceptance (tests first; a `RED (expected):` commit before the fix):**
+  - The concurrency test signs exactly one DELIVERED; the already-notarized case is reported in the result field and the summary line; the inbox page test shows one transaction per page; no test weakened.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
