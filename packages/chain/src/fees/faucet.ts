@@ -16,6 +16,11 @@
 //   first cannot be simulated before that approve is mined, so the faucet sends the approve, waits
 //   for its receipt (bounded), then simulates and sends the `depositFor`. An approve that is not
 //   mined in time, or reverts, sends no `depositFor` (a leftover allowance serves the next claim).
+// - Every gas limit is capped at `FAUCET_MAX_GAS` (M1-10b-c): a simulation above it is refused, not
+//   clamped (a clamped limit could run out of gas and still spend the fee), and nothing is sent.
+// - A stuck approve (one still in the mempool, so the faucet key's `pending` nonce is above its
+//   `latest` one) would wedge every later claim behind it. Before sending an approve the faucet
+//   compares the two and refuses at once with the retryable `busy`, sending nothing (M1-10b-c).
 import { decodeFunctionResult, encodeFunctionData, erc20Abi, keccak256 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ChainConfigError, type ChainConfig, type FeeTokenSymbol } from '../config/index.js';
@@ -29,6 +34,13 @@ import { offeredToken, offeredTokens } from './tokens.js';
 
 /** The chains a faucet may serve: testnets only (SUB-7). Chiado (10200) joins with M1-3j-b (after its smoke test), together with its faucet configuration. */
 export const FAUCET_CHAIN_IDS: readonly number[] = Object.freeze([84532]);
+
+/**
+ * The highest gas limit the faucet signs for any one transaction (simulated gas plus the margin).
+ * An ERC-20 approve and a `depositFor` each need far less; a simulation above this cap is refused,
+ * not clamped (M1-10b-c).
+ */
+export const FAUCET_MAX_GAS = 300_000n;
 
 /** The most one claim may credit, in US cents ($10). */
 export const FAUCET_MAX_USD_CENTS = 1_000;
@@ -94,7 +106,8 @@ export type FaucetCredit =
   /** No `depositFor` was broadcast; nothing was credited. */
   | {
       readonly state: 'not_sent';
-      readonly reason: 'faucet_empty' | 'no_gas' | 'reverted' | 'unavailable';
+      /** `busy`: an earlier faucet transaction is still pending; retry later (M1-10b-c). */
+      readonly reason: 'faucet_empty' | 'no_gas' | 'reverted' | 'unavailable' | 'busy';
     }
   /**
    * The `depositFor` broadcast lost its answer: it may or may not land. `txHash` is computed
@@ -153,9 +166,11 @@ const quantity = (value: unknown): bigint => {
   return BigInt(value);
 };
 
+type NotSentReason = 'faucet_empty' | 'no_gas' | 'reverted' | 'unavailable' | 'busy';
+
 class NotSent extends Error {
-  readonly reason: 'faucet_empty' | 'no_gas' | 'reverted' | 'unavailable';
-  constructor(reason: 'faucet_empty' | 'no_gas' | 'reverted' | 'unavailable') {
+  readonly reason: NotSentReason;
+  constructor(reason: NotSentReason) {
     super('not sent');
     this.reason = reason;
   }
@@ -235,7 +250,10 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
     }
   };
 
-  /** Simulated gas plus the margin; a revert is `reverted`, anything else `unavailable`. */
+  /**
+   * Simulated gas plus the margin, at most FAUCET_MAX_GAS; a revert is `reverted`, anything else
+   * (including a figure above the cap) `unavailable`.
+   */
   const estimate = async (step: DepositStep): Promise<bigint> => {
     let raw: unknown;
     try {
@@ -253,11 +271,14 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
       }
       throw new NotSent('unavailable');
     }
+    let gas: bigint;
     try {
-      return quantity(raw) + GAS_MARGIN;
+      gas = quantity(raw) + GAS_MARGIN;
     } catch {
       throw new NotSent('unavailable');
     }
+    if (gas > FAUCET_MAX_GAS) throw new NotSent('unavailable');
+    return gas;
   };
 
   const sign = async (
@@ -371,6 +392,14 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
       let spent = 0n;
 
       if (needsApprove && approve !== undefined) {
+        // A transaction still pending (latest nonce below the pending one) is most likely an
+        // earlier approve that was not mined: a new one would queue behind it and wedge every later
+        // claim. Refuse at once, retryable, and send nothing (M1-10b-c).
+        const latestNonce = await readQuantity('eth_getTransactionCount', [
+          faucetAddress,
+          'latest',
+        ]);
+        if (firstNonce > latestNonce) throw new NotSent('busy');
         // The depositFor pulls the token with the allowance, so it can be simulated only once the
         // approve is mined. A failed, lost, reverted or slow approve sends no depositFor: nothing
         // was credited (a leftover allowance is used by the next claim).
