@@ -10,7 +10,9 @@
 # string from the response, a key the response chose, or the body: no URLs, tokens or IDs.
 #
 # Fails closed (IR-OPS-PRIV-1-1). Required: `success` true; `result` an object; `logpush` present
-# and false; `observability` an object with `enabled` present and false. Optional, and then off:
+# and false. `observability` absent or null means not configured, which is off (owner decision
+# after run 39565358532, where the live response had `observability: null`); an object must have
+# `enabled` present and false, and any other type fails. Optional, and then off:
 # `observability.logs` (absent or null, it follows `observability.enabled`; present, `enabled`
 # false is required), `observability.traces` (a missing `enabled` is accepted, IR-OPS-PRIV-1-2),
 # `invocation_logs` and `destinations` inside them, `tail_consumers` (null when there are none)
@@ -22,8 +24,10 @@
 
 def none: . == null or (type == "array" and length == 0);
 def unset($k; f): (has($k) | not) or (.[$k] | f);
-# A part of `observability` (logs or traces): absent or null, or an object meeting `f`.
-def part($k; f): .result.observability | unset($k; . == null or (type == "object" and f));
+# A part of `observability` (logs or traces): absent or null (also when `observability` itself
+# is absent or null), or an object meeting `f`.
+def part($k; f):
+  .result.observability | . == null or unset($k; . == null or (type == "object" and f));
 def holds(f): (try f catch false) == true;
 
 # For `destinations` only, whether every entry is the string "cloudflare" (a boolean).
@@ -59,9 +63,9 @@ def obs: ["result", "observability"];
     {name: "logpush-off", paths: [["result", "logpush"]],
      ok: holds(.result | has("logpush") and .logpush == false)},
     {name: "observability-object", paths: [obs],
-     ok: holds((.result.observability | type) == "object")},
+     ok: holds(.result | unset("observability"; . == null or type == "object"))},
     {name: "observability-off", paths: [obs + ["enabled"]],
-     ok: holds(.result.observability | has("enabled") and .enabled == false)},
+     ok: holds(.result.observability | . == null or (has("enabled") and .enabled == false))},
     {name: "logs-off", paths: [obs + ["logs"], obs + ["logs", "enabled"]],
      ok: holds(part("logs"; .enabled == false))},
     {name: "invocation-logs-off", paths: [obs + ["logs", "invocation_logs"]],
