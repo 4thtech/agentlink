@@ -1,6 +1,7 @@
 // M1-19 (S1; 06 §7.1, 11 §5.1, D-53): the install-and-accept prompt is the official template plus
 // the canonical invite link, nothing else. Until M1-25 ships the per-harness templates, the page
-// uses the M1a variant, which is also the one in skills/agentlink/SKILL.md.
+// uses the M1a variant, which is also the one in skills/agentlink/SKILL.md; e2e/test/invite-page-site.test.ts checks
+// that the two are equal (it needs Node file access, which apps/invite may not use).
 import { describe, expect, it } from 'vitest';
 import { INSTALL_AND_ACCEPT_TEMPLATE, buildPrompt } from './prompt.js';
 import { BANNED } from './testing/vocabulary.js';
