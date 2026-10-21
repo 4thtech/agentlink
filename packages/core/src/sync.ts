@@ -142,7 +142,31 @@ export interface SyncDeps {
    * M1-7g (07 §2.1 step 4): checks each new `proof` envelope on-chain and signs the receipts the
    * policy and an approved accept allow. Runs after processing; never throws.
    */
-  readonly proofs?: { processInbound(reports: readonly InboundReport[]): Promise<number> };
+  readonly proofs?: {
+    processInbound(reports: readonly InboundReport[]): Promise<{
+      readonly reports: readonly InboundReport[];
+    }>;
+  };
+}
+
+/**
+ * The pass reports with the proof service's flags (04 §3.4, M1-7g-c): a flagged `proof` envelope's
+ * report replaces its own `ok` report from this pass (the row is now refused); a flag for an envelope
+ * processed in an earlier pass (a pending body checked again) is added at the end.
+ */
+export function mergeProofReports(
+  reports: readonly InboundReport[],
+  flags: readonly InboundReport[],
+): InboundReport[] {
+  if (flags.length === 0) return [...reports];
+  const byId = new Map(flags.map((f) => [f.envelopeId, f]));
+  const merged = reports.map((r) => {
+    const flag = r.envelopeId === undefined ? undefined : byId.get(r.envelopeId);
+    if (flag === undefined) return r;
+    byId.delete(r.envelopeId);
+    return flag;
+  });
+  return [...merged, ...byId.values()];
 }
 
 /**
@@ -287,10 +311,10 @@ export class SyncService {
   async syncInbox(options: SyncInboxOptions = {}): Promise<SyncInboxResult> {
     const budgetMs = readBudget(options.budgetMs);
     const fetched = await this.#fetch(budgetMs);
-    const reports = await this.#deps.envelopes.processReceived();
+    const processed = await this.#deps.envelopes.processReceived();
     // Rate-limit drops at processing time (07 §3.2) join the fetch-time ones, by contact.
     const limited = new Map(fetched.rateLimited.map((r) => [r.contactId, r.dropped]));
-    for (const r of reports) {
+    for (const r of processed) {
       if (r.outcome === 'dropped' && r.reason === 'rate_limited' && r.contactId !== undefined) {
         limited.set(r.contactId, (limited.get(r.contactId) ?? 0) + 1);
       }
@@ -298,8 +322,9 @@ export class SyncService {
     const rateLimited = [...limited]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([contactId, dropped]) => ({ contactId, dropped }));
-    const acksSent = await this.#deps.acks.sendFor(reports);
-    await this.#deps.proofs?.processInbound(reports);
+    const acksSent = await this.#deps.acks.sendFor(processed);
+    const flags = (await this.#deps.proofs?.processInbound(processed))?.reports ?? [];
+    const reports = mergeProofReports(processed, flags);
     const newIds = reports
       .filter((r) => r.outcome === 'ok' && r.contactId !== undefined && r.envelopeId !== undefined)
       .map((r) => r.envelopeId as string);
@@ -308,7 +333,7 @@ export class SyncService {
     const { requests } = await this.#deps.inbox.counts();
     this.#ctx.log.info('inbox sync', {
       stored: fetched.stored,
-      processed: reports.length,
+      processed: processed.length,
       items: items.length,
       acks: acksSent,
       partial: fetched.partial,
@@ -371,9 +396,10 @@ export class SyncService {
         stored = 0;
         let reports: InboundReport[];
         try {
-          reports = await this.#deps.envelopes.processReceived();
-          await this.#deps.acks.sendFor(reports);
-          await this.#deps.proofs?.processInbound(reports);
+          const processed = await this.#deps.envelopes.processReceived();
+          await this.#deps.acks.sendFor(processed);
+          const flags = (await this.#deps.proofs?.processInbound(processed))?.reports ?? [];
+          reports = mergeProofReports(processed, flags);
         } catch {
           // Rows stay `received` for the next run or pass (07 §3.2); fixed message only (I-7).
           log.warn('live processing failed', {});

@@ -67,7 +67,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| M1 Local beta | 151 (M1a 80, M1b 71; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 152 (M1a 80, M1b 72; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 43 (incl. M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -2561,19 +2561,31 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A chain read that fails keeps the body pending with no receipt; after the read recovers, the next sync re-checks it and stores it (or drops it on a definite mismatch); past 256 pending bodies or 7 days it is dropped as `proof_unchecked`.
   - No log line, error or tool result carries the Record, signature or salt (I-7); the largest allowed body fits the payload limit.
 
-#### M1-7g-c · core: proof and receipt follow-ups (new, M1-7g and M1-7g-b reviews)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/core (proofs, receipts, inbox), packages/node (logger)
+#### M1-7g-c · core: proof mismatch flag and per-contact pending share (new, M1-7g and M1-7g-b reviews)
+- **Status:** in review (4thtech/agentlink#329; split on 2026-10-21: the other follow-ups moved to M1-7g-d) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (proofs, inbox)
 - **Depends on:** M1-7g-b
-- **Spec:** 04 §3.4; 06 §2.4; 07 §3.2, §8
-- **Invariants:** I-3, I-5, I-7
+- **Spec:** 04 §3.4; 07 §3.2
+- **Invariants:** I-4, I-5, I-7
 - **Scope:**
-  - Flag the contact when a `proof` body does not match the on-chain record (04 §3.4), including a parent mismatch (`proof_parent_mismatch`, M1-33c: today dropped and logged only).
-  - A per-contact share of the 256-entry pending pool, so one contact cannot fill it.
-  - A logger allowlist for the fixed codes, so only listed codes reach the logs.
-  - The core signs the `ACCEPTED` receipt for `confirm`.
+  - Flag the contact when a `proof` body does not match the on-chain record (04 §3.4), including a parent mismatch (`proof_parent_mismatch`, M1-33c: today dropped and logged only). The `proof` envelope is stored as refused with the fixed code, and the inbox pass reports it as a flagged refusal.
+  - A per-contact share of the 256-entry pending pool (32 per contact), so one contact cannot fill it.
 - **Acceptance:**
-  - Tests first: a mismatching `proof` body flags its contact; one contact cannot take more than its share of the pending pool; an unlisted code is not logged; `confirm` produces a signed `ACCEPTED` receipt.
+  - Tests first: a mismatching `proof` body flags its contact; one contact cannot take more than its share of the pending pool.
+
+#### M1-7g-d · core: proof and receipt follow-ups, part 2 (new, split from M1-7g-c)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/log (logger), packages/core (proofs, receipts, terms-flow), packages/node (store schema, if the stored flag is added)
+- **Depends on:** M1-7g-c
+- **Spec:** 04 §3.4; 06 §2.4; 07 §2.1, §3, §3.2, §8
+- **Invariants:** I-3, I-4, I-5, I-7
+- **Scope:**
+  - A logger allowlist in `@4thtech-io/log` for the fixed codes, so only listed codes reach the logs.
+  - The core signs the `ACCEPTED` receipt for `confirm` (terms-flow).
+  - A per-contact share of the 256-entry pool of `proof` envelopes whose message has not arrived yet, so one contact cannot fill it.
+  - Optional: a stored per-contact flag (a schema migration) in place of, or next to, the refused row and pass report of M1-7g-c. The owner decides whether to add it.
+- **Acceptance:**
+  - Tests first: an unlisted code is not logged; `confirm` produces a signed `ACCEPTED` receipt; one contact cannot take more than its share of the waiting pool; if the stored flag is added, a mismatch sets it and no MCP tool clears it (I-4).
 
 #### M1-7h · core: inbox sync, card updates, revocation, delivery acks
 - **Status:** done (4thtech/agentlink#106, merged 2026-10-15; follow-ups in M1-7h-b) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
