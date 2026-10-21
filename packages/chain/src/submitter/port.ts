@@ -154,6 +154,13 @@ export function batchCalldata(items: readonly SubmitItem[]): Hex {
 }
 
 /** The contract error name in revert data, or `reverted`. */
+/** An unknown record, as `getRecord` would decode it if the Notary returned instead of reverting. */
+const ABSENT_RECORD = Object.freeze({
+  signer: ZERO_ADDRESS as string,
+  recordStructHash: `0x${'0'.repeat(64)}`,
+  receiptAt: Object.freeze([]) as readonly bigint[],
+});
+
 function revertName(data: Hex | undefined): string {
   if (data === undefined || data === '0x') return 'reverted';
   try {
@@ -241,6 +248,11 @@ export function createSubmitterChain(
     try {
       raw = await call('eth_call', [{ to: notary, data }, 'latest']);
     } catch (error) {
+      // The deployed Notary reverts RecordNotFound() for an unknown ID: that, and only that
+      // revert, means "absent" (as the read client, clients/state.ts). Any other stays an error.
+      if (error instanceof RpcAnswerError && revertName(error.data) === 'RecordNotFound') {
+        return ABSENT_RECORD;
+      }
       if (error instanceof RpcAnswerError) throw new ChainError('rpc_error');
       throw error;
     }
