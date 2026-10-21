@@ -72,7 +72,7 @@ export function UntrustedContent({
       </figcaption>
       <div className="al-untrusted-body al-text-body">
         {fileName === undefined ? (
-          inert(cleanText(children ?? ''))
+          inert(cleanText(children ?? '', 10_000, true))
         ) : (
           <code className="al-text-code">{cleanText(fileName, 80)}</code>
         )}

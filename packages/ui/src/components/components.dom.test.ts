@@ -91,7 +91,7 @@ describe('ApprovalCard focus and buttons (04 §2.5, 11 §8)', () => {
     mount(
       h(ui.ApprovalCard, {
         ...props,
-        remember: { reason: 'ask-me', contactName: 'Marko', rule: 'Allow up to $1' },
+        remember: { reason: 'ask-me', contact: { alias: 'Marko' }, rule: 'Allow up to $1' },
         onRememberChange,
       }),
     );

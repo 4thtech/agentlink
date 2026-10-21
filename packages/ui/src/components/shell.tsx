@@ -14,6 +14,14 @@ export interface NavItem {
   href?: string;
 }
 
+/** A nav link goes to this app (`/…`), a fragment (`#…`) or an https address; anything else is `#`. */
+function safeHref(href: string | undefined): string {
+  if (href === undefined) return '#';
+  if (href.startsWith('#') || href.startsWith('https:')) return href;
+  if (href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/\\')) return href;
+  return '#';
+}
+
 type Connection = 'connected' | 'offline' | 'paused';
 
 export interface AppShellProps {
@@ -87,7 +95,7 @@ export function AppShell({
             {nav.map((item, i) => (
               <li key={i}>
                 <a
-                  href={item.href ?? '#'}
+                  href={safeHref(item.href)}
                   className={cx('al-nav', item.active === true && 'is-active')}
                   aria-current={item.active === true ? 'page' : undefined}
                 >

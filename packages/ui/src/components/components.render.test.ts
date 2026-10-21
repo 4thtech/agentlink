@@ -111,7 +111,7 @@ describe('ContactName, Fingerprint, IdentityLabel', () => {
   });
   it('lists the four identity labels, weakest to strongest', () => {
     const t = (kind: 'selfdeclared' | 'checked' | 'registered' | 'verified') =>
-      html(h(ui.IdentityLabel, { kind, domain: 'example.com' }));
+      html(h(ui.IdentityLabel, { kind, domain: 'example.com' } as ui.IdentityLabelProps));
     expect(t('selfdeclared')).toContain('Self-declared');
     expect(t('checked')).toContain('Safety code checked');
     expect(t('registered')).toContain('Registered');
@@ -413,7 +413,7 @@ describe('ApprovalCard (C-1, LA-3…LA-9)', () => {
         ...base,
         type: 'proof',
         disclosure: ['A proof is public. Anyone can see that your agent recorded something.'],
-        receiptRequest: { contactName: 'Marko' },
+        receiptRequest: { contact: { alias: 'Marko' } },
       }),
     );
     expect(out).toContain('A proof is public.');
@@ -429,7 +429,7 @@ describe('ApprovalCard (C-1, LA-3…LA-9)', () => {
           type,
           remember: {
             reason: reason as never,
-            contactName: 'Marko',
+            contact: { alias: 'Marko' },
             rule: 'Allow proofs up to $1 from Marko',
           },
         }),

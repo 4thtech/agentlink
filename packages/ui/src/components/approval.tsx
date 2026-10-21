@@ -6,7 +6,8 @@ import { useEffect, useId, useRef, type ReactElement, type ReactNode } from 'rea
 import { Icon } from './brand.js';
 import { Button } from './forms.js';
 import { Banner } from './feedback.js';
-import type { ApprovalState } from './types.js';
+import { formatContactName } from './identity.js';
+import type { ApprovalState, ContactNameInput } from './types.js';
 import { UntrustedContent } from './trust.js';
 import { cleanText, cx } from './util.js';
 
@@ -104,11 +105,11 @@ export interface ApprovalCardProps {
   /** The 11 §5.6 lines, as the caller's strings (for example "A proof is public. …"). */
   disclosure?: readonly string[];
   /** A proof approval that also asks the contact to confirm delivery (M1-33d, LA-9). */
-  receiptRequest?: { contactName: string };
+  receiptRequest?: { contact: ContactNameInput };
   /** The budget window when the daily budget raised the approval (LA-7). */
   budget?: { used: string; frees?: string };
   /** The "Remember for this contact" offer. Rendered only where the rules allow it (LA-4). */
-  remember?: { reason: RememberReason; contactName: string; rule: string };
+  remember?: { reason: RememberReason; contact: ContactNameInput; rule: string };
   onRememberChange?: (remember: boolean) => void;
   state?: ApprovalState;
   /** The presence method named on the button: "Touch ID", "owner code", "owner passphrase"… */
@@ -205,7 +206,7 @@ export function ApprovalCard({
       ) : null}
       {receiptRequest === undefined ? null : (
         <p className="al-disclosure-line al-text-body-sm">
-          {`Ask ${cleanText(receiptRequest.contactName, 100)} to confirm delivery? If they do, anyone can see that this went to their agent.`}
+          {`Ask ${formatContactName(receiptRequest.contact).text} to confirm delivery? If they do, anyone can see that this went to their agent.`}
         </p>
       )}
       {children === undefined ? null : <div className="al-approval-extra">{children}</div>}
@@ -218,6 +219,7 @@ export function ApprovalCard({
           />
           <span>
             Remember for this contact
+            <span className="al-text-body-sm">{formatContactName(remember.contact).text}</span>
             <span className="al-text-body-sm al-muted">{remember.rule}</span>
           </span>
         </label>

@@ -64,16 +64,20 @@ const IDENTITY: Readonly<
   'domain-warning': ['warning', 'domain-warning', 'Domain no longer verified'],
 };
 
-export interface IdentityLabelProps {
-  kind: IdentityKind;
-  /** For `verified`. */
-  domain?: string;
+interface IdentityLabelCommon {
   /** The punycode form of an international domain name. */
   punycode?: string;
   /** For "Domain no longer verified". */
   date?: string;
   className?: string;
 }
+
+/** A verified label always names the domain it verified. */
+export type IdentityLabelProps = IdentityLabelCommon &
+  (
+    | { kind: Exclude<IdentityKind, 'verified'>; domain?: string }
+    | { kind: 'verified'; domain: string }
+  );
 
 /** How strongly a contact's identity is established. A name never stands where a label stands. */
 export function IdentityLabel({
@@ -140,7 +144,11 @@ const RESERVED = [
   'owner',
 ];
 // Letters, digits, spaces and . ' - only, Latin script only (mixed scripts fall back).
-const NAME_OK = /^[A-Za-z0-9À-ɏ .'’-]+$/;
+const NAME_BASE = /^[A-Za-z0-9\u00C0-\u024F .'\u2019-]+$/;
+// Latin-1 multiplication and division signs sit inside the letter range but are not letters.
+const NAME_OK = {
+  test: (name: string): boolean => NAME_BASE.test(name) && !/[\u00D7\u00F7]/.test(name),
+};
 
 export type FormattedName = { kind: 'alias' | 'restricted' | 'fingerprint'; text: string };
 
@@ -177,10 +185,17 @@ export function ContactName({
   ...input
 }: ContactNameProps): ReactElement {
   const n = formatContactName(input);
-  const identity =
-    label !== undefined && (n.kind !== 'alias' || showLabel === true) ? (
-      <IdentityLabel kind={label} {...(domain === undefined ? {} : { domain })} />
-    ) : null;
+  // A name the contact declared is always shown with its label (11 §5.2): "Self-declared" unless
+  // something stronger is known. An alias is the owner's own word and needs none.
+  const shown = label ?? (n.kind === 'restricted' ? 'selfdeclared' : undefined);
+  const wanted = shown !== undefined && (n.kind !== 'alias' || showLabel === true);
+  const identity = !wanted ? null : shown === 'verified' ? (
+    domain === undefined ? null : (
+      <IdentityLabel kind="verified" domain={domain} />
+    )
+  ) : (
+    <IdentityLabel kind={shown} {...(domain === undefined ? {} : { domain })} />
+  );
   return (
     <span className={cx('al-cname', `al-cname-${n.kind}`, className)}>
       {n.kind === 'fingerprint' ? (

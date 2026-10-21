@@ -16,17 +16,23 @@ const UNSAFE_RANGES: ReadonlyArray<readonly [number, number]> = [
   [0x202a, 0x202e],
   [0x2060, 0x2069],
   [0xfeff, 0xfeff],
+  // Unicode tag characters: invisible, and used to smuggle text past a reader.
+  [0xe0000, 0xe007f],
 ];
 
 function isUnsafe(codePoint: number): boolean {
   return UNSAFE_RANGES.some(([from, to]) => codePoint >= from && codePoint <= to);
 }
 
-/** Remove control, bidi and zero-width characters, then cut to `max` characters. */
-export function cleanText(text: string, max = 10_000): string {
+/** Remove control, bidi and zero-width characters, then cut to `max` characters.
+ * With `multiline`, tab and line feed stay (message body text). */
+export function cleanText(text: string, max = 10_000, multiline = false): string {
   let out = '';
   for (const ch of String(text)) {
-    if (!isUnsafe(ch.codePointAt(0) ?? 0)) out += ch;
+    const cp = ch.codePointAt(0) ?? 0;
+    // Message bodies keep line breaks and tabs; names, file names and labels do not.
+    if (multiline && (cp === 0x09 || cp === 0x0a)) out += ch;
+    else if (!isUnsafe(cp)) out += ch;
     if (out.length >= max) break;
   }
   return out.slice(0, max);
