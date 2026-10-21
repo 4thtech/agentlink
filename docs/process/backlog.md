@@ -1342,7 +1342,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Tests first: after an epoch advance, a receipt deletes the object uploaded under the older epoch; every KeyStore backend passes the shared suite.
 
 #### M1-1g-i · core: per-file `deleteAfter` snapshot at send time (new, IR-M1-1g-h-1 decision a)
-- **Status:** in review (PR pending) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#346) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, retention)
 - **Depends on:** M1-1g-h
 - **Spec:** 04 §4 (retention); 06 §3 (`files.deleteAfter`)
