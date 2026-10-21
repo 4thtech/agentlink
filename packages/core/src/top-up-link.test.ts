@@ -143,13 +143,13 @@ describe('suggestTopUpUsd (08 §1: the shortfall rounded up to the first preset,
     for (const s of ['0.1', '7', '30', '9999.5']) {
       const usd = suggestTopUpUsd(s);
       expect(usd).toBeDefined();
-      expect(buildTopUpLink({
+      expect(
+        buildTopUpLink({
           agentAddress: A,
           payHost: TOP_UP_PAY_HOST,
           ...(usd === undefined ? {} : { usd }),
-        })).toContain(
-        `&usd=${usd}`,
-      );
+        }),
+      ).toContain(`&usd=${usd}`);
     }
   });
 });
