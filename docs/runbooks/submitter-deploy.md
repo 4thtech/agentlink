@@ -123,6 +123,22 @@ CI reads back each Worker's own settings after every deploy, but its narrow API 
 24. **Each Worker's settings:** <https://dash.cloudflare.com/?to=/:account/workers-and-pages> → the Worker → **Settings** → **Observability**: Workers Logs off, Traces off, Logpush off, no Tail Workers. (CI checks this too; this is the owner's spot check.)
 25. **No live tailing:** never open **Real-time logs** / `wrangler tail` on these Workers, and never use the CI deploy tokens to tail (the permission comes with Workers Scripts Edit, so it cannot be withheld; the workflow tests refuse any `wrangler tail` step). Live tails store nothing but would show requests, IPs and paths to whoever watches.
 
+**Part F · Add Gnosis Chiado (chain 10200; M1-3j-b; laptop, then phone)**
+
+Automatic selection uses exactly the chains the testnet faucet serves (`autoSelectableChains()` in `packages/chain`, gated on `FAUCET_CHAIN_IDS`). Chiado is not routed to until a later reviewed PR adds 10200 to that allowlist, so these steps can run at any time and nothing changes for users until that PR merges. Do them **before** that PR: its deploy waits (skips with "Worker secrets not set") until all four keys exist.
+
+26. Part B steps 3 to 5, then the four Chiado keys, each with its own address (write each one down):
+    ```sh
+    newkey SUBMITTER_GAS_KEY_10200 staging
+    newkey SUBMITTER_FAUCET_KEY_10200 staging
+    newkey SUBMITTER_GAS_KEY_10200 production
+    newkey SUBMITTER_FAUCET_KEY_10200 production
+    ```
+    Then step 12 (`unset -f newkey`) and step 14's name check: the two new names are listed in each environment, and `SUBMITTER_FAUCET_ADDRESS_10200`, `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` are **not** Worker secrets (they are reviewed `wrangler.toml` vars).
+27. Send the two **faucet** addresses (staging, production; public) to the orchestrator in chat. They go into `wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_10200` in the enabling PR, together with `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` = `"84532,10200"`, the two 10200 names in the workflow's `SUBMITTER_REQUIRED_SECRETS` and 10200 in `FAUCET_CHAIN_IDS`.
+28. Fund the production gas and faucet wallets with Chiado test xDAI (the native coin, used for gas and as the fee token, D-46). Use the official Gnosis Chiado faucet; this runbook names no link until one is confirmed. Check balances on <https://gnosis-chiado.blockscout.com/>.
+29. After the enabling PR merges and deploys: `https://submit.agentlink.4thtech.io/v1/health` shows chain `10200` with `"available":true`.
+
 Residual (04 §4): Cloudflare, as the infrastructure operator, still sees request metadata, and the zone's Security Events show the IPs of requests a WAF rule blocks (the drop's rate-limit rule). These cannot be turned off and are not logged by us.
 
 ### What CI does (for reference)
