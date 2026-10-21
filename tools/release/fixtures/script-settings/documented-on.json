@@ -25,6 +25,8 @@
       }
     },
     "tags": ["team-a", "public-api"],
-    "tail_consumers": [{ "service": "log-consumer", "environment": "production", "namespace": "ns" }]
+    "tail_consumers": [
+      { "service": "log-consumer", "environment": "production", "namespace": "ns" }
+    ]
   }
 }

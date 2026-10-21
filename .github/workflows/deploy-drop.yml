@@ -368,33 +368,19 @@ jobs:
         run: |
           set -euo pipefail
           # READBACK-SETTINGS-BEGIN
-          # Fails closed (IR-OPS-PRIV-1-1): `result` must be an object with `logpush` false and
-          # `observability.enabled` false, both present. Optional in the script-settings API, and
-          # then off: `observability.logs` and `.traces` (absent, they follow `observability.enabled`;
-          # so does a missing `traces.enabled`),
-          # `invocation_logs` and `destinations` inside them, `tail_consumers` (null when there are
-          # none) and `streaming_tail_consumers`. A field that is present must have the expected type;
-          # anything else, including a jq error on an odd shape, fails the deploy.
-          if ! jq -e '
-            def none: . == null or (type == "array" and length == 0);
-            def unset($k; f): (has($k) | not) or (.[$k] | f);
-            # logs: `enabled` required; traces: `enabled` optional in the API (IR-OPS-PRIV-1-2).
-            def part_off($logs):
-              . == null or (type == "object"
-                and (if $logs then .enabled == false else unset("enabled"; . == false) end)
-                and unset("destinations"; none)
-                and (($logs | not) or unset("invocation_logs"; . == false)));
-            .success == true
-            and (.result | type) == "object"
-            and (.result | has("logpush") and .logpush == false)
-            and (.result.observability | type) == "object"
-            and (.result.observability | has("enabled") and .enabled == false)
-            and (.result.observability | unset("logs"; part_off(true)))
-            and (.result.observability | unset("traces"; part_off(false)))
-            and (.result | unset("tail_consumers"; none))
-            and (.result | unset("streaming_tail_consumers"; none))
-          ' "$SETTINGS_JSON" > /dev/null; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the drop (04 §4)."
+          # Fails closed (IR-OPS-PRIV-1-1). The conditions live in one jq program shared by every copy
+          # of this block in deploy-submitter.yml and deploy-drop.yml (see its header): it prints exactly
+          # `logging-settings: ok`, or one line per failed condition with only our own field paths, JSON
+          # types and boolean, number or null values (never the body, strings, URLs, tokens or IDs).
+          # Anything but that one ok line, including a jq error or a body that is not one JSON document,
+          # fails the deploy.
+          program="$GITHUB_WORKSPACE/.github/scripts/worker-logging-settings.jq"
+          if ! report="$(jq -r -f "$program" "$SETTINGS_JSON" 2> /dev/null)"; then
+            report="failed response: not one readable JSON document, or the check could not run"
+          fi
+          if [ "$report" != "logging-settings: ok" ]; then
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the drop (04 §4). Failed conditions follow."
+            printf '%s\n' "$report"
             exit 1
           fi
           echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
@@ -712,33 +698,19 @@ jobs:
         run: |
           set -euo pipefail
           # READBACK-SETTINGS-BEGIN
-          # Fails closed (IR-OPS-PRIV-1-1): `result` must be an object with `logpush` false and
-          # `observability.enabled` false, both present. Optional in the script-settings API, and
-          # then off: `observability.logs` and `.traces` (absent, they follow `observability.enabled`;
-          # so does a missing `traces.enabled`),
-          # `invocation_logs` and `destinations` inside them, `tail_consumers` (null when there are
-          # none) and `streaming_tail_consumers`. A field that is present must have the expected type;
-          # anything else, including a jq error on an odd shape, fails the deploy.
-          if ! jq -e '
-            def none: . == null or (type == "array" and length == 0);
-            def unset($k; f): (has($k) | not) or (.[$k] | f);
-            # logs: `enabled` required; traces: `enabled` optional in the API (IR-OPS-PRIV-1-2).
-            def part_off($logs):
-              . == null or (type == "object"
-                and (if $logs then .enabled == false else unset("enabled"; . == false) end)
-                and unset("destinations"; none)
-                and (($logs | not) or unset("invocation_logs"; . == false)));
-            .success == true
-            and (.result | type) == "object"
-            and (.result | has("logpush") and .logpush == false)
-            and (.result.observability | type) == "object"
-            and (.result.observability | has("enabled") and .enabled == false)
-            and (.result.observability | unset("logs"; part_off(true)))
-            and (.result.observability | unset("traces"; part_off(false)))
-            and (.result | unset("tail_consumers"; none))
-            and (.result | unset("streaming_tail_consumers"; none))
-          ' "$SETTINGS_JSON" > /dev/null; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the drop (04 §4)."
+          # Fails closed (IR-OPS-PRIV-1-1). The conditions live in one jq program shared by every copy
+          # of this block in deploy-submitter.yml and deploy-drop.yml (see its header): it prints exactly
+          # `logging-settings: ok`, or one line per failed condition with only our own field paths, JSON
+          # types and boolean, number or null values (never the body, strings, URLs, tokens or IDs).
+          # Anything but that one ok line, including a jq error or a body that is not one JSON document,
+          # fails the deploy.
+          program="$GITHUB_WORKSPACE/.github/scripts/worker-logging-settings.jq"
+          if ! report="$(jq -r -f "$program" "$SETTINGS_JSON" 2> /dev/null)"; then
+            report="failed response: not one readable JSON document, or the check could not run"
+          fi
+          if [ "$report" != "logging-settings: ok" ]; then
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the drop (04 §4). Failed conditions follow."
+            printf '%s\n' "$report"
             exit 1
           fi
           echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."

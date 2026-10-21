@@ -57,7 +57,8 @@ export function readbackDiagnosisSuite(workflowName, copies) {
     it('runs the one shared jq program, with no inline copy of the check', () => {
       expect(copies.length).toBe(2);
       for (const copy of copies) {
-        expect(copy).toContain(`jq -r -f "$GITHUB_WORKSPACE/${PROGRAM}"`);
+        expect(copy).toContain(`program="$GITHUB_WORKSPACE/${PROGRAM}"`);
+        expect(copy).toContain('jq -r -f "$program" "$SETTINGS_JSON"');
         expect(copy).not.toMatch(/jq -e '/);
       }
     });
@@ -86,7 +87,9 @@ export function readbackDiagnosisSuite(workflowName, copies) {
       const off = documented('documented-off');
       const missing = structuredClone(off);
       delete missing.result.logpush;
-      expect(failures(run(missing).output)).toEqual(['failed logpush-off: result.logpush: missing']);
+      expect(failures(run(missing).output)).toEqual([
+        'failed logpush-off: result.logpush: missing',
+      ]);
 
       const invocation = structuredClone(off);
       invocation.result.observability.logs.invocation_logs = true;

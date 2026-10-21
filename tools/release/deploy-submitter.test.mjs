@@ -40,13 +40,6 @@ function block(marker) {
   ].map((m) => m[1].replace(/^ {10}/gm, ''));
 }
 
-function fixture(value) {
-  const dir = mkdtempSync(join(tmpdir(), 'submitter-readback-'));
-  const file = join(dir, 'response.json');
-  writeFileSync(file, typeof value === 'string' ? value : JSON.stringify(value));
-  return file;
-}
-
 function runWithFakes(script, fakes, env) {
   const result = (() => {
     try {
