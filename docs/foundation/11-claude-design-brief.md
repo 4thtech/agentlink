@@ -333,7 +333,7 @@ Proof is public by design, so the user is told what others can see, in plain wor
 | Asking for a delivery receipt (sender) | "Ask {contactName} to confirm delivery? If they do, anyone can see that this went to their agent." |
 | Receipt request (recipient) | "{contactName} asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content." Buttons: **Confirm delivery** · **Not now** |
 | Turn on automatic delivery confirmations for a contact | "Confirm deliveries from {contactName} automatically? Each confirmation shows publicly that their proof reached your agent." |
-| Opened, accepted or rejected receipt | "This is public: anyone can see that your agent {opened / accepted / rejected} it, and when." |
+| Opened, accepted or rejected receipt | "This is public: anyone can see that your agent {opened / accepted / rejected / received} it, and when." ("received" for a delivery the user confirmed, M1-33d) |
 | Rules page, delivery confirmations (default off) | "Confirm deliveries publicly: Off (recommended). Turn on for contacts you trust." |
 | Owner re-sign while receipts are on from an older default (CLI, 06 §3, M1-33a) | "Delivery receipts are on from an older default. Each one shows publicly that a proof reached your agent, never the content." then "Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off." |
 | `agentlink doctor`, same case | "Delivery receipts are on from an older default; they will turn off unless you keep them." |

@@ -2525,6 +2525,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The card's 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
   - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
 - **Acceptance:** M1-7f's remaining lines: expired link → refresh-link returns a working URL; after the retention trigger the object returns 404 and file-key rows are gone on both sides, and the receiver's stored payload holds no `fileKey` after ingest; with `deleteAfter: expiry` a drop object stays retrievable by the owner console after `DELIVERED` (I-9); 5 MB via MinIO.
+  - Added by M1-33d (#333): with `files.deleteAfter: receipt`, a file whose record never gets a DELIVERED receipt is deleted at `expiry` (06 §3), on both sides and for the drop.
 - **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
@@ -3765,20 +3766,33 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A parent signed by another agent is refused and nothing is signed or charged; a parent of the same signer is accepted; a failed chain read refuses (fail closed); the recipient-side flag test.
 
 #### M1-33d · Delivery receipt requests and the user's own DELIVERED (new, split from M1-33a, D-109)
-- **Status:** in review (PR #333; the local UI's "Confirm deliveries from <name> automatically" and the `files.deleteAfter: receipt` retention runner stay open, see the PR) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/types (`proof` body `receiptRequest`), packages/core (proofs, inbox), apps/cli (tool inputs and summaries, local UI rule)
+- **Status:** in review (PR #333) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/types (`proof` body `receiptRequest`), packages/core (proofs, inbox), apps/cli (tool inputs and summaries)
 - **Depends on:** M1-33a
 - **Spec:** 04 §3.4 (`proof`, receipt request); 06 §2.4, §3 (delivery receipts); 11 §5.6; D-109
 - **Invariants:** I-4, I-5, I-6
 - **Scope (the parts of M1-33a left for this card on 2026-10-20):**
   - `requestReceipt?` on `agentlink_notarize` and `agentlink_send`; `receiptRequest: "delivered"` in the `proof` body; on the recipient, `receiptRequested: true` on the inbox item and the summary line.
   - `agentlink_acknowledge` with `delivered` (the user's yes; no owner approval).
-  - `files.deleteAfter: receipt` falls back to `expiry` without a receipt.
-  - The 11 §5.6 lines in the tool summaries for receipt requests and receipts; the local UI's "Confirm deliveries from <name> automatically" as an owner-signed `policy.set` (the contact rule itself landed in M1-33a).
+  - `files.deleteAfter: receipt` falls back to `expiry` without a receipt: the setting's help text here; the runtime fallback is in M1-7f-2's acceptance (retention lands there).
+  - The 11 §5.6 lines in the tool summaries for receipt requests and receipts, and on approval cards. The local UI toggle moved to M1-33e (decided on #333).
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - A `receiptRequest` alone never signs anything; the user's `agentlink_acknowledge {type: "delivered"}` signs exactly one; a malformed `receiptRequest` refuses the body.
   - No tool can set the contact rule (I-4); the summaries carry the 11 §5.6 lines.
   - Lands before the first release that ships proofs, or carries a release gate like M1-7g-b.
+
+#### M1-33e · Local UI: "Confirm deliveries from <name> automatically" (new, split from M1-33d on #333, D-109)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (local approval page), packages/core (owner actions)
+- **Depends on:** M1-33a (`ContactRule.receipts`), M1-33d; the local approval page in packages/node (with "Remember for this contact", 06 §3)
+- **Spec:** 06 §3 (delivery receipts, "Turning it on for a contact"; "Remember for this contact"); 11 §5.6; D-109
+- **Invariants:** I-4
+- **Scope:**
+  - The local UI offers "Confirm deliveries from <name> automatically" on the contact page and next to a received receipt request: an owner-signed `policy.set` that adds `receipts.autoDelivered: true` to that contact's rule, built like "Remember for this contact"; the card says what becomes public in the 11 §5.6 wording ("Confirm deliveries from {contactName} automatically? …").
+  - Remove the "planned for v0.2.0" marker for it in docs-site/guide (privacy-and-security.md, everyday-use/agreements-and-proof.md).
+- **Acceptance (tests first; a `RED (expected):` commit before the fix):**
+  - The rule is set only with owner presence and an owner signature; no MCP tool can set it (I-4).
+  - Other fields of an existing rule for the contact stay as they are; a refused `policy.set` is reported and changes nothing.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 

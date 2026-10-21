@@ -156,6 +156,7 @@ type InboundMessage = MessageBase & {
   contact: ContactRef | null;            // null only for an accepted request (§2.1, D-72)
   senderCode?: string;                   // only when contact is null: the sender code of 04 §2.9
   read: boolean;                         // true if it had been returned before this call
+  receiptRequested?: true;               // M1-33d: the contact asked for a delivery receipt not signed yet (§3, D-109); a flag only, ours
 };
 
 type OutboundMessage = MessageBase & {
