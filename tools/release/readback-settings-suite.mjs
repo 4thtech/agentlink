@@ -69,6 +69,56 @@ export function readbackDiagnosisSuite(workflowName, copies) {
       expect(failures(result.output)).toEqual([]);
     });
 
+    // Owner decision (Tali, after run 39565358532): the live staging response had `observability`
+    // null with Logpush false. Null or absent means observability is not configured, which is off.
+    // An object must still carry `enabled` false; any other type fails.
+    it('accepts observability null or absent (not configured), as in the live response', () => {
+      const live = run(documented('live-observability-null'));
+      expect(live.ok, live.output).toBe(true);
+      expect(failures(live.output)).toEqual([]);
+      for (const result of [
+        { logpush: false, observability: null },
+        { logpush: false },
+        { logpush: false, observability: null, tail_consumers: null },
+      ]) {
+        const outcome = run({ success: true, result });
+        expect(outcome.ok, JSON.stringify(result)).toBe(true);
+      }
+    });
+
+    it('refuses observability of any other type, or an object without `enabled` false', () => {
+      const cases = [
+        [true, 'failed observability-object: result.observability: boolean true'],
+        [false, 'failed observability-object: result.observability: boolean false'],
+        ['x', 'failed observability-object: result.observability: string'],
+        [[], 'failed observability-object: result.observability: array of 0'],
+        [0, 'failed observability-object: result.observability: number 0'],
+        [{}, 'failed observability-off: result.observability.enabled: missing'],
+        [{ enabled: null }, 'failed observability-off: result.observability.enabled: null'],
+        [{ enabled: true }, 'failed observability-off: result.observability.enabled: boolean true'],
+      ];
+      for (const [observability, line] of cases) {
+        const outcome = run({ success: true, result: { logpush: false, observability } });
+        expect(outcome.ok, JSON.stringify(observability)).toBe(false);
+        expect(failures(outcome.output), JSON.stringify(observability)).toContain(line);
+      }
+      // A present sub-field must still be off when `observability` is an object.
+      expect(
+        run({
+          success: true,
+          result: { logpush: false, observability: { enabled: false, logs: { enabled: true } } },
+        }).ok,
+      ).toBe(false);
+      // Null observability does not excuse Logpush or a Tail Worker.
+      expect(run({ success: true, result: { logpush: true, observability: null } }).ok).toBe(false);
+      expect(
+        run({
+          success: true,
+          result: { logpush: false, observability: null, tail_consumers: [{ service: 't' }] },
+        }).ok,
+      ).toBe(false);
+    });
+
     it('refuses the documented example (everything on) and names each condition', () => {
       const result = run(documented('documented-on'));
       expect(result.ok).toBe(false);
