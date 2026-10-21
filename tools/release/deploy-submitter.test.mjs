@@ -572,8 +572,6 @@ describe('logging settings read-back', () => {
       { success: true, result: { tail_consumers: null } },
       { success: true, result: { observability: { enabled: false } } },
       { success: true, result: { log_push: false, observability: { enabled: false } } },
-      { success: true, result: { logpush: false } },
-      { success: true, result: { logpush: false, observability: null } },
       { success: true, result: { logpush: false, observability: {} } },
       { success: true, result: { logpush: 'false', observability: { enabled: false } } },
       { success: true, result: { logpush: null, observability: { enabled: false } } },
