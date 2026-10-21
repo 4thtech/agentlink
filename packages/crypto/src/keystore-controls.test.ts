@@ -147,7 +147,11 @@ describe('KeyImportControl (04 §2.3.3 restore steps 3, 5 and 6)', () => {
     expectTypeOf<Params<KeyImportControl, 'importAgent'>>().toEqualTypeOf<
       [RecoveryKitImport, string, (ImportAgentOptions | undefined)?]
     >();
-    expectTypeOf<keyof ImportAgentOptions>().toEqualTypeOf<'name'>();
+    expectTypeOf<keyof ImportAgentOptions>().toEqualTypeOf<'name' | 'owner'>();
+    // Opus L-1: an existing owner item is kept only with its own session; the backend checks it by
+    // identity and against kit.ownerNostr (M1-9i-c). Optional, because a clean machine has none.
+    expectTypeOf<ImportAgentOptions['owner']>().toEqualTypeOf<OwnerSession | undefined>();
+    expectTypeOf<{ owner: { isActive(): boolean } }>().not.toExtend<ImportAgentOptions>();
     expectTypeOf<Params<KeyImportControl, 'importOwner'>>().toEqualTypeOf<[RecoveryKitImport]>();
   });
 

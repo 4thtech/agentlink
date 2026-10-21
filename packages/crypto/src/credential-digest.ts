@@ -9,7 +9,7 @@
 // UTF-8 (RFC 8785 string rules: `"` and `\` escaped, U+0008, U+0009, U+000A, U+000C and U+000D as
 // \b \t \n \f \r, every other code point below U+0020 as \u00xx in lower-case hex, everything else as
 // itself), so the secret never becomes a JS string (04 §2.2: "kept as Uint8Array"). Each value must
-// be non-empty, well-formed UTF-8 and is never normalised. Temporary credentials (a session token)
+// be non-empty, at most 4 KiB, well-formed UTF-8 and is never normalised. Temporary credentials (a session token)
 // have no field here and are refused by the item reader (M1).
 //
 // HMAC-SHA256 is @noble/hashes through pairing.ts; nothing here implements a primitive (I-8). Errors
@@ -23,6 +23,13 @@ import { wipe } from './wipe.js';
 
 /** The salt of an `s3:<id>` item: 16 CSPRNG bytes (04 §2.2). */
 export const STORAGE_CREDENTIAL_SALT_LENGTH = 16;
+
+/**
+ * The most UTF-8 bytes a credential value may hold (proposed, owner confirms at merge; 04 §2.5.1):
+ * with every byte written as a six-byte JCS escape, an item still fits the 64 KiB KeyStore item limit
+ * (04 §2.8).
+ */
+export const STORAGE_CREDENTIAL_MAX_VALUE_BYTES = 4096;
 
 /** S3 credentials as UTF-8 bytes (07 §5.2). Temporary credentials are refused in M1. */
 export interface StorageCredential {
@@ -108,6 +115,9 @@ function checkValue(value: unknown, what: string): asserts value is Uint8Array {
   if (value.length === 0) {
     throw new CryptoInputError('invalid_argument', `storage credential: ${what} must not be empty`);
   }
+  if (value.length > STORAGE_CREDENTIAL_MAX_VALUE_BYTES) {
+    throw new CryptoInputError('invalid_length', `storage credential: ${what} is too long`);
+  }
   if (!isWellFormedUtf8(value)) {
     throw new CryptoInputError('invalid_utf8', `storage credential: ${what} must be UTF-8`);
   }
@@ -191,9 +201,10 @@ function messageOf(fields: StorageCredential): Uint8Array {
 }
 
 /**
- * 04 §2.5.1 `storage.set` `credentialDigest`: HMAC-SHA256 under the item's 16-byte salt over
- * JCS({"accessKeyId","secretAccessKey"}), as 64 lowercase hex. Both values are UTF-8 bytes, non-empty
- * and well-formed, never normalised. The inputs are not changed or kept.
+ * 04 §2.5.1 `storage.set` `credentialDigest`: HMAC-SHA256 keyed by the 16 decoded salt bytes over
+ * JCS({"accessKeyId","secretAccessKey"}), as 64 lowercase hex. Both values are UTF-8 bytes,
+ * non-empty, at most 4 KiB and well-formed, never normalised. The inputs are not changed or kept.
+ * A match against a stored digest is a MAC check: compare in constant time (equalBytes).
  */
 export function credentialDigest(fields: StorageCredentialItemFields): string {
   checkFields(fields, true);
@@ -327,7 +338,9 @@ export function parseStorageCredentialItem(item: Uint8Array): StorageCredentialI
 
 /**
  * The `credentialDigest` of a stored `s3:<id>` item (04 §2.5.1: own storage reads `ready` only when
- * it matches the signed `storage.set`). The item must be exactly its canonical form.
+ * it matches the signed `storage.set`). The item must be exactly its canonical form. The core
+ * compares the result with the signed digest in constant time (equalBytes over the decoded bytes,
+ * never `===` on the hex), as for every MAC check.
  */
 export function credentialDigestOfItem(item: Uint8Array): string {
   const fields = parseStorageCredentialItem(item);

@@ -191,6 +191,7 @@ describe('@4thtech-io/crypto/keystore', () => {
       'credentialDigest',
       'credentialDigestOfItem',
       'STORAGE_CREDENTIAL_SALT_LENGTH',
+      'STORAGE_CREDENTIAL_MAX_VALUE_BYTES',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }

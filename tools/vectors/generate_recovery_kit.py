@@ -37,7 +37,7 @@ nonce prefixes, store bytes and item values are synthetic test values (vectorlib
 
 credentialDigest (04 §2.5.1 `storage.set`, M1-9i-b2): HMAC-SHA256(key = the 16 raw bytes of the
 `s3:<id>` item's salt, msg = JCS({"accessKeyId","secretAccessKey"})) as 64 lowercase hex, with both
-values non-empty, well-formed UTF-8 and never normalised; the item (04 §2.2) is the JCS JSON
+values non-empty, at most 4 KiB, well-formed UTF-8 and never normalised; the item (04 §2.2) is the JCS JSON
 {"v":1,"salt","accessKeyId","secretAccessKey"} as UTF-8 bytes, salt as base64url, and an item
 reader accepts exactly that canonical form. HMAC is Python's `hmac`; JCS is `rfc8785`, checked
 against Python's `json` module.
@@ -299,12 +299,17 @@ def flipped(data, offset, mask=0x01):
 # itself. Encoded twice here, with `rfc8785` and with Python's json module, which must agree.
 
 SALT_LEN = 16
+# Proposed (owner confirms at merge): at most 4 KiB of UTF-8 per value, so an item (each byte at most
+# six as a JCS escape) always fits the 64 KiB KeyStore item limit (04 §2.8).
+MAX_CREDENTIAL_VALUE = 4096
 CREDENTIAL_KEYS = ["accessKeyId", "salt", "secretAccessKey", "v"]
 
 
 def credential_text(raw):
     """A credential value: non-empty, strict UTF-8 (Python's codec refuses overlongs, surrogates and
     code points above U+10FFFF)."""
+    if len(raw) > MAX_CREDENTIAL_VALUE:
+        raise ValueError("credential value above 4 KiB")
     text = bytes(raw).decode("utf-8", "strict")
     if text == "":
         raise ValueError("empty credential value")
@@ -413,6 +418,7 @@ def build_credential_digest():
     if credential_digest_of_item(nfc) == credential_digest_of_item(nfd):
         v.fail("credentialDigest: NFC and NFD agree")
     accept("long", "a 1024-byte secret", salt, key_id, v.b64u(v.det("recovery-kit/credential/long", 768)).encode("ascii"))
+    accept("cap-4096", "a 4096-byte secret of U+001F, the most a value holds, written as 24 KiB of \\u001f (the item stays under 64 KiB)", salt, key_id, b"\x1f" * MAX_CREDENTIAL_VALUE)
     # Reject.
     reject("salt-15", "a 15-byte salt", salt[:15], key_id, secret)
     reject("salt-17", "a 17-byte salt", salt + b"\x00", key_id, secret)
@@ -425,6 +431,8 @@ def build_credential_digest():
     reject("utf8-above-10ffff", "a secret with F4 90 80 80 (above U+10FFFF)", salt, key_id, b"a\xf4\x90\x80\x80b")
     reject("utf8-truncated", "a secret ending in the first two bytes of a three-byte sequence", salt, key_id, b"ab\xe2\x82")
     reject("utf8-key-id", "an access key ID with a lone continuation byte 0x80", salt, b"key\x80", secret)
+    reject("secret-4097", "a 4097-byte secret (at most 4 KiB per value)", salt, key_id, b"s" * (MAX_CREDENTIAL_VALUE + 1))
+    reject("key-id-4097", "a 4097-byte access key ID", salt, b"k" * (MAX_CREDENTIAL_VALUE + 1), secret)
 
     # The item reader: the digest of a stored item, which must be exactly its canonical form.
     item_accept("ascii", "the canonical item of the ascii case", base)
@@ -471,6 +479,7 @@ def build_credential_digest():
     item_reject("not-utf8", "the byte 0xff inside the secret", shaped(secret_text='"aÿb"').replace("ÿ".encode("utf-8"), b"\xff"))
     item_reject("not-object", "a JSON array", b"[]")
     item_reject("empty", "no bytes", b"")
+    item_reject("secret-4097", "an otherwise canonical item whose secret is 4097 bytes", shaped(secret_text=quoted("s" * (MAX_CREDENTIAL_VALUE + 1))))
     return cases
 
 

@@ -4,6 +4,7 @@
 // tricky Unicode, inputs are never changed or kept, results are copies, and errors carry no input.
 import { describe, expect, it } from 'vitest';
 import {
+  STORAGE_CREDENTIAL_MAX_VALUE_BYTES,
   STORAGE_CREDENTIAL_SALT_LENGTH,
   credentialDigest,
   credentialDigestOfItem,
@@ -69,6 +70,31 @@ describe('credentialDigest (04 §2.5.1)', () => {
     credentialDigest(f);
     encodeStorageCredentialItem(f);
     expect([f.salt, f.accessKeyId, f.secretAccessKey]).toEqual(copies);
+  });
+
+  it('caps each value at 4 KiB, so the worst-case item fits a 64 KiB KeyStore item', () => {
+    expect(STORAGE_CREDENTIAL_MAX_VALUE_BYTES).toBe(4096);
+    const worst = new Uint8Array(STORAGE_CREDENTIAL_MAX_VALUE_BYTES).fill(0x1f);
+    const item = encodeStorageCredentialItem({ salt, accessKeyId: worst, secretAccessKey: worst });
+    expect(item.length).toBeLessThanOrEqual(65_536);
+    expect(credentialDigestOfItem(item)).toBe(
+      credentialDigest({ salt, accessKeyId: worst, secretAccessKey: worst }),
+    );
+    const over = new Uint8Array(STORAGE_CREDENTIAL_MAX_VALUE_BYTES + 1).fill(0x61);
+    for (const f of [
+      { salt, accessKeyId: over, secretAccessKey: text('b') },
+      { salt, accessKeyId: text('a'), secretAccessKey: over },
+    ]) {
+      expect(() => credentialDigest(f)).toThrow(CryptoInputError);
+      expect(() => encodeStorageCredentialItem(f)).toThrow(CryptoInputError);
+    }
+    const overItem = text(
+      decodeUtf8(encodeStorageCredentialItem(fields('a', 'b'))).replace(
+        '"secretAccessKey":"b"',
+        `"secretAccessKey":"${'s'.repeat(STORAGE_CREDENTIAL_MAX_VALUE_BYTES + 1)}"`,
+      ),
+    );
+    expect(() => parseStorageCredentialItem(overItem)).toThrow(CryptoInputError);
   });
 
   it('refuses a salt of another length, an empty value and bytes that are not UTF-8', () => {

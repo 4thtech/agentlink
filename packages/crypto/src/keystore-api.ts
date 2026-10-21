@@ -286,6 +286,12 @@ export interface RecoveryKitExportRequest {
    * agent's inter-process lock (06 §6), right after it read the agent's `policy-version` and
    * `receipts-kept` items, so the marks and the store are one consistent cut (04 §2.3.3
    * "Snapshot"). For an `identity` kit the snapshot already has its message rows deleted.
+   *
+   * The callback runs inside the backend's lock hold, so it must not take the agent's lock itself
+   * (that would deadlock) and must not write to the KeyStore. It returns a finished private
+   * temporary file (`VACUUM INTO` done and closed): the backend seals from it after the lock is
+   * released. Residual: a callback that never resolves holds the agent's lock, which only stalls
+   * the owner's own export (owner-side DoS, no secret exposed).
    */
   readonly snapshots: (agentId: string) => Promise<RecoveryKitStoreSource>;
   /**
@@ -344,8 +350,21 @@ export interface RecoveryKitImport {
 
 /** Options for KeyImportControl.importAgent. */
 export interface ImportAgentOptions {
-  /** The local name to restore under (`--agent <newname>`, 06 §6); default the kit's name. */
+  /**
+   * The local name to restore under (`--agent <newname>`, 06 §6); default the kit's name. The
+   * backend checks it against `/^[a-z][a-z0-9-]{0,31}$/` (06 §6) before it names any file (the
+   * `.alks`, the agent folder) and refuses any other value, so it can never become a path.
+   */
   readonly name?: string;
+  /**
+   * The session of the owner item already on this machine (04 §2.3.3 restore table: an existing
+   * owner is kept only after its own code opens it to the kit's owner). Required when an owner item
+   * exists, and then checked by the backend (M1-9i-c): it must be a session the paired
+   * OwnerKeyStore minted (by identity; a look-alike is `presence_required`, an ended one
+   * `owner_locked`), and that store's `ownerNostr` must equal `kit.ownerNostr`, otherwise nothing
+   * is written. Not needed on a machine without an owner item (step 6, importOwner).
+   */
+  readonly owner?: OwnerSession;
 }
 
 /** What an agent import leaves the owner to see. */

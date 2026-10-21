@@ -57,9 +57,56 @@ function toolGraph(): Map<string, string> {
   return seen;
 }
 
-/** Comments are prose about the controls, not references to them. */
-const code = (text: string): string =>
-  text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+/**
+ * The source without its comments (comments are prose about the controls, not references to them).
+ * A small lexer, not a regex (AUDIT-FABLE-M1-9i-b2-1 Low): string, template and regex literals are
+ * kept verbatim and never read as the start of a comment, so `'//'` or `'/*'` in a string cannot hide
+ * the code after it. A `/` starts a regex literal after an operator or bracket, else it is division.
+ */
+function code(text: string): string {
+  let out = '';
+  let i = 0;
+  let last = ''; // the last significant character of code, for the regex-or-division choice
+  const literal = (end: string): void => {
+    const start = i;
+    i += 1;
+    let inClass = false;
+    while (i < text.length) {
+      const c = text[i]!;
+      if (c === '\\') {
+        i += 2;
+        continue;
+      }
+      if (end === '/' && (c === '[' || c === ']')) inClass = c === '[';
+      if (c === end && !inClass) {
+        i += 1;
+        break;
+      } else if (end !== '`' && c === '\n') break;
+      else i += 1;
+    }
+    out += text.slice(start, i);
+    last = 'a';
+  };
+  while (i < text.length) {
+    const c = text[i]!;
+    const next = text[i + 1];
+    if (c === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1;
+      out += ' ';
+    } else if (c === '/' && next === '*') {
+      const end = text.indexOf('*/', i + 2);
+      i = end < 0 ? text.length : end + 2;
+      out += ' ';
+    } else if (c === "'" || c === '"' || c === '`') literal(c);
+    else if (c === '/' && (last === '' || '(,=:[!&|?{};+-*%<>~^'.includes(last))) literal('/');
+    else {
+      out += c;
+      if (!/\s/.test(c)) last = c;
+      i += 1;
+    }
+  }
+  return out;
+}
 
 describe('no MCP tool handler reaches the owner controls (M1-9i-b2, I-4)', () => {
   const graph = toolGraph();
@@ -94,6 +141,19 @@ describe('no MCP tool handler reaches the owner controls (M1-9i-b2, I-4)', () =>
     expect(FENCED_IMPORT.test("import { openAgent } from '@4thtech-io/node';")).toBe(true);
     expect(FENCED_IMPORT.test("import type { X } from '@4thtech-io/crypto/keystore';")).toBe(true);
     expect(CONTROL_NAME.test(code('// KeyExportControl is owner-only'))).toBe(false);
+    expect(CONTROL_NAME.test(code('/* a\n StorageCredentialControl */ x'))).toBe(false);
+  });
+
+  it('a comment marker inside a string, template or regex literal hides nothing (Fable Low)', () => {
+    for (const sample of [
+      "const a = '//'; const c = owner.exportControl;",
+      "const b = '/*'; createKeyImportControl(store); const d = '*/';",
+      'const t = `//${x}`; const k = keys.storageCredentialControl;',
+      'const r = /\\/\\//; const e = owner.exportControl;',
+      'const s = "/*"; type K = KeyExportControl;',
+    ]) {
+      expect(CONTROL_NAME.test(code(sample)), sample).toBe(true);
+    }
   });
 });
 

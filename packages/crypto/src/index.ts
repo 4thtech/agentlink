@@ -175,6 +175,7 @@ export {
 // M1-9i-b2 (04 §2.5.1 storage.set, §2.2 s3:<id>): the credentialDigest the core checks on every
 // own-storage load. Writing and reading the item itself is in @4thtech-io/crypto/keystore.
 export {
+  STORAGE_CREDENTIAL_MAX_VALUE_BYTES,
   STORAGE_CREDENTIAL_SALT_LENGTH,
   credentialDigest,
   credentialDigestOfItem,
