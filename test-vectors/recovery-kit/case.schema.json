@@ -190,22 +190,38 @@
           }
         },
         "expected": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "kit",
-            "kek"
-          ],
-          "properties": {
-            "kit": {
-              "type": "string",
-              "pattern": "^([0-9a-f]{2})*$"
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kit",
+                "kek"
+              ],
+              "properties": {
+                "kit": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                },
+                "kek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
             },
-            "kek": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{64}$"
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
             }
-          }
+          ]
         }
       }
     },

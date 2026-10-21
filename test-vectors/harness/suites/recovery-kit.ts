@@ -90,6 +90,9 @@ function memorySinks() {
         write(bytes) {
           parts.push(bytes);
         },
+        commit() {
+          // Nothing to release: the bytes are already in memory.
+        },
         discard() {
           stores.delete(sink);
         },

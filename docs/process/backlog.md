@@ -3143,7 +3143,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9i-a · types and core: storage and backup owner ops (new, split from M1-9i)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types/src/{constants,owner-action}.ts; packages/core/src/{owner-action,owner-actions,own-storage}.ts, the store migration and `Store` contract for `own_storage`, packages/core/src/files/outgoing.ts; owner-action vectors for the new ops
-- **Depends on:** M1-9i-s, M1-9i-b (`credentialDigest`)
+- **Depends on:** M1-9i-s, M1-9i-b2 (`credentialDigest`)
 - **Spec:** 04 §2.5.1 (new rows); 07 §3.4 (`own_storage`), §5.6
 - **Invariants:** I-4, I-7
 - **Scope:**
@@ -3153,24 +3153,34 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Anti-rollback `storage-mark` (`{v, active}`), raised under the inter-process lock after each apply; load requires the row's `id` = `active`. Reload re-verifies signature and schema only, never the 600 s expiry (as for `policy.set`).
 - **Acceptance:** signing and rejection vectors per op (unknown key, bad `id`, endpoint not in canonical form, lifetime above 600 s); a tampered `own_storage` row or a credential digest mismatch reads `broken`; an old row and credential put back after `storage.remove` read `broken`; a row older than 600 s still reads `ready`; a `broken` own storage makes `agentlink_send` return `needs_setup`, never the drop; tests first (`RED (expected):` commit).
 
-#### M1-9i-b · crypto: recovery kit `ALKK` v1, export and import controls, vectors (new, split from M1-9i)
-- **Status:** in review (ALKK format, vectors and conformance tests; `credentialDigest` and the three control types still open) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/crypto/src/recovery-kit.ts (new), packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), test-vectors/recovery-kit/, tools/vectors/generate_recovery_kit.py
+#### M1-9i-b · crypto: recovery kit `ALKK` v1 format and vectors (new, split from M1-9i)
+- **Status:** done (4thtech/agentlink#367, format and vectors; IR-M1-9i-b-1; `credentialDigest` and the three controls moved to M1-9i-b2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto/src/recovery-kit.ts (new), packages/crypto/src/stream.ts (shared STREAM body), test-vectors/recovery-kit/, tools/vectors/generate_recovery_kit.py
 - **Depends on:** M1-9i-s
 - **Spec:** 04 §2.3.3 (new), §2.3.2, §2.8 (`password` kind 1), §4 (STREAM)
-- **Invariants:** I-1, I-4, I-7, I-8, I-10
+- **Invariants:** I-1, I-7, I-8, I-10
 - **Order (D-82):** vectors from an independent Python generator first, then the TypeScript.
-- **Scope:** seal and open `ALKK` v1 as a stream (Argon2id + HKDF label `agentlink/v1/recovery-kit`, STREAM AES-256-GCM, AAD = header ‖ isFinal); plaintext entry parser; post-decryption owner and agent checks; `credentialDigest` (HMAC-SHA256 under the item salt); type separation against `ALKP`, `ALKR`, `ALKO`, `ALKS`, `ALF1`.
-- **Acceptance:** secret entries stay in wiped memory buffers and only store snapshots go to a 0600 quarantine file; nothing is parsed or written before the final chunk authenticates (a test truncating the last chunk leaves no file and no state); vector suite `recovery-kit` registered and passing in every runtime it declares; tamper, truncation, reorder, wrong code, wrong version, cross-type and oversize cases fail with one generic error and no partial output; no raw seed crosses the control interfaces (type test); tests first.
+- **Scope:** seal and open `ALKK` v1 as a stream (Argon2id + HKDF label `agentlink/v1/recovery-kit`, STREAM AES-256-GCM, AAD = header ‖ isFinal); plaintext entry parser; post-decryption owner and agent checks; type separation against `ALKP`, `ALKR`, `ALKO`, `ALKS`, `ALF1`.
+- **Acceptance:** secret entries stay in wiped memory buffers and only store snapshots go to a caller sink (the 0600 quarantine file), committed only after every check passes; nothing is parsed or written before the final chunk authenticates (a test truncating the last chunk leaves no file and no state); vector suite `recovery-kit` registered and passing in every runtime it declares; tamper, truncation, reorder, wrong code, wrong version, cross-type, duplicate agent name and oversize cases fail with one generic error and no partial output; tests first.
+
+#### M1-9i-b2 · crypto: `credentialDigest` and the export, import and storage credential controls (new, split from M1-9i-b)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), packages/crypto/src (`credentialDigest`), test-vectors/recovery-kit/ (`credentialDigest` vectors), tools/vectors/generate_recovery_kit.py
+- **Depends on:** M1-9i-b
+- **Spec:** 04 §2.2 (`s3:<id>` item), §2.3.3 ("Export: who sees the seeds", restore step 5), §2.5.1 (`storage.set` `credentialDigest`)
+- **Invariants:** I-1, I-4, I-7
+- **Order (D-82):** `credentialDigest` vectors from the independent Python generator first, then the TypeScript.
+- **Scope:** `credentialDigest` = HMAC-SHA256(key = the item's `salt`, msg = JCS(`{"accessKeyId","secretAccessKey"}`)) as 64 lowercase hex, without turning the secret into a JS string where the spec keeps it in bytes; the three control types (`KeyExportControl.sealRecoveryKit(session, …)` returning the code bytes only, `KeyImportControl`, `StorageCredentialControl`), modelled on `KeyEpochControl`, built on M1-9i-b's `sealRecoveryKit` / `openRecoveryKit`.
+- **Acceptance:** `credentialDigest` vectors in the `recovery-kit` suite (salt, Unicode and JCS escaping cases); no raw seed crosses the control interfaces (type test); the controls are reachable from no MCP tool handler (import fence); tests first (`RED (expected):` commit).
 
 #### M1-9i-c · node: KeyStore export, import and storage credential items (new, split from M1-9i)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node/src/\*\*
-- **Depends on:** M1-9i-b
+- **Depends on:** M1-9i-b (kit format), M1-9i-b2 (the three controls)
 - **Spec:** 04 §2.2 (`s3:<id>`), §2.3.3 (restore order and refusals), §2.8 (`owner-next`, write protocol); 07 §9.1
 - **Invariants:** I-4, I-7, I-10
 - **Scope:** keychain and file backends implement `KeyExportControl` (session checked by identity), `KeyImportControl` (all items at once, refuses any existing item or `.alks`), `StorageCredentialControl` (`s3:<id>` write and delete under the inter-process lock); restore writes the owner `ALKO` under a new generated code with the `owner-next` protocol and never overwrites.
-- **Acceptance:** shared KeyStore conformance tests for both backends; a look-alike session is `presence_required`; import over an existing agent writes nothing; an existing owner item is kept only after its own code opens it to the kit's owner (a planted card naming that owner is not enough); the snapshot and the `policy-version` and `receipts-kept` reads happen under one lock hold; canary for the S3 secret, recovery code and kit key; tests first.
+- **Acceptance:** shared KeyStore conformance tests for both backends; a look-alike session is `presence_required`; import over an existing agent writes nothing; an existing owner item is kept only after its own code opens it to the kit's owner (a planted card naming that owner is not enough); the snapshot and the `policy-version` and `receipts-kept` reads happen under one lock hold; the 04 §2.3.3 snapshot checks run on the quarantined store before anything is written (its `identity.agent_id` equals the agent's `agentId`, and its stored card names the kit's `ownerNostr`), with a snapshot-mismatch reject vector for each (IR-M1-9i-b-1); the store sink is committed (`RecoveryKitStoreSink.commit`) only after those checks, and discarded on any failure; canary for the S3 secret, recovery code and kit key; tests first.
 
 #### M1-9i-d · docs: storage and recovery kit (new, split from M1-9i)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b

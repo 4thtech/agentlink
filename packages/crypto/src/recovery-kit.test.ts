@@ -95,15 +95,18 @@ async function seal(input: RecoveryKitInput = INPUT, chunkSize = 64): Promise<Ui
 
 /** Store sinks that record what happens to them. */
 function sinks() {
-  const made: { parts: Uint8Array[]; discarded: boolean }[] = [];
+  const made: { parts: Uint8Array[]; discarded: boolean; committed: boolean }[] = [];
   return {
     made,
     createStoreSink(): RecoveryKitStoreSink {
-      const record = { parts: [] as Uint8Array[], discarded: false };
+      const record = { parts: [] as Uint8Array[], discarded: false, committed: false };
       made.push(record);
       return {
         write(bytes) {
           record.parts.push(bytes);
+        },
+        commit() {
+          record.committed = true;
         },
         discard() {
           record.discarded = true;
@@ -154,7 +157,7 @@ describe('ALKK v1 round trip', () => {
       const record = s.made[i];
       expect(concatBytes(...(record?.parts ?? []))).toEqual(want.storeBytes);
     }
-    expect(s.made.every((m) => !m.discarded)).toBe(true);
+    expect(s.made.every((m) => !m.discarded && m.committed)).toBe(true);
     const seed = kit.ownerSeed;
     const item = kit.agents[0]?.items[0]?.value as Uint8Array;
     kit.wipe();
@@ -227,7 +230,62 @@ describe('ALKK v1 refusals', () => {
     expect(error.code).toBe('open_failed');
     // The stores were streamed while the kit decrypted, and all were discarded at the failure.
     expect(s.made.length).toBeGreaterThan(0);
-    expect(s.made.every((m) => m.discarded && m.parts.length === 0)).toBe(true);
+    expect(s.made.every((m) => m.discarded && m.parts.length === 0 && !m.committed)).toBe(true);
+  });
+
+  it('commits no store when the kit fails, and discards them all', async () => {
+    const parts: Uint8Array[] = [];
+    await sealRecoveryKitWith(CODE, SALT, PREFIX, 64, FLOOR, INPUT, (b) => {
+      parts.push(b);
+    });
+    const s = sinks();
+    const kit = concatBytes(...parts);
+    const other = kit.slice();
+    other.set(new Uint8Array(32).fill(9), 42); // another header owner: the chunks do not authenticate
+    await refusal(
+      openRecoveryKitWithKek(other, KEK, { createStoreSink: () => s.createStoreSink() }),
+    );
+    expect(s.made.every((m) => !m.committed)).toBe(true);
+  });
+
+  it('passes a failing commit through and discards every store', async () => {
+    const failure = new Error('rename failed');
+    const s = sinks();
+    let calls = 0;
+    const error = await openRecoveryKitWithKek(KIT, KEK, {
+      createStoreSink: () => {
+        calls += 1;
+        const sink = s.createStoreSink();
+        if (calls === 2) return { ...sink, commit: () => Promise.reject(failure) };
+        return sink;
+      },
+    }).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBe(failure);
+    expect(s.made.every((m) => m.discarded)).toBe(true);
+  });
+
+  it('wipes the kek copy when the header is refused before the key is used', async () => {
+    const copies: Uint8Array[] = [];
+    class Tracked extends Uint8Array<ArrayBuffer> {
+      override slice(start?: number, end?: number): Uint8Array<ArrayBuffer> {
+        const copy = Uint8Array.prototype.slice.call(this, start, end) as Uint8Array<ArrayBuffer>;
+        copies.push(copy);
+        return copy;
+      }
+    }
+    const kek = new Tracked(new ArrayBuffer(KEK.length));
+    kek.set(KEK);
+    const bad = KIT.slice();
+    bad[4] = 2;
+    await refusal(
+      openRecoveryKitWithKek(bad, kek, { createStoreSink: () => sinks().createStoreSink() }),
+    );
+    expect(copies.length).toBe(1);
+    expect(copies[0]?.every((b) => b === 0)).toBe(true);
+    expect(Array.from(kek)).toEqual(Array.from(KEK));
   });
 
   it('gives one error for a wrong code, a tampered kit, a missing final chunk and a reorder', async () => {
@@ -356,7 +414,12 @@ describe('ALKK v1 refusals', () => {
     const error = await openRecoveryKitWithKek(KIT, KEK, {
       createStoreSink: () => {
         calls += 1;
-        if (calls === 2) return { write: () => Promise.reject(failure), discard: () => undefined };
+        if (calls === 2)
+          return {
+            write: () => Promise.reject(failure),
+            commit: () => undefined,
+            discard: () => undefined,
+          };
         return s.createStoreSink();
       },
     }).then(
@@ -418,6 +481,7 @@ describe('ALKK v1 sealing checks its input before writing anything', () => {
       },
     ],
     ['the same agent twice', { ...INPUT, agents: [A, A] }],
+    ['two agents with the same name', { ...INPUT, agents: [A, { ...B, name: A.name }] }],
     [
       '17 agents',
       { ...INPUT, agents: Array.from({ length: 17 }, (_, i) => agent(`many/${i}`, `a${i}`, 1)) },

@@ -237,12 +237,13 @@ Order follows D-82: spec → vectors → implementation.
 |---|---|---|---|
 | **M1-9i-s** spec text | Opus, S1 (new crypto format text) | `docs/foundation/04-*.md`, `06-*.md`, `07-*.md`, `00-README.md` (decision row) | owner decisions A to E |
 | **M1-9i-a** types and core ops | Opus, S2 | `packages/types/src/{constants,owner-action}.ts` and tests; `packages/core/src/{owner-action,owner-actions}.ts`, new `packages/core/src/own-storage.ts`, the store migration and `Store` contract for `own_storage`; `packages/core/src/files/outgoing.ts` (`broken` counts as configured); owner-action vectors for the three ops; the `storage-mark` read and raise | M1-9i-s, M1-9i-b (`credentialDigest`) |
-| **M1-9i-b** crypto kit format and vectors | Opus, S2 | `packages/crypto/src/recovery-kit.ts` (new), `KeyExportControl`, `KeyImportControl`, `StorageCredentialControl` types in `keystore-api.ts`, `credentialDigest`; `test-vectors/recovery-kit/`, `tools/vectors/generate_recovery_kit.py` (independent of the TypeScript) | M1-9i-s |
+| **M1-9i-b** crypto kit format and vectors | Opus, S2 | `packages/crypto/src/recovery-kit.ts` (new); `test-vectors/recovery-kit/`, `tools/vectors/generate_recovery_kit.py` (independent of the TypeScript) | M1-9i-s |
+| **M1-9i-b2** crypto `credentialDigest` and controls (split from M1-9i-b, IR-M1-9i-b-1) | Opus, S2 | `KeyExportControl`, `KeyImportControl`, `StorageCredentialControl` types in `keystore-api.ts`, `credentialDigest` and its vectors | M1-9i-b |
 | **M1-9i-c** node backends: export, import, credential items | Opus, S2 | `packages/node/src/**` (keychain and file backends implement the three controls; `s3:<id>` items; restore's owner `ALKO` write via `owner-next`) | M1-9i-b |
 | **M1-9i** (existing, narrowed) CLI commands | Opus, S2 | `apps/cli/src/**`: `storage connect | disconnect`, `backup export | restore`, runtime wiring of `ownStorage.load()`, `doctor` lines, strings; `init`'s kit offer (from M1-9h) | M1-9i-a, M1-9i-c, M1-6b |
 | **M1-9i-d** docs | Sonnet, S0 | README Status, `docs/status.yaml` and generated blocks, quickstart and a restore runbook in `docs/runbooks/`, `changelog.d/` | M1-9i |
 
-After the spec: M1-9i-b first (it exports `credentialDigest`), then M1-9i-a and M1-9i-c in parallel. Every S2 card: tests first with a `RED (expected):` commit, independent Opus audit, Tali's "merge".
+After the spec: M1-9i-b, then M1-9i-b2 (it exports `credentialDigest` and the controls), then M1-9i-a and M1-9i-c in parallel. Every S2 card: tests first with a `RED (expected):` commit, independent Opus audit, Tali's "merge".
 
 ## 8. Owner decisions
 

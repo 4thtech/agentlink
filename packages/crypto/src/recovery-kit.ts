@@ -318,6 +318,8 @@ function parseManifest(bytes: Uint8Array): Manifest | undefined {
       );
       const previous = agents[agents.length - 1];
       if (previous !== undefined && compareBytes(previous.agentId, agentId) >= 0) return undefined;
+      // Two agents with one local name would write the same agent folder (IR-M1-9i-b-1).
+      if (agents.some((a) => equalBytes(a.name, name))) return undefined;
       agents.push({ agentId, name });
       if (lit(']')) break;
       if (!lit(',')) return undefined;
@@ -506,6 +508,9 @@ function checkInput(input: RecoveryKitInput): CheckedAgent[] {
   for (let i = 1; i < agents.length; i += 1) {
     if (agents[i - 1]?.agentId === agents[i]?.agentId) throw argument('an agent appears twice');
   }
+  if (new Set(agents.map((a) => a.name)).size !== agents.length) {
+    throw argument('two agents have the same name');
+  }
   return agents;
 }
 
@@ -654,11 +659,15 @@ export async function sealRecoveryKit(
 
 /**
  * Where a store value goes while the kit decrypts: the restore's private temporary file (04 §4
- * quarantine rules, D-84). `write` gets each piece in order (the buffer is the sink's); `discard`
- * deletes it, and is called on every failure, before the kit is authenticated or after.
+ * quarantine rules, D-84). `write` gets each piece in order (the buffer is the sink's). `commit` is
+ * called on every sink, in kit order, only after the whole kit authenticated and every check
+ * passed; until then the bytes stay quarantined. `discard` deletes them and is called on every
+ * failure, before the kit is authenticated or after, including after a commit when a later commit
+ * fails.
  */
 export interface RecoveryKitStoreSink {
   write(bytes: Uint8Array): Promise<void> | void;
+  commit(): Promise<void> | void;
   discard(): Promise<void> | void;
 }
 
@@ -928,7 +937,8 @@ export function openRecoveryKitWithKek(
     throw new CryptoInputError('invalid_length', 'recovery kit: the kek must be 32 bytes');
   }
   const copy = kek.slice();
-  return openWith(kit, () => Promise.resolve(copy), options, limits);
+  // The copy is wiped however the open ends, a header refused before the key is used included.
+  return openWith(kit, () => Promise.resolve(copy), options, limits).finally(() => wipe(copy));
 }
 
 /**
@@ -938,7 +948,8 @@ export function openRecoveryKitWithKek(
  * not 24 base32 characters is `invalid_secret`. While the body decrypts, secret entries are kept in
  * memory and each store value goes to a new sink from `createStoreSink`. Only after the final chunk
  * authenticates are the entry names, order and caps, the manifest, the owner seed (it must derive
- * the header owner) and each agent seed (it must derive its agentId) checked. Any failure is one
+ * the header owner) and each agent seed (it must derive its agentId) checked; then every sink is
+ * committed. Any failure is one
  * `open_failed` error: everything is wiped and every sink discarded. A failing sink or source
  * passes its own error through, after the same clean-up. Call `wipe()` on the result when done.
  */
@@ -1031,6 +1042,14 @@ async function openWith(
       const ownerSeed = (splitter.entries[1] as Entry).value as Uint8Array;
       const manifestBytes = (splitter.entries[0] as Entry).value as Uint8Array;
       const secrets = splitter.entries.map((e) => e.value);
+      // 5. Every check passed: release the quarantined stores. A failing commit is the caller's error.
+      for (const sink of splitter.sinks) {
+        try {
+          await sink.commit();
+        } catch (error) {
+          throw new CallerError(error);
+        }
+      }
       return Object.freeze({
         ownerNostr: fields.ownerNostr.slice(),
         ownerSeed,

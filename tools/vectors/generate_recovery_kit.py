@@ -24,7 +24,8 @@ authenticates: duplicate, unknown or out-of-order names, a missing required entr
 overflow, trailing bytes, a manifest that is not exactly the JCS form above, a manifest owner other
 than the header's, an owner seed that does not derive ownerNostr (04 §2.1, x-only Nostr key at
 epoch 0), an agent seed that does not derive its agentId (04 §2.9), and the caps: at most 16 agents,
-every non-store value at most 64 KiB, each store at most 1 GiB, the whole kit at most 4 GiB.
+each non-store value at most 64 KiB, each store at most 1 GiB, the whole kit at most 4 GiB in
+total bytes. Two agents with the same name are refused on seal and on open (IR-M1-9i-b-1).
 The store snapshot is opaque to this format: its `identity.agent_id` and card checks belong to the
 restore (M1-9i-c), which can read SQLite.
 
@@ -210,6 +211,9 @@ def check_manifest(raw, owner):
         ids.append(a["agentId"])
     if any(ids[k] >= ids[k + 1] for k in range(len(ids) - 1)):
         raise ValueError("agents not strictly sorted by agentId")
+    names = [a["name"] for a in agents]
+    if len(set(names)) != len(names):
+        raise ValueError("two agents with the same name")
     return ids
 
 
@@ -400,6 +404,10 @@ def build():
         cases.append(v.case(f"header-{kit.label}", f"{SPEC} header fields, read before the code is asked for: {why}", {"op": "header", "kit": v.hx(kit.data)}, {"ownerNostr": v.hx(kit.owner), "chunkSize": str(kit.chunk_size), "memoryKiB": str(m), "iterations": str(t), "parallelism": str(p)}))
     default_salt = v.det("recovery-kit/default/salt", 16)
     cases.append(v.case("kek-default-params", f"{SPEC} kek at the default parameters m = 64 MiB, t = 3, p = 1", kek_input(single.code, default_salt, DEFAULT), {"kek": v.hx(kek(single.code, default_salt, *DEFAULT))}))
+    dup = Kit("same-name", owner_seed, [a1, dict(a2, name=a1["name"])], "full", 64)
+    if not refused(check_manifest, dup.manifest, dup.owner):
+        v.fail("same-name: the reference manifest check accepts two agents with one name")
+    cases.append(v.case("seal-reject-agents-same-name", f"{SPEC} seal: two agents with the same local name are refused before anything is written", dup.seal_input(), {"outcome": "reject"}))
     spelled = "-".join(multi.code[i : i + 4] for i in range(0, 24, 4)).lower()
     cases.append(v.case("open-code-spelled", f"{SPEC} open with the code in six lower-case groups of four with dashes (04 §2.8 password kind 1)", open_input(multi.data, spelled, None), opened(open_kit(multi.data, spelled))))
     cases.append(v.case("open-no-expected-owner", f"{SPEC} open with no expected owner; the owner seed still derives the header owner", open_input(single.data, single.code, None), opened(open_kit(single.data, single.code))))
@@ -573,7 +581,9 @@ def build():
     man_case("not-json", "not JSON", b"{")
     man_case("not-utf8", "not UTF-8", b"\xff")
     entry_case("agents-unsorted", "two agents in the manifest not sorted by agentId (entries follow the manifest)", [("manifest", manifest_bytes(multi.kit_id, multi.created_at, "full", multi.owner, [second, first])), ("owner/seed", s1), *agent_pairs(second), *agent_pairs(first)])
-    entry_case("agents-duplicate", "the same agent twice in the manifest", [("manifest", manifest_bytes(multi.kit_id, multi.created_at, "full", multi.owner, [a1, a1])), ("owner/seed", s1), *agent_pairs(a1), *agent_pairs(a1)])
+    same_name = [first, dict(second, name=first["name"])]
+    entry_case("agents-same-name", "two agents with the same local name, sealed validly otherwise (refused on seal and on open)", [("manifest", manifest_bytes(multi.kit_id, multi.created_at, "full", multi.owner, same_name)), ("owner/seed", s1), *agent_pairs(first), *agent_pairs(second)])
+    entry_case("agents-duplicate","the same agent twice in the manifest", [("manifest", manifest_bytes(multi.kit_id, multi.created_at, "full", multi.owner, [a1, a1])), ("owner/seed", s1), *agent_pairs(a1), *agent_pairs(a1)])
     many = [agent(f"many/{k}", f"agent-{k}") for k in range(MAX_AGENTS + 1)]
     many.sort(key=lambda a: a["agentId"])
     many_pairs = [pair for a in many for pair in agent_pairs(a)]
@@ -659,7 +669,7 @@ SCHEMA = v.case_schema(
         "kek": ({"code": v.STRING, "salt": v.hexn(16), **KDF}, [{"kek": v.hexn(32)}]),
         "seal": (
             {"code": v.STRING, "salt": v.hexn(16), "noncePrefix": v.hexn(8), "chunkSize": v.INTEGER, **KDF, "ownerSeed": v.hexn(32), "kitId": v.STRING, "createdAt": v.INTEGER, "contents": {"enum": ["full", "identity"]}, "agents": {"type": "array", "items": AGENT}},
-            [{"kit": v.HEX, "kek": v.hexn(32)}],
+            [{"kit": v.HEX, "kek": v.hexn(32)}, v.REJECT],
         ),
         "open": ({"kit": v.HEX, "code": v.STRING, "source": {"enum": ["prompt", "file"]}, "expectedOwnerNostr": v.HEX}, [v.REJECT]),
         "openWithKek": ({"kit": v.HEX, "kek": v.hexn(32)}, [v.REJECT]),
