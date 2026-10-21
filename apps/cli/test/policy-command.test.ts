@@ -1175,10 +1175,10 @@ describe('delivery receipts on from an older default (06 §3, D-109; M1-33a)', (
 describe('files.deleteAfter help text (06 §3, D-109, M1-33d)', () => {
   it('says that without a delivery confirmation, deletion falls back to expiry', () => {
     const row = POLICY_REVIEW_ROWS.find((r) => r.path === 'files.deleteAfter')!;
-    expect(row.read?.('receipt')).toBe(
+    expect(row.read?.('receipt')).toContain(
       'the contact confirms delivery (if they never do, when they expire)',
     );
-    expect(row.read?.('expiry')).toBe('they expire');
+    expect(row.read?.('expiry')).toMatch(/^they expire\n/);
   });
 
   it('says it applies only to files sent while it is on, and when it is checked (M1-1g-j)', () => {
@@ -1187,7 +1187,9 @@ describe('files.deleteAfter help text (06 §3, D-109, M1-33d)', () => {
       const text = row.read?.(value) ?? '';
       expect(text).toContain('Applies only to files sent while it is on.');
       expect(text).toContain('Checked once each time old files are cleaned up.');
-      expect(text).toContain('The value kept with a file is the one in force when it is prepared for sending.');
+      expect(text).toContain(
+        'The value kept with a file is the one in force when it is prepared for sending.',
+      );
     }
   });
 });
