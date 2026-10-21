@@ -136,8 +136,9 @@ export const RESTRICTED_ENTRY_POINTS = [
     // apps/cli/test holds the two-process keychain test, which needs a test owner identity
     // (MemoryOwnerKeyStore) beside the real agent KeyStore. M1-27a: apps/drop/test holds the drop
     // Worker's Miniflare tests, which sign drop requests with fixed test keys (signDropAuthorization);
-    // the Worker itself only verifies and never imports the seam.
-    testDirs: ['apps/cli/test', 'apps/drop/test'],
+    // the Worker itself only verifies and never imports the seam. M1-10c: apps/submitter/test holds
+    // the submitter's deploy smoke tests, which sign a Record with a random MemoryKeyStore agent.
+    testDirs: ['apps/cli/test', 'apps/drop/test', 'apps/submitter/test'],
     via: 'the public entry points (the test seam is never built)',
     reason:
       'a fixed nonce, IV or ephemeral key, or an in-memory seed holder, must never reach production code (M1-1c, M1-1f, M1-1g)',
