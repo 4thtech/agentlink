@@ -206,7 +206,12 @@ describe('SecretDisplay (never echoes the secret elsewhere)', () => {
     click(byText('button', 'Copy'));
     expect(onCopy).toHaveBeenCalledTimes(1);
     expect(host.innerHTML.match(/ABCD EFGH/g)).toBeNull(); // shown in groups, not as one string
-    expect(host.innerHTML.replace(/<[^>]*>/g, '')).toContain('ABCDEFGH');
+    expect(host.textContent).toContain('ABCDEFGH'); // parsed text, not a tag-stripped string
+    for (const el of host.querySelectorAll('*')) {
+      for (const name of el.getAttributeNames()) {
+        expect(el.getAttribute(name), name).not.toMatch(/ABCD|EFGH/);
+      }
+    }
   });
 });
 
