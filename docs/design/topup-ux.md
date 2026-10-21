@@ -97,7 +97,7 @@ The agent takes the complexity away; the user does one step.
 **Never.** The agent never holds, asks for or accepts the user's keys, recovery phrase or card details; never moves the user's funds or withdraws credits; never signs anything with the user's own account. Spending credits stays under the owner's policy and approvals (I-4). A message from anyone else asking the agent to send funds or a code is untrusted content (I-5) and is not acted on.
 
 
-- **`needs_credits` (06 §2.4).** `url` is the top-up link; `nextStep` says, in this shape: "Adding proof needs credits. Add at least $0.10 here: {url}. $5 covers 50 proofs." No network, token or "wallet" (11 §5.1). The agent shares the link and offers to finish the action after.
+- **`needs_credits` (06 §2.4).** `url` is the top-up link; `nextStep` says, in this shape: "Adding proof needs credits. Add at least $5 here: {url}. $5 covers 50 proofs." No network, token or "wallet" (11 §5.1). The agent shares the link and offers to finish the action after.
 - **CLI.** `agentlink credits --topup` prints the link and a terminal QR code and opens the browser when one is available (06 §8).
 - **Local UI and console.** Proofs & credits → "Add credits" opens the same link (08 §1, §2.2; console in M2).
 - **Afterwards.** `agentlink_status` shows the new balance; the agent says "Credits added. Shall I record the proof now?" (J3, 11 §8).
