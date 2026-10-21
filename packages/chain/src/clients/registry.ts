@@ -13,6 +13,7 @@ import {
   type ChainNetwork,
   type FeeToken,
 } from '../config/index.js';
+import { isFaucetChain } from '../fees/faucet.js';
 import { loadOccV2Contracts, type OccV2Contracts } from '../occ-v2.js';
 import { checkRpcUrl } from './rpc-url.js';
 
@@ -99,16 +100,19 @@ export function chainRegistry(): readonly ChainConfig[] {
 }
 
 /**
- * Chains in the registry (their addresses and ABIs are shipped and an explicit override may name
- * them) that automatic selection must not pick yet. Gnosis Chiado (10200) is deployed, but its smoke
- * test has not run and the faucet does not serve it, so an unfunded payer would be routed to a chain
- * it cannot get credits on. Enabling it is card M1-3j-b (owner accepts the routing change).
+ * The registry chains that automatic selection and the default proof platform may use: in this
+ * testnet release, exactly those the testnet faucet serves (`isFaucetChain`, the hard-coded
+ * allowlist in fees/faucet.ts). An unfunded payer is routed to the cheapest chain (07 §6.3; at an
+ * equal fee, the lower chain ID), so a chain the faucet does not serve would leave them with no way
+ * to get credits. Every registry chain stays available to an explicit override and to verification.
+ *
+ * Gnosis Chiado (10200) is in the registry; the owner accepted its routing change (M1-3j-b,
+ * 2026-10-21). It joins automatic selection when it joins the faucet allowlist, a reviewed change
+ * made only once its submitter gas and faucet keys exist and its smoke test has passed. Mainnets
+ * (M3-2a) need their own rule here: no faucet serves them.
  */
-const NOT_AUTO_SELECTED: ReadonlySet<number> = new Set([10200]);
-
-/** The registry chains that automatic selection and the default proof platform may use. */
 export function autoSelectableChains(): readonly ChainConfig[] {
-  return chainRegistry().filter((c) => !NOT_AUTO_SELECTED.has(c.chainId));
+  return chainRegistry().filter((c) => isFaucetChain(c.chainId));
 }
 
 /** The config for `chainId`, or undefined when this release does not support it. */

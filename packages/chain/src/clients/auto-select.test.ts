@@ -89,7 +89,11 @@ describe('automatic selection once the faucet serves Gnosis Chiado (M1-3j-b)', (
       amount: 10n ** 18n,
     });
     expect(steps).toHaveLength(1);
-    expect(steps[0]).toMatchObject({ purpose: 'deposit', to: chiado.contracts.vault, value: 10n ** 18n });
+    expect(steps[0]).toMatchObject({
+      purpose: 'deposit',
+      to: chiado.contracts.vault,
+      value: 10n ** 18n,
+    });
   });
 
   it('funded on both at equal fees: Chiado (lower chain ID) pays', () => {
