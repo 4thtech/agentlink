@@ -177,7 +177,9 @@ export const TABLES = {
     },
     primaryKey: ['envelope_id'],
   },
-  // 07 §3.
+  // 07 §3. delete_after (M1-1g-i, schema version 4): the `files.deleteAfter` in effect when the
+  // file was sent, so a later policy change never applies retroactively. Null on a row stored
+  // before version 4: retention keeps it until it expires (I-9).
   files: {
     columns: {
       envelope_id: id,
@@ -190,6 +192,7 @@ export const TABLES = {
       file_key: enc,
       expires_at: int,
       deleted_at: opt('int'),
+      delete_after: optOneOf('expiry', 'receipt'),
     },
     primaryKey: ['envelope_id', 'idx'],
   },

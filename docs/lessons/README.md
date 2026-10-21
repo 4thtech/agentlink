@@ -21,6 +21,7 @@ A lesson explains a rule; it does not create one. When a lesson needs a binding 
 | [LL-13](LL-13-open-prs-after-review.md) | Failed-run emails come from PR runs under the owner's account; open PRs only after review |
 | [LL-14](LL-14-red-ci-emails-owner.md) | Red CI runs e-mail the owner; prove red locally, and the reviewer reproduces it |
 | [LL-15](LL-15-s2-red-commit-unchecked.md) | An S2 PR merges only with its RED commit checked |
+| [LL-16](LL-16-design-status-one-place.md) | The design status lives in one place, and session start reads it |
 
 ## Adding a lesson
 

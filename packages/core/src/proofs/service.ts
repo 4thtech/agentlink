@@ -16,7 +16,8 @@
 // stored envelope's, its kind is the 05 §3.1 kind of the payload this agent holds, and its recipient
 // commitment opens to this agent with the delivered salt. Then DELIVERED per the effective
 // `receipts.autoDelivered` (default off; the contact rule, else the global value; D-109)
-// and the deferred ACCEPTED of an approved accept (07 §2.1 step 4). A `receiptRequest` in the body
+// and the deferred ACCEPTED of an approved accept on its OFFER record, or of an approved `confirm` on
+// their ACCEPT record (07 §2.1 step 4; 04 §3.4.2, M1-7g-d). A `receiptRequest` in the body
 // (M1-33d) is kept as a flag on the received record and never signs anything; the user's
 // `acknowledge {type: "delivered"}` signs exactly one DELIVERED (receipt-request.ts). OPENED only on request;
 // ACCEPTED / REJECTED without terms are commitments (`commitments.accept`, D-31) and exclusive.
@@ -39,7 +40,8 @@
 // approval of a commitment is included by default (D-55).
 //
 // Never logged or put in an error (I-7, 04 §5): salts, signatures, content keys, record contents.
-// Inbound proof bodies and chain answers are untrusted data (I-5): only fixed codes leave here.
+// Inbound proof bodies and chain answers are untrusted data (I-5): only fixed codes leave here, and
+// the log keeps a `code` field only when it is one of PROOF_LOG_CODES (M1-7g-d).
 import {
   HPKE_ENC_LENGTH,
   WRAPPED_CEK_LENGTH,
@@ -62,6 +64,7 @@ import type {
   RecordKind,
   TopUpRoute,
 } from '@4thtech-io/chain';
+import type { Logger } from '@4thtech-io/log';
 import {
   RECEIPT_TYPE_NAMES,
   RECORD_KINDS as RECORD_KIND,
@@ -151,6 +154,12 @@ const AWAITING = 'awaiting';
 /** At most this many proof envelopes wait for their message, each at most this long. */
 const MAX_AWAITING = 256;
 const AWAITING_SECONDS = 7 * 86_400;
+const AWAITING_PREFIX = 'await:';
+/**
+ * One contact's share of the waiting pool (M1-7g-d, as for the pending pool): at most this many of
+ * the MAX_AWAITING proof envelopes come from one contact, so one contact cannot fill the pool.
+ */
+export const PROOF_AWAITING_PER_CONTACT = 32;
 /**
  * A `proof` envelope whose chain read failed (an RPC error or timeout, not an answer; 04 §3.4,
  * M1-7g-b): kept, keyed `pending:<proof envelope id>`, never a pass and never a mismatch, and checked
@@ -166,6 +175,28 @@ const PENDING_SECONDS = 7 * 86_400;
  * come from one contact, so one contact cannot fill the pool and push out the others' bodies.
  */
 export const PROOF_PENDING_PER_CONTACT = 32;
+/**
+ * The fixed codes the proof flow writes in a log line's `code` field (M1-7g-d, I-7): the logger
+ * keeps only these; any other value is redacted. The void codes of a deferred receipt are TermsCode.
+ */
+export const PROOF_LOG_CODES: readonly string[] = Object.freeze([
+  'submit_error',
+  'record_failed',
+  'announce_failed',
+  'proof_inbound_error',
+  'proof_unchecked',
+  'proof_pending',
+  'proof_mismatch',
+  'proof_parent_mismatch',
+  'receipt_conflict',
+  'deferred_error',
+  'pack_invalid',
+  'APPROVAL_VOID',
+  'TERMS_EXPIRED',
+  'TERMS_SUPERSEDED',
+  'POLICY_DENIED',
+  'NOT_A_PARTY',
+]);
 /** Rows that are a record: own or received (not a stored receipt or a waiting proof). */
 const isRecordRow = (r: Row<'proofs'>): boolean =>
   !RECEIPT_STATUSES.includes(r.status) &&
@@ -409,12 +440,14 @@ function proofTriggers(triggers: readonly ProofTrigger[]): string[] {
 
 export class ProofService implements RecordLookup {
   readonly #ctx: CoreContext;
+  readonly #log: Logger;
   readonly #deps: ProofServiceDeps;
   readonly #platform: ProofsPlatform | undefined;
   readonly #selector: Selector | undefined;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
     this.#ctx = ctx;
+    this.#log = ctx.log.withCodes(PROOF_LOG_CODES);
     this.#deps = deps;
     this.#platform = platform;
     this.#selector =
@@ -725,7 +758,7 @@ export class ProofService implements RecordLookup {
     try {
       outcome = await chain.submitter.notarize(item);
     } catch {
-      this.#ctx.log.warn('proof submit failed', { code: 'submit_error' });
+      this.#log.warn('proof submit failed', { code: 'submit_error' });
       return this.#setStatus(row, 'pending');
     }
     switch (outcome.status) {
@@ -744,7 +777,7 @@ export class ProofService implements RecordLookup {
       }
       case 'failed':
         await this.#setStatus(row, 'failed');
-        this.#ctx.log.info('proof refused by the chain', { code: 'record_failed' });
+        this.#log.info('proof refused by the chain', { code: 'record_failed' });
         return { status: 'error', code: 'RECORD_FAILED', recordId: row.record_id };
       case 'conflict':
         await this.#setStatus(row, 'conflict');
@@ -877,7 +910,7 @@ export class ProofService implements RecordLookup {
         // The rows stay pending; the outbox retries (07 §3.2).
       }
     } catch {
-      this.#ctx.log.warn('proof envelope not sent', { code: 'announce_failed' });
+      this.#log.warn('proof envelope not sent', { code: 'announce_failed' });
     }
   }
 
@@ -1039,7 +1072,7 @@ export class ProofService implements RecordLookup {
     try {
       pending = await this.#pendingAfterExpiry();
     } catch {
-      this.#ctx.log.warn('pending proof envelopes not read', { code: 'proof_inbound_error' });
+      this.#log.warn('pending proof envelopes not read', { code: 'proof_inbound_error' });
     }
     for (const report of reports) {
       if (report.outcome !== 'ok' || report.envelopeId === undefined) continue;
@@ -1048,14 +1081,14 @@ export class ProofService implements RecordLookup {
         signed += await this.#inbound(report.envelopeId, report.contactId, flags);
         signed += await this.#released(report.envelopeId, report.contactId, flags);
       } catch {
-        this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
+        this.#log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
     for (const row of pending) {
       try {
         signed += await this.#recheck(row, flags);
       } catch {
-        this.#ctx.log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
+        this.#log.warn('proof envelope not processed', { code: 'proof_inbound_error' });
       }
     }
     return { signed, reports: flags };
@@ -1074,7 +1107,7 @@ export class ProofService implements RecordLookup {
     });
     for (let i = 0; i < expired; i += 1) {
       // Fixed code only: nothing from the body or the chain (I-5, I-7).
-      this.#ctx.log.warn('proof envelope dropped unchecked (proof_unchecked)', {
+      this.#log.warn('proof envelope dropped unchecked (proof_unchecked)', {
         code: 'proof_unchecked',
       });
     }
@@ -1143,9 +1176,9 @@ export class ProofService implements RecordLookup {
       return 'new';
     });
     if (kept === 'new') {
-      this.#ctx.log.info('proof envelope pending a chain read', { code: 'proof_pending' });
+      this.#log.info('proof envelope pending a chain read', { code: 'proof_pending' });
     } else if (kept === 'full') {
-      this.#ctx.log.warn('proof envelope dropped unchecked (proof_unchecked)', {
+      this.#log.warn('proof envelope dropped unchecked (proof_unchecked)', {
         code: 'proof_unchecked',
       });
     }
@@ -1162,20 +1195,41 @@ export class ProofService implements RecordLookup {
     });
     let signed = 0;
     for (const r of waiting) {
-      signed += await this.#inbound(r.record_id.slice('await:'.length), contactId, flags);
+      signed += await this.#inbound(r.record_id.slice(AWAITING_PREFIX.length), contactId, flags);
     }
     return signed;
   }
 
-  /** Keeps a proof envelope whose message is not here yet; bounded in number and time. */
-  async #await(proofEnvelopeId: string, envelopeId: string, chainId: number): Promise<void> {
+  /**
+   * Keeps a proof envelope whose message is not here yet; bounded in number and time, and per
+   * contact (M1-7g-d): past MAX_AWAITING, or past the contact's share, it is dropped as
+   * `proof_unchecked`.
+   */
+  async #await(
+    proofEnvelopeId: string,
+    envelopeId: string,
+    chainId: number,
+    contactId: string,
+  ): Promise<void> {
     const now = nowOf(this.#ctx);
-    const key = `await:${proofEnvelopeId}`;
+    const key = `${AWAITING_PREFIX}${proofEnvelopeId}`;
     const empty = await seal(this.#ctx, 'proofs', 'salt', [key], '');
-    await this.#ctx.store.transaction((tx) => {
+    const kept = await this.#ctx.store.transaction((tx) => {
       tx.delete('proofs', { status: AWAITING, created_at: { lt: now - AWAITING_SECONDS } });
-      if (tx.count('proofs', { status: AWAITING }) >= MAX_AWAITING) return;
-      if (tx.get('proofs', { record_id: key }) !== undefined) return;
+      if (tx.get('proofs', { record_id: key }) !== undefined) return 'kept';
+      const waiting = tx.select('proofs', { status: AWAITING });
+      if (waiting.length >= MAX_AWAITING) return 'full';
+      // The contact's share: a waiting row belongs to the contact of its proof envelope, while that
+      // envelope is held and not refused.
+      let mine = 0;
+      for (const r of waiting) {
+        if (!r.record_id.startsWith(AWAITING_PREFIX)) continue;
+        const proofEnvelope = tx.get('envelopes', {
+          envelope_id: r.record_id.slice(AWAITING_PREFIX.length),
+        });
+        if (proofEnvelope?.state === 'ok' && proofEnvelope.contact_id === contactId) mine += 1;
+      }
+      if (mine >= PROOF_AWAITING_PER_CONTACT) return 'full';
       tx.insert('proofs', {
         record_id: key,
         envelope_id: envelopeId,
@@ -1188,7 +1242,14 @@ export class ProofService implements RecordLookup {
         salt: empty,
         created_at: now,
       });
+      return 'new';
     });
+    if (kept === 'full') {
+      // Fixed code only: nothing from the body (I-5, I-7).
+      this.#log.warn('proof envelope dropped unchecked (proof_unchecked)', {
+        code: 'proof_unchecked',
+      });
+    }
   }
 
   async #inbound(
@@ -1206,7 +1267,7 @@ export class ProofService implements RecordLookup {
     const { envelopeId, chainId, recordId, salt } = body.data;
     if ((await this.#envelope(envelopeId)) === undefined) {
       // The message is not here yet (relays deliver out of order): check it when it arrives.
-      await this.#await(proofEnvelopeId, envelopeId, chainId);
+      await this.#await(proofEnvelopeId, envelopeId, chainId, contactId);
       return 0;
     }
     const signedItem =
@@ -1261,12 +1322,12 @@ export class ProofService implements RecordLookup {
       }
       // Fixed code only: nothing from the proof body or the chain answer (I-5, I-7).
       if (reason === 'proof_parent_mismatch') {
-        this.#ctx.log.warn(
+        this.#log.warn(
           'proof envelope names another signer’s record as parent (proof_parent_mismatch)',
           { code: 'proof_parent_mismatch' },
         );
       } else {
-        this.#ctx.log.warn('proof envelope does not match the chain (proof_mismatch)', {
+        this.#log.warn('proof envelope does not match the chain (proof_mismatch)', {
           code: 'proof_mismatch',
         });
       }
@@ -1335,7 +1396,9 @@ export class ProofService implements RecordLookup {
     if (auto === 'allow') {
       if ((await this.#signReceipt(stored, 'DELIVERED')).status === 'ok') signed += 1;
     }
-    if (checked.kind === RECORD_KIND.OFFER) signed += await this.#deferred(stored, checked);
+    if (checked.kind === RECORD_KIND.OFFER || checked.kind === RECORD_KIND.ACCEPT) {
+      signed += await this.#deferred(stored, checked);
+    }
     return signed;
   }
 
@@ -1620,7 +1683,7 @@ export class ProofService implements RecordLookup {
     try {
       status = (await chain.submitter.acknowledge(parseJson(stored.record_json) as never)).status;
     } catch {
-      this.#ctx.log.warn('receipt submit failed', { code: 'submit_error' });
+      this.#log.warn('receipt submit failed', { code: 'submit_error' });
       return 'error';
     }
     const now = nowOf(this.#ctx);
@@ -1638,7 +1701,7 @@ export class ProofService implements RecordLookup {
         );
       });
     } else if (status === 'conflict') {
-      this.#ctx.log.info('receipt conflicts on-chain', { code: 'receipt_conflict' });
+      this.#log.info('receipt conflicts on-chain', { code: 'receipt_conflict' });
       await this.#ctx.store.transaction((tx) =>
         tx.update(
           'proofs',
@@ -1720,16 +1783,26 @@ export class ProofService implements RecordLookup {
     return true;
   }
 
-  /** The deferred ACCEPTED of an approved accept scope (07 §2.1 step 4; D-55). */
+  /**
+   * The deferred ACCEPTED of an approved scope (07 §2.1 step 4; D-55): an `accept` on its OFFER
+   * record, or a `confirm` on their ACCEPT record (04 §3.4.2, M1-7g-d).
+   */
   async #deferred(row: Row<'proofs'>, checked: ReceivedItem['received']): Promise<number> {
+    const kind =
+      checked.kind === RECORD_KIND.OFFER
+        ? 'OFFER'
+        : checked.kind === RECORD_KIND.ACCEPT
+          ? 'ACCEPT'
+          : undefined;
+    if (kind === undefined) return 0;
     const terms = this.#deps.terms();
     const d = await terms.deferredReceipt({
       envelopeHash: checked.envelopeHash,
-      kind: 'OFFER',
+      kind,
       signer: checked.signer,
     });
     if (d.status !== 'ready') {
-      if (d.status === 'void') this.#ctx.log.info('deferred receipt void', { code: d.code });
+      if (d.status === 'void') this.#log.info('deferred receipt void', { code: d.code });
       return 0;
     }
     const approvalId = d.approvalId;
@@ -1743,8 +1816,9 @@ export class ProofService implements RecordLookup {
   }
 
   /**
-   * Runs the deferred ACCEPTED for every received OFFER record (07 §2.1 step 4): after an accept
-   * whose offer was already recorded, so its receipt is signed without a second approval.
+   * Runs the deferred ACCEPTED for every received OFFER and ACCEPT record (07 §2.1 step 4): after an
+   * accept whose offer was already recorded, or an approved `confirm` (whose ACCEPT record is always
+   * known first), so the receipt is signed without a second approval.
    */
   async runDeferredReceipts(): Promise<number> {
     if (this.#platform === undefined) return 0;
@@ -1754,11 +1828,11 @@ export class ProofService implements RecordLookup {
     let n = 0;
     for (const row of rows) {
       const item = this.#received(row);
-      if (item?.kind !== RECORD_KIND.OFFER) continue;
+      if (item?.kind !== RECORD_KIND.OFFER && item?.kind !== RECORD_KIND.ACCEPT) continue;
       try {
         n += await this.#deferred(row, item);
       } catch {
-        this.#ctx.log.warn('deferred receipt failed', { code: 'deferred_error' });
+        this.#log.warn('deferred receipt failed', { code: 'deferred_error' });
       }
     }
     return n;
@@ -2014,7 +2088,7 @@ export class ProofService implements RecordLookup {
       parsed = proofPackSchema.safeParse({ ...base, ownerApproval: null });
     }
     if (!parsed.success) {
-      this.#ctx.log.warn('proof pack not built', { code: 'pack_invalid' });
+      this.#log.warn('proof pack not built', { code: 'pack_invalid' });
       return rejected('RECORD_UNAVAILABLE');
     }
     return Object.freeze({

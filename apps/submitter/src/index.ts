@@ -10,7 +10,9 @@
 // Per faucet chain (SUBMITTER_FAUCET_CHAINS; testnets only, M1-10b), the owner sets:
 //   SUBMITTER_FAUCET_KEY_<chainId> the faucet key, 0x + 64 lowercase hex: its own key, never the
 //                                  gas key (a faucet key equal to the gas key is refused)
-// A chain without its faucet key has no faucet (503); the submitter is not affected.
+// A chain without its faucet key has no faucet (503); the submitter is not affected. The faucet
+// serves only a key whose address is the environment's pinned SUBMITTER_FAUCET_ADDRESS_<chainId>
+// (a wrangler.toml var; staging and production pin different wallets, M1-10b-b; worker.ts).
 import {
   createFaucetChain,
   createSubmitterChain,
@@ -26,8 +28,9 @@ import {
   readConfig,
 } from './worker.js';
 
-export const packageName = '@4thtech-io/submitter';
-export * from './worker.js';
+// The entry module exports only the fetch handler and the Durable Object classes wrangler.toml
+// binds: Wrangler refuses any other export here (CHORE-SUBMITTER-WRANGLER-DEV). The package name
+// and the shared exports of worker.ts are in lib.ts.
 
 /** One port per chain per isolate; a changed secret starts a new isolate. */
 const ports = new Map<number, SubmitterChain | null>();

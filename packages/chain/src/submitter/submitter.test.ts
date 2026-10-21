@@ -376,10 +376,13 @@ function mockFetch(chain: MockChain) {
           const id = (decoded.args as readonly [Hex])[0];
           const stored = chain.records.get(id);
           if (chain.getRecordRevert !== null) {
-            const data = encodeErrorResult({
-              abi: NOTARY_CLIENT_ABI,
-              errorName: chain.getRecordRevert as never,
-            });
+            // An error name, or raw revert data when it starts with 0x.
+            const data = chain.getRecordRevert.startsWith('0x')
+              ? chain.getRecordRevert
+              : encodeErrorResult({
+                  abi: NOTARY_CLIENT_ABI,
+                  errorName: chain.getRecordRevert as never,
+                });
             return replyError({ code: 3, message: 'execution reverted', data });
           }
           // The deployed Notary reverts RecordNotFound() for an unknown record ID.
@@ -641,6 +644,17 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
     const p = port(chain);
     const item = await recordItem();
     await expect(p.simulateItem(item)).rejects.toMatchObject({ code: 'rpc_error' });
+  });
+
+  it('reads absent only for the exact RecordNotFound selector, not one with trailing bytes', async () => {
+    // IR #338 L1: decodeErrorResult accepts bytes after a no-argument error's selector.
+    const chain = newChain();
+    chain.getRecordRevert = '0x3e07f1a1deadbeef';
+    const p = port(chain);
+    const item = await recordItem();
+    await expect(p.simulateItem(item)).rejects.toMatchObject({ code: 'rpc_error' });
+    chain.getRecordRevert = '0x3e07f1a1';
+    expect(await p.simulateItem(item)).toEqual({ outcome: 'ok', gas: chain.estimate });
   });
 
   it('treats an RPC error without revert data as the infrastructure’s, not a failed item', async () => {

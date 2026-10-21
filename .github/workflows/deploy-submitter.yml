@@ -12,7 +12,9 @@
 # `wrangler deploy <bundle>/index.js --no-bundle` without it ignores [env.*] (M1-27b-b).
 #
 # JOBS
-#   ci-green           waits for this commit's ci.yml and security.yml gates (as release.yml).
+#   ci-green           waits for this commit's ci.yml and security.yml gates (as release.yml). If
+#                      this commit's CI was cancelled because a newer push to main superseded it, it
+#                      ends green with result=superseded: nothing deploys, and catch-up runs.
 #   guard              main of 4thtech/agentlink only, and only once apps/submitter/wrangler.toml exists.
 #   build              builds the Worker bundle ONCE (wrangler deploy --dry-run, no credentials) and
 #                      uploads it with its SHA-256; both environments deploy exactly these bytes.
@@ -36,6 +38,12 @@
 #                      naming the owner fix, when its token cannot set the variable.
 #   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
 #                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
+#   catch-up           only when this run did not deploy its commit because main moved on (CI
+#                      superseded, or deploy-production found a newer head): dispatches this workflow
+#                      on main unless a run already exists for main's head, whose commits may not
+#                      touch the paths above (tools/release/catch-up-deploy.mjs). The dispatched run
+#                      passes every gate again for the head commit: its own green CI, staging and
+#                      the smoke test, the production environment, DEPLOY_FREEZE, the head check.
 #
 # SKIPPING VS FAILING: absent credentials, an absent Worker or an absent required Worker secret skip
 # with a notice; a token the API refuses fails the job. The wrangler.toml vars (SUBMITTER_CHAINS,
@@ -76,6 +84,7 @@ on:
       # Every repo-local script a step runs (tools/release/deploy-path-triggers.test.mjs).
       - ".github/scripts/worker-logging-settings.jq"
       - "tools/release/wait-for-ci.mjs"
+      - "tools/release/catch-up-deploy.mjs"
       - ".github/workflows/deploy-submitter.yml"
   workflow_dispatch:
     inputs:
@@ -98,7 +107,7 @@ env:
   # wrangler.toml (tools/release/deploy-submitter.test.mjs keeps the two in step).
   SUBMITTER_REQUIRED_SECRETS: "SUBMITTER_IP_KEY SUBMITTER_GAS_KEY_84532 SUBMITTER_FAUCET_KEY_84532"
   # The wrangler.toml vars: a Worker secret with one of these names fails the deploy.
-  SUBMITTER_SHADOW_VARS: "SUBMITTER_CHAINS SUBMITTER_FAUCET_CHAINS"
+  SUBMITTER_SHADOW_VARS: "SUBMITTER_CHAINS SUBMITTER_FAUCET_ADDRESS_84532 SUBMITTER_FAUCET_CHAINS"
 
 jobs:
   ci-green:
@@ -109,6 +118,8 @@ jobs:
     permissions:
       actions: read
       contents: read
+    outputs:
+      result: ${{ steps.wait.outputs.result }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,6 +127,7 @@ jobs:
           persist-credentials: false
 
       - name: Wait for this commit's CI and require it green
+        id: wait
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -126,12 +138,14 @@ jobs:
             --require security.yml:security-gate \
             --timeout-minutes 45 \
             --interval-seconds 30 \
-            --missing-grace-minutes 10
+            --missing-grace-minutes 10 \
+            --superseded-ok
 
   guard:
     name: guard
     needs: ci-green
-    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main'
+    # A superseded ci-green exits 0 with result=superseded: nothing after it may run.
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' && needs.ci-green.outputs.result == 'green'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -465,6 +479,7 @@ jobs:
     outputs:
       deployed: ${{ steps.deploy.outputs.deployed }}
       rollback: ${{ steps.rollback.outputs.result }}
+      current: ${{ steps.head.outputs.current }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -500,7 +515,7 @@ jobs:
             exit 1
           fi
           if [ "$head" != "$COMMIT" ]; then
-            echo "::notice::main has moved on from $COMMIT to $head; the newer run handles production. Skipped."
+            echo "::notice::main has moved on from $COMMIT to $head; the newer run or the catch-up job handles production. Skipped."
             echo "current=false" >> "$GITHUB_OUTPUT"
           else
             echo "current=true" >> "$GITHUB_OUTPUT"
@@ -832,6 +847,34 @@ jobs:
             echo "| Logging read-back | ${SETTINGS_RESULT:-skipped} |"
             echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # CHORE-CI-SUPERSEDED: a run that did not deploy because main moved on makes sure main's head
+  # still gets a run of this workflow (tools/release/catch-up-deploy.mjs). It only dispatches; the
+  # dispatched run deploys nothing unless the head's own CI is green and every gate passes.
+  catch-up:
+    name: catch-up
+    needs: [ci-green, deploy-production]
+    if: >-
+      always() && github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' &&
+      (needs.ci-green.outputs.result == 'superseded' || needs.deploy-production.outputs.current == 'false')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # dispatch this workflow on main; the only job that may
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Make sure the head of main gets a deploy run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/release/catch-up-deploy.mjs --workflow deploy-submitter.yml
 
   freeze:
     name: freeze

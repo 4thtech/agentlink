@@ -12,6 +12,10 @@
 //   from the gas key (release §4.5; I-7: never logged, never in an error, never on the returned
 //   object). It signs locally through viem's account, in this package only (M0-10). It holds only
 //   testnet funds. Nothing is signed until every check passed (chain ID, balances, simulation).
+// - Every gas limit comes from a simulation (M1-10b-b). A `depositFor` that needs an `approve`
+//   first cannot be simulated before that approve is mined, so the faucet sends the approve, waits
+//   for its receipt (bounded), then simulates and sends the `depositFor`. An approve that is not
+//   mined in time, or reverts, sends no `depositFor` (a leftover allowance serves the next claim).
 import { decodeFunctionResult, encodeFunctionData, erc20Abi, keccak256 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ChainConfigError, type ChainConfig, type FeeTokenSymbol } from '../config/index.js';
@@ -92,8 +96,11 @@ export type FaucetCredit =
       readonly state: 'not_sent';
       readonly reason: 'faucet_empty' | 'no_gas' | 'reverted' | 'unavailable';
     }
-  /** The `depositFor` broadcast lost its answer: it may or may not land. */
-  | { readonly state: 'unknown' };
+  /**
+   * The `depositFor` broadcast lost its answer: it may or may not land. `txHash` is computed
+   * locally from the signed bytes, so a retry can return it (M1-10b-b).
+   */
+  | { readonly state: 'unknown'; readonly txHash: Hex };
 
 /** The faucet wallet of one testnet. */
 export interface FaucetChain {
@@ -119,15 +126,25 @@ export interface FaucetChainOptions {
   readonly timeoutMs?: number;
   /** An optional ceiling on `maxFeePerGas`, in wei. */
   readonly maxFeePerGasWei?: bigint;
+  /** How often to ask for an approve's receipt, 1 to 10 000 ms (default 1 000). */
+  readonly receiptPollMs?: number;
+  /** How long to wait for an approve to be mined, 1 to 120 000 ms (default 30 000). */
+  readonly receiptTimeoutMs?: number;
 }
 
 /** Added to every simulated gas amount (the submitter's FA-1 default margin). */
 const GAS_MARGIN = 25_000n;
-/**
- * The gas limit of a `depositFor` sent right after its `approve`, which cannot be simulated before
- * the approve is mined: a token transfer plus one credit update, with room to spare.
- */
-const DEPOSIT_AFTER_APPROVE_GAS = 200_000n;
+const DEFAULT_RECEIPT_POLL_MS = 1_000;
+const DEFAULT_RECEIPT_TIMEOUT_MS = 30_000;
+
+interface TimerGlobals {
+  setTimeout(fn: () => void, ms: number): unknown;
+}
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    (globalThis as unknown as TimerGlobals).setTimeout(resolve, ms);
+  });
 
 const quantity = (value: unknown): bigint => {
   if (typeof value !== 'string' || !/^0x[0-9a-fA-F]{1,64}$/.test(value)) {
@@ -165,6 +182,14 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
   const timeout = options.timeoutMs ?? DEFAULT_RPC_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 30_000) {
     throw new ChainConfigError('bad_client_option', 'timeoutMs: 1 to 30000');
+  }
+  const pollMs = options.receiptPollMs ?? DEFAULT_RECEIPT_POLL_MS;
+  if (!Number.isSafeInteger(pollMs) || pollMs < 1 || pollMs > 10_000) {
+    throw new ChainConfigError('bad_client_option', 'receiptPollMs: 1 to 10000');
+  }
+  const receiptTimeout = options.receiptTimeoutMs ?? DEFAULT_RECEIPT_TIMEOUT_MS;
+  if (!Number.isSafeInteger(receiptTimeout) || receiptTimeout < 1 || receiptTimeout > 120_000) {
+    throw new ChainConfigError('bad_client_option', 'receiptTimeoutMs: 1 to 120000');
   }
   const offered = offeredTokens(config)[0];
   if (offered === undefined) {
@@ -268,6 +293,25 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
     }
   };
 
+  /** Waits until `txHash` is mined with status 1; anything else (reverted, too slow) is not sent. */
+  const mined = async (txHash: Hex): Promise<void> => {
+    const deadline = Date.now() + receiptTimeout;
+    for (;;) {
+      let receipt: unknown;
+      try {
+        receipt = await rpc('eth_getTransactionReceipt', [txHash]);
+      } catch {
+        receipt = null; // a failed poll is retried until the deadline
+      }
+      if (receipt !== null && typeof receipt === 'object') {
+        if ((receipt as { status?: unknown }).status === '0x1') return;
+        throw new NotSent('unavailable');
+      }
+      if (Date.now() + pollMs > deadline) throw new NotSent('unavailable');
+      await sleep(pollMs);
+    }
+  };
+
   const credit = async (agent: Hex, usdCents: number): Promise<FaucetCredit> => {
     const target = checkAgent(agent);
     if (!Number.isSafeInteger(usdCents) || usdCents < 1 || usdCents > FAUCET_MAX_USD_CENTS) {
@@ -302,14 +346,6 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
       } else if (native < amount) {
         throw new NotSent('faucet_empty');
       }
-      const plan: { step: DepositStep; gas: bigint }[] = [];
-      if (needsApprove && approve !== undefined) {
-        plan.push({ step: approve, gas: await estimate(approve) });
-        plan.push({ step: deposit, gas: DEPOSIT_AFTER_APPROVE_GAS });
-      } else {
-        plan.push({ step: deposit, gas: await estimate(deposit) });
-      }
-
       const block = (await read('eth_getBlockByNumber', ['latest', false])) as {
         baseFeePerGas?: unknown;
       } | null;
@@ -326,34 +362,40 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
         maxFee = options.maxFeePerGasWei;
         if (priority > maxFee) priority = maxFee;
       }
-      const gasCost = plan.reduce((sum, p) => sum + p.gas, 0n) * maxFee;
+      const fees = { maxFee, priority };
       const valueSent = approve === undefined ? amount : 0n;
-      if (native < gasCost + valueSent) {
-        throw new NotSent(approve === undefined && native >= gasCost ? 'faucet_empty' : 'no_gas');
-      }
 
       const firstNonce = await readQuantity('eth_getTransactionCount', [faucetAddress, 'pending']);
       if (firstNonce > BigInt(Number.MAX_SAFE_INTEGER - 2)) throw new NotSent('unavailable');
       let nonce = Number(firstNonce);
-      const signed: Hex[] = [];
-      for (const p of plan) {
-        signed.push(await sign(p.step, nonce, p.gas, { maxFee, priority }));
+      let spent = 0n;
+
+      if (needsApprove && approve !== undefined) {
+        // The depositFor pulls the token with the allowance, so it can be simulated only once the
+        // approve is mined. A failed, lost, reverted or slow approve sends no depositFor: nothing
+        // was credited (a leftover allowance is used by the next claim).
+        const approveGas = await estimate(approve);
+        spent = approveGas * maxFee;
+        if (native < spent) throw new NotSent('no_gas');
+        const raw = await sign(approve, nonce, approveGas, fees);
+        if ((await broadcast(raw)) !== 'ok') throw new NotSent('unavailable');
+        await mined(keccak256(raw) as Hex);
         nonce += 1;
       }
-      // Only the depositFor credits anything: an approve that fails or loses its answer means no
-      // credit was sent (a leftover allowance is used by the next claim).
-      for (let i = 0; i < signed.length; i += 1) {
-        const raw = signed[i] as Hex;
-        const last = i === signed.length - 1;
-        const answer = await broadcast(raw);
-        if (answer === 'ok') {
-          if (last) return { state: 'sent', txHash: keccak256(raw) as Hex };
-          continue;
-        }
-        if (!last || answer === 'refused') return { state: 'not_sent', reason: 'unavailable' };
-        return { state: 'unknown' };
+
+      const depositGas = await estimate(deposit);
+      const depositCost = depositGas * maxFee;
+      if (native < spent + depositCost + valueSent) {
+        throw new NotSent(
+          approve === undefined && native >= depositCost ? 'faucet_empty' : 'no_gas',
+        );
       }
-      return { state: 'not_sent', reason: 'unavailable' };
+      const raw = await sign(deposit, nonce, depositGas, fees);
+      const answer = await broadcast(raw);
+      const txHash = keccak256(raw) as Hex;
+      if (answer === 'ok') return { state: 'sent', txHash };
+      if (answer === 'refused') return { state: 'not_sent', reason: 'unavailable' };
+      return { state: 'unknown', txHash };
     } catch (error) {
       if (error instanceof NotSent) return { state: 'not_sent', reason: error.reason };
       return { state: 'not_sent', reason: 'unavailable' };

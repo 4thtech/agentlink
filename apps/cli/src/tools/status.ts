@@ -14,6 +14,10 @@
 // budget by the platform; when no chain answers they are left out and status still answers. The
 // summary stays the session-start line: no credit, token or network name in it (11 §5.1).
 //
+// Incomplete catch-up (M1-5g; 07 §4.2): when a relay returned a second at its cap, the `nextStep` is
+// one fixed line (some messages may be missing; the next check looks again). The summary and the
+// output fields do not change, so the tool surface is the same.
+//
 // Open offers (M1-22): received offers still waiting for an answer, even ones already read in an
 // earlier session, are counted by contact (`openOffers`, `offers`) from the core's store read, so a
 // fresh session can find them; their content is read only through `agentlink_inbox` with
@@ -52,6 +56,7 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     counts = await client.storedCounts();
   }
 
+  const incomplete = counts.incomplete ?? 0;
   const contacts = activeContacts(await client.contacts());
   const byId = new Map(contacts.map((view) => [view.id, contactRef(view)] as const));
   const inbox: { contact: ContactRef; unread: number }[] = [];
@@ -89,8 +94,11 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     unread,
     requests: counts.requests,
     openOffers,
+    incomplete,
   });
   return ok(statusSummary(inbox, counts.requests, offers), {
+    // M1-5g: a relay returned a second at its cap. Fixed text only (I-5, I-7).
+    ...(incomplete > 0 ? { nextStep: copy('chat.inbox.incompleteNextStep') } : {}),
     agent: { name: context.agentName, id: self.agentId, fingerprint: self.agentFingerprint },
     owner: { fingerprint: self.ownerFingerprint },
     contacts: contacts.length,

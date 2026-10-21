@@ -10,7 +10,9 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 
 - `init [--agent <name>] [--harness <id|none>] [--config <path>]` (identity and harness setup, with diff and confirmation; `--harness` picks one app, `none` creates the identity only; `--config` names the OpenCode or Antigravity config file)
 - `mcp` (the MCP server over stdio, started by your AI app)
-- `status`, `invite`, `accept <url> [--approval <approvalId>]`, `contacts`, `requests`
+- `init --hook [--agent <name>]` (optional start-of-session note for Claude Code, a separate opt-in with its own diff and confirmation; needs AgentLink installed with `npm install -g`)
+- `status [--brief]` (`--brief` prints one or two lines: counts and contact names under the name rule, never message text)
+- `invite`, `accept <url> [--approval <approvalId>]`, `contacts`, `requests`
 - `contacts rename <contactId> <name>`, `contacts remove <contactId>` (owner operations, since v0.1.1: the owner's own name for a contact, or remove it; `contacts` lists each contact's ID)
 - `owner init`, `owner add-agent --agent <name>`, `approve`, `deny`, `cancel` (owner operations, typed in a terminal you opened; `owner init` once per computer user, `owner add-agent` for each further agent)
 - `policy show`, `policy allow-folder <path>`, `policy remove-folder <path>` (owner operations, next release, M1-9m: the folders your agent may send files from; the canonical realpath is stored in a new owner-signed `policy.set`, and symbolic links, relative paths, the root, the home folder and folders above it, hidden and protected folders, and a folder that contains a protected folder (M1-9m-b, D-99: the refusal names it and suggests a narrower one; compared by realpath and ignoring case) are refused). `policy set <key> <value>` (owner operation) is not available yet
