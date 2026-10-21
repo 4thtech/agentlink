@@ -60,9 +60,7 @@ describe('credentialDigest (04 §2.5.1)', () => {
   });
 
   it('never normalises: NFC and NFD give different digests', () => {
-    expect(credentialDigest(fields('k', 'café'))).not.toBe(
-      credentialDigest(fields('k', 'café')),
-    );
+    expect(credentialDigest(fields('k', 'café'))).not.toBe(credentialDigest(fields('k', 'café')));
   });
 
   it('leaves its inputs unchanged', () => {
@@ -93,9 +91,11 @@ describe('credentialDigest (04 §2.5.1)', () => {
   });
 
   it('refuses values that are not byte arrays (the secret never travels as a JS string)', () => {
-    const asString = { salt, accessKeyId: text('a'), secretAccessKey: 'b' } as unknown as Parameters<
-      typeof credentialDigest
-    >[0];
+    const asString = {
+      salt,
+      accessKeyId: text('a'),
+      secretAccessKey: 'b',
+    } as unknown as Parameters<typeof credentialDigest>[0];
     expect(() => credentialDigest(asString)).toThrow(CryptoInputError);
     expect(() => credentialDigest(null as never)).toThrow(CryptoInputError);
   });
@@ -120,7 +120,11 @@ describe('the s3:<id> item (04 §2.2)', () => {
       const f = fields(`id-${value}`, `secret-${value}`);
       const item = encodeStorageCredentialItem(f);
       const parsed = parseStorageCredentialItem(item);
-      expect(parsed).toEqual({ salt, accessKeyId: f.accessKeyId, secretAccessKey: f.secretAccessKey });
+      expect(parsed).toEqual({
+        salt,
+        accessKeyId: f.accessKeyId,
+        secretAccessKey: f.secretAccessKey,
+      });
       expect(credentialDigestOfItem(item)).toBe(credentialDigest(f));
       item.fill(0);
       expect(parsed.secretAccessKey).toEqual(f.secretAccessKey);

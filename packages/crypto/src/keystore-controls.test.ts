@@ -60,7 +60,8 @@ type DeepKeys<T, D extends number = 6> = [D] extends [never]
             : never;
 
 /** A property name that would carry key material or a KeyStore item value. */
-type SecretName = `${string}${'seed' | 'Seed' | 'item' | 'Item' | 'privateKey' | 'secretKey' | 'kek'}${string}`;
+type SecretName =
+  `${string}${'seed' | 'Seed' | 'item' | 'Item' | 'privateKey' | 'secretKey' | 'kek'}${string}`;
 
 type ControlSurface = KeyExportControl | KeyImportControl | StorageCredentialControl;
 
@@ -94,7 +95,9 @@ describe('the controls carry no raw seed (M1-9i-b2 acceptance; 04 §2.3.3)', () 
 
   it('the opened kit of M1-9i-b, which holds the seeds, cannot pose as an import handle', () => {
     expectTypeOf<OpenedRecoveryKit>().not.toExtend<RecoveryKitImport>();
-    expectTypeOf<OpenedRecoveryKitAgent>().not.toExtend<RecoveryKitImportAgent>();
+    // Its agents carry the items; the import handle's agents do not.
+    expectTypeOf<'items'>().toExtend<keyof OpenedRecoveryKitAgent>();
+    expectTypeOf<'items'>().not.toExtend<keyof RecoveryKitImportAgent>();
   });
 
   it('none of them is on the KeyStore, the OwnerKeyStore or a session (the agent path cannot reach them)', () => {

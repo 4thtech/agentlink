@@ -97,7 +97,8 @@ describe('no MCP tool handler reaches the owner controls (M1-9i-b2, I-4)', () =>
   });
 });
 
-type ControlMethod = keyof KeyExportControl | keyof KeyImportControl | keyof StorageCredentialControl;
+type ControlMethod =
+  keyof KeyExportControl | keyof KeyImportControl | keyof StorageCredentialControl;
 type Depth = [never, 0, 1, 2, 3, 4];
 /** Every property name reachable in T through objects and function results (bounded depth). */
 type DeepKeys<T, D extends number = 4> = [D] extends [never]
@@ -113,7 +114,10 @@ type DeepKeys<T, D extends number = 4> = [D] extends [never]
 describe('ToolContext offers no control method (type level)', () => {
   it('no property path of what a handler is given reaches a control method', () => {
     expectTypeOf<Extract<DeepKeys<ToolContext>, ControlMethod>>().toEqualTypeOf<never>();
-    // The walk is not vacuous.
+    // The walk is not vacuous: it reaches into the client, and stays a set of literal names (an
+    // index signature widening it to `string` would make the Extract above pass vacuously).
     expectTypeOf<'client'>().toExtend<DeepKeys<ToolContext>>();
+    expectTypeOf<'agentName'>().toExtend<DeepKeys<ToolContext>>();
+    expectTypeOf<string>().not.toExtend<DeepKeys<ToolContext>>();
   });
 });

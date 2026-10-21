@@ -710,7 +710,9 @@ export interface OpenedRecoveryKit {
   wipe(): void;
 }
 
-type KitSource = Uint8Array | AsyncIterable<Uint8Array> | Iterable<Uint8Array>;
+/** A kit to open: the whole kit, or its bytes in order (for example a file read stream). */
+export type RecoveryKitSource = Uint8Array | AsyncIterable<Uint8Array> | Iterable<Uint8Array>;
+type KitSource = RecoveryKitSource;
 
 interface Entry {
   readonly name: Uint8Array;
