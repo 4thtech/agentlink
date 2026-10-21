@@ -28,7 +28,7 @@ import { ACK_KIND_RECEIVED } from './acks.js';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
 import { MemoryStore } from './store/memory-store.js';
-import { StoreSyncPersistence } from './sync.js';
+import { StoreSyncPersistence, mergeProofReports } from './sync.js';
 import {
   FakeClock,
   RecordingApprovalChannel,
@@ -916,4 +916,27 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
     );
     expect(okFromA).toHaveLength(limit);
   }, 300_000);
+});
+
+describe('proof flags join the pass reports (04 §3.4, M1-7g-c)', () => {
+  const ok = (envelopeId: string, contactId = 'c1') =>
+    ({ envelopeId, outcome: 'ok', contactId, flagged: false }) as const;
+  const flag = (envelopeId: string, contactId = 'c1') =>
+    ({
+      envelopeId,
+      outcome: 'refused',
+      reason: 'proof_mismatch',
+      contactId,
+      flagged: true,
+    }) as const;
+
+  it('a flagged proof envelope replaces its own ok report; one from an earlier pass is added', () => {
+    const merged = mergeProofReports([ok('m1'), ok('p1')], [flag('p1'), flag('p0', 'c2')]);
+    expect(merged).toEqual([ok('m1'), flag('p1'), flag('p0', 'c2')]);
+  });
+
+  it('no flags: the reports are unchanged', () => {
+    const reports = [ok('m1')];
+    expect(mergeProofReports(reports, [])).toEqual(reports);
+  });
 });

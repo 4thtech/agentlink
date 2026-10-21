@@ -295,6 +295,7 @@ export {
 // package's Record builder only (04 §5, D-61).
 export type { ProofChain, ProofKit, ProofsPlatform } from './proofs/platform.js';
 export {
+  PROOF_PENDING_PER_CONTACT,
   RECEIPT_DEADLINE_SECONDS,
   RECORD_DEADLINE_SECONDS,
   type AcknowledgeInput,
@@ -305,6 +306,7 @@ export {
   type NotarizeResult,
   type ProofCode,
   type ProofFee,
+  type ProofInboundResult,
   type ProofRejected,
   type ProofService,
   type ProofServiceDeps,
