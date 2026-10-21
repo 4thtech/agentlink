@@ -7,4 +7,11 @@ declare module 'cloudflare:test' {
     fetch(input: string | URL | Request, init?: RequestInit): Promise<Response>;
   };
   export function runDurableObjectAlarm(stub: unknown): Promise<boolean>;
+  export function runInDurableObject<R>(
+    stub: unknown,
+    callback: (
+      instance: unknown,
+      state: { storage: { get<T>(key: string): Promise<T | undefined> } },
+    ) => R | Promise<R>,
+  ): Promise<R>;
 }

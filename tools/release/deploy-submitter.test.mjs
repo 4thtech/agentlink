@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { commandLines, isDeployCall, runScripts, wranglerCalls } from './workflow-run-steps.mjs';
 
 // M1-10c: the submitter and faucet deploy workflow (release-and-deployment.md §4.5, D-25, D-52,
 // D-88), mirroring deploy-drop.yml (tools/release/deploy-drop.test.mjs). Structure checks on
@@ -419,6 +420,108 @@ describe('deploy-submitter.yml structure', () => {
   });
 });
 
+describe('no step turns logging on (OPS-PRIV-1, I-7)', () => {
+  // The `run:` steps read as YAML (tools/release/workflow-run-steps.mjs), not by a regex over the
+  // whole file. `--logpush` is wrangler's only command-line switch for a logging setting; Workers
+  // Logs, traces and Tail Workers come from wrangler.toml, which every deploy must name.
+  const scripts = runScripts(workflow);
+  const lines = scripts.flatMap(({ script }) => commandLines(script));
+  const calls = lines.flatMap((line) => wranglerCalls(line));
+
+  it('finds the run steps and the wrangler calls in them', () => {
+    expect(scripts.length).toBeGreaterThan(5);
+    expect(calls.filter(isDeployCall).length).toBeGreaterThan(0);
+  });
+
+  it('runs wrangler only from run steps, never through a wrangler action', () => {
+    const outside = workflow
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('#'))
+      .flatMap((line) => wranglerCalls(line));
+    expect(outside.length).toBe(calls.length);
+    expect(workflow).not.toMatch(/uses:\s*cloudflare\/wrangler-action/);
+  });
+
+  it('every deploy, versions deploy or versions upload names the reviewed wrangler.toml', () => {
+    for (const call of calls.filter(isDeployCall)) {
+      expect(call.text).toMatch(/--config[ =]wrangler\.toml(?:\s|$)/);
+    }
+  });
+
+  it('never tails a Worker and never passes --logpush', () => {
+    for (const call of calls) expect(call.subcommand).not.toBe('tail');
+    for (const line of lines) expect(line).not.toMatch(/--logpush\b/);
+  });
+});
+
+describe('workflow run-step reader', () => {
+  it('reads block, plain and quoted run values as mapping keys and sequence entries', () => {
+    const source = [
+      'jobs:',
+      '  a:',
+      '    steps:',
+      '      - name: one',
+      '        run: |',
+      '          set -e',
+      '          # a comment',
+      '          pnpm exec wrangler deploy x.js \\',
+      '            --env staging --config wrangler.toml',
+      '      - run: npx wrangler versions upload',
+      "      - run: 'wrangler tail'",
+      '        env:',
+      '          A: b',
+    ].join('\n');
+    const scripts = runScripts(source);
+    expect(scripts.map((s) => s.line)).toEqual([5, 10, 11]);
+    const lines = scripts.flatMap(({ script }) => commandLines(script));
+    expect(lines).toEqual([
+      'set -e',
+      'pnpm exec wrangler deploy x.js --env staging --config wrangler.toml',
+      'npx wrangler versions upload',
+      'wrangler tail',
+    ]);
+    const calls = lines.flatMap((line) => wranglerCalls(line));
+    expect(calls.map((c) => [c.subcommand, isDeployCall(c)])).toEqual([
+      ['deploy', true],
+      ['versions', true],
+      ['tail', false],
+    ]);
+  });
+
+  it('does not count wrangler.toml or WRANGLER_ variables as calls', () => {
+    expect(wranglerCalls('WRANGLER_OUTPUT_FILE_PATH=x cat wrangler.toml')).toEqual([]);
+  });
+
+  it('throws on a plain run value continued on a more-indented line', () => {
+    const source = [
+      '      - run: pnpm exec wrangler deploy x.js',
+      '          --env production',
+    ].join('\n');
+    expect(() => runScripts(source)).toThrow(/unsupported/);
+  });
+
+  it('joins the lines of a folded (>) block with spaces', () => {
+    const source = [
+      '      - run: >',
+      '          pnpm exec wrangler deploy x.js',
+      '          --env production',
+      '      - run: echo done',
+    ].join('\n');
+    const scripts = runScripts(source);
+    expect(scripts.map((s) => s.script)).toEqual([
+      'pnpm exec wrangler deploy x.js --env production',
+      'echo done',
+    ]);
+    const calls = commandLines(scripts[0].script).flatMap((line) => wranglerCalls(line));
+    expect(calls[0]?.text).toBe('wrangler deploy x.js --env production');
+  });
+
+  it('fails closed on a run value it does not know', () => {
+    expect(() => runScripts('      - run:\n          wrangler deploy')).toThrow(/unsupported/);
+    expect(() => runScripts('        run: [a]')).toThrow(/unsupported/);
+  });
+});
+
 describe('logging settings read-back', () => {
   const copies = block('READBACK-SETTINGS');
   const script = copies[0] ?? '';
@@ -445,9 +548,69 @@ describe('logging settings read-back', () => {
     expect(copies[1]).toBe(copies[0]);
   });
 
-  it('accepts everything off, and absent fields', () => {
+  it('accepts everything off, with the optional fields absent, null or empty', () => {
     expect(check({ success: true, result: off() })).toBe(true);
-    expect(check({ success: true, result: { tail_consumers: null } })).toBe(true);
+    expect(check({ success: true, result: off({ tail_consumers: null }) })).toBe(true);
+    expect(
+      check({ success: true, result: { logpush: false, observability: { enabled: false } } }),
+    ).toBe(true);
+    expect(
+      check({
+        success: true,
+        result: off({
+          observability: {
+            enabled: false,
+            logs: { enabled: false, invocation_logs: false, destinations: [] },
+            traces: { enabled: false, destinations: [] },
+          },
+          streaming_tail_consumers: [],
+        }),
+      }),
+    ).toBe(true);
+  });
+
+  // IR-OPS-PRIV-1-2: Cloudflare documents `observability.traces.enabled` as optional.
+  it('accepts traces without `enabled`, and refuses traces enabled or exported', () => {
+    const traces = (t) => off({ observability: { enabled: false, traces: t } });
+    expect(check({ success: true, result: traces({}) })).toBe(true);
+    expect(check({ success: true, result: traces({ destinations: [] }) })).toBe(true);
+    expect(check({ success: true, result: traces({ enabled: true }) })).toBe(false);
+    expect(check({ success: true, result: traces({ destinations: ['otel'] }) })).toBe(false);
+  });
+
+  // IR-OPS-PRIV-1-1 HIGH: a missing, null or renamed field is not "off"; the check fails closed.
+  it('fails closed on an unexpected response shape', () => {
+    const shapes = [
+      { success: true },
+      { success: true, result: null },
+      { success: true, result: {} },
+      { success: true, result: [] },
+      { success: true, result: { tail_consumers: null } },
+      { success: true, result: { observability: { enabled: false } } },
+      { success: true, result: { log_push: false, observability: { enabled: false } } },
+      { success: true, result: { logpush: false } },
+      { success: true, result: { logpush: false, observability: null } },
+      { success: true, result: { logpush: false, observability: {} } },
+      { success: true, result: { logpush: 'false', observability: { enabled: false } } },
+      { success: true, result: { logpush: null, observability: { enabled: false } } },
+      { success: true, result: off({ observability: { enabled: false, logs: 'off' } }) },
+      { success: true, result: off({ observability: { enabled: false, logs: {} } }) },
+      {
+        success: true,
+        result: off({ observability: { enabled: false, traces: { destinations: {} } } }),
+      },
+      {
+        success: true,
+        result: off({
+          observability: { enabled: false, logs: { enabled: false, destinations: {} } },
+        }),
+      },
+      { success: true, result: off({ tail_consumers: {} }) },
+      { success: true, result: off({ streaming_tail_consumers: 'none' }) },
+      { result: off() },
+      { success: 'true', result: off() },
+    ];
+    for (const shape of shapes) expect(check(shape), JSON.stringify(shape)).toBe(false);
   });
 
   it('refuses Logpush, observability, invocation logs, traces or a Tail Worker', () => {
@@ -476,6 +639,33 @@ describe('logging settings read-back', () => {
     expect(check({ success: true, result: off({ tail_consumers: [{ service: 'tail' }] }) })).toBe(
       false,
     );
+  });
+
+  // OPS-PRIV-1: streaming Tail Workers are Tail Workers too, and an export destination for logs
+  // or traces sends them to a third party even when Workers Logs itself keeps nothing.
+  it('refuses a streaming Tail Worker and a log or trace export destination', () => {
+    expect(check({ success: true, result: off({ streaming_tail_consumers: null }) })).toBe(true);
+    expect(
+      check({ success: true, result: off({ streaming_tail_consumers: [{ service: 'tail' }] }) }),
+    ).toBe(false);
+    for (const part of ['logs', 'traces']) {
+      expect(
+        check({
+          success: true,
+          result: off({
+            observability: { enabled: false, [part]: { enabled: false, destinations: [] } },
+          }),
+        }),
+      ).toBe(true);
+      expect(
+        check({
+          success: true,
+          result: off({
+            observability: { enabled: false, [part]: { enabled: false, destinations: ['otel'] } },
+          }),
+        }),
+      ).toBe(false);
+    }
   });
 
   it('refuses an API error and a response that is not JSON', () => {

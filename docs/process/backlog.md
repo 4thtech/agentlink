@@ -751,6 +751,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Runs 39144772282 and 39153323893 (the second with the OPS-CI-9 probe, which passed) failed the same way: the gnome-keyring daemon died mid-run without cleanup (stale control socket, "Connection refused"), D-Bus started a fresh `gnome-keyring-daemon --start`, which could not unlock the login keyring (random password) without SystemPrompter, so every keychain call was refused. `tools/ci/with-keyring.sh` now creates a passwordless default ("login") collection in a private folder that any daemon of the session opens without a prompt, runs the daemon in its own session, waits for it to own the Secret Service name, and reports a mid-run daemon death as a `::warning::`. `tools/ci/keyring-restart-check.sh` (keychain job, Linux) kills the daemon and checks the replacement serves the same items with no prompt.
 - **Acceptance:** the restart check fails on the OPS-CI-9 script and passes on the new one; `e2e-deterministic` green on repeated runs; no gate or test weakened.
 
+#### CHORE-WIN-RELAY-IO · Windows node-os: packages/node relay-io.test.ts hook timed out in 10000ms (new, flake 2026-10-21)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: `packages/node`)
+- **Repo/path:** agentlink · `packages/node/src/relay-io.test.ts`, `packages/node/vitest.config.ts`
+- **Depends on:** —
+- **Scope:** Seen 2026-10-21 on the #326 push run 39547945275: the Windows `node-os` job failed with a hook in `packages/node/src/relay-io.test.ts` that timed out at 10000 ms; the re-run passed. Find the slow hook, then fix it or give it a measured per-file timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout.
+- **Acceptance:** the PR names the slow hook with its measured Windows duration; the fix or the per-file timeout lands with that measurement; no test or gate weakened.
+
 #### OPS-REL-3 · The Version packages PR also rolls the root CHANGELOG (new)
 - **Status:** done (4thtech/agentlink#198) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/release.yml` or a Changesets hook, `tools/**`, `docs/process/versioning.md` §5
@@ -777,7 +784,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (IR-OPS-REL-4-1 L1..L5, 2026-10-17): validate changelog fragments in CI (format and section); align `versioning.md` wording with the check.
 
 #### OPS-PRIV-1 · Submitter and service logging off, with a deploy check (new, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy configuration)
+- **Status:** in review (PR #331) · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy configuration)
 - **Repo/path:** agentlink · `apps/submitter/wrangler.toml` (when it lands with M1-10c), `apps/drop/wrangler.toml`, the deploy workflows, `docs/runbooks/`
 - **Depends on:** M1-10c (submitter deploy pipeline)
 - **Spec:** 07 §7 (privacy invariant); 04 §4, §5.1; D-109. Ongoing: applies to every 4thTech service and any relay 4thTech runs

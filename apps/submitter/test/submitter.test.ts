@@ -4,9 +4,11 @@
 // 3 new items per signer per hour. Signers and IPs are distinct per test, so tests do not share
 // counters. Nothing here is a real key or signature.
 //
-// The canary block at the end searches everything the Worker wrote to the console for the IPs and
-// signatures the tests used (07 §7: no request logging; never signatures with IPs).
-import { SELF, env as testEnv, runDurableObjectAlarm } from 'cloudflare:test';
+// The canary block at the end searches everything the Worker wrote to the console, and the
+// aggregate metrics it kept, for the IPs, signers, recipients, record IDs, salts, signatures and
+// transaction hashes the tests used (07 §7, D-109 (8), OPS-PRIV-1: no request logging; no log line
+// or metric carries any of them).
+import { SELF, env as testEnv, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   RECORD_KIND,
@@ -16,6 +18,7 @@ import {
   type Hex,
 } from '@4thtech-io/chain';
 import type { SubmitterEnv } from '../src/worker.js';
+import { METRICS } from '../src/limits.js';
 import { POLL_MS } from '../src/queue.js';
 import { FakeChain, fakeChains } from './fake-chain.js';
 
@@ -34,10 +37,26 @@ beforeEach(() => {
   fakeChains.set(CHAIN_ID, chain);
 });
 
-// Everything a log line must never contain, collected as the tests run.
+// Everything a log line or metric must never contain, collected as the tests run. Hex values are
+// kept without `0x`, lowercase, and compared case-insensitively (an address may be checksummed).
 const secrets = new Set<string>();
+let txHashes = 0;
+function secretHex(value: string | null | undefined): void {
+  if (typeof value === 'string' && value.length > 2) secrets.add(value.slice(2).toLowerCase());
+}
 const captured: string[] = [];
-const METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
+const METHODS = [
+  'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
+  'trace',
+  'dir',
+  'dirxml',
+  'table',
+  'assert',
+] as const;
 const originals = new Map<string, (...args: unknown[]) => void>();
 
 beforeAll(() => {
@@ -70,6 +89,7 @@ function newSigner(code = true): Hex {
   signerCounter += 1;
   const address = `0x${signerCounter.toString(16).padStart(40, 'b')}` as Hex;
   if (code) chain.code.add(address);
+  secretHex(address);
   return address;
 }
 
@@ -90,18 +110,20 @@ function newSignature(): Hex {
   return sig;
 }
 
-function record(signer: Hex) {
+function record(signer: Hex, recipient: Hex | null = null) {
   const built = buildRecord({
     chainId: CHAIN_ID,
     notary: NOTARY,
     signer,
     envelopeHash: `0x${'12'.repeat(32)}`,
-    recipient: null,
+    recipient,
     kind: RECORD_KIND.NOTE,
     feeToken: ZERO,
     maxFee: 1000n,
     deadline: Math.floor(Date.now() / 1000) + 3600,
   });
+  secretHex(built.recordId);
+  secretHex(built.salt);
   return { record: built.record, recordId: built.recordId, signature: newSignature() };
 }
 
@@ -128,7 +150,12 @@ async function notarize(
     ip,
   );
   const body = (await res.json()) as Record<string, unknown>;
-  return { status: res.status, items: (body.items ?? []) as Item[], body };
+  const items = (body.items ?? []) as Item[];
+  for (const item of items) {
+    if (item.txHash) txHashes += 1;
+    secretHex(item.txHash);
+  }
+  return { status: res.status, items, body };
 }
 
 const queueStub = () =>
@@ -284,7 +311,10 @@ describe('POST /v1/notarize', () => {
 
 describe('POST /v1/receipt', () => {
   it('relays a signed receipt', async () => {
+    // The receipt's signer is the record's recipient (05 §3.1); the salt is revealed on-chain only.
     const signer = newSigner();
+    secretHex(`0x${'34'.repeat(32)}`);
+    secretHex(`0x${'56'.repeat(32)}`);
     const built = buildReceipt({
       chainId: CHAIN_ID,
       notary: NOTARY,
@@ -382,10 +412,33 @@ describe('other routes', () => {
   });
 });
 
-describe('logging canary (07 §7)', () => {
-  it('the Worker wrote no IP and no signature to the console', () => {
-    expect(secrets.size).toBeGreaterThan(10);
-    const all = captured.join('\n');
+describe('logging canary (07 §7, OPS-PRIV-1)', () => {
+  it('notarizes a record to a recipient, so a recipient and its salt are canaries too', async () => {
+    const r = record(newSigner(), newSigner(false));
+    const { status, items } = await notarize([r]);
+    expect(status).toBe(200);
+    expect(items[0]?.recordId).toBe(r.recordId);
+  });
+
+  it('the Worker logged no IP, signer, recipient, record ID, salt, signature or tx hash', () => {
+    expect(secrets.size).toBeGreaterThan(40);
+    expect(txHashes).toBeGreaterThan(0);
+    const all = captured.join('\n').toLowerCase();
     for (const secret of secrets) expect(all).not.toContain(secret);
+  });
+
+  it('keeps only fixed counter names with integer values, carrying none of them', async () => {
+    const stub = env.SUBMITTER_LIMITS.get(env.SUBMITTER_LIMITS.idFromName('metrics'));
+    const stored = await runInDurableObject(stub, (_instance, state) =>
+      state.storage.get<Record<string, unknown>>('m'),
+    );
+    const metrics = stored ?? {};
+    expect(Object.keys(metrics).length).toBeGreaterThan(0);
+    for (const [name, value] of Object.entries(metrics)) {
+      expect(METRICS as readonly string[]).toContain(name);
+      expect(Number.isSafeInteger(value)).toBe(true);
+    }
+    const text = JSON.stringify(metrics).toLowerCase();
+    for (const secret of secrets) expect(text).not.toContain(secret);
   });
 });

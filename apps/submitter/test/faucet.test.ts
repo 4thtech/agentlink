@@ -23,7 +23,18 @@ beforeEach(() => {
 
 const secrets = new Set<string>();
 const captured: string[] = [];
-const METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
+const METHODS = [
+  'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
+  'trace',
+  'dir',
+  'dirxml',
+  'table',
+  'assert',
+] as const;
 const originals = new Map<string, (...args: unknown[]) => void>();
 
 beforeAll(() => {
