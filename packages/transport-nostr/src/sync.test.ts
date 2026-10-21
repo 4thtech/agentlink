@@ -2082,6 +2082,60 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
   });
 
+  // --- AUDIT-FABLE-M2-19-1: exclusive `until` (M-1) and stray frames as page evidence (L-1, L-2) ---
+
+  it('keeps the gap when the other relay applies `until` exclusively and cut that second', async () => {
+    const s = setup();
+    const [capped, strict] = relayUrls('rq-excl-until', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 2 });
+    s.net.configure(strict, { maxLimit: 4, exclusiveUntil: true });
+    const T = NOW - 1_500;
+    injectEverywhere(s, [capped, strict], 1, T + 10);
+    injectEverywhere(s, [capped, strict], 6, T);
+    injectEverywhere(s, [capped, strict], 1, T - 10);
+    const result = await s.engine.sync({
+      relays: [capped, strict],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.relays.find((r) => r.relay === strict)?.status).toBe('complete');
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
+  /** The other relay cuts T (cap 4) and adds one stray frame at T-10 to its first page. */
+  async function strayCase(name: string, stray: (s: Setup, at: number) => Record<string, unknown>) {
+    const s = setup();
+    const [capped, other] = relayUrls(name, 2) as [string, string];
+    const T = NOW - 1_500;
+    s.net.configure(capped, { maxLimit: 2 });
+    s.net.configure(other, {
+      maxLimit: 4,
+      extraFrames: (subId) => [JSON.stringify(['EVENT', subId, stray(s, T - 10)])],
+    });
+    injectEverywhere(s, [capped, other], 1, T + 10);
+    injectEverywhere(s, [capped, other], 6, T);
+    const result = await s.engine.sync({
+      relays: [capped, other],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  }
+
+  it('does not take a stray kind-1 event as proof that a second was read in full', async () => {
+    await strayCase('rq-stray-kind', (s, at) => ({ ...junkWrap(s.recipient.pubkey, at), kind: 1 }));
+  });
+
+  it('does not take a wrap for a foreign key as proof that a second was read in full', async () => {
+    await strayCase('rq-stray-p', (_s, at) => junkWrap(encodeHex(randomBytes(32)), at));
+  });
+
+  it('does not take an older junk wrap with a bad signature, out of order, as proof', async () => {
+    await strayCase('rq-stray-sig', (s, at) => junkWrap(s.recipient.pubkey, at));
+  });
+
   it('keeps the gap when the other relay lacks a wrap the capped relay showed at that second', async () => {
     const s = setup();
     const [capped, other] = relayUrls('rq-not-superset', 2) as [string, string];

@@ -50,6 +50,8 @@ export interface MockRelayConfig {
   capSequence?: number[];
   /** M1-5c: ignores `limit` and `until` (a relay that does not paginate). */
   ignoreLimit?: boolean;
+  /** M2-19: applies `until` exclusively (`created_at < until`), against NIP-01. */
+  exclusiveUntil?: boolean;
   /** M2-19: accepts a REQ with an `ids` filter but never answers it. */
   silentIdsReq?: boolean;
   /** M2-19: raw frames sent before the stored events of every REQ with an `ids` filter (hostile input). */
@@ -182,7 +184,10 @@ export class MockSocket implements RelaySocket {
       if (!event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] as string))) return false;
     }
     if (filter.since !== undefined && event.created_at < filter.since) return false;
-    return filter.until === undefined || event.created_at <= filter.until;
+    if (filter.until === undefined) return true;
+    return this.config.exclusiveUntil === true
+      ? event.created_at < filter.until
+      : event.created_at <= filter.until;
   }
 
   private handleReq(subId: string, filter: MockFilter, config: MockRelayConfig): void {
