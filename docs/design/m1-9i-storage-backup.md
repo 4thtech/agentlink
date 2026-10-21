@@ -1,6 +1,6 @@
 # M1-9i design proposal: own storage and the recovery kit
 
-> **Status: proposal, pending owner decisions.** Nothing here changes a spec yet. The owner decides the points marked **OWNER DECISION**; card M1-9i-s then applies the agreed text to 04, 06 and 07, and the build cards follow (backlog, M1-9i-s to M1-9i-d).
+> **Status: decided (D-115).** The owner accepted all five recommendations (A1, B1, C1, D1, E1) on 2026-10-21, in chat: "M1-9i: accept all 5 recommendations A–E." The review revisions of IR-DESIGN-M1-9i-1 are included. Nothing here changes a spec yet: card M1-9i-s applies the agreed text to 04, 06 and 07, and the build cards follow (backlog, M1-9i-s to M1-9i-d).
 > Card: M1-9i ("CLI: owner commands for storage and backup"), stopped because 04 §2.3, §2.5.1, §2.8 and 06 §8 leave four things open.
 > Inputs read: 04 §1 (I-4, I-7, I-10), §2.2, §2.3, §2.3.2, §2.5, §2.5.1, §2.8; 06 §8; 07 §3, §3.4, §5.2, §5.6, §9; D-48, D-49, D-78, D-82; `packages/types/src/{constants,owner-action}.ts`, `packages/core/src/{owner-action,owner-actions,policy-engine}.ts`, `packages/crypto/src/keystore-api.ts`, `packages/storage/src/{s3,session,endpoint}.ts`.
 
@@ -246,7 +246,9 @@ After the spec: M1-9i-b first (it exports `credentialDigest`), then M1-9i-a and 
 
 ## 8. Owner decisions
 
-| ID | Question | Recommended | Alternative |
+**Accepted (D-115).** Tali, in chat, 2026-10-21: "M1-9i: accept all 5 recommendations A–E." Every point below is decided as its recommended option; the alternatives are kept for the record.
+
+| ID | Question | Decided (recommended) | Alternative (not chosen) |
 |---|---|---|---|
 | A | Kit contents | **A1:** full history by default, `--identity-only` option | A2: identity and contacts only, never history |
 | B | Recovery code | **B1:** a fresh code per kit, shown once | B2: one long-lived code typed at each export |

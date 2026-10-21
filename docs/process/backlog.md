@@ -3070,19 +3070,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Each † command fails with piped stdin and no passkey or passphrase (tests).
   - Recovery kit export → restore on a clean machine restores identity, contacts and history (I-10).
   - Storage credentials never printed or logged (canary).
-- **Note (2026-10-21):** blocked on spec gaps (ops, kit format, config location, restore rules). Design proposal: `docs/design/m1-9i-storage-backup.md`. Once the owner decides A to E there, this card is narrowed to `apps/cli/src/**` and depends on M1-9i-a and M1-9i-c (proposed, pending owner decision).
+- **Note (2026-10-21):** blocked on spec gaps (ops, kit format, config location, restore rules). Design proposal: `docs/design/m1-9i-storage-backup.md`. The owner accepted A to E (D-115, 2026-10-21), so this card is narrowed to `apps/cli/src/**` and depends on M1-9i-a and M1-9i-c.
 
 #### M1-9i-s · spec: own storage ops, recovery kit `ALKK`, restore rules (new, split from M1-9i)
-- **Status:** proposed, pending owner decision (A to E in `docs/design/m1-9i-storage-backup.md` §8) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog (decisions A to E accepted, D-115) · **Size:** S · **Tier:** Opus (new crypto format text) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md, 06-mcp-server.md, 07-sdk-transport-storage.md, 00-README.md (decision row)
-- **Depends on:** owner decisions A to E
+- **Depends on:** D-115 (decided)
 - **Spec:** design proposal §6 (diff-style list)
 - **Invariants:** I-4, I-7, I-10
 - **Scope:** apply §6 of the proposal as decided: new 04 §2.3.3 (`ALKK` v1), the `s3:<id>` item format (04 §2.2), the `storage.set`, `storage.remove` and `backup.export` rows and lifetimes (04 §2.5.1), restore rules (04 §2.8), 06 §8 command lines, 07 §3.4 `own_storage`, 07 §5.2, §5.6, §9.1, §9.4; record the decisions as a D-row.
 - **Acceptance:** docs checks pass; no implementation; the build cards below cite the new sections.
 
 #### M1-9i-a · types and core: storage and backup owner ops (new, split from M1-9i)
-- **Status:** proposed, pending owner decision · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types/src/{constants,owner-action}.ts; packages/core/src/{owner-action,owner-actions,own-storage}.ts, the store migration and `Store` contract for `own_storage`, packages/core/src/files/outgoing.ts; owner-action vectors for the new ops
 - **Depends on:** M1-9i-s, M1-9i-b (`credentialDigest`)
 - **Spec:** 04 §2.5.1 (new rows); 07 §3.4 (`own_storage`), §5.6
@@ -3095,7 +3095,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** signing and rejection vectors per op (unknown key, bad `id`, endpoint not in canonical form, lifetime above 600 s); a tampered `own_storage` row or a credential digest mismatch reads `broken`; an old row and credential put back after `storage.remove` read `broken`; a row older than 600 s still reads `ready`; a `broken` own storage makes `agentlink_send` return `needs_setup`, never the drop; tests first (`RED (expected):` commit).
 
 #### M1-9i-b · crypto: recovery kit `ALKK` v1, export and import controls, vectors (new, split from M1-9i)
-- **Status:** proposed, pending owner decision · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto/src/recovery-kit.ts (new), packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), test-vectors/recovery-kit/, tools/vectors/generate_recovery_kit.py
 - **Depends on:** M1-9i-s
 - **Spec:** 04 §2.3.3 (new), §2.3.2, §2.8 (`password` kind 1), §4 (STREAM)
@@ -3105,7 +3105,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** secret entries stay in wiped memory buffers and only store snapshots go to a 0600 quarantine file; nothing is parsed or written before the final chunk authenticates (a test truncating the last chunk leaves no file and no state); vector suite `recovery-kit` registered and passing in every runtime it declares; tamper, truncation, reorder, wrong code, wrong version, cross-type and oversize cases fail with one generic error and no partial output; no raw seed crosses the control interfaces (type test); tests first.
 
 #### M1-9i-c · node: KeyStore export, import and storage credential items (new, split from M1-9i)
-- **Status:** proposed, pending owner decision · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node/src/\*\*
 - **Depends on:** M1-9i-b
 - **Spec:** 04 §2.2 (`s3:<id>`), §2.3.3 (restore order and refusals), §2.8 (`owner-next`, write protocol); 07 §9.1
@@ -3114,7 +3114,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** shared KeyStore conformance tests for both backends; a look-alike session is `presence_required`; import over an existing agent writes nothing; an existing owner item is kept only after its own code opens it to the kit's owner (a planted card naming that owner is not enough); the snapshot and the `policy-version` and `receipts-kept` reads happen under one lock hold; canary for the S3 secret, recovery code and kit key; tests first.
 
 #### M1-9i-d · docs: storage and recovery kit (new, split from M1-9i)
-- **Status:** proposed, pending owner decision · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · README.md (Status), docs/status.yaml and generated blocks, docs/runbooks/ (restore runbook), quickstart, changelog.d/
 - **Depends on:** M1-9i
 - **Scope:** user-facing how-to for `storage connect | disconnect`, `backup export | restore`; README Status line; "stop the old agent after a restore".
