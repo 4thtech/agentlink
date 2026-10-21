@@ -304,6 +304,20 @@ describe('lifecycle read-back', () => {
   });
 });
 
+describe('no step turns logging on (OPS-PRIV-1, I-7)', () => {
+  it('never tails the Worker, passes a Logpush flag or sets observability on the command line', () => {
+    expect(workflow).not.toMatch(/wrangler\s+tail\b/);
+    expect(workflow).not.toMatch(/--logpush\b/);
+    expect(workflow).not.toMatch(/--(?:observability|tail-consumers?)\b/);
+  });
+
+  it('deploys with the reviewed wrangler.toml, which keeps logging off', () => {
+    const deploys = workflow.match(/pnpm exec wrangler deploy\b[^\n]*/g) ?? [];
+    expect(deploys.length).toBeGreaterThan(0);
+    for (const line of deploys) expect(line).toMatch(/--config wrangler\.toml/);
+  });
+});
+
 describe('logging settings read-back', () => {
   const copies = block('READBACK-SETTINGS');
   const script = copies[0] ?? '';
@@ -353,6 +367,33 @@ describe('logging settings read-back', () => {
     expect(
       check({ success: true, result: off({ tail_consumers: [{ service: 'tail' }] }) }).ok,
     ).toBe(false);
+  });
+
+  // OPS-PRIV-1: streaming Tail Workers are Tail Workers too, and an export destination for logs
+  // or traces sends them to a third party even when Workers Logs itself keeps nothing.
+  it('refuses a streaming Tail Worker and a log or trace export destination', () => {
+    expect(check({ success: true, result: off({ streaming_tail_consumers: null }) }).ok).toBe(true);
+    expect(
+      check({ success: true, result: off({ streaming_tail_consumers: [{ service: 'tail' }] }) }).ok,
+    ).toBe(false);
+    for (const part of ['logs', 'traces']) {
+      expect(
+        check({
+          success: true,
+          result: off({
+            observability: { enabled: false, [part]: { enabled: false, destinations: [] } },
+          }),
+        }).ok,
+      ).toBe(true);
+      expect(
+        check({
+          success: true,
+          result: off({
+            observability: { enabled: false, [part]: { enabled: false, destinations: ['otel'] } },
+          }),
+        }).ok,
+      ).toBe(false);
+    }
   });
 
   it('refuses an API error and a response that is not JSON', () => {
