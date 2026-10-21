@@ -14,14 +14,14 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-10-20"
-version: "v0.1.1"
+updated: "2026-10-21"
+version: "v0.1.2"
 versionLabel: "M1a, walking skeleton: pair and talk"
 milestone: "M1a Walking skeleton: pair and talk"
-phase: "M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026 and updated in v0.1.1 on 18 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress, with the building blocks merged but not yet usable from the CLI or the MCP tools"
+phase: "M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 on 18 Oct 2026 and v0.1.2 on 20 Oct 2026 (pre-alpha); M1b (files, proof, credits) in progress: file and proof tools are in v0.1.2, and the proof submitter is live on a testnet (21 Oct 2026)"
 
 # Components by area. state: done | in-progress | planned.
-# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.1.1) is published or user-runnable until a release says so.
+# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.1.2) is published or user-runnable until a release says so.
 areas:
   - id: m0
     title: "M0 Foundations"
@@ -52,7 +52,7 @@ areas:
         summary: "A few CI follow-ups are still open."
   - id: crypto
     title: "Crypto (@4thtech-io/crypto)"
-    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
+    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package."
     components:
       - name: "Encodings, hashing, JSON canonicalisation"
         state: done
@@ -100,7 +100,7 @@ areas:
         summary: "STREAM file encryption in 1 MiB chunks with the header bound into every chunk (D-80) is merged, with its independent vectors. In development: no tool sends or receives files yet."
   - id: types
     title: "Shared types (@4thtech-io/types)"
-    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
+    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package."
     components:
       - name: "Constants and the envelope, payload, card and invite schemas"
         state: done
@@ -116,7 +116,7 @@ areas:
         summary: "Merged: the strict `terms` schema with the D-74 canonical form (pinned UCD 15.0.0 characters), `TermsInput` with its JSON Schema and mapping, `termsHash` (in crypto) and the pure negotiation-chain reducer; all 381 `terms` vectors pass in Node, three browsers and workerd. The Unicode data file is vendored, with a drift check and a table-hash vector; the regenerated table equals the earlier interim one (D-77, M1-21-b)."
   - id: transport
     title: "Transport (@4thtech-io/transport-nostr)"
-    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
+    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package."
     components:
       - name: "Gift wrap and unwrap"
         state: done
@@ -168,7 +168,7 @@ areas:
       - name: "Automatic chain selection"
         state: done
         prs: [284, 312]
-        summary: "Merged, not user-facing yet. The client checks the agent's credits on every supported network at once and picks where a proof is paid with no question to the user: the default network when it has enough credits, otherwise the cheapest one that does, otherwise a \"credits needed\" answer naming where to add them and how much is missing. A network that does not answer in time is skipped, never chosen, and only test networks are used in this release (M1-26). Merged for the next release (0.1.2), not in v0.1.1: no default CLI or tool output names a network; it appears only under Advanced (M1-26-b, D-108). The paid tools choosing the network on their own follows (M1-26-c)."
+        summary: "Released in 0.1.2. The client checks the agent's credits on every supported network at once and picks where a proof is paid with no question to the user: the default network when it has enough credits, otherwise the cheapest one that does, otherwise a \"credits needed\" answer naming where to add them and how much is missing. A network that does not answer in time is skipped, never chosen, and only test networks are used in this release (M1-26). Released in 0.1.2 (not in v0.1.1): no default CLI or tool output names a network; it appears only under Advanced (M1-26-b, D-108). The paid tools choosing the network on their own follows (M1-26-c)."
       - name: "Proof submission and deposits"
         state: done
         prs: [295]
@@ -176,10 +176,10 @@ areas:
       - name: "Proof verification and who sent a message"
         state: done
         prs: [290, 297, 314]
-        summary: "Merged, not user-facing yet. Checking a proof pack confirms the record on the chain and, when the agent profile carries the agent's own signatures over it, who sent the message; without them the proof shows the record but not the sender, and a forged signature makes the proof fail (M1-4d-b, M1-4d-d). Merged for the next release (0.1.2), not in v0.1.1: `agentlink verify` checks a proof pack from the proofs or inbox folder and ends with an exit code scripts can read, and `agentlink credits` shows the agent's credits (M1-9h, D-108)."
+        summary: "Merged, not user-facing yet. Checking a proof pack confirms the record on the chain and, when the agent profile carries the agent's own signatures over it, who sent the message; without them the proof shows the record but not the sender, and a forged signature makes the proof fail (M1-4d-b, M1-4d-d). Released in 0.1.2 (not in v0.1.1): `agentlink verify` checks a proof pack from the proofs or inbox folder and ends with an exit code scripts can read, and `agentlink credits` shows the agent's credits (M1-9h, D-108)."
   - id: core
     title: "Core (@4thtech-io/core)"
-    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
+    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package."
     components:
       - name: "Skeleton: identity, contacts, store and approval interfaces"
         state: done
@@ -244,7 +244,7 @@ areas:
       - name: "Terms and one approval per agreement"
         state: done
         prs: [126, 134]
-        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). Receipts and recorded offers follow in M1b."
+        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). The deferred Accepted receipt has landed (M1-7g-d); firm offers and recorded accepts, each under one owner approval with the proof fee on the same request, are in review (M1-9d-3)."
       - name: "Agent profile signatures"
         state: done
         prs: [300]
@@ -252,10 +252,22 @@ areas:
       - name: "Proofs, receipts and proof packs"
         state: done
         prs: [306, 315]
-        summary: "Merged for the next release (0.1.2), not in v0.1.1: notarizing a sent message, receipts and exporting a proof pack (M1-7g). The recipient can export a proof pack too, from the signed record the sender passes along end to end encrypted and that the recipient checks against the chain first (M1-7g-b, D-107). Proof runs on test networks only."
+        summary: "Released in 0.1.2 (not in v0.1.1): notarizing a sent message, receipts and exporting a proof pack (M1-7g). The recipient can export a proof pack too, from the signed record the sender passes along end to end encrypted and that the recipient checks against the chain first (M1-7g-b, D-107). Proof runs on test networks only."
+      - name: "Delivery receipts off by default, receipt requests"
+        state: done
+        prs: [325, 333, 347]
+        summary: "Merged for the next release (after 0.1.2), not in v0.1.2. A delivery receipt shows publicly that a recorded message reached the agent, so it is signed only when the rules allow it for that contact, or the owner says yes to the sender's request (M1-33a, M1-33d, D-109). Adding proof can ask the contact to confirm delivery; asking confirms nothing by itself. Rules from the old default are flagged by `agentlink doctor` and need a yes at the next signing. Confirming that the other side accepted terms signs the matching receipt once under the one approval (M1-7g-d)."
+      - name: "Proof linking and mismatch flags"
+        state: done
+        prs: [323, 329, 347]
+        summary: "Merged for the next release (after 0.1.2). A proof links only to the same agent's earlier proof, never to the other side's, so no public link between two agents appears without a receipt (M1-33c). A proof from another agent that does not match the chain, including one that links to someone else's, is refused and the contact is flagged; one contact can no longer fill the queue of proofs waiting for a network check and gets at most 32 of its 256 places (M1-7g-c, M1-7g-d). Log codes come from a fixed list per component."
+      - name: "Delete a sent file on receipt"
+        state: done
+        prs: [313, 339, 346]
+        summary: "Merged for the next release (after 0.1.2). With the rule `files.deleteAfter: receipt`, the agent deletes a sent file from storage (the encrypted drop or your own) once the contact's delivery receipt is on record, using the key generation the file was uploaded under (M1-1g-h). The rule is recorded with each file at send time, so switching to it later never deletes files sent earlier (M1-1g-i). Without a receipt nothing is deleted and the file stays until it expires."
   - id: node
     title: "Node runtime (@4thtech-io/node)"
-    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.1); not published as a separate package."
+    intro: "Code merged. Built into the released `@4thtech-io/agentlink` CLI (v0.1.2); not published as a separate package."
     components:
       - name: "Agent key store in the OS keychain"
         state: done
@@ -298,12 +310,12 @@ areas:
         summary: "M1-8f."
   - id: apps
     title: "MCP server, CLI and apps"
-    intro: "The CLI runtime, its everyday and owner commands, the MCP server with its tools and its background loop, and the agent skill file and quickstart guides have landed. v0.1.0 was released on npm on 16 Oct 2026 and v0.1.1 on 18 Oct 2026 as `@4thtech-io/agentlink`; a new user installs it with `npx -y @4thtech-io/agentlink init`."
+    intro: "The CLI runtime, its everyday and owner commands, the MCP server with its tools and its background loop, and the agent skill file and quickstart guides have landed. v0.1.0 was released on npm on 16 Oct 2026, v0.1.1 on 18 Oct 2026 and v0.1.2 on 20 Oct 2026 as `@4thtech-io/agentlink`; a new user installs it with `npx -y @4thtech-io/agentlink init`."
     components:
       - name: "MCP server and CLI"
         state: in-progress
         prs: [102, 103, 107, 111, 112, 113, 115, 124, 125, 127, 131, 132, 135, 142, 143, 178, 183, 184, 185, 186, 190, 192, 193, 199, 200, 201, 205, 206, 219, 231, 235, 238]
-        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease, receives new messages over live relay subscriptions as they reach a relay (M1-9s, after the v0.1.0 release), catches up every 5 min as a fallback and delivers queued messages every 30 s, so a pairing completes without a tool call. Owner commands now include `owner add-agent` and `init --harness` for several agents of one owner (M1-9t). v0.1.0 was released on 16 Oct 2026 and v0.1.1 on 18 Oct 2026: `@4thtech-io/agentlink` on npm (`latest` is 0.1.1), one bundled file with the libraries built in, published from CI with provenance (OPS-REL-1; release steps `docs/runbooks/merge-and-release.md`). New in v0.1.1: live relay subscriptions in the background loop (M1-9s, with the 5-minute catch-up kept as a fallback), `init --harness claude-desktop` and Gemini CLI detection by its binary or settings file (M1-9w), `status` and `doctor` naming a missing owner card (M1-9u), owner recovery with no attached agent (M1-9x), the terms tools passing `clientRequestId` and a fixed approval clock (M1-32-c, M1-32-d), contact names instead of raw addresses in summaries (M1-22-b), a clear message when Node.js is older than 22.14 and quieter one-shot commands (M1-9y), `owner change-code` to replace an exposed owner code without changing the owner (M1-9z), the invite approval naming who is inviting with their owner fingerprint (M1-9zb), and the owner commands `contacts rename` and `contacts remove` (M1-9za). Merged for the next release, not in v0.1.1: the file tools (M1-9d-1): `agentlink_send` attaches a file from a folder the owner allows (checked with realpath, never opened when refused) and `agentlink_fetch_file` saves a received file into the inbox folder after both checks; `agentlink_status` shows where larger files go. Owners can allow a folder for sending with `agentlink policy allow-folder` (owner code, never from the AI tool; M1-9m), merged for the next release; a protected-root refusal and `policy recover` are in review (M1-9m-b). Files above about 12 KB need the encrypted drop, which went live on 19 Oct 2026; sending through it from the tools follows (M1-13c)."
+        summary: "`npx` package with the MCP server over stdio and the `agentlink` CLI (M1a). The CLI runtime (opening an agent, the M1a approval channel, the command dispatcher, terminal output sanitising), `init`, `invite`, `accept`, `contacts`, `status`, `doctor`, `requests` and the owner commands (`owner init`, `approve` for one request or a list, `deny`, `cancel`) have landed, with the in-chat copy sheet. The MCP server over stdio (the frozen M1a tool list, the untrusted-content wrapper) and its tools have landed: status, contacts, get approval (real approval data, with the sender code of an unknown sender), invite, accept, send, inbox and the terms tools (propose, respond, and the owner's terms approval card in `approve`). A conformance and tool-surface guard test pins the tool list. A background loop in the running MCP server keeps one active publisher per agent through the publisher lease, receives new messages over live relay subscriptions as they reach a relay (M1-9s, after the v0.1.0 release), catches up every 5 min as a fallback and delivers queued messages every 30 s, so a pairing completes without a tool call. Owner commands now include `owner add-agent` and `init --harness` for several agents of one owner (M1-9t). v0.1.0 was released on 16 Oct 2026 and v0.1.1 on 18 Oct 2026: `@4thtech-io/agentlink` on npm (`latest` is 0.1.2), one bundled file with the libraries built in, published from CI with provenance (OPS-REL-1; release steps `docs/runbooks/merge-and-release.md`). New in v0.1.1: live relay subscriptions in the background loop (M1-9s, with the 5-minute catch-up kept as a fallback), `init --harness claude-desktop` and Gemini CLI detection by its binary or settings file (M1-9w), `status` and `doctor` naming a missing owner card (M1-9u), owner recovery with no attached agent (M1-9x), the terms tools passing `clientRequestId` and a fixed approval clock (M1-32-c, M1-32-d), contact names instead of raw addresses in summaries (M1-22-b), a clear message when Node.js is older than 22.14 and quieter one-shot commands (M1-9y), `owner change-code` to replace an exposed owner code without changing the owner (M1-9z), the invite approval naming who is inviting with their owner fingerprint (M1-9zb), and the owner commands `contacts rename` and `contacts remove` (M1-9za). Released in 0.1.2: the file tools (M1-9d-1): `agentlink_send` attaches a file from a folder the owner allows (checked with realpath, never opened when refused) and `agentlink_fetch_file` saves a received file into the inbox folder after both checks; `agentlink_status` shows where larger files go. Owners can allow a folder for sending with `agentlink policy allow-folder` (owner code, never from the AI tool; M1-9m), in 0.1.2, with a protected-root refusal and `policy recover` (M1-9m-b). Files above about 12 KB need the encrypted drop, which went live on 19 Oct 2026; sending through it from the tools follows (M1-13c)."
       - name: "Agent skill file and quickstart guides"
         state: done
         prs: [151, 152]
@@ -329,21 +341,21 @@ areas:
         prs: [234]
         summary: "A docs-site page that walks a new user through adding AgentLink to their AI tool (DOCS-SETUP)."
       - name: "Submitter and test-credits faucet"
-        state: in-progress
-        prs: [293, 298]
-        summary: "The submitter Worker, which records signed proofs on the agent's behalf, resubmits items apart after a shared failure and repairs nonce gaps (M1-10a, M1-10a-b). It also holds a test-credits faucet that tops up a test agent's credits on test networks only, limited to one claim per agent per day with per-IP and global caps (M1-10b). Code only: neither is deployed (M1-10c deploys), so no tool can use them yet."
+        state: done
+        prs: [293, 298, 327, 330, 332, 338, 342, 349]
+        summary: "The submitter Worker records signed proofs on the agent's behalf, resubmits items apart after a shared failure and repairs nonce gaps (M1-10a, M1-10a-b). It is live in production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta: Base Sepolia, health ok), deployed through its CI pipeline with owner approval: staging, a smoke test that sends nothing, production with automatic rollback and the deploy freeze (M1-10c). Proofs work end to end on the testnet. Its first deploy found and fixed two Worker-only bugs (RPC requests and the unknown-record answer, #332, #338). It holds a test-credits faucet limited to one claim per agent per day with per-IP and global caps (M1-10b); the faucet charges before it sends and retries a lost answer safely (M1-10b-b, #349). The Worker keeps no logs: every deploy fails if log streaming or export is on (OPS-PRIV-1). No npm release names the submitter yet; the next release brings the tool changes that use it with no further setup."
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2."
       - name: "Adding credits: pay page"
         state: planned
-        summary: "Direction set (D-111): one link from the agent opens a separate pay page where credits are added in dollars, crypto first: use crypto you already have (connect your own account, M2-18b) or send from an exchange to the agent's address with a QR code (M2-18c), plus free test credits on testnets. The agent explains the one step, watches for the funds and confirms the credits; users pay every cost. Pay by card comes last, after the legal entity is decided (M2-18a, M3-4c). The top-up link format and who pays for receipts are open owner decisions (M1-26-d, M1-34)."
+        summary: "Direction set (D-111): one link from the agent opens a separate pay page where credits are added in dollars, crypto first: use crypto you already have (connect your own account, M2-18b) or send from an exchange to the agent's address with a QR code (M2-18c), plus free test credits on testnets. The agent explains the one step, watches for the funds and confirms the credits; users pay every cost. Pay by card comes last, after the legal entity is decided (M2-18a, M3-4c). Decided 21 Oct 2026: messages and files stay free (D-112), the top-up link carries everything after the `#` so it never reaches a server log (D-113), and the sender's proof fee covers up to 3 receipts (D-114). The link in the tools (M1-26-e) is in review and stays off until the pay page exists."
       - name: "Encrypted drop service"
         state: in-progress
         summary: "The 4thTech drop Worker (signed uploads with no accounts, single-use upload targets, a hash-checked commit, signed downloads until expiry, quotas and rate limits, no logs, M1-27a) is deployed: staging, and production at drop.agentlink.4thtech.io since 19 Oct 2026, through its deploy pipeline (staging, smoke test, production with automatic rollback, M1-27b). The first production deploy is healthy; its pipeline now waits for a new domain's certificate and reports a rollback that Cloudflare refuses across a storage change (M1-27b-c). Sending files through it from the CLI and the MCP tools (M1-13c) follows."
   - id: contracts
     title: "OCC v2 contracts (private repo)"
-    intro: "Pre-audit. Nothing in AgentLink uses them yet."
+    intro: "Pre-audit, testnets only. The live proof submitter records on Base Sepolia."
     components:
       - name: "Notary and fee vault"
         state: done
@@ -358,8 +370,9 @@ areas:
         prs: [273, "contracts#19"]
         summary: "The contracts release v0.1.0-testnet.3 exports the interface ABIs, the Base Sepolia and Gnosis Chiado addresses and a SHA-256 manifest, with no Solidity source. The private in-repo package `@4thtech-io/occ-v2-abi` imports it, CI checks every file against the manifest, and client code gets ABIs without admin, upgrade or module functions (M1-3f, D-83)."
       - name: "Gnosis Chiado deployment"
-        state: in-progress
-        summary: "Deployed on the Gnosis Chiado testnet on 19 Oct 2026 at the same addresses as Base Sepolia; the live smoke test is pending (it needs test xDAI), and automatic selection does not use Chiado until then (M1-3j-b)."
+        state: done
+        prs: ["contracts#24"]
+        summary: "Deployed on the Gnosis Chiado testnet on 19 Oct 2026 at the same addresses as Base Sepolia; the live smoke test passed on 21 Oct 2026. Chiado is still not in automatic network selection (M1-3j-b)."
       - name: "Pre-audit fixes"
         state: planned
         summary: "Follow-ups for M1b; mainnet follows the external audit (M3)."
@@ -370,24 +383,27 @@ areas:
       - name: "Design drop D1"
         state: done
         prs: [33]
-        summary: "Brand core, tokens, components and the local approvals screens."
+        summary: "Brand core, tokens, components and the local approvals screens. In docs/design since 14 Oct 2026; it needs adjustment before the UI is built (D-116)."
       - name: "Design drop D2"
         state: in-progress
         prs: [82]
-        summary: "Console, desktop apps, onboarding and more; partly in."
+        summary: "Console, desktop apps, onboarding and more; a first pass is in docs/design (14 Oct 2026) and needs adjustment (D-116)."
   - id: privacy
     title: "Privacy of proofs (D-109)"
-    intro: "Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which agent recorded it, when and what kind, and a receipt shows who received it. These items limit that. None is built yet."
+    intro: "Specified on 20 Oct 2026 (D-109). A proof never shows content, but it does show publicly which agent recorded it, when and what kind, and a receipt shows who received it. These items limit that. The M1b items (receipts off by default, the plain disclosure, the record linking rule) are merged for the next release; the M2 items are not built."
     components:
       - name: "Delivery receipts off by default"
-        state: planned
-        summary: "M1b (M1-33a): a delivery receipt is signed only when the recipient's rules allow it for that contact or the recipient says yes to the sender's request, since it shows publicly who received a proof."
+        state: done
+        prs: [325, 333]
+        summary: "Merged for the next release (after 0.1.2) (M1-33a, M1-33d): a delivery receipt is signed only when the recipient's rules allow it for that contact or the recipient says yes to the sender's request, since it shows publicly who received a proof."
       - name: "Plain-language disclosure"
-        state: planned
-        summary: "M1b (M1-33b): every proof, receipt, export and top-up screen says what becomes public and what stays private."
+        state: done
+        prs: [328]
+        summary: "Merged for the next release (after 0.1.2) (M1-33b): the agent says, before the first proof of a session and on every approval that adds one, that anyone can see that the agent recorded something, when and what kind, and never what it says. Receipts, the proof file and adding credits carry the same words, and the user guide quotes them."
       - name: "Record linking rule"
-        state: planned
-        summary: "M1b (M1-33c): a proof links only to the same agent's earlier proof, never to the other side's, so no link between two agents is published without a receipt."
+        state: done
+        prs: [323]
+        summary: "Merged for the next release (after 0.1.2) (M1-33c): a proof links only to the same agent's earlier proof, never to the other side's, so no link between two agents is published without a receipt."
       - name: "Per-relationship signing addresses"
         state: planned
         summary: "M2 (M2-17a): a separate, unlinkable signing address for each contact, so one agent does not collect a public log of all its proofs."
@@ -398,26 +414,27 @@ areas:
         state: planned
         summary: "M2 (M2-17c): optional random delay and batching, so receipt times do not show when an agent was online."
       - name: "Service logging off"
-        state: planned
-        summary: "Ongoing (OPS-PRIV-1): the proof submitter and other 4thTech services keep no IP address next to an agent, with platform logging off and checked at every deploy."
+        state: in-progress
+        prs: [331, 334, 335]
+        summary: "The proof submitter, the testnet faucet and the encrypted drop keep no logs: every deploy fails if platform logging, log streaming or trace export is switched on, and a test checks that the relay never logs an IP, address, record ID, salt, signature or transaction hash (OPS-PRIV-1). The owner's runbook lists the account-level settings to check."
 
 # The deploy state of the OCC v2 contracts and services. No addresses here (public-safe).
 deploy:
   testnet:
     state: deployed
     network: "Base Sepolia"
-    note: "OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit; no released AgentLink tool uses them yet."
+    note: "OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) but not yet chosen automatically."
   mainnet:
     state: planned
     note: "After the external audit (M3). Not deployed."
   services:
     state: deployed
-    note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). No released CLI version uses it yet. The submitter Worker is built and tested locally (M1-10a) and is not deployed yet (its deploy pipeline is M1-10c); its test-credits faucet (M1-10b) is code only and deploys with it."
+    note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). No released CLI version uses it yet. The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "M1b is in progress. v0.1.1 (18 Oct 2026) is on npm `latest`. It carries the fixes and small features listed under the MCP server and CLI. In development, merged but not yet usable from the CLI or the MCP tools: STREAM file encryption, the owner-signed Revocation typed data, multipart upload with streaming encryption for your own storage, the localhost approval page (`agentlink mcp` opens it when an approval is needed), the safe fetch and path guard, the files and proof policy rules, the proof hashing, file send and fetch in the core (inline or through the encrypted drop, verified before a file is saved), and the file tools in the MCP server (send a file from an allowed folder, save a received file; M1-9d-1). The encrypted drop Worker is deployed to production through its pipeline (19 Oct 2026); no released CLI version uses it yet. The submitter Worker, which records signed proofs on the agent's behalf, is built and tested locally (M1-10a, M1-10a-b), with a testnet faucet for free test credits (M1-10b); neither is deployed yet. The chain client can send proofs, add credits and check who sent a message, but no tool uses it yet. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: deploying the submitter, the designed approval page and proof."
-notYet: "file transfer, proof, credits, the designed local approval page (a functional page with the owner code and a localhost passkey is merged, and `agentlink mcp` opens it when an approval is needed), the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. v0.1.1 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha, testnets only) was released on 18 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
-next: "Send files through the encrypted drop (M1-13c), add `agentlink ui`, run the two-person dogfood, then finish M1b: proof and credits on testnets, and cut the 0.2.0 release."
+inProgress: "M1b is in progress. v0.1.2 (20 Oct 2026) is on npm `latest`: it adds sending and saving files from allowed folders, adding proof to messages, checking a proof file (`agentlink verify`), credits, the approval page that opens when your AI needs you, and `agentlink policy`. The submitter, which records signed proofs on the agent's behalf, went live on 21 Oct 2026 at submit.agentlink.4thtech.io on a testnet, and proofs work end to end there. The Gnosis Chiado contracts passed their live smoke test the same day; Chiado is not chosen automatically yet. The encrypted drop is live (19 Oct 2026). Merged on main for the next release, not in v0.1.2: delivery receipts off by default with receipt requests, the plain notices on what a proof makes public, a flag on a contact whose proof does not match the chain, deleting a sent file once the receipt arrives, paid tools choosing the funded network on their own, and the testnet faucet hardening. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23). Next in M1b: the designed approval page, sending files through the drop from the tools, adding credits through a pay page, and the 0.2.0 release."
+notYet: "the designed local approval page (a functional page with the owner code and a localhost passkey is merged, and `agentlink mcp` opens it when an approval is needed), the pay page for adding credits (the top-up link is built but off until it exists), the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on testnets only. v0.1.2 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) was released on 20 Oct 2026 and is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
+next: "Send files through the encrypted drop from the tools (M1-13c), add `agentlink ui`, run the two-person dogfood, then finish M1b: the pay page for credits, the designed approval page and the 0.2.0 release."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
 # docs-site wording, `progress` an optional README note on what is done so far.
@@ -434,7 +451,7 @@ roadmap:
   - id: "M1a"
     name: "Walking skeleton: pair and talk"
     state: in-progress
-    stateNote: "v0.1.0 released 16 Oct 2026, v0.1.1 on 18 Oct 2026; two-person dogfood open"
+    stateNote: "v0.1.0 released 16 Oct 2026, v0.1.1 on 18 Oct, v0.1.2 on 20 Oct 2026; two-person dogfood open"
     version: "0.1.0"
     duration: "~2–3 weeks"
     outcome: "Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals"
@@ -443,12 +460,12 @@ roadmap:
   - id: "M1b"
     name: "Files, proof, credits"
     state: in-progress
-    stateNote: "started; building blocks merged, none usable from the tools yet"
+    stateNote: "started; file and proof tools in v0.1.2, submitter live on a testnet"
     version: "0.2.0 (M1 gate)"
     duration: "~3–4 weeks"
     outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109)"
     gate: "10 internal testers on at least 3 harness combinations complete setup, first message, a file handover with proof, an owner approval, a third-party verification and a proof of agreement (completes M1, testnets)."
-    progress: "Released in v0.1.1 as part of M1a hardening: live relay subscriptions, the claude-desktop setup option and Gemini CLI detection, clearer status and recovery messages, `owner change-code`, contact rename and remove, the invite approval naming who is inviting, and the Node.js 22.14 check. Merged, in development and not usable from the CLI or the MCP tools yet: STREAM file encryption, the Revocation typed data, the storage adapters with multipart upload and streaming encryption, the localhost approval server and page, the safe fetch and path guard, the files and proof policy rules, the proof hashing, file send and fetch in the core, the file tools in the MCP server (M1-9d-1), and the passkey and recovery-code backup formats. The encrypted drop Worker and its deploy pipeline are built, and the Worker is deployed to production (19 Oct 2026). The two-machine M1 gate run passed 17 of 17 for J1, J4, J8 and J9; J2, J3 and J5 wait for the M1b features. Merged for the next release: `agentlink policy allow-folder` for allowing folders for sending. Not started or not merged: the designed approval page, proofs and credits in the tools."
+    progress: "Released in v0.1.1 as part of M1a hardening: live relay subscriptions, the claude-desktop setup option and Gemini CLI detection, clearer status and recovery messages, `owner change-code`, contact rename and remove, the invite approval naming who is inviting, and the Node.js 22.14 check. Released in v0.1.2: the file and proof tools (M1-9d-1, M1-9d-2), `agentlink policy allow-folder` and `policy recover` (M1-9m, M1-9m-b), the localhost approval page, STREAM file encryption and file send and fetch in the core. Merged but not yet reachable from the tools: multipart upload with streaming encryption for your own storage, the Revocation typed data, and the passkey and recovery-code backup formats. The encrypted drop Worker is deployed to production (19 Oct 2026) and the proof submitter is live on a testnet (21 Oct 2026). Merged after v0.1.2, for the next release: delivery receipts off by default with receipt requests, privacy notices for proofs, proof-mismatch flags, delete on receipt, and automatic network choice in the paid tools. The two-machine M1 gate run passed 17 of 17 for J1, J4, J8 and J9; J2, J3 and J5 wait for the M1b features. Not started or not merged: the designed approval page, the pay page for credits and sending files through the drop from the tools."
   - id: "M2"
     name: "Owner console, desktop apps, self-host, design"
     state: planned

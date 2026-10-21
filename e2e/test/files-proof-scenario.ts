@@ -18,7 +18,8 @@
 //   4. D-109: under the defaults nothing is signed; explicit DELIVERED then OPENED.
 //   5. A contact rule signs DELIVERED on its own for that contact, and never OPENED.
 //   6. J5: export, then a third party's `agentlink verify` passes; tampered packs fail with their reason.
-//   7. J8 proof of agreement: see the `it.fails` tests (product gap, NOTARIZE_UNAVAILABLE).
+//   7. J8 proof of agreement, both shapes (M1-9d-3): a firm offer accepted, and a recorded accept
+//      confirmed; ACCEPTED on-chain, one owner approval per side, the exported pack verifies.
 //   8. Zero access (I-1, I-2, I-7): relays, drop, logs and artifacts hold no plaintext, key or URL.
 //
 // Everything printed or stored goes to files under the artifact directory, which the canary scan reads.
@@ -651,80 +652,184 @@ export function defineFilesProofScenario(options: ScenarioOptions): void {
     }, 600_000);
 
     // ---- 7. J8 proof of agreement ---------------------------------------------------------------
-    // PRODUCT GAP (reported with this card): the terms tools refuse `notarize` with
-    // NOTARIZE_UNAVAILABLE (packages/core/src/terms-flow.ts, "records (notarize, firm offers) are
-    // M1-7i: notarize is refused for now"), and agentlink_notarize refuses an offer with
-    // USE_TERMS_TOOLS. The receiving half exists (the deferred ACCEPTED receipt, the pack's
-    // ownerApproval) and is tested in packages/core, but nothing records an offer or an accept, so no
-    // agreement can be proven end to end through the tools. These two tests state the card's
-    // acceptance; `it.fails` keeps CI green while the gap is open and turns red the day it closes, when
-    // `.fails` is removed and the rest of the journey (ACCEPTED receipt, exported pack, one approval
-    // each) is asserted below it.
+    // M1-9d-3: `notarize` on the terms tools. Both J8 shapes, one owner approval per side (04 §3.4.2
+    // "Each J8 shape asks each owner once"): (1) a firm offer recorded with its OFFER record and an
+    // accept that adds ACCEPTED; (2) an accept recorded with its ACCEPT record and the offerer's
+    // `confirm` that adds ACCEPTED. Each ends with an exported pack that the verifier accepts as a
+    // proof of agreement: valid, ACCEPTED on the record, and the owner's signed approval bound to it.
 
-    it.fails(
-      'J8 (gap): an offer recorded with notarize is accepted, ACCEPTED lands after one owner approval each',
-      async (ctx) => {
-        needsCredits(ctx);
-        const proposed = await aliceMcp.call('agentlink_propose_terms', {
-          to: 'Bob',
-          terms: agreementTerms('120.00'),
-          notarize: true,
-        });
-        // Expected: ok, or pending_approval for the firm offer (06 §3 commitments), never a refusal.
-        expect(['ok', 'pending_approval']).toContain(String(proposed.structured['status']));
-      },
-      120_000,
-    );
+    /** A tool call that needs the owner once: the owner approves, the same call runs. */
+    async function withOwner(
+      mcp: McpHandle,
+      agent: TestAgent,
+      tool: string,
+      args: Record<string, unknown>,
+    ): Promise<McpCall> {
+      const asked = await mcp.call(tool, args);
+      expect(asked.structured['status']).toBe('pending_approval');
+      const approvalId = String(asked.structured['approvalId']);
+      expect(await ownerApprove(agent, approvalId)).toBe(0);
+      return mcp.call(tool, { ...args, approvalId });
+    }
 
-    it.fails(
-      'J8 (gap): an accept recorded with notarize is proved, one owner approval, the pack verifies',
-      async (ctx) => {
-        needsCredits(ctx);
-        const offer = await aliceMcp.call('agentlink_propose_terms', {
-          to: 'Bob',
-          terms: agreementTerms('140.00'),
-        });
-        expect(offer.structured['status']).toBe('ok');
-        await unreadAtLeast(bobMcp, 1);
-        const inbox = await bobMcp.call('agentlink_inbox');
-        const [message] = inbox.structured['messages'] as Record<string, unknown>[];
-        const accepted = await bobMcp.call('agentlink_respond_to_terms', {
-          envelopeId: message?.['envelopeId'],
+    /** Waits until `mcp` holds a checked record of the envelope (its own, or a contact's). */
+    const holdsRecord = (mcp: McpHandle, envelopeId: string, what: string) =>
+      proofOf(mcp, envelopeId, (c) => typeof c.structured['recordId'] === 'string', what);
+
+    const hasAccepted = (c: McpCall) =>
+      receiptTypes(c)
+        .map((t) => t.toLowerCase())
+        .includes('accepted');
+
+    /** The approval rows of an agent (every request or grant, whatever its state). */
+    const approvalCount = async (agent: TestAgent) => (await storeRows(agent, 'approvals')).length;
+
+    /** Exports the pack of `envelopeId` and returns what a third party's verifier makes of it. */
+    async function exportAndVerify(mcp: McpHandle, envelopeId: string) {
+      const exported = await mcp.call('agentlink_export_proof_pack', { envelopeId });
+      expect(exported.structured['status']).toBe('ok');
+      const savedTo = String(exported.structured['savedTo']);
+      const own = await mcp.call('agentlink_verify_proof_pack', { path: savedTo });
+      expect(own.structured).toMatchObject({ status: 'ok', valid: true });
+      const pack = JSON.parse(await readFile(savedTo, 'utf8')) as Record<string, unknown>;
+      expect(pack['ownerApproval']).not.toBeNull();
+      const verified = (await world.verifier()(pack)) as unknown as Record<string, unknown>;
+      expect(verified['valid']).toBe(true);
+      expect(((verified['receipts'] ?? []) as { type: string }[]).map((r) => r.type)).toContain(
+        'ACCEPTED',
+      );
+      return verified;
+    }
+
+    it('J8: a firm offer recorded with notarize is accepted; ACCEPTED lands after one owner approval each; the pack proves the agreement', async (ctx) => {
+      needsCredits(ctx);
+      const aliceBefore = await approvalCount(alice);
+      const bobBefore = await approvalCount(bob);
+      const args = { to: 'Bob', terms: agreementTerms('120.00'), notarize: true };
+
+      const sent = await step('A: firm offer, one owner approval for the offer and its proof', () =>
+        withOwner(aliceMcp, alice, 'agentlink_propose_terms', args),
+      );
+      expect(['ok', 'submitted']).toContain(String(sent.structured['status']));
+      const offerId = String(sent.structured['envelopeId']);
+      expect(sent.structured['proof']).toMatchObject({
+        status: expect.stringMatching(/ok|submitted/),
+      });
+      await step('A: the offer is recorded', () =>
+        holdsRecord(aliceMcp, offerId, 'the OFFER record'),
+      );
+      // An offer is never recorded through agentlink_notarize (D-55): only the terms tools record it.
+      const refused = await aliceMcp.call('agentlink_notarize', { envelopeId: offerId });
+      expect(refused.structured).toMatchObject({ status: 'error', code: 'USE_TERMS_TOOLS' });
+
+      await step('B: holds the offer and its checked record', () =>
+        holdsRecord(bobMcp, offerId, 'Bob to hold the OFFER record'),
+      );
+      const accepted = await step('B: accepts, one owner approval', () =>
+        withOwner(bobMcp, bob, 'agentlink_respond_to_terms', {
+          envelopeId: offerId,
+          decision: 'accept',
+        }),
+      );
+      expect(accepted.structured).toMatchObject({ status: 'ok', decision: 'accept' });
+
+      await step('A: ACCEPTED is on the offer record', () =>
+        proofOf(aliceMcp, offerId, hasAccepted, 'ACCEPTED on the OFFER record'),
+      );
+      expect(await approvalCount(alice)).toBe(aliceBefore + 1);
+      expect(await approvalCount(bob)).toBe(bobBefore + 1);
+
+      const verified = await step('A: the exported pack verifies as a proof of agreement', () =>
+        exportAndVerify(aliceMcp, offerId),
+      );
+      expect(verified['ownerApproval']).toMatchObject({
+        status: 'signed',
+        approver: 'signer',
+        decision: 'offer',
+      });
+      const theirs = await step('B: its pack of the same record carries the accept', () =>
+        exportAndVerify(bobMcp, offerId),
+      );
+      expect(theirs['ownerApproval']).toMatchObject({
+        status: 'signed',
+        approver: 'recipient',
+        decision: 'accept',
+      });
+    }, 600_000);
+
+    it('J8: an accept recorded with notarize is confirmed; ACCEPTED lands after one owner approval each; the pack proves the agreement', async (ctx) => {
+      needsCredits(ctx);
+      const funded = await step('B: the faucet route', () => world.topUp(bob.agentId));
+      if (!funded) {
+        if (world.kind === 'live') return ctx.skip('the faucet gave Bob no credits');
+        throw new Error('the fake faucet gave Bob no credits');
+      }
+      const aliceBefore = await approvalCount(alice);
+      const bobBefore = await approvalCount(bob);
+      const offer = await step('A: an offer without proof (free, no approval)', () =>
+        aliceMcp.call('agentlink_propose_terms', { to: 'Bob', terms: agreementTerms('140.00') }),
+      );
+      expect(offer.structured['status']).toBe('ok');
+      const offerId = String(offer.structured['envelopeId']);
+      await step('B: the offer arrives', () =>
+        waitFor(
+          'the offer in Bob’s inbox',
+          async () => {
+            const inbox = await bobMcp.call('agentlink_inbox');
+            const messages = (inbox.structured['messages'] ?? []) as Record<string, unknown>[];
+            return messages.some((m) => m['envelopeId'] === offerId) ? inbox : undefined;
+          },
+          world.waitMs.relay,
+        ),
+      );
+
+      const accepted = await step('B: accepts with notarize, one owner approval', () =>
+        withOwner(bobMcp, bob, 'agentlink_respond_to_terms', {
+          envelopeId: offerId,
           decision: 'accept',
           notarize: true,
-        });
-        expect(['ok', 'pending_approval']).toContain(String(accepted.structured['status']));
-      },
-      120_000,
-    );
+        }),
+      );
+      expect(['ok', 'submitted']).toContain(String(accepted.structured['status']));
+      const acceptId = String(accepted.structured['envelopeId']);
+      await step('B: the accept is recorded', () =>
+        holdsRecord(bobMcp, acceptId, 'the ACCEPT record'),
+      );
 
-    it('J8: what is reachable today is refused cleanly: an offer cannot be notarized as a plain message', async () => {
-      const offer = await aliceMcp.call('agentlink_propose_terms', {
-        to: 'Bob',
-        terms: agreementTerms('150.00'),
+      await step('A: holds the accept and its checked record', () =>
+        holdsRecord(aliceMcp, acceptId, 'Alice to hold the ACCEPT record'),
+      );
+      const confirmed = await step('A: confirms, one owner approval', () =>
+        withOwner(aliceMcp, alice, 'agentlink_respond_to_terms', {
+          envelopeId: acceptId,
+          decision: 'accept',
+        }),
+      );
+      expect(confirmed.structured).toMatchObject({ status: 'ok' });
+
+      await step('B: ACCEPTED is on the accept record', () =>
+        proofOf(bobMcp, acceptId, hasAccepted, 'ACCEPTED on the ACCEPT record'),
+      );
+      expect(await approvalCount(alice)).toBe(aliceBefore + 1);
+      expect(await approvalCount(bob)).toBe(bobBefore + 1);
+
+      const verified = await step('B: the exported pack verifies as a proof of agreement', () =>
+        exportAndVerify(bobMcp, acceptId),
+      );
+      expect(verified['ownerApproval']).toMatchObject({
+        status: 'signed',
+        approver: 'signer',
+        decision: 'accept',
       });
-      expect(offer.structured['status']).toBe('ok');
-      const before = world.notary?.calls.notarize ?? 0;
-      const refused = await aliceMcp.call('agentlink_notarize', {
-        envelopeId: offer.structured['envelopeId'],
+      const hers = await step('A: its pack of the same record carries the confirm', () =>
+        exportAndVerify(aliceMcp, acceptId),
+      );
+      expect(hers['ownerApproval']).toMatchObject({
+        status: 'signed',
+        approver: 'recipient',
+        decision: 'confirm',
       });
-      expect(refused.structured).toMatchObject({ status: 'error', code: 'USE_TERMS_TOOLS' });
-      expect(world.notary?.calls.notarize ?? 0).toBe(before);
-      // The gap itself, as it is today: the terms tools refuse `notarize` and send nothing. When the
-      // product records offers and accepts, this assertion fails and the two `it.fails` tests above
-      // lose their `.fails` (and gain the ACCEPTED receipt, pack and approval-count assertions).
-      const sentBefore = (await storeRows(alice, 'envelopes', { direction: 'out' })).length;
-      const gap = await aliceMcp.call('agentlink_propose_terms', {
-        to: 'Bob',
-        terms: agreementTerms('151.00'),
-        notarize: true,
-      });
-      expect(gap.structured).toMatchObject({ code: 'NOTARIZE_UNAVAILABLE' });
-      expect((await storeRows(alice, 'envelopes', { direction: 'out' })).length).toBe(sentBefore);
-      // Alice's owner was never asked for the terms: an unrecorded offer is free and not binding.
-      const approvals = await storeRows(alice, 'approvals');
-      expect(approvals.filter((a) => a['status'] === 'pending')).toEqual([]);
-    }, 120_000);
+    }, 600_000);
 
     // ---- 8. zero access ---------------------------------------------------------------------------
 

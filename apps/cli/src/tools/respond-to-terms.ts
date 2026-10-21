@@ -10,6 +10,8 @@
 //    `approvalId` runs each part at most once (APPROVAL_USED after); a newer version voids it.
 // 3. `pending_approval` carries the fixed M1a `nextStep` (06 §2.5 step 2, no URL) and a summary
 //    built from the core's card data: the contact under the 06 §2.1 rule, the version, nothing else.
+// 4. `accept` with `notarize` (M1-9d-3): the same one approval also covers the accept's proof when
+//    the offer has none; `needs_credits` first (nothing sent); the result carries `proof`.
 //
 // `clientRequestId` goes to the core (M1-32-b): a repeat returns the original result, another
 // request under the key is IDEMPOTENCY_KEY_REUSED, a concurrent repeat is IN_PROGRESS (as send).
@@ -39,7 +41,9 @@ import {
   termsApprovalState,
   termsCoreError,
   termsInProgress,
+  termsNeedsCredits,
   termsRefusal,
+  termsWithProof,
 } from './terms-common.js';
 import { proofDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
@@ -70,7 +74,8 @@ export async function respondToTermsHandler(
   const { client, logger } = context;
   const tools = client.terms;
   if (tools === undefined) return notAvailable();
-  if ((await client.self()) === undefined) {
+  const self = await client.self();
+  if (self === undefined) {
     return fail(
       'needs_setup',
       noOwnerCard(context.agentName).summary,
@@ -101,6 +106,9 @@ export async function respondToTermsHandler(
   switch (result.status) {
     case 'in_progress':
       return termsInProgress();
+    case 'needs_credits':
+      logger.info('respond to terms needs credits', { answers: 0 });
+      return termsNeedsCredits(self.agentId, result.topUp);
     case 'approval_state':
       return termsApprovalState(context, 'agentlink_respond_to_terms', result);
     case 'pending_approval':
@@ -147,6 +155,17 @@ export async function respondToTermsHandler(
             fields,
           );
         case 'accept':
+          // A recorded accept (M1-9d-3): its own proof, not a wait for the offer's record.
+          if (result.proof !== undefined) {
+            return termsWithProof(
+              TERMS_TEXT.accepted(result.version, name),
+              fields,
+              result.proof,
+              context,
+              self.agentId,
+              sender === undefined ? undefined : name,
+            );
+          }
           return ok(
             result.receipt?.status === 'waiting_for_record' && result.receipt.until !== undefined
               ? copy('chat.commitment.acceptedPending', {
