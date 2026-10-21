@@ -7,7 +7,9 @@
 // frames they use (EVENT/OK, REQ/EVENT/EOSE, CLOSE). Wraps are real NIP-59 gift wraps. Every key is
 // derived at runtime from fixed test seeds.
 import {
+  encodeBase64url,
   encodeHex,
+  encodeUtf8,
   type Envelope,
   type JsonObject,
   type KeyStore,
@@ -26,8 +28,10 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED } from './acks.js';
 import { AgentLinkClient } from './client.js';
+import { UNOPENED_TYPE, type InboundReport } from './envelopes.js';
 import { CoreError } from './errors.js';
 import { MemoryStore } from './store/memory-store.js';
+import { rowKeyOf } from './store/store.js';
 import { StoreSyncPersistence, mergeProofReports } from './sync.js';
 import {
   FakeClock,
@@ -72,6 +76,8 @@ class RelayNetwork implements RelayConnector {
   readonly stored = new Map<string, NostrEvent[]>();
   /** REQ filters seen, by relay. */
   readonly reqs: { relay: string; filter: Filter }[] = [];
+  /** EVENT frames published to any relay (M1-7h-b: acks are not published inside syncInbox). */
+  published = 0;
 
   inject(relay: string, event: NostrEvent): void {
     const list = this.stored.get(relay) ?? [];
@@ -92,6 +98,7 @@ class RelayNetwork implements RelayConnector {
         const frame = JSON.parse(text) as unknown[];
         if (frame[0] === 'EVENT') {
           const event = frame[1] as NostrEvent;
+          this.published += 1;
           this.inject(target.url, event);
           push(['OK', event.id, true, '']);
         } else if (frame[0] === 'REQ') {
@@ -643,6 +650,8 @@ describe('delivery acknowledgements (02 F-23, behind a flag)', () => {
 
     const atB = await b.client.syncInbox();
     expect(atB.acksSent).toBe(1);
+    // M1-7h-b (IR-M1-7h-1 F04 b): the ack is staged; the outbox pass gives it rows and publishes it.
+    await b.client.outbox.processDue();
     const ackRow = (await rowsOf(b)).envelopes.find(
       (r) => r.direction === 'out' && r.type === 'ack',
     );
@@ -938,5 +947,452 @@ describe('proof flags join the pass reports (04 §3.4, M1-7g-c)', () => {
   it('no flags: the reports are unchanged', () => {
     const reports = [ok('m1')];
     expect(mergeProofReports(reports, [])).toEqual(reports);
+  });
+});
+
+// --- M1-7h-b: revocation follow-ups (IR-M1-7h-1 F01, F04) -------------------------------------------
+
+type ApprovalStatus = 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled' | 'void';
+type PartState = 'unclaimed' | 'claimed' | 'done' | 'void';
+
+let approvalSerial = 0;
+const approvalId = (): string => {
+  approvalSerial += 1;
+  return `apr_${encodeBase64url(encodeUtf8(`m17hb-${String(approvalSerial).padStart(10, '0')}`))}`;
+};
+
+/**
+ * Stores one approval row as the core writes it (07 §3, §3.5): the action sealed, and for a
+ * commitment its scope in clear with one row per part. Only the counterparty matters here.
+ */
+async function storeApproval(
+  agent: Agent,
+  o: {
+    readonly status: ApprovalStatus;
+    readonly counterparty: string;
+    readonly commitment?: readonly (readonly ['envelope' | 'record' | 'receipt', PartState])[];
+  },
+): Promise<string> {
+  const id = approvalId();
+  const counterparty = { agentId: o.counterparty, ownerKey: 'ab'.repeat(32) };
+  const scope =
+    o.commitment === undefined
+      ? undefined
+      : { v: 1, kind: 'agentlink/commitment', agentId: agent.id, decision: 'accept', counterparty };
+  const action =
+    scope === undefined
+      ? {
+          tool: 'agentlink_send',
+          args: { to: o.counterparty, text: 'x', notarize: true },
+          context: { triggers: ['proofs.notarize'], counterparty, file: null, fee: null },
+        }
+      : {
+          tool: 'agentlink_respond_to_terms',
+          args: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA', decision: 'accept', notarize: false },
+          context: { triggers: ['commitments.accept'], scope, terms: {}, fee: null },
+        };
+  const rowKey = rowKeyOf([id]);
+  const actionJson = await agent.cipher.seal(
+    { table: 'approvals', column: 'action_json', rowKey },
+    JSON.stringify(action),
+  );
+  const summary = await agent.cipher.seal({ table: 'approvals', column: 'summary', rowKey }, 'x');
+  await agent.store.transaction((tx) => {
+    tx.insert('approvals', {
+      approval_id: id,
+      action_json: actionJson,
+      scope_json: scope === undefined ? null : JSON.stringify(scope),
+      answers_envelope_id: null,
+      scope_key: scope === undefined ? null : id,
+      source: 'owner',
+      policy_hash: null,
+      signed_decision: null,
+      signed_cancel: null,
+      summary,
+      status: o.status,
+      expires_at: clock.t + 86_400,
+      created_at: clock.t,
+      decided_at: o.status === 'pending' ? null : clock.t,
+    });
+    for (const [part, state] of o.commitment ?? []) {
+      tx.insert('commitment_parts', {
+        approval_id: id,
+        part,
+        state,
+        item_ref: null,
+        item_json: null,
+        ledger_entry_id: null,
+        void_reason: null,
+        replacements: 0,
+        claimed_at: state === 'unclaimed' ? null : clock.t,
+        done_at: state === 'done' ? clock.t : null,
+        updated_at: clock.t,
+      });
+    }
+  });
+  return id;
+}
+
+const approvalsOf = (agent: Agent) =>
+  agent.store.transaction((tx) => ({
+    approvals: new Map(tx.select('approvals').map((r) => [r.approval_id, r])),
+    parts: tx.select('commitment_parts'),
+  }));
+
+/** A contact owner's revoke of `revoked`, crafted per 04 §3.4.1 for `to`. */
+async function contactRevoke(revoked: Agent, to: Agent): Promise<Envelope> {
+  return craft({
+    signer: await ownerSigner(revoked.owner),
+    entries: [
+      { pk: await agentEnc(to) },
+      { pk: await ownerEnc(to.owner) },
+      { pk: await ownerEnc(revoked.owner) },
+      { pk: await agentEnc(revoked) },
+    ],
+    payload: revokePayload(await revokeObject(revoked.owner, revoked.id, clock.t)),
+    createdAt: clock.t,
+  });
+}
+
+describe('M1-7h-b (IR-M1-7h-1 F01): a revoke voids approvals and commitment parts with that counterparty', () => {
+  it('in the revoke transaction: pending approvals void, open parts void, done parts and other contacts untouched; one activity line', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const c = await openAgent(3, 'carol', RELAYS_C, net);
+    await pair(a, b);
+    await pair(c, b);
+    const pendingSend = await storeApproval(b, { status: 'pending', counterparty: a.id });
+    const pendingScope = await storeApproval(b, {
+      status: 'pending',
+      counterparty: a.id,
+      commitment: [
+        ['envelope', 'unclaimed'],
+        ['record', 'unclaimed'],
+      ],
+    });
+    const approvedScope = await storeApproval(b, {
+      status: 'approved',
+      counterparty: a.id,
+      commitment: [
+        ['envelope', 'done'],
+        ['receipt', 'claimed'],
+      ],
+    });
+    const otherSend = await storeApproval(b, { status: 'pending', counterparty: c.id });
+    const otherScope = await storeApproval(b, {
+      status: 'approved',
+      counterparty: c.id,
+      commitment: [['receipt', 'unclaimed']],
+    });
+    clock.t += 5;
+    const revoke = await contactRevoke(a, b);
+    await deliverFromOwner(net, a.owner, b, revoke);
+    const lines = b.lines.length;
+    const result = await b.client.syncInbox();
+
+    const { approvals, parts } = await approvalsOf(b);
+    expect(approvals.get(pendingSend)).toMatchObject({ status: 'void', decided_at: clock.t });
+    expect(approvals.get(pendingScope)).toMatchObject({ status: 'void', decided_at: clock.t });
+    // Only an owner signature ends what an owner approved: the row stays, its open parts end.
+    expect(approvals.get(approvedScope)?.status).toBe('approved');
+    expect(approvals.get(otherSend)?.status).toBe('pending');
+    expect(approvals.get(otherScope)?.status).toBe('approved');
+    const partOf = (id: string, part: string) =>
+      parts.find((p) => p.approval_id === id && p.part === part);
+    for (const [id, part] of [
+      [pendingScope, 'envelope'],
+      [pendingScope, 'record'],
+      [approvedScope, 'receipt'],
+    ] as const) {
+      expect(partOf(id, part)).toMatchObject({
+        state: 'void',
+        void_reason: 'void',
+        updated_at: clock.t,
+      });
+    }
+    expect(partOf(approvedScope, 'envelope')?.state).toBe('done');
+    expect(partOf(otherScope, 'receipt')).toMatchObject({ state: 'unclaimed', void_reason: null });
+    // The same transaction as the revoked_agents row.
+    expect(
+      await b.store.transaction((tx) => tx.get('revoked_agents', { agent_evm: a.id })),
+    ).toBeDefined();
+
+    // The activity line (07 §3.2 "The activity feed reports it"): counts only.
+    const report = result.reports.find((r) => r.envelopeId === revoke.id) as InboundReport;
+    expect(report).toMatchObject({ outcome: 'ok', contactId: a.id });
+    expect(report.revoke).toEqual({
+      self: false,
+      outboxStopped: 0,
+      approvalsVoided: 2,
+      partsVoided: 3,
+    });
+    const logged = b.lines.slice(lines).join('\n');
+    expect(logged).toContain('revoke applied');
+    expect(logged).not.toContain(a.id);
+    expect(logged).not.toContain(pendingSend);
+  });
+
+  it('an approval stored while the revoke was being prepared is not missed: the revoke waits a pass, then voids it', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    await storeApproval(b, { status: 'pending', counterparty: a.id });
+    let late: string | undefined;
+    let started = false;
+    const open = b.cipher.open.bind(b.cipher);
+    b.cipher.open = async (context, sealed) => {
+      if (!started && context.table === 'approvals' && context.column === 'action_json') {
+        started = true;
+        late = await storeApproval(b, { status: 'pending', counterparty: a.id });
+      }
+      return open(context, sealed);
+    };
+    clock.t += 5;
+    await deliverFromOwner(net, a.owner, b, await contactRevoke(a, b));
+    await b.client.syncInbox();
+    await b.client.syncInbox();
+    expect(late).toBeDefined();
+    const { approvals } = await approvalsOf(b);
+    expect([...approvals.values()].map((r) => r.status)).toEqual(['void', 'void']);
+    expect((await rowsOf(b)).contacts.find((x) => x.contact_id === a.id)?.status).toBe('revoked');
+  });
+
+  it('a re-published copy voids nothing more and has no activity line', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    clock.t += 5;
+    const revoke = await contactRevoke(a, b);
+    await deliverFromOwner(net, a.owner, b, revoke);
+    const first = await b.client.syncInbox();
+    expect(first.reports.find((r) => r.envelopeId === revoke.id)?.revoke).toEqual({
+      self: false,
+      outboxStopped: 0,
+      approvalsVoided: 0,
+      partsVoided: 0,
+    });
+    clock.t += 5;
+    const again = await contactRevoke(a, b);
+    await deliverFromOwner(net, a.owner, b, again);
+    const second = await b.client.syncInbox();
+    const report = second.reports.find((r) => r.envelopeId === again.id);
+    expect(report?.outcome).toBe('duplicate');
+    expect(report?.revoke).toBeUndefined();
+  });
+
+  it('the own owner revoke reports its activity line with self', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const envelope = await craft({
+      signer: await ownerSigner(b.owner),
+      entries: [{ pk: await agentEnc(b) }, { pk: await ownerEnc(b.owner) }],
+      payload: revokePayload(await revokeObject(b.owner, b.id, clock.t)),
+      createdAt: clock.t,
+    });
+    await deliverFromOwner(net, b.owner, b, envelope);
+    const result = await b.client.syncInbox();
+    expect(result.reports.find((r) => r.envelopeId === envelope.id)?.revoke).toMatchObject({
+      self: true,
+    });
+  });
+});
+
+/** Inbound `ok` text rows from `from`, as a processing pass leaves them (no payload needed). */
+async function storeInboundOk(to: Agent, from: Agent, n: number): Promise<string[]> {
+  const ids: string[] = [];
+  await to.store.transaction((tx) => {
+    for (let i = 0; i < n; i += 1) {
+      const id = encodeBase64url(encodeUtf8(`ack-${String(i).padStart(12, '0')}`));
+      ids.push(id);
+      tx.insert('envelopes', {
+        envelope_id: id,
+        envelope_hash: `0x${String(i).padStart(64, '0')}`,
+        thread_id: id,
+        direction: 'in',
+        contact_id: from.id,
+        from_key: from.nostr,
+        type: 'text',
+        state: 'ok',
+        refused_reason: null,
+        created_at: clock.t,
+        envelope_json: null,
+        payload_json: null,
+        read_at: null,
+        delivery: null,
+        refused_at: null,
+        request_accepted_at: null,
+      });
+    }
+  });
+  return ids;
+}
+
+/** Makes the next processing passes report `ids` as new messages from `from`. */
+function reportAsNew(agent: Agent, from: Agent, ids: readonly string[]): void {
+  agent.client.envelopes.processReceived = () =>
+    Promise.resolve(
+      ids.map((envelopeId) => ({
+        envelopeId,
+        outcome: 'ok' as const,
+        contactId: from.id,
+        flagged: false,
+      })),
+    );
+}
+
+describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key listing', () => {
+  it('F04 a: catchUp leaves out received rows whose type is known and not a message', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    await b.store.transaction((tx) => {
+      ['ack', UNOPENED_TYPE, 'text', 'card-update'].forEach((type, i) => {
+        const id = encodeBase64url(encodeUtf8(`rcv-${String(i).padStart(12, '0')}`));
+        tx.insert('envelopes', {
+          envelope_id: id,
+          envelope_hash: `0x${String(i + 1).padStart(64, 'f')}`,
+          thread_id: id,
+          direction: 'in',
+          contact_id: null,
+          from_key: a.nostr,
+          type,
+          state: 'received',
+          refused_reason: null,
+          created_at: clock.t,
+          envelope_json: '{}',
+          payload_json: null,
+          read_at: null,
+          delivery: null,
+          refused_at: null,
+          request_accepted_at: null,
+        });
+      });
+    });
+    // Unopened (type not yet known) and a message type count; a known ack or card-update does not.
+    expect((await b.client.catchUp()).inbox).toEqual([{ contactId: a.id, unread: 2 }]);
+  });
+
+  it('F04 a: a peer acks do not raise catchUp counts', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net, { deliveryAcks: true });
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: true });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'one' });
+    await a.client.sendMessage({ to: b.id, text: 'two' });
+    expect((await b.client.syncInbox()).acksSent).toBe(2);
+    await b.client.outbox.processDue();
+    await a.client.syncInbox();
+    expect((await a.client.catchUp()).inbox).toEqual([]);
+  });
+
+  it('F04 b: syncInbox stages 200 acks for the outbox and publishes none of them itself', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: true });
+    await pair(a, b);
+    reportAsNew(b, a, await storeInboundOk(b, a, 200));
+    const published = net.published;
+    const result = await b.client.syncInbox();
+    expect(result.acksSent).toBe(200);
+    expect(net.published).toBe(published);
+    const state = await rowsOf(b);
+    const acks = state.envelopes.filter((r) => r.direction === 'out' && r.type === 'ack');
+    expect(acks).toHaveLength(200);
+    expect(acks.every((r) => r.delivery === 'queued' && r.contact_id === a.id)).toBe(true);
+    expect(state.outbox).toEqual([]);
+
+    // The outbox pass gives staged acks their wraps and publishes them, a batch per pass.
+    await b.client.outbox.processDue();
+    const after = await rowsOf(b);
+    expect(new Set(after.outbox.map((r) => r.envelope_id)).size).toBe(50);
+    expect(after.outbox.every((r) => r.state === 'sent')).toBe(true);
+    expect(net.published).toBeGreaterThan(published);
+  }, 300_000);
+
+  it('F04 b: a staged ack to a contact that is no longer active is never published', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: true });
+    await pair(a, b);
+    reportAsNew(b, a, await storeInboundOk(b, a, 1));
+    expect((await b.client.syncInbox()).acksSent).toBe(1);
+    await b.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: a.id }, { status: 'blocked' }),
+    );
+    const published = net.published;
+    await b.client.outbox.processDue();
+    const state = await rowsOf(b);
+    expect(state.outbox).toEqual([]);
+    expect(state.envelopes.find((r) => r.type === 'ack')?.delivery).toBe('not_delivered');
+    expect(net.published).toBe(published);
+  });
+
+  it('F04 b: a staged row of type ack that answers no inbound message from that contact is never published', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: true });
+    await pair(a, b);
+    const ids = await storeInboundOk(b, a, 1);
+    reportAsNew(b, a, ids);
+    expect((await b.client.syncInbox()).acksSent).toBe(1);
+    // The message it answers is no longer an inbound message of that contact.
+    await b.store.transaction((tx) => tx.delete('envelopes', { envelope_id: ids[0] as string }));
+    const published = net.published;
+    await b.client.outbox.processDue();
+    const state = await rowsOf(b);
+    expect(state.outbox).toEqual([]);
+    expect(state.envelopes.find((r) => r.type === 'ack')?.delivery).toBe('not_delivered');
+    expect(net.published).toBe(published);
+  });
+
+  it('F04 c: a KeyStore failure while listing own keys degrades the fetch; the sync does not fail', async () => {
+    const net = new RelayNetwork();
+    const inner = new MemoryKeyStore(seed(2));
+    let failing = false;
+    const keyStore = new Proxy(inner, {
+      get(target, prop) {
+        const value = Reflect.get(target, prop, target) as unknown;
+        if (typeof value !== 'function') return value;
+        if (prop === 'getPublicBundle') {
+          return (...args: unknown[]) => {
+            if (failing) return Promise.reject(new Error('keystore unavailable'));
+            return (value as (...x: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return (value as (...x: unknown[]) => unknown).bind(target);
+      },
+    }) as unknown as KeyStore;
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { keyStore });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'stored earlier' });
+    expect((await b.client.catchUp()).inbox).toEqual([{ contactId: a.id, unread: 1 }]);
+
+    failing = true;
+    // The read-only catch-up still counts what is stored (06 §2.0).
+    expect(await b.client.catchUp()).toEqual({
+      partial: true,
+      inbox: [{ contactId: a.id, unread: 1 }],
+      requests: 0,
+    });
+    // syncInbox: only the fetch fails; what is stored is still processed (here the KeyStore
+    // recovers before the processing step, which needs the keys to open envelopes).
+    const process = b.client.envelopes.processReceived.bind(b.client.envelopes);
+    b.client.envelopes.processReceived = () => {
+      failing = false;
+      return process();
+    };
+    const result = await b.client.syncInbox();
+    expect(result.partial).toBe(true);
+    expect(result.stored).toBe(0);
+    expect(result.items.map((i) => i.payload.body)).toEqual(['stored earlier']);
+    expect(b.lines.join('\n')).toContain('inbox fetch failed');
+    expect(b.lines.join('\n')).not.toContain('keystore unavailable');
   });
 });

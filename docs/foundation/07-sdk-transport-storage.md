@@ -156,7 +156,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **Revocation (proposed; owner confirms at merge).** The revoke transaction (§3.4) sets every `pending` row whose recipient_key is a known key of the revoked agent, at any epoch, to `not_delivered` with reason `revoked`. For the own agent it does so for every `pending` row. The activity feed reports it.
 - **On failure.** If the outbox write fails, nothing is published and the call returns `error`, so the sender always holds what it sent. A row that cannot be read is marked `not_delivered` (reason `unreadable`) and reported; it is never sent to relays other than those it lists.
 
-**`outbox_staged`** (M1-7k-b; IR-M1-7k-1 F08; schema version 3): the transient faults of a staged pairing message, meaning a `handshake` or `handshake-ack` envelope that is still `queued` and has no outbox rows yet.
+**`outbox_staged`** (M1-7k-b; IR-M1-7k-1 F08; schema version 3): the transient faults of a staged message, meaning a `handshake` or `handshake-ack` envelope, or a delivery `ack` (02 F-23; IR-M1-7h-1 F04 b, M1-7h-b: a processing pass signs and stages it and the delivery pass wraps and publishes it, so `syncInbox` never waits on relays for acks), that is still `queued` and has no outbox rows yet. A staged `ack` gets rows only while its contact is active and paired and its sealed payload acknowledges an `ok` inbound message from that contact; otherwise it is marked `not_delivered`.
 
 | Column | Type and meaning |
 |---|---|
