@@ -3826,9 +3826,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Prompt tests: a hostile invite (name with instructions, closing tags, control and bidi characters; oversized or malformed payloads) yields either no prompt or a prompt equal to the template plus the canonical link; the prompt passes the vocabulary lint.
   - DOM test (Playwright): with a name containing `<img src=x onerror=…>`, `<div>` and a fake "Copy this to your AI" line, no DOM element derives from the name, no script runs, no Trusted Types violation is allowed through, and the copy button yields exactly the template plus the canonical link; run in Chromium (Trusted Types enforced); a framing attempt is refused.
   - **Deploy (D-25):** staging deploy on merge; smoke test; production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous artifacts; deploy record; halted by `DEPLOY_FREEZE`.
+- **Split:** the deploy work moved to M1-19-b (the page itself shipped in #348); the Deploy (D-25) bullet above is carried out there.
 
 #### M1-19-b · Invite page: deploy pipeline and `nameHash` check (new, #348)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · apps/invite, `.github/workflows/` (invite deploy)
 - **Depends on:** M1-19
 - **Spec:** 04 §3.6; 08 §4; D-28, D-53
