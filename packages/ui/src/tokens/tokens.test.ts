@@ -1,14 +1,6 @@
 // M1-35a: the design tokens module, the CSS and the shipped notices (S1). The sources of truth are
 // the D1 files under docs/design/d1/ (read with Vite `?raw`: the ui zone allows no Node built-ins).
 import { describe, expect, it } from 'vitest';
-import baseRaw from '../../../../docs/design/d1/tokens/base.json?raw';
-import contrastMd from '../../../../docs/design/d1/design-system/contrast.md?raw';
-import d1Css from '../../../../docs/design/d1/tokens/tokens.css?raw';
-import sourceRaw from '../../../../docs/design/d1/tokens/tokens.source.json?raw';
-import darkRaw from '../../../../docs/design/d1/tokens/theme-dark.json?raw';
-import darkContrastRaw from '../../../../docs/design/d1/tokens/theme-dark-contrast.json?raw';
-import lightRaw from '../../../../docs/design/d1/tokens/theme-light.json?raw';
-import lightContrastRaw from '../../../../docs/design/d1/tokens/theme-light-contrast.json?raw';
 import css from './tokens.css?raw';
 import {
   colorTokens,
@@ -22,6 +14,28 @@ import {
   typeStyles,
   type ThemeId,
 } from './index.js';
+
+// The D1 files, read through Vite: a relative import would leave the package (boundaries rule).
+const d1 = import.meta.glob(
+  [
+    '../../../../docs/design/d1/tokens/*.{json,css}',
+    '../../../../docs/design/d1/design-system/contrast.md',
+  ],
+  { query: '?raw', import: 'default', eager: true },
+);
+function d1File(name: string): string {
+  const text = d1[`../../../../docs/design/d1/${name}`];
+  if (text === undefined || text === '') throw new Error(`D1 file missing or empty: ${name}`);
+  return text;
+}
+const baseRaw = d1File('tokens/base.json');
+const contrastMd = d1File('design-system/contrast.md');
+const d1Css = d1File('tokens/tokens.css');
+const sourceRaw = d1File('tokens/tokens.source.json');
+const darkRaw = d1File('tokens/theme-dark.json');
+const darkContrastRaw = d1File('tokens/theme-dark-contrast.json');
+const lightRaw = d1File('tokens/theme-light.json');
+const lightContrastRaw = d1File('tokens/theme-light-contrast.json');
 
 interface SourceToken {
   name: string;
@@ -129,36 +143,42 @@ describe('tokens module matches the D1 token source', () => {
   });
 });
 
-/** The body of the first rule whose selector line equals `selector`. */
-function block(text: string, selector: string): string {
-  const start = text.indexOf(`\n${selector} {`);
+/** Prettier formats tokens.css (quotes, line breaks); everything is compared whitespace-free. */
+const compact = (text: string): string => text.replace(/\s+/g, '').replaceAll("'", '"');
+const css0 = compact(css);
+
+/** The declarations of the first top-level rule with exactly this selector, whitespace-free. */
+function block(selector: string): string {
+  const open = `}${compact(selector)}{`;
+  const start = css0.indexOf(open);
   expect(start, selector).toBeGreaterThanOrEqual(0);
-  return text.slice(start, text.indexOf('\n}', start));
+  return css0.slice(start, css0.indexOf('}', start + 1));
 }
+const decl = (name: string, value: string): string => compact(`--${name}:${value};`);
 
 describe('tokens.css', () => {
   it('equals the D1 tokens.css except for the font paths', () => {
-    expect(css).toBe(d1Css.replaceAll('url("fonts/', 'url("../../fonts/'));
+    expect(css0).toBe(compact(d1Css.replaceAll('url("fonts/', 'url("../../fonts/')));
   });
 
   it('declares every scalar token once at :root', () => {
-    const root = block(css, ':root');
+    const root = block(':root');
     for (const [name, value] of Object.entries(scalarTokens)) {
-      expect(root, name).toContain(`  --${name}: ${value};`);
+      expect(root, name).toContain(decl(name, value));
     }
   });
 
   it('declares every colour and shadow token in the dark and light blocks', () => {
     const blocks = {
-      dark: block(css, ':root, [data-theme="dark"]'),
-      light: block(css, '[data-theme="light"]'),
+      dark: block(':root, [data-theme="dark"]'),
+      light: block('[data-theme="light"]'),
     };
     for (const id of ['dark', 'light'] as const) {
       for (const [name, values] of Object.entries(colorTokens)) {
-        expect(blocks[id], `${id} ${name}`).toContain(`--${name}: ${values[id]};`);
+        expect(blocks[id], `${id} ${name}`).toContain(decl(name, values[id]));
       }
       for (const [name, values] of Object.entries(shadowTokens)) {
-        expect(blocks[id], `${id} ${name}`).toContain(`--${name}: ${values[id]};`);
+        expect(blocks[id], `${id} ${name}`).toContain(decl(name, values[id]));
       }
     }
   });
@@ -166,11 +186,9 @@ describe('tokens.css', () => {
   it('declares the increased-contrast overrides in both contrast blocks', () => {
     const blocks = {
       'dark-contrast': block(
-        css,
         ':root[data-contrast="more"]:not([data-theme="light"]), [data-theme="dark"][data-contrast="more"], [data-theme="dark-contrast"]',
       ),
       'light-contrast': block(
-        css,
         '[data-theme="light"][data-contrast="more"], [data-theme="light-contrast"]',
       ),
     };
@@ -180,16 +198,16 @@ describe('tokens.css', () => {
         // The contrast files hold overrides only: a value that differs from the base theme must be
         // declared in the block.
         if (values[id] !== values[base]) {
-          expect(blocks[id], `${id} ${name}`).toContain(`--${name}: ${values[id]};`);
+          expect(blocks[id], `${id} ${name}`).toContain(decl(name, values[id]));
         }
       }
     }
   });
 
   it('defines the two font faces from first-party woff2 files', () => {
-    expect(css).toContain('font-family: "Geist";');
-    expect(css).toContain('font-family: "Geist Mono";');
-    expect([...css.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1])).toEqual([
+    expect(css0).toContain('font-family:"Geist";');
+    expect(css0).toContain('font-family:"GeistMono";');
+    expect([...css0.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1])).toEqual([
       '../../fonts/Geist-Variable.woff2',
       '../../fonts/GeistMono-Variable.woff2',
     ]);
@@ -198,7 +216,7 @@ describe('tokens.css', () => {
   it('exposes cssVar() names that exist in the CSS', () => {
     expect(cssVar('al-space-5')).toBe('var(--al-space-5)');
     for (const name of [...Object.keys(colorTokens), ...Object.keys(scalarTokens)]) {
-      expect(css, name).toContain(`--${name}:`);
+      expect(css0, name).toContain(`--${name}:`);
     }
   });
 });
@@ -252,16 +270,16 @@ describe('contrast table', () => {
 
 describe('package contents', () => {
   const sources = import.meta.glob(
-    [
-      './**/*.{ts,css}',
-      '!./**/*.test.ts',
-      '../index.ts',
-      '../../package.json',
-      '../../*.md',
-      '../../fonts/*.txt',
-    ],
+    ['./**/*.{ts,css}', '!./**/*.test.ts', '../index.ts', '../../package.json', '../../*.md'],
     { query: '?raw', import: 'default', eager: true },
   );
+  // The OFL text is the licence as published, with its own reference to SIL's site in prose: shipped
+  // unmodified, never loaded, so it is checked for content but not for URLs.
+  const ofl = import.meta.glob('../../fonts/OFL.txt', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  });
   const fontFiles = import.meta.glob('../../fonts/*.woff2', {
     query: '?raw',
     import: 'default',
@@ -271,10 +289,17 @@ describe('package contents', () => {
   it('references no external URL anywhere in the package', () => {
     const files = Object.entries(sources);
     expect(files.length).toBeGreaterThan(4);
-    for (const [path, text] of files) {
+    for (const [path, rawText] of files) {
+      // package.json's repository field is metadata, never fetched by the package.
+      const text = path.endsWith('package.json')
+        ? JSON.stringify({ ...JSON.parse(rawText), repository: undefined })
+        : rawText;
       // The notices quote licence text without links: the whole package is free of scheme URLs,
       // @import and CDN hosts.
-      expect(text.match(/\b(?:https?|wss?|ftp):\/\/[^\s)"'`]+|@import|\/\/cdn\./g), path).toBeNull();
+      expect(
+        text.match(/\b(?:https?|wss?|ftp):\/\/[^\s)"'`]+|@import|\/\/cdn\./g),
+        path,
+      ).toBeNull();
     }
   });
 
@@ -284,8 +309,7 @@ describe('package contents', () => {
       '../../fonts/GeistMono-Variable.woff2',
     ]);
     for (const text of Object.values(fontFiles)) expect(text.startsWith('wOF2')).toBe(true);
-    const ofl = sources['../../fonts/OFL.txt'] as string;
-    expect(ofl).toContain('SIL OPEN FONT LICENSE Version 1.1');
+    expect(ofl['../../fonts/OFL.txt']).toContain('SIL OPEN FONT LICENSE Version 1.1');
   });
 
   it('ships the Lucide ISC and Geist OFL notices and lists them in "files"', () => {

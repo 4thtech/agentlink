@@ -2,7 +2,7 @@
   "name": "@4thtech-io/ui",
   "version": "0.1.2",
   "private": true,
-  "description": "Shared React components (design system).",
+  "description": "Shared design system: design tokens (CSS and typed), Geist fonts; components follow.",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -20,11 +20,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    }
+    },
+    "./tokens.css": "./src/tokens/tokens.css",
+    "./fonts/*": "./fonts/*"
   },
   "files": [
     "dist",
-    "!dist/tsconfig.tsbuildinfo"
+    "!dist/tsconfig.tsbuildinfo",
+    "src/tokens/tokens.css",
+    "fonts",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
     "build": "tsc -b",
