@@ -45,7 +45,18 @@ function secretHex(value: string | null | undefined): void {
   if (typeof value === 'string' && value.length > 2) secrets.add(value.slice(2).toLowerCase());
 }
 const captured: string[] = [];
-const METHODS = ['log', 'info', 'warn', 'error', 'debug', 'trace'] as const;
+const METHODS = [
+  'log',
+  'info',
+  'warn',
+  'error',
+  'debug',
+  'trace',
+  'dir',
+  'dirxml',
+  'table',
+  'assert',
+] as const;
 const originals = new Map<string, (...args: unknown[]) => void>();
 
 beforeAll(() => {
