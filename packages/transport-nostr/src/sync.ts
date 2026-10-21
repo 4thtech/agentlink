@@ -397,25 +397,35 @@ interface Learned {
   untrusted: boolean;
 }
 
-/** One page of a walk: its `until` (undefined: the first page), its oldest in-window second, its size. */
+/**
+ * One page of a walk: its `until` (undefined: the first page), the oldest second of a wrap on it that
+ * is for us and opened or was seen before (stray or junk frames never count, AUDIT-FABLE-M2-19-1
+ * L-1), whether an event sat at `until` (the relay applies `until` inclusively), and its size.
+ */
 interface PageRecord {
   readonly until: number | undefined;
   readonly oldest: number | undefined;
+  readonly sawAtUntil: boolean;
   readonly count: number;
 }
 
 /**
  * True when the walk of `learned` read second `t` in full (IR-M2-19-1 H-1, IR-M2-19-2 H-2). The one
- * piece of evidence: a page whose range holds `t` also held an event older than `t`, so a
- * newest-first cap cut that page below `t`. A page smaller than the largest is no proof (a lower cap
- * can cut it). `t` must lie above the walk's `since` (a walk may stop in the middle of its oldest
- * second), and a walk that ended because the relay ignores `until` proves nothing.
+ * piece of evidence: a page whose range holds `t` also held a verified wrap older than `t`, so a
+ * newest-first cap cut that page below `t`. `t` equal to the page's `until` counts only when an
+ * event sat at `until` on that page: a relay that applies `until` exclusively never served `t` there
+ * (AUDIT-FABLE-M2-19-1 M-1). A page smaller than the largest is no proof (a lower cap can cut it).
+ * `t` must lie above the walk's `since` (a walk may stop in the middle of its oldest second), and a
+ * walk that ended because the relay ignores `until` proves nothing. Assumes the relay returns stored
+ * events newest first and applies `until` inclusively (NIP-01); see 07 §4.2 for the residual.
  */
 function readInFull(learned: Learned, t: number): boolean {
   if (learned.full || learned.untrusted || t <= learned.since) return false;
   return learned.pages.some(
     (page) =>
-      (page.until === undefined || t <= page.until) && page.oldest !== undefined && page.oldest < t,
+      (page.until === undefined || t < page.until || (t === page.until && page.sawAtUntil)) &&
+      page.oldest !== undefined &&
+      page.oldest < t,
   );
 }
 
@@ -715,6 +725,8 @@ export class SyncEngine {
       // This page, relative to its `until`: did an event sit at it, and did one lie above it (a relay
       // that ignores `until`)?
       let sawAtUntil = false;
+      // M2-19: the oldest in-window second of a verified wrap for us on this page (page evidence).
+      let proofOldest: number | undefined;
       let sawNewer = false;
       // Events of this page inside the window and at or below its `until` (repeats included), and
       // the most any page of this walk returned: a relay's cap is at least that (M1-5d).
@@ -820,7 +832,12 @@ export class SyncEngine {
         if (learned !== undefined) {
           if (sawNewer) learned.untrusted = true;
           if (learned.pages.length < MAX_PAGES_PER_PASS) {
-            learned.pages.push({ until: pageUntil, oldest: pageOldest, count: pageCount });
+            learned.pages.push({
+              until: pageUntil,
+              oldest: proofOldest,
+              sawAtUntil,
+              count: pageCount,
+            });
           } else {
             learned.full = true;
           }
@@ -860,6 +877,7 @@ export class SyncEngine {
           pageUntil = next.until;
           skipIds = new Set(next.skip);
           pageOldest = undefined;
+          proofOldest = undefined;
           pageOldestIds = [];
           sawAtUntil = false;
           sawNewer = false;
@@ -903,8 +921,26 @@ export class SyncEngine {
           finish({ status: 'failed', reason: 'keys_unavailable' });
           return;
         }
-        if (learned !== undefined && (result === 'delivered' || result === 'duplicate')) {
+        if (
+          learned !== undefined &&
+          phase === 'backlog' &&
+          (result === 'delivered' || result === 'duplicate') &&
+          isRecord(event) &&
+          event.kind === NOSTR_KIND_GIFT_WRAP &&
+          pickIdentity(event.tags, run.identities) !== undefined
+        ) {
           learn(learned, event);
+          // This event's page is still the current one: the page's EOSE work is chained behind it.
+          const at = event.created_at;
+          if (
+            typeof at === 'number' &&
+            Number.isSafeInteger(at) &&
+            at >= since &&
+            (pageUntil === undefined || at <= pageUntil) &&
+            (proofOldest === undefined || at < proofOldest)
+          ) {
+            proofOldest = at;
+          }
         }
         if (result === 'retry') hold = true;
         if (result === 'bound') {
