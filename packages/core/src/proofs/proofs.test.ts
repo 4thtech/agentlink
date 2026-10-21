@@ -2381,6 +2381,32 @@ describe('`confirm` signs the ACCEPTED receipt on their ACCEPT record (M1-7g-d; 
     chain.censor = false;
   });
 
+  it('when the receipt re-read fails, the call returns its own result and logs only `deferred_error` (M1-7g-f)', async () => {
+    const { a, accept } = await acceptRecorded();
+    const asked = await a.client.respondToTerms({ envelopeId: accept, decision: 'accept' });
+    const approvalId = (asked as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    const spy = vi.spyOn(a.client.terms, 'receiptStatus').mockRejectedValue(new Error('canary-x'));
+    const before = a.lines.length;
+    try {
+      expect(
+        await a.client.respondToTerms({ envelopeId: accept, decision: 'accept', approvalId }),
+      ).toMatchObject({
+        status: 'ok',
+        receipt: { type: 'ACCEPTED', status: 'waiting_for_record' },
+      });
+    } finally {
+      spy.mockRestore();
+    }
+    const fresh = a.lines.slice(before);
+    expect(fresh.join('\n')).not.toContain('canary-x');
+    const codes = fresh
+      .map((l) => parseJson(l) as { code?: unknown })
+      .filter((r) => r.code !== undefined)
+      .map((r) => r.code);
+    expect(codes).toEqual(['deferred_error']);
+  });
+
   // A confirm needs their ACCEPT record first (NOT_RECORDED otherwise, 06 §2.2a), so the case of
   // a record that has not arrived is an accept of an offer that is not recorded yet.
   it('an approved accept of an offer not recorded yet returns `waiting_for_record` (M1-7g-f)', async () => {
@@ -2559,6 +2585,23 @@ describe('each contact has a share of the waiting pool (M1-7g-d; 04 §3.4)', () 
     const rows = await awaitingRows(b);
     expect(rows.some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
     // The refused row's slot is released, not held until it expires.
+    expect(rows.some((r) => r.record_id === 'await:waitC0')).toBe(false);
+    expect(rows).toHaveLength(256);
+  });
+
+  it('a waiting row whose proof envelope is no longer held releases its slot (M1-7g-f)', async () => {
+    const { a, b } = await twoAgents();
+    const c = await openAgent(33, ownerC, 'carol');
+    await pair(c, b);
+    await sendText(a, b);
+    await sendText(c, b, 'from carol');
+    await fillAwaiting(b, c.id, 256, 'waitC');
+    await b.store.transaction((tx) => {
+      tx.delete('envelopes', { envelope_id: 'waitC0' });
+    });
+    const fromA = await proofBeforeMessage(a, b, 'late from alice');
+    const rows = await awaitingRows(b);
+    expect(rows.some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
     expect(rows.some((r) => r.record_id === 'await:waitC0')).toBe(false);
     expect(rows).toHaveLength(256);
   });
