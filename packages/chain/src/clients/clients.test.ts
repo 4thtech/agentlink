@@ -6,6 +6,7 @@ import { encodeFunctionData } from 'viem';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { BASE_SEPOLIA, GNOSIS_CHIADO } from '../config/index.js';
 import type { ChainConfig, ChainNetwork } from '../config/index.js';
+import { FAUCET_CHAIN_IDS, isFaucetChain } from '../fees/faucet.js';
 import { loadOccV2Contracts, type OccV2Contracts } from '../occ-v2.js';
 import { composeChainConfig } from './registry.js';
 import {
@@ -121,7 +122,16 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
     ]);
   });
 
-  it('keeps Chiado out of automatic selection until its smoke test and faucet are in place (M1-3j-b)', () => {
+  it('selects automatically only the registry chains the testnet faucet serves (M1-3j-b)', () => {
+    // The gate: a chain joins automatic selection when, and only when, it is on the faucet allowlist
+    // (auto-select.test.ts plays the release where the allowlist names Chiado).
+    expect(autoSelectableChains().map((c) => c.chainId)).toEqual(
+      chainRegistry()
+        .filter((c) => isFaucetChain(c.chainId))
+        .map((c) => c.chainId),
+    );
+    // Shipped today: the faucet serves Base Sepolia only, so Chiado is not routed to yet.
+    expect(FAUCET_CHAIN_IDS).toEqual([84532]);
     expect(autoSelectableChains().map((c) => c.chainId)).toEqual([84532]);
     expect(selectChain().chainId).toBe(84532);
     expect(getChainConfig(10200)).toBeDefined(); // data and an explicit override stay available
