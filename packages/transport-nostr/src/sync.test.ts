@@ -2037,6 +2037,51 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
   });
 
+  // --- IR-M2-19-2 H-2: a page smaller than the largest is no proof that it was not capped ---------
+
+  /** `count` wraps at the distinct seconds T+1 … T+count on each of `relays`. */
+  function newerEverywhere(s: Setup, relays: readonly string[], count: number, at: number) {
+    for (let i = 1; i <= count; i += 1) injectEverywhere(s, relays, 1, at + i);
+  }
+
+  it('keeps the gap when the other relay lowers its cap between pages (10, then 7)', async () => {
+    const s = setup();
+    const [capped, shifty] = relayUrls('rq-cap-shift', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(shifty, { capSequence: [10, 7] });
+    const T = NOW - 1_500;
+    newerEverywhere(s, [capped, shifty], 10, T);
+    injectEverywhere(s, [capped, shifty], 9, T);
+    olderEverywhere(s, [capped, shifty], T);
+    const result = await s.engine.sync({
+      relays: [capped, shifty],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.relays.find((r) => r.relay === shifty)?.status).toBe('complete');
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
+  it('keeps the gap when the other relay serves that second only on a smaller last page (8, 8, then 7)', async () => {
+    const s = setup();
+    const [capped, shifty] = relayUrls('rq-cap-last', 2) as [string, string];
+    s.net.configure(capped, { maxLimit: 5 });
+    s.net.configure(shifty, { capSequence: [8, 8, 7] });
+    const T = NOW - 1_500;
+    newerEverywhere(s, [capped, shifty], 16, T);
+    injectEverywhere(s, [capped, shifty], 9, T);
+    olderEverywhere(s, [capped, shifty], T);
+    const result = await s.engine.sync({
+      relays: [capped, shifty],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    expect(result.relays.find((r) => r.relay === shifty)?.status).toBe('complete');
+    expect(idsReqs(s, capped)).toHaveLength(0);
+    expect(result.gaps).toEqual([{ relay: capped, second: T, reason: 'relay_cap' }]);
+  });
+
   it('keeps the gap when the other relay lacks a wrap the capped relay showed at that second', async () => {
     const s = setup();
     const [capped, other] = relayUrls('rq-not-superset', 2) as [string, string];

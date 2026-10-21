@@ -43,6 +43,11 @@ export interface MockRelayConfig {
    * is 500). The cap applies below any `limit` the client asks for.
    */
   maxLimit?: number;
+  /**
+   * M2-19: a cap that changes between REQs on one connection: the n-th REQ without `ids` gets
+   * `capSequence[n]` (the last entry repeats). Overrides `maxLimit` for those REQs.
+   */
+  capSequence?: number[];
   /** M1-5c: ignores `limit` and `until` (a relay that does not paginate). */
   ignoreLimit?: boolean;
   /** M2-19: accepts a REQ with an `ids` filter but never answers it. */
@@ -73,6 +78,8 @@ export class MockSocket implements RelaySocket {
   /** Open subscriptions on this connection (M1-5c): sub id to filter. */
   readonly subs = new Map<string, MockFilter>();
   private extrasSent = false;
+  /** REQs without an `ids` filter on this connection (for `capSequence`). */
+  private pageReqs = 0;
   readonly challenge: string;
 
   constructor(
@@ -199,7 +206,13 @@ export class MockSocket implements RelaySocket {
     if (config.newestFirst === true) stored.reverse();
     const limit = ignore ? undefined : filter.limit;
     if (limit === 0) stored = []; // limit 0: no stored events, live only
-    const cap = Math.min(limit ?? Infinity, config.maxLimit ?? Infinity);
+    let relayCap = config.maxLimit ?? Infinity;
+    const sequence = config.capSequence;
+    if (sequence !== undefined && sequence.length > 0 && filter.ids === undefined) {
+      relayCap = sequence[Math.min(this.pageReqs, sequence.length - 1)] as number;
+      this.pageReqs += 1;
+    }
+    const cap = Math.min(limit ?? Infinity, relayCap);
     if (cap !== Infinity) {
       // Newest created_at first (stable), then cut: what a relay with a result cap does.
       stored = stored
