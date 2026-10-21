@@ -6,7 +6,7 @@
 // tools/release/deploy-submitter.test.mjs.
 import { unstable_readConfig } from 'wrangler';
 import { describe, expect, it } from 'vitest';
-import { readConfig, readFaucetConfig } from '../src/config.js';
+import { readConfig, readFaucetAddress, readFaucetConfig } from '../src/config.js';
 import wranglerToml from '../wrangler.toml?raw';
 
 const ENVIRONMENTS = {
@@ -80,7 +80,11 @@ describe('wrangler.toml', () => {
 
       it('serves testnets only, with the faucet on the hard-coded allowlist (SUB-7)', () => {
         const vars = read(env).vars;
-        expect(Object.keys(vars).sort()).toEqual(['SUBMITTER_CHAINS', 'SUBMITTER_FAUCET_CHAINS']);
+        expect(Object.keys(vars).sort()).toEqual([
+          'SUBMITTER_CHAINS',
+          'SUBMITTER_FAUCET_ADDRESS_84532',
+          'SUBMITTER_FAUCET_CHAINS',
+        ]);
         expect(chainList(vars.SUBMITTER_CHAINS)).toEqual([84532]);
         expect(chainList(vars.SUBMITTER_FAUCET_CHAINS)).toEqual([84532]);
         // The Worker's own parsers accept the values (an invalid one would make it answer 503).
@@ -90,6 +94,34 @@ describe('wrangler.toml', () => {
       });
     });
   }
+
+  it('staging and production pin different faucet wallets on every faucet chain (M1-10b-b)', () => {
+    // The Worker serves the faucet only from a key of its environment's pinned address
+    // (config.ts pinnedFaucet), so distinct pins mean the two configs cannot share a faucet key.
+    const staging = read('staging').vars;
+    const production = read('production').vars;
+    const chains = new Set([
+      ...chainList(staging.SUBMITTER_FAUCET_CHAINS),
+      ...chainList(production.SUBMITTER_FAUCET_CHAINS),
+    ]);
+    expect(chains.size).toBeGreaterThan(0);
+    for (const chainId of chains) {
+      const s = readFaucetAddress(staging, chainId);
+      const p = readFaucetAddress(production, chainId);
+      expect(s, `staging ${String(chainId)}`).not.toBeNull();
+      expect(p, `production ${String(chainId)}`).not.toBeNull();
+      expect(s, String(chainId)).not.toBe(p);
+    }
+    // Every faucet address var belongs to a faucet chain of its environment.
+    for (const vars of [staging, production]) {
+      const pinned = Object.keys(vars).filter((k) => k.startsWith('SUBMITTER_FAUCET_ADDRESS_'));
+      expect(pinned.sort()).toEqual(
+        chainList(vars.SUBMITTER_FAUCET_CHAINS)
+          .map((id) => `SUBMITTER_FAUCET_ADDRESS_${String(id)}`)
+          .sort(),
+      );
+    }
+  });
 
   it('staging runs on workers.dev only', () => {
     const config = read('staging');
@@ -116,9 +148,13 @@ describe('wrangler.toml', () => {
   });
 
   it('contains no account ID, token or key material', () => {
+    // The pinned faucet addresses are public (a 20-byte address, never a 32-byte key): only an
+    // exact `SUBMITTER_FAUCET_ADDRESS_<chainId> = "0x<40 hex>"` line is set aside before the checks.
+    const PIN = /^SUBMITTER_FAUCET_ADDRESS_[1-9][0-9]* = "0x[0-9a-f]{40}"$/;
     const lines = wranglerToml
       .split('\n')
-      .map((line) => line.replace(/#.*$/, ''))
+      .map((line) => line.replace(/#.*$/, '').trim())
+      .filter((line) => !PIN.test(line))
       .join('\n');
     expect(lines).not.toMatch(/account_id/);
     expect(lines).not.toMatch(/SUBMITTER_(IP|GAS|FAUCET)_KEY|SUBMITTER_RPC_URLS/);

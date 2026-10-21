@@ -107,7 +107,7 @@ env:
   # wrangler.toml (tools/release/deploy-submitter.test.mjs keeps the two in step).
   SUBMITTER_REQUIRED_SECRETS: "SUBMITTER_IP_KEY SUBMITTER_GAS_KEY_84532 SUBMITTER_FAUCET_KEY_84532"
   # The wrangler.toml vars: a Worker secret with one of these names fails the deploy.
-  SUBMITTER_SHADOW_VARS: "SUBMITTER_CHAINS SUBMITTER_FAUCET_CHAINS"
+  SUBMITTER_SHADOW_VARS: "SUBMITTER_CHAINS SUBMITTER_FAUCET_ADDRESS_84532 SUBMITTER_FAUCET_CHAINS"
 
 jobs:
   ci-green:

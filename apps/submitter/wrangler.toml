@@ -12,6 +12,11 @@
 # The deploy workflow skips cleanly until the required ones exist (names only; it never reads a
 # value). No account ID here either: CI passes CLOUDFLARE_ACCOUNT_ID from the GitHub Environment.
 #
+# Faucet key separation (M1-10b-b): each environment pins its own faucet wallet's public address
+# (SUBMITTER_FAUCET_ADDRESS_<chainId>, a lowercase 20-byte address, never a key). The Worker serves
+# the faucet only from a key of that address, and test/smoke-config.test.ts asserts that staging
+# and production pin different addresses, so the two environments cannot share a faucet key.
+#
 # Vars are reviewed in PRs and asserted by test/smoke-config.test.ts. SUBMITTER_CHAINS and
 # SUBMITTER_FAUCET_CHAINS name Base Sepolia (84532) only: Gnosis Chiado (10200) joins with M1-3j-b,
 # together with its keys and the workflow's required-secret list. Never set a var as a Worker secret
@@ -90,6 +95,7 @@ enabled = false
 [env.staging.vars]
 SUBMITTER_CHAINS = "84532"
 SUBMITTER_FAUCET_CHAINS = "84532"
+SUBMITTER_FAUCET_ADDRESS_84532 = "0x8846edc0bb0181b8b92c295cd3405a6914fbdb69"
 
 [[env.staging.durable_objects.bindings]]
 name = "SUBMITTER_QUEUE"
@@ -126,6 +132,7 @@ enabled = false
 [env.production.vars]
 SUBMITTER_CHAINS = "84532"
 SUBMITTER_FAUCET_CHAINS = "84532"
+SUBMITTER_FAUCET_ADDRESS_84532 = "0x194b23b695c9a20949ca321615678bd6cac651e9"
 
 [[env.production.durable_objects.bindings]]
 name = "SUBMITTER_QUEUE"
