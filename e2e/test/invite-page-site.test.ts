@@ -5,9 +5,11 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { CSP, headersFor } from './headers.js';
+import { INSTALL_AND_ACCEPT_TEMPLATE } from '../../apps/invite/src/prompt.js';
+import { CSP, headersFor } from './invite/headers.js';
 
-const site = (path: string): string => fileURLToPath(new URL(`../site/${path}`, import.meta.url));
+const site = (path: string): string =>
+  fileURLToPath(new URL(`../../apps/invite/site/${path}`, import.meta.url));
 const read = (path: string): string => readFileSync(site(path), 'utf8');
 
 describe('_headers', () => {
@@ -68,7 +70,7 @@ describe('the pages', () => {
       });
 
       it('sends no referrer even where headers are lost', () => {
-        expect(html).toMatch(/<meta name="referrer" content="no-referrer">/);
+        expect(html).toMatch(/<meta name="referrer" content="no-referrer"\s*\/?>/);
       });
 
       it('has the elements the script fills, and the prompt section apart from the inviter', () => {
@@ -115,5 +117,15 @@ describe('the pages', () => {
       .sort();
     expect(files).toEqual(['_headers', 'i/index.html', 'index.html']);
     expect(existsSync(site('invite.js'))).toBe(false); // built, never committed
+  });
+});
+
+describe('the prompt', () => {
+  it('is the install-and-accept template of the skill file (06 §7.1)', () => {
+    const skill = readFileSync(
+      fileURLToPath(new URL('../../skills/agentlink/SKILL.md', import.meta.url)),
+      'utf8',
+    );
+    expect(skill).toContain(`> ${INSTALL_AND_ACCEPT_TEMPLATE}`);
   });
 });

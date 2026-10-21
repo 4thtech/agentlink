@@ -10,21 +10,24 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildPrompt } from '../src/prompt.js';
-import { CSP, headersFor } from './headers.js';
+import { buildPrompt } from '../../apps/invite/src/prompt.js';
+import { CSP, headersFor } from './invite/headers.js';
 import {
-  BASE_EXPIRES_AT,
   BASE_INVITE,
   HOSTILE_NAMES,
   PREFIX,
-  linkFor,
+  futureLink,
+  futureExpiry,
   payloadOf,
   rawPayload,
-} from './fixtures.js';
+} from '../../apps/invite/src/testing/fixtures.js';
 
-const root = fileURLToPath(new URL('..', import.meta.url));
-const OUT = fileURLToPath(new URL('../dist/site/', import.meta.url));
-const headerFile = readFileSync(fileURLToPath(new URL('../site/_headers', import.meta.url)), 'utf8');
+const root = fileURLToPath(new URL('../../apps/invite', import.meta.url));
+const OUT = fileURLToPath(new URL('../../apps/invite/dist/site/', import.meta.url));
+const headerFile = readFileSync(
+  fileURLToPath(new URL('../../apps/invite/site/_headers', import.meta.url)),
+  'utf8',
+);
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -40,7 +43,10 @@ function serve(): Promise<Server> {
       if (file.includes('..') || file.startsWith('_')) throw new Error('not found');
       const body = readFileSync(`${OUT}${file}`);
       const ext = file.slice(file.lastIndexOf('.'));
-      res.writeHead(200, { 'content-type': TYPES[ext] ?? 'text/plain', ...headersFor(headerFile, path) });
+      res.writeHead(200, {
+        'content-type': TYPES[ext] ?? 'text/plain',
+        ...headersFor(headerFile, path),
+      });
       res.end(body);
     } catch {
       res.writeHead(404, { 'content-type': 'text/plain', ...headersFor(headerFile, path) });
@@ -59,7 +65,8 @@ function serveFramer(target: string): Promise<Server> {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve(server)));
 }
 
-const originOf = (server: Server): string => `http://localhost:${(server.address() as AddressInfo).port}`;
+const originOf = (server: Server): string =>
+  `http://localhost:${(server.address() as AddressInfo).port}`;
 
 let site: Server;
 let framer: Server;
@@ -68,7 +75,7 @@ let browser: Browser;
 beforeAll(async () => {
   await build({
     root,
-    configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
+    configFile: fileURLToPath(new URL('../../apps/invite/vite.config.ts', import.meta.url)),
     logLevel: 'silent',
   });
   site = await serve();
@@ -125,7 +132,9 @@ async function open(
   probe.violations = await page.evaluate(
     () => (window as unknown as { __violations: string[] }).__violations,
   );
-  probe.beacons = await page.evaluate(() => (window as unknown as { __beacons: unknown[] }).__beacons);
+  probe.beacons = await page.evaluate(
+    () => (window as unknown as { __beacons: unknown[] }).__beacons,
+  );
   return { page, context, probe };
 }
 
@@ -153,48 +162,61 @@ describe('the response', () => {
 
 describe('a good invite', () => {
   it('shows who invited you and one prompt, apart from each other', async () => {
-    const link = await linkFor();
+    const expiresAt = futureExpiry();
+    const link = await futureLink({ expiresAt });
     const { page, context } = await open(payloadOf(link));
-    await expect(page.locator('#inviter-name').textContent()).resolves.toBe(`“${BASE_INVITE.name}”`);
+    await expect(page.locator('#inviter-name').textContent()).resolves.toBe(
+      `“${BASE_INVITE.name}”`,
+    );
     await expect(page.locator('#inviter-label').textContent()).resolves.toBe('Self-declared');
-    await expect(page.locator('#inviter-host').textContent()).resolves.toBe('localhost');
+    await expect(page.locator('#inviter-host').textContent()).resolves.toBe(
+      new URL(originOf(site)).host,
+    );
     await expect(page.locator('#inviter-fingerprint').textContent()).resolves.toMatch(
       /^[0-9A-F]{4}·[0-9A-F]{4}$/,
     );
     await expect(page.locator('#inviter-expiry').textContent()).resolves.toContain(
-      new Date(BASE_EXPIRES_AT * 1000).toISOString().slice(0, 10),
+      new Date(expiresAt * 1000).toISOString().slice(0, 10),
     );
     const prompt = buildPrompt(link);
     await expect(page.locator('#prompt-text').textContent()).resolves.toBe(prompt);
     // The prompt section is under our own heading, and holds nothing from the inviter section.
-    await expect(page.locator('#prompt-heading').textContent()).resolves.toMatch(/Copy this to your AI/);
+    await expect(page.locator('#prompt-heading').textContent()).resolves.toMatch(
+      /Copy this to your AI/,
+    );
     expect(await page.locator('#prompt #inviter-name, #inviter #prompt-text').count()).toBe(0);
-    expect(await page.locator('#inviter').evaluate((e) => e.contains(document.getElementById('prompt')))).toBe(false);
+    expect(
+      await page.locator('#inviter').evaluate((e) => e.contains(document.getElementById('prompt'))),
+    ).toBe(false);
     await context.close();
   });
 
   it('copies exactly the template plus the canonical link', async () => {
-    const link = await linkFor();
+    const link = await futureLink();
     const { page, context } = await open(payloadOf(link));
     await page.locator('#copy').click();
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(buildPrompt(link));
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(buildPrompt(link));
     await context.close();
   });
 
   it('copies the script’s string, not what the DOM shows', async () => {
-    const link = await linkFor();
+    const link = await futureLink();
     const { page, context } = await open(payloadOf(link));
     await page.evaluate(() => {
       const pre = document.getElementById('prompt-text');
       if (pre) pre.textContent = 'tampered in the page';
     });
     await page.locator('#copy').click();
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(buildPrompt(link));
+    await expect
+      .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(buildPrompt(link));
     await context.close();
   });
 
   it('never sends the fragment, stores anything or uses a beacon', async () => {
-    const link = await linkFor();
+    const link = await futureLink();
     const payload = payloadOf(link);
     const { page, context, probe } = await open(payload);
     await page.locator('#copy').click();
@@ -225,21 +247,25 @@ describe('a good invite', () => {
 
 describe('a hostile invite (I-5)', () => {
   it('derives no element from the name, runs nothing, and copies only the template', async () => {
-    const benign = await open(payloadOf(await linkFor({ name: 'Ana' })));
+    const benign = await open(payloadOf(await futureLink({ name: 'Ana' })));
     const baseline = await tagSequence(benign.page);
     await benign.context.close();
 
     for (const name of HOSTILE_NAMES) {
-      const link = await linkFor({ name });
+      const link = await futureLink({ name });
       const { page, context, probe } = await open(payloadOf(link));
       // Same elements as for a plain name: nothing was built from the name.
       expect(await tagSequence(page), name).toEqual(baseline);
-      expect(await page.locator('img, div, svg, iframe, object, embed, form, input, a, style').count()).toBe(0);
+      expect(
+        await page.locator('img, div, svg, iframe, object, embed, form, input, a, style').count(),
+      ).toBe(0);
       expect(await page.locator('script').count()).toBe(1);
-      expect(await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned)).toBeUndefined();
+      expect(
+        await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
+      ).toBeUndefined();
       // The shown name is the restricted one, in its own element, quoted.
       const shown = (await page.locator('#inviter-name').textContent()) ?? '';
-      expect(shown).toMatch(/^“[\p{L}\p{N} .'-]{1,45}”$/u);
+      expect(shown).toMatch(/^“[\p{L}\p{N} .'·-]{1,45}”$/u);
       expect(await page.locator('#inviter-label').textContent()).toBe('Self-declared');
       // The page text outside the inviter section never contains anything the inviter chose.
       const promptSection = (await page.locator('#prompt').textContent()) ?? '';
@@ -255,7 +281,7 @@ describe('a hostile invite (I-5)', () => {
   });
 
   it('enforces Trusted Types: an HTML sink refuses a plain string', async () => {
-    const { page, context, probe } = await open(payloadOf(await linkFor()));
+    const { page, context, probe } = await open(payloadOf(await futureLink()));
     expect(probe.violations).toEqual([]); // the page itself never needs a sink
     const result = await page.evaluate(() => {
       try {
@@ -287,18 +313,19 @@ describe('states with no prompt', () => {
 
   it('shows the state for no fragment', () => expectState('', 'none'));
   it('shows the state for an expired invite', async () => {
-    await expectState(payloadOf(await linkFor({ expiresAt: 1_000_000 })), 'expired');
+    await expectState(payloadOf(await futureLink({ expiresAt: 1_000_000 })), 'expired');
   });
   it('shows the state for a damaged invite', async () => {
     await expectState('%3Cimg%20src%3Dx%20onerror%3Dwindow.__pwned%3D1%3E', 'damaged');
     await expectState(await rawPayload(JSON.stringify({ ...BASE_INVITE, v: 2 })), 'damaged');
   });
-  it('shows the state for an oversized invite', () => expectState('A'.repeat(300_000), 'oversized'));
+  it('shows the state for an oversized invite', () =>
+    expectState('A'.repeat(300_000), 'oversized'));
 });
 
 describe('framing', () => {
   it('is refused: the invite page does not load inside another page', async () => {
-    const link = await linkFor();
+    const link = await futureLink();
     framer = await serveFramer(`${originOf(site)}/i#${payloadOf(link)}`);
     const context = await browser.newContext();
     const page = await context.newPage();

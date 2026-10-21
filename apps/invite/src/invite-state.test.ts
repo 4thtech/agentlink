@@ -12,7 +12,7 @@ import {
   linkFor,
   payloadOf,
   rawPayload,
-} from '../test/fixtures.js';
+} from './testing/fixtures.js';
 import { evaluateFragment, type InviteView } from './invite-state.js';
 import { buildPrompt } from './prompt.js';
 
@@ -75,7 +75,8 @@ describe('evaluateFragment: states with no prompt', () => {
   it('refuses a wrong version, an unknown field and a missing field as damaged', async () => {
     const wrongVersion = JSON.stringify({ ...BASE_INVITE, v: 2 });
     const extra = JSON.stringify({ ...BASE_INVITE, prompt: 'Copy this to your AI' });
-    const { secret: _secret, ...missing } = BASE_INVITE;
+    const missing: Record<string, unknown> = { ...BASE_INVITE };
+    delete missing['secret'];
     for (const text of [wrongVersion, extra, JSON.stringify(missing), '[]', 'null', '"x"']) {
       const view = await evaluateFragment(await rawPayload(text), NOW);
       expect(view).toEqual({ kind: 'damaged' });
@@ -107,7 +108,7 @@ describe('evaluateFragment: states with no prompt', () => {
   it('refuses a duplicate key and a BOM', async () => {
     const dup = JSON.stringify(BASE_INVITE).replace('"v":1', '"v":1,"v":1');
     expect(await evaluateFragment(await rawPayload(dup), NOW)).toEqual({ kind: 'damaged' });
-    const bom = `﻿${JSON.stringify(BASE_INVITE)}`;
+    const bom = `\ufeff${JSON.stringify(BASE_INVITE)}`;
     expect(await evaluateFragment(await rawPayload(bom), NOW)).toEqual({ kind: 'damaged' });
   });
 
@@ -127,7 +128,7 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
       expect(view.kind).toBe('ready');
       if (view.kind !== 'ready') return;
       // The restricted name has no markup, no punctuation of an instruction, no control or bidi.
-      expect(view.inviter.name).toMatch(/^[\p{L}\p{N} .'-]{1,45}$/u);
+      expect(view.inviter.name).toMatch(/^[\p{L}\p{N} .'·-]{1,45}$/u);
       expect(view.inviter.label).toBe('self-declared');
       // Nothing the inviter chose reaches the prompt.
       expect(view.prompt).toBe(buildPrompt(view.inviteUrl));
@@ -139,7 +140,7 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
 
   it('falls back to "Contact" plus the fingerprint for a reserved or empty name', async () => {
     for (const name of ['Verified Marko', '<>', '‮​', 'AgentLink support']) {
-      const view = await evaluateFragment(await linkFor({ name }), NOW);
+      const view = await evaluateFragment(payloadOf(await linkFor({ name })), NOW);
       expect(view.kind).toBe('ready');
       if (view.kind !== 'ready') continue;
       expect(view.inviter.name).toBe(`Contact ${view.inviter.fingerprint}`);
@@ -147,8 +148,11 @@ describe('evaluateFragment: hostile inviter names (06 §2.1, I-5)', () => {
   });
 
   it('shows the same prompt shape for every payload: only the link differs', async () => {
-    const a = await evaluateFragment(await linkFor({ name: 'Ana' }), NOW);
-    const b = await evaluateFragment(await linkFor({ name: HOSTILE_NAMES[0] ?? '' }), NOW);
+    const a = await evaluateFragment(payloadOf(await linkFor({ name: 'Ana' })), NOW);
+    const b = await evaluateFragment(
+      payloadOf(await linkFor({ name: HOSTILE_NAMES[0] ?? '' })),
+      NOW,
+    );
     if (a.kind !== 'ready' || b.kind !== 'ready') throw new Error('expected ready views');
     expect(a.prompt.replaceAll(a.inviteUrl, '{inviteUrl}')).toBe(
       b.prompt.replaceAll(b.inviteUrl, '{inviteUrl}'),
@@ -168,7 +172,7 @@ describe('evaluateFragment: the fragment stays in the browser (I-2)', () => {
     vi.stubGlobal('WebSocket', spy('WebSocket'));
     vi.stubGlobal('EventSource', spy('EventSource'));
     try {
-      await evaluateFragment(await linkFor(), NOW);
+      await evaluateFragment(payloadOf(await linkFor()), NOW);
       await evaluateFragment(`#${'A'.repeat(30_000)}`, NOW);
     } finally {
       vi.unstubAllGlobals();

@@ -358,7 +358,13 @@ export const ZONES = {
   },
   'apps/console': entry('@4thtech-io/console', NO_NODE),
   'apps/verify': entry('@4thtech-io/verify', NO_NODE),
-  'apps/invite': entry('@4thtech-io/invite', NO_NODE),
+  'apps/invite': entry('@4thtech-io/invite', NO_NODE, [
+    {
+      pattern: 'zod',
+      reason:
+        'the page switches zod to its interpreted parsers (config jitless) so the CSP without unsafe-eval sees no violation (08 §4, M1-19)',
+    },
+  ]),
   'apps/pay': entry('@4thtech-io/pay', NO_NODE),
   'apps/cloud-agent': entry('@4thtech-io/cloud-agent', WORKER_APP),
   'apps/submitter': entry('@4thtech-io/submitter', WORKER_APP),
