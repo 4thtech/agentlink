@@ -1673,11 +1673,20 @@ describe('the recipient drops a Record whose parent is another signer’s (04 §
     await expectDroppedParent(out, acks);
   });
 
-  it('a parent the chain does not hold is dropped and logged: no receipt', async () => {
+  it('a parent the chain does not show (yet) is kept pending, never flagged, then dropped unchecked', async () => {
     const out = await received(() => Promise.resolve(`0x${'ab'.repeat(32)}`));
     const acks = chain.calls.acknowledge;
-    await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
-    await expectDroppedParent(out, acks);
+    const sent = await sendProofEnvelope(out.a, out.b, bodyOf(out.rec, out.envelopeId));
+    expect(sent.result.reports).toEqual([]);
+    expect(await receipts(out.b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(acks);
+    expect(await pendingRows(out.b)).toHaveLength(1);
+    expect(logged(out.b, 'proof_parent_mismatch')).toBe(false);
+    clock.t += 7 * 86_400 + 1;
+    expect((await out.b.client.proofs.processInbound([])).reports).toEqual([]);
+    expect(await pendingRows(out.b)).toEqual([]);
+    expect(logged(out.b, 'proof_unchecked')).toBe(true);
+    expect(await out.b.client.getProof({ envelopeId: out.envelopeId })).toBeUndefined();
   });
 
   it('a failed parent read signs no receipt and is tried again at the next sync (then dropped)', async () => {
@@ -1910,5 +1919,110 @@ describe('each contact has a share of the pending pool (04 §3.4, M1-7g-c)', () 
     await deliver(a, b);
     expect((await pendingRows(b)).some((r) => r.envelope_id === fromA)).toBe(true);
     expect(logged(b, 'proof_unchecked')).toBe(false);
+  });
+});
+
+describe('only a definite contradiction flags; not-yet and unknown cases are retried (IR-M1-7g-c-1)', () => {
+  const envelopeRow = (agent: Agent, envelopeId: string) =>
+    agent.store.transaction((tx) => tx.get('envelopes', { envelope_id: envelopeId }));
+
+  it('(a) a record the chain does not show yet: pending, no flag; stored once it is visible', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { put: false });
+    const sent = await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(sent.result.reports).toEqual([]);
+    expect((await envelopeRow(b, sent.proofEnvelopeId))?.state).toBe('ok');
+    expect(await pendingRows(b)).toHaveLength(1);
+    expect(logged(b, 'proof_mismatch')).toBe(false);
+    chain.put(rec.built.record);
+    expect((await b.client.proofs.processInbound([])).reports).toEqual([]);
+    expect(await pendingRows(b)).toEqual([]);
+    expect(await b.client.getProof({ envelopeId })).toMatchObject({ recordId: rec.recordId });
+  });
+
+  it('(b) a chain this agent does not know: pending, no flag, dropped unchecked after 7 days', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const sent = await sendProofEnvelope(a, b, { ...bodyOf(rec, envelopeId), chainId: 999_999 });
+    expect(sent.result.reports).toEqual([]);
+    expect((await envelopeRow(b, sent.proofEnvelopeId))?.state).toBe('ok');
+    expect(await pendingRows(b)).toHaveLength(1);
+    clock.t += 7 * 86_400 + 1;
+    expect((await b.client.proofs.processInbound([])).reports).toEqual([]);
+    expect(await pendingRows(b)).toEqual([]);
+    expect(logged(b, 'proof_mismatch')).toBe(false);
+    expect((await envelopeRow(b, sent.proofEnvelopeId))?.state).toBe('ok');
+  });
+
+  it('(c) the message is not ok yet (still received): pending, no flag; stored once it is ok', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE);
+    const { built, row } = await a.client.envelopes.prepare({
+      to: { contact: b.id },
+      payload: {
+        type: 'proof',
+        body: { chainId: chain.config.chainId, ...bodyOf(rec, envelopeId) } as never,
+        replyTo: envelopeId,
+        files: [],
+      },
+    });
+    await a.store.transaction((tx) => tx.insert('envelopes', row));
+    await b.client.envelopes.receive({ envelope: built.envelope });
+    const reports = await b.client.envelopes.processReceived();
+    // The message is back to `received` when the proof is checked (e.g. a terms offer waiting).
+    await b.store.transaction((tx) =>
+      tx.update('envelopes', { envelope_id: envelopeId }, { state: 'received' }),
+    );
+    expect((await b.client.proofs.processInbound(reports)).reports).toEqual([]);
+    expect((await envelopeRow(b, built.envelope.id))?.state).toBe('ok');
+    expect(await pendingRows(b)).toHaveLength(1);
+    expect(logged(b, 'proof_mismatch')).toBe(false);
+    await b.store.transaction((tx) =>
+      tx.update('envelopes', { envelope_id: envelopeId }, { state: 'ok' }),
+    );
+    expect((await b.client.proofs.processInbound([])).reports).toEqual([]);
+    expect(await b.client.getProof({ envelopeId })).toMatchObject({ recordId: rec.recordId });
+  });
+
+  it('an answered read that contradicts the body (another struct hash on-chain) still flags', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { put: false });
+    chain.put({ ...rec.built.record, deadline: rec.built.record.deadline + 1 });
+    const sent = await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(sent.result.reports).toEqual([
+      {
+        envelopeId: sent.proofEnvelopeId,
+        outcome: 'refused',
+        reason: 'proof_mismatch',
+        contactId: a.id,
+        flagged: true,
+      },
+    ]);
+    expect((await envelopeRow(b, sent.proofEnvelopeId))?.state).toBe('refused');
+  });
+
+  it('a pending row whose proof envelope was refused meanwhile is removed, not checked', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const rec = await signedRecordOf(a, b, envelopeId, RECORD_KIND.MESSAGE, { put: false });
+    const sent = await sendProofEnvelope(a, b, bodyOf(rec, envelopeId));
+    expect(await pendingRows(b)).toHaveLength(1);
+    // A concurrent pass refused the proof envelope after this row was written.
+    await b.store.transaction((tx) =>
+      tx.update(
+        'envelopes',
+        { envelope_id: sent.proofEnvelopeId },
+        { state: 'refused', refused_reason: 'proof_mismatch', refused_at: clock.t },
+      ),
+    );
+    chain.put(rec.built.record);
+    expect((await b.client.proofs.processInbound([])).reports).toEqual([]);
+    expect(await pendingRows(b)).toEqual([]);
+    expect(await b.client.getProof({ envelopeId })).toBeUndefined();
+    expect(await receipts(b)).toEqual([]);
   });
 });

@@ -1024,8 +1024,13 @@ export class ProofService implements RecordLookup {
   async #recheck(row: Row<'proofs'>, flags: InboundReport[]): Promise<number> {
     const proofEnvelopeId = row.record_id.slice(PENDING_PREFIX.length);
     const envelope = await this.#envelope(proofEnvelopeId);
-    if (envelope?.contact_id == null || !row.record_id.startsWith(PENDING_PREFIX)) {
-      // The proof envelope is gone (pruned or removed with its contact): nothing left to check.
+    if (
+      envelope?.contact_id == null ||
+      envelope.state !== 'ok' ||
+      !row.record_id.startsWith(PENDING_PREFIX)
+    ) {
+      // The proof envelope is gone (pruned or removed with its contact) or was refused by a
+      // concurrent pass (an orphan row, IR-M1-7g-c-1): nothing left to check.
       await this.#ctx.store.transaction((tx) =>
         tx.delete('proofs', { record_id: row.record_id, status: PENDING }),
       );
@@ -1049,6 +1054,8 @@ export class ProofService implements RecordLookup {
     const empty = await seal(this.#ctx, 'proofs', 'salt', [key], '');
     const kept = await this.#ctx.store.transaction((tx) => {
       if (tx.get('proofs', { record_id: key }) !== undefined) return 'kept';
+      // Refused by a concurrent pass in the meantime: no orphan row (IR-M1-7g-c-1).
+      if (tx.get('envelopes', { envelope_id: proofEnvelopeId })?.state !== 'ok') return 'gone';
       const pending = tx.select('proofs', { status: PENDING });
       if (pending.length >= MAX_PENDING) return 'full';
       // The contact's share (M1-7g-c): a pending row belongs to the contact of its proof envelope.
@@ -1057,7 +1064,7 @@ export class ProofService implements RecordLookup {
         const proofEnvelope = tx.get('envelopes', {
           envelope_id: r.record_id.slice(PENDING_PREFIX.length),
         });
-        if (proofEnvelope?.contact_id === contactId) mine += 1;
+        if (proofEnvelope?.state === 'ok' && proofEnvelope.contact_id === contactId) mine += 1;
       }
       if (mine >= PROOF_PENDING_PER_CONTACT) return 'full';
       tx.insert('proofs', {
@@ -1267,8 +1274,16 @@ export class ProofService implements RecordLookup {
    * is the contact, its envelope hash is the stored envelope's (from that contact, to us), its kind
    * is the 05 §3.1 kind of the payload held, and its commitment opens to this agent. With a signed
    * Record in the body (D-107), checks 1–5 of 04 §3.4 as well: the local ones before any read, so a
-   * definite mismatch never waits on the chain. Only a read that fails is `unavailable`; anything
-   * else that does not match is `mismatch`.
+   * definite mismatch never waits on the chain.
+   *
+   * Definite (`mismatch`, the contact is flagged; M1-7g-c, IR-M1-7g-c-1): the body contradicts the
+   * message held from this contact (checks 1, 2 and 4 on the signed Record), or an answered read of
+   * a record that exists contradicts it (signer, kind, envelope hash, commitment, struct hash,
+   * signature, or a parent that exists and has another signer). Everything else is `unavailable`
+   * (kept pending, checked again, dropped unchecked after 7 days, never flagged): a read that fails,
+   * a record or parent not visible yet (zero signer or timestamp, or none), a chain this agent does
+   * not know, and local state that is not ready (the message not `ok` yet, its payload not held, a
+   * kind this build does not map, a card lookup that fails).
    */
   async #checkRecord(
     contactId: string,
@@ -1278,21 +1293,20 @@ export class ProofService implements RecordLookup {
     salt: string,
     signedItem: { readonly record: RecordJson; readonly signature: string } | undefined,
   ): Promise<RecordCheck> {
+    // A chain this agent does not know (config or version skew): never a flag.
     const chain = this.#chain(chainId);
-    if (chain === undefined) return MISMATCH;
+    if (chain === undefined) return UNAVAILABLE;
     const target = await this.#envelope(envelopeId);
-    if (
-      target === undefined ||
-      target.direction !== 'in' ||
-      target.state !== 'ok' ||
-      target.contact_id !== contactId
-    ) {
+    // The body names a message this contact did not send to this agent: a contradiction.
+    if (target === undefined || target.direction !== 'in' || target.contact_id !== contactId) {
       return MISMATCH;
     }
+    // Local state not ready (still `received`, e.g. a terms offer waiting for a link): retried.
+    if (target.state !== 'ok') return UNAVAILABLE;
     const payload = await this.#payload(target);
-    if (payload === undefined) return MISMATCH;
+    if (payload === undefined) return UNAVAILABLE;
     const kind = this.#kit.recordKindForPayload(payload);
-    if (kind === null) return MISMATCH;
+    if (kind === null) return UNAVAILABLE;
     const self = await this.#self();
     const contact = contactId.toLowerCase();
     const heldHash = target.envelope_hash.toLowerCase();
@@ -1325,7 +1339,7 @@ export class ProofService implements RecordLookup {
           return MISMATCH;
         }
       } catch {
-        return MISMATCH;
+        return UNAVAILABLE;
       }
       try {
         structHash = encodeHex0x(hashRecord(occV2Domain(chainId, notary), r).structHash);
@@ -1350,7 +1364,8 @@ export class ProofService implements RecordLookup {
       return UNAVAILABLE;
     }
     const signer = String(state.signer).toLowerCase();
-    if (signer === ZERO_ADDRESS || state.timestamp === 0n) return MISMATCH;
+    // Not visible yet (a lagging RPC, a reorg, a record sent before it was confirmed): retried.
+    if (signer === ZERO_ADDRESS || state.timestamp === 0n) return UNAVAILABLE;
     if (signer !== contact) return MISMATCH;
     if (Number(state.kind) !== kind) return MISMATCH;
     const envelopeHash = String(state.envelopeHash).toLowerCase();
@@ -1375,9 +1390,9 @@ export class ProofService implements RecordLookup {
         } catch {
           return UNAVAILABLE;
         }
-        if (parent === null || String(parent.signer).toLowerCase() !== r.signer) {
-          return PARENT_MISMATCH;
-        }
+        // A parent not visible yet is retried; one that exists with another signer is definite.
+        if (parent === null || /^0x0*$/.test(String(parent.signer))) return UNAVAILABLE;
+        if (String(parent.signer).toLowerCase() !== r.signer) return PARENT_MISMATCH;
       }
     }
     return {
