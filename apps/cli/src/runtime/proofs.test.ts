@@ -162,6 +162,7 @@ describe('nodeProofs: the default chain set (M1-3j-b)', () => {
         .map((c) => c.chainId),
     );
     expect(ids).toContain(84532);
+    expect(ids).not.toContain(10200);
   });
 });
 

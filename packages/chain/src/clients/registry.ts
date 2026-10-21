@@ -101,7 +101,7 @@ export function chainRegistry(): readonly ChainConfig[] {
 
 /**
  * The registry chains that automatic selection and the default proof platform may use: in this
- * testnet release, exactly those the testnet faucet serves (`isFaucetChain`, the hard-coded
+ * testnet release, exactly the testnets the testnet faucet serves (`isFaucetChain`, the hard-coded
  * allowlist in fees/faucet.ts). An unfunded payer is routed to the cheapest chain (07 §6.3; at an
  * equal fee, the lower chain ID), so a chain the faucet does not serve would leave them with no way
  * to get credits. Every registry chain stays available to an explicit override and to verification.
@@ -112,7 +112,15 @@ export function chainRegistry(): readonly ChainConfig[] {
  * (M3-2a) need their own rule here: no faucet serves them.
  */
 export function autoSelectableChains(): readonly ChainConfig[] {
-  return chainRegistry().filter((c) => isFaucetChain(c.chainId));
+  return autoSelectableFrom(chainRegistry());
+}
+
+/**
+ * The selection rule over any chain list: a testnet the faucet serves. Fails closed on a non-testnet
+ * entry even if its ID were ever on the faucet allowlist. Internal (not re-exported); tested directly.
+ */
+export function autoSelectableFrom(chains: readonly ChainConfig[]): readonly ChainConfig[] {
+  return chains.filter((c) => c.testnet && isFaucetChain(c.chainId));
 }
 
 /** The config for `chainId`, or undefined when this release does not support it. */

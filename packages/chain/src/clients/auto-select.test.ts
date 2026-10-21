@@ -11,6 +11,7 @@ import type { FeeQuote } from '../fees/index.js';
 import { buildDepositFor, isFaucetChain } from '../fees/faucet.js';
 import { pickChain, type ChainFunding, type FundingDetection } from '../select/index.js';
 import { autoSelectableChains, chainRegistry, getChainConfig } from './index.js';
+import { autoSelectableFrom } from './registry.js';
 
 vi.mock('../fees/faucet.js', async (importOriginal) => {
   const real = await importOriginal<typeof import('../fees/faucet.js')>();
@@ -101,5 +102,13 @@ describe('automatic selection once the faucet serves Gnosis Chiado (M1-3j-b)', (
       status: 'ok',
       chainId: 10200,
     });
+  });
+
+  it('fails closed on a non-testnet entry, even with its chain ID on the faucet allowlist', () => {
+    const chiado = getChainConfig(10200) as ChainConfig;
+    const asMainnet: ChainConfig = { ...chiado, testnet: false };
+    expect(isFaucetChain(asMainnet.chainId)).toBe(true);
+    expect(autoSelectableFrom([asMainnet]).map((c) => c.chainId)).toEqual([]);
+    expect(autoSelectableFrom([asMainnet, chiado]).map((c) => c.chainId)).toEqual([10200]);
   });
 });
