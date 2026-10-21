@@ -17,6 +17,8 @@ export class FakeFaucet implements FaucetChain {
   readonly faucetAddress: Hex;
   /** What the next credits answer: sent (default), not sent before any broadcast, or unknown. */
   mode: 'sent' | 'not_sent' | 'unknown' = 'sent';
+  /** Why a `not_sent` credit sent nothing. */
+  notSentReason: Extract<FaucetCredit, { state: 'not_sent' }>['reason'] = 'faucet_empty';
   /** Called at the start of every credit, before it answers (to look at storage then). */
   onCredit: (() => void | Promise<void>) | null = null;
   /** Every call, in order, with its outcome. */
@@ -33,7 +35,7 @@ export class FakeFaucet implements FaucetChain {
     // Yield, so concurrent claims really interleave unless the Durable Object serialises them.
     await new Promise((resolve) => setTimeout(resolve, 5));
     this.calls.push({ agent, usdCents, outcome: this.mode });
-    if (this.mode === 'not_sent') return { state: 'not_sent', reason: 'faucet_empty' };
+    if (this.mode === 'not_sent') return { state: 'not_sent', reason: this.notSentReason };
     this.counter += 1;
     const txHash = `0x${this.counter.toString(16).padStart(64, 'e')}` as Hex;
     if (this.mode === 'unknown') return { state: 'unknown', txHash };

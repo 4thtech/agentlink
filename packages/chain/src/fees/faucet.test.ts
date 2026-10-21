@@ -19,6 +19,7 @@ import type { ChainConfig } from '../config/index.js';
 import type { Hex } from '../ids/index.js';
 import {
   FAUCET_CHAIN_IDS,
+  FAUCET_MAX_GAS,
   FAUCET_MAX_USD_CENTS,
   buildDepositFor,
   createFaucetChain,
@@ -44,6 +45,8 @@ interface MockChain {
   allowance: bigint;
   gasBalance: bigint;
   nonce: number;
+  /** The `pending` nonce when it differs from the `latest` one (a transaction still in the mempool). */
+  pendingNonce?: number;
   estimate: bigint;
   /** What `eth_estimateGas` answers for a `depositFor` (it reverts while the allowance is short). */
   depositEstimate: bigint;
@@ -100,8 +103,10 @@ function mockFetch(chain: MockChain) {
         return reply(`0x${chain.chainId.toString(16)}`);
       case 'eth_getBalance':
         return reply(`0x${chain.gasBalance.toString(16)}`);
-      case 'eth_getTransactionCount':
-        return reply(`0x${chain.nonce.toString(16)}`);
+      case 'eth_getTransactionCount': {
+        const n = p[1] === 'pending' ? (chain.pendingNonce ?? chain.nonce) : chain.nonce;
+        return reply(`0x${n.toString(16)}`);
+      }
       case 'eth_maxPriorityFeePerGas':
         return reply('0x3b9aca00');
       case 'eth_getBlockByNumber':
@@ -431,5 +436,85 @@ describe('createFaucetChain().credit', () => {
     await expect(port.credit(`0x${'0'.repeat(40)}` as Hex, 100)).rejects.toThrow();
     expect(chain.methods).toEqual([]);
     expect(FAUCET_MAX_USD_CENTS).toBeLessThanOrEqual(1_000);
+  });
+});
+
+describe('createFaucetChain().credit robustness (M1-10b-c)', () => {
+  it('with a stuck approve (pending nonce above latest), a claim that needs an approve is refused at once and sends nothing', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({ state: 'not_sent', reason: 'busy' });
+    expect(chain.attempted).toEqual([]);
+    expect(chain.methods).not.toContain('eth_sendRawTransaction');
+    expect(chain.methods).not.toContain('eth_estimateGas');
+  });
+
+  it('reads both the latest and the pending nonce before an approve', async () => {
+    const chain = newChain();
+    const tags: unknown[] = [];
+    const fetchFn = mockFetch(chain);
+    const spy = vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const req = JSON.parse(String(init?.body)) as { method: string; params: unknown[] };
+      if (req.method === 'eth_getTransactionCount') tags.push(req.params[1]);
+      return fetchFn(url, init);
+    });
+    Object.defineProperty(spy, ADDRESS_CHECKED, { value: true });
+    const port = createFaucetChain(config, {
+      fetchFn: spy as unknown as typeof fetch,
+      faucetKey: FAUCET_KEY,
+      rpcUrls: [RPC_URL],
+      timeoutMs: 1000,
+      receiptPollMs: 1,
+      receiptTimeoutMs: 40,
+    });
+    expect((await port.credit(AGENT, 100)).state).toBe('sent');
+    expect(tags).toContain('latest');
+    expect(tags).toContain('pending');
+  });
+
+  it('once the stuck approve is mined (nonces equal again), the next claim goes through', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8 });
+    const port = faucet(chain);
+    expect(await port.credit(AGENT, 100)).toEqual({ state: 'not_sent', reason: 'busy' });
+    chain.nonce = 8;
+    chain.pendingNonce = undefined;
+    expect((await port.credit(AGENT, 100)).state).toBe('sent');
+    expect(decodeSent(chain.sent[0]?.raw as Hex).tx.nonce).toBe(8);
+  });
+
+  it('caps the depositFor gas: at most FAUCET_MAX_GAS (300k)', () => {
+    expect(FAUCET_MAX_GAS).toBe(300_000n);
+  });
+
+  it('a depositFor simulation above the cap is rejected and sends nothing (no clamping)', async () => {
+    const chain = newChain({ allowance: ONE_USDC, depositEstimate: 300_000n - 25_000n + 1n });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'unavailable',
+    });
+    expect(chain.attempted).toEqual([]);
+  });
+
+  it('a depositFor simulation exactly at the cap is sent with the cap as its limit', async () => {
+    const chain = newChain({ allowance: ONE_USDC, depositEstimate: 300_000n - 25_000n });
+    expect((await faucet(chain).credit(AGENT, 100)).state).toBe('sent');
+    expect(decodeSent(chain.sent[0]?.raw as Hex).tx.gas).toBe(300_000n);
+  });
+
+  it('a runaway depositFor simulation after the approve sends no depositFor', async () => {
+    const chain = newChain({ depositEstimate: 10_000_000n });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'unavailable',
+    });
+    expect(chain.sent.map((s) => decodeSent(s.raw).functionName)).toEqual(['approve']);
+  });
+
+  it('an approve simulation above the cap is rejected and sends nothing', async () => {
+    const chain = newChain({ estimate: 10_000_000n });
+    expect(await faucet(chain).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'unavailable',
+    });
+    expect(chain.attempted).toEqual([]);
   });
 });
