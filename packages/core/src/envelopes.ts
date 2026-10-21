@@ -216,6 +216,8 @@ export interface InboundReport {
    * it. Never set for a sender that is not a contact.
    */
   readonly flagged: boolean;
+  /** For an applied `revoke`: its activity line, counts only (07 §3.2, §3.4; M1-7h-b). */
+  readonly revoke?: RevokeActivity;
 }
 
 /**
@@ -265,14 +267,30 @@ export interface ReceiveResult {
 }
 
 /**
- * A verified `revoke` (04 §3.4.1, 07 §3.4; M1-7h): `effect` runs inside the store transaction that
- * stores the revoke envelope and returns `noop` when the agent is already revoked (a re-published
- * copy: nothing is stored).
+ * What applying a `revoke` changed, for the activity feed (07 §3.2 "The activity feed reports it";
+ * M1-7h-b): counts only, never an ID or anything from the envelope (I-7).
+ */
+export interface RevokeActivity {
+  /** True when the own agent was revoked; otherwise the report's `contactId` was. */
+  readonly self: boolean;
+  /** `pending` outbox rows stopped as `not_delivered` with reason `revoked` (07 §3.2). */
+  readonly outboxStopped: number;
+  /** Pending approvals with that agent as counterparty, now `void` (04 §3.4.2 void rule 3). */
+  readonly approvalsVoided: number;
+  /** `unclaimed` or `claimed` commitment parts with that agent as counterparty, now `void`. */
+  readonly partsVoided: number;
+}
+
+/**
+ * A verified `revoke` (04 §3.4.1, 07 §3.4; M1-7h, M1-7h-b): `effect` runs inside the store
+ * transaction that stores the revoke envelope. It returns `noop` when the agent is already revoked
+ * (a re-published copy: nothing is stored), `stale` when an approval appeared that `prepare` could
+ * not read (nothing is written; the row stays `received` for the next pass), or the activity.
  */
 export interface PreparedRevoke {
   /** The revoked contact; absent when the own agent is revoked. */
   readonly contactId?: string;
-  readonly effect: (tx: StoreTx) => 'applied' | 'noop';
+  readonly effect: (tx: StoreTx) => RevokeActivity | 'noop' | 'stale';
 }
 
 /** The revocation flow as the envelope pipeline sees it (M1-7h). */
@@ -1440,8 +1458,10 @@ export class EnvelopeService {
       request_accepted_at: null,
     };
     const now = nowOf(ctx);
+    let revoked: RevokeActivity | undefined;
     try {
       const done = await ctx.store.transaction((tx) => {
+        revoked = undefined;
         if (!claim(tx, item)) return 'lost' as const;
         // The chain rows are still those the terms decision was made on; otherwise nothing is
         // written, the row stays `received` and the next pass decides it again (M1-32).
@@ -1458,9 +1478,15 @@ export class EnvelopeService {
           deleteRow(tx, item);
           return 'full' as const;
         }
-        if (d.revoke !== undefined && d.revoke.effect(tx) === 'noop') {
-          deleteRow(tx, item);
-          return 'noop' as const;
+        if (d.revoke !== undefined) {
+          const applied = d.revoke.effect(tx);
+          // An approval the revoke could not read yet: nothing written, decided in a later pass.
+          if (applied === 'stale') return 'lost' as const;
+          if (applied === 'noop') {
+            deleteRow(tx, item);
+            return 'noop' as const;
+          }
+          revoked = applied;
         }
         // 07 §3.2 rate_counters: counted in the transaction that stores the contact's envelope.
         if (
@@ -1512,10 +1538,18 @@ export class EnvelopeService {
     }
     const outcome: InboundOutcome =
       d.state === 'sent_copy' ? 'sent_copy' : d.state === 'request' ? 'request' : 'ok';
+    const activity = revoked as RevokeActivity | undefined;
+    if (activity !== undefined) {
+      // The activity line of a revoke (07 §3.2, §3.4): counts only (I-7).
+      ctx.log.info('revoke applied', { ...activity });
+    }
     return {
-      report: report(item.envelopeId, outcome, {
-        ...(d.state === 'ok' && d.contactId !== undefined ? { contactId: d.contactId } : {}),
-      }),
+      report: {
+        ...report(item.envelopeId, outcome, {
+          ...(d.state === 'ok' && d.contactId !== undefined ? { contactId: d.contactId } : {}),
+        }),
+        ...(activity === undefined ? {} : { revoke: activity }),
+      },
       ...(d.cardUpdate === undefined ? {} : { applied: d.cardUpdate.card }),
     };
   }
