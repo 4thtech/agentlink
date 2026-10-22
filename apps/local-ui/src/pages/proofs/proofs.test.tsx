@@ -14,7 +14,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
 import { ProofsPage } from './index.js';
-import { PROOFS_STRINGS } from './strings.js';
+import { PROOFS_STRINGS, priceLine } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -38,6 +38,16 @@ interface Call {
 
 type Routes = Record<string, unknown>;
 
+/** A non-200 answer (the shared route answers, route-types.ts). */
+class Answer {
+  constructor(
+    readonly status: number,
+    readonly body: unknown,
+  ) {}
+}
+const NOT_SET_UP = new Answer(409, { error: 'not_set_up' });
+const UNAVAILABLE = new Answer(503, { error: 'unavailable' });
+
 function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
   const calls: Call[] = [];
   const fetchFn = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
@@ -46,9 +56,10 @@ function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
     const body = routes[url];
     if (body === undefined) return Promise.resolve(new Response('{}', { status: 404 }));
     if (body instanceof Error) return Promise.reject(body);
+    const answer = body instanceof Answer ? body : new Answer(200, body);
     return Promise.resolve(
-      new Response(JSON.stringify(body), {
-        status: 200,
+      new Response(JSON.stringify(answer.body), {
+        status: answer.status,
         headers: { 'content-type': 'application/json' },
       }),
     );
@@ -58,7 +69,14 @@ function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
 
 const LIST = '/api/ui/proofs?limit=20';
 const CREDITS = '/api/ui/proofs/credits';
-const OK_CREDITS = { status: 'ok', proofsLeft: 48, balance: '$4.80', test: true, partial: false };
+const OK_CREDITS = {
+  status: 'ok',
+  proofsLeft: 48,
+  balance: '$4.80',
+  price: '$0.25',
+  test: true,
+  partial: false,
+};
 const T1 = Date.UTC(2026, 9, 12, 14, 2) / 1000;
 const T2 = Date.UTC(2026, 9, 12, 9, 14) / 1000;
 
@@ -88,7 +106,9 @@ describe('ProofsPage', () => {
     expect(card?.textContent).toContain('$4.80');
     expect(card?.textContent).toContain(PROOFS_STRINGS.testCredits);
     expect(card?.textContent).toContain(PROOFS_STRINGS.addCreditsNotAvailable);
-    expect(text()).toContain(PROOFS_STRINGS.price);
+    // The price comes from the server (core's schedule), never a literal in the page.
+    expect(text()).toContain(priceLine('$0.25'));
+    expect(text()).not.toContain('$0.10');
   });
 
   it('says "1 proof left" for one', async () => {
@@ -208,7 +228,7 @@ describe('ProofsPage', () => {
         ],
         nextCursor: 'bad cursor\n',
       },
-      [CREDITS]: { ...OK_CREDITS, balance: '<img src=x onerror=alert(1)>', proofsLeft: -3 },
+      [CREDITS]: { ...OK_CREDITS, balance: '<img src=x onerror=alert(1)>', price: '<b>1</b>' },
     });
     expect(host.querySelectorAll('tbody tr')).toHaveLength(1);
     expect(host.querySelector('img')).toBeNull();
@@ -223,9 +243,10 @@ describe('ProofsPage', () => {
   it('says when credits cannot be checked, and when only part could be', async () => {
     await mount({
       [LIST]: { status: 'ok', items: [] },
-      [CREDITS]: { status: 'unavailable' },
+      [CREDITS]: UNAVAILABLE,
     });
     expect(text()).toContain(PROOFS_STRINGS.creditsUnavailable);
+    expect(text()).not.toContain('A proof costs');
     act(() => root.unmount());
     root = createRoot(host);
     await mount({
@@ -237,11 +258,25 @@ describe('ProofsPage', () => {
 
   it('shows the not-set-up state when there is no agent yet', async () => {
     await mount({
-      [LIST]: { status: 'not_set_up' },
-      [CREDITS]: { status: 'not_set_up' },
+      [LIST]: NOT_SET_UP,
+      [CREDITS]: NOT_SET_UP,
     });
     expect(host.querySelector('.al-empty')?.textContent).toContain(PROOFS_STRINGS.notSetUp);
     expect(host.querySelector('section[aria-label="Credits"]')).toBeNull();
+  });
+
+  it('shows the not-set-up state from either read alone', async () => {
+    await mount({ [LIST]: NOT_SET_UP, [CREDITS]: OK_CREDITS });
+    expect(host.querySelector('.al-empty')?.textContent).toContain(PROOFS_STRINGS.notSetUp);
+  });
+
+  it('treats a malformed price as credits it cannot check', async () => {
+    await mount({
+      [LIST]: { status: 'ok', items: [] },
+      [CREDITS]: { ...OK_CREDITS, price: '10c' },
+    });
+    expect(text()).toContain(PROOFS_STRINGS.creditsUnavailable);
+    expect(host.querySelector('.al-credits-bal')).toBeNull();
   });
 
   it('shows a calm error when the list cannot be loaded', async () => {

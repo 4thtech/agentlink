@@ -12,7 +12,9 @@ import { describe, expect, it } from 'vitest';
 import { readOnlyClient, type LocalUiContext, type LocalUiReadClient } from '../context.js';
 import type { LocalUiReadRoute, LocalUiRequest } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
-import { PROOF_FEE_USD_MICROS, proofsRoutes } from './proofs.js';
+import { PROOF_PRICE_USD_MICROS } from '@4thtech-io/core';
+import { UI_INVALID_QUERY, UI_NOT_SET_UP, UI_UNAVAILABLE } from '../route-types.js';
+import { proofsRoutes } from './proofs.js';
 
 const AGENT = '0x71c4000000000000000000000000000000009a2e';
 const RECORD = '0x' + 'ab'.repeat(32);
@@ -128,7 +130,8 @@ describe('routes (M1-11c-a4)', () => {
 describe('GET /api/ui/proofs: the proof list', () => {
   it('answers not_set_up without an agent', async () => {
     const res = await route('/api/ui/proofs').handler(ctx(undefined), req());
-    expect(res).toEqual({ status: 200, body: { status: 'not_set_up' } });
+    expect(res).toEqual({ status: 409, body: { error: 'not_set_up' } });
+    expect(res).toEqual(UI_NOT_SET_UP);
   });
 
   it('returns direction, display state and time only, newest first as core gives them', async () => {
@@ -251,18 +254,37 @@ describe('GET /api/ui/proofs: the proof list', () => {
   it('answers any other failure as unavailable, with no error text', async () => {
     const list: ListFn = () => Promise.reject(new Error(`db at /home/x/.agentlink ${RECORD}`));
     const res = await route('/api/ui/proofs').handler(ctx(fakeClient(list)), req());
-    expect(res).toEqual({ status: 503, body: { status: 'unavailable' } });
+    expect(res).toEqual({ status: 503, body: { error: 'unavailable' } });
+    expect(res).toEqual(UI_UNAVAILABLE);
   });
 });
 
 describe('GET /api/ui/proofs/credits: proofs left', () => {
-  it('uses the published proof price, $0.10 (12 §2)', () => {
-    expect(PROOF_FEE_USD_MICROS).toBe(100_000n);
+  it('takes the proof price from core and returns it formatted, never a literal of its own', async () => {
+    // Core's price is the chain schedule's NOTARIZE fee (12 §2); this test follows it.
+    const price = Number(PROOF_PRICE_USD_MICROS) / 1_000_000;
+    const res = await route('/api/ui/proofs/credits').handler(
+      ctx(fakeClient(undefined, okCredits([chain(['5'])]))),
+      req(),
+    );
+    const body = res.body as { proofsLeft: number; price: string };
+    expect(body.price).toBe(`$${price.toFixed(2)}`);
+    expect(body.proofsLeft).toBe(Math.floor(5 / price));
+  });
+
+  it('shares the fixed answers with the other page routes (route-types.ts)', () => {
+    expect(UI_NOT_SET_UP).toEqual({ status: 409, body: { error: 'not_set_up' } });
+    expect(UI_INVALID_QUERY).toEqual({ status: 400, body: { error: 'invalid_query' } });
+    expect(UI_UNAVAILABLE).toEqual({ status: 503, body: { error: 'unavailable' } });
+    for (const a of [UI_NOT_SET_UP, UI_INVALID_QUERY, UI_UNAVAILABLE]) {
+      expect(Object.isFrozen(a) && Object.isFrozen(a.body)).toBe(true);
+    }
   });
 
   it('answers not_set_up without an agent', async () => {
     const res = await route('/api/ui/proofs/credits').handler(ctx(undefined), req());
-    expect(res).toEqual({ status: 200, body: { status: 'not_set_up' } });
+    expect(res).toEqual({ status: 409, body: { error: 'not_set_up' } });
+    expect(res).toEqual(UI_NOT_SET_UP);
   });
 
   it('sums the networks into proofs left and a dollar balance, nothing else', async () => {
@@ -276,7 +298,14 @@ describe('GET /api/ui/proofs/credits: proofs left', () => {
     );
     expect(res).toEqual({
       status: 200,
-      body: { status: 'ok', proofsLeft: 48, balance: '$4.80', test: true, partial: false },
+      body: {
+        status: 'ok',
+        proofsLeft: 48,
+        balance: '$4.80',
+        price: '$0.10',
+        test: true,
+        partial: false,
+      },
     });
     expectNoLeak(res.body);
   });
@@ -316,6 +345,7 @@ describe('GET /api/ui/proofs/credits: proofs left', () => {
         status: 'ok',
         proofsLeft: 10,
         balance: '$1.00',
+        price: '$0.10',
         test: true,
         partial: true,
       });
@@ -334,7 +364,7 @@ describe('GET /api/ui/proofs/credits: proofs left', () => {
         ctx(fakeClient(undefined, credits)),
         req(),
       );
-      expect(res).toEqual({ status: 200, body: { status: 'unavailable' } });
+      expect(res).toEqual({ status: 503, body: { error: 'unavailable' } });
     }
   });
 
