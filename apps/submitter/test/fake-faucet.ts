@@ -23,7 +23,20 @@ export class FakeFaucet implements FaucetChain {
   onCredit: (() => void | Promise<void>) | null = null;
   /** Every call, in order, with its outcome. */
   readonly calls: FakeCredit[] = [];
+  /** The wallet's balances (M1-10b-e): the fee token in whole US cents, the native coin in wei. */
+  tokenUsdCents = 10_000n;
+  nativeWei = 10n ** 17n;
+  /** The balance read fails (an RPC outage). */
+  failBalances = false;
+  /** How many times the balances were read. */
+  balanceReads = 0;
   private counter = 0;
+
+  balances(): Promise<{ nativeWei: bigint; tokenUsdCents: bigint }> {
+    this.balanceReads += 1;
+    if (this.failBalances) return Promise.reject(new Error('rpc down'));
+    return Promise.resolve({ nativeWei: this.nativeWei, tokenUsdCents: this.tokenUsdCents });
+  }
 
   constructor(chainId: number, faucetAddress: Hex = FAKE_FAUCET_ADDRESS) {
     this.chainId = chainId;

@@ -201,8 +201,8 @@ export interface FaucetConfig {
 }
 
 export const FAUCET_DEFAULTS = Object.freeze({
-  /** $1: ten proofs at the beta price (12 §2). */
-  usdCents: 100,
+  /** $0.50: five proofs at the beta price (12 §2); owner decision 2026-10-22 (M1-10b-e). */
+  usdCents: 50,
   agentWindowSeconds: 86_400,
   ipClaimsPerDay: 3,
   dailyCap: 200,
@@ -261,6 +261,48 @@ export function readFaucetConfig(env: Record<string, unknown>): FaucetConfig | n
     dailyCap: cap,
     ipRequestsPerHour: requests,
   });
+}
+
+/**
+ * Low-balance thresholds of one chain's gas and faucet wallets (M1-10b-e). `/v1/health` reports
+ * `gas: low` under `gasLowWei` and `faucet: low` under `faucetLowUsdCents` of the faucet's fee
+ * token (or when the faucet's own gas is under `gasLowWei`); the scheduled pool alert
+ * (`.github/workflows/submitter-pool.yml`) fails on either. A faucet that cannot cover one grant is
+ * `paused` and refuses claims, whatever the thresholds (pool.ts, faucet-claim.ts).
+ */
+export interface PoolThresholds {
+  /** The faucet is low under this many US cents of the fee token it credits. */
+  readonly faucetLowUsdCents: number;
+  /** A gas wallet (the submitter's, or the faucet's own gas) is low under this many wei. */
+  readonly gasLowWei: bigint;
+  /** False until the figures are checked against the chain's own measured costs. */
+  readonly measured: boolean;
+}
+
+/**
+ * Per chain, in the chain's native units. Base Sepolia, measured 2026-10-22 on the production
+ * wallets: the pool is bound by the faucet's test USDC, not by gas; low under $20 (40 grants of
+ * $0.50); a proof costs about 1.1e-6 ETH of gas, so the gas wallet is low under 1 000 proofs
+ * (0.0011 ETH). Chiado: no measurement yet; the same figures in xDAI (its native coin and fee
+ * token), to verify after the first Chiado transactions.
+ */
+export const POOL_THRESHOLDS: Readonly<Record<number, PoolThresholds>> = Object.freeze({
+  84532: Object.freeze({
+    faucetLowUsdCents: 2_000,
+    gasLowWei: 1_100_000_000_000_000n,
+    measured: true,
+  }),
+  // To verify after the first Chiado transactions (M1-10b-e).
+  10200: Object.freeze({
+    faucetLowUsdCents: 2_000,
+    gasLowWei: 1_100_000_000_000_000n,
+    measured: false,
+  }),
+});
+
+/** The pool thresholds of a chain, or null when it has none. */
+export function poolThresholds(chainId: number): PoolThresholds | null {
+  return Object.hasOwn(POOL_THRESHOLDS, chainId) ? (POOL_THRESHOLDS[chainId] ?? null) : null;
 }
 
 const FAUCET_ADDRESS = /^0x[0-9a-f]{40}$/;
