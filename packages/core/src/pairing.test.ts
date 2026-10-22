@@ -18,6 +18,7 @@ import {
   pairingProof,
   parseJson,
   randomBytes,
+  type AgentCard,
   type Envelope,
   type JsonValue,
   type KeyStore,
@@ -676,7 +677,7 @@ describe('the invite binds the owner fingerprint and the card hash (M1-9zf; 04 Â
    * stand-in for any path that stages a card with the invite's contact id (agentEvm and agentNostr
    * kept) that is not the card the invite carried. Expects the fixed invite refusal and no writes.
    */
-  async function expectRefused(swap: (card: Invite['card']) => Invite['card']): Promise<void> {
+  async function expectRefused(swap: (card: AgentCard) => AgentCard): Promise<void> {
     const invite = await a.client.pairing.createInvite();
     const contacts = b.client.contacts;
     const original = contacts.prepareStage.bind(contacts);
