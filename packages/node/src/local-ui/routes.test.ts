@@ -127,12 +127,20 @@ describe('route registration (M1-11s-b, I-4)', () => {
 
 describe('the default registry: one stub per page (M1-11s-b)', () => {
   it('registers every page stub as a read route that answers 501 not_implemented', async () => {
+    // A built page's own test covers its routes (contacts: api/contacts.test.ts, M1-11c-a2).
+    const built = new Set([
+      '/api/ui/contacts',
+      '/api/ui/contacts/:ref/safety-code',
+      '/api/ui/contacts/:ref/rename-check',
+      '/api/ui/contacts/:ref/check',
+      '/api/ui/contacts/:ref/rename',
+      '/api/ui/contacts/:ref/remove',
+    ]);
     const registry = createLocalUiRoutes();
     const pages = [
       'first-run',
       'approvals',
       'activity',
-      'contacts',
       'files',
       'storage',
       'proofs',
@@ -140,13 +148,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       'backup',
       'advanced',
     ];
-    expect(
-      registry
-        .routes()
-        .map((r) => r.path)
-        .sort(),
-    ).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
-    for (const route of registry.routes() as readonly LocalUiRoute[]) {
+    const stubs = registry.routes().filter((r) => !built.has(r.path));
+    expect(stubs.map((r) => r.path).sort()).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
+    for (const route of stubs as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');
       expect(route.presence).toBe(false);
       if (route.presence) throw new Error('unreachable');
