@@ -1364,6 +1364,15 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
+#### CHORE-E2E-RENDEZVOUS-AEAD · Retire the rendezvous.mjs node:crypto exemption (new, IR-M1-1g-c-1 L-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (crypto package API) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto, e2e/src/rendezvous.mjs, tools/deps-check/policy.mjs
+- **Depends on:** M1-1g-c
+- **Scope:**
+  - `@4thtech-io/crypto` exports no general AEAD, so `e2e/src/rendezvous.mjs` (AES-256-GCM and HKDF, OPS-CI-7) imports `node:crypto` under `NODE_CRYPTO_EXEMPT_FILES`. Provide a crypto-package API for this, move rendezvous.mjs onto it, then remove the exemption.
+- **Acceptance:**
+  - `NODE_CRYPTO_EXEMPT_FILES` is empty; rendezvous tests and the nightly jobs pass.
+
 #### M1-1g-f · crypto: drop DELETE signed with an older epoch's drop key (new, IR-M1-1g-e-1)
 - **Status:** done (4thtech/agentlink#294, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore, `keystore-drop.ts`), packages/node (keychain KeyStore and facade)
