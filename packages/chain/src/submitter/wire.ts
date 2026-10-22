@@ -92,7 +92,11 @@ export interface StatusResponse {
   readonly items: readonly SubmitItemResult[];
 }
 
-/** `GET /v1/health`: per chain, the gas balance in wei (decimal string) and the queue depth. */
+/**
+ * `GET /v1/health`: per chain, the gas balance in wei (decimal string), the queue depth and, from
+ * M1-10b-e, the pool states: `gas` (null when the balance is unknown or the chain has no
+ * thresholds) and `faucet` (null when the chain has no faucet). An older submitter sends neither.
+ */
 export interface HealthResponse {
   readonly ok: boolean;
   readonly chains: readonly {
@@ -100,8 +104,15 @@ export interface HealthResponse {
     readonly available: boolean;
     readonly gasBalance: string | null;
     readonly queueDepth: number;
+    readonly gas?: GasPoolState | null;
+    readonly faucet?: FaucetPoolState | null;
   }[];
 }
+
+/** The gas wallet: `low` under its threshold (M1-10b-e). */
+export type GasPoolState = 'ok' | 'low';
+/** The faucet: `low` under its threshold; `paused` when it grants nothing (M1-10b-e). */
+export type FaucetPoolState = 'ok' | 'low' | 'paused';
 
 const BYTES32 = /^0x[0-9a-f]{64}$/;
 const TX_HASH = BYTES32;
@@ -317,7 +328,24 @@ export function parseHealthResponse(value: unknown): HealthResponse {
     fail('invalid_submitter_answer', 'health');
   }
   const chains = (o.chains as unknown[]).map((c) => {
-    const e = exactKeys(c, ['chainId', 'available', 'gasBalance', 'queueDepth'], [], 'chain');
+    const e = exactKeys(
+      c,
+      ['chainId', 'available', 'gasBalance', 'queueDepth'],
+      ['gas', 'faucet'],
+      'chain',
+    );
+    if (Object.hasOwn(e, 'gas') && e.gas !== null && e.gas !== 'ok' && e.gas !== 'low') {
+      fail('invalid_submitter_answer', 'gas');
+    }
+    if (
+      Object.hasOwn(e, 'faucet') &&
+      e.faucet !== null &&
+      e.faucet !== 'ok' &&
+      e.faucet !== 'low' &&
+      e.faucet !== 'paused'
+    ) {
+      fail('invalid_submitter_answer', 'faucet');
+    }
     if (typeof e.available !== 'boolean') fail('invalid_submitter_answer', 'available');
     if (
       e.gasBalance !== null &&
@@ -337,6 +365,8 @@ export function parseHealthResponse(value: unknown): HealthResponse {
       available: e.available as boolean,
       gasBalance: e.gasBalance as string | null,
       queueDepth: e.queueDepth as number,
+      ...(Object.hasOwn(e, 'gas') ? { gas: e.gas as GasPoolState | null } : {}),
+      ...(Object.hasOwn(e, 'faucet') ? { faucet: e.faucet as FaucetPoolState | null } : {}),
     });
   });
   return Object.freeze({ ok: o.ok as boolean, chains: Object.freeze(chains) });

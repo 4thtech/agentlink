@@ -21,6 +21,7 @@ import type { SubmitterEnv } from '../src/worker.js';
 import { METRICS } from '../src/limits.js';
 import { POLL_MS } from '../src/queue.js';
 import { FakeChain, fakeChains } from './fake-chain.js';
+import { FakeFaucet, fakeFaucets } from './fake-faucet.js';
 
 const env = testEnv as SubmitterEnv;
 const HOST = 'https://submitter.test';
@@ -162,15 +163,24 @@ const queueStub = () =>
   env.SUBMITTER_QUEUE.get(env.SUBMITTER_QUEUE.idFromName(`chain:${String(CHAIN_ID)}`));
 
 describe('GET /v1/health', () => {
-  it('reports per-chain gas balance and queue depth', async () => {
+  it('reports per-chain gas balance, queue depth and the gas and faucet pool states', async () => {
+    fakeFaucets.set(CHAIN_ID, new FakeFaucet(CHAIN_ID));
     const res = await SELF.fetch(`${HOST}/v1/health`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       ok: true,
       chains: [
-        { chainId: CHAIN_ID, available: true, gasBalance: String(10n ** 17n), queueDepth: 0 },
+        {
+          chainId: CHAIN_ID,
+          available: true,
+          gasBalance: String(10n ** 17n),
+          queueDepth: 0,
+          gas: 'ok',
+          faucet: 'ok',
+        },
       ],
     });
+    fakeFaucets.delete(CHAIN_ID);
   });
 });
 
