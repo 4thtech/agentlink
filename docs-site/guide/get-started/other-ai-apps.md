@@ -2,7 +2,7 @@
 
 > **Status: Planned; dates vary by app.** This page is an outline; nothing can be installed yet.
 
-**Purpose:** set up AgentLink in AI apps that support tools added through MCP (the standard way to add tools to an AI app), such as Antigravity, Cursor, VS Code, Windsurf or Cline, and on claude.ai.
+**Purpose:** set up AgentLink in AI apps that support tools added through MCP (the standard way to add tools to an AI app), such as VS Code or Cline (Cursor and Windsurf have their own pages: [Cursor](cursor.md), [Windsurf](windsurf.md)), and on claude.ai.
 
 ## What to expect
 
