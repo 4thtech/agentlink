@@ -333,6 +333,9 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
+      '@4thtech-io/invite':
+        specifier: workspace:*
+        version: link:../apps/invite
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../packages/log

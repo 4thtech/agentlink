@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildPrompt } from '../../apps/invite/src/prompt.js';
+import { buildPrompt } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 import {
   BASE_INVITE,
@@ -20,7 +20,7 @@ import {
   futureExpiry,
   payloadOf,
   rawPayload,
-} from '../../apps/invite/src/testing/fixtures.js';
+} from './invite/fixtures.js';
 
 const root = fileURLToPath(new URL('../../apps/invite', import.meta.url));
 const OUT = fileURLToPath(new URL('../../apps/invite/dist/site/', import.meta.url));

@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { INSTALL_AND_ACCEPT_TEMPLATE } from '../../apps/invite/src/prompt.js';
+import { INSTALL_AND_ACCEPT_TEMPLATE } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 
 const site = (path: string): string =>
