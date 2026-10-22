@@ -63,6 +63,9 @@ const SEED_OR_SECRET = [
   // M1-9i-b (04 §2.3.3): the recovery kit ALKK, which takes or returns the owner and agent seeds.
   'sealRecoveryKit',
   'openRecoveryKit',
+  // M1-9i-b2 (04 §2.2): the s3:<id> item, which holds the storage secret (KeyStore backends only).
+  'encodeStorageCredentialItem',
+  'parseStorageCredentialItem',
 ];
 
 // The one deterministic test seam (@4thtech-io/crypto/testing, never built or exported).
@@ -183,6 +186,12 @@ describe('@4thtech-io/crypto/keystore', () => {
       'safetyCodeForRole',
       'KEYSTORE_KDF_DEFAULTS',
       'KEYSTORE_KDF_BOUNDS',
+      // M1-9i-b2 (04 §2.5.1 storage.set): the digest the core checks on every own-storage load. It
+      // returns a keyed digest, never the secret.
+      'credentialDigest',
+      'credentialDigestOfItem',
+      'STORAGE_CREDENTIAL_SALT_LENGTH',
+      'STORAGE_CREDENTIAL_MAX_VALUE_BYTES',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }
