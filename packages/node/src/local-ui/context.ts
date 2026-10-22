@@ -10,6 +10,7 @@
 import type { AgentLinkClient, OwnerActionOutcome } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
+import type { FirstAgentCard } from '../owner-first-card.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -26,6 +27,18 @@ export interface LocalUiOptions {
   readonly assets?: LocalUiAssets;
   /** The agent's core client; absent when the agent is not set up. */
   readonly client?: AgentLinkClient;
+  /**
+   * M1-11s-c: owner setup on the first-run page (D-120 (1)), for a keychain agent that has no owner
+   * yet: the agent whose first card the setup signs. Held by the server only, never by a handler or
+   * LocalUiContext. Absent: the setup routes answer 503 `unavailable`.
+   */
+  readonly ownerSetup?: LocalUiOwnerSetup;
+}
+
+/** M1-11s-c: what owner setup needs from the caller (the CLI). Keychain machines only. */
+export interface LocalUiOwnerSetup {
+  /** The agent whose first card the new owner signs (owner-first-card.ts). */
+  readonly firstCard: FirstAgentCard;
 }
 
 /**

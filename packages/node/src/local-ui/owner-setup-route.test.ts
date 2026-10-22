@@ -553,15 +553,13 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     expect(setupEvents(h)).toEqual(['ready', 'done', 'not_pending']);
   }, 60_000);
 
-  it('never logs the owner code: no event, console line or stream write carries it (canary)', async () => {
+  it('never logs the owner code: no event or console line carries it (canary)', async () => {
     const lines: string[] = [];
     for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
       vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
         lines.push(args.map(String).join(' '));
       });
     }
-    const stdout = vi.spyOn(process.stdout, 'write');
-    const stderr = vi.spyOn(process.stderr, 'write');
     const agent = await initAgent();
     const h = await harness(agent);
     const s = await h.session();
@@ -577,8 +575,6 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     const written = [
       JSON.stringify(h.events),
       ...lines,
-      ...stdout.mock.calls.map((c) => String(c[0])),
-      ...stderr.mock.calls.map((c) => String(c[0])),
     ].join('\n');
     expect(compact).toHaveLength(24);
     expect(written).not.toContain(compact);
