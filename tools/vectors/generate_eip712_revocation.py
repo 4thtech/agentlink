@@ -29,9 +29,10 @@ fields, name "OCC", version "2", chainId a JSON integer in [1, 2^53 - 1] and ver
 AgentCard domain (04 §2.4), so a Revocation never hashes under the card's domain (M1-1j-b).
 
 `keyEpoch` spelled `-0` (M1-1j-b): the JSON token `-0` does not match `0|[1-9][0-9]*` (04 §2.4.1).
-Python's json reads it as the int 0, JavaScript's JSON.parse as the number -0. The generator models
-it as the float -0.0 (rejected as not an integer, like the JS -0), and `render` below writes the
-exact token `-0`; the check mode compares the same text. All addresses, hashes and nonces are synthetic test values
+The harness loads vector files as parsed JSON, which writes -0 back as 0, so this case carries the
+Revocation as raw JSON text (op `revocationJson`, as the `eip712` suite's `agentCardJson`). The
+suite parses that text with JSON.parse, which keeps -0 in every runtime, and hands the value to the
+code under test. The generator rejects it on the token. All addresses, hashes and nonces are synthetic test values
 (vectorlib.det); the chain IDs are Base Sepolia (84532) and Gnosis Chiado (10200). No signatures:
 the card scope is hashing only.
 
@@ -39,6 +40,7 @@ Usage: python3 -I tools/vectors/generate_eip712_revocation.py --check [FILE] | -
 """
 
 import copy
+import json
 import re
 import sys
 from pathlib import Path
@@ -84,7 +86,7 @@ UINT32_MAX = 2**32 - 1
 SAFE_MAX = 2**53 - 1
 ZERO32 = "0x" + "00" * 32
 ZERO_ADDRESS = "0x" + "00" * 20
-NEG_ZERO = -0.0
+JSON_INTEGER = re.compile(r"0|[1-9][0-9]*")
 
 
 def addr(label):
@@ -230,9 +232,7 @@ def build():
         ("key-epoch-negative", "keyEpoch = -1", variant(rev, keyEpoch=-1)),
         ("key-epoch-string", "keyEpoch as a decimal string", variant(rev, keyEpoch="0")),
         ("key-epoch-boolean", "keyEpoch as false", variant(rev, keyEpoch=False)),
-        ("key-epoch-fraction", "keyEpoch = 1.5", variant(rev, keyEpoch=1.5)),
-        ("key-epoch-minus-zero", "keyEpoch spelled -0 (negative zero; the token is not 0|[1-9][0-9]*)", variant(rev, keyEpoch=NEG_ZERO)),
-        ("nonce-number", "nonce as a JSON number", variant(rev, nonce=12345)),
+        ("key-epoch-fraction", "keyEpoch = 1.5", variant(rev, keyEpoch=1.5)),        ("nonce-number", "nonce as a JSON number", variant(rev, nonce=12345)),
         ("nonce-leading-zero", "nonce with a leading zero", variant(rev, nonce="0" + rev["nonce"])),
         ("nonce-sign", "nonce with a + sign", variant(rev, nonce="+" + rev["nonce"])),
         ("nonce-negative", "nonce \"-1\"", variant(rev, nonce="-1")),
@@ -277,6 +277,16 @@ def build():
         except ValueError:
             pass
         cases.append(v.case(f"revocation-reject-domain-{case_id}", f"{SOURCES['Revocation']}; I-6: {why}; a canonical Revocation under it is refused, never hashed", {"op": "revocation", "domain": bad, "revocation": revocation}, {"outcome": "reject"}))
+
+    # Raw JSON text (module doc): the token -0 survives only as text.
+    canonical_text = json.dumps(revocation)
+    if json.loads(canonical_text) != revocation or canonical_text.count('"keyEpoch": 0,') != 1:
+        v.fail("the canonical Revocation text is not the expected one")
+    minus_zero = canonical_text.replace('"keyEpoch": 0,', '"keyEpoch": -0,')
+    token = re.search(r'"keyEpoch": (-?[0-9]+),', minus_zero).group(1)
+    if JSON_INTEGER.fullmatch(token):
+        v.fail("the keyEpoch -0 token is accepted")
+    cases.append(v.case("revocation-json-reject-key-epoch-minus-zero", f"{JSON_FORM}: keyEpoch spelled -0 (negative zero; the token is not 0|[1-9][0-9]*), as raw JSON text; rejected, never normalised", {"op": "revocationJson", "domain": registry, "json": minus_zero}, {"outcome": "reject"}))
     return cases
 
 
@@ -287,26 +297,14 @@ SCHEMA = v.case_schema(
     "domain separator, struct hash and digest (32-byte hex without 0x) of a Revocation in its JSON "
     "form under a domain {name, version, chainId, verifyingContract}, or a rejection of a "
     "non-canonical Revocation. `registration`: the same hashes of a Registration that shares its "
-    "owner nonce with a Revocation.",
+    "owner nonce with a Revocation. `revocationJson`: as `revocation`, with the Revocation as raw "
+    "JSON text (for tokens such as -0 that parsed JSON cannot carry).",
     {
         "revocation": ({"domain": v.OBJECT, "revocation": v.OBJECT}, [HASHES, v.REJECT]),
         "registration": ({"domain": v.OBJECT, "registration": v.OBJECT}, [HASHES]),
+        "revocationJson": ({"domain": v.OBJECT, "json": v.STRING}, [HASHES, v.REJECT]),
     },
 )
-
-_render = v.render
-MINUS_ZERO_FLOAT = '"keyEpoch": -0.0'
-
-
-def render(document):
-    """vectorlib.render, with the one keyEpoch -0.0 written as the JSON token -0 (module doc)."""
-    text = _render(document)
-    if text.count(MINUS_ZERO_FLOAT) != 1:
-        v.fail("expected exactly one keyEpoch -0 case")
-    return text.replace(MINUS_ZERO_FLOAT, '"keyEpoch": -0')
-
-
-v.render = render
 
 if __name__ == "__main__":
     v.main(

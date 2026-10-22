@@ -478,28 +478,6 @@
       }
     },
     {
-      "id": "revocation-reject-key-epoch-minus-zero",
-      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch spelled -0 (negative zero; the token is not 0|[1-9][0-9]*); rejected, never normalised",
-      "input": {
-        "op": "revocation",
-        "domain": {
-          "name": "OCC",
-          "version": "2",
-          "chainId": 84532,
-          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
-        },
-        "revocation": {
-          "agentEvm": "0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248",
-          "keyEpoch": -0,
-          "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
-          "deadline": 1760003600
-        }
-      },
-      "expected": {
-        "outcome": "reject"
-      }
-    },
-    {
       "id": "revocation-reject-nonce-number",
       "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): nonce as a JSON number; rejected, never normalised",
       "input": {
@@ -1065,6 +1043,23 @@
           "nonce": "102792877295054551976894389593595762211999635364346346245788438465392251708722",
           "deadline": 1760003600
         }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "revocation-json-reject-key-epoch-minus-zero",
+      "source": "05 \u00a73.1 JSON form applied to Revocation (04 \u00a72.4.1; derived): keyEpoch spelled -0 (negative zero; the token is not 0|[1-9][0-9]*), as raw JSON text; rejected, never normalised",
+      "input": {
+        "op": "revocationJson",
+        "domain": {
+          "name": "OCC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x5bfda94cee5727ef7345e97865acead432939583"
+        },
+        "json": "{\"agentEvm\": \"0x297dfdde7498b0e62f8db6c8bc15e0d2c2fde248\", \"keyEpoch\": -0, \"nonce\": \"102792877295054551976894389593595762211999635364346346245788438465392251708722\", \"deadline\": 1760003600}"
       },
       "expected": {
         "outcome": "reject"
