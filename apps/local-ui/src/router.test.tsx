@@ -44,13 +44,18 @@ describe('routes', () => {
     expect(ROUTES.map((r) => r.path).sort()).toEqual(EXPECTED.map(([p]) => p).sort());
   });
 
-  it.each(EXPECTED)('%s renders its stub inside the layout', (path, title) => {
+  // Built pages test their own content (pages/<page>/*.test.tsx).
+  const BUILT: ReadonlySet<string> = new Set(['/settings/proofs']);
+
+  it.each(EXPECTED)('%s renders its page inside the layout', (path, title) => {
     mountAt(path);
     expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
     expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
     const main = host.querySelector('main');
     expect(main?.querySelector('h1')?.textContent).toBe(title);
-    expect(main?.querySelector('.al-empty')?.textContent).toContain('available yet');
+    if (!BUILT.has(path)) {
+      expect(main?.querySelector('.al-empty')?.textContent).toContain('available yet');
+    }
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
