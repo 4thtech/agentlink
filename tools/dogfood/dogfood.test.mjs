@@ -1516,3 +1516,18 @@ describe('capped error text in notes and results (M1-23-f)', () => {
     expect(scan.findings.length).toBeGreaterThan(0);
   });
 });
+
+describe('secrets are redacted before the cap (IR-M1-23-f-1)', () => {
+  it('a secret straddling the cap does not survive as a prefix', () => {
+    const nsec = `nsec1${'q'.repeat(58)}`;
+    const text = `${'a'.repeat(NOTE_MAX - 25)} ${nsec} tail`;
+    const out = capText(text);
+    expect(out.length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(out).not.toContain('nsec1');
+    expect(out).toContain('[redacted');
+  });
+
+  it('a key shape inside the cap is redacted too', () => {
+    expect(capText(`x sk-ant-${'q'.repeat(40)} y`)).not.toContain('sk-ant-q');
+  });
+});

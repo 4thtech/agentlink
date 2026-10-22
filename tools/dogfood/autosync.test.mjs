@@ -1,6 +1,6 @@
 // M1-23-e: auto-sync two-Mac dogfood (autosync.mjs). A fake `ssh` runs the remote command locally
 // with HOME set to a temp folder, so the file protocol is tested end to end; no network, no harness.
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ import {
   FILES,
   abortPeer,
   clearStaleInvite,
+  clearStaleInvites,
   discoverWaiting,
   inviteText,
   localTransport,
@@ -324,5 +325,37 @@ exec sh -c "$last"
       runWithExitHooks(() => Promise.reject(new Error('main failed')), hooks),
     ).rejects.toThrow('main failed');
     expect(order).toEqual(['third', 'first']);
+  });
+});
+
+describe('stale invites from earlier runs (IR-M1-23-f-1)', () => {
+  it('sweeps <out>/<run>/sync/invite of every earlier run, and nothing else', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'al-sweep-'));
+    try {
+      const runs = ['20261016-090000', '20261017-101500'];
+      for (const r of runs) {
+        await mkdir(join(out, r, 'sync'), { recursive: true });
+        await writeFile(join(out, r, 'sync', FILES.invite), inviteText(NONCE, 'INVITE', INVITE));
+        await writeFile(join(out, r, 'sync', FILES.b), 'keep\n');
+      }
+      // Not a run folder, and a symlinked sync folder: neither is followed.
+      await mkdir(join(out, 'other', 'sync'), { recursive: true });
+      await writeFile(join(out, 'other', 'sync', FILES.invite), 'x');
+      const outside = await mkdtemp(join(tmpdir(), 'al-outside-'));
+      await writeFile(join(outside, FILES.invite), 'x');
+      await mkdir(join(out, '20261018-000000'), { recursive: true });
+      await symlink(outside, join(out, '20261018-000000', 'sync'));
+      await clearStaleInvites(out);
+      for (const r of runs) {
+        expect(await localTransport(join(out, r, 'sync')).read(FILES.invite)).toBeUndefined();
+        expect(await localTransport(join(out, r, 'sync')).read(FILES.b)).toBe('keep\n');
+      }
+      expect(await readFile(join(out, 'other', 'sync', FILES.invite), 'utf8')).toBe('x');
+      expect(await readFile(join(outside, FILES.invite), 'utf8')).toBe('x');
+      await rm(outside, { recursive: true, force: true });
+      await expect(clearStaleInvites(join(out, 'missing'))).resolves.toBeUndefined();
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
   });
 });
