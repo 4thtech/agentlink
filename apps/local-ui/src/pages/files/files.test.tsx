@@ -78,7 +78,7 @@ const LIST = '/api/ui/files';
 const PASSKEY = '/api/owner/passkey';
 const COMMIT = '/api/ui/files/folders';
 const reviewUrl = (key: 'add' | 'remove', path: string): string =>
-  `/api/ui/files/review?${new URLSearchParams({ [key]: path }).toString()}`;
+  `/api/ui/files/review?${new URLSearchParams({ [key]: path, version: '3' }).toString()}`;
 const TOKEN = 'R'.repeat(43);
 const NO_PASSKEY = {
   passkey: { registered: false, rpId: 'localhost', userId: 'dQ', prfSalt: 'cw' },
@@ -140,6 +140,7 @@ describe('the folder list', () => {
           { path: '/Users/tali/Gone', resolved: null },
         ],
         max: 32,
+        version: 3,
       },
     });
     const text = host.textContent ?? '';
@@ -155,7 +156,7 @@ describe('the folder list', () => {
   });
 
   it('shows an empty state with what to ask the AI', async () => {
-    await mount({ [LIST]: { folders: [], max: 32 } });
+    await mount({ [LIST]: { folders: [], max: 32, version: 3 } });
     const empty = host.querySelector('.al-empty');
     expect(empty?.textContent).toContain(S.emptyTitle);
     expect(empty?.textContent).toContain(`Try: ${S.emptyPrompt}`);
@@ -184,7 +185,7 @@ describe('allow a folder (04 §4, D-119)', () => {
 
   async function toConfirm(answer: unknown = twoWarnings, typed = '~/Linked') {
     const s = await mount({
-      [LIST]: { folders: [], max: 32 },
+      [LIST]: { folders: [], max: 32, version: 3 },
       [reviewUrl('add', typed)]: answer,
       [PASSKEY]: NO_PASSKEY,
       [`POST ${COMMIT}`]: { status: 'applied', confirmed: true },
@@ -273,9 +274,29 @@ describe('allow a folder (04 §4, D-119)', () => {
     expect(host.textContent).toContain(S.receiptsQuestion);
   });
 
+  it('L-1: a review built on an old list says so in plain words and reads the list again', async () => {
+    const s = await toConfirm(new Answer(409, { error: 'stale' }));
+    expect(host.textContent).toContain(S.stale);
+    expect(S.stale).toBe('Your rules changed. Reload and try again.');
+    expect(s.calls.filter((c) => c.url === LIST)).toHaveLength(2);
+    expect(s.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('L-1: without a rules version, nothing is reviewed', async () => {
+    const s = await mount({ [LIST]: { folders: [], max: 32, version: null } });
+    await click(button(S.allowFolder));
+    await type(
+      host.querySelector<HTMLInputElement>('input[name="folder"]') as HTMLInputElement,
+      '/x/y',
+    );
+    await click(button(S.check));
+    expect(host.textContent).toContain(S.rulesUnreadable);
+    expect(s.calls.some((c) => c.url.startsWith('/api/ui/files/review'))).toBe(false);
+  });
+
   it('a wrong owner code changes nothing and says so', async () => {
     const s = server({
-      [LIST]: { folders: [], max: 32 },
+      [LIST]: { folders: [], max: 32, version: 3 },
       [reviewUrl('add', '/x/y')]: {
         ...twoWarnings,
         warnings: [],
@@ -308,7 +329,11 @@ describe('allow a folder (04 §4, D-119)', () => {
 describe('remove a folder', () => {
   it('reviews the removal and confirms it with the owner', async () => {
     const s = await mount({
-      [LIST]: { folders: [{ path: '/Users/tali/Work', resolved: '/Users/tali/Work' }], max: 32 },
+      [LIST]: {
+        folders: [{ path: '/Users/tali/Work', resolved: '/Users/tali/Work' }],
+        max: 32,
+        version: 3,
+      },
       [reviewUrl('remove', '/Users/tali/Work')]: {
         review: TOKEN,
         change: 'remove',

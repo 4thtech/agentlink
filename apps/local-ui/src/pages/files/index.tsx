@@ -47,7 +47,11 @@ type ListState =
   | { readonly phase: 'loading' }
   | { readonly phase: 'not_set_up' }
   | { readonly phase: 'error' }
-  | { readonly phase: 'ok'; readonly folders: readonly FolderRow[] };
+  | {
+      readonly phase: 'ok';
+      readonly folders: readonly FolderRow[];
+      readonly version: number | null;
+    };
 
 type Step =
   | { readonly kind: 'idle' }
@@ -58,6 +62,8 @@ interface Notice {
   readonly tone: 'success' | 'warning' | 'danger' | 'info';
   readonly text: string;
   readonly rules?: boolean;
+  /** L-1: the list is out of date; the banner offers to reload it. */
+  readonly reload?: boolean;
 }
 
 function problemText(problem: ReviewProblem): Notice {
@@ -70,6 +76,8 @@ function problemText(problem: ReviewProblem): Notice {
       return { tone: 'info', text: S.receiptsQuestion, rules: true };
     case 'changed':
       return { tone: 'warning', text: S.changed };
+    case 'stale':
+      return { tone: 'warning', text: S.stale, reload: true };
     case 'not_set_up':
       return { tone: 'info', text: S.notSetUp };
     case 'unavailable':
@@ -275,8 +283,8 @@ export function FilesPage({ fetch: givenFetch, token }: FilesPageProps = {}): Re
     const answer = await api.get(LIST_PATH);
     if (answer.kind !== 'answer') return setList({ phase: 'error' });
     if (answer.status === 409) return setList({ phase: 'not_set_up' });
-    const folders = answer.status === 200 ? parseList(answer.json) : undefined;
-    setList(folders === undefined ? { phase: 'error' } : { phase: 'ok', folders });
+    const parsed = answer.status === 200 ? parseList(answer.json) : undefined;
+    setList(parsed === undefined ? { phase: 'error' } : { phase: 'ok', ...parsed });
   }, [api]);
 
   useEffect(() => {
@@ -285,8 +293,15 @@ export function FilesPage({ fetch: givenFetch, token }: FilesPageProps = {}): Re
 
   const startReview = async (change: 'add' | 'remove', path: string): Promise<void> => {
     setNotice(undefined);
+    // L-1: the review names the version this list was read at; without one, nothing can change.
+    const version = list.phase === 'ok' ? list.version : null;
+    if (version === null) {
+      if (change === 'add') setStep({ kind: 'enter', checking: false, problem: S.rulesUnreadable });
+      setNotice({ tone: 'warning', text: S.rulesUnreadable });
+      return;
+    }
     if (change === 'add') setStep({ kind: 'enter', checking: true });
-    const answer = await api.get(reviewPath(change, path));
+    const answer = await api.get(reviewPath(change, path, version));
     const review =
       answer.kind === 'answer' && answer.status === 200 ? parseReview(answer.json) : undefined;
     if (review === undefined) {
@@ -303,6 +318,8 @@ export function FilesPage({ fetch: givenFetch, token }: FilesPageProps = {}): Re
       }
       if (change === 'remove') setStep({ kind: 'idle' });
       setNotice(problem);
+      // The rules changed since this list was read: read it again, so trying again works.
+      if (problem.reload === true) await load();
       return;
     }
     setPasskey(passkeysAvailable() ? await api.passkey() : undefined);

@@ -39,6 +39,7 @@ export const FILES_STRINGS = {
   receiptsQuestion:
     'Before changing folders, answer one question about delivery receipts on the Rules page.',
   openRules: 'Open Rules',
+  stale: 'Your rules changed. Reload and try again.',
   changed: 'Your rules changed in the meantime. Nothing was changed. Check the folder again.',
   expired: 'This check timed out. Nothing was changed. Check the folder again.',
   refused: "That didn't go through. Nothing was changed. Check the folder again.",

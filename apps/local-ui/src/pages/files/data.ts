@@ -3,8 +3,9 @@
 export const LIST_PATH = '/api/ui/files';
 export const COMMIT_PATH = '/api/ui/files/folders';
 
-export const reviewPath = (change: 'add' | 'remove', path: string): string =>
-  `/api/ui/files/review?${new URLSearchParams({ [change]: path }).toString()}`;
+/** `version`: the rules version the folder list was read at (the server's `baseVersion`, L-1). */
+export const reviewPath = (change: 'add' | 'remove', path: string, version: number): string =>
+  `/api/ui/files/review?${new URLSearchParams({ [change]: path, version: String(version) }).toString()}`;
 
 export interface FolderRow {
   /** As the rules write it. */
@@ -36,15 +37,23 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 const isPath = (v: unknown): v is string =>
   typeof v === 'string' && v.length > 0 && v.length <= MAX_PATH;
 
-export function parseList(data: unknown): readonly FolderRow[] | undefined {
+export interface FolderList {
+  readonly folders: readonly FolderRow[];
+  /** The rules version this list was read at; null when the rules can't be read. */
+  readonly version: number | null;
+}
+
+export function parseList(data: unknown): FolderList | undefined {
   if (!isObject(data) || !Array.isArray(data['folders'])) return undefined;
+  const v = data['version'];
+  const version = typeof v === 'number' && Number.isSafeInteger(v) && v >= 0 ? v : null;
   const rows: FolderRow[] = [];
   for (const row of data['folders'] as unknown[]) {
     if (!isObject(row) || !isPath(row['path'])) continue;
     const resolved = row['resolved'];
     rows.push({ path: row['path'], resolved: isPath(resolved) ? resolved : null });
   }
-  return rows;
+  return { folders: rows, version };
 }
 
 export function parseReview(data: unknown): Review | undefined {
@@ -67,6 +76,7 @@ export type ReviewProblem =
         | 'rules_unreadable'
         | 'receipts_question'
         | 'changed'
+        | 'stale'
         | 'not_set_up'
         | 'unavailable'
         | 'failed';
@@ -85,6 +95,7 @@ export function parseReviewProblem(status: number, data: unknown): ReviewProblem
     case 'rules_unreadable':
     case 'receipts_question':
     case 'changed':
+    case 'stale':
     case 'not_set_up':
     case 'unavailable':
       return { kind: error };

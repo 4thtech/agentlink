@@ -206,14 +206,19 @@ const hashOf = (jcs: string): string => encodeBase64url(sha256(encodeUtf8(jcs)))
 /** The one query parameter of a review: `add` or `remove`, once, 1–4096 characters. */
 function parseReviewQuery(
   query: URLSearchParams,
-): { readonly change: 'add' | 'remove'; readonly path: string } | undefined {
+):
+  | { readonly change: 'add' | 'remove'; readonly path: string; readonly baseVersion: number }
+  | undefined {
   const keys = [...query.keys()];
-  if (keys.length !== 1) return undefined;
-  const [change] = keys;
+  if (keys.length !== 2 || query.getAll('version').length !== 1) return undefined;
+  const change = keys.find((k) => k !== 'version');
   if (change !== 'add' && change !== 'remove') return undefined;
+  if (query.getAll(change).length !== 1) return undefined;
   const path = query.get(change);
   if (path === null || path.length === 0 || path.length > MAX_PATH_CHARS) return undefined;
-  return { change, path };
+  const version = query.get('version') ?? '';
+  if (!/^(0|[1-9][0-9]{0,14})$/.test(version)) return undefined;
+  return { change, path, baseVersion: Number(version) };
 }
 
 /** The POST input, strictly: `{ review, acknowledged }` and nothing else. */
@@ -294,6 +299,16 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     } catch {
       return UI_UNAVAILABLE;
     }
+    // L-1: the version the owner's view is built on. An empty patch prepares an inert body (signed
+    // never, kept never) only to learn it; the review passes it back as `baseVersion`, so an edit
+    // made on this view after the rules changed is refused (`stale_version`), never undoing it.
+    let version: number | null = null;
+    try {
+      const probe = await client.files.preparePolicyEdit({});
+      if (probe.status === 'prepared') version = probe.baseVersion;
+    } catch {
+      version = null;
+    }
     const home = homeOf();
     const resolvedByCore = new Set(folders.resolved);
     const rows = await Promise.all(
@@ -303,7 +318,7 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
         return { path, resolved: real !== undefined && resolvedByCore.has(real) ? real : null };
       }),
     );
-    return result(200, { folders: rows, max: MAX_FOLDERS });
+    return result(200, { folders: rows, max: MAX_FOLDERS, version });
   }
 
   async function review(context: LocalUiContext, request: LocalUiRequest): Promise<LocalUiResult> {
@@ -329,6 +344,8 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
       if (configured.length >= MAX_FOLDERS) return refused('too_many');
       next = [...configured, folder];
     } else {
+      // L-3: the same showable rule as an add (no control, format, bidi or lone surrogate).
+      if (!showable(parsed.path)) return refused('not_showable');
       if (!configured.includes(parsed.path)) return refused('not_allowed');
       folder = parsed.path;
       next = configured.filter((entry) => entry !== parsed.path);
@@ -336,7 +353,10 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
 
     let prepared: Awaited<ReturnType<typeof client.files.preparePolicyEdit>>;
     try {
-      prepared = await client.files.preparePolicyEdit({ files: { allowedFolders: next } });
+      prepared = await client.files.preparePolicyEdit(
+        { files: { allowedFolders: next } },
+        { baseVersion: parsed.baseVersion },
+      );
     } catch {
       return UI_UNAVAILABLE;
     }
@@ -347,7 +367,7 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
         case 'policy_not_valid':
           return fixed(409, 'rules_unreadable');
         case 'stale_version':
-          return fixed(409, 'changed');
+          return fixed(409, 'stale');
         default:
           return fixed(409, 'refused');
       }

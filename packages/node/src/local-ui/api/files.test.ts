@@ -92,6 +92,7 @@ interface Fake {
   resolved: string[] | 'throw';
   warnings: PolicyEditWarning[];
   refusal?: 'policy_not_valid' | 'patch_invalid' | 'identity_missing' | 'stale_version' | undefined;
+  base: number;
   askKeep: boolean;
   prepareThrows: boolean;
   patches: unknown[];
@@ -106,6 +107,7 @@ beforeEach(() => {
     resolved: [work],
     warnings: [ADDED],
     askKeep: false,
+    base: 3,
     prepareThrows: false,
     patches: [],
     applied: [],
@@ -122,13 +124,21 @@ function fakeClient(): LocalUiReadClient {
         fake.resolved === 'throw'
           ? Promise.reject(new Error(`store error at ${root}`))
           : Promise.resolve({ configured: [...fake.configured], resolved: [...fake.resolved] }),
-      preparePolicyEdit: (patch: unknown): Promise<PreparedPolicyEdit> => {
+      preparePolicyEdit: (
+        patch: unknown,
+        options?: { baseVersion?: number },
+      ): Promise<PreparedPolicyEdit> => {
         fake.patches.push(patch);
         if (fake.prepareThrows) return Promise.reject(new Error(`boom ${root}`));
         if (fake.refusal !== undefined) {
           return Promise.resolve({ status: 'refused', op: 'policy.set', reason: fake.refusal });
         }
-        const folders = (patch as { files: { allowedFolders: string[] } }).files.allowedFolders;
+        // core: an edit built on another version than the one in force is refused.
+        if (options?.baseVersion !== undefined && options.baseVersion !== fake.base) {
+          return Promise.resolve({ status: 'refused', op: 'policy.set', reason: 'stale_version' });
+        }
+        const folders =
+          (patch as { files?: { allowedFolders: string[] } }).files?.allowedFolders ?? [];
         const body = bodyFor(folders);
         return Promise.resolve({
           status: 'prepared',
@@ -136,7 +146,7 @@ function fakeClient(): LocalUiReadClient {
           body,
           jcs: canonicalize(body),
           version: 4,
-          baseVersion: 3,
+          baseVersion: fake.base,
           askKeepDeliveryReceipts: fake.askKeep,
           keepDeliveryReceipts: false,
           warnings: fake.warnings.map((w) => ({ ...w })),
@@ -189,8 +199,8 @@ function write(routes: ReturnType<typeof createFilesRoutes>): LocalUiOwnerRoute 
 }
 
 const req = (query = ''): LocalUiRequest => ({ params: {}, query: new URLSearchParams(query) });
-const q = (key: 'add' | 'remove', value: string): string =>
-  new URLSearchParams({ [key]: value }).toString();
+const q = (key: 'add' | 'remove', value: string, version = 3): string =>
+  new URLSearchParams({ [key]: value, version: String(version) }).toString();
 
 function setup(now?: number) {
   const routes = createFilesRoutes({ home, flavor: 'posix' });
@@ -283,6 +293,7 @@ describe('GET /api/ui/files: the allowed folders', () => {
         { path: join(home, 'Gone'), resolved: null },
       ],
       max: 32,
+      version: 3,
     });
   });
 
@@ -303,11 +314,17 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     const { review } = setup();
     for (const query of [
       '',
-      'add=a&add=b',
-      `add=${encodeURIComponent(shared)}&remove=${encodeURIComponent(work)}`,
-      'folder=x',
+      'version=3',
+      `add=${encodeURIComponent(shared)}`,
+      'add=a&add=b&version=3',
+      `add=${encodeURIComponent(shared)}&remove=${encodeURIComponent(work)}&version=3`,
+      'folder=x&version=3',
       `add=${encodeURIComponent(shared)}&x=1`,
-      `add=${'a'.repeat(4097)}`,
+      `add=${encodeURIComponent(shared)}&version=3&version=3`,
+      `add=${encodeURIComponent(shared)}&version=-1`,
+      `add=${encodeURIComponent(shared)}&version=03`,
+      `add=${encodeURIComponent(shared)}&version=1.5`,
+      `add=${'a'.repeat(4097)}&version=3`,
     ]) {
       expect(await review(query), query).toEqual(UI_INVALID_QUERY);
     }
@@ -407,6 +424,32 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     });
   });
 
+  it('L-1: passes the listed version as baseVersion, so a concurrent edit is stale, not undone', async () => {
+    const { routes, context, review } = setup();
+    const listed = await read(routes, '/api/ui/files').handler(context, req());
+    expect(body(listed)['version']).toBe(3);
+    // Another surface applied version 4 after the page listed version 3.
+    fake.base = 4;
+    expect(await review(q('add', shared, 3))).toEqual({ status: 409, body: { error: 'stale' } });
+    expect(fake.patches.at(-1)).toEqual({ files: { allowedFolders: [work, shared] } });
+    // Nothing was kept: the stale review has no token to sign.
+    const fresh = await review(q('add', shared, 4));
+    expect(fresh.status).toBe(200);
+  });
+
+  it('L-3: refuses a remove target with an unsafe character before anything is prepared', async () => {
+    const bidi = `${docs}/\u202eShared`;
+    fake.configured = [work, bidi];
+    const { review } = setup();
+    for (const path of [bidi, `${work}\u0007`, `${work}\u200b`]) {
+      expect(await review(q('remove', path))).toEqual({
+        status: 422,
+        body: { error: 'folder_refused', reason: 'not_showable' },
+      });
+    }
+    expect(fake.patches).toEqual([]);
+  });
+
   it('maps a core refusal or failure to a fixed answer', async () => {
     const { review } = setup();
     fake.refusal = 'policy_not_valid';
@@ -417,7 +460,7 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     fake.refusal = 'identity_missing';
     expect(await review(q('add', shared))).toEqual(UI_NOT_SET_UP);
     fake.refusal = 'stale_version';
-    expect(await review(q('add', shared))).toEqual({ status: 409, body: { error: 'changed' } });
+    expect(await review(q('add', shared))).toEqual({ status: 409, body: { error: 'stale' } });
     fake.refusal = undefined;
     fake.prepareThrows = true;
     const failed = await review(q('add', shared));
