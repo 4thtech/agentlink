@@ -65,13 +65,20 @@ function sourceFiles(dir: string): string[] {
  * Files another card owns and is fixing (M1-36 UX-B and UX-D). Their dead ends are tolerated here
  * only until those cards land; remove each entry then. Every other file must be clean.
  */
-const FIXED_BY_OTHER_CARDS = [
-  'tools/strings/en.ts',
-  'tools/invite-common.ts',
-  'commands/init.ts',
-  'approval/next-step.ts',
-  'approval/approval-ui.ts',
-];
+const FIXED_BY_OTHER_CARDS = ['tools/strings/en.ts', 'tools/invite-common.ts'];
+
+describe('the subcommand list matches the handlers (M1-36c)', () => {
+  const handlerFile: Readonly<Record<string, string>> = {
+    owner: 'owner/owner-init.ts',
+    contacts: 'owner/contacts-manage.ts',
+    policy: 'owner/policy.ts',
+    requests: 'requests.ts',
+  };
+  it.each(Object.entries(SUBCOMMANDS))('%s: every listed subcommand is handled', (name, subs) => {
+    const source = readFileSync(join(SRC, 'commands', handlerFile[name] ?? ''), 'utf8');
+    for (const sub of subs) expect(source).toContain(`'${sub}'`);
+  });
+});
 
 describe('the instructions in --help (M1-36c)', () => {
   it('every usage line names a registered command, subcommand and flag', () => {
