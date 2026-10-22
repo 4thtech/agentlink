@@ -150,6 +150,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       expect(route.method).toBe('GET');
       expect(route.presence).toBe(false);
       if (route.presence) throw new Error('unreachable');
+      // M1-11c-a1 filled the activity page (api/activity.test.ts).
+      if (route.path === '/api/ui/activity') continue;
       const result = await route.handler(context, { params: {}, query: new URLSearchParams() });
       expect(result).toEqual({ status: 501, body: { error: 'not_implemented' } });
     }

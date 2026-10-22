@@ -50,7 +50,10 @@ describe('routes', () => {
     expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
     const main = host.querySelector('main');
     expect(main?.querySelector('h1')?.textContent).toBe(title);
-    expect(main?.querySelector('.al-empty')?.textContent).toContain('available yet');
+    // M1-11c-a1: Activity is a real page now; the others are still stubs.
+    if (path !== '/settings/activity') {
+      expect(main?.querySelector('.al-empty')?.textContent).toContain('available yet');
+    }
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
