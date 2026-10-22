@@ -3,8 +3,11 @@
 // @4thtech-io/types already fixes (G-7: clock skew, approval TTL, nonce retention, budget window) are
 // imported from there and not repeated here.
 
-/** The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7). */
-export const STORE_SCHEMA_VERSION = 4;
+/**
+ * The logical schema version of 07 §3 that this code implements (forward migrations only, §3.7).
+ * Version 5 (M1-9i-a, D-115) adds `own_storage` (07 §3.4).
+ */
+export const STORE_SCHEMA_VERSION = 5;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

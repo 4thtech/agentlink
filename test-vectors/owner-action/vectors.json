@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 6,
+  "version": 7,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, pyhpke 0.6.5, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
@@ -8167,6 +8167,1403 @@
             "expiresAt": 1760000600
           },
           "sig": "e0cbb801e28651aa812f5d5b2fc4f7a8bd78da4506bde2bc3304ef1131c8c59aadbc54ecae37fc178f93f668ebf4c9545b7129a54fe377f75d92451c3f809775"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-storage-set",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, storage.set, R2 (M1-9i-a)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "storage.set",
+          "params": {
+            "id": "fddb65c96d017bd0",
+            "provider": "r2",
+            "endpoint": "https://acct.r2.cloudflarestorage.com",
+            "bucket": "agent-files",
+            "region": "auto",
+            "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"storage.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"bucket\":\"agent-files\",\"credentialDigest\":\"c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907\",\"endpoint\":\"https://acct.r2.cloudflarestorage.com\",\"id\":\"fddb65c96d017bd0\",\"provider\":\"r2\",\"region\":\"auto\"},\"v\":1}",
+        "bodyHash": "7d06aa61e7f1510a7716d9c06b00b2b9c21ba01502c8f4e92018011bae9a4bee",
+        "signatureInput": "32a6c3cfab31d24bd0ada5f07b868affa3df7341664b6a56af974085483c1de4",
+        "sig": "0576513fcf40e771a3325ee58a5181c4990179ed856fe5bd21f939fb38ba96891f50a645a28249ab65a3aa1fed2d2fe6858a8ec028542528aa65f5647919a399"
+      }
+    },
+    {
+      "id": "sign-storage-set-port",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, storage.set, an endpoint with a port (M1-9i-a)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "storage.set",
+          "params": {
+            "id": "fddb65c96d017bd0",
+            "provider": "minio",
+            "endpoint": "https://minio.example.com:9000",
+            "bucket": "a.b-c",
+            "region": "eu-central-1",
+            "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"storage.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"bucket\":\"a.b-c\",\"credentialDigest\":\"c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907\",\"endpoint\":\"https://minio.example.com:9000\",\"id\":\"fddb65c96d017bd0\",\"provider\":\"minio\",\"region\":\"eu-central-1\"},\"v\":1}",
+        "bodyHash": "0c65ada4282efcf99ac4782340f2028bd9181b77d385508148078dfe01f87213",
+        "signatureInput": "26b6210da65530ad08225754a2ff70828c6480941bea9a9254af9cae8fb6e6c3",
+        "sig": "a5ffa24d36a2b229487f4fa3b3825af4285412685e5ba4e9cf02fde863160a2bccd0bf8a906c723a14cd0a291d93295973f4bc72ba13e29b61fa8f30056f8dad"
+      }
+    },
+    {
+      "id": "sign-storage-remove",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, storage.remove (M1-9i-a)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "storage.remove",
+          "params": {
+            "id": "fddb65c96d017bd0"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"storage.remove\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"id\":\"fddb65c96d017bd0\"},\"v\":1}",
+        "bodyHash": "33a4ef83258cd434be5b9b61efdeb6516f4eedc13302af350494ad3a32a24be2",
+        "signatureInput": "0cc26846d2947cbfb13292af00a90e4c2fbffee48437ac6bf7dffe75749c05ca",
+        "sig": "d84be3e5e7e79cb318259f866bda3ef6f2afe018dbedd3bf1d2beb70de01f00436657a9ae7ded020d47840e9d9ec63323115fc519e6803aa1a5a7c86117ce8aa"
+      }
+    },
+    {
+      "id": "sign-backup-export-full",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, backup.export, contents full (M1-9i-a)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "backup.export",
+          "params": {
+            "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+            "contents": "full"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"backup.export\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"contents\":\"full\",\"kitId\":\"xXucm0WxMQmX0t-cFoyJDA\"},\"v\":1}",
+        "bodyHash": "8b26cc5da4569803e1cf014adf74a11d3ff86bd172cd8fedda0cea8c4b77a39f",
+        "signatureInput": "11cebe4241a1bfe3a41d59bad00b239e5625c1dc0cffc2820340695e7865d810",
+        "sig": "19fa2dad47a581a3b76d31b9d63cfecabc06b5fbcab518ce86d66d905a718e30f543cc29a3553de6db5989b8160e0386fff03ab44ba7c6c45c39c40e312cfc07"
+      }
+    },
+    {
+      "id": "sign-backup-export-identity",
+      "source": "04 \u00a72.5.1 SignedOwnerAction, backup.export, contents identity (M1-9i-a)",
+      "input": {
+        "op": "sign",
+        "body": {
+          "v": 1,
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "op": "backup.export",
+          "params": {
+            "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+            "contents": "identity"
+          },
+          "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+          "issuedAt": 1760000000,
+          "expiresAt": 1760000600
+        },
+        "secretKey": "132b5e8f0be4c36e6ea424491b50031bfd315867a5c2512dae02259a6434fde5",
+        "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
+      },
+      "expected": {
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"backup.export\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"contents\":\"identity\",\"kitId\":\"xXucm0WxMQmX0t-cFoyJDA\"},\"v\":1}",
+        "bodyHash": "8ce2ffaf0a58812270db551ad32aee18497e1b3dfc184c06596e73b556b4ed32",
+        "signatureInput": "2b49bcf6eb15059f560990d88c11184a4be3a9b98725032b24dc16aa5b5b03ad",
+        "sig": "9de20456cec6781ff0174f50088858322870f6b935cc8a606a1ba335b3fc3742168a6ba780f2f7fef16f7e6bf056a07e63622c2c977aebddd7fceef49d32465f"
+      }
+    },
+    {
+      "id": "verify-storage-set",
+      "source": "04 \u00a72.5.1: storage.set verifies (M1-9i-a)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "0576513fcf40e771a3325ee58a5181c4990179ed856fe5bd21f939fb38ba96891f50a645a28249ab65a3aa1fed2d2fe6858a8ec028542528aa65f5647919a399"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-storage-set-port",
+      "source": "04 \u00a72.5.1: storage.set with a port verifies (M1-9i-a)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "minio",
+              "endpoint": "https://minio.example.com:9000",
+              "bucket": "a.b-c",
+              "region": "eu-central-1",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "a5ffa24d36a2b229487f4fa3b3825af4285412685e5ba4e9cf02fde863160a2bccd0bf8a906c723a14cd0a291d93295973f4bc72ba13e29b61fa8f30056f8dad"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-storage-remove",
+      "source": "04 \u00a72.5.1: storage.remove verifies (M1-9i-a)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.remove",
+            "params": {
+              "id": "fddb65c96d017bd0"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "d84be3e5e7e79cb318259f866bda3ef6f2afe018dbedd3bf1d2beb70de01f00436657a9ae7ded020d47840e9d9ec63323115fc519e6803aa1a5a7c86117ce8aa"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-backup-export",
+      "source": "04 \u00a72.5.1: backup.export verifies (M1-9i-a)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+              "contents": "full"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "19fa2dad47a581a3b76d31b9d63cfecabc06b5fbcab518ce86d66d905a718e30f543cc29a3553de6db5989b8160e0386fff03ab44ba7c6c45c39c40e312cfc07"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-storage-set-at-expiry",
+      "source": "04 \u00a72.5.1: storage.set verified at now = expiresAt (expiry has no skew)",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "0576513fcf40e771a3325ee58a5181c4990179ed856fe5bd21f939fb38ba96891f50a645a28249ab65a3aa1fed2d2fe6858a8ec028542528aa65f5647919a399"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000600
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "reject-storage-set-lifetime",
+      "source": "04 \u00a72.5.1: expiresAt - issuedAt = 601 s (L(storage.set) = 600 s); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000601
+          },
+          "sig": "0ef362959ac092274e9e6ef7676a2aac7dbcb20c9e0ef8d7769647bbb1696c243e3b416bc0261edc4f7ea34da25ff10a13f23315e5f1db7824bfc4c1f2a9acaa"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-remove-lifetime",
+      "source": "04 \u00a72.5.1: expiresAt - issuedAt = 601 s (L(storage.remove) = 600 s); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.remove",
+            "params": {
+              "id": "fddb65c96d017bd0"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000601
+          },
+          "sig": "4ec9ec21fe22a176eb147d4cd2a2988b133139b62ad7067f48a8e238356729cdc4ceaaf062515941eccf3eaf6a9b31c84223cb93ad9d1a607d800de97512298d"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-backup-export-lifetime",
+      "source": "04 \u00a72.5.1: expiresAt - issuedAt = 601 s (L(backup.export) = 600 s); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+              "contents": "full"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000601
+          },
+          "sig": "b33650d1fc28bc7c4ae74ebbd2d56d79d2d7b48d27593270cbf73599e2dbeb9d872d64278e3a47b39b7b91a1794231455dba1da1a47ba0df8e097c601fe04f15"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-expired",
+      "source": "04 \u00a72.5.1: now > expiresAt; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000059
+          },
+          "sig": "f5b6c5f9cc5b001a562c3a83a00031c960333d631df45fcdf3b896816afe05aec18a044998325f3191c89e7e1041d2a11598c40df81c7f32f21c92b8cef9ca32"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in storage.set params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907",
+              "note": "x"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "b10538b0df1b32b4cdb468b945d6d76b2cb16e05a91b1e1e927066048f5a632717ceffee07ed8aa7e6f998aa326afe7d70276c200b89cd42ac0edc847c0689b3"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-secret-param",
+      "source": "04 \u00a72.5.1: a credential in storage.set params (never a param, I-7); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907",
+              "secretAccessKey": "s"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "4ec56bb54a5b39f72c3abf37c74d08a2ac169160f809164153ebca7cd1c25ade97e2d753f1ccbb99512fdb00d84468dc2500106b7547209cc0fddabc93d79e5c"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-missing-region",
+      "source": "04 \u00a72.5.1: storage.set params without `region`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "ae8393123016c759d59679f2fc15e313b45976f70f74d2f47166a5e206ff32d98b1cb3fc3a5969626403d532857e14dacd4329f46387e41717e5f72992ab58e1"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-remove-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in storage.remove params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.remove",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "8e71bc401d5eedff1da65e28b4dd206fc5c7990bfac1bd6516a80d27152bcca149d300faaa27a6061af1c174f4e6ed4de58b2126a8d28f6363e1b45ccbcbc3b4"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-backup-export-unknown-param",
+      "source": "04 \u00a72.5.1: unknown key in backup.export params; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+              "contents": "full",
+              "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "a83cbce4f2e289fb84aa17b51dfbf3d8ce3b57d16facc9169b2405d6f40a0c8e8829c3e7c576cbf8cc715466746f15841e600406d70a05444bcd473fc8299219"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-id-uppercase",
+      "source": "04 \u00a72.5.1: `id` in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "FDDB65C96D017BD0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "d25a9744256f09ffa783eede10ff5134b2720501ea2da232a25fb0a0c5899892f6347518f76ab67ff9512583ac4c52d395618e32eed269dd7ef740222d5bbdda"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-id-short",
+      "source": "04 \u00a72.5.1: `id` of 15 hex digits (8 bytes are 16); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "4788610e9ec03ece30730c9c9254698b8a85b2034e1ee2d523c9a501b68af61e7137d0bf8c677f33bd5e137243a54c01691260a78e53a249b2b47a181ecaadf4"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-id-long",
+      "source": "04 \u00a72.5.1: `id` of 9 bytes; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd000",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "9c677737b9d11adde24de5ea4a9eb14ab35b8a0091b6fff11b47a5f24191f9d8663f49d3e479b386cc80589c5a5ef3eb12d775290abca953659999359ea292eb"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-remove-id-0x",
+      "source": "04 \u00a72.5.1: `id` with a 0x prefix; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.remove",
+            "params": {
+              "id": "0xfddb65c96d017bd0"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "ea337542033d1887445803d00d04b335af91b2442fdb33c17aa8fedd06f8dfd86336c7307e206d52354f4d35dce1e97dd5984346caa0ef88b54eefb6bcee52f0"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-trailing-slash",
+      "source": "04 \u00a72.5.1: endpoint with a trailing slash (not the validateEndpoint output); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com/",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "eb95083e0908ba3c74ab7fada5789bada748e03547de933005422b84cfb2ba63a4506502f9bbf0c93c12687608e5b79618b2d47b9e21c9e83bae0045452b73c4"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-http",
+      "source": "04 \u00a72.5.1: endpoint over http; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "http://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "eeab067b850e3bef4dfebb82d4a7811ed95bff6aa5d43d9a951e04fc20439052f67895d151364e8af9ba03701916f5ee00ae91cd81e0b7bbbd6e534615d1c298"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-uppercase",
+      "source": "04 \u00a72.5.1: endpoint host in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://ACCT.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "0d37b6a2898535b8b7adc09c34b4fcb9da6a21fd1811cc4e35dc0292bdc31efeebb1580fa954cc142e9a5d2c7ba93093dc16015b743fce3bf63245365d4ffbb0"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-path",
+      "source": "04 \u00a72.5.1: endpoint with a path; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com/agent-files",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "de4aa743827ecc9760aee4e65f6013d24f044623615f35bb1dcff6b1d999160b94c3a9d3c3cf702bf2d6b87766e31d287f356112340b0eedca1223422bf1f015"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-ip",
+      "source": "04 \u00a72.5.1: endpoint an IP literal; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://10.0.0.1:9000",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "79ca800afc6b4ad1cc9405ea3a54c3841957733555fb57f3e74a9611941e8631a63dac17ffe66b071709ef6a9086302a7022acaa655e3e45c6450d89987a922f"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-localhost",
+      "source": "04 \u00a72.5.1: endpoint a local name; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://minio.localhost",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "12dd188fd268e06048e37b7e1471f2554bd980bb66680650c035cf8b38e574dd1fd149a6a3254bf57fd2a511bdc8dc1f007a40110745204f072b137ee45d15ba"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-port-leading-zero",
+      "source": "04 \u00a72.5.1: endpoint port with a leading zero; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://minio.example.com:09000",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "993deac0a5da1cf5603a7071308322421062778ce99bf6aac7bff82cc8ffc2050fa8c3eb37a8c2adc4e12debab3b7531ee38e518b2126e7f0f9ab502756575c9"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-endpoint-percent",
+      "source": "04 \u00a72.5.1: endpoint with percent-encoding; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorag%65.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "f5c4e09d9d40e395a9f5016502c233f46de8b1d276283e10b3689719d3c77326c10b095f382f3e0f816fb3b0d1e0178eaa88041645e1548376c780be370ab296"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-provider",
+      "source": "04 \u00a72.5.1: a provider outside the list; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "gcs",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "8f64c2372fd8949d67c05fafa31b2a24e11c61c5ea16592c03dca220d2d24a0f1c090c23262e541eaf4e3f41f3566dfa362b9ad15565de2eab1095e72e3e2526"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-bucket-uppercase",
+      "source": "04 \u00a72.5.1: bucket in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "Agent-Files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "2c4c686b67128f823f40ac61b35fc7278ae12998ea11f57eb21ebb9ac387cd91fbe7b87feba8c9661751af9d0e654c8f52110734bd36d787fa15771eacb0a2ac"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-bucket-short",
+      "source": "04 \u00a72.5.1: bucket of 2 characters; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "ab",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "477980794031ea64d5a3916bbe3e4b376acb959aa67e614a2d819b5096b39832ba66b629e4e289c0d8a218a446019164b528818b009df046084f40418827ad29"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-region-uppercase",
+      "source": "04 \u00a72.5.1: region in upper case; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "EU",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "52d5b7446f401b6a1ac26c5fc98291f9fb008aff1b2d8fb44268e6e7831631ca4b53c5930a538b51c63e25295fadf7ca02bff290754603acc144f009bdf258d5"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-digest-uppercase",
+      "source": "04 \u00a72.5.1: credentialDigest in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "C2002852E94F5A1CB0E33CA5E58E0D33F3E6CDDC82757E847DFBC4972A658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "1a3b938fa8a7ea30f6e692658dd7d076311729ea800cb90928e29be4dd4eb6cde96f122afac6f1eaeb2c33546a688a044753bbb9395c8f3d50fee487638dc2bb"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-backup-export-kit-id-padded",
+      "source": "04 \u00a72.5.1: kitId base64url with padding; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJDA==",
+              "contents": "full"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "8ebddc33fab39a50d1e0bf385541a4be630472f59468c02d5437da23f98598dd2c74e1ef12381f13fd79126eaf981cbef48d446f26ba4ba563842ffd2741eac8"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-backup-export-kit-id-short",
+      "source": "04 \u00a72.5.1: kitId of 15 bytes; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJ",
+              "contents": "full"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "459c653492a8fb3cdbf483e5735b4894113b733151124235fddac8072fee32cb2e5ff0b35999f7548eb9d2e2860279a63426a5d5cab494608c09f580f8327345"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-backup-export-contents",
+      "source": "04 \u00a72.5.1: contents outside full and identity; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+              "contents": "all"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "8099a84e5f30eafdad9b5ab1f9cf75a437990a589a917251f9ca85a387bd16d05725442c18b00b178a7ca6563149001b34a4de5fabadd76ff1790a2b28dfffba"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-expires-zero",
+      "source": "04 \u00a72.5.1: expiresAt = 0 (allowed only for agent.revoke); rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 0
+          },
+          "sig": "3249731e7f891d9ed75a760a3394d117d9e904c4b12153672311014b8899811c7e6bc16631c74fd4970fa26d2de77f27939b5ffb8989dd52fc3f0c02f445ca79"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-storage-set-other-signer",
+      "source": "04 \u00a72.5.1: signed by another key than `owner`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "storage.set",
+            "params": {
+              "id": "fddb65c96d017bd0",
+              "provider": "r2",
+              "endpoint": "https://acct.r2.cloudflarestorage.com",
+              "bucket": "agent-files",
+              "region": "auto",
+              "credentialDigest": "c2002852e94f5a1cb0e33ca5e58e0d33f3e6cddc82757e847dfbc4972a658907"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "57c398c6b8031ad3969f7f4a6a800c7fc23b73991dd377fb2bb4db6936995705e3c206c0c59de4a76f94b073d9d91ef8e2ba14a7083f66cee8ed431d64f3cebd"
+        },
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "reject-backup-export-other-signer",
+      "source": "04 \u00a72.5.1: signed by another key than `owner`; rejected, never normalised",
+      "input": {
+        "op": "verify",
+        "signed": {
+          "body": {
+            "v": 1,
+            "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+            "owner": "241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+            "op": "backup.export",
+            "params": {
+              "kitId": "xXucm0WxMQmX0t-cFoyJDA",
+              "contents": "full"
+            },
+            "nonce": "-_8-DwD_EOD4_n08GwqZ7g",
+            "issuedAt": 1760000000,
+            "expiresAt": 1760000600
+          },
+          "sig": "a4fe01e1e9192571c99bd0098a025f3b718517fe2a002fb3c1a9af639e439b10586ef7a2a3b6aa8dd1d7cd0d3dd03e4d24a870169025a802556e12664fb12e44"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
