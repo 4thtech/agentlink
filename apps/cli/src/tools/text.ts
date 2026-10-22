@@ -48,6 +48,12 @@ export const TOOL_TEXT = Object.freeze({
   approvalNotFound: "There's no approval request with that ID for this agent.",
   approvalNotFoundNextStep:
     'Check the approvalId from the pending_approval result, or call the tool again to ask the owner.',
+  // M1-36j (D4): the decision seen during the brief wait inside the call. Slot: a checked ID only.
+  approvalWaitApproved: "The owner approved this request. It hasn't run yet.",
+  approvalWaitApprovedNextStep:
+    'Call the same tool again now with the same arguments and approvalId {approvalId} to go ahead.',
+  approvalWaitDeniedNextStep:
+    "Tell the user it won't run. Nothing else is needed unless they ask for it again.",
 });
 
 /**
