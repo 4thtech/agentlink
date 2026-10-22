@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 254 (M1a 88, M1b 166; 24 cards added from D-118 on 2026-10-22: M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 230 (M1a 88, M1b 142), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 256 (M1a 88, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 230 (M1a 88, M1b 142; the baseline also counts the format-example heading in §1, so it may really be 229), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 44 (incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -1015,7 +1015,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
 
 #### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
-- **Status:** done (4thtech/agentlink#362, merged; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** done (landed through #356 and #364; #362 closed as superseded; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
 - **Depends on:** — (runs in parallel with M1-35a)
 - **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
@@ -3750,8 +3750,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11s-a · local UI: client shell (`apps/local-ui`) (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/**`: `package.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `router.tsx`, `nav.ts`, `api/client.ts`, `layout/**`, stub pages `src/pages/{first-run,approvals,approve,activity,contacts,files,storage,proofs,rules,backup,advanced}/index.tsx` and `src/states/index.tsx`
-- **Depends on:** #370 (React components in `packages/ui`, lockfile)
+- **Repo/path:** agentlink · `apps/local-ui/**`: `package.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `router.tsx`, `nav.ts`, `api/client.ts`, `layout/**`, its own `pnpm-lock.yaml` importer entry, stub pages `src/pages/{first-run,approvals,approve,activity,contacts,files,storage,proofs,rules,backup,advanced}/index.tsx` and `src/states/index.tsx`
+- **Depends on:** #370 (React components in `packages/ui`, lockfile); merges after M1-11s-b (the deps-check zone for `apps/local-ui` exists only then); lockfile conflicts are resolved by regenerating with `pnpm install` at merge
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
@@ -3763,7 +3763,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11s-b · local UI: server shell (static assets, routes, context, CLI embedding) (new, D-118)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` (static `/assets/*`, CSP `font-src 'self'`, SPA fallback for the new routes only), `packages/node/src/local-ui/{context.ts,route-types.ts,routes.ts}`, `packages/node/src/local-ui/api/{activity,contacts,files,storage,proofs,rules,backup,advanced}.ts` (501 stubs), `packages/node/src/index.ts`, `apps/cli/src/mcp/command.ts` and `agentlink ui` wiring, the `apps/cli` build (embeds the built `apps/local-ui` assets), `tools/deps-check/policy.mjs` (zone `apps/local-ui`), `pnpm-lock.yaml`
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` (static `/assets/*`, CSP `font-src 'self'`, SPA fallback for the new routes only), `packages/node/src/local-ui/{context.ts,route-types.ts,routes.ts}`, `packages/node/src/local-ui/api/{first-run,approvals,activity,contacts,files,storage,proofs,rules,backup,advanced}.ts` (501 stubs, so wave 1 never edits `routes.ts`), `packages/node/src/index.ts`, `apps/cli/src/mcp/command.ts` and `agentlink ui` wiring, the `apps/cli` build (embeds the built `apps/local-ui` assets), `tools/deps-check/policy.mjs` (zone `apps/local-ui`), the `pnpm-lock.yaml` entries other than the `apps/local-ui` importer
 - **Depends on:** #348, #370
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
@@ -3789,14 +3789,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-11r-b · owner-operation prepare helpers for the local UI (new, D-118)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (the owner-action files shared with M1-9i-a) and their `src/index.ts` exports
-- **Depends on:** M1-9i-a (same owner-action files)
+- **Depends on:** M1-9i-a (same owner-action files), M1-11r-a (both write `packages/core/src/index.ts`)
 - **Spec:** 04 §2.5; 06 §8; 07; 08 §1; D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Helpers that build the unsigned body the server then signs after the presence check (D-118): `preparePolicyEdit(patch)` with a version bump (for the Rules and Files writes); `contact.check`, `contact.rename` and `contact.remove` bodies; relay and RPC set through owner operations.
+  - Helpers that build the unsigned body the server then signs after the presence check (D-118): `preparePolicyEdit(patch)` with a version bump (for the Rules and Files writes); the unsigned `contact.check`, `contact.rename` and `contact.remove` bodies. Relay and RPC writes are not here: they depend on M1-7j and M1-9n (see M1-11c-a6).
   - The browser never signs: these return unsigned bodies to the server-side handler only.
 - **Acceptance:**
   - Tests-first: the version bump, rejection of a stale version, and byte-exact bodies against vectors where a vector exists; an unsigned body is never accepted by the core without an owner signature. Threat note and tests-first evidence (S2).
+
+#### M1-11r-c · core dropUsage and own-storage status (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (new module and `src/index.ts` export)
+- **Depends on:** M1-9i-a (shares own-storage), M1-11r-b (both write `packages/core/src/index.ts`)
+- **Spec:** 06 §8; 07; 08 §1; D-48, D-115, D-118
+- **Invariants:** I-7
+- **Scope:**
+  - `files.dropUsage()`: used bytes against the quota for the encrypted drop, and a read of the own-storage status (connected or not, last test result) for the Storage page. Read-only; no credential, presigned URL or share link in any result.
+- **Acceptance:**
+  - Unit tests for empty, partly used and over-quota states and for own storage connected and not; a fixture grep shows no credential or URL in any result. Threat note and tests-first evidence (S2).
 
 #### M1-11c · local UI: settings pages
 - **Status:** split into M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-11c-a1…a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c (D-118, 2026-10-22) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -3812,7 +3823,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Playwright flow per page; every mutating action requires presence; default views pass the vocabulary lint; owner confirms fidelity to the adjusted design.
 
 #### M1-11c-a1 · local UI page: Activity (new, D-118)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/activity.ts` and its test, `e2e/test/local-ui-activity.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a; DESIGN-ADJ-1
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
@@ -3859,7 +3870,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 
 #### M1-11c-a4 · local UI page: Proofs and credits (new, D-118)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/proofs.ts` and its test, `e2e/test/local-ui-proofs.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a; DESIGN-ADJ-1
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
@@ -3911,32 +3922,34 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Advanced (Local-advanced): fingerprints, relays, RPCs and chains; the only place a chain can be chosen (D-40).
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Advanced (Local-advanced): fingerprints, relays, RPCs and chains; the only place a chain can be chosen (D-40). Relay and RPC writes go through the M1-7j relay republish and M1-9n owner operations, not through M1-11r-b; if no RPC or chain-override owner operation is specified by then, the page shows these read-only.
   - The server handler in `packages/node/src/local-ui/api/advanced.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
 - **Acceptance:**
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 
 #### M1-11c-b · local UI page: Storage (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/storage/**`, `packages/node/src/local-ui/api/storage.ts` and test, `e2e/test/local-ui-storage.test.ts`
-- **Depends on:** M1-9i, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-4
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/storage/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/storage.ts` and its test, `e2e/test/local-ui-storage.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-9i, M1-11r-c, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-4
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
-- **Invariants:** I-4, I-5
+- **Invariants:** I-4, I-5, I-7
 - **Scope:**
-  - Storage (Local-storage): drop usage against the quota (`dropUsage`, M1-9i) and, under Advanced, the status of own storage with a "connect in terminal" step and a test. Credential entry stays in the terminal (D-117, `agentlink storage connect`); the page never takes a storage credential.
+  - Storage (Local-storage): drop usage against the quota (`dropUsage`, M1-11r-c) and, under Advanced, the status of own storage with a "connect in terminal" step and a test. Credential entry stays in the terminal (D-117, `agentlink storage connect`); the page never takes a storage credential.
 - **Acceptance:**
+  - I-7 holds: no storage credential or URL of the user's storage reaches the page, a log or an error (fixture grep).
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
   - No storage credential, presigned URL or share link reaches the page or any log.
 
 #### M1-11c-c · local UI page: Backup (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**`, `packages/node/src/local-ui/api/backup.ts` and test, `e2e/test/local-ui-backup.test.ts`
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/backup.ts` and its test, `e2e/test/local-ui-backup.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-9i, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-3
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
-- **Invariants:** I-4, I-5
+- **Invariants:** I-4, I-5, I-7, I-10
 - **Scope:**
   - Backup (Local-backup): recovery-kit export behind the owner's passkey; restore stays in the terminal only (D-117, 06 §8, 04 §2.3). The kit is shown through the `SecretDisplay` component and never logged.
 - **Acceptance:**
+  - I-7 and I-10 hold: the kit needs owner presence, is shown once through `SecretDisplay` and never reaches a log, URL or the 4thTech services.
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
   - The kit never appears in a URL, a log or an error.
 
@@ -3957,7 +3970,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-11b-1 · local UI: first run and shared states (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
-- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-9i (the recovery kit for Local-recovery); DESIGN-ADJ-1
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
@@ -3980,8 +3993,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-3 · local UI: first-run recovery-code step per brief B-3 (new, D-118)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/**` (the pages named by the brief), their tests and `e2e/test/` files
-- **Depends on:** M1-11b-1; design brief B-3 (S2 parts gated by the brief)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/recovery/**` and its tests only
+- **Depends on:** M1-11b-1, M1-9i; design brief B-3
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
@@ -3991,8 +4004,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-4 · local UI: states and cards using the components from M1-35b-b (new, D-118)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/**` (the pages named by the brief), their tests and `e2e/test/` files
-- **Depends on:** M1-35b-b (S2 parts gated by the brief)
+- **Repo/path:** agentlink · `apps/local-ui/src/states/**` and its tests only
+- **Depends on:** M1-11b-1, M1-11b-2, M1-35b-b
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
@@ -4002,8 +4015,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-5 · local UI: approval and commitment cards per brief B-9 (new, D-118)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/**` (the pages named by the brief), their tests and `e2e/test/` files
-- **Depends on:** M1-11b-2; design brief B-9 (S2 parts gated by the brief)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/cards/**` and `apps/local-ui/src/pages/approve/**` with their tests only
+- **Depends on:** M1-11b-2, M1-11b-4 (serial; no overlapping files); design brief B-9
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
 - **Scope:**
@@ -4411,6 +4424,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Inbox page: remove the N+1 database transaction (one read per page, not one per item).
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - The concurrency test signs exactly one DELIVERED; the already-notarized case is reported in the result field and the summary line; the inbox page test shows one transaction per page; no test weakened.
+
+#### M1-33d-c · proofStatusShape follows 06 ProofStatus (new, from IR-M1-33d-b-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/types` (`proofStatusShape` and its schema test)
+- **Depends on:** M1-33d-b
+- **Spec:** 06 `ProofStatus`; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - Align `proofStatusShape` with 06 `ProofStatus`: add `receiptRequested`, `receiptRequestNotAdded` and `advanced`.
+- **Acceptance:**
+  - A schema test accepts each new field and rejects a malformed one; the existing proof tests pass unchanged.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
