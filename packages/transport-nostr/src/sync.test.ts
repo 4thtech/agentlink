@@ -1862,6 +1862,22 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect(new Set(ids(s)).size).toBe(ids(s).length);
   });
 
+  /**
+   * `count` wraps at second `at` on each of `relays` that the seen-set already holds: the engine
+   * takes them as `duplicate` without opening them (no crypto), which keeps the bound tests fast.
+   */
+  function seenEverywhere(s: Setup, relays: readonly string[], count: number, at: number) {
+    const events = Array.from(
+      { length: count },
+      () => junkWrap(s.recipient.pubkey, at) as unknown as NostrEvent,
+    );
+    for (const event of events) {
+      s.store.seen.set(`wrap:${event.id}`, NOW - 10);
+      for (const relay of relays) s.net.inject(relay, event);
+    }
+    return events;
+  }
+
   it('keeps the queries per pass and the ids per query within the fixed bounds', async () => {
     const s = setup();
     const [capped, full] = relayUrls('rq-bounds', 2) as [string, string];
@@ -1871,7 +1887,7 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     expect(MAX_GAP_REQUERY_IDS).toBe(64);
     const seconds = MAX_GAP_REQUERIES_PER_PASS + 4;
     for (let sec = 0; sec < seconds; sec += 1)
-      injectEverywhere(s, [capped, full], 3, NOW - 100 - sec);
+      seenEverywhere(s, [capped, full], 3, NOW - 100 - sec);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
@@ -1885,7 +1901,28 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     }
     // The gaps over the query bound stay reported, so the user still hears of them (M1-5g).
     expect(result.gaps ?? []).toHaveLength(seconds - MAX_GAP_REQUERIES_PER_PASS);
-    expect(result.delivered).toBe(seconds * 3);
+    expect(result.partial).toBe(false);
+    expect(result.dropped).toBe(0);
+  });
+
+  it('queries a second with exactly the bound of missing ids, and closes it', async () => {
+    const s = setup();
+    const [capped, full] = relayUrls('rq-at-bound', 2) as [string, string];
+    // A relay's cap applies to the ids query too, so this one shows 64 and can return 64 more.
+    s.net.configure(capped, { maxLimit: MAX_GAP_REQUERY_IDS });
+    s.net.configure(full);
+    const T = NOW - 3_000;
+    seenEverywhere(s, [capped, full], 2 * MAX_GAP_REQUERY_IDS, T);
+    seenEverywhere(s, [capped, full], 1, T - HOUR);
+    const result = await s.engine.sync({
+      relays: [capped, full],
+      identities: identity(s),
+      onEnvelope: s.handler(),
+    });
+    const rq = idsReqs(s, capped);
+    expect(rq).toHaveLength(1);
+    expect(reqIds(rq[0])).toHaveLength(MAX_GAP_REQUERY_IDS);
+    expect(result.gaps).toEqual([]);
   });
 
   it('does not query a second with more missing ids than the bound, and keeps it reported', async () => {
@@ -1894,8 +1931,8 @@ describe('a bounded ids re-query for a relay-cap gap (M2-19)', () => {
     s.net.configure(capped, { maxLimit: 5 });
     s.net.configure(full);
     const T = NOW - 3_000;
-    injectEverywhere(s, [capped, full], MAX_GAP_REQUERY_IDS + 6, T);
-    olderEverywhere(s, [capped, full], T);
+    seenEverywhere(s, [capped, full], MAX_GAP_REQUERY_IDS + 6, T);
+    seenEverywhere(s, [capped, full], 1, T - HOUR);
     const result = await s.engine.sync({
       relays: [capped, full],
       identities: identity(s),
