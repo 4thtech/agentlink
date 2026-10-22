@@ -243,7 +243,12 @@ async function evaluateInput(input: RecoveryKitInput): Promise<readonly Comparis
   }
 }
 
+// CHORE-VECTORS-KDF-TIMEOUT: kek-default-params runs Argon2id at 64 MiB (memory-hard). It took
+// 0.67 s locally (node) and, on CI main push 39670996155 (2026-10-21), up to 2.7 s in WebKit, 2.5 s
+// in Firefox, 1.6 s in workerd and 1.1 s in Node. 60 s matches the crypto package's Argon2id files
+// (M0-10e). No KDF parameter, vector or assertion changed.
 export const recoveryKit: SuiteModule = {
+  timeoutMs: 60_000,
   async evaluate(testCase) {
     const input = parseInput(testCase.input);
     try {
