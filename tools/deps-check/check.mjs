@@ -42,7 +42,6 @@ import {
   SUBTLE_ZONES,
   ZONES,
   allowedManifestNames,
-  allowedWorkspaceNames,
   relativeEscapeAllowed,
   isRetiredScope,
   isSubtleExempt,
