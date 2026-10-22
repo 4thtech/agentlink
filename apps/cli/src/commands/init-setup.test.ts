@@ -68,7 +68,8 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
     clock: () => NOW,
     platform: 'darwin',
     cliPrefix: () => options.prefix ?? NPX,
-    agentlinkOnPath: () => options.onPath ?? false,
+    // A successful install puts `agentlink` on PATH, unless the test says otherwise.
+    agentlinkOnPath: () => options.onPath ?? (installs > 0 && (options.installOk ?? true)),
     installGlobal: () => {
       installs += 1;
       return Promise.resolve(options.installOk ?? true);
@@ -133,6 +134,13 @@ describe('D1: the offer to install AgentLink on this computer', () => {
     },
   );
 
+  it('installed but not reachable on PATH: the commands keep the npx form', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: TTY, answers: ['y', 'y'], onPath: false });
+    expect(run.installs).toBe(1);
+    expect(run.out).toContain(`\`${NPX} owner init --agent codex\``);
+  });
+
   it('a failed install says so plainly and falls back to npx', async () => {
     await mkdir(join(home, '.codex'));
     const run = await init([], { terminal: TTY, answers: ['y', 'y'], installOk: false });
@@ -145,7 +153,12 @@ describe('D1: the offer to install AgentLink on this computer', () => {
 
   it('is not offered when AgentLink is already installed', async () => {
     await mkdir(join(home, '.codex'));
-    const run = await init([], { terminal: TTY, answers: ['y'], onPath: true, prefix: 'agentlink' });
+    const run = await init([], {
+      terminal: TTY,
+      answers: ['y'],
+      onPath: true,
+      prefix: 'agentlink',
+    });
     expect(run.asked).toBe(1);
     expect(run.installs).toBe(0);
     expect(run.out).not.toContain(INIT_TEXT.installQuestion);

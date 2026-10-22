@@ -22,6 +22,7 @@ import {
   createDispatcher,
   type DispatchIO,
 } from '../dispatch.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import { readAgentConfig } from '../runtime/index.js';
 import type { TerminalContext } from '../runtime/guards.js';
@@ -106,6 +107,9 @@ function codeOf(run: Run): string {
   return match[1];
 }
 
+/** INIT_TEXT with the M1-36a command prefix filled in, as printed here (run through vitest, not npx). */
+const withPrefix = (text: string): string => text.replaceAll('{prefix}', cliPrefix());
+
 const read = (...parts: string[]): Promise<string> => readFile(join(home, ...parts), 'utf8');
 const exists = (...parts: string[]): Promise<boolean> =>
   readFile(join(home, ...parts)).then(
@@ -182,7 +186,11 @@ describe('detection', () => {
 describe('Claude Desktop (M1-9w)', () => {
   const MAC = ['Library', 'Application Support', 'Claude', 'claude_desktop_config.json'];
   const WIN = ['AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'];
-  const ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
+  // M1-36b (D5): one app, so the agent is named after it.
+  const ENTRY = {
+    command: 'npx',
+    args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'claude-desktop'],
+  };
   const cases: [NodeJS.Platform, string[], string][] = [
     ['darwin', MAC, '~/Library/Application Support/Claude/claude_desktop_config.json'],
     ['win32', WIN, '~/AppData/Roaming/Claude/claude_desktop_config.json'],
@@ -262,17 +270,19 @@ describe('the exact diff of each harness', () => {
     expect(plan.out).toContain(copy('cli.init.changesFor', { appName: 'Claude Code' }));
     const lines = plan.out.split('\n');
     const start = lines.indexOf('--- a/~/.claude.json');
-    expect(lines.slice(start, start + 13)).toEqual([
+    expect(lines.slice(start, start + 15)).toEqual([
       '--- a/~/.claude.json',
       '+++ b/~/.claude.json',
-      '@@ -3,0 +4,10 @@',
+      '@@ -3,0 +4,12 @@',
       '+    "agentlink": {',
       '+      "type": "stdio",',
       '+      "command": "npx",',
       '+      "args": [',
       '+        "-y",',
       '+        "@4thtech-io/agentlink",',
-      '+        "mcp"',
+      '+        "mcp",',
+      '+        "--agent",',
+      '+        "claude-code"',
       '+      ],',
       '+      "env": {}',
       '+    },',
@@ -290,7 +300,7 @@ describe('the exact diff of each harness', () => {
     expect(written.mcpServers.agentlink).toEqual({
       type: 'stdio',
       command: 'npx',
-      args: ['-y', '@4thtech-io/agentlink', 'mcp'],
+      args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'claude-code'],
       env: {},
     });
     expect(written.mcpServers.other).toEqual({ command: 'x', env: { KEY: 'v' } });
@@ -312,7 +322,12 @@ describe('the exact diff of each harness', () => {
     expect(plan.out).not.toContain('"type"');
     await init(['--confirm', codeOf(plan)]);
     expect(JSON.parse(await read('.gemini', 'settings.json'))).toEqual({
-      mcpServers: { agentlink: { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] } },
+      mcpServers: {
+        agentlink: {
+          command: 'npx',
+          args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'gemini-cli'],
+        },
+      },
       theme: 'x',
     });
   });
@@ -331,11 +346,11 @@ describe('the exact diff of each harness', () => {
       '+',
       '+[mcp_servers.agentlink]',
       '+command = "npx"',
-      '+args = ["-y", "@4thtech-io/agentlink", "mcp"]',
+      '+args = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "codex"]',
     ]);
     await init(['--confirm', codeOf(plan)]);
     expect(await read('.codex', 'config.toml')).toBe(
-      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n`,
+      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "codex"]\n`,
     );
   });
 
@@ -344,7 +359,7 @@ describe('the exact diff of each harness', () => {
     const plan = await init([]);
     await init(['--confirm', codeOf(plan)]);
     expect(await read('.codex', 'config.toml')).toBe(
-      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n',
+      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "codex"]\n',
     );
     expect(await exists('.codex', 'config.toml')).toBe(true);
   });
@@ -388,10 +403,10 @@ describe('confirmation', () => {
     const plan = await init([]);
     const wrong = await init(['--confirm', '0000-0000']);
     expect(wrong.code).toBe(EXIT_FAILED);
-    expect(wrong.err).toBe(INIT_TEXT.codeMismatch);
+    expect(wrong.err).toBe(withPrefix(INIT_TEXT.codeMismatch));
     const malformed = await init(['--confirm', 'not a code']);
     expect(malformed.code).toBe(EXIT_USAGE);
-    expect(malformed.err).toBe(INIT_TEXT.badCode);
+    expect(malformed.err).toBe(withPrefix(INIT_TEXT.badCode));
     expect(malformed.err).not.toContain('not a code');
     // A code made for one agent name does not work for another.
     const other = await init(['--agent', 'other', '--confirm', codeOf(plan)]);
@@ -439,8 +454,14 @@ describe('confirmation', () => {
     const lines = run.out.split('\n');
     const questions = lines.flatMap((l, i) => (l === copy('cli.init.apply') ? [i] : []));
     expect(questions).toHaveLength(2);
-    expect(lines[(questions[0] ?? 0) - 1]).toBe(copy('cli.init.changesFor', { appName: 'Codex' }));
-    expect(lines[(questions[1] ?? 0) - 1]).toBe(
+    // M1-36b (UX-B F9): the header, then that app's diff, then its question.
+    const headerAbove = (q: number): string | undefined =>
+      lines
+        .slice(0, q)
+        .reverse()
+        .find((l) => l.startsWith('Changes for '));
+    expect(headerAbove(questions[0] ?? 0)).toBe(copy('cli.init.changesFor', { appName: 'Codex' }));
+    expect(headerAbove(questions[1] ?? 0)).toBe(
       copy('cli.init.changesFor', { appName: 'Gemini CLI' }),
     );
   });
@@ -458,10 +479,11 @@ describe('confirmation', () => {
     await mkdir(join(home, '.codex'));
     const run = await init([], { terminal: TTY, answers: ['', 'maybe'] });
     expect(run.code).toBe(EXIT_OK);
-    expect(run.out).toContain(INIT_TEXT.declinedKept);
+    expect(run.out).toContain(withPrefix(INIT_TEXT.declinedKept));
     expect(run.created).toBe(1);
     expect(await exists('.codex', 'config.toml')).toBe(false);
-    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+    // M1-36b (D5): the one app found names the agent.
+    expect((await readAgentConfig(home, 'codex'))?.config.agentId).toBe(AGENT_ID);
   });
 
   it('declining every change never touches an existing identity', async () => {
@@ -487,12 +509,14 @@ describe('confirmation', () => {
 describe('an existing agent', () => {
   it('is reused, never replaced, so init can add another harness later', async () => {
     await mkdir(join(home, '.codex'));
-    const first = await init([]);
-    await init(['--confirm', codeOf(first)]);
-    const second = await init([], { terminal: { ...PIPE, env: await geminiOnPath() } });
+    // A named agent: without --agent, M1-36b (D5) names a lone app's agent after the app.
+    const first = await init(['--agent', 'work']);
+    await init(['--agent', 'work', '--confirm', codeOf(first)]);
+    const env = await geminiOnPath();
+    const second = await init(['--agent', 'work'], { terminal: { ...PIPE, env } });
     expect(second.out).not.toContain(INIT_TEXT.identity);
-    await init(['--confirm', codeOf(second)], { terminal: { ...PIPE, env: await geminiOnPath() } });
-    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+    await init(['--agent', 'work', '--confirm', codeOf(second)], { terminal: { ...PIPE, env } });
+    expect((await readAgentConfig(home, 'work'))?.config.agentId).toBe(AGENT_ID);
     expect(await exists('.gemini', 'settings.json')).toBe(true);
   });
 });
@@ -643,12 +667,16 @@ describe('keychain and agent names', () => {
 
 // D-78 (06 §7): one harness at a time, identity only, OpenCode and Antigravity, `--config`.
 describe('init --harness and --config (M1-9t)', () => {
+  // M1-36b (D5): one app, so the agent is named after it.
   const OPENCODE_ENTRY = {
     type: 'local',
-    command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp'],
+    command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'opencode'],
     enabled: true,
   };
-  const ANTIGRAVITY_ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
+  const ANTIGRAVITY_ENTRY = {
+    command: 'npx',
+    args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'antigravity'],
+  };
   const readAbs = (path: string): Promise<string> => readFile(path, 'utf8');
   const existsAbs = (path: string): Promise<boolean> =>
     readFile(path).then(
@@ -662,7 +690,7 @@ describe('init --harness and --config (M1-9t)', () => {
     const plan = await init(['--harness', 'codex']);
     expect(plan.out).toContain('--- a/~/.codex/config.toml');
     expect(plan.out).not.toContain('settings.json');
-    expect(plan.out).toContain('agentlink init --harness codex --confirm');
+    expect(plan.out).toContain('agentlink init --agent codex --harness codex --confirm');
     const run = await init(['--harness', 'codex', '--confirm', codeOf(plan)]);
     expect(run.code).toBe(EXIT_OK);
     expect(await exists('.codex', 'config.toml')).toBe(true);
