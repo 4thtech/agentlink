@@ -6,16 +6,18 @@ import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
 
 /**
- * What the status bar shows. The server exposes no connection status to the app yet, so the only
- * real signal is the browser's own online state; until one is known the value is "unknown" and the
- * bar never says "Connected". Gap: a server health endpoint should feed `setConnectionState`.
+ * What the status bar shows. "Connected" may appear only when the local server reports healthy. No
+ * health read exists yet, so the state stays "unknown" (shown as "Checking…"). The browser's offline
+ * event is the one real signal we act on ("Not connected"); the online event only means the browser
+ * has a network, not that the server is reachable, so it goes back to "unknown", never "connected".
+ * Gap: a server health read should call `setConnectionState('connected')`.
  */
 export type ConnectionState = 'unknown' | 'connected' | 'offline';
 
 let current: ConnectionState = 'unknown';
 const listeners = new Set<() => void>();
 
-/** Record the connection state (called by whatever learns it: the API client once it exposes one). */
+/** Record the connection state (called by whatever learns it: a server health read). */
 export function setConnectionState(next: ConnectionState): void {
   if (next === current) return;
   current = next;
@@ -27,7 +29,9 @@ export function useConnectionState(): ConnectionState {
   useEffect(() => {
     const sync = (): void => setState(current);
     const onOffline = (): void => setConnectionState('offline');
-    const onOnline = (): void => setConnectionState('connected');
+    const onOnline = (): void => {
+      if (current === 'offline') setConnectionState('unknown');
+    };
     listeners.add(sync);
     window.addEventListener('offline', onOffline);
     window.addEventListener('online', onOnline);
@@ -41,8 +45,12 @@ export function useConnectionState(): ConnectionState {
   return state;
 }
 
-// The shell has no "unknown" look: show the neutral Paused state rather than a false Connected.
-const SHELL_STATE = { unknown: 'paused', connected: 'connected', offline: 'offline' } as const;
+// "Paused" means the user paused AgentLink, so it is never used for an unknown state.
+const SHELL_STATE = {
+  unknown: 'checking',
+  connected: 'connected',
+  offline: 'disconnected',
+} as const;
 
 function inSettings(path: string): boolean {
   return SETTINGS_PAGES.some((p) => p.path === path);

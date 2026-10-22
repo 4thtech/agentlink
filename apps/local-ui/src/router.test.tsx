@@ -4,6 +4,7 @@
 import { createElement as h, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setConnectionState } from './layout/index.js';
 import { NAV_ITEMS } from './nav.js';
 import { AppRoutes, ROUTES } from './router.js';
 
@@ -112,9 +113,33 @@ describe('nav', () => {
     expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
   });
 
-  it('does not claim to be connected before the connection is known', () => {
+  it('shows Checking… (never Connected or Paused) before the server reports', () => {
     mountAt('/settings/rules');
-    expect(host.querySelector('footer.al-statusbar')?.textContent).not.toContain('Connected');
+    const bar = host.querySelector('footer.al-statusbar')?.textContent ?? '';
+    expect(bar).toContain('Checking…');
+    expect(bar).not.toContain('Connected');
+    expect(bar).not.toContain('Paused');
+  });
+
+  it('shows Not connected after offline and does not turn Connected on the online event', () => {
+    mountAt('/settings/rules');
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(host.querySelector('footer.al-statusbar')?.textContent).toContain('Not connected');
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    const bar = host.querySelector('footer.al-statusbar')?.textContent ?? '';
+    expect(bar).toContain('Checking…');
+    expect(bar).not.toContain('Connected');
+  });
+
+  it('shows Connected only when the server reports healthy', () => {
+    mountAt('/settings/rules');
+    act(() => setConnectionState('connected'));
+    expect(host.querySelector('footer.al-statusbar')?.textContent).toContain('Connected');
+    act(() => setConnectionState('unknown'));
   });
 
   it('marks only the active item with aria-current', () => {
