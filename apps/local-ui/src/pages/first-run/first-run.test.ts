@@ -61,12 +61,19 @@ function fakeApi(
     status?: StatusResult;
     begin?: BeginResult;
     finish?: FinishResult;
+    /** What the status re-check answers after the first status call. */
+    statusAfter?: StatusResult;
   } = {},
 ): SetupApi & { finished: Uint8Array[] } {
   const finished: Uint8Array[] = [];
+  let statusCalls = 0;
   return {
     finished,
-    status: () => Promise.resolve(options.status ?? { kind: 'ok', owner: 'missing' }),
+    status: () => {
+      statusCalls += 1;
+      const first = options.status ?? { kind: 'ok', owner: 'missing' };
+      return Promise.resolve(statusCalls > 1 ? (options.statusAfter ?? first) : first);
+    },
     begin: () => Promise.resolve(options.begin ?? { kind: 'ready', publicKey: VALUES }),
     finish: (body) => {
       finished.push(body.slice());
@@ -198,6 +205,50 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(text()).toContain('agentlink doctor');
     expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
       FIRST_RUN.createPasskey,
+    );
+  });
+
+  it('IR-M1-11b-1-1 L-1: an unknown status sends the owner to agentlink doctor, not to setup', async () => {
+    await mount(fakeApi({ status: { kind: 'ok', owner: 'unknown' } }));
+    expect(text()).toContain(SETUP_MESSAGES.unknown);
+    expect(text()).toContain('agentlink doctor');
+    expect(host.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it('IR-M1-11b-1-1 L-2: finish offline, owner now set up: no retry, use the passkey or doctor', async () => {
+    const api = fakeApi({
+      finish: { kind: 'error', problem: 'offline' },
+      statusAfter: { kind: 'ok', owner: 'set_up' },
+    });
+    await mount(api);
+    await click(FIRST_RUN.createPasskey);
+    expect(text()).toContain(SETUP_MESSAGES.finishedNoCode);
+    expect(host.querySelectorAll('button')).toHaveLength(0);
+    expect(api.finished).toHaveLength(1);
+  });
+
+  it('IR-M1-11b-1-1 L-2: finish offline, still no owner: offers to try again', async () => {
+    const api = fakeApi({
+      finish: { kind: 'error', problem: 'offline' },
+      statusAfter: { kind: 'ok', owner: 'missing' },
+    });
+    await mount(api);
+    await click(FIRST_RUN.createPasskey);
+    expect(text()).toContain(SETUP_MESSAGES.notFinished);
+    expect(button(FIRST_RUN.tryAgain)).toBeDefined();
+  });
+
+  it('IR-M1-11b-1-1 L-2: finish offline and the re-check fails: no retry', async () => {
+    await mount(
+      fakeApi({
+        finish: { kind: 'error', problem: 'offline' },
+        statusAfter: { kind: 'error', problem: 'offline' },
+      }),
+    );
+    await click(FIRST_RUN.createPasskey);
+    expect(text()).toContain("AgentLink isn't running");
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
+      FIRST_RUN.tryAgain,
     );
   });
 
@@ -337,6 +388,18 @@ describe('the setup calls (setup-api.ts)', () => {
     }
     expect((r.calls[0]?.init.body as Uint8Array).length).toBe(0);
     expect(r.calls[1]?.init.body).toEqual(BODY);
+  });
+
+  it('IR-M1-11b-1-1 L-3: zeroes its copy of the finish body once sent', async () => {
+    const sent: Uint8Array[] = [];
+    const fetch = ((_input: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(init?.body as Uint8Array);
+      return Promise.resolve(new Response(JSON.stringify({ status: 'busy' }), { status: 409 }));
+    }) as typeof globalThis.fetch;
+    await createSetupApi({ fetch, token: 't' }).finish(BODY);
+    expect(sent[0]).not.toBe(BODY);
+    expect(sent[0]?.length).toBe(BODY.length);
+    expect(sent[0]?.every((b) => b === 0)).toBe(true);
   });
 
   it('maps done_unconfirmed, owner_exists, failed reasons, wait and 401', async () => {
