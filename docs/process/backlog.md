@@ -2966,28 +2966,82 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-31-1 L-1, 2026-10-17): add "on `http://localhost:<port>`" to this card's acceptance (the approval page origin is localhost, D-79).
 - Review note (IR-M1-1k-1 (PR #223), 2026-10-17): wiping the PRF output after use is the caller's duty (JSDoc in `@4thtech-io/crypto`); do it in the node and console callers and test it.
 
-#### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
+#### M1-8f · node: passphrase-locked file KeyStore backend for headless machines (new, D-54)
+- **Status:** in review (4thtech/agentlink#392; the backend slice; CLI, MCP unlock, CI and `KeyEpochControl` split into M1-8f-b … M1-8f-e) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card and M1-8f-b; proposed, owner confirms at merge)
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-1f (`ALKS`/`ALKO` seal/open), M1-1g, M1-8a (keychain probe, recorded backend), M1-8c (owner passphrase path); M1-8b for the shared inter-process lock; M1-8g (the policy-version mark item of the file KeyStore)
-- **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
+- **Spec:** 04 §2.8 (format, KDF, unlock, file handling, threat delta, required tests); 07 §9.1, §9.2; D-54
 - **Invariants:** I-1, I-4, I-7, I-10
 - **Scope:**
   - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check and exact 04 §2.9 form (`0x` + 40 lowercase hex); expected-agent-ID check before the KDF and seed-derived check (the seed's EVM address) after decryption. All crypto through `@4thtech-io/crypto`; this package only handles files, locking and unlock sources.
-  - Selection per 07 §9.1: opt-in only, only when the keychain probe fails (with timeout and fix message), only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; backend recorded per agent and never switched.
-  - Unlock sources per 07 §9.2: passphrase file (`O_NOFOLLOW`, `fstat` checks), environment variable (allowed with the 04 §2.8 conditions; both variables removed from `process.env`; never written by `init`), interactive prompt for CLI commands; no CLI argument takes a passphrase. Async unlock after MCP `initialize`. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
-  - Secrets: generated unlock code by default (pinned base32 encoding, `secretKind` in the header); chosen passphrase ≥ 12 characters. Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko`, generated 120-bit owner code required. Agent ≠ owner enforced in both directions across all agents, with the owner wrap's normalisation.
-  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; `keystore passphrase` asks for the current passphrase at the prompt; `doctor` reporting and warnings (07 §9.4).
-  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit) and record whether `@noble/hashes` clears its Argon2id buffers.
-  - Full threat note (04 §2.8 threat delta, including the faked-terminal case) and quickstart input for M1-12b.
+  - Selection per 07 §9.1 in the create entry point: opt-in only, only when the keychain probe fails, only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; the recorded backend `file` opens only from its unlocked file, never from the keychain.
+  - Unlock sources per 07 §9.2: passphrase file (`realpath`, `O_NOFOLLOW`, `fstat` checks), environment variable (both variables removed from `process.env`), a prompt callback for CLI commands; no CLI argument takes a passphrase. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
+  - Secrets: generated unlock code by default (`secretKind` in the header); chosen passphrase ≥ 12 characters. Agent ≠ owner on the agent side (a candidate that unlocks `owner.alko` is refused), with the owner wrap's normalisation, and a helper for the owner side (does a candidate open any agent file).
+  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; the passphrase change asks for the current secret at the prompt only.
+  - Measure Argon2id unlock time and record whether `@noble/hashes` clears its Argon2id buffers.
+  - Threat note (04 §2.8 threat delta, including the faked-terminal case) in the PR.
 - **Acceptance:**
-  - Every test listed in 04 §2.8 "Required tests", written first: canary (I-7), wrong passphrase, tamper detection, agent binding, parser, normalisation, permissions, write protocol, selection, owner key, environment, unlock timing, `ALKS` v1 vectors (M1-1h).
-  - CI: an Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
-  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
-  - `KeyEpochControl` as in M1-8a (IR-M1-1g-d-1 M-1, L-5). The advance writes the epoch with the 04 §2.8 write protocol, so it is atomic and durable. Every open `KeyStore` instance over the same file sees it at once. The control accepts only sessions the paired `OwnerKeyStore` minted.
-  - Unlock time on the reference container is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
+  - Tests first, the 04 §2.8 "Required tests" this package owns: canary (I-7), wrong passphrase, tamper detection, agent binding, permissions, write protocol, selection, environment, agent ≠ owner (agent side); parser, normalisation and `ALKS` v1 vectors stay with M1-1f/M1-1h.
+  - The KeyStore conformance suite passes against the file backend.
+  - Unlock time is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
   - (M1-8g) The policy-version mark is the `ALKS` entry `policy-version`, written with the 04 §2.8 write protocol; M1-8g's mark contract test (`policy-mark.fixture.ts`) passes against the file backend, and `openAgentStore` hands the file backend's mark to the client.
+
+#### M1-8f-b · cli: `init --keystore file`, `keystore passphrase`, `doctor` and `owner init` with `owner.alko` on file-KeyStore machines (new, split from M1-8f)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · apps/cli, packages/node (owner store over `owner.alko`)
+- **Depends on:** M1-8f, M1-8c, M1-8h, M1-9a, M1-9t, M1-9z
+- **Spec:** 04 §2.8 (Selection, Passphrase strength, The owner key on a headless machine, Changing the passphrase, Logging and display); 07 §9.1–§9.4; 06 §7; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - `agentlink init --keystore file` (and the `init` question) on M1-8f's `createFileKeyStoreAgent`: interactive terminal only, harness-marker guard, generated unlock code shown once with its last group re-typed (`confirmCode`) and the screen cleared; the optional code file (`O_CREAT | O_EXCL | O_NOFOLLOW`, 0600, never under `~/.agentlink`); `init` and the harness config writers write only `AGENTLINK_KEYSTORE_PASSPHRASE_FILE`, never the value; the one-time trade-off copy at opt-in (07 §9.4); probe timeout with the fix message.
+  - `agentlink keystore passphrase` on `changeFileKeyStorePassphrase`, current secret at the prompt, with its copy.
+  - `doctor` reporting and warnings (07 §9.4): value variable set, passphrase file readable by others, `AGENTLINK_OWNER_*` set and ignored, owner key present on a file-KeyStore machine; owner fingerprint and creation time.
+  - Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko` (`ALKO` v1, the `.alks` file-handling rules), generated 120-bit owner code required, display-only; agent ≠ owner on the owner side across all agents; `owner add-agent` and `owner change-code` on `owner.alko`.
+  - The redacting logger treats both environment variable names as secret-bearing; the CI secret-pattern test knows the code pattern.
+  - Quickstart input for M1-12b.
+- **Acceptance:**
+  - The 04 §2.8 "Owner key" required tests, written first: no non-interactive source unlocks `OwnerKeyStore` (`AGENTLINK_OWNER_*`, a file, an argument, piped stdin); on file-KeyStore machines a chosen owner passphrase is refused and `init --keystore file` creates no owner key; `owner init` refuses when the owner key exists or the card names an owner, never overwrites, and points to `owner add-agent` (D-78); `owner init` writes the owner code to no file and offers no code file; fingerprint and lost-code consequence before the code, and `doctor` shows the fingerprint and creation time; agent ≠ owner in both directions across several agents, with matching normalisation.
+  - Canary (I-7) over CLI output and `doctor`; no CLI command accepts the agent passphrase as an argument; `init` never writes the value variable into a harness config.
+  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
   - (IR-M1-8c-1 F-10, F-11) The TTY prompt tests run unconditionally in CI (a pseudo-terminal, not skipped when no TTY is present), and the owner and passphrase prompts refuse C0 control characters in the typed input.
+
+#### M1-8f-c · cli: async file KeyStore unlock in the MCP server (new, split from M1-8f)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · apps/cli (MCP server start-up, open-agent runtime)
+- **Depends on:** M1-8f, M1-8f-b (recorded backend `file` from `init`)
+- **Spec:** 04 §2.8 (Unlocking the agent key; KDF target); 07 §9.2; 06 §2.5
+- **Invariants:** I-1, I-7
+- **Scope:**
+  - For an agent recorded with the backend `file`, the MCP server calls `unlockFileKeyStoreAgent` after answering MCP `initialize` (no prompt), then opens the KeyStore and the store with `fileAgent`. Until it finishes, tools return `needs_setup` (`keystore_locked`, "unlocking"); with no source or a failed unlock, `needs_setup` (`keystore_locked`) naming the fix without revealing anything about the file.
+  - A later `keystore_locked` (a passphrase change elsewhere) keeps tools at `needs_setup` until restart.
+- **Acceptance:**
+  - Unlock timing: the async unlock answers MCP `initialize` before the KDF finishes, and tools return `keystore_locked` until it does.
+  - Environment: both variables are removed from `process.env` at start-up and child processes started later do not inherit them; canary (I-7) over tool results.
+
+#### M1-8f-d · CI: Ubuntu job without D-Bus or Secret Service for the file KeyStore (new, split from M1-8f)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · .github/workflows/ci.yml
+- **Depends on:** M1-8f-b, M1-8f-c
+- **Spec:** 04 §2.8 (Required tests: Vectors and the CI job); docs/process/ci-cd.md
+- **Invariants:** I-1
+- **Scope:**
+  - An Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
+  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit, x86); M1-8f measured on arm64 only.
+- **Acceptance:**
+  - The job is green and required. Unlock time on the reference container is recorded; up to 5 s is accepted, above that it goes to the owner (04 §2.8).
+
+#### M1-8f-e · node: `KeyEpochControl` for the keychain and file KeyStores (new, split from M1-8f; IR-M1-1g-d-1 M-1, L-5)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/node
+- **Depends on:** M1-1g-d, M1-8a, M1-8f
+- **Spec:** 04 §2.6, §2.8 (Writes), §3.1.1 (Epoch advance); 07 §9
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - `KeyEpochControl` as in M1-8a for both Node backends (packages/node has none yet): a separate object, built only by owner flows and unreachable from the `KeyStore` instance.
+- **Acceptance:**
+  - `advanceEpoch` accepts only sessions the paired `OwnerKeyStore` minted, checked by identity; a look-alike gets `presence_required`.
+  - The compare-and-set is atomic and durable across processes, and every open `KeyStore` instance over the same keychain entry or file sees an advance at once; on the file backend the advance writes the epoch with the 04 §2.8 write protocol.
+  - Tests: a fake session, a cast of the agent `KeyStore`, two processes advancing concurrently, and a kill during the advance.
 
 #### M1-8g · node: policy-version mark in the keychain and file KeyStores (new, IR-M1-7d-1 F-2)
 - **Status:** ready (planning 2026-10-15: dependencies M1-7d #79, M1-8a #54 and M1-8b #60 merged) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
