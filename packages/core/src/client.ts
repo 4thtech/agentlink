@@ -13,6 +13,7 @@ import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
+import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
 import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
@@ -85,6 +86,12 @@ export interface AgentLinkClientOptions {
    */
   readonly receiptsKept?: ReceiptsKeptMark;
   /**
+   * The own-storage KeyStore items, `storage-mark` and the `credentialDigest` of `s3:<id>` (04 §2.2,
+   * §2.5.1; M1-9i-a, D-115). Without them no `storage.set` or `storage.remove` applies, and
+   * `ownStorage.load()` reads `broken` (fail closed).
+   */
+  readonly ownStorageKeys?: OwnStorageKeys;
+  /**
    * The relay transport (07 §4.1; M1-7k): `nostrTransport({connector, addressCheck, nip11})` with the
    * runtime's relay I/O (packages/node supplies it). Without one the client cannot send or publish
    * (`transport_unavailable`); reading the store still works.
@@ -133,6 +140,8 @@ export class AgentLinkClient {
   readonly approvals: ApprovalChannel;
   /** Owner-signed actions and the signed policy (M1-7d; 04 §2.5.1). Authority is the signature. */
   readonly ownerActions: OwnerActions;
+  /** Own storage as the owner signed it: `none`, `ready` or `broken` (M1-9i-a; 07 §3.4, §5.6). */
+  readonly ownStorage: OwnStorage;
   /** Approval requests and their one use (M1-7e; 04 §3.4.1, 06 §2.5). Decides nothing. */
   readonly approvalService: ApprovalService;
   /** The requests queue for unknown senders: count, list and ignore (M1-7e; 07 §3.2). */
@@ -176,6 +185,7 @@ export class AgentLinkClient {
     dropOrigins: readonly string[],
     files: FilesPlatform | undefined,
     proofs: ProofsPlatform | undefined,
+    ownStorageKeys: OwnStorageKeys | undefined,
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
@@ -188,7 +198,9 @@ export class AgentLinkClient {
       this.contacts,
       policyMark,
       receiptsKept,
+      ownStorageKeys,
     );
+    this.ownStorage = new OwnStorage(ctx, this.identity, ownStorageKeys);
     const ownerActions = this.ownerActions;
     // M1-7h: revoke envelopes are applied or dropped (IR-M1-7h-1 F01), and the per-contact rate
     // limit is counted where the contact's envelope is stored (07 §3.2; IR-M1-7h-1 F02).
@@ -521,6 +533,7 @@ export class AgentLinkClient {
       options.dropOrigins ?? [],
       options.files,
       options.proofs,
+      options.ownStorageKeys,
     );
   }
 }
