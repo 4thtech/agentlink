@@ -35,6 +35,7 @@ export {
 export { NATIVE_TOKEN_ADDRESS, offeredTokens, type OfferedToken } from './tokens.js';
 export {
   FAUCET_CHAIN_IDS,
+  FAUCET_MAX_GAS,
   FAUCET_MAX_USD_CENTS,
   buildDepositFor,
   createFaucetChain,

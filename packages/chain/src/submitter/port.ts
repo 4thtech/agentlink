@@ -39,6 +39,24 @@ export type ItemSimulation =
   /** Any other failure, named by the contract error (`InsufficientCredits`) or `reverted`. */
   | { readonly outcome: 'failed'; readonly error: string };
 
+/**
+ * Receipts the sender's proof fee covers per record (D-114; 12 §2): DELIVERED, OPENED, and ACCEPTED
+ * or REJECTED. The submitter accepts up to this many for a record whose fee was charged, whatever
+ * the recipient holds, and refuses any further one (`receipt_limit`).
+ */
+export const MAX_RECEIPTS_PER_RECORD = 3;
+
+/**
+ * A record's receipt allowance (D-114). `charged`: the Notary stores the record, and it stores a
+ * Record only in the call that charges its NOTARIZE fee (05 §3.3 notarize steps 3 and 4; batches
+ * are all-or-nothing), so a stored record is a charged one and an unknown one never was. `set`: the
+ * receipt types already on-chain (05 §3.1 codes), ascending.
+ */
+export interface RecordReceipts {
+  readonly charged: boolean;
+  readonly set: readonly number[];
+}
+
 export type BatchSimulation =
   | { readonly ok: true; readonly gas: bigint }
   | { readonly ok: false; readonly error: string; readonly paused: boolean };
@@ -74,6 +92,8 @@ export interface SubmitterChain {
   /** True when the address has code: an ERC-1271 account or an EIP-7702 delegation (FA-1). */
   hasCode(address: Hex): Promise<boolean>;
   simulateItem(item: SubmitItem): Promise<ItemSimulation>;
+  /** The receipt allowance of a record (D-114): one `getRecord` read; a failed read throws. */
+  recordReceipts(recordId: Hex): Promise<RecordReceipts>;
   simulateBatch(items: readonly SubmitItem[]): Promise<BatchSimulation>;
   /** The gas wallet's next nonce, counting transactions still in the mempool (`pending`). */
   pendingNonce(): Promise<number>;
@@ -322,6 +342,16 @@ export function createSubmitterChain(
       const stored = await getRecord(item.recordId);
       const at = stored.receiptAt[item.receipt.receiptType - 1] ?? 0n;
       return at !== 0n ? { outcome: 'skipped' } : { outcome: 'ok', gas };
+    },
+
+    async recordReceipts(recordId) {
+      const stored = await getRecord(recordId);
+      if (stored.signer.toLowerCase() === ZERO_ADDRESS) return { charged: false, set: [] };
+      const set: number[] = [];
+      for (let t = 1; t <= 4; t += 1) {
+        if ((stored.receiptAt[t - 1] ?? 0n) !== 0n) set.push(t);
+      }
+      return { charged: true, set };
     },
 
     async simulateBatch(items) {

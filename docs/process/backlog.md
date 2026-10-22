@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 159 (M1a 80, M1b 79; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 160 (M1a 80, M1b 80; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 44 (incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -1792,6 +1792,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - After the Chiado smoke test passes and the faucet serves Chiado: remove 10200 from `NOT_AUTO_SELECTED`, add it to `FAUCET_CHAIN_IDS`, configure the Chiado faucet. The owner accepts the routing change.
 - **Acceptance:** tests first: with Chiado enabled, an unfunded payer gets the documented tie-break and a top-up path that works on that chain; the networks page says Chiado is used by default.
 
+#### M1-3j-c · enable Chiado: faucet allowlist, submitter config and deploy secrets (new, M1-3j-b)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain (`FAUCET_CHAIN_IDS` in fees/faucet.ts), apps/submitter (wrangler.toml vars, smoke-config test), .github/workflows/deploy-submitter.yml (required secrets, shadow vars), docs (networks page, status.yaml, RB-19)
+- **Depends on:** M1-3j-b (automatic selection gated on the faucet allowlist), M1-10b-c, the owner's Chiado keys (`SUBMITTER_GAS_KEY_10200`, `SUBMITTER_FAUCET_KEY_10200` in staging and production, RB-19 Part F) and the two public faucet addresses, the Chiado smoke test
+- **Spec:** 07 §6.3, §7; 05 §9; D-40, D-46
+- **Invariants:** I-3
+- **Scope:** add 10200 to `FAUCET_CHAIN_IDS` (Chiado then joins automatic selection through the M1-3j-b gate); `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` = `"84532,10200"` and `SUBMITTER_FAUCET_ADDRESS_10200` (lowercase, distinct per environment) in both environments; the two 10200 keys in `SUBMITTER_REQUIRED_SECRETS` and `SUBMITTER_FAUCET_ADDRESS_10200` in `SUBMITTER_SHADOW_VARS`; flip the selection pins in packages/chain and apps/cli; the networks page and status.yaml say Chiado is used by default.
+- **Acceptance:** tests first; the staging smoke is green with 10200 available; production `/v1/health` shows 10200 `available:true` before the npm release that routes to Chiado is promoted.
+
 #### M1-3k · contracts: Fable pre-audit fixes (FA-4, FA-5, FA-8) (new, AUDIT-FABLE-OCCv2-1)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · test/**, .gas-snapshot, contracts CI; agentlink · `release-and-deployment.md` §4.4 (runbook line)
@@ -2091,7 +2100,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Outcome (2026-10-21):** D-114: B, with D as the fallback when the submitter is unreachable; a recipient is never charged without asking. Spec lines in 12 §2, §11, 07 §7 and `docs/design/topup-ux.md` §8. The submitter work is M1-34-b. The specs state no contract change; if M1-34-b finds one is needed, it opens a card noting the work happens in the private `occ-v2-contracts` repo.
 
 #### M1-34-b · submitter: receipts covered by the sender's proof fee, and the deferred fallback (new, D-114)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
 - **Repo/path:** agentlink · the submitter (07 §7), packages/chain (submitter port, deferred posting), packages/core (receipt queue)
 - **Depends on:** M1-34, M1-10a, M1-4c
 - **Spec:** 07 §7; 12 §2, §11; `docs/design/topup-ux.md` §8; D-114, D-111
@@ -2727,7 +2736,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
 #### M1-7h-d · core: faster sync rate-limit tests (new, follow-up from #252)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#371) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h
 - **Spec:** `development-process.md` (CI budget)
@@ -3163,7 +3172,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-9i-a · types and core: storage and backup owner ops (new, split from M1-9i)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types/src/{constants,owner-action}.ts; packages/core/src/{owner-action,owner-actions,own-storage}.ts, the store migration and `Store` contract for `own_storage`, packages/core/src/files/outgoing.ts; owner-action vectors for the new ops
-- **Depends on:** M1-9i-s, M1-9i-b (`credentialDigest`)
+- **Depends on:** M1-9i-s, M1-9i-b2 (`credentialDigest`)
 - **Spec:** 04 §2.5.1 (new rows); 07 §3.4 (`own_storage`), §5.6
 - **Invariants:** I-4, I-7
 - **Scope:**
@@ -3173,24 +3182,34 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Anti-rollback `storage-mark` (`{v, active}`), raised under the inter-process lock after each apply; load requires the row's `id` = `active`. Reload re-verifies signature and schema only, never the 600 s expiry (as for `policy.set`).
 - **Acceptance:** signing and rejection vectors per op (unknown key, bad `id`, endpoint not in canonical form, lifetime above 600 s); a tampered `own_storage` row or a credential digest mismatch reads `broken`; an old row and credential put back after `storage.remove` read `broken`; a row older than 600 s still reads `ready`; a `broken` own storage makes `agentlink_send` return `needs_setup`, never the drop; tests first (`RED (expected):` commit).
 
-#### M1-9i-b · crypto: recovery kit `ALKK` v1, export and import controls, vectors (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/crypto/src/recovery-kit.ts (new), packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), test-vectors/recovery-kit/, tools/vectors/generate_recovery_kit.py
+#### M1-9i-b · crypto: recovery kit `ALKK` v1 format and vectors (new, split from M1-9i)
+- **Status:** done (4thtech/agentlink#367, format and vectors; IR-M1-9i-b-1; `credentialDigest` and the three controls moved to M1-9i-b2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto/src/recovery-kit.ts (new), packages/crypto/src/stream.ts (shared STREAM body), test-vectors/recovery-kit/, tools/vectors/generate_recovery_kit.py
 - **Depends on:** M1-9i-s
 - **Spec:** 04 §2.3.3 (new), §2.3.2, §2.8 (`password` kind 1), §4 (STREAM)
-- **Invariants:** I-1, I-4, I-7, I-8, I-10
+- **Invariants:** I-1, I-7, I-8, I-10
 - **Order (D-82):** vectors from an independent Python generator first, then the TypeScript.
-- **Scope:** seal and open `ALKK` v1 as a stream (Argon2id + HKDF label `agentlink/v1/recovery-kit`, STREAM AES-256-GCM, AAD = header ‖ isFinal); plaintext entry parser; post-decryption owner and agent checks; `credentialDigest` (HMAC-SHA256 under the item salt); type separation against `ALKP`, `ALKR`, `ALKO`, `ALKS`, `ALF1`.
-- **Acceptance:** secret entries stay in wiped memory buffers and only store snapshots go to a 0600 quarantine file; nothing is parsed or written before the final chunk authenticates (a test truncating the last chunk leaves no file and no state); vector suite `recovery-kit` registered and passing in every runtime it declares; tamper, truncation, reorder, wrong code, wrong version, cross-type and oversize cases fail with one generic error and no partial output; no raw seed crosses the control interfaces (type test); tests first.
+- **Scope:** seal and open `ALKK` v1 as a stream (Argon2id + HKDF label `agentlink/v1/recovery-kit`, STREAM AES-256-GCM, AAD = header ‖ isFinal); plaintext entry parser; post-decryption owner and agent checks; type separation against `ALKP`, `ALKR`, `ALKO`, `ALKS`, `ALF1`.
+- **Acceptance:** secret entries stay in wiped memory buffers and only store snapshots go to a caller sink (the 0600 quarantine file), committed only after every check passes; nothing is parsed or written before the final chunk authenticates (a test truncating the last chunk leaves no file and no state); vector suite `recovery-kit` registered and passing in every runtime it declares; tamper, truncation, reorder, wrong code, wrong version, cross-type, duplicate agent name and oversize cases fail with one generic error and no partial output; tests first.
+
+#### M1-9i-b2 · crypto: `credentialDigest` and the export, import and storage credential controls (new, split from M1-9i-b)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto/src/keystore-api.ts (`KeyExportControl`, `KeyImportControl`, `StorageCredentialControl`), packages/crypto/src (`credentialDigest`), test-vectors/recovery-kit/ (`credentialDigest` vectors), tools/vectors/generate_recovery_kit.py
+- **Depends on:** M1-9i-b
+- **Spec:** 04 §2.2 (`s3:<id>` item), §2.3.3 ("Export: who sees the seeds", restore step 5), §2.5.1 (`storage.set` `credentialDigest`)
+- **Invariants:** I-1, I-4, I-7
+- **Order (D-82):** `credentialDigest` vectors from the independent Python generator first, then the TypeScript.
+- **Scope:** `credentialDigest` = HMAC-SHA256(key = the item's `salt`, msg = JCS(`{"accessKeyId","secretAccessKey"}`)) as 64 lowercase hex, without turning the secret into a JS string where the spec keeps it in bytes; the three control types (`KeyExportControl.sealRecoveryKit(session, …)` returning the code bytes only, `KeyImportControl`, `StorageCredentialControl`), modelled on `KeyEpochControl`, built on M1-9i-b's `sealRecoveryKit` / `openRecoveryKit`.
+- **Acceptance:** `credentialDigest` vectors in the `recovery-kit` suite (salt, Unicode and JCS escaping cases); no raw seed crosses the control interfaces (type test); the controls are reachable from no MCP tool handler (import fence); tests first (`RED (expected):` commit).
 
 #### M1-9i-c · node: KeyStore export, import and storage credential items (new, split from M1-9i)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node/src/\*\*
-- **Depends on:** M1-9i-b
+- **Depends on:** M1-9i-b (kit format), M1-9i-b2 (the three controls)
 - **Spec:** 04 §2.2 (`s3:<id>`), §2.3.3 (restore order and refusals), §2.8 (`owner-next`, write protocol); 07 §9.1
 - **Invariants:** I-4, I-7, I-10
 - **Scope:** keychain and file backends implement `KeyExportControl` (session checked by identity), `KeyImportControl` (all items at once, refuses any existing item or `.alks`), `StorageCredentialControl` (`s3:<id>` write and delete under the inter-process lock); restore writes the owner `ALKO` under a new generated code with the `owner-next` protocol and never overwrites.
-- **Acceptance:** shared KeyStore conformance tests for both backends; a look-alike session is `presence_required`; import over an existing agent writes nothing; an existing owner item is kept only after its own code opens it to the kit's owner (a planted card naming that owner is not enough); the snapshot and the `policy-version` and `receipts-kept` reads happen under one lock hold; canary for the S3 secret, recovery code and kit key; tests first.
+- **Acceptance:** shared KeyStore conformance tests for both backends; a look-alike session is `presence_required`; import over an existing agent writes nothing; an existing owner item is kept only after its own code opens it to the kit's owner (a planted card naming that owner is not enough); the snapshot and the `policy-version` and `receipts-kept` reads happen under one lock hold; the 04 §2.3.3 snapshot checks run on the quarantined store before anything is written (its `identity.agent_id` equals the agent's `agentId`, and its stored card names the kit's `ownerNostr`), with a snapshot-mismatch reject vector for each (IR-M1-9i-b-1); commit() marks the store bytes authenticated; the restored store stays in quarantine and nothing is written to the agent's folders until the snapshot checks pass; canary for the S3 secret, recovery code and kit key; tests first.
 
 #### M1-9i-d · docs: storage and recovery kit (new, split from M1-9i)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
@@ -3861,6 +3880,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-5
 - **Scope:**
   - The M1-13b corpus plus file paths, hostile file names and hostile proof packs, run against the file and proof tools.
+- Wired into CI (CHORE-E2E-INJECTION, 2026-10-21): the deterministic suites of M1-13b and M1-13d run in the `e2e-deterministic` job with exact counts (checker 13, talk 10, files-proofs 9); the LLM layer stays opt-in.
 - **Acceptance:**
   - For every corpus item: wrapped and escaped in text and `structuredContent`; no tool call issued by our code; no inbound bytes in descriptions, instructions or errors.
   - The LLM report is reviewed at M1-GATE.
@@ -5160,6 +5180,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Base (8453) and Gnosis (100), stablecoin-only allowlist with the M1-14 config check (D-46; xDAI native on Gnosis, no volatile native coin): CreateX presence (code hash), `evm_version`, USDC/USDT addresses checked against the issuers' official lists (Base native USDC; on Gnosis determine which USDC/USDT variants, if any, meet 12 §3.2), decimals, no fee-on-transfer behaviour, EIP-3009 support proven on a fork per token (USDT generally lacks it), RPC set, explorers, confirmations.
 - **Acceptance:**
   - Re-runnable verification script output attached; each token entry cites its issuer source and date; EIP-3009 flags proven by fork calls.
+  - Mainnets need an explicit auto-select allowlist; the testnet faucet gate never applies (`autoSelectableChains()` in packages/chain clients/registry.ts, M1-3j-b).
 
 #### M3-2b · Treasury Safes, signer keys and role holders
 - **Status:** backlog · **Size:** M · **Tier:** Owner (Opus prepares the role plan) · **Security:** S2
