@@ -151,17 +151,37 @@ export {
   KeyStoreError,
   OWNER_SESSION_DEFAULT_TTL_MS,
   OWNER_SESSION_MAX_TTL_MS,
+  type DisplayCode,
   type EnvelopeKeys,
   type EpochOptions,
+  type ImportAgentOptions,
+  type ImportedAgentKeys,
   type KeyEpochControl,
+  type KeyExportControl,
+  type KeyImportControl,
   type KeyStore,
   type KeyStoreErrorCode,
   type OwnerKeyStore,
   type OwnerPresence,
   type OwnerPublicKeys,
   type OwnerSession,
+  type RecoveryKitExportAgent,
+  type RecoveryKitExportRequest,
+  type RecoveryKitImport,
+  type RecoveryKitImportAgent,
+  type StorageCredentialControl,
   type UnlockOptions,
 } from './keystore-api.js';
+// M1-9i-b2 (04 §2.5.1 storage.set, §2.2 s3:<id>): the credentialDigest the core checks on every
+// own-storage load. Writing and reading the item itself is in @4thtech-io/crypto/keystore.
+export {
+  STORAGE_CREDENTIAL_MAX_VALUE_BYTES,
+  STORAGE_CREDENTIAL_SALT_LENGTH,
+  credentialDigest,
+  credentialDigestOfItem,
+  type StorageCredential,
+  type StorageCredentialItemFields,
+} from './credential-digest.js';
 export {
   NIP44_MAX_PLAINTEXT_BYTES,
   NIP44_MIN_PLAINTEXT_BYTES,
@@ -266,9 +286,13 @@ export {
   RECOVERY_KIT_LIMITS,
   RECOVERY_KIT_MAX_CHUNK_SIZE,
   readRecoveryKitHeader,
+  type OpenRecoveryKitOptions,
   type RecoveryKitContents,
   type RecoveryKitHeader,
   type RecoveryKitItemName,
+  type RecoveryKitSource,
+  type RecoveryKitStoreSink,
+  type RecoveryKitStoreSource,
 } from './recovery-kit.js';
 // M1-1f: the pairing proof and the safety code (04 §3.6, §3.6.1; only the commit-checked functions
 // produce digits, IR-M1-1f-1 L-7), and the public constants of the
