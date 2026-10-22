@@ -1,12 +1,11 @@
 // M1-5b-c: outbox reasons for rows with fewer than 2 usable relays, and backoff jitter.
-import { createLogger, type Level } from '@4thtech-io/log';
+import { createLogger } from '@4thtech-io/log';
 import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,
   type OutboxAttempt,
-  type OutboxGiveUpReason,
   type OutboxPersistence,
   type OutboxRow,
 } from './outbox.js';
@@ -49,7 +48,7 @@ class Rows implements OutboxPersistence {
     this.rows.set(id, { ...this.get(id), acks, state: 'sent' });
     return Promise.resolve(true);
   }
-  markNotDelivered(id: string, _reason: OutboxGiveUpReason): Promise<boolean> {
+  markNotDelivered(id: string): Promise<boolean> {
     this.rows.set(id, { ...this.get(id), state: 'not_delivered' });
     return Promise.resolve(true);
   }
@@ -57,7 +56,11 @@ class Rows implements OutboxPersistence {
 
 function makeRow(relays: readonly string[], giveUpIn = OUTBOX_GIVE_UP_SECONDS): OutboxRow {
   const recipientKey = getPublicKey(generateSecretKey());
-  const event = makeWrapEvent({ recipient: recipientKey, content: 'AAAA', createdAt: nowSeconds() });
+  const event = makeWrapEvent({
+    recipient: recipientKey,
+    content: 'AAAA',
+    createdAt: nowSeconds(),
+  });
   const createdAt = nowSeconds();
   return {
     wrapId: event.id,
@@ -77,7 +80,7 @@ function makeRow(relays: readonly string[], giveUpIn = OUTBOX_GIVE_UP_SECONDS): 
 function setup(random?: () => number) {
   const net = new MockNetwork();
   const rows = new Rows();
-  const logger = createLogger({ level: 'debug', sink: (_l: Level, _line: string) => undefined });
+  const logger = createLogger({ level: 'debug', sink: () => undefined });
   const worker = new OutboxWorker({
     persistence: rows,
     pool: new RelayPool({ connector: net, addressCheck: { resolver: net }, nip11: net, logger }),
