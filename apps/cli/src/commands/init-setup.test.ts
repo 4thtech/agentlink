@@ -291,7 +291,7 @@ describe('D5: agents are named after their app', () => {
   });
 
   it('several agents and no --agent: refuses with fixed text, creates nothing', async () => {
-    for (const name of ['one', 'two']) {
+    for (const name of ['agent-alpha', 'agent-beta']) {
       const plan = await init(['--agent', name, '--harness', 'none']);
       await init(['--agent', name, '--harness', 'none', '--confirm', codeOf(plan)]);
     }
@@ -299,7 +299,7 @@ describe('D5: agents are named after their app', () => {
     const run = await init([]);
     expect(run.code).toBe(EXIT_USAGE);
     expect(run.err).toContain(INIT_TEXT.chooseAgent.replaceAll('{prefix}', NPX));
-    expect(run.err).not.toMatch(/\bone\b|\btwo\b/);
+    expect(run.err).not.toMatch(/agent-alpha|agent-beta/);
     expect(await readAgentConfig(home, 'codex')).toBeUndefined();
     expect(await readAgentConfig(home, 'default')).toBeUndefined();
   });

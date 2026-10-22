@@ -175,6 +175,8 @@ export const INIT_TEXT = Object.freeze({
   ownerStepAdd:
     "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',
+  chooseAgent:
+    'This computer has more than one AgentLink agent, so AgentLink won’t pick one for you. Run `{prefix} init --agent <name>` with the agent this app should use. Nothing was changed.',
   // M1-36b (D1). Fixed text: the command is a constant, nothing from a file or the user.
   installOffer:
     'Recommended: install AgentLink on this computer. Your AI apps then start it faster, and the commands AgentLink shows you are shorter.',
@@ -210,17 +212,24 @@ async function knownAgents(deps: InitDeps): Promise<readonly string[] | undefine
 }
 
 /**
- * D5: `default` when the computer already has it (earlier setups keep their entries) or when the run
- * is not for exactly one app; otherwise that app's name. Unreadable agents: `default`, as before.
+ * D5 (IR-M1-36b-1): an existing agent is always reused, never a second one created without
+ * `--agent`. `default` when it exists; else the only agent on this computer; with several and no
+ * `default`, undefined (the owner must name one). Only a computer with no agent yet gets a new one:
+ * named after the app when the run is for exactly one app, otherwise `default`. Agents that can't be
+ * listed: `default`, as before M1-36b.
  */
 async function defaultAgentName(
   deps: InitDeps,
   apps: readonly HarnessDef[] | undefined,
-): Promise<string> {
+): Promise<string | undefined> {
+  const known = await knownAgents(deps);
+  if (known === undefined) return DEFAULT_AGENT_NAME;
+  const valid = known.filter((n) => isAgentName(n));
+  if (valid.includes(DEFAULT_AGENT_NAME)) return DEFAULT_AGENT_NAME;
+  if (valid.length === 1) return valid[0];
+  if (valid.length > 1) return undefined;
   const [app] = apps ?? [];
   if (apps?.length !== 1 || app === undefined) return DEFAULT_AGENT_NAME;
-  const known = await knownAgents(deps);
-  if (known === undefined || known.includes(DEFAULT_AGENT_NAME)) return DEFAULT_AGENT_NAME;
   return agentNameForApp(app);
 }
 
@@ -361,12 +370,14 @@ async function runHookOptIn(
 ): Promise<number> {
   const { output, terminal } = context;
   let name = requested;
-  // D5: the Claude Code agent is `claude-code` unless this computer already uses `default`.
+  // D5: `default` when it exists, else the Claude Code agent, else the only agent.
   if (context.parsed.agent === undefined) {
     const known = await knownAgents(deps);
     if (known !== undefined && !known.includes(DEFAULT_AGENT_NAME)) {
       const claude = agentNameForApp(HOOK_HARNESS);
-      if (known.includes(claude)) name = claude;
+      const valid = known.filter((n) => isAgentName(n));
+      if (valid.includes(claude)) name = claude;
+      else if (valid.length === 1 && valid[0] !== undefined) name = valid[0];
     }
   }
   const prefix = deps.installedCli === undefined ? undefined : await deps.installedCli();
@@ -554,6 +565,11 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     // D5: named after the app unless `--agent` says otherwise.
     const name =
       parsed.agent ?? (await defaultAgentName(deps, harnessValue === 'none' ? undefined : targets));
+    if (name === undefined) {
+      // Local names are agent-written text: none is shown (agent-name.ts).
+      output.printError(initText(INIT_TEXT.chooseAgent, startPrefix));
+      return EXIT_USAGE;
+    }
     const existing = await readAgentConfig(
       deps.home,
       name,
