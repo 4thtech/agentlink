@@ -11,6 +11,7 @@ import {
   SUBTLE_ZONES,
   WORKSPACE_NAMES,
   ZONES,
+  allowedManifestNames,
   allowedWorkspaceNames,
   violationFor,
 } from './policy.mjs';
@@ -113,11 +114,16 @@ describe('M1-11s-b: the local UI app zone (D-118)', () => {
 
   it('lets only the CLI declare it, as a build-time embed (never a runtime dependency)', () => {
     expect(ZONES['apps/cli']?.embeds).toEqual(['apps/local-ui']);
-    expect(allowedWorkspaceNames('apps/cli')).toContain('@4thtech-io/local-ui');
+    expect(allowedManifestNames('apps/cli')).toContain('@4thtech-io/local-ui');
+    // IR-M1-11s-b-1 L-1: declared for the build, never imported (browser code).
+    expect(allowedWorkspaceNames('apps/cli')).not.toContain('@4thtech-io/local-ui');
+    expect(violationFor('apps/cli', '@4thtech-io/local-ui', 'apps/cli/src/a.ts')).toMatch(
+      /layering/,
+    );
     for (const [zone, policy] of Object.entries(ZONES)) {
       if (zone === 'apps/cli' || zone === 'apps/local-ui') continue;
       expect(policy.embeds, zone).toBeUndefined();
-      expect(allowedWorkspaceNames(zone), zone).not.toContain('@4thtech-io/local-ui');
+      expect(allowedManifestNames(zone), zone).not.toContain('@4thtech-io/local-ui');
     }
   });
 });

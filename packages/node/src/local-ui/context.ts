@@ -1,7 +1,7 @@
 // M1-11s-b: what every local UI API handler gets (08 §1; D-118; I-4).
 //
 // One `LocalUiContext` per approval server, shared by every route. It holds read access to the
-// agent's core and store (through the core client), the owner the agent card names, and core's
+// agent's core (a read-only client view, LocalUiReadClient), the owner the agent card names, and core's
 // `ownerActions.apply`, which verifies an owner signature before anything changes (I-4). There is
 // no signing here: an owner operation is reached only through the per-request
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
@@ -28,9 +28,30 @@ export interface LocalUiOptions {
   readonly client?: AgentLinkClient;
 }
 
+/**
+ * IR-M1-11s-b-1 H-1: the read-only view of the agent's core client that handlers get. It is built
+ * by the server as a new object of bound read methods, so a handler cannot reach `sendMessage`,
+ * `notarize`, terms, the store or the KeyStore (not even through a cast). A page card that needs
+ * another read adds it here (S2 review); a change is always a signed owner action applied by core.
+ */
+export interface LocalUiReadClient {
+  readonly agentId: string;
+  getProof(
+    input: Parameters<AgentLinkClient['getProof']>[0],
+  ): ReturnType<AgentLinkClient['getProof']>;
+}
+
+/** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
+export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
+  return Object.freeze<LocalUiReadClient>({
+    agentId: client.agentId,
+    getProof: (input) => client.getProof(input),
+  });
+}
+
 export interface LocalUiContext {
-  /** The agent's core client (reads, and the store behind it); undefined when not set up. */
-  readonly client: AgentLinkClient | undefined;
+  /** Read-only access to the agent's core; undefined when not set up. */
+  readonly client: LocalUiReadClient | undefined;
   /** The agent and its owner; undefined when no identity or owner is set up. */
   ownerContext(): Promise<ApprovalContext | undefined>;
   /** core `ownerActions.apply`: verifies the owner signature, then applies (I-4). */

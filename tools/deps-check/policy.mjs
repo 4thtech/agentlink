@@ -388,11 +388,17 @@ export const WORKSPACE_NAMES = Object.values(ZONES).map(({ name }) => name);
 export function allowedWorkspaceNames(zone) {
   const found = ZONES[zone];
   if (!found) return [];
-  return [
-    found.name,
-    ...found.uses.map((short) => ZONES[`packages/${short}`].name),
-    ...(found.embeds ?? []).map((zone) => ZONES[zone].name),
-  ];
+  return [found.name, ...found.uses.map((short) => ZONES[`packages/${short}`].name)];
+}
+
+/**
+ * Workspace package names a zone may declare in its manifest: what it may import, plus the apps it
+ * embeds at build time (M1-11s-b `embeds`; IR-M1-11s-b-1 L-1: declared, never imported).
+ */
+export function allowedManifestNames(zone) {
+  const found = ZONES[zone];
+  if (!found) return [];
+  return [...allowedWorkspaceNames(zone), ...(found.embeds ?? []).map((app) => ZONES[app].name)];
 }
 
 const matchesEntry = (specifier, pattern) =>

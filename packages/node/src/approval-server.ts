@@ -71,9 +71,11 @@
 //   same-origin fetch metadata; a mutating one also the page's Origin and an octet-stream body. The
 //   central presence gate then runs before the handler: the wrong-code backoff, the presence proof
 //   (the owner code, or the passkey assertion checked as for a decision), one owner operation at a
-//   time, and the owner being set up. The handler gets a one-use owner operation that signs with
-//   that proof (runOwnerGesture, the allowlist and one gesture, D-68); a wrong code counts towards
-//   the backoff and is answered 403 `presence_rejected` whatever the handler returns.
+//   time, the owner being set up, and the owner store unlocked with the proof. A wrong code is 403
+//   `presence_rejected`, counts towards the backoff, and the handler never runs (IR-M1-11s-b-1 H-1).
+//   The handler gets a read-only client view and a one-use `sign` bound to that session (the
+//   allowlist and one gesture, D-68); the session closes and the store locks when it returns, and a
+//   presence route that signed nothing is answered 409 `refused`.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
@@ -93,6 +95,7 @@ import {
   equalBytes,
   randomBytes,
   sha256,
+  OWNER_SESSION_DEFAULT_TTL_MS,
   ownerPrfSalt,
   parseJson,
   wipe,
@@ -100,6 +103,7 @@ import {
   type JsonValue,
   type OwnerPresence,
   type OwnerPublicKeys,
+  type OwnerSession,
 } from '@4thtech-io/crypto';
 import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
 import { APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
@@ -116,18 +120,19 @@ import {
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
-import type { LocalUiAssets, LocalUiContext, LocalUiOptions } from './local-ui/context.js';
+import {
+  readOnlyClient,
+  type LocalUiAssets,
+  type LocalUiContext,
+  type LocalUiOptions,
+} from './local-ui/context.js';
 import type { LocalUiOwnerOperation, LocalUiResult } from './local-ui/route-types.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
   createLocalUiRoutes,
 } from './local-ui/routes.js';
-import {
-  runOwnerGesture,
-  type OwnerSignature,
-  type PromptingOwnerKeyStore,
-} from './owner-operation.js';
+import { checkGesture, signGesture, type PromptingOwnerKeyStore } from './owner-operation.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
 /** 08 §1 (M1-31, D-79): the local UI's host name; its origin is `http://localhost:<port>`. */
@@ -237,6 +242,11 @@ function loadLocalUi(assets: LocalUiAssets | undefined): {
       }
       const metas = [...html.matchAll(CSRF_META)];
       if (metas.length > 1) throw badBundle('index.html has more than one CSRF meta');
+      // IR-M1-11s-b-1 L-2: any other mention (other attribute order or quotes) is refused, never
+      // left beside an injected one.
+      if (html.toLowerCase().split('agentlink-csrf').length - 1 !== metas.length) {
+        throw badBundle('index.html has a CSRF meta in another form');
+      }
       const meta = metas[0];
       if (meta !== undefined) {
         if (meta[1] !== '') throw badBundle('index.html already holds a CSRF token');
@@ -663,7 +673,9 @@ export async function startApprovalServerWith(
   let failures = 0;
   let waitUntil = 0;
   const uiContext: LocalUiContext = Object.freeze<LocalUiContext>({
-    client: options.localUi?.client,
+    // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
+    client:
+      options.localUi?.client === undefined ? undefined : readOnlyClient(options.localUi.client),
     ownerContext: () => source.context(),
     applyOwnerAction: (signed) => source.apply(signed),
     now: () => now(),
@@ -1179,12 +1191,15 @@ export async function startApprovalServerWith(
   };
 
   /**
-   * M1-11s-b, the central presence gate for a /api/ui/ owner route (04 §2.5, I-4). Everything that
-   * can be checked without unlocking is checked here, before `run` (the handler) is called: the
-   * wrong-code backoff, a presence proof in the body (the owner code, or a passkey assertion verified
-   * against the stored passkey and the owner), one owner operation at a time, and the owner set up.
-   * `run` gets a one-use owner operation; an owner code is checked when it unlocks, and a wrong one
-   * counts towards the backoff and is answered 403 whatever the handler returns.
+   * M1-11s-b, the central presence gate for a /api/ui/ owner route (04 §2.5, I-4; IR-M1-11s-b-1 H-1).
+   * Owner presence is verified before `run` (the handler) is called: the wrong-code backoff, a
+   * presence proof in the body (the owner code, or a passkey assertion verified against the stored
+   * passkey and the owner), one owner operation at a time, the owner set up, and then the owner store
+   * unlocked with that proof. A wrong code or gesture is 403 `presence_rejected`, counted towards the
+   * backoff, and the handler never runs. `run` gets a one-use `sign` bound to that session (the
+   * allowlist and one gesture, D-68); the session is closed and the store locked when `run` returns,
+   * whatever happened. A presence route that returns without signing performed no owner operation
+   * and is answered 409 `refused`, never its own result.
    */
   async function ownerGate(
     req: IncomingMessage,
@@ -1251,62 +1266,63 @@ export async function startApprovalServerWith(
         } else {
           presence = { kind: 'passphrase', secret: body };
         }
-        let used = false;
-        let rejected = false;
-        let noStore = false;
-        const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
-          sign: async (review, requests) => {
-            // One entry of the owner secret, one owner operation (D-68).
-            if (used) {
-              throw new NodeKeyStoreError(
-                'owner_operation_invalid',
-                'One owner operation signs once.',
-              );
-            }
-            used = true;
-            let store: PromptingOwnerKeyStore;
-            try {
-              store = await openOwnerStore(context.owner);
-            } catch (error) {
-              noStore = true;
-              throw error;
-            }
-            try {
-              const signed: readonly OwnerSignature[] = await runOwnerGesture(
-                store,
-                pageTerminal(presence),
-                review,
-                requests,
-              );
-              presenceSucceeded();
-              return signed;
-            } catch (error) {
-              if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
-                rejected = true;
-                presenceFailed();
-              }
-              throw error;
-            } finally {
-              await store.close().catch(() => undefined);
-            }
-          },
-        });
-        let result: LocalUiResult;
+        let store: PromptingOwnerKeyStore;
         try {
-          result = await run(owner);
-        } catch (error) {
-          if (rejected) finishOwner(res, 403, 'presence_rejected');
-          else if (noStore) finishOwner(res, 503, 'needs_setup');
-          else if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
-          else finishOwner(res, 500, 'failed');
+          store = await openOwnerStore(context.owner);
+        } catch {
+          finishOwner(res, 503, 'needs_setup');
           return;
         }
-        if (rejected) {
-          finishOwner(res, 403, 'presence_rejected');
-          return;
+        try {
+          let session: OwnerSession;
+          try {
+            // unlock wipes the presented bytes, whether or not they unlock.
+            session = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
+          } catch (error) {
+            if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+              presenceFailed();
+              finishOwner(res, 403, 'presence_rejected');
+            } else {
+              finishOwner(res, 500, 'failed');
+            }
+            return;
+          }
+          presenceSucceeded();
+          let used = false;
+          let result: LocalUiResult;
+          try {
+            const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
+              sign: async (review, requests) => {
+                // One entry of the owner secret, one owner operation (D-68).
+                if (used) {
+                  throw new NodeKeyStoreError(
+                    'owner_operation_invalid',
+                    'One owner operation signs once.',
+                  );
+                }
+                used = true;
+                return signGesture(session, checkGesture(review, requests));
+              },
+            });
+            result = await run(owner);
+          } catch (error) {
+            if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
+            else finishOwner(res, 500, 'failed');
+            return;
+          } finally {
+            await session.close().catch(() => undefined);
+          }
+          if (!used) {
+            // A presence route that signed nothing did no owner operation (fail closed).
+            finishOwner(res, 409, 'refused');
+            return;
+          }
+          emit({ kind: 'owner_operation', outcome: 'done' });
+          sendResult(res, result);
+        } finally {
+          await store.lock().catch(() => undefined);
+          await store.close().catch(() => undefined);
         }
-        emit({ kind: 'owner_operation', outcome: 'done' });
-        sendResult(res, result);
       } finally {
         busy = false;
       }

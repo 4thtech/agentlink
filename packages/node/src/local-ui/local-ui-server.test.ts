@@ -10,8 +10,9 @@
 // - The session token (cookie) gates the app pages, the assets and every /api/ui/ route.
 // - A route declared `presence: true` runs only after the central presence gate: a POST with the
 //   page's Origin, CSRF and an octet-stream body carrying the owner code (or the passkey assertion).
-//   No proof: 403 before the handler runs. The handler gets a one-use owner operation; a wrong code
-//   counts towards the server's wrong-code backoff, which then holds back every owner operation.
+//   No proof, or a wrong one: 403 before the handler runs (the store is unlocked first, IR-M1-11s-b-1
+//   H-1), and a wrong code counts towards the server's wrong-code backoff. The handler gets a
+//   read-only client view and a one-use `sign` on that session; one that signs nothing is 409.
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -190,11 +191,21 @@ interface Harness {
 }
 
 async function harness(
-  options: { assets?: LocalUiAssets; internals?: ApprovalServerInternals } = {},
+  options: {
+    assets?: LocalUiAssets;
+    internals?: ApprovalServerInternals;
+    client?: unknown;
+  } = {},
 ): Promise<Harness> {
   const opened: string[] = [];
   const server = await startApprovalServerWith(
-    { source, localUi: { assets: options.assets ?? bundle() } },
+    {
+      source,
+      localUi: {
+        assets: options.assets ?? bundle(),
+        ...(options.client === undefined ? {} : { client: options.client as never }),
+      },
+    },
     {
       keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(keychain, expected),
@@ -323,6 +334,15 @@ describe('static assets of the local UI (M1-11s-b, 04 §4)', () => {
       ]),
     };
     await expect(harness({ assets: preset })).rejects.toThrow(/local UI/);
+    // IR-M1-11s-b-1 L-2: any other form of the meta (attribute order, quotes) is refused too.
+    for (const html of [
+      '<head><meta content="" name="agentlink-csrf"></head>',
+      "<head><meta name='agentlink-csrf' content=''></head>",
+      '<head><meta name="agentlink-csrf" content="" /><meta name=agentlink-csrf></head>',
+    ]) {
+      const odd: LocalUiAssets = { files: new Map([['index.html', encodeUtf8(html)]]) };
+      await expect(harness({ assets: odd }), html).rejects.toThrow(/local UI/);
+    }
   });
 });
 
@@ -564,7 +584,9 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     expect(calls).toHaveLength(0);
   });
 
-  it('counts a wrong owner code towards the backoff, which then holds back the handler', async () => {
+  // IR-M1-11s-b-1 H-1: presence is verified before the handler runs. A wrong code never reaches it
+  // (this test pinned the opposite at eebdebd6, a bad pin corrected here, not a weakening).
+  it('refuses a wrong owner code before the handler runs and counts it towards the backoff', async () => {
     const calls: { input: unknown }[] = [];
     let clock = 1_000_000;
     const h = await harness({ internals: { routes: ownerRoutes(calls), now: () => clock } });
@@ -573,12 +595,150 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       expect(res.status).toBe(403);
       expect(JSON.parse(res.body)).toEqual({ status: 'presence_rejected' });
     }
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(0);
     const held = await post(h, encodeUtf8(code));
     expect(held.status).toBe(429);
     expect(held.headers['retry-after']).toBe('5');
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(0);
     clock += 6_000;
     expect((await post(h, encodeUtf8(code))).status).toBe(200);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('refuses a presence route whose handler returns without signing (409, never its result)', async () => {
+    const routes = createLocalUiRoutes();
+    let ran = 0;
+    routes.register({
+      method: 'POST',
+      path: '/api/ui/test/:id/check',
+      presence: true,
+      handler: () => {
+        ran += 1;
+        return Promise.resolve({ status: 200, body: { status: 'changed without signing' } });
+      },
+    });
+    const h = await harness({ internals: { routes } });
+    const res = await post(h, encodeUtf8(code));
+    expect(ran).toBe(1);
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ status: 'refused' });
+  });
+
+  it('closes the session and locks the store after success, a handler error and a wrong code', async () => {
+    const seen: { locked: number; closed: number; sessionsClosed: number }[] = [];
+    const openOwnerStore = async (expected: OwnerPublicKeys) => {
+      const store = await KeychainOwnerKeyStore.open(keychain, expected);
+      const record = { locked: 0, closed: 0, sessionsClosed: 0 };
+      seen.push(record);
+      const lock = store.lock.bind(store);
+      const close = store.close.bind(store);
+      const unlock = store.unlock.bind(store);
+      store.lock = () => {
+        record.locked += 1;
+        return lock();
+      };
+      store.close = () => {
+        record.closed += 1;
+        return close();
+      };
+      store.unlock = async (...args: Parameters<typeof unlock>) => {
+        const session = await unlock(...args);
+        const end = session.close.bind(session);
+        session.close = () => {
+          record.sessionsClosed += 1;
+          return end();
+        };
+        return session;
+      };
+      return store;
+    };
+    const routes = ownerRoutes([]);
+    let afterSign: { signed?: OwnerSignature[] } | undefined;
+    routes.register({
+      method: 'POST',
+      path: '/api/ui/test/:id/fail',
+      presence: true,
+      handler: async (_ctx, req, ownerOp) => {
+        afterSign = {
+          signed: [
+            ...(await ownerOp.sign({ lines: ['Check'] }, [
+              {
+                kind: 'owner-action',
+                action: {
+                  v: 1,
+                  op: 'contact.check',
+                  agent: agentId,
+                  owner: encodeHex(owner.ownerNostr),
+                  nonce: 'm'.repeat(22),
+                  params: { contact: req.params['id'] ?? '' },
+                },
+              },
+            ])),
+          ],
+        };
+        throw new Error('the handler failed after signing');
+      },
+    });
+    const h = await harness({ internals: { routes, openOwnerStore } });
+    expect((await post(h, encodeUtf8(code))).status).toBe(200);
+    expect((await post(h, encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'))).status).toBe(403);
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    const failed = await send(h.port, '/api/ui/test/c1/fail', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: h.origin,
+        'X-AgentLink-CSRF': csrf,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: encodeUtf8(code),
+    });
+    expect(failed.status).toBe(500);
+    expect(afterSign?.signed).toHaveLength(1);
+    // close() locks as well, so lock runs at least once per request.
+    expect(
+      seen.map((r) => ({
+        locked: r.locked >= 1,
+        closed: r.closed,
+        sessionsClosed: r.sessionsClosed,
+      })),
+    ).toEqual([
+      { locked: true, closed: 1, sessionsClosed: 1 },
+      { locked: true, closed: 1, sessionsClosed: 0 },
+      { locked: true, closed: 1, sessionsClosed: 1 },
+    ]);
+  });
+
+  it('gives handlers a read-only view of the core client, never the client itself', async () => {
+    const routes = createLocalUiRoutes();
+    let client: unknown;
+    routes.register({
+      method: 'GET',
+      path: '/api/ui/test/client',
+      presence: false,
+      handler: (ctx) => {
+        client = ctx.client;
+        return Promise.resolve({ status: 200, body: {} });
+      },
+    });
+    const full = {
+      agentId: 'agent-1',
+      getProof: () => Promise.resolve(undefined),
+      sendMessage: () => Promise.reject(new Error('never')),
+      notarize: () => Promise.reject(new Error('never')),
+      store: {},
+      keyStore: {},
+    };
+    const h = await harness({ internals: { routes }, client: full });
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    const res = await send(h.port, '/api/ui/test/client', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
+    expect(res.status).toBe(200);
+    expect(client).not.toBe(full);
+    expect(Object.keys(client as object).sort()).toEqual(['agentId', 'getProof']);
+    expect(Object.isFrozen(client)).toBe(true);
   });
 });
