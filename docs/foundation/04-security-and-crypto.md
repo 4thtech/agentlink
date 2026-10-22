@@ -665,6 +665,12 @@ The server derives `kek` and keeps only `kek`, together with the `salt`, `m`, `t
   - The redacting logger treats both environment variable names as secret-bearing.
   - The code pattern (24 base32 characters in groups) is added to the CI secret-pattern test (§8.4).
   - A generated code is shown once and the screen is cleared after the user confirms it, to limit scrollback and tmux logs. When the user asks for a code file, it is written with `O_CREAT | O_EXCL | O_NOFOLLOW` and mode 0600, never under `~/.agentlink`.
+- **Same-user residuals of the file and its unlock** (proposed; owner confirms at merge; AUDIT-FABLE-M1-8f-1). Each one needs a process running as the same OS user, which can already read the agent key (§2.2). They are consistent with the G-1 residual (D-67), and no software check on a same-user machine removes them:
+  - **Rollback by restoring a copy.** An older copy of the `.alks` file with the same salt, restored over the current one, opens under the in-memory `kek` and passes the write-protocol header check. It silently rolls items back, for example `policy-version`. The format has no counter outside the file to detect this.
+  - **Hard link made before a write.** A hard link to the `.alks` file, made before a write, keeps the old ciphertext under its other name after the rename. The `nlink` check refuses to open a linked file, but cannot stop the old copy existing.
+  - **No retry limit on unlock.** Unlock does not count wrong secrets. That gives an attacker nothing beyond offline guessing of a copied file at the same Argon2id cost.
+  - **No guards on unlock, by design.** Unlock runs without the TTY and harness-marker guards, because the MCP server unlocks non-interactively (passphrase file or environment). Those guards apply only to the opt-in and to owner steps.
+  - The environment-variable residuals (above, "What deleting does not protect") and the faked-terminal residual ("Interactive only" is a UX guard) apply unchanged.
 
 **Threat model delta (compared with the OS keychain).**
 

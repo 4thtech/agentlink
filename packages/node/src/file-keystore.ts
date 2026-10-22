@@ -269,7 +269,8 @@ export interface CreateFileAgentOptions {
   readonly passphrase?: Uint8Array;
   /**
    * For a generated code: shows the code and has the user re-type its last group; false writes
-   * nothing (04 §2.8). The CLI always passes it.
+   * nothing (04 §2.8). Required whenever the code is generated (`keystore_passphrase_refused`
+   * without it).
    */
   readonly confirmCode?: (code: Uint8Array) => Promise<boolean>;
   /** Test seams. */
@@ -277,6 +278,12 @@ export interface CreateFileAgentOptions {
   readonly kdf?: Argon2idParams;
   readonly fs?: KeystoreFsOptions;
 }
+
+const codeNotConfirmed = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'keystore_passphrase_refused',
+    'The unlock code was not confirmed, so nothing was set up. Run the command again.',
+  );
 
 /**
  * `agentlink init --keystore file` (04 §2.8 "Selection" 3; 07 §9.1): creates a new agent in a
@@ -294,6 +301,9 @@ export async function createFileAgent(
   const dir = options.dir ?? defaultKeystoreDir();
   const fs = options.fs ?? {};
   const chosen = options.passphrase !== undefined;
+  // AUDIT-FABLE-M1-8f-1 L-1: a generated code is written only after the user re-typed its last
+  // group (04 §2.8), so the re-type step cannot be skipped by leaving the callback out.
+  if (!chosen && typeof options.confirmCode !== 'function') throw codeNotConfirmed();
   const secret = chosen ? Uint8Array.from(options.passphrase as Uint8Array) : generateSecretCode();
   let kek: KeystoreKek | undefined;
   const seed = randomBytes(MASTER_SEED_LENGTH);
@@ -301,11 +311,11 @@ export async function createFileAgent(
   try {
     await assertNotOwnerSecret(dir, secret, fs);
     kek = await newKek(secret, chosen ? 2 : 1, options.kdf ?? KEYSTORE_KDF_DEFAULTS);
-    if (!chosen && options.confirmCode !== undefined && !(await options.confirmCode(secret))) {
-      throw new NodeKeyStoreError(
-        'keystore_passphrase_refused',
-        'The unlock code was not confirmed, so nothing was set up. Run the command again.',
-      );
+    if (
+      !chosen &&
+      !(await (options.confirmCode as (code: Uint8Array) => Promise<boolean>)(secret))
+    ) {
+      throw codeNotConfirmed();
     }
     const agentId = await writeAgentFile(dir, seed, kek, fs);
     returned = !chosen;
@@ -632,7 +642,10 @@ export async function changeFileAgentPassphrase(
 export interface FileKeyStoreSetupOptions {
   /** A chosen passphrase typed at the prompt; omitted, a generated unlock code (the default). */
   readonly passphrase?: Uint8Array;
-  /** Shows a generated code and has the user re-type its last group (04 §2.8). */
+  /**
+   * Shows a generated code and has the user re-type its last group (04 §2.8). Required unless a
+   * passphrase is given: without it creation is refused (`keystore_passphrase_refused`).
+   */
   readonly confirmCode?: (code: Uint8Array) => Promise<boolean>;
 }
 
