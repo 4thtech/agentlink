@@ -1,35 +1,39 @@
 # @talirezun — sync
-**Headline:** Standing merge rule: the orchestrator merges a PR once it has an independent review PASS and green checks. Release 0.2.0 waits on main's e2e (#396). Chiado keys are set; #402 is in review.
-_Updated 2026-10-22 · claude-code / claude-haiku-5-5 · orchestrator_
+**Headline:** D-118 to D-123 recorded in PR #416; about 25 PRs passed review and wait on CI runners, and the merge queue has been stalled since 10:03Z (#386 and #395 jumped to the front).
+_Updated 2026-10-22T12:05Z · claude-code / claude-haiku-5-5 · orchestrator, afternoon_
 
 ## Now
 - **Merge rule (standing, from Tali):** merge once an independent review PASSes and checks are green.
-- **CI:** #395 runs the macOS and Windows legs in the merge queue only. Merge-queue batching is on (groups of 5, 2 concurrent builds).
-- **Release 0.2.0** is next. Blocked until main's e2e is green; #396 is the flake fix.
-- **Chiado:** submitter keys are set. Enabling it (#402) is in review. Production funding is coming through the community.
-- **UI:** M1-11b (first interactive local app) starts once #370 (UI components) merges. M1-35c (UI strings, #398) is reviewed.
-- **Main** has landed through #384 (2026-10-22). 30 PRs are open.
+- **Queue:** stalled by a flaky test and runner load. #386 and #395 were moved to the front.
+- **Release 0.2.0** stays blocked until main's e2e is green (#396, flake fix).
+- **Faucet:** Base Sepolia faucet funded to 40 test USDC (Tali).
 
-## In flight
-| Task | PR | Status | Next step |
+## Decisions (D-118 to D-123, PR #416)
+- Local UI is a React app in `apps/local-ui`.
+- Policy loosening is allowed, with warnings that must be acknowledged.
+- App UX: passkey owner setup with an owner-code backup; recovery kit "Later"; free test credits auto-claimed once; navigation cut to 7 items.
+- Agent side: global install, approval wait, automatic agent names, Send folder.
+- Payments: QR top-up, Withdraw credits button, public trust docs.
+- Chiado QR top-up now; gasless top-up (M1-3c) and the testnet slice of M3-4b pulled forward.
+
+## In flight (claims)
+| Task | PR / branch | Status | Next step |
 |---|---|---|---|
-| UI components (M1-35b) | #370 | review | unblocks M1-11b, then M1-35c |
-| UI strings (M1-35c) | #398 | reviewed | merge under the standing rule |
-| e2e flake fix | #396 | open | unblocks main e2e and 0.2.0 |
+| UI frame and pages | #407, #410, #411, #417, #418, #424 | claimed | — |
+| Core helpers | #415 | claimed | — |
+| Test credits | #419, #420 | claimed | — |
+| CLI UX | #409, #412, #413, #421, #422 | claimed | — |
+| Docs | #416, #423 | claimed | — |
+| M1-3c contracts (builder) | branch not yet pushed | in progress | push branch |
+| M1-4c-b KeyStore signTransaction | m1-4c-b | in progress | — |
 | CI matrix, queue-only legs | #395 | open | — |
-| Chiado enable | #402 | review | needs Chiado funding |
-| Transport hardening (M1-5b-c) | #403 | open | — |
-| Counter-offers (M1-9d-5) | #401 | open | — |
-| Receiver file-key rows (M1-7f-2) | #400 | open | — |
+| e2e flake fix | #396 | open | unblocks main e2e and 0.2.0 |
 | Version packages | #324 | open | release 0.2.0 |
-| Top-up link (M1-26-e) | #344 | review | on until the pay page is live |
-| Invite page (M1-19) | #348 | review | — |
 
 ## Waiting on owner
-- Design briefs B-2, B-3 and B-9.
 - e2e-live environment.
 - npm `latest` approval click for the release.
-- Chiado funding.
+- Design briefs B-2, B-3 and B-9.
 
 ## Owner to-dos
 - E2e API-key secrets.
