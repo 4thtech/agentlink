@@ -8,7 +8,7 @@
 // - the recovery kit's "Later" path is remembered for the persistent banner;
 // - "Ready" hands back to the AI with a prompt to copy;
 // - the default views use no web3 or key words (11 §5.1; UX north star).
-import { act } from 'react';
+import { act, createElement as h, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RECOVERY_KIT_LATER_KEY, recoveryKitPending } from '../../states/index.js';
@@ -102,7 +102,7 @@ async function mount(
       createPasskey: passkey,
       passkeysAvailable: () => available,
     };
-    root.render(<FirstRunPage {...props} />);
+    root.render(h(FirstRunPage as ComponentType<FirstRunPageProps>, props));
   });
 }
 
