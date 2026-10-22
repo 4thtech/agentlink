@@ -244,7 +244,7 @@ areas:
       - name: "Terms and one approval per agreement"
         state: done
         prs: [126, 134]
-        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). The deferred Accepted receipt has landed (M1-7g-d); firm offers and recorded accepts, each under one owner approval with the proof fee on the same request, are in review (M1-9d-3)."
+        summary: "Offers, counters, rejects and accepts with the chain fields filled from the agent's own store; the negotiation rules (no forks, lock after an accept, conflicts and anchored resends) applied on receive; an accept asks the owner once per agreement, or runs within the owner-signed auto-accept limits, and is sent at most once (M1-32, D-55). Repeats under one clientRequestId send nothing, and revisions that arrive out of order are applied in link order (M1-32-b). The deferred Accepted receipt has landed (M1-7g-d); firm offers and recorded accepts, each under one owner approval with the proof fee on the same request, have landed (M1-9d-3); recorded counter-offers, firm offers sent as a counter, are in review (M1-9d-5)."
       - name: "Agent profile signatures"
         state: done
         prs: [300]
