@@ -7,7 +7,13 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
-import type { AgentLinkClient, OwnerActionOutcome } from '@4thtech-io/core';
+import type {
+  ActivityEntry,
+  AgentLinkClient,
+  OwnerActionOutcome,
+  Page,
+  PageQuery,
+} from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 
@@ -39,6 +45,8 @@ export interface LocalUiReadClient {
   getProof(
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
+  /** M1-11c-a1: one page of core's activity feed (`ActivityService.list`); store only, no write. */
+  listActivity(query: PageQuery): Promise<Page<ActivityEntry>>;
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -46,6 +54,7 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    listActivity: (query) => client.activity.list(query),
   });
 }
 
