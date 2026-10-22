@@ -2,6 +2,9 @@
 // `Revocation` struct (05 §4, D-81) and of a `Registration` that shares its owner nonce, through
 // @4thtech-io/crypto. A refusal by the code under test (CryptoInputError) is reported as
 // `outcome: reject`. Any other error is a bug and fails the case.
+// `revocationJson` (M1-1j-b) carries the Revocation as raw JSON text: the harness loads vector files
+// as parsed JSON, which writes a -0 back as 0, so a token such as -0 reaches the code under test only
+// through JSON.parse here, which keeps it in every runtime.
 import {
   CryptoInputError,
   hashRegistration,
@@ -13,7 +16,8 @@ import type { Comparison, SuiteModule } from '../suite';
 
 type RevocationInput =
   | { op: 'revocation'; domain: unknown; message: unknown }
-  | { op: 'registration'; domain: unknown; message: unknown };
+  | { op: 'registration'; domain: unknown; message: unknown }
+  | { op: 'revocationJson'; domain: unknown; json: string };
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -25,6 +29,9 @@ function parseInput(input: unknown): RevocationInput {
     }
     if (input.op === 'registration' && 'registration' in input) {
       return { op: 'registration', domain: input.domain, message: input.registration };
+    }
+    if (input.op === 'revocationJson' && typeof input.json === 'string') {
+      return { op: 'revocationJson', domain: input.domain, json: input.json };
     }
   }
   throw new TypeError(
@@ -54,6 +61,10 @@ function evaluate(input: RevocationInput): readonly Comparison[] {
       return rejectedOr(() => hashFields(hashRevocation(input.domain, input.message)));
     case 'registration':
       return rejectedOr(() => hashFields(hashRegistration(input.domain, input.message)));
+    case 'revocationJson': {
+      const message: unknown = JSON.parse(input.json);
+      return rejectedOr(() => hashFields(hashRevocation(input.domain, message)));
+    }
   }
 }
 

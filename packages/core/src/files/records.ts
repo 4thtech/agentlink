@@ -57,7 +57,7 @@ const isKeyEpoch = (v: unknown): v is number =>
 
 /**
  * The stored object a sender `files` row names, with the drop key epoch of its upload, or null for
- * an inline file (nothing stored). A locator that does not parse is the fixed `storage_failed`.
+ * an inline file or a receiver row (nothing this agent stored). A locator that does not parse is the fixed `storage_failed`.
  */
 export async function openFileObject(
   ctx: CoreContext,
@@ -72,7 +72,8 @@ export async function openFileObject(
   }
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) throw notDeleted();
   const { kind, locator, keyEpoch } = parsed as Record<string, unknown>;
-  if (kind === 'inline') return null;
+  // `received` (M1-7f-2): a receiver row names nothing this agent stored, so it deletes nothing.
+  if (kind === 'inline' || kind === 'received') return null;
   if ((kind !== 'drop' && kind !== 's3') || typeof locator !== 'string') throw notDeleted();
   if (keyEpoch !== undefined && (kind !== 'drop' || !isKeyEpoch(keyEpoch))) throw notDeleted();
   return {
