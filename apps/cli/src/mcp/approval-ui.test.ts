@@ -248,6 +248,16 @@ describe('the owner’s browser opens with the one-shot link, not the agent', ()
   });
 });
 
+describe('the link nextStep command prefix (M1-36a)', () => {
+  it('prints the npx form when given it, never a bare name that is not on PATH', () => {
+    const url = `http://localhost:47321/approve/${APPROVAL}`;
+    const npx = 'npx -y @4thtech-io/agentlink';
+    expect(approvalLinkNextStep(APPROVAL, url, 'work', npx)).toContain(
+      `\`${npx} approve ${APPROVAL} --agent work\``,
+    );
+  });
+});
+
 describe('the nextStep with the link (06 §2.5; 11 §6.10)', () => {
   it('names the link, keeps the CLI command and tells the agent never to open or fetch it', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;

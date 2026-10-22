@@ -1,6 +1,7 @@
 // The M1a nextStep text (06 §2.5 step 2, IR-M1-9j-1 F02).
 import { encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import { approveCommand, approvalNextStep, isApprovalId } from './next-step.js';
 
 const newId = (): string => `apr_${encodeBase64url(randomBytes(16))}`;
@@ -49,5 +50,21 @@ describe('approvalNextStep (06 §2.5 step 2)', () => {
       const inserted = command.replace(/^agentlink approve /, '').replace(' --agent ', '');
       expect(inserted).toMatch(/^[A-Za-z0-9_-]+$/);
     }
+  });
+});
+
+describe('the command prefix (M1-36a)', () => {
+  const NPX = 'npx -y @4thtech-io/agentlink';
+
+  it('prints the prefix it is given, with and without --agent', () => {
+    const id = newId();
+    expect(approveCommand(id, undefined, NPX).command).toBe(`${NPX} approve ${id}`);
+    expect(approveCommand(id, 'work', NPX).command).toBe(`${NPX} approve ${id} --agent work`);
+    expect(approvalNextStep(id, 'default', NPX)).toContain(`\`${NPX} approve ${id}\`.`);
+  });
+
+  it('defaults to the launch-detected prefix, so the printed command always works', () => {
+    const id = newId();
+    expect(approveCommand(id).command).toBe(`${cliPrefix()} approve ${id}`);
   });
 });
