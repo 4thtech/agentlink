@@ -2124,7 +2124,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A decision-log entry and 08 §1 updated.
 
 #### M1-26-e · top-up link in the tools and CLI (new, D-111)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
+- **Status:** in review (4thtech/agentlink#344) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
 - **Repo/path:** agentlink · packages/core, apps/cli
 - **Depends on:** M1-26-d (decided, D-113), M1-26-c
 - **Spec:** 06 §2.4 (`needs_credits`), §8 (`credits --topup`); 08 §1
@@ -2132,6 +2132,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Build the top-up link in the decided format from the shipped config; `needs_credits` `url` and `nextStep` per 06 §2.4; `agentlink credits --topup` prints the link, the agent's address with a terminal QR code, and opens the browser when one is available.
   - Agent-assisted funding (D-111, 06 §2.4): the skill file and server instructions tell the agent to explain the one step, share the link or address and QR, watch `credits` and confirm; never ask for keys, recovery codes or card details, never move funds.
+  - SKILL.md top-up rule lands with the live pay page (M2-10), together with relaxing `tools/skill-file.test.mjs:142`.
 - **Acceptance:**
   - Tests first: the link host comes only from the shipped config; no network, token or "wallet" in `nextStep` or the CLI default output; no tool or `nextStep` asks for a key, recovery code or card detail.
 

@@ -120,7 +120,7 @@ async function accountFields(
 ): Promise<Record<string, unknown>> {
   const proofs = context.client.proofs;
   if (proofs === undefined) return {};
-  const url = topUpUrl(agentId);
+  const url = topUpUrl(agentId, undefined, context.payPage);
   const base = { agentAddress: agentId, ...(url === undefined ? {} : { topUpUrl: url }) };
   let account;
   try {

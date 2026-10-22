@@ -126,7 +126,7 @@ export async function proposeTermsHandler(
     }
     case 'needs_credits':
       logger.info('propose terms needs credits', { offers: 0 });
-      return termsNeedsCredits(self.agentId, result.topUp);
+      return termsNeedsCredits(self.agentId, result.topUp, context.payPage);
     case 'rejected':
       logger.info('propose terms refused', { kind: 'terms' });
       return termsRefusal(result.code, false);
