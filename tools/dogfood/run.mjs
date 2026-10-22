@@ -67,13 +67,16 @@ import {
 import {
   DEFAULT_REMOTE_OUT,
   FILES,
+  abortPeer,
   approvalNoticeLocal,
   approveCommandText,
+  clearStaleInvite,
   discoverWaiting,
   inviteText,
   localTransport,
   makeChannel,
   parseInviteFile,
+  runWithExitHooks,
   sshTransport,
   waitingText,
 } from './autosync.mjs';
@@ -474,6 +477,15 @@ function runApprove(options, where, agent, approvalId) {
   });
 }
 
+// M1-23-f: auto-sync cleanup that must also run when the script stops early (see runWithExitHooks).
+const exitHooks = [];
+let planDone = false;
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.once(signal, () => {
+    void runWithExitHooks(() => Promise.resolve(), exitHooks).finally(() => process.exit(130));
+  });
+}
+
 async function main() {
   let options;
   try {
@@ -627,6 +639,9 @@ async function main() {
       // Mac B: announce the run in the sync folder (0700), then wait for Mac A. No stdin prompts.
       transport = localTransport(join(dir, 'sync'));
       await transport.init();
+      // An invite file holds a secret link: one left by an earlier run goes now, ours goes on exit.
+      await clearStaleInvite(transport);
+      exitHooks.push(() => clearStaleInvite(transport));
       nonce = randomBytes(16).toString('hex');
       channel = makeChannel({ transport, nonce, role: 'b', ...chanDeps });
       await transport.write(FILES.waiting, waitingText(runId, nonce));
@@ -666,6 +681,8 @@ async function main() {
       nonce = syncInfo.nonce;
       channel = makeChannel({ transport, nonce, role: 'a', ...chanDeps });
       await transport.remove(FILES.waiting);
+      // Any early exit of Mac A (error, Ctrl-C, a failed step) tells Mac B to stop.
+      exitHooks.push(() => (planDone ? undefined : abortPeer({ transport, channel, nonce })));
       await channel.send('READY');
     }
   }
@@ -871,6 +888,7 @@ async function main() {
     },
     options.only,
   );
+  planDone = true;
   pollers.cc.close();
   pollers.oc.close();
   asker.close();
@@ -993,4 +1011,4 @@ async function main() {
   return allPass && scan.findings.length === 0 ? 0 : 1;
 }
 
-process.exitCode = await main();
+process.exitCode = await runWithExitHooks(main, exitHooks);

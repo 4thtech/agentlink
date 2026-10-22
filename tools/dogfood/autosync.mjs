@@ -225,3 +225,48 @@ export function approvalNoticeLocal(agent, approvalId, command, minutes) {
   const bar = `+${'-'.repeat(width + 2)}+`;
   return [bar, ...lines.map((l) => `| ${l.padEnd(width)} |`), bar].join('\n');
 }
+
+// ---------------------------------------------------------------------------------------------
+// Cleanup and early exit (M1-23-f).
+
+/** Mac B: removes an invite file left by an earlier run (it holds a secret link). Never throws. */
+export async function clearStaleInvite(transport) {
+  try {
+    await transport.remove(FILES.invite);
+  } catch {
+    // nothing to remove, or the folder is gone
+  }
+}
+
+/**
+ * Mac A, on any early exit: tells Mac B to stop (ABORT in the invite file, so a B still waiting for
+ * the invite stops, and ABORT in the status file, so a B waiting for a step stops). Best effort:
+ * never throws, so it cannot hide the reason A stopped.
+ */
+export async function abortPeer({ transport, channel, nonce }) {
+  try {
+    await transport.write(FILES.invite, inviteText(nonce, 'ABORT'));
+  } catch {
+    // ssh is down: Mac B times out on its own
+  }
+  try {
+    await channel.send('ABORT');
+  } catch {
+    // same
+  }
+}
+
+/** Runs `main`, then the exit `hooks` last-first (also when main throws). A failing hook is ignored. */
+export async function runWithExitHooks(main, hooks) {
+  try {
+    return await main();
+  } finally {
+    for (const hook of [...hooks].reverse()) {
+      try {
+        await hook();
+      } catch {
+        // cleanup is best effort
+      }
+    }
+  }
+}

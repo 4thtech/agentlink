@@ -299,7 +299,12 @@ exec sh -c "$last"
 
   it('abortPeer never throws when ssh is down', async () => {
     const down = sshTransport('u@mini.local', syncDir, { ssh: '/nonexistent/ssh' });
-    const channel = makeChannel({ transport: down, nonce: NONCE, role: 'a', sleep: async () => {} });
+    const channel = makeChannel({
+      transport: down,
+      nonce: NONCE,
+      role: 'a',
+      sleep: async () => {},
+    });
     await expect(abortPeer({ transport: down, channel, nonce: NONCE })).resolves.toBeUndefined();
   });
 

@@ -1490,9 +1490,12 @@ describe('capped error text in notes and results (M1-23-f)', () => {
 
   it('an oversized thrown error is capped in the step note, and the secret scan still sees it', async () => {
     const huge = `boom ${'z'.repeat(6000)} sk-ant-${'q'.repeat(40)}`;
-    const m1 = buildSteps({ cc: 'cc-test', oc: 'oc-test', runId: '20261017-101500', workspace: '/w' }).filter(
-      (s) => s.id === 'M1',
-    );
+    const m1 = buildSteps({
+      cc: 'cc-test',
+      oc: 'oc-test',
+      runId: '20261017-101500',
+      workspace: '/w',
+    }).filter((s) => s.id === 'M1');
     const { results } = await runPlan(m1, {
       now: () => 0,
       log: () => {},
@@ -1505,7 +1508,11 @@ describe('capped error text in notes and results (M1-23-f)', () => {
     expect(note.endsWith('[truncated]')).toBe(true);
     // The scan runs over what is written: a key-shaped value inside the capped text is still found.
     const kept = capText(`could not run: sk-ant-${'q'.repeat(40)}`, NOTE_MAX);
-    const scan = await scanResults('/r', {}, { files: async () => ['/r/a.md'], read: async () => kept });
+    const scan = await scanResults(
+      '/r',
+      {},
+      { files: async () => ['/r/a.md'], read: async () => kept },
+    );
     expect(scan.findings.length).toBeGreaterThan(0);
   });
 });
