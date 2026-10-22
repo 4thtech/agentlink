@@ -325,6 +325,8 @@ describe('POST /v1/receipt', () => {
       deadline: Math.floor(Date.now() / 1000) + 3600,
     });
     const signature = newSignature();
+    // The record is stored, so its proof fee was charged (D-114: it covers up to 3 receipts).
+    chain.records.add(`0x${'34'.repeat(32)}`);
     const res = await post(
       '/v1/receipt',
       { chainId: CHAIN_ID, receipts: [{ receipt: built.receipt, signature }] },
