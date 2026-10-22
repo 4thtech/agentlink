@@ -52,9 +52,9 @@ afterEach(async () => {
 describe('ownerSetupAvailable (M1-11b-6)', () => {
   it('is true on a clean computer: no card, no owner item, no owner file', async () => {
     const files = defaultOwnerFiles(home);
-    await expect(ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), files)).resolves.toBe(
-      true,
-    );
+    await expect(
+      ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), files),
+    ).resolves.toBe(true);
   });
 
   it('is false when the agent card already names an owner', async () => {

@@ -206,4 +206,3 @@ describe('FIRST_RUN_TEXT (11 §5)', () => {
     expect(FIRST_RUN_TEXT.agentRun).toContain('own terminal');
   });
 });
-

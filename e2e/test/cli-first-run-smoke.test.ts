@@ -28,7 +28,10 @@ import {
   type ApprovalServerEvent,
 } from '../../packages/node/dist/approval-server.js';
 import type { KeychainBackend } from '../../packages/node/dist/keychain.js';
-import { defaultOwnerFiles, ownerSetupAvailableWith } from '../../packages/node/dist/owner-setup.js';
+import {
+  defaultOwnerFiles,
+  ownerSetupAvailableWith,
+} from '../../packages/node/dist/owner-setup.js';
 
 const BUNDLE = fileURLToPath(new URL('../../apps/cli/dist/agentlink.js', import.meta.url));
 const APP_DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
@@ -50,7 +53,10 @@ class FileKeychain implements KeychainBackend {
     return Promise.resolve(value === undefined ? null : decodeBase64url(value));
   }
   set(account: string, value: Uint8Array): Promise<void> {
-    writeFileSync(this.#file, JSON.stringify({ ...this.#read(), [account]: encodeBase64url(value) }));
+    writeFileSync(
+      this.#file,
+      JSON.stringify({ ...this.#read(), [account]: encodeBase64url(value) }),
+    );
     return Promise.resolve();
   }
   delete(account: string): Promise<boolean> {

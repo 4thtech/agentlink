@@ -67,6 +67,7 @@ import {
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
 import { copy } from '../tools/strings/index.js';
+import { firstRunStep } from './first-run.js';
 
 /** The Node pieces `init` uses. Tests pass doubles; production uses `nodeInitDeps()`. */
 export interface InitDeps {
@@ -86,6 +87,12 @@ export interface InitDeps {
    * temporary or unsafe copy is running (installed-cli.ts).
    */
   readonly installedCli?: () => Promise<string | undefined>;
+  /** M1-11b-6: the first-run page step (first-run.ts); true when it handled the owner step. */
+  readonly firstRun?: (
+    context: CommandContext,
+    name: string,
+    interactive: boolean,
+  ) => Promise<boolean>;
 }
 
 export function nodeInitDeps(): InitDeps {
@@ -107,6 +114,7 @@ export function nodeInitDeps(): InitDeps {
     },
     clock: () => Math.floor(Date.now() / 1000),
     installedCli: () => resolveInstalledCli(process.argv[1], process.execPath),
+    firstRun: (context, name, interactive) => firstRunStep(context, name, interactive),
   };
 }
 
@@ -453,6 +461,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     if (!needIdentity && changes.length === 0) {
       printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
       output.print(INIT_TEXT.nothingToDo);
+      await deps.firstRun?.(context, name, interactive); // M1-11b-6
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
@@ -546,6 +555,10 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       ).filter((n) => n !== name && isAgentName(n));
     } catch {
       // Only the hint depends on it.
+    }
+    // M1-11b-6: with no other agent, the first-run page may take the owner step (first-run.ts).
+    if (others.length === 0 && (await deps.firstRun?.(context, name, interactive)) === true) {
+      return failed ? EXIT_FAILED : EXIT_OK;
     }
     output.print(
       others.length > 0 ? INIT_TEXT.ownerStepAdd.replace('{name}', name) : INIT_TEXT.ownerStep,

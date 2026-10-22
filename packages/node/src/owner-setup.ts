@@ -52,7 +52,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
-import type { KeychainBackend } from './keychain.js';
+import { osKeychain, type KeychainBackend } from './keychain.js';
 import { signFirstCardWith, type FirstAgentCard } from './owner-init.js';
 import {
   OWNER_ACCOUNT,
@@ -266,6 +266,28 @@ export async function noOwnerAnywhere(
     if (await entryExists(path)) return false;
   }
   return true;
+}
+
+/**
+ * M1-11b-6: whether owner setup may be offered for `first` (the CLI wires the first-run page's
+ * setup only then): noOwnerAnywhere against `keychain` and `ownerFiles`. Store-only: reads no
+ * secret, unlocks nothing. Any error answers false (fail closed: setup is then never wired).
+ */
+export async function ownerSetupAvailableWith(
+  keychain: KeychainBackend,
+  first: FirstAgentCard,
+  ownerFiles: readonly string[] = defaultOwnerFiles(),
+): Promise<boolean> {
+  try {
+    return await noOwnerAnywhere(keychain, first, KEYCHAIN_CALL_TIMEOUT_MS, ownerFiles);
+  } catch {
+    return false;
+  }
+}
+
+/** The package entry (index.ts): ownerSetupAvailableWith against the OS keychain and real home. */
+export function ownerSetupAvailable(first: FirstAgentCard): Promise<boolean> {
+  return Promise.resolve().then(() => ownerSetupAvailableWith(osKeychain(), first));
 }
 
 export interface OwnerSetupInput {

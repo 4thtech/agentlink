@@ -52,6 +52,9 @@ export {
 // M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
 // types: the restricted session stays inside the package (owner-first-card.ts).
 export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';
+// M1-11b-6: whether the first-run page may offer owner setup (no owner anywhere: card, owner items,
+// file-KeyStore owner files). A store-only boolean like hasOwnerOnMachine; the keychain seam stays.
+export { ownerSetupAvailable } from './owner-setup.js';
 export {
   performOwnerOperation,
   type OwnerOperationItem,
@@ -79,7 +82,12 @@ export {
 } from './approval-server.js';
 // M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
 // agent's core client. The route registry and the presence gate stay inside the package.
-export type { LocalUiAssets, LocalUiContext, LocalUiOptions } from './local-ui/context.js';
+export type {
+  LocalUiAssets,
+  LocalUiContext,
+  LocalUiOptions,
+  LocalUiOwnerSetup,
+} from './local-ui/context.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';
