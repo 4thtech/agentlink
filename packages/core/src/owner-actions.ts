@@ -934,7 +934,8 @@ export class OwnerActions {
    * mark is unreadable (`policy_not_valid`: no value is ever taken from an invalid policy, and the
    * way back is `policy recover`, D-100); `options.baseVersion` is not the version in force
    * (`stale_version`). Delivery receipts on from an older default (D-109) are signed `false` unless
-   * the patch sets them or `options.keepDeliveryReceipts` is `true`. Two bodies prepared from one
+   * `options.keepDeliveryReceipts` is `true` (a patch value is never the answer). Every loosening is
+   * returned as a stable warning code the server makes the owner acknowledge. Two bodies prepared from one
    * base sign one version: apply() takes the first and refuses the second (`version_not_newer`).
    */
   async preparePolicyEdit(
@@ -971,8 +972,9 @@ export class OwnerActions {
       (await this.receiptsOnFromOlderDefault({ policy: base, version: baseVersion }));
     let keepDeliveryReceipts = false;
     if (askKeepDeliveryReceipts) {
-      const named = parsedPatch.data.receipts?.autoDelivered;
-      keepDeliveryReceipts = named ?? options.keepDeliveryReceipts === true;
+      // D-109: only the owner's explicit answer keeps them. A patch value (a form re-submitting the
+      // receipts section as shown) is never that answer (IR-M1-11r-b-1 L1).
+      keepDeliveryReceipts = options.keepDeliveryReceipts === true;
       merged.receipts.autoDelivered = keepDeliveryReceipts;
     }
     const policy = policySchema.safeParse(merged);

@@ -21,8 +21,11 @@ import {
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import {
+  POLICY_EDIT_WARNING_CODES,
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
   buildOwnerActionBody,
+  policyEditWarnings,
+  type PolicyEditWarning,
   type PreparedOwnerAction,
 } from './owner-prepare.js';
 import { MemoryStore } from './store/memory-store.js';
@@ -46,6 +49,8 @@ import {
 const BODY_KEYS = ['agent', 'expiresAt', 'issuedAt', 'nonce', 'op', 'owner', 'params', 'v'];
 const NONCE_RE = /^[A-Za-z0-9_-]{22}$/;
 const FOLDER = '~/Projects/agentlink';
+const C1 = `0x${'11'.repeat(20)}`;
+const C2 = `0x${'22'.repeat(20)}`;
 
 /** Signs a prepared body with `owner` and applies it, as the local UI server does after presence. */
 async function signAndApply(
@@ -381,14 +386,27 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
       }
     });
 
-    it('a patch that sets autoDelivered is the explicit choice', async () => {
+    it('a patch value autoDelivered true is NOT the explicit yes: it still signs false (IR L1)', async () => {
       const { client, applyDirect } = await policySetup();
       await applyDirect(1, on);
-      const prepared = await client.ownerActions.preparePolicyEdit(
+      for (const keep of [undefined, false]) {
+        const prepared = await client.ownerActions.preparePolicyEdit(
+          { receipts: { autoDelivered: true } },
+          keep === undefined ? { baseVersion: 1 } : { baseVersion: 1, keepDeliveryReceipts: keep },
+        );
+        expect(prepared).toMatchObject({
+          askKeepDeliveryReceipts: true,
+          keepDeliveryReceipts: false,
+        });
+        if (prepared.status === 'prepared' && prepared.body.op === 'policy.set') {
+          expect(prepared.body.params.policy.receipts.autoDelivered).toBe(false);
+        }
+      }
+      const yes = await client.ownerActions.preparePolicyEdit(
         { receipts: { autoDelivered: true } },
-        { baseVersion: 1 },
+        { baseVersion: 1, keepDeliveryReceipts: true },
       );
-      expect(prepared).toMatchObject({ keepDeliveryReceipts: true });
+      expect(yes).toMatchObject({ keepDeliveryReceipts: true });
     });
 
     it('the defaults and a signed false never ask', async () => {
@@ -404,20 +422,226 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
     });
   });
 
-  it('names the warnings the confirm screen must show (06 §3: sell auto-accept, public receipts)', async () => {
+  it('returns the warnings as stable codes from the prepared edit (06 §3; 11 §5.6)', async () => {
     const { client } = await policySetup();
     const sell = await client.ownerActions.preparePolicyEdit({
       commitments: { autoAcceptDirection: 'sell', autoAcceptMinUSD: '20' },
     });
-    expect(sell).toMatchObject({ status: 'prepared', warnings: ['sell_auto_accept'] });
+    expect(sell).toMatchObject({ status: 'prepared', warnings: [{ code: 'sell_auto_accept' }] });
     const receipts = await client.ownerActions.preparePolicyEdit({
       receipts: { autoDelivered: true },
     });
-    expect(receipts).toMatchObject({ warnings: ['delivery_receipts_public'] });
-    const plain = await client.ownerActions.preparePolicyEdit({
-      files: { allowedFolders: [FOLDER] },
+    expect(receipts).toMatchObject({ warnings: [{ code: 'delivery_receipts_public' }] });
+    const rule = await client.ownerActions.preparePolicyEdit({
+      contactRules: [{ contact: C1, receipts: { autoDelivered: true } }],
     });
-    expect(plain).toMatchObject({ warnings: [] });
+    expect(rule).toMatchObject({
+      warnings: [{ code: 'contact_receipts_public', contacts: [C1] }],
+    });
+    const stricter = await client.ownerActions.preparePolicyEdit({
+      proofs: { notarize: 'approval', dailyBudgetUSD: '1' },
+      contacts: { rateLimitPerContactPerHour: 10 },
+    });
+    expect(stricter).toMatchObject({ warnings: [] });
+  });
+
+  describe('policyEditWarnings: every loosening the schema allows warns (IR-M1-11r-b-1 M1)', () => {
+    const edit = (f: (p: Policy) => void, from: (p: Policy) => void = () => {}) => {
+      const base = defaultPolicy();
+      from(base);
+      const next = structuredClone(base);
+      f(next);
+      return policyEditWarnings(base, next);
+    };
+    const cases: [string, (p: Policy) => void, PolicyEditWarning[], ((p: Policy) => void)?][] = [
+      ['invites auto', (p) => void (p.contacts.acceptInvites = 'auto'), [{ code: 'invites_auto' }]],
+      [
+        'allowed list -> paired',
+        (p) => void (p.contacts.allowed = 'paired'),
+        [{ code: 'contacts_allowed_widened' }],
+        (p) => void (p.contacts.allowed = [C1]),
+      ],
+      [
+        'allowed list gains an ID',
+        (p) => void (p.contacts.allowed = [C1, C2]),
+        [{ code: 'contacts_allowed_widened', contacts: [C2] }],
+        (p) => void (p.contacts.allowed = [C1]),
+      ],
+      [
+        'limits raised',
+        (p) => {
+          p.contacts.rateLimitPerContactPerHour = 500;
+          p.files.maxSendSizeMB = 101;
+          p.files.maxReceiveSizeMB = 201;
+          p.envelopes.maxEnvelopeKB = 24;
+          p.files.defaultExpiryDays = 7;
+        },
+        [
+          {
+            code: 'limits_raised',
+            fields: [
+              'contacts.rateLimitPerContactPerHour',
+              'files.maxSendSizeMB',
+              'files.maxReceiveSizeMB',
+              'files.defaultExpiryDays',
+              'envelopes.maxEnvelopeKB',
+            ],
+          },
+        ],
+        (p) => {
+          p.envelopes.maxEnvelopeKB = 12;
+          p.files.defaultExpiryDays = 1;
+        },
+      ],
+      [
+        'a folder added',
+        (p) => void (p.files.allowedFolders = ['~/b', FOLDER]),
+        [{ code: 'allowed_folders_added', folders: [FOLDER] }],
+        (p) => void (p.files.allowedFolders = ['~/b']),
+      ],
+      [
+        'storage leaves own',
+        (p) => void (p.files.storage = 'auto'),
+        [{ code: 'files_drop_allowed' }],
+        (p) => void (p.files.storage = 'own'),
+      ],
+      [
+        'notarize deny -> approval',
+        (p) => void (p.proofs.notarize = 'approval'),
+        [{ code: 'proofs_notarize_looser' }],
+        (p) => void (p.proofs.notarize = 'deny'),
+      ],
+      [
+        'spend raised',
+        (p) => {
+          p.proofs.dailyBudgetUSD = '5.5';
+          p.proofs.perActionMaxUSD = '2';
+        },
+        [
+          {
+            code: 'proofs_spend_raised',
+            fields: ['proofs.dailyBudgetUSD', 'proofs.perActionMaxUSD'],
+          },
+        ],
+      ],
+      [
+        'key disclosure deny -> approval',
+        (p) => void (p.proofs.allowKeyDisclosure = 'approval'),
+        [{ code: 'key_disclosure_approval' }],
+        (p) => void (p.proofs.allowKeyDisclosure = 'deny'),
+      ],
+      [
+        'global delivered receipts on',
+        (p) => void (p.receipts.autoDelivered = true),
+        [{ code: 'delivery_receipts_public' }],
+      ],
+      [
+        'opened receipts on',
+        (p) => void (p.receipts.autoOpened = true),
+        [{ code: 'opened_receipts_auto' }],
+      ],
+      [
+        'commitments allow',
+        (p) => void (p.commitments.accept = 'allow'),
+        [{ code: 'commitments_allow' }],
+      ],
+      [
+        'commitments approval -> allow with sell already on',
+        (p) => void (p.commitments.accept = 'allow'),
+        [{ code: 'commitments_allow' }],
+        (p) => {
+          p.commitments.autoAcceptDirection = 'sell';
+          p.commitments.autoAcceptMinUSD = '20';
+        },
+      ],
+      [
+        'buy auto-accept widened',
+        (p) => {
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '10';
+        },
+        [{ code: 'auto_accept_widened', contacts: [C1] }],
+      ],
+      [
+        'buy maximum raised',
+        (p) => void (p.commitments.autoAcceptMaxUSD = '10'),
+        [{ code: 'auto_accept_widened' }],
+      ],
+      [
+        'sell auto-accept on',
+        (p) => {
+          p.commitments.autoAcceptDirection = 'sell';
+          p.commitments.autoAcceptMinUSD = '20';
+        },
+        [{ code: 'sell_auto_accept' }],
+      ],
+      [
+        'a contact rule loosens proofs',
+        (p) => void (p.contactRules = [{ contact: C1, proofs: { perActionMaxUSD: '3' } }]),
+        [{ code: 'contact_proof_rules_looser', contacts: [C1] }],
+      ],
+      [
+        'a contact rule turns delivered receipts on',
+        (p) =>
+          void (p.contactRules = [
+            { contact: C1, receipts: { autoDelivered: true } },
+            { contact: C2, receipts: { autoDelivered: false } },
+          ]),
+        [{ code: 'contact_receipts_public', contacts: [C1] }],
+      ],
+      [
+        'contact receipts already on globally: nothing new',
+        (p) => void (p.contactRules = [{ contact: C1, receipts: { autoDelivered: true } }]),
+        [],
+        (p) => void (p.receipts.autoDelivered = true),
+      ],
+      [
+        'a contact rule under a global deny: nothing',
+        (p) => void (p.contactRules = [{ contact: C1, proofs: { notarize: 'allow' } }]),
+        [],
+        (p) => void (p.proofs.notarize = 'deny'),
+      ],
+      [
+        'only stricter values',
+        (p) => {
+          p.contacts.unknownSenders = 'drop';
+          p.files.storage = 'own';
+          p.proofs.notarize = 'deny';
+          p.proofs.allowKeyDisclosure = 'deny';
+          p.commitments.accept = 'deny';
+          p.files.allowedFolders = [];
+        },
+        [],
+      ],
+    ];
+    for (const [name, f, expected, from] of cases) {
+      it(name, () => {
+        expect(edit(f, from)).toEqual(expected);
+      });
+    }
+
+    it('every code is in the stable list, in its order', () => {
+      expect(POLICY_EDIT_WARNING_CODES).toContain('commitments_allow');
+      expect(POLICY_EDIT_WARNING_CODES).toContain('invites_auto');
+      expect(POLICY_EDIT_WARNING_CODES).toContain('contact_receipts_public');
+      const all = edit((p) => {
+        p.contacts.acceptInvites = 'auto';
+        p.receipts.autoDelivered = true;
+        p.commitments.accept = 'allow';
+        p.files.allowedFolders = [FOLDER];
+      }).map((w) => w.code);
+      expect(all).toEqual([
+        'invites_auto',
+        'allowed_folders_added',
+        'delivery_receipts_public',
+        'commitments_allow',
+      ]);
+      expect(
+        [...all].sort(
+          (a, b) => POLICY_EDIT_WARNING_CODES.indexOf(a) - POLICY_EDIT_WARNING_CODES.indexOf(b),
+        ),
+      ).toEqual(all);
+    });
   });
 
   it('a prepared body is never applied without the owner signature (I-4)', async () => {

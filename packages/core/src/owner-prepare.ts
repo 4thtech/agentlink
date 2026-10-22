@@ -16,7 +16,9 @@ import { canonicalize, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import {
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   PROTOCOL_VERSION,
+  compareUsd,
   ownerActionSchema,
+  type PolicyRule,
   type ContactCheckParams,
   type ContactRemoveParams,
   type ContactRenameParams,
@@ -133,12 +135,56 @@ export type PreparedOwnerAction =
     }
   | { readonly status: 'refused'; readonly op: PreparableOp; readonly reason: PrepareRefusal };
 
-/** What the confirm screen must say before the owner signs (06 §3; 11 §5.6). */
-export type PolicyEditWarning =
+/**
+ * Every loosening the strict schema allows, as a stable code (06 §3; 11 §5.6), in the order they are
+ * reported. The confirm screen shows each one, and the local UI server refuses to sign an edit while
+ * any warning it returned is not acknowledged by the owner (M1-11c-a3, M1-11c-a5).
+ */
+export const POLICY_EDIT_WARNING_CODES = Object.freeze([
+  /** `contacts.acceptInvites` → `auto`: new contacts without approval. */
+  'invites_auto',
+  /** `contacts.allowed` widened: a list → `paired`, or a list gains IDs (`contacts`). */
+  'contacts_allowed_widened',
+  /** A limit raised (`fields`): rate, send or receive size, file expiry, envelope size. */
+  'limits_raised',
+  /** `files.allowedFolders` gains folders (`folders`): the agent may send files from them. */
+  'allowed_folders_added',
+  /** `files.storage` leaves `own`: files may go to the encrypted drop. */
+  'files_drop_allowed',
+  /** `proofs.notarize` looser (deny → approval → allow). */
+  'proofs_notarize_looser',
+  /** `proofs.dailyBudgetUSD` or `proofs.perActionMaxUSD` raised (`fields`). */
+  'proofs_spend_raised',
+  /** `proofs.allowKeyDisclosure` deny → approval. */
+  'key_disclosure_approval',
+  /** Global DELIVERED receipts turned on: what becomes public (D-109). */
+  'delivery_receipts_public',
+  /** OPENED receipts signed automatically. */
+  'opened_receipts_auto',
+  /** `commitments.accept` → `allow`: commitments, firm offers and REJECTED without approval. */
+  'commitments_allow',
+  /** Buy auto-accept widened: new allowlisted contacts (`contacts`) or a higher maximum. */
+  'auto_accept_widened',
   /** Sell auto-accept turned on or changed: the 06 §3 sell warning. */
-  | 'sell_auto_accept'
-  /** Global delivery receipts turned on: what becomes public (D-109). */
-  | 'delivery_receipts_public';
+  'sell_auto_accept',
+  /** A contact rule makes proofs looser for these contacts (`contacts`). */
+  'contact_proof_rules_looser',
+  /** A contact rule turns DELIVERED receipts on for these contacts (`contacts`; 11 §5.6). */
+  'contact_receipts_public',
+] as const);
+
+export type PolicyEditWarningCode = (typeof POLICY_EDIT_WARNING_CODES)[number];
+
+/** What the confirm screen must say before the owner signs. Owner input only; no inbound text. */
+export interface PolicyEditWarning {
+  readonly code: PolicyEditWarningCode;
+  /** Agent IDs the warning names, sorted. */
+  readonly contacts?: readonly string[];
+  /** Policy fields the warning names, as `section.field`. */
+  readonly fields?: readonly string[];
+  /** Folders the warning names, as the owner wrote them. */
+  readonly folders?: readonly string[];
+}
 
 export interface PolicyEditOptions {
   /**
@@ -194,23 +240,118 @@ export function mergePolicyPatch(base: Policy, patch: PolicyPatch): Policy {
   return out;
 }
 
-/** The warnings for an edit from `base` to `next` (06 §3). */
+const RULE_RANK: Readonly<Record<PolicyRule, number>> = { allow: 0, approval: 1, deny: 2 };
+const added = (from: readonly string[], to: readonly string[]): string[] =>
+  to.filter((x) => !from.includes(x)).sort();
+const usdRaised = (from: string, to: string): boolean => compareUsd(to, from) > 0;
+
+/** A contact's effective proof rule and DELIVERED setting (06 §3 evaluation; a global deny wins). */
+function contactEffect(p: Policy, contact: string) {
+  const rule = p.contactRules.find((r) => r.contact === contact);
+  return {
+    notarize: p.proofs.notarize === 'deny' ? 'deny' : (rule?.proofs?.notarize ?? p.proofs.notarize),
+    perActionMaxUSD: rule?.proofs?.perActionMaxUSD ?? p.proofs.perActionMaxUSD,
+    autoDelivered: rule?.receipts?.autoDelivered ?? p.receipts.autoDelivered,
+  };
+}
+
+/**
+ * Every loosening from `base` to `next`, as stable codes in POLICY_EDIT_WARNING_CODES order (06 §3;
+ * 11 §5.6). A stricter or unchanged value warns nothing. Contact-rule warnings name only contacts
+ * whose own rule changes their effective value; a global change is its own warning.
+ */
 export function policyEditWarnings(base: Policy, next: Policy): PolicyEditWarning[] {
-  const warnings: PolicyEditWarning[] = [];
+  const out: PolicyEditWarning[] = [];
+  const b = base;
+  const n = next;
+
+  if (n.contacts.acceptInvites === 'auto' && b.contacts.acceptInvites !== 'auto') {
+    out.push({ code: 'invites_auto' });
+  }
+  if (n.contacts.allowed === 'paired' && b.contacts.allowed !== 'paired') {
+    out.push({ code: 'contacts_allowed_widened' });
+  } else if (n.contacts.allowed !== 'paired' && b.contacts.allowed !== 'paired') {
+    const ids = added(b.contacts.allowed, n.contacts.allowed);
+    if (ids.length > 0) out.push({ code: 'contacts_allowed_widened', contacts: ids });
+  }
+  const limits = [
+    [
+      'contacts.rateLimitPerContactPerHour',
+      b.contacts.rateLimitPerContactPerHour,
+      n.contacts.rateLimitPerContactPerHour,
+    ],
+    ['files.maxSendSizeMB', b.files.maxSendSizeMB, n.files.maxSendSizeMB],
+    ['files.maxReceiveSizeMB', b.files.maxReceiveSizeMB, n.files.maxReceiveSizeMB],
+    ['files.defaultExpiryDays', b.files.defaultExpiryDays, n.files.defaultExpiryDays],
+    ['envelopes.maxEnvelopeKB', b.envelopes.maxEnvelopeKB, n.envelopes.maxEnvelopeKB],
+  ] as const;
+  const raised = limits.filter(([, from, to]) => to > from).map(([field]) => field);
+  if (raised.length > 0) out.push({ code: 'limits_raised', fields: raised });
+  const folders = added(b.files.allowedFolders, n.files.allowedFolders);
+  if (folders.length > 0) out.push({ code: 'allowed_folders_added', folders });
+  if (b.files.storage === 'own' && n.files.storage !== 'own') {
+    out.push({ code: 'files_drop_allowed' });
+  }
+  if (RULE_RANK[n.proofs.notarize] < RULE_RANK[b.proofs.notarize]) {
+    out.push({ code: 'proofs_notarize_looser' });
+  }
+  const spend = (['dailyBudgetUSD', 'perActionMaxUSD'] as const)
+    .filter((f) => usdRaised(b.proofs[f], n.proofs[f]))
+    .map((f) => `proofs.${f}`);
+  if (spend.length > 0) out.push({ code: 'proofs_spend_raised', fields: spend });
+  if (n.proofs.allowKeyDisclosure === 'approval' && b.proofs.allowKeyDisclosure === 'deny') {
+    out.push({ code: 'key_disclosure_approval' });
+  }
+  if (n.receipts.autoDelivered && !b.receipts.autoDelivered) {
+    out.push({ code: 'delivery_receipts_public' });
+  }
+  if (n.receipts.autoOpened && !b.receipts.autoOpened) {
+    out.push({ code: 'opened_receipts_auto' });
+  }
+  if (n.commitments.accept === 'allow' && b.commitments.accept !== 'allow') {
+    out.push({ code: 'commitments_allow' });
+  }
+  if (n.commitments.accept !== 'deny') {
+    const ids = added(b.commitments.autoAcceptContacts, n.commitments.autoAcceptContacts);
+    const higher = usdRaised(b.commitments.autoAcceptMaxUSD, n.commitments.autoAcceptMaxUSD);
+    const fromDeny = b.commitments.accept === 'deny' && n.commitments.autoAcceptContacts.length > 0;
+    if (ids.length > 0 || higher || fromDeny) {
+      out.push({
+        code: 'auto_accept_widened',
+        ...(ids.length > 0 ? { contacts: ids } : {}),
+      });
+    }
+  }
   const sellOn = (p: Policy) =>
     p.commitments.accept !== 'deny' && p.commitments.autoAcceptMinUSD !== null;
   if (
-    sellOn(next) &&
-    (!sellOn(base) ||
-      base.commitments.autoAcceptMinUSD !== next.commitments.autoAcceptMinUSD ||
-      base.commitments.autoAcceptDirection !== next.commitments.autoAcceptDirection ||
-      canonicalize(base.commitments.autoAcceptContacts as never) !==
-        canonicalize(next.commitments.autoAcceptContacts as never))
+    sellOn(n) &&
+    (!sellOn(b) ||
+      b.commitments.autoAcceptMinUSD !== n.commitments.autoAcceptMinUSD ||
+      b.commitments.autoAcceptDirection !== n.commitments.autoAcceptDirection ||
+      canonicalize(b.commitments.autoAcceptContacts as never) !==
+        canonicalize(n.commitments.autoAcceptContacts as never))
   ) {
-    warnings.push('sell_auto_accept');
+    out.push({ code: 'sell_auto_accept' });
   }
-  if (next.receipts.autoDelivered && !base.receipts.autoDelivered) {
-    warnings.push('delivery_receipts_public');
+  const looserProofs: string[] = [];
+  const receiptsOn: string[] = [];
+  for (const rule of n.contactRules) {
+    const before = contactEffect(b, rule.contact);
+    const after = contactEffect(n, rule.contact);
+    if (
+      RULE_RANK[after.notarize] < RULE_RANK[before.notarize] ||
+      usdRaised(before.perActionMaxUSD, after.perActionMaxUSD)
+    ) {
+      looserProofs.push(rule.contact);
+    }
+    if (after.autoDelivered && !before.autoDelivered) receiptsOn.push(rule.contact);
   }
-  return warnings;
+  if (looserProofs.length > 0) {
+    out.push({ code: 'contact_proof_rules_looser', contacts: looserProofs.sort() });
+  }
+  if (receiptsOn.length > 0) {
+    out.push({ code: 'contact_receipts_public', contacts: receiptsOn.sort() });
+  }
+  return out;
 }
