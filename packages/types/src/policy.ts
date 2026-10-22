@@ -268,3 +268,39 @@ export const POLICY_DEFAULTS: DeepReadonly<Policy> = deepFreeze(buildDefaults())
 
 /** A fresh, mutable copy of the 06 §3 defaults (for a signing surface to edit). */
 export const defaultPolicy = (): Policy => buildDefaults();
+
+// --- Policy patch (M1-11r-b, D-118) ---------------------------------------------------------------
+
+/** Every field of a strict object section, each optional but never an explicit `undefined`. */
+function exactPartial<S extends Record<string, z.ZodType>>(
+  shape: S,
+): z.ZodObject<{ [K in keyof S]: z.ZodExactOptional<S[K]> }, z.core.$strict> {
+  const out: Record<string, z.ZodType> = {};
+  for (const [key, field] of Object.entries(shape)) out[key] = field.exactOptional();
+  return z.strictObject(out) as unknown as z.ZodObject<
+    { [K in keyof S]: z.ZodExactOptional<S[K]> },
+    z.core.$strict
+  >;
+}
+
+const sections = policySchema.shape;
+
+/**
+ * A typed edit of the policy for an owner surface (the local UI's Rules and Files pages; M1-11r-b,
+ * D-118). It is never signed: the core merges it over the verified policy and builds the complete
+ * document `policy.set` signs (04 §2.5.1: "never a partial patch"). Strict like the policy: each
+ * object section names only its own fields, each field takes only the values the policy schema
+ * takes, a list (`allowedFolders`, `autoAcceptContacts`, `contactRules`, …) is replaced whole, and an
+ * unknown key or an explicit `undefined` is rejected, never dropped.
+ */
+export const policyPatchSchema = z.strictObject({
+  contacts: exactPartial(sections.contacts.shape).exactOptional(),
+  files: exactPartial(sections.files.shape).exactOptional(),
+  envelopes: exactPartial(sections.envelopes.shape).exactOptional(),
+  proofs: exactPartial(sections.proofs.shape).exactOptional(),
+  receipts: exactPartial(sections.receipts.shape).exactOptional(),
+  commitments: exactPartial(sections.commitments.shape).exactOptional(),
+  contactRules: sections.contactRules.exactOptional(),
+});
+
+export type PolicyPatch = z.infer<typeof policyPatchSchema>;

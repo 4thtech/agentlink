@@ -168,6 +168,8 @@ const V2_ENVELOPE_COLUMNS: readonly string[] = ['refused_at', 'request_accepted_
 const V3_TABLES: readonly TableName[] = ['publisher_lease', 'outbox_staged'];
 /** Files columns added by version 4 (M1-1g-i): the `files.deleteAfter` snapshot. */
 const V4_FILES_COLUMNS: readonly string[] = ['delete_after'];
+/** Tables added by version 5 (M1-9i-a, D-115): the owner-signed own storage (07 §3.4). */
+const V5_TABLES: readonly TableName[] = ['own_storage'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -180,7 +182,7 @@ function without(spec: TableSpec, columns: readonly string[]): TableSpec {
 }
 
 /**
- * The version 1 (G-9) schema: today's TABLES without what versions 2 to 4 added. Its statements
+ * The version 1 (G-9) schema: today's TABLES without what versions 2 to 5 added. Its statements
  * are pinned by digest in sqlite-store.test.ts, so this snapshot cannot drift.
  */
 function v1Spec(table: TableName): TableSpec {
@@ -228,7 +230,8 @@ function v4Statements(): readonly string[] {
  * The forward migrations, oldest first; the last one's version is STORE_SCHEMA_VERSION. Version 1
  * is the G-9 schema, version 2 adds D-72's columns and table, version 3 adds the `publisher_lease`
  * and `outbox_staged` tables (M1-7k-b; new tables only, so existing rows are untouched), version 4
- * adds `files.delete_after` (M1-1g-i; a nullable column, null on existing rows). A later
+ * adds `files.delete_after` (M1-1g-i; a nullable column, null on existing rows), version 5 adds
+ * `own_storage` (M1-9i-a, D-115; a new table with its one-row trigger, existing rows untouched). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -237,13 +240,16 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({
     version: 1,
     statements: createSchemaStatements(
-      TABLE_NAMES.filter((t) => !V2_TABLES.includes(t) && !V3_TABLES.includes(t)),
+      TABLE_NAMES.filter(
+        (t) => !V2_TABLES.includes(t) && !V3_TABLES.includes(t) && !V5_TABLES.includes(t),
+      ),
       v1Spec,
     ),
   }),
   Object.freeze({ version: 2, statements: Object.freeze(v2Statements()) }),
   Object.freeze({ version: 3, statements: createSchemaStatements(V3_TABLES) }),
   Object.freeze({ version: 4, statements: Object.freeze(v4Statements()) }),
+  Object.freeze({ version: 5, statements: createSchemaStatements(V5_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {
