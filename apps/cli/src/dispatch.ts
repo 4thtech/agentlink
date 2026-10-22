@@ -14,6 +14,9 @@
 //   exact pattern (04 §2.4.1).
 // - Nothing the caller typed is ever echoed: usage errors and refusals are fixed text (I-5), and
 //   values a handler prints go through the terminal output rule (src/terminal/sanitize.ts, 06 §8).
+// - M1-9zd: an argument shaped like a generated owner code (04 §2.8 kind 1) stops every command
+//   before anything else runs, with fixed text that never echoes it. A UX guard, like the others:
+//   the code is already in the shell's history, so the text says how to change it.
 //
 // The commands themselves land with their cards (M1-9a, M1-9b, M1-9l, M1-9m, M1-9c); until then
 // each is registered and answers "not available yet".
@@ -23,6 +26,7 @@ import type { Output } from './output.js';
 import { isAgentName } from './runtime/agent-name.js';
 import { RUNTIME_MESSAGES, RuntimeError } from './runtime/errors.js';
 import { checkOwnerTerminal, type TerminalContext } from './runtime/guards.js';
+import { looksLikeOwnerCode } from './runtime/owner-code-shape.js';
 
 type Options = NonNullable<ParseArgsConfig['options']>;
 
@@ -230,6 +234,14 @@ export const DISPATCH_TEXT = Object.freeze({
   notInteractive:
     'This command needs you at an interactive terminal. Run it yourself, in a terminal window you opened.',
   failed: 'Something went wrong. Run `agentlink doctor` in your own terminal to see why.',
+  // M1-9zd (11 §5.5, §6.10): fixed text; nothing of what was typed is repeated.
+  ownerCodeInCommand: [
+    "Problem  That looks like your owner code, so AgentLink didn't run anything.",
+    '         Type your owner code only at the prompt a command shows. It is never',
+    '         part of a command, and never paste it into a chat. Your shell may have',
+    '         kept what you typed in its history, so change your owner code:',
+    '         agentlink owner change-code',
+  ].join('\n'),
 });
 
 /** The `--help` text: exactly the registered commands of 06 §8. */
@@ -262,6 +274,11 @@ export function createDispatcher(
 
   return async (argv, io) => {
     const { output } = io;
+    // M1-9zd: before help, the command lookup or argument parsing, so no path can print it.
+    if (looksLikeOwnerCode(argv)) {
+      output.printError(DISPATCH_TEXT.ownerCodeInCommand);
+      return EXIT_USAGE;
+    }
     const [first, ...rest] = argv;
     if (first === undefined || first === '--help' || first === '-h' || first === 'help') {
       output.print(helpText());

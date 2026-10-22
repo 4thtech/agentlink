@@ -4420,7 +4420,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
 
 #### M1-9zd · cli: owner code typed at a shell prompt (new, UX review low 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`commands/owner/**`, `strings.ts`), docs-site troubleshooting; 11 §5
 - **Depends on:** M1-9z
 - **Scope:** `owner-code-typed-at-shell-prompt` (the M1-9z incident: a code typed into a shell and a chat). The code prompt states that it is not a shell command and not for chat; guard where feasible (for example a hint when the entry looks like a command). Never log or echo the entry (I-1).
