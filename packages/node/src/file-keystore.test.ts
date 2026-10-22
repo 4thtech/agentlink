@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import {
   chmod,
   copyFile,
+  lstat,
   mkdir,
   mkdtemp,
   readFile,
@@ -46,6 +47,13 @@ import {
 import { readKeystoreFile, writeKeystoreFile } from './file-keystore-fs.js';
 import { openRecordedKeyStore } from './keychain-keystore.js';
 import { keychainAccount, type KeychainProbe } from './keychain.js';
+
+/**
+ * 04 §2.8 "File handling": the keystore must live on a filesystem with POSIX modes, so native Windows
+ * is refused (WSL is Linux). The suites below that need a working file KeyStore run where it exists;
+ * the refusal itself is tested on every platform at the end of this file.
+ */
+const POSIX = process.platform !== 'win32';
 
 const FAST: Argon2idParams = Object.freeze({ memoryKiB: 19456, iterations: 2, parallelism: 1 });
 const NO_KEYCHAIN: KeychainProbe = Object.freeze({
@@ -98,7 +106,7 @@ async function createWithPassphrase(passphrase = CANARY): Promise<string> {
 /** A prompt that answers `value` (bytes, as the TTY prompt returns them). */
 const promptWith = (value: string) => (): Promise<Uint8Array> => Promise.resolve(utf8(value));
 
-describe('selection (04 §2.8 "Selection", 07 §9.1)', () => {
+describe.runIf(POSIX)('selection (04 §2.8 "Selection", 07 §9.1)', () => {
   it('refuses the file KeyStore while the keychain works (no forced file mode)', async () => {
     const error = await rejection(
       createFileAgent({ probe: KEYCHAIN_OK, interactive: true, env: {}, dir, kdf: FAST }),
@@ -223,7 +231,7 @@ describe('selection (04 §2.8 "Selection", 07 §9.1)', () => {
   });
 });
 
-describe('unlock sources (04 §2.8 "Unlocking the agent key", 07 §9.2)', () => {
+describe.runIf(POSIX)('unlock sources (04 §2.8 "Unlocking the agent key", 07 §9.2)', () => {
   it('reads the passphrase file first and removes both variables from the environment', async () => {
     const agentId = await createWithPassphrase();
     const secretPath = join(home, 'secret');
@@ -355,7 +363,7 @@ describe('unlock sources (04 §2.8 "Unlocking the agent key", 07 §9.2)', () => 
   });
 });
 
-describe('wrong secret, tamper and agent binding (04 §2.8)', () => {
+describe.runIf(POSIX)('wrong secret, tamper and agent binding (04 §2.8)', () => {
   it('gives one generic error for a wrong passphrase and for a tampered file', async () => {
     const agentId = await createWithPassphrase();
     const wrong = await rejection(
@@ -406,7 +414,7 @@ describe('wrong secret, tamper and agent binding (04 §2.8)', () => {
   });
 });
 
-describe('file permissions (04 §2.8 "File handling")', () => {
+describe.runIf(POSIX)('file permissions (04 §2.8 "File handling")', () => {
   it.each([0o000, 0o077])('creates 0700 / 0600 whatever the umask (%o)', async (mask) => {
     const previous = process.umask(mask);
     let agentId: string;
@@ -475,10 +483,10 @@ describe('file permissions (04 §2.8 "File handling")', () => {
 
   it('accepts a symlinked home directory that still resolves inside', async () => {
     const agentId = await createWithPassphrase();
-    const linkedHome = join(
-      tmpdir(),
-      `agentlink-home-link-${encodeHex(SEED.subarray(0, 4))}-${process.pid}`,
-    );
+    // The link lives in a fresh private directory (mkdtemp, mode 0700, unpredictable name), never
+    // under a guessable name in the shared temp directory (CodeQL js/insecure-temporary-file).
+    const linkRoot = await mkdtemp(join(tmpdir(), 'agentlink-home-link-'));
+    const linkedHome = join(linkRoot, 'home');
     await symlink(home, linkedHome);
     try {
       const unlocked = await unlockFileAgent(agentId, {
@@ -488,7 +496,7 @@ describe('file permissions (04 §2.8 "File handling")', () => {
       });
       unlocked.close();
     } finally {
-      await rm(linkedHome, { force: true });
+      await rm(linkRoot, { recursive: true, force: true });
     }
   });
 
@@ -514,7 +522,7 @@ describe('file permissions (04 §2.8 "File handling")', () => {
   });
 });
 
-describe('the write protocol (04 §2.8 "Writes")', () => {
+describe.runIf(POSIX)('the write protocol (04 §2.8 "Writes")', () => {
   async function unlockedStore(agentId: string, passphrase = CANARY) {
     return unlockFileAgent(agentId, { dir, env: {}, prompt: promptWith(passphrase) });
   }
@@ -629,6 +637,32 @@ describe('the write protocol (04 §2.8 "Writes")', () => {
     (await unlockedStore(agentId)).close();
   });
 
+  it('writes through a fresh 0600 temporary file in the same directory, with an unpredictable name', async () => {
+    const agentId = await createWithPassphrase();
+    const name = `${agentId}.alks`;
+    const pattern = new RegExp(`^\\.${agentId}\\.alks\\.tmp-[0-9a-f]{16}$`);
+    const seen: string[] = [];
+    for (const bytes of [Uint8Array.of(1, 2, 3), Uint8Array.of(4, 5, 6)]) {
+      await writeKeystoreFile(dir, name, bytes, {
+        beforeRename: async () => {
+          const temps = (await readdir(dir)).filter((entry) => entry.startsWith(`.${name}.tmp-`));
+          expect(temps).toHaveLength(1);
+          const temp = temps[0] as string;
+          expect(temp).toMatch(pattern);
+          const st = await lstat(join(dir, temp));
+          expect(st.isFile()).toBe(true);
+          expect(st.mode & 0o777).toBe(0o600);
+          expect(await readFile(join(dir, temp))).toEqual(Buffer.from(bytes));
+          seen.push(temp);
+        },
+      });
+      expect(await readFile(join(dir, name))).toEqual(Buffer.from(bytes));
+    }
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).not.toBe(seen[1]);
+    expect((await readdir(dir)).filter((entry) => entry.includes('.tmp-'))).toEqual([]);
+  });
+
   it('removes stale temporary files at start-up', async () => {
     const agentId = await createWithPassphrase();
     const stale = join(dir, `.${agentId}.alks.tmp-0123456789abcdef`);
@@ -646,7 +680,7 @@ describe('the write protocol (04 §2.8 "Writes")', () => {
   });
 });
 
-describe('agent ≠ owner (04 §2.8 "Passphrase strength")', () => {
+describe.runIf(POSIX)('agent ≠ owner (04 §2.8 "Passphrase strength")', () => {
   async function plantOwner(): Promise<string> {
     const code = new TextDecoder().decode(generateSecretCode());
     const kek = await newKeystoreKek(
@@ -693,7 +727,7 @@ describe('agent ≠ owner (04 §2.8 "Passphrase strength")', () => {
   });
 });
 
-describe('canary (I-7)', () => {
+describe.runIf(POSIX)('canary (I-7)', () => {
   it('never puts the passphrase, the seed or the store key in a log, error or other file', async () => {
     const logs: string[] = [];
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((level) =>
@@ -746,5 +780,39 @@ describe('canary (I-7)', () => {
       expect(bytes.includes(Buffer.from(CANARY))).toBe(false);
       expect(bytes.includes(Buffer.from(SEED))).toBe(false);
     }
+  });
+});
+
+describe('native Windows (04 §2.8 "Filesystems without POSIX modes are refused")', () => {
+  // Runs on every platform: natively on Windows, and with process.platform set to win32 elsewhere.
+  const original = Object.getOwnPropertyDescriptor(process, 'platform');
+  beforeEach(() => {
+    if (POSIX) Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+  });
+  afterEach(() => {
+    if (POSIX && original !== undefined) Object.defineProperty(process, 'platform', original);
+  });
+
+  it('refuses to create a file agent and writes nothing', async () => {
+    const error = await rejection(
+      createFileAgent({
+        probe: NO_KEYCHAIN,
+        interactive: true,
+        env: {},
+        dir,
+        kdf: FAST,
+        passphrase: utf8(CANARY),
+      }),
+    );
+    expect(codeOf(error)).toBe('keystore_file_unsafe');
+    expect(await readdir(home)).toEqual([]);
+  });
+
+  it('refuses to read or write a keystore file', async () => {
+    expect(codeOf(await rejection(readKeystoreFile(dir, 'x.alks')))).toBe('keystore_file_unsafe');
+    expect(codeOf(await rejection(writeKeystoreFile(dir, 'x.alks', Uint8Array.of(1))))).toBe(
+      'keystore_file_unsafe',
+    );
+    expect(await readdir(home)).toEqual([]);
   });
 });
