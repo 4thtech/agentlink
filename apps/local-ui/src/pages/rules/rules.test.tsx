@@ -60,7 +60,8 @@ function server(routes: Record<string, unknown | Handler>) {
     const url = typeof input === 'string' ? input : input.toString();
     const headers = new Headers(init?.headers);
     const raw = init?.body;
-    const body = raw instanceof Uint8Array ? raw.slice() : undefined;
+    const body: Uint8Array | undefined =
+      raw instanceof Uint8Array ? new Uint8Array(raw) : undefined;
     const call: Call = { url, method: init?.method ?? 'GET', headers, ...(body ? { body } : {}) };
     calls.push(call);
     const key = `${call.method} ${url.split('?')[0] ?? ''}`;
@@ -97,8 +98,15 @@ const DEFAULTS = {
 };
 
 const RULES = (rules: unknown = DEFAULTS, version = 0) => ({ status: 'ok', version, rules });
-const NO_PASSKEY = { passkey: { registered: false, rpId: 'localhost', userId: 'AA', prfSalt: 'AA' } };
-const REVIEW_OK = { status: 'review', review: 'ab'.repeat(32), warnings: [], askKeepDeliveryReceipts: false };
+const NO_PASSKEY = {
+  passkey: { registered: false, rpId: 'localhost', userId: 'AA', prfSalt: 'AA' },
+};
+const REVIEW_OK = {
+  status: 'review',
+  review: 'ab'.repeat(32),
+  warnings: [],
+  askKeepDeliveryReceipts: false,
+};
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 6; i += 1) {
@@ -328,7 +336,9 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
     await click(buttonByText(S.reviewSave));
     const confirm = host.querySelector('section[aria-labelledby="rules-confirm"]');
     expect(confirm).not.toBeNull();
-    const boxes = [...(confirm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])];
+    const boxes = [
+      ...(confirm?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? []),
+    ];
     expect(boxes).toHaveLength(2);
     expect(confirm?.textContent).toContain(warningText('proofs_spend_raised'));
     expect(confirm?.textContent).toContain(warningText('commitments_allow'));
@@ -352,7 +362,9 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
     expect(new TextDecoder().decode(post?.body)).toBe('ABCD-EFGH');
     expect(text()).toContain(S.saved);
     // The page reloads the rules from the server after a save.
-    expect(srv.calls.filter((c) => c.url === '/api/ui/rules' && c.method === 'GET')).toHaveLength(2);
+    expect(srv.calls.filter((c) => c.url === '/api/ui/rules' && c.method === 'GET')).toHaveLength(
+      2,
+    );
   });
 
   it('no warnings: says so, and saves without ticking anything', async () => {
@@ -409,7 +421,13 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
         'GET /api/ui/rules': RULES(),
         'GET /api/ui/rules/review': REVIEW_OK,
         'GET /api/owner/passkey': {
-          passkey: { registered: true, rpId: 'localhost', userId: 'AA', prfSalt: 'AA', credentialId: 'AQI' },
+          passkey: {
+            registered: true,
+            rpId: 'localhost',
+            userId: 'AA',
+            prfSalt: 'AA',
+            credentialId: 'AQI',
+          },
         },
         'POST /api/ui/rules': { status: 'saved', version: 1 },
       },

@@ -7,7 +7,13 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
-import type { AgentLinkClient, OwnerActionOutcome } from '@4thtech-io/core';
+import type {
+  AgentLinkClient,
+  EffectivePolicy,
+  OwnerActionOutcome,
+  PolicyEditOptions,
+  PreparedPolicyEdit,
+} from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 
@@ -39,6 +45,19 @@ export interface LocalUiReadClient {
   getProof(
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
+  /**
+   * M1-11c-a5 (Rules): the policy in force and the unsigned `policy.set` for an edit (core
+   * `loadPolicy` and `preparePolicyEdit`, M1-11r-b). Both sign, write and grant nothing (I-4): a
+   * prepared body changes nothing until the owner signs it behind the presence gate and core's
+   * `apply` verifies that signature. `recordReceiptsKept` writes only core's receipts-kept marker,
+   * and only for the verified, applied policy at that version with receipts on (D-109): it grants
+   * nothing the signed policy does not already say. Not `apply`, not the store, not the KeyStore.
+   */
+  readonly policy: {
+    load(): Promise<EffectivePolicy>;
+    prepareEdit(patch: unknown, options: PolicyEditOptions): Promise<PreparedPolicyEdit>;
+    recordReceiptsKept(version: number): Promise<boolean>;
+  };
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -46,6 +65,12 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    policy: Object.freeze({
+      load: () => client.ownerActions.loadPolicy(),
+      prepareEdit: (patch: unknown, options: PolicyEditOptions) =>
+        client.ownerActions.preparePolicyEdit(patch, options),
+      recordReceiptsKept: (version: number) => client.ownerActions.recordReceiptsKept(version),
+    }),
   });
 }
 

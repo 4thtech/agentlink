@@ -54,8 +54,14 @@ class TestCipher implements StoreCipher {
     return Promise.resolve(`${PREFIX}${encodeBase64url(encodeUtf8(body))}` as Sealed);
   }
   open(context: SealContext, sealed: Sealed): Promise<string> {
-    const parsed = JSON.parse(decodeUtf8(decodeBase64url(sealed.slice(PREFIX.length)))) as unknown[];
-    if (parsed[0] !== context.table || parsed[1] !== context.column || parsed[2] !== context.rowKey) {
+    const parsed = JSON.parse(
+      decodeUtf8(decodeBase64url(sealed.slice(PREFIX.length))),
+    ) as unknown[];
+    if (
+      parsed[0] !== context.table ||
+      parsed[1] !== context.column ||
+      parsed[2] !== context.rowKey
+    ) {
       return Promise.reject(new Error('test cipher: wrong context'));
     }
     return Promise.resolve(parsed[3] as string);
@@ -93,7 +99,10 @@ const approvals: ApprovalChannel = {
 };
 
 const seed = (n: number): Uint8Array => new Uint8Array(32).fill(n);
-const passphrase = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8('correct horse') });
+const passphrase = (): OwnerPresence => ({
+  kind: 'passphrase',
+  secret: encodeUtf8('correct horse'),
+});
 const RELAYS = ['wss://relay.agentlink.dev', 'wss://nos.lol'];
 
 interface Setup {
@@ -198,7 +207,8 @@ async function getRules(context: LocalUiContext): Promise<LocalUiResult> {
 }
 
 async function review(context: LocalUiContext, query: URLSearchParams | unknown) {
-  const q = query instanceof URLSearchParams ? query : new URLSearchParams({ edit: editParam(query) });
+  const q =
+    query instanceof URLSearchParams ? query : new URLSearchParams({ edit: editParam(query) });
   return readRoute('/api/ui/rules/review').handler(context, { params: {}, query: q });
 }
 
@@ -334,7 +344,10 @@ describe('GET /api/ui/rules', () => {
 describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', () => {
   const invalid: [string, () => URLSearchParams][] = [
     ['no edit', () => new URLSearchParams()],
-    ['an unknown parameter', () => new URLSearchParams({ edit: editParam({ base: 0, patch: {} }), x: '1' })],
+    [
+      'an unknown parameter',
+      () => new URLSearchParams({ edit: editParam({ base: 0, patch: {} }), x: '1' }),
+    ],
     [
       'edit given twice',
       () => {
@@ -416,7 +429,12 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
     expect(r.review).toMatch(/^[0-9a-f]{64}$/);
     expect(r.warnings).toEqual([]);
     expect(r.askKeepDeliveryReceipts).toBe(false);
-    expect(Object.keys(r).sort()).toEqual(['askKeepDeliveryReceipts', 'review', 'status', 'warnings']);
+    expect(Object.keys(r).sort()).toEqual([
+      'askKeepDeliveryReceipts',
+      'review',
+      'status',
+      'warnings',
+    ]);
   });
 
   it('a looser edit: every warning code, in core order, no IDs', async () => {
@@ -430,7 +448,12 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
         commitments: { accept: 'allow' },
       },
     });
-    expect(codes(r)).toEqual(['invites_auto', 'limits_raised', 'proofs_spend_raised', 'commitments_allow']);
+    expect(codes(r)).toEqual([
+      'invites_auto',
+      'limits_raised',
+      'proofs_spend_raised',
+      'commitments_allow',
+    ]);
     expect(JSON.stringify(r)).not.toMatch(/0x|fields|proofs\.|files\./);
   });
 
@@ -475,7 +498,10 @@ describe('POST /api/ui/rules: sign only an acknowledged prepared body (D-119; I-
     expect(encodeHex(sha256(encodeUtf8(canonicalize(request.action))))).toBe(r.review);
     expect(request.action.op).toBe('policy.set');
     expect(await getRules(context)).toMatchObject({
-      body: { version: 1, rules: { proofs: { dailyBudgetUSD: '20' }, commitments: { accept: 'allow' } } },
+      body: {
+        version: 1,
+        rules: { proofs: { dailyBudgetUSD: '20' }, commitments: { accept: 'allow' } },
+      },
     });
   });
 
@@ -596,11 +622,15 @@ describe('delivery receipts on from an older default (06 §3, D-109)', () => {
   it('asks; keeping them signs true and records the receipts-kept marker at that version', async () => {
     const { context, owner, kept, client } = await setup();
     // An older default: receipts on, signed elsewhere, with no marker.
-    const prepared = await client.ownerActions.preparePolicyEdit({ receipts: { autoDelivered: true } });
+    const prepared = await client.ownerActions.preparePolicyEdit({
+      receipts: { autoDelivered: true },
+    });
     if (prepared.status !== 'prepared') throw new Error('not prepared');
     const session = await owner.unlock(passphrase());
     const body = prepared.body as unknown as JsonObject;
-    await client.ownerActions.apply(JSON.stringify({ body, sig: await session.signOwnerAction(body) }));
+    await client.ownerActions.apply(
+      JSON.stringify({ body, sig: await session.signOwnerAction(body) }),
+    );
     await session.close();
 
     const asked = await reviewOk(context, { base: 1, patch: { proofs: { notarize: 'approval' } } });
@@ -612,7 +642,9 @@ describe('delivery receipts on from an older default (06 §3, D-109)', () => {
     });
     await save(context, ownerOp(owner).op, { review: keep.review, acknowledged: codes(keep) });
     expect(kept.value).toBe(2);
-    expect(await getRules(context)).toMatchObject({ body: { rules: { receipts: { autoDelivered: true } } } });
+    expect(await getRules(context)).toMatchObject({
+      body: { rules: { receipts: { autoDelivered: true } } },
+    });
   });
 
   it('not keeping them signs false', async () => {
@@ -647,7 +679,7 @@ describe('every warning code has plain words on the confirm screen (D-119; 11 §
     );
     expect(POLICY_EDIT_WARNING_CODES.length).toBeGreaterThanOrEqual(15);
     for (const code of POLICY_EDIT_WARNING_CODES) {
-      expect(source, code).toMatch(new RegExp(`\\b${code}:\\s*\\n?\\s*'[^']{12,}`));
+      expect(source, code).toMatch(new RegExp(`\\b${code}:\\s*['"][^'"]{12,}`));
     }
   });
 });
