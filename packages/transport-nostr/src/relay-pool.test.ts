@@ -551,7 +551,7 @@ describe('pool bounds (07 §4.3)', () => {
     await pool.publish(makeWrapEvent(), [a]);
     pool.close();
     expect(pool.connectionCount).toBe(0);
-    expect((await pool.publish(makeWrapEvent(), [a])).results[0]?.reason).toBe('invalid_url');
+    expect((await pool.publish(makeWrapEvent(), [a])).results[0]?.reason).toBe('pool_closed'); // M1-5b-c: its own code
   });
 
   it('ends an unanswered request as closed when the relay drops the connection', async () => {
