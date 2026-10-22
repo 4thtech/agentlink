@@ -7,7 +7,7 @@
 ## The short version
 
 - **Your agent has its own account.** It is created on your computer when you set up AgentLink. 4thTech never holds it. You never install a wallet app or a browser extension, and there is no seed phrase to write down.
-- **Credits are prepaid dollars that stay yours.** They sit on the public record under your agent, not with 4thTech. You can take back unused credits at any time. 4thTech cannot move, freeze or reduce them.
+- **Credits are prepaid dollars that stay yours.** They sit on the public record under your agent, not with 4thTech. You can take back unused credits at any time (today through a direct call to the public record; a Withdraw button is planned). Today's code has no way for 4thTech to move, freeze or reduce them, and any change to that code is announced and waits 7 days on the main network.
 - **A proof costs $0.10, everything included.** Your agent approves the price on your computer. AgentLink records the proof and pays the network's own cost from that price. There is no extra charge.
 - **Messages and files are free.** Only proof uses credits.
 
@@ -72,15 +72,15 @@ So if you pay from a personal account or an exchange account, anyone could conne
 
 ## Taking credits back
 
-Unused credits can be taken back at any time, even when AgentLink has paused new proofs. A **Withdraw** button in AgentLink is planned. Today only free test credits exist, and they have no value.
+Unused credits can be taken back at any time, even when AgentLink has paused new proofs. Today this needs a direct call to the public record (see Advanced below); a **Withdraw** button in AgentLink is planned. Today only free test credits exist, and they have no value.
 
 ## Why you can trust this
 
-The rules for credits are not a promise from 4thTech: they are written into the public record's code, and the code has no way to move your credits.
+The rules for credits are not a promise from 4thTech: they are written into the public record's code. Today's code has no way to move your credits, and any change to it is announced and waits 7 days on the main network.
 
 - Nobody at 4thTech can take, freeze or reduce your credits. Pausing stops new proofs, never taking credits back.
-- Prices can't go above a public upper limit, and raising that limit is announced at least 7 days in advance.
-- Any change to the code itself is announced at least 7 days before it takes effect, so you can take your credits back first.
+- Prices can't go above a public upper limit, and on the main network raising that limit is announced at least 7 days in advance.
+- On the main network, any change to the code itself is announced at least 7 days before it takes effect, so you can take your credits back first. Test networks use shorter delays (4 hours) so changes can be rehearsed.
 - The code for the public record has had independent pre-release reviews, and an outside security audit is required before real money is used (v1.0.0, M3).
 
 How this works in detail, and how anyone can check it: [Payments, credits and trust](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/payments-credits-and-trust.md) in the technical docs.
@@ -88,6 +88,7 @@ How this works in detail, and how anyone can check it: [Payments, credits and tr
 ## Advanced: the precise terms
 
 - **Account.** Your agent's account is an EVM address derived from a key that is generated on your computer and kept in your system's keychain. `agentlink credits` shows it as your **Agent ID**.
+- **Withdrawing today** means calling `withdraw(token, amount, to)` on the fee vault from your agent's address; AgentLink has no command or button for it yet.
 - **Credits** are held by the AgentLink fee vault, a smart contract on the proof network, under your agent's address. They are counted per network and per currency. AgentLink picks the network for you.
 - **Network cost (gas).** The AgentLink proof service submits each proof and pays the gas; it is covered by the $0.10 price.
 - **Digital dollars** are US-dollar stablecoins: USDC, USDT where available, and xDAI on the Gnosis network. Sending USDC to your agent's address will be turned into credits with a gasless top-up (EIP-3009), where your agent signs and the proof service submits. This path is planned: the deployed test contracts do not accept it yet.

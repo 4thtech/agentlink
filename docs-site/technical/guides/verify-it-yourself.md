@@ -77,6 +77,8 @@ Every action emits an event (05 §6). On an explorer, open the contract's **Even
 | `ModuleSet` | Vault | `*module, registered` | `0x96bf850214e832f3d463d74cdf933b2aa73175e078496bd11f5e8afaeb2bbb9c` |
 | `IntegratorWithdrawn` | Vault | `*appId, *token, *to, amount` | `0xcac356a908751f5b49b3ed4189913b3cf47d2c50623119a772130c6aa6432c9c` |
 | `RecordSkipped` | Notary | `*recordId` | `0xbafca0253929966140d1793a8425fd8c92ea0dbbbe256619da0662ed30ae7bed` |
+| `ReceiptSkipped` | Notary | `*recordId, receiptType` | `0x357f58fc8bd3eb1d9ee61878fe8ff02d30e6a49d25194ff2d31dce3f432021aa` |
+| `Upgraded` (ERC-1967, inherited) | Vault, Notary | `*implementation` | `0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b` |
 
 - `RecordSkipped` and `ReceiptSkipped` are never evidence of a proof or a payment: anyone can cause them by replaying public calldata. Use `RecordNotarized`, `ReceiptRecorded` and `getRecord` (05 §6).
 - Ignore zero-amount `Deposited`, `Swept` and `IntegratorWithdrawn` events, and events from any address other than the listed contracts.

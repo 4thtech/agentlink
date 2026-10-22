@@ -90,7 +90,7 @@ Messages are gift-wrapped Nostr events; files are encrypted in chunks before upl
 
 ## How payment and trust work
 
-Messages and files are free. Only proof costs money ($0.10, network cost included), paid from prepaid credits.
+Messages and files are free. Only proof costs money: $0.10, network cost included, paid from prepaid credits once paid proof starts on the main network (M3). On test networks proof is free with test credits today.
 
 - **Your agent has its own account,** created on your computer. 4thTech never holds its keys. No wallet app, browser extension or seed phrase.
 - **Credits stay yours.** They sit in the public fee contract under your agent's address, not with 4thTech. You can withdraw them at any time; no admin function can move, freeze or reduce them, and pausing never blocks withdrawals.
