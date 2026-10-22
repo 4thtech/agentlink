@@ -12,7 +12,7 @@
 // The invite link is written by A through ssh stdin (`cat >`), never in argv. No owner code and no
 // approval ever crosses ssh.
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { appendFile, lstat, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { encodeLine, parseLine, remotePath, sealLine, shq, sshArgs } from './remote.mjs';
 
@@ -235,6 +235,34 @@ export async function clearStaleInvite(transport) {
     await transport.remove(FILES.invite);
   } catch {
     // nothing to remove, or the folder is gone
+  }
+}
+
+/**
+ * Mac B: removes the invite file of every earlier run, `<out>/<run>/sync/invite`. Each run has a
+ * fresh folder, so clearing only this run's folder would find nothing. Only fixed names are used:
+ * run folders must match the stamp pattern and be real directories (symlinks are not followed),
+ * and `rm` is not recursive. Never throws.
+ */
+export async function clearStaleInvites(outDir) {
+  const isDir = async (p) => {
+    const st = await lstat(p);
+    return st.isDirectory() && !st.isSymbolicLink();
+  };
+  try {
+    for (const run of await readdir(outDir)) {
+      if (!/^\d{8}-\d{6}$/.test(run)) continue;
+      try {
+        const sync = join(outDir, run, 'sync');
+        if ((await isDir(join(outDir, run))) && (await isDir(sync))) {
+          await rm(join(sync, FILES.invite), { force: true });
+        }
+      } catch {
+        // not a run folder we can read
+      }
+    }
+  } catch {
+    // no results folder yet
   }
 }
 

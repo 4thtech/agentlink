@@ -71,6 +71,7 @@ import {
   approvalNoticeLocal,
   approveCommandText,
   clearStaleInvite,
+  clearStaleInvites,
   discoverWaiting,
   inviteText,
   localTransport,
@@ -482,7 +483,8 @@ const exitHooks = [];
 let planDone = false;
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => {
-    void runWithExitHooks(() => Promise.resolve(), exitHooks).finally(() => process.exit(130));
+    const code = signal === 'SIGTERM' ? 143 : 130;
+    void runWithExitHooks(() => Promise.resolve(), exitHooks).finally(() => process.exit(code));
   });
 }
 
@@ -640,8 +642,10 @@ async function main() {
       transport = localTransport(join(dir, 'sync'));
       await transport.init();
       // An invite file holds a secret link: one left by an earlier run goes now, ours goes on exit.
+      await clearStaleInvites(options.out);
       await clearStaleInvite(transport);
       exitHooks.push(() => clearStaleInvite(transport));
+      exitHooks.push(() => clearStaleInvites(options.out));
       nonce = randomBytes(16).toString('hex');
       channel = makeChannel({ transport, nonce, role: 'b', ...chanDeps });
       await transport.write(FILES.waiting, waitingText(runId, nonce));

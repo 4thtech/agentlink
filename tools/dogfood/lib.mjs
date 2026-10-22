@@ -689,7 +689,11 @@ const TRUNCATED = '[truncated]';
 
 /** `text` cut to at most `max` characters; a cut ends with the marker `[truncated]`. */
 export function capText(text, max = NOTE_MAX) {
-  const s = String(text);
+  // Redact first: a cut must never split a secret into a prefix the scan no longer recognises.
+  let s = String(text);
+  for (const { name, re } of SECRET_PATTERNS) {
+    s = s.replace(new RegExp(re.source, `${re.flags.replace('g', '')}g`), `[redacted: ${name}]`);
+  }
   return s.length <= max ? s : `${s.slice(0, Math.max(0, max - TRUNCATED.length))}${TRUNCATED}`;
 }
 

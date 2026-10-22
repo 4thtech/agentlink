@@ -1506,14 +1506,15 @@ describe('capped error text in notes and results (M1-23-f)', () => {
     const note = results[0].notes.find((n) => n.startsWith('could not run'));
     expect(note.length).toBeLessThanOrEqual(NOTE_MAX);
     expect(note.endsWith('[truncated]')).toBe(true);
-    // The scan runs over what is written: a key-shaped value inside the capped text is still found.
+    // A key-shaped value is redacted before the cap, so nothing secret is written.
     const kept = capText(`could not run: sk-ant-${'q'.repeat(40)}`, NOTE_MAX);
     const scan = await scanResults(
       '/r',
       {},
       { files: async () => ['/r/a.md'], read: async () => kept },
     );
-    expect(scan.findings.length).toBeGreaterThan(0);
+    expect(kept).not.toContain('sk-ant-q');
+    expect(scan.findings).toEqual([]);
   });
 });
 
