@@ -6,15 +6,20 @@
 // `expectedOwnerNostr` means the caller knows no expected owner. Codes are encoded with the package's
 // strict UTF-8 encoder. A refusal by the code under test (CryptoInputError) is `outcome: reject`;
 // any other error fails the case. `crossType` gives an ALKK kit to the ALKP, ALKR, ALKO, ALKS and
-// ALF1 readers, which must each refuse it. Runs in every runtime.
+// ALF1 readers, which must each refuse it. `credentialDigest` (M1-9i-b2, 04 §2.5.1 `storage.set`)
+// gives the salt and the two credential values as bytes and compares the digest and the `s3:<id>`
+// item (04 §2.2); `credentialItem` gives a stored item and compares its digest. Runs in every runtime.
 import {
   CryptoInputError,
+  credentialDigest,
+  credentialDigestOfItem,
   decodeHex0x,
   encodeUtf8,
   openAlf1,
   readRecoveryKitHeader,
 } from '@4thtech-io/crypto';
 import {
+  encodeStorageCredentialItem,
   openKeystoreFile,
   openOwnerSeed,
   openPasskeySeed,
@@ -64,9 +69,20 @@ type RecoveryKitInput =
       agentId: string;
       ownerEvm: string;
       ownerNostr: string;
-    };
+    }
+  | { op: 'credentialDigest'; salt: string; accessKeyId: string; secretAccessKey: string }
+  | { op: 'credentialItem'; item: string };
 
-const OPS = ['kek', 'seal', 'open', 'openWithKek', 'header', 'crossType'];
+const OPS = [
+  'kek',
+  'seal',
+  'open',
+  'openWithKek',
+  'header',
+  'crossType',
+  'credentialDigest',
+  'credentialItem',
+];
 
 function parseInput(input: unknown): RecoveryKitInput {
   const i = input as Record<string, unknown> | null;
@@ -240,10 +256,33 @@ async function evaluateInput(input: RecoveryKitInput): Promise<readonly Comparis
       }
       return [{ field: 'outcome', actual: 'accept' }];
     }
+    case 'credentialDigest': {
+      const fields = {
+        salt: hexToBytes(input.salt),
+        accessKeyId: hexToBytes(input.accessKeyId),
+        secretAccessKey: hexToBytes(input.secretAccessKey),
+      };
+      // Both must refuse the same inputs: the item is only ever written for a digest it matches.
+      const digest = credentialDigest(fields);
+      const item = encodeStorageCredentialItem(fields);
+      return [
+        { field: 'credentialDigest', actual: digest },
+        { field: 'item', actual: bytesToHex(item) },
+      ];
+    }
+    case 'credentialItem':
+      return [
+        { field: 'credentialDigest', actual: credentialDigestOfItem(hexToBytes(input.item)) },
+      ];
   }
 }
 
+// CHORE-VECTORS-KDF-TIMEOUT: kek-default-params runs Argon2id at 64 MiB (memory-hard). It took
+// 0.67 s locally (node) and, on CI main push 39670996155 (2026-10-21), up to 2.7 s in WebKit, 2.5 s
+// in Firefox, 1.6 s in workerd and 1.1 s in Node. 60 s matches the crypto package's Argon2id files
+// (M0-10e). No KDF parameter, vector or assertion changed.
 export const recoveryKit: SuiteModule = {
+  timeoutMs: 60_000,
   async evaluate(testCase) {
     const input = parseInput(testCase.input);
     try {
