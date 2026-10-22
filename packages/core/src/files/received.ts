@@ -10,9 +10,9 @@
 // What this covers (D-98): relay copies and owner copies of the envelope (07 §4.3), and the stored
 // envelope itself, still carry the key inside the end-to-end encryption. The effective shred is
 // deleting the object; this row only keeps the key out of the payload column.
-import type { Payload } from '@4thtech-io/types';
+import { FILE_LINK_MAX_EXPIRY_DAYS, type Payload } from '@4thtech-io/types';
 import type { CoreContext } from '../context.js';
-import { seal } from '../context.js';
+import { nowOf, seal } from '../context.js';
 import type { Row } from '../store/schema.js';
 
 /**
@@ -37,6 +37,9 @@ export async function receivedFileRows(
 ): Promise<{ readonly payloadText: string; readonly rows: Row<'files'>[] }> {
   if (payload.files.length === 0) return { payloadText, rows: [] };
   const stored = JSON.parse(payloadText) as { files: { fileKey: string }[] };
+  // The sender states `expiresAt`; the receiver keeps its row at most the 7-day maximum from now
+  // (04 §4 Delivery), so a hostile far-future value cannot keep the key for good.
+  const latest = nowOf(ctx) + FILE_LINK_MAX_EXPIRY_DAYS * 86_400;
   const rows: Row<'files'>[] = [];
   for (const [idx, entry] of payload.files.entries()) {
     const key = [envelopeId, idx];
@@ -49,7 +52,7 @@ export async function receivedFileRows(
       locator: await seal(ctx, 'files', 'locator', key, RECEIVED_LOCATOR),
       url: entry.url === null ? null : await seal(ctx, 'files', 'url', key, entry.url),
       file_key: await seal(ctx, 'files', 'file_key', key, entry.fileKey),
-      expires_at: entry.expiresAt,
+      expires_at: Math.min(entry.expiresAt, latest),
       deleted_at: null,
       // The receiver deletes its row at expiry (deleteExpiredFiles); no send-time snapshot applies.
       delete_after: null,

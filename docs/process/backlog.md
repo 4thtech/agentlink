@@ -2642,7 +2642,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope (left after M1-7f-2):**
   - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`, the proposed body in packages/types) and the sender's answer from its sealed `files` row; an expired link on the recipient side leads into it; the answer updates the receiver row's `url` and `expires_at`. Decide how a refreshed link relates to retention at `expiresAt` (today both sides delete at the first `expiresAt`, so a refresh only helps before it).
   - The receiver deleting its key row on its own DELIVERED receipt under `receipt` (today it deletes at `expiresAt`); keep it out of the proofs service files touched by open PRs, or land it after them.
-  - Payloads stored before M1-7f-2 still carry their `fileKey` and have no receiver row: backfill them (move the key into a row) or document that they stay until the envelope is deleted.
+  - Payloads stored before M1-7f-2 still carry their `fileKey` and have no receiver row, so they keep their keys until this backfill (IR-M1-7f-2-1 L2): move each key into a capped receiver row and replace it in the stored payload with the placeholder.
+  - The expiry pass takes the oldest 200 due rows each time, so rows whose delete keeps failing can stall it for good (IR-M1-7f-2-1 L3): give it a rotating cursor like the receipt pass (`ReceiptRetentionDeps.cursor`).
   - A sent copy (07 §4.3, another device of the same agent) keeps its payload's keys and gets no row; decide whether it should.
   - The 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
   - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
