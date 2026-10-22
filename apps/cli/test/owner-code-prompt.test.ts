@@ -9,7 +9,7 @@
 //   before anything runs, with fixed text that never echoes it (I-1, I-5), and says how to change
 //   the code.
 import { KeyStoreError, type OwnerPublicKeys } from '@4thtech-io/crypto';
-import type { ChangeOwnerCodeOptions, OwnerSetupOptions } from '@4thtech-io/node';
+import type { ChangeOwnerCodeOptions } from '@4thtech-io/node';
 import { describe, expect, it } from 'vitest';
 import {
   ownerCommandHandlers,
@@ -98,7 +98,11 @@ describe('an owner code typed as part of a command (M1-9zd)', () => {
 
   it('stops it the same way when an AI app runs the command (no terminal, a marker set)', async () => {
     const d = dispatcherRecording();
-    const marked: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: { CLAUDECODE: '1' } };
+    const marked: TerminalContext = {
+      stdinIsTTY: false,
+      stdoutIsTTY: false,
+      env: { CLAUDECODE: '1' },
+    };
     expect(await d.run(['approve', CODE], marked)).toBe(2);
     expect(d.err).toEqual([DISPATCH_TEXT.ownerCodeInCommand]);
     expect(d.called).toEqual([]);
@@ -192,7 +196,7 @@ function machine(options: { readonly cardOwner?: boolean } = {}) {
     listAgents: () => Promise.resolve(['default']),
     open: () => Promise.resolve({ status: 'ok', agent }),
     backendOf: () => Promise.resolve('keychain'),
-    initOwner: (_o: OwnerSetupOptions) => {
+    initOwner: () => {
       atPrompt();
       return Promise.resolve({ fingerprint: '7F3A·19C2' } as never);
     },

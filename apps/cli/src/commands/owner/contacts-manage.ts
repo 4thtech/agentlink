@@ -142,7 +142,7 @@ async function manage(
 /** `contacts rename | remove` (the `contacts` handler hands these subcommands here). */
 export function contactsManageHandler(deps: OwnerCommandDeps): CommandHandler {
   return (context) =>
-    ownerStep(context, () => {
+    ownerStep(context, deps, (deps) => {
       const [sub, id, alias, ...extra] = context.parsed.positionals;
       if (extra.length > 0 || id === undefined || context.parsed.values['verify'] !== undefined) {
         return Promise.resolve(badArguments(context.output));
