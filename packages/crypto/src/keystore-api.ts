@@ -20,6 +20,9 @@
 //   key material.
 // - The key epoch moves only through KeyEpochControl.advanceEpoch (M1-1g-d), an owner-only
 //   compare-and-set on the backend's management surface, never on the KeyStore the agent path uses.
+// - Restore, export and storage credentials go through KeyExportControl, KeyImportControl and
+//   StorageCredentialControl (M1-9i-b2), owner-flow surfaces of the same kind; no raw seed crosses
+//   them.
 // - Errors are fixed sentences that never contain an input (I-7).
 import type { AgentCard } from './agent-card.js';
 import type { DropAuthRequest } from './drop-auth.js';
@@ -28,6 +31,15 @@ import type { WrappedCek } from './hpke.js';
 import type { PublicIdentity } from './keys.js';
 import type { JsonObject } from './jcs.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
+import type { RecoveryCodeSecret } from './owner-seed-wrap.js';
+import type {
+  OpenRecoveryKitOptions,
+  RecoveryKitContents,
+  RecoveryKitSource,
+  RecoveryKitStoreSink,
+  RecoveryKitStoreSource,
+} from './recovery-kit.js';
+import type { StorageCredential } from './credential-digest.js';
 
 /** Why a KeyStore refused an operation for its state, not its input. Stable strings. */
 export type KeyStoreErrorCode =
@@ -53,7 +65,12 @@ export type KeyStoreErrorCode =
    * A well-formed request this signer will not perform, such as an OwnerSession asked to sign a
    * Nostr kind other than 13 or 22242 (04 §3.1.1). A capability limit, not an input error.
    */
-  | 'operation_not_allowed';
+  | 'operation_not_allowed'
+  /**
+   * The item an owner-flow control would write already exists (M1-9i-b2: restore never overwrites,
+   * D-115 C; a storage credential id is new on every connect). Nothing was written.
+   */
+  | 'item_exists';
 
 /** The error a KeyStore throws for its state. Input refusals stay CryptoInputError. */
 export class KeyStoreError extends Error {
@@ -218,6 +235,201 @@ export interface KeyEpochControl {
    * issued, and with `owner_locked` once that session has ended.
    */
   advanceEpoch(expected: number, owner: OwnerSession): Promise<PublicIdentity>;
+}
+
+// --- Owner-flow controls for export, restore and storage credentials (M1-9i-b2, D-115) -----------
+//
+// Three more management surfaces on the KeyEpochControl model above (04 §2.3.3 "Export: who sees
+// the seeds", restore step 5; 04 §2.5.1 `storage.set`). Contract for every backend (Node keychain and
+// file, M1-9i-c):
+// - Each control is a distinct object, constructed only by owner flows (the CLI's own terminal and
+//   the local UI), never by the agent path. The KeyStore, the OwnerKeyStore and an OwnerSession have
+//   no method, field or reference that reaches one, and no MCP tool handler is given or imports one
+//   (I-4; the import fence in apps/cli/test/owner-controls-fence.test.ts).
+// - No raw seed crosses them, in either direction: callers pass ids, names, the recovery code typed
+//   at the prompt and the store snapshot; the backend reads and writes the seeds and items itself.
+//   The only bytes a control returns are DisplayCodes (keystore-controls.test.ts).
+// - A method that takes an OwnerSession accepts only a session its paired OwnerKeyStore minted,
+//   checked by identity, never by shape (as for advanceEpoch): a look-alike or a Proxy is
+//   `presence_required`, an ended session `owner_locked`.
+// - Every seed, item value and code the backend held is wiped after use and on every failure
+//   (04 §8 rule 3). Errors are fixed sentences that never contain an input (I-7).
+
+declare const DISPLAY_CODE: unique symbol;
+
+/**
+ * A code that is shown once and never stored, logged or passed on: the recovery code of a new kit,
+ * a new owner code, or a new file-KeyStore unlock code, as ASCII bytes (04 §2.3.3, §2.8 display
+ * rules). The caller shows it, then wipes it. A plain Uint8Array (a seed, for example) is not one.
+ */
+export type DisplayCode = Uint8Array & { readonly [DISPLAY_CODE]: true };
+
+/** An agent to include in a recovery kit (04 §2.3.3 manifest `agents`). */
+export interface RecoveryKitExportAgent {
+  /** `0x` + 40 lowercase hex (04 §2.9). */
+  readonly agentId: string;
+  /** The local agent name (06 §6). */
+  readonly name: string;
+}
+
+/** What `agentlink backup export` asks the export control to seal (04 §2.3.3). */
+export interface RecoveryKitExportRequest {
+  /** The `kitId` of the `backup.export` actions the owner signed and the core applied first. */
+  readonly kitId: string;
+  /** Unix seconds, the manifest's `createdAt`. */
+  readonly createdAt: number;
+  readonly contents: RecoveryKitContents;
+  /** Every agent to include, by default every local agent of this owner (I-10). */
+  readonly agents: readonly RecoveryKitExportAgent[];
+  /**
+   * The store snapshot of one agent. The backend calls it for each agent while it holds that
+   * agent's inter-process lock (06 §6), right after it read the agent's `policy-version` and
+   * `receipts-kept` items, so the marks and the store are one consistent cut (04 §2.3.3
+   * "Snapshot"). For an `identity` kit the snapshot already has its message rows deleted.
+   *
+   * The callback runs inside the backend's lock hold, so it must not take the agent's lock itself
+   * (that would deadlock) and must not write to the KeyStore. It returns a finished private
+   * temporary file (`VACUUM INTO` done and closed): the backend seals from it after the lock is
+   * released. Residual: a callback that never resolves holds the agent's lock, which only stalls
+   * the owner's own export (owner-side DoS, no secret exposed).
+   */
+  readonly snapshots: (agentId: string) => Promise<RecoveryKitStoreSource>;
+  /**
+   * Where the kit is written. The backend creates it itself (Node: `O_CREAT | O_EXCL |
+   * O_NOFOLLOW`, mode 0600, refused under `~/.agentlink`) and deletes it on any failure.
+   */
+  readonly path: string;
+}
+
+/**
+ * The recovery-kit export surface (04 §2.3.3 "Export: who sees the seeds"; M1-9i-b2). Owner flows
+ * only, paired with the OwnerKeyStore whose sessions it accepts. The agent KeyStore gains no method.
+ *
+ * sealRecoveryKit reads the owner seed and each agent's items (`seed`, `store-key` and those of
+ * `policy-version`, `receipts-kept` and `storage-mark` that exist; never `s3:*`, D-115 D) inside the
+ * backend, seals them with the snapshots as `ALKK` v1 under a new generated recovery code
+ * (sealRecoveryKit of @4thtech-io/crypto/keystore) and returns that code, for display only. The
+ * owner signs and the core applies one `backup.export` per included agent before this is called
+ * (its nonce row is the audit record, 07 §3.4); the session check proves only that the session is
+ * genuine, as for advanceEpoch.
+ */
+export interface KeyExportControl {
+  sealRecoveryKit(owner: OwnerSession, request: RecoveryKitExportRequest): Promise<DisplayCode>;
+}
+
+declare const RECOVERY_KIT_IMPORT: unique symbol;
+
+/** One agent of an opened kit, as the restore lists it (04 §2.3.3 step 3). Public facts only. */
+export interface RecoveryKitImportAgent {
+  /** `0x` + 40 lowercase hex, derived from the kit's agent seed. */
+  readonly agentId: string;
+  /** The local agent name from the manifest, as ASCII bytes (`[a-z][a-z0-9-]{0,31}`). */
+  readonly name: Uint8Array;
+  /** The sink that holds the agent's quarantined store snapshot (04 §4 quarantine rules, D-84). */
+  readonly store: RecoveryKitStoreSink;
+  readonly storeLength: number;
+}
+
+/**
+ * An opened and checked recovery kit inside a KeyImportControl (04 §2.3.3 steps 3, 5 and 6). It shows
+ * only public facts; the seeds and items stay in the backend, where only importAgent and importOwner
+ * reach them. Brand: the opened kit of openRecoveryKit, which holds the seeds, is not one.
+ */
+export interface RecoveryKitImport {
+  readonly [RECOVERY_KIT_IMPORT]: true;
+  readonly ownerNostr: Uint8Array;
+  /** The 16 raw bytes of the manifest's kitId. */
+  readonly kitId: Uint8Array;
+  readonly createdAt: number;
+  readonly contents: RecoveryKitContents;
+  /** In manifest order (sorted by agentId). */
+  readonly agents: readonly RecoveryKitImportAgent[];
+  /** Wipes every seed and item the backend holds for this kit; later imports fail. */
+  wipe(): void;
+}
+
+/** Options for KeyImportControl.importAgent. */
+export interface ImportAgentOptions {
+  /**
+   * The local name to restore under (`--agent <newname>`, 06 §6); default the kit's name. The
+   * backend checks it against `/^[a-z][a-z0-9-]{0,31}$/` (06 §6) before it names any file (the
+   * `.alks`, the agent folder) and refuses any other value, so it can never become a path.
+   */
+  readonly name?: string;
+  /**
+   * The session of the owner item already on this machine (04 §2.3.3 restore table: an existing
+   * owner is kept only after its own code opens it to the kit's owner). Required when an owner item
+   * exists, and then checked by the backend (M1-9i-c): it must be a session the paired
+   * OwnerKeyStore minted (by identity; a look-alike is `presence_required`, an ended one
+   * `owner_locked`), and that store's `ownerNostr` must equal `kit.ownerNostr`, otherwise nothing
+   * is written. Not needed on a machine without an owner item (step 6, importOwner).
+   */
+  readonly owner?: OwnerSession;
+}
+
+/** What an agent import leaves the owner to see. */
+export interface ImportedAgentKeys {
+  /**
+   * The file KeyStore's new generated unlock code for the new `.alks` (04 §2.8), shown once; undefined
+   * for the keychain backend.
+   */
+  readonly unlockCode: DisplayCode | undefined;
+}
+
+/**
+ * The restore surface (04 §2.3.3 "Restore", D-115 C and E; M1-9i-b2). Owner flows only: the CLI's
+ * `agentlink backup restore` †, which signs no owner action (D-115 E). Its authority is the kit plus
+ * its recovery code typed at the prompt, never an argument, environment variable, file or pipe.
+ *
+ * - openRecoveryKit opens and checks the kit inside the backend (openRecoveryKit of
+ *   @4thtech-io/crypto/keystore, with `options.expectedOwnerNostr` when an owner item exists) and
+ *   returns a handle with public facts only. Every failure is one generic error, nothing is kept and
+ *   every sink is discarded.
+ * - importAgent and importOwner accept only a handle that an import control of the same
+ *   implementation minted (checked by identity, so the CLI may open the kit before it picks the
+ *   backend, 04 §2.3.3 steps 3 and 4); a look-alike is refused and a wiped handle is
+ *   `keystore_closed`.
+ * - importAgent writes every item of that agent at once (keychain items, or a new `.alks` under a
+ *   new generated unlock code), with `storage-mark` as `{"v":1,"active":null}` (D-115 D). It never
+ *   overwrites: any existing item of that agent, or an existing `.alks`, is `item_exists` and
+ *   nothing is written (D-115 C). The store snapshot and `config.json` are the restore's to write.
+ * - importOwner writes the owner seed as `ALKO` under a new generated owner code with the
+ *   `owner-next` write, read-back and open protocol of `owner change-code` (04 §2.8) and returns
+ *   that code for display. An existing owner item is `item_exists`; the recovery code never becomes
+ *   the owner code.
+ */
+export interface KeyImportControl {
+  openRecoveryKit(
+    kit: RecoveryKitSource,
+    code: RecoveryCodeSecret,
+    options: OpenRecoveryKitOptions,
+  ): Promise<RecoveryKitImport>;
+  importAgent(
+    kit: RecoveryKitImport,
+    agentId: string,
+    options?: ImportAgentOptions,
+  ): Promise<ImportedAgentKeys>;
+  importOwner(kit: RecoveryKitImport): Promise<DisplayCode>;
+}
+
+/**
+ * The storage credential surface of one agent (04 §2.5.1 `storage.set`, §2.2 `s3:<id>`; 07 §5.2;
+ * M1-9i-b2). Owner flows only (`agentlink storage connect` †, the local UI), paired with the agent's
+ * KeyStore backend and the OwnerKeyStore whose sessions it accepts. `id` is the `storage.set` id: 8
+ * CSPRNG bytes as 16 lowercase hex, new on every connect; any other form is refused.
+ *
+ * - writeCredential draws a new 16-byte salt, writes the item `s3:<id>` (encodeStorageCredentialItem)
+ *   under the agent's inter-process lock (06 §6), reads it back, and returns its credentialDigest for
+ *   the `storage.set` the owner then signs. An existing `s3:<id>` is `item_exists` and is left as it
+ *   was. The credential is the caller's: it is copied, never kept, and the caller wipes it.
+ * - removeCredential deletes `s3:<id>` under the same lock (after a newer connect is applied, or when
+ *   a connect fails before its apply); an item that does not exist is not an error.
+ * - No method returns the credential: the S3 adapter's credentials provider reads the item itself
+ *   (M1-9i-a, M1-9i-c), and the values never become log fields (I-7).
+ */
+export interface StorageCredentialControl {
+  writeCredential(owner: OwnerSession, id: string, credential: StorageCredential): Promise<string>;
+  removeCredential(owner: OwnerSession, id: string): Promise<void>;
 }
 
 /**
