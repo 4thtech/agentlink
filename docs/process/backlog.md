@@ -2002,6 +2002,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** the `SubmitterChain` port's `getRecord` treats only the Notary's `RecordNotFound` revert as "absent", as the client's `getRecord` now does; any other revert or read error is an error, never "absent", so no replacement is signed on a failed read.
 - **Acceptance:** tests first: `RecordNotFound` gives absent; another revert, a transport error and an empty result do not.
 
+#### M1-4c-d · chain: the chain-state `getRecord` fails closed on a zero-signer struct (new, M1-4c-c review)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain/src/clients/state.ts
+- **Depends on:** M1-4c-c
+- **Spec:** 04 §5; 07 §6.2
+- **Invariants:** I-3
+- **Scope:** the chain-state port's `getRecord` reads only the Notary's `RecordNotFound` revert as "absent". A returned struct with a zero signer cannot come from the deployed Notary, so it is ChainError `bad_answer` (retryable), never "absent": `replacementAllowed` refuses, and no record or receipt is sent on it.
+- **Acceptance:** tests first: a zero-signer struct is not absent; `replacementAllowed` refuses on it (record and receipt); `readInclusion`, `notarize` and `acknowledge` fail with a ChainError and send nothing; `RecordNotFound` still means absent.
+
 #### M1-4d-e · chain: card confirmation for contract-account signers (new, D-102 follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** later (not M1)
 - **Repo/path:** agentlink · packages/chain/src/verify; docs/foundation/04 §2.9, 07 §8
