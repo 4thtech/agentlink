@@ -119,7 +119,10 @@ for (const { directory, file } of vectorFiles) {
         });
         continue;
       }
-      test(testCase.id, async ({ task }) => {
+      // A memory-hard suite declares a measured per-case timeout (SuiteModule.timeoutMs); this file
+      // runs in every project, so the same limit holds in every runtime.
+      const options = suite?.timeoutMs === undefined ? {} : { timeout: suite.timeoutMs };
+      test(testCase.id, options, async ({ task }) => {
         task.meta.vectors = {
           kind: 'case',
           runtime: observeRuntime().id,
