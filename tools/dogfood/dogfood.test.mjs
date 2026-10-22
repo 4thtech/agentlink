@@ -21,8 +21,10 @@ import {
   sideOf,
   sideOk,
   validInviteUrl,
+  NOTE_MAX,
   approvalBox,
   buildSteps,
+  capText,
   childEnv,
   envCanaries,
   inviteUrlOf,
@@ -1464,5 +1466,69 @@ describe('tool error codes and ambiguous contacts (M1-23-c)', () => {
     const m1 = buildSteps(names).find((s) => s.id === 'M1');
     expect(m1.prompt({})).toContain('Send oc-test a short note');
     expect(m1.prompt({ peerContactId: 'agt_1' })).toContain('oc-test (contact ID agt_1)');
+  });
+});
+
+describe('capped error text in notes and results (M1-23-f)', () => {
+  it('capText keeps short text, truncates long text with a marker, stays within the cap', () => {
+    expect(capText('short', 50)).toBe('short');
+    const long = capText('x'.repeat(5000), 50);
+    expect(long.length).toBeLessThanOrEqual(50);
+    expect(long.endsWith('[truncated]')).toBe(true);
+    expect(capText('a'.repeat(50), 50)).toBe('a'.repeat(50));
+  });
+
+  it('an oversized error token from tool text is cut in the note', () => {
+    const token = `ERR_${'A'.repeat(4000)}_${'B'.repeat(4000)}`;
+    const notes = errorCodeNotes(
+      runOf([{ name: 'agentlink_send', input: {}, result: `Failed: ${token}`, isError: true }]),
+    );
+    expect(notes).toHaveLength(1);
+    expect(notes[0].length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(notes[0]).toMatch(/\[truncated\]$/);
+  });
+
+  it('an oversized thrown error is capped in the step note, and the secret scan still sees it', async () => {
+    const huge = `boom ${'z'.repeat(6000)} sk-ant-${'q'.repeat(40)}`;
+    const m1 = buildSteps({
+      cc: 'cc-test',
+      oc: 'oc-test',
+      runId: '20261017-101500',
+      workspace: '/w',
+    }).filter((s) => s.id === 'M1');
+    const { results } = await runPlan(m1, {
+      now: () => 0,
+      log: () => {},
+      agentOf: (h) => (h === 'cc' ? 'cc-test' : 'oc-test'),
+      initialCtx: { paired: true },
+      run: () => Promise.reject(new Error(huge)),
+    });
+    const note = results[0].notes.find((n) => n.startsWith('could not run'));
+    expect(note.length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(note.endsWith('[truncated]')).toBe(true);
+    // A key-shaped value is redacted before the cap, so nothing secret is written.
+    const kept = capText(`could not run: sk-ant-${'q'.repeat(40)}`, NOTE_MAX);
+    const scan = await scanResults(
+      '/r',
+      {},
+      { files: async () => ['/r/a.md'], read: async () => kept },
+    );
+    expect(kept).not.toContain('sk-ant-q');
+    expect(scan.findings).toEqual([]);
+  });
+});
+
+describe('secrets are redacted before the cap (IR-M1-23-f-1)', () => {
+  it('a secret straddling the cap does not survive as a prefix', () => {
+    const nsec = `nsec1${'q'.repeat(58)}`;
+    const text = `${'a'.repeat(NOTE_MAX - 25)} ${nsec} tail`;
+    const out = capText(text);
+    expect(out.length).toBeLessThanOrEqual(NOTE_MAX);
+    expect(out).not.toContain('nsec1');
+    expect(out).toContain('[redacted');
+  });
+
+  it('a key shape inside the cap is redacted too', () => {
+    expect(capText(`x sk-ant-${'q'.repeat(40)} y`)).not.toContain('sk-ant-q');
   });
 });

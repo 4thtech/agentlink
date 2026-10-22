@@ -315,7 +315,7 @@ export function sshPreflight(host, run = spawnSync) {
 /** What `agentlink doctor` prints when macOS refuses the login keychain (an ssh session has no GUI session). */
 export const KEYCHAIN_OVER_SSH = /no system keychain|User interaction is not allowed/i;
 export const KEYCHAIN_OVER_SSH_HELP =
-  'macOS blocks the keychain over SSH; use --auto-sync (start role b on Mac B first)';
+  "macOS does not give an SSH session the login keychain, so the agent must run in the Mac's own terminal: use --auto-sync (start role b on Mac B first)";
 
 /**
  * --two-mac preflight: runs `agentlink doctor` for Mac B's agent over ssh and recognises the macOS
