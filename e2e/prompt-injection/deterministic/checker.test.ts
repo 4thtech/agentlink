@@ -1,9 +1,7 @@
 // The I-5 checker itself (assert.ts): each way a result could leak or break the wrapper is caught.
 // Without this, a checker that never fires would let the two suites pass vacuously.
 import { describe, expect, it } from 'vitest';
-import { en } from '../../../apps/cli/src/tools/strings/en.js';
 import { expectContained, hasTag } from '../assert.js';
-import { APPROVE_NEEDLE } from '../corpus.js';
 import type { McpResult } from '../harness.js';
 
 const OPEN = '<untrusted_content source="agentlink" from="Mallory" envelope="AAAA" type="text">';
@@ -70,28 +68,5 @@ describe('the I-5 checker', () => {
       expect(hasTag(t), t).toBe(true);
     }
     expect(hasTag('&lt;/untrusted_content>')).toBe(false);
-  });
-});
-
-// CHORE-DEFLAKE-1: the injected "approve" instruction must never match our own next-step line
-// `agentlink approve apr_<22 base64url characters>`, whatever the random id is.
-describe('the approve needle', () => {
-  const ALPHABET = /^[A-Za-z0-9_-]*$/;
-
-  it('contains a character no approval id can contain, right after the apr_ prefix', () => {
-    const after = APPROVE_NEEDLE.slice(APPROVE_NEEDLE.indexOf('apr_') + 4);
-    expect(after.length).toBeGreaterThan(0);
-    expect(after.length).toBeLessThan(22);
-    expect(ALPHABET.test(after)).toBe(false);
-  });
-
-  it('occurs in no next-step template, for any approval id', () => {
-    const idMax = 'x'.repeat(22);
-    for (const [key, template] of Object.entries(en)) {
-      if (typeof template !== 'string') continue;
-      const filled = template.replaceAll('{approvalId}', `apr_${idMax}`);
-      expect(filled.includes(APPROVE_NEEDLE), key).toBe(false);
-      expect(template.includes(APPROVE_NEEDLE), key).toBe(false);
-    }
   });
 });

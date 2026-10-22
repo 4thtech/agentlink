@@ -66,7 +66,7 @@ exports[`copy catalogue (M1-9g) > chat.status.needs_setup.folder > renders as de
 
 exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keyLocked > renders as designed 1`] = `"AgentLink's key file is locked, so I can't use it yet. Run \`agentlink doctor\` in a terminal to see how to set up its unlock code."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keychain > renders as designed 1`] = `"AgentLink can't find a system keychain on this machine. Set it up in a terminal: \`agentlink init --keystore file\`."`;
+exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keychain > renders as designed 1`] = `"AgentLink can't find a system keychain on this machine. Run \`agentlink doctor\` in a terminal to see how to fix it."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.needs_setup.storage > renders as designed 1`] = `"Your settings keep files in your own storage, which isn't connected yet: http://127.0.0.1:4310/a/xyz."`;
 
@@ -74,13 +74,13 @@ exports[`copy catalogue (M1-9g) > chat.status.not_found.contact > renders as des
 
 exports[`copy catalogue (M1-9g) > chat.status.not_found.contactNone > renders as designed 1`] = `"I couldn't find a contact called 'Marco', and you have no contacts yet."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.acceptedInvite > renders as designed 1`] = `"You are connected to Marko. Compare the safety code on your own screen (local app or terminal), not in this chat."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.acceptedInvite > renders as designed 1`] = `"You are connected to Marko. Nothing else is needed now."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.contacts > renders as designed 1`] = `"You have 2 contacts: Marko Novak, Ana Kovač, Denis."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.contactsNone > renders as designed 1`] = `"You have no contacts yet. Create an invite to connect with someone."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.ok.invite > renders as designed 1`] = `"Invite ready: it works once, until 20 Oct 2026. Send it only to Marko: whoever uses it first is connected. Once they accept, you'll both see a safety code to compare in AgentLink, not in this chat."`;
+exports[`copy catalogue (M1-9g) > chat.status.ok.invite > renders as designed 1`] = `"Invite ready: it works once, until 20 Oct 2026. Send it only to Marko: whoever uses it first is connected. You'll be connected as soon as they accept."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.inviteShare > renders as designed 1`] = `"Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 20 Oct 2026: https://invite.example/i/xyz"`;
 
@@ -100,7 +100,7 @@ exports[`copy catalogue (M1-9g) > chat.status.pending_approval.free > renders as
 Approve here: http://127.0.0.1:4310/a/xyz"
 `;
 
-exports[`copy catalogue (M1-9g) > chat.status.pending_approval.nextStep > renders as designed 1`] = `"Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId."`;
+exports[`copy catalogue (M1-9g) > chat.status.pending_approval.nextStep > renders as designed 1`] = `"Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId. To check the decision, call agentlink_get_approval."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.rejected.declined > renders as designed 1`] = `"You declined, so nothing was sent."`;
 
@@ -270,7 +270,7 @@ exports[`copy catalogue (M1-9g) > common.privacy.registered > renders as designe
 
 exports[`copy catalogue (M1-9g) > common.privacy.topUp > renders as designed 1`] = `"The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."`;
 
-exports[`copy catalogue (M1-9g) > local.linkExpired > renders as designed 1`] = `"This link has expired. Open AgentLink again from your AI, or run \`agentlink ui\`."`;
+exports[`copy catalogue (M1-9g) > local.linkExpired > renders as designed 1`] = `"This link has expired. Ask your AI to open AgentLink again."`;
 
 exports[`copy catalogue (M1-9g) > local.requests.accepted > renders as designed 1`] = `"Your AI can now read this message. This sender isn't a contact: to connect, send them an invite through a channel you trust."`;
 

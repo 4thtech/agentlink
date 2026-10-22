@@ -13,6 +13,7 @@ import {
   type JsonObject,
   type OwnerKeyStore,
   type OwnerPresence,
+  type OwnerSession,
   type OwnerPublicKeys,
   type SecretKind,
   type TypedData,
@@ -127,6 +128,50 @@ function assertOneGesture(frozen: readonly OwnerSignRequest[]): void {
 }
 
 /**
+ * The checks of one gesture before anything is shown or unlocked: each request snapshotted and
+ * allowlisted, at most the one pair runOwnerGesture allows, and printable review lines.
+ */
+export function checkGesture(
+  review: OwnerReview,
+  requests: readonly OwnerSignRequest[],
+): readonly OwnerSignRequest[] {
+  if (!Array.isArray(requests)) throw invalid('The request is malformed.');
+  const frozen = (requests as readonly unknown[]).map(snapshot);
+  assertOneGesture(frozen);
+  if (typeof review !== 'object' || review === null || !Array.isArray(review.lines)) {
+    throw invalid('Nothing to show the owner.');
+  }
+  const lines = [...review.lines];
+  if (lines.length === 0) throw invalid('Nothing to show the owner.');
+  for (const line of lines) assertPrintable(line, 'A review line');
+  if (review.question !== undefined) assertPrintable(review.question, 'The question');
+  return frozen;
+}
+
+/** Signs the checked snapshots with an unlocked session (the caller closes it). */
+export async function signGesture(
+  session: OwnerSession,
+  frozen: readonly OwnerSignRequest[],
+): Promise<readonly OwnerSignature[]> {
+  const out: OwnerSignature[] = [];
+  for (const request of frozen) {
+    if (request.kind === 'owner-action') {
+      const sig = await session.signOwnerAction(request.action);
+      out.push(
+        Object.freeze({
+          kind: request.kind,
+          signed: Object.freeze({ body: request.action, sig }),
+        }),
+      );
+    } else {
+      const signature = await session.sign712(request.typedData);
+      out.push(Object.freeze({ kind: request.kind, signature }));
+    }
+  }
+  return Object.freeze(out);
+}
+
+/**
  * Runs one owner operation: shows the review, asks its question if any, reads the owner secret once
  * at the prompt, unlocks, signs exactly the snapshots (one object, or an approval and its rule change
  * in the same gesture), then closes the session (its keys are wiped) and locks the store, whatever
@@ -139,13 +184,8 @@ export async function runOwnerGesture(
   review: OwnerReview,
   requests: readonly OwnerSignRequest[],
 ): Promise<readonly OwnerSignature[]> {
-  if (!Array.isArray(requests)) throw invalid('The request is malformed.');
-  const frozen = (requests as readonly unknown[]).map(snapshot);
-  assertOneGesture(frozen);
+  const frozen = checkGesture(review, requests);
   const lines = [...review.lines];
-  if (lines.length === 0) throw invalid('Nothing to show the owner.');
-  for (const line of lines) assertPrintable(line, 'A review line');
-  if (review.question !== undefined) assertPrintable(review.question, 'The question');
   const kind = await store.secretKind();
   for (const line of lines) terminal.write(line);
   if (review.question !== undefined && !(await terminal.confirm(review.question))) {
@@ -159,22 +199,7 @@ export async function runOwnerGesture(
       : await terminal.readPresence(secretLabel(kind));
   const session = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
   try {
-    const out: OwnerSignature[] = [];
-    for (const request of frozen) {
-      if (request.kind === 'owner-action') {
-        const sig = await session.signOwnerAction(request.action);
-        out.push(
-          Object.freeze({
-            kind: request.kind,
-            signed: Object.freeze({ body: request.action, sig }),
-          }),
-        );
-      } else {
-        const signature = await session.sign712(request.typedData);
-        out.push(Object.freeze({ kind: request.kind, signature }));
-      }
-    }
-    return Object.freeze(out);
+    return await signGesture(session, frozen);
   } finally {
     await session.close();
     await store.lock();
