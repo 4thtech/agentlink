@@ -2362,7 +2362,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An aborted upload leaves no open multipart uploads; lifecycle rule applied and read back on MinIO and R2.
 
 #### M1-6b-b · storage: lifecycle and upload follow-ups (new, follow-up from #254)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (L3, L4, L5 in this PR; the R2 lifecycle read-back stays open on M1-28) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-6b, M1-28
 - **Spec:** 07 §5.2, §5.4; 04 §4
