@@ -135,6 +135,8 @@ struct Receipt {
 
 **Kind mapping (G-13, D-86; decided by Tali in chat, 2026-10-18).** The core sets `kind` from the notarized envelope's payload (04 §3.4); no tool takes a kind as input. `offer` → 3 OFFER; `accept` → 4 ACCEPT; `delivery` → 5 DELIVERY; `note` → 6 NOTE; `file` → 2 FILE; `text` and `request` → 2 FILE when `files` is non-empty, otherwise 1 MESSAGE; `reject` → 1 MESSAGE. Every other type (`ack`, `handshake`, `handshake-ack`, `proof`, `approval`, `approval-request`, `policy`, `card-update`, `revoke`) is never notarized: the call returns `rejected` with code `NOT_NOTARIZABLE` and records nothing. `kind` is public and permanent, so it reveals the category of the message, never its content. **Checks.** Before signing any receipt, a recipient checks that the record's `kind` equals this mapping for the envelope it holds (with `envelopeHash`, 04 §3.4 `proof`); otherwise it signs nothing and flags the contact. A verifier with a disclosed content key (07 §8) applies the same check after step 6; on a mismatch the pack proves no content (`contentVerified: false`), while the record and receipts are still verified. Values 7–255 are reserved; adding one is a spec change.
 
+**`kind` and `name` are not checked on-chain (FA-12; proposed, owner confirms at merge).** The contract does not constrain `kind`: any `uint8` is stored, so the 1–6 range and the §3.1 kind mapping are enforced by clients, and the proof-pack verifier validates `kind` too (M1-4d). An integrator app's `name` is inbound content (I-5), never trusted: the console and indexers bound what they render, in length and in characters (the M2 console cards).
+
 **`parentRecordId` rule (D-109; proposed, owner confirms at merge).** The core sets `parentRecordId` to zero, or to a `recordId` whose stored `signer` equals this Record's `signer`. It never names a record signed by another agent, since that would publish the link between the two agents with no receipt; a link both sides agree in terms needs its own decision first (04 §5.1). The contract does not check this rule; clients do (M1-33c).
 
 **JSON form (04 §2.4.1).** Wherever these values appear in JSON (the `proof` body, proof packs, tool results, the submitter API), addresses and every `bytes32` (`recordId`, `salt`, `envelopeHash`, `recipientCommitment`, `parentRecordId`, `appId`), transaction hashes and signatures are `0x` + lowercase hex; `uint256` values (`maxFee`, `nonce`) are decimal strings; the other integers are JSON integers. Anything else is rejected, never normalised.
@@ -158,8 +160,7 @@ Signatures are verified with OpenZeppelin `SignatureChecker.isValidSignatureNow(
 **notarize**
 1. `block.timestamp ≤ deadline`; signature valid for `r.signer`.
 2. `recordId = keccak256(abi.encode(block.chainid, address(this), r.signer, r.nonce))`; requires `records[recordId].signer == address(0)` (this also enforces single-use nonces, so no separate nonce mapping is needed).
-3. `vault.charge(r.signer, NOTARIZE, r.appId, r.feeToken, r.maxFee)`.
-4. Store:
+3. Store (before the charge; FA-9, proposed, owner confirms at merge):
    ```solidity
    struct RecordState {
        address signer;              // slot 1: 20 B
@@ -172,7 +173,8 @@ Signatures are verified with OpenZeppelin `SignatureChecker.isValidSignatureNow(
        uint64[4] receiptAt;         // slot 5: timestamps for DELIVERED, OPENED, ACCEPTED, REJECTED (packed)
    }
    ```
-5. Emit `RecordNotarized(...)`.
+4. Emit `RecordNotarized(...)`.
+5. `vault.charge(r.signer, NOTARIZE, r.appId, r.feeToken, r.maxFee)`, last. The contract stores and emits before it charges, so a re-entrant call from the vault or a fee token finds the record already stored and its nonce spent (checks-effects-interactions). A failed charge reverts the store and the event with it.
 
 **`receiptFlags` layout (D-97; decided by Tali in chat, 2026-10-19).** Receipt type `t` (§3.1: 1 DELIVERED, 2 OPENED, 3 ACCEPTED, 4 REJECTED) sets bit `t − 1` of `receiptFlags` (bit 0 = DELIVERED, bit 1 = OPENED, bit 2 = ACCEPTED, bit 3 = REJECTED), and its block time is stored in `receiptAt[t − 1]`. Bits 4–7 are always 0. A bit is set exactly when its `receiptAt` entry is non-zero, and bits 2 and 3 are never both set. A verifier cross-checks the flags against `receiptAt` and reports any mismatch as `malformed_record` (07 §8).
 
@@ -383,7 +385,7 @@ ReceiptSkipped(bytes32 indexed recordId, uint8 receiptType)  -- Notary, acknowle
 
 | Event | Emitted by | Meaning |
 |---|---|---|
-| `Paused(account)` / `Unpaused(account)` | `pause` / `unpause` (§5.2), on each state change only (a call that reverts emits nothing); also once at initialisation, with the initialising caller, when a mainnet contract starts paused (§5.1) | `account` is the caller. Both functions have no delay, so it is the actual ops key or Safe that paused, and which one tells the on-call who to revoke. Same names and signature as OpenZeppelin `Pausable`, so standard monitors recognise them. |
+| `Paused(account)` / `Unpaused(account)` | `pause` / `unpause` (§5.2), on each state change only (a call that reverts emits nothing); also once at initialisation, when a mainnet contract starts paused (§5.1) | `account` is the caller; at initialisation under CREATE3 it names the intermediate CREATE3 proxy or CreateX, whichever calls `initialize`, never the deployer key (FA-10; mainnet only, since testnets start unpaused; proposed, owner confirms at merge). Monitoring does not treat that address as an ops key or alert on it as one. Both functions have no delay, so it is the actual ops key or Safe that paused, and which one tells the on-call who to revoke. Same names and signature as OpenZeppelin `Pausable`, so standard monitors recognise them. |
 | `TreasuryChanged(old, new)` | `setTreasury` | The address that receives `sweep` changed. The most important event to monitor: it redirects all protocol fees. Both addresses are indexed so an alert can match either. |
 | `MinDepositSet(token, amount)` | `setMinDeposit` | New anti-griefing minimum for gasless deposits in `token`. |
 | `IntegratorFeeCapMultipleSet(multiple)` | `setIntegratorFeeCapMultiple` | New integrator fee cap, as a multiple of the protocol fee. |
