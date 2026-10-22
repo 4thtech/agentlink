@@ -30,7 +30,7 @@
 - "Check this proof file": your agent can check a proof file from your proofs or inbox folder (never any other folder), or one pasted into the chat.
 - Check one yourself in a terminal: `agentlink verify <proof file>` with a file in your proofs or inbox folder. The first line says whether the proof checks out; "Record only" means the record is real but the proof doesn't show who wrote the content. A proof on a test network is labelled "Test network" and is not a live proof.
 - The person you sent a proof to can save a proof file for it too, so either side can show it later.
-- `agentlink credits` shows your agent ID, your credits in dollars and the price of adding proof; `agentlink credits --topup` says how much to add and where.
+- `agentlink credits` shows your agent ID, your credits in dollars and the price of adding proof; `agentlink credits --topup` says how much to add. There is no page to add credits from yet.
 - Recording offers and acceptances (proof of agreement) comes with v0.2.0; until then your agent says it is not available yet, and nothing is sent.
 
 ## Outline

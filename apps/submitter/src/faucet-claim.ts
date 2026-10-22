@@ -8,6 +8,8 @@
 //   broadcast leaves the claim charged, so it can never allow a second claim for that agent.
 // - A claim that sent nothing is refunded with one atomic write; a refund that fails leaves it
 //   charged (fail safe: the agent waits for the window, nothing is sent twice).
+// - Paused (M1-10b-e): after the agent's own earlier claim is checked, the faucet wallet's balance
+//   is read; below one grant the claim is `paused`, before any charge, and nothing is sent.
 // - A lost broadcast answer is recorded with its transaction hash; a retry by the same agent inside
 //   the window returns that transaction, sends nothing and charges nothing.
 // - Storage: `a:<agent>` [claim time, state, txHash?], `i:<HMAC of the IP bucket>` [day, count],
@@ -21,7 +23,9 @@ export type ClaimAnswer =
       readonly error: 'already_claimed' | 'rate_limited' | 'daily_cap_reached';
       readonly retryAfter: number;
     }
-  | { readonly ok: false; readonly error: 'unavailable' };
+  | { readonly ok: false; readonly error: 'unavailable' }
+  /** The faucet cannot cover one grant (M1-10b-e); nothing was sent or charged. */
+  | { readonly ok: false; readonly error: 'paused' };
 
 /** The storage calls a claim needs; a Durable Object's storage has them. */
 export interface ClaimStore {
@@ -56,6 +60,7 @@ export type AgentClaim = number | [number, 'p' | 's' | 'n'] | [number, 'u', Hex]
 
 const TX_HASH = /^0x[0-9a-f]{64}$/;
 const UNAVAILABLE: ClaimAnswer = Object.freeze({ ok: false, error: 'unavailable' });
+const PAUSED: ClaimAnswer = Object.freeze({ ok: false, error: 'paused' });
 
 /** The claim time of a stored entry that counts as a claim, else null. */
 export function claimTime(entry: unknown): number | null {
@@ -95,6 +100,15 @@ export async function runClaim(
     const retryAfter = Math.max(1, claimedAt + limits.agentWindowSeconds - now);
     return { ok: false, error: 'already_claimed', retryAfter };
   }
+  // M1-10b-e: a faucet that cannot cover one grant pauses before its wallet is empty. Checked
+  // before the caps, so a paused claim charges nothing; a failed read sends and charges nothing.
+  let tokenUsdCents: bigint;
+  try {
+    tokenUsdCents = (await port.balances()).tokenUsdCents;
+  } catch {
+    return UNAVAILABLE;
+  }
+  if (tokenUsdCents < BigInt(limits.usdCents)) return PAUSED;
   const global = await store.get<DayCount>('g');
   const used = global && global[0] === day ? global[1] : 0;
   if (used >= limits.dailyCap) {

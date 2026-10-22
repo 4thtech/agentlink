@@ -823,7 +823,7 @@ describe('results (06 §1 rule 3, §2.5)', () => {
       status: 'pending_approval',
       summary: 'This needs your approval.',
       approvalId: APPROVAL,
-      nextStep: `Run agentlink approve ${APPROVAL} in your own terminal.`,
+      nextStep: `Run agentlink approve ${APPROVAL} in your own terminal. To check the decision, call agentlink_get_approval.`,
     });
   });
 

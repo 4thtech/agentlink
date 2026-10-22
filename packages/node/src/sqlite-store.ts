@@ -385,10 +385,17 @@ export class SqliteStore implements Store {
    * Test seam (IR-M1-8b-1 L-1): reads one of the connection's settings. The connection itself is
    * private, and the package hands out only a frozen facade (agent-store.ts), never this instance.
    */
-  static readSetting(store: SqliteStore, name: 'journal_mode' | 'synchronous'): unknown {
-    return store.#db.pragma(name === 'journal_mode' ? 'journal_mode' : 'synchronous', {
-      simple: true,
-    });
+  static readSetting(
+    store: SqliteStore,
+    name: 'journal_mode' | 'synchronous' | 'secure_delete',
+  ): unknown {
+    const pragma =
+      name === 'journal_mode'
+        ? 'journal_mode'
+        : name === 'synchronous'
+          ? 'synchronous'
+          : 'secure_delete';
+    return store.#db.pragma(pragma, { simple: true });
   }
 
   /** The schema version of this store's data (07 §3.7), after its forward migrations ran. */
@@ -430,6 +437,11 @@ export class SqliteStore implements Store {
       });
       db.pragma('synchronous = FULL');
       db.pragma('trusted_schema = OFF');
+      // M1-7f-2 (04 §4 crypto-shredding): deleted content, a file key among it, is overwritten with
+      // zeros instead of staying in free pages of the file.
+      if (Number(db.pragma('secure_delete = ON', { simple: true })) !== 1) {
+        throw new NodeStoreError('store_failed');
+      }
       store.#schemaVersion = await store.#migrate(migrations);
       verifySchema(db);
       db.pragma(`busy_timeout = ${STATEMENT_BUSY_MS}`);

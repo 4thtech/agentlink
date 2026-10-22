@@ -19,6 +19,9 @@ const deps = {
   portFor: (_env: unknown, chainId: number) => fakeChains.get(chainId) ?? null,
   faucetFor: (_env: unknown, chainId: number) => fakeFaucets.get(chainId) ?? null,
   pollMs: 3_600_000,
+  // `/v1/health` reads the fakes' balances afresh on every request (M1-10b-e), so a test that
+  // changes a balance sees it on the next read.
+  balanceCacheMs: 0,
 };
 
 export default createSubmitterWorker(deps);

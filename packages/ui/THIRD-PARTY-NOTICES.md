@@ -12,7 +12,7 @@ The fonts are served from the package itself (first-party woff2 files through `t
 
 ## Lucide (icons)
 
-Lucide-derived icon paths are not used in this package yet. This notice ships before any Lucide path is copied in, as the D1 manifest requires (`docs/design/d1/MANIFEST.md`); the card that copies a path confirms which icons are Lucide.
+Thirty-six of the icons in `src/components/icon-data.ts` are Lucide-derived (the ISC notice below applies to them). The other 21 are AgentLink's own (`docs/design/brand/icons/ui/`, listed as `CUSTOM_ICONS` in the same file). The Lucide icons are: check, x, copy, clock, triangle-alert, info, file, folder, search, settings, chevron-right, chevron-down, pause, play, refresh-cw, download, printer, user-plus, ban, plus, terminal, inbox, activity, users, hard-drive, sliders-horizontal, wifi-off, ellipsis, circle, circle-alert, external-link, arrow-right, key-round, life-buoy, minus, eye-off. The paths are copied into the package as data; no Lucide package is a dependency.
 
 ISC License
 
