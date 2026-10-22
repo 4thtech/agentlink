@@ -46,6 +46,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `packages/storage/**` | S1 | Storage credentials, presigned URLs, OAuth tokens, SSRF (the drop adapter's request signing → S2) |
 | `packages/types/**` | S1 | Inbound validation schemas (envelope, payload, policy schema changes → S2) |
 | `packages/ui/**` | S1 | Approval and policy UI; runs inside the console origin |
+| `apps/local-ui/**` | S1 | Local owner UI; the browser never signs; presence is enforced server-side (proposed, owner confirms at merge; D-118) |
 | `apps/cli/**` | S1 | MCP tool surface, files, inbound content (owner operations → S2) |
 | `apps/console/**` | S2 | Generates and holds the owner seed; signs approvals and policies |
 | `apps/cloud-agent/**` | S2 | Generates and holds agent seeds; OAuth owner proof |

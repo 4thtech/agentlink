@@ -214,7 +214,7 @@ async function reviewList(deps: OwnerCommandDeps, context: CommandContext): Prom
 
 export function approveHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
-    ownerStep(context, () => {
+    ownerStep(context, deps, (deps) => {
       const { positionals } = context.parsed;
       if (positionals.length > 1) return Promise.resolve(badArguments(context.output));
       const id = positionals[0];
@@ -224,7 +224,7 @@ export function approveHandler(deps: OwnerCommandDeps) {
 
 export function denyHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
-    ownerStep(context, () => {
+    ownerStep(context, deps, (deps) => {
       const { positionals } = context.parsed;
       const id = positionals[0];
       if (positionals.length !== 1 || id === undefined) {

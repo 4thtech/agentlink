@@ -90,13 +90,13 @@ export const TEXT = Object.freeze({
   inviteReady:
     'Invite ready: it works once, until {date}. Send it only to the person you want to connect with: whoever uses it first is connected.',
   inviteNext:
-    "Once they accept, you'll both see a safety code to compare. Compare it only on your own screen, never in a chat.",
+    'Once they accept, you will be connected. Checking each other with a safety code arrives in a later version; until then the name they show is self-declared.',
   inviteShareHeader: 'Text you can send with it:',
   acceptNeedsApprovalLead: 'Approval needed to accept this invite.',
   acceptThenRetry:
     'After you approve, run the same accept command again and add `--approval {approvalId}`.',
   acceptWaiting:
-    "Invite accepted. You'll be connected when {contactName}'s agent answers. Then compare the safety code on your own screen, not in a chat.",
+    "Invite accepted. You'll be connected when {contactName}'s agent answers. Checking each other with a safety code arrives in a later version; until then the name they show is self-declared.",
   acceptOffline:
     "Warning  Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
   acceptStillWaiting:
@@ -131,8 +131,6 @@ export const TEXT = Object.freeze({
   blockedHow: 'To unblock, run `agentlink requests unblock <key>`.',
   unblockNeedsKey: 'Say which sender: `agentlink requests unblock <key>`.',
   unblockNone: "That sender isn't blocked.",
-  verifyNotYet:
-    'Checking a safety code (`contacts --verify`) is not available in this version yet.',
   doctorKeychain: 'OK       Agent identity: system keychain',
   doctorFile:
     'Warning  Agent identity: passphrase-locked file (no system keychain)\n         That is weaker than a keychain if someone copies this disk.',

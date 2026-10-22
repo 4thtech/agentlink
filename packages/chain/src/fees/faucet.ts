@@ -126,6 +126,19 @@ export interface FaucetChain {
    * request.
    */
   credit(agent: Hex, usdCents: number): Promise<FaucetCredit>;
+  /**
+   * The faucet wallet's balances (public on-chain; M1-10b-e). Reads only; signs and sends nothing.
+   * Rejects with a ChainError (fixed text, no URL) when the RPC is unreachable or on another chain.
+   */
+  balances(): Promise<FaucetBalances>;
+}
+
+/** The faucet wallet's balances (M1-10b-e). */
+export interface FaucetBalances {
+  /** The native coin, in wei: the faucet's own gas (and, on a native fee-token chain, its credits). */
+  readonly nativeWei: bigint;
+  /** The fee token the faucet credits, in whole US cents, rounded down. */
+  readonly tokenUsdCents: bigint;
 }
 
 export interface FaucetChainOptions {
@@ -431,5 +444,23 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
     }
   };
 
-  return Object.freeze({ chainId, faucetAddress, credit });
+  const balances = async (): Promise<FaucetBalances> => {
+    try {
+      if (!chainChecked) {
+        if ((await readQuantity('eth_chainId', [])) !== BigInt(chainId)) {
+          throw new NotSent('unavailable');
+        }
+        chainChecked = true;
+      }
+      const nativeWei = await readQuantity('eth_getBalance', [faucetAddress, 'latest']);
+      const token =
+        tokenAddress === undefined ? nativeWei : await erc20Read('balanceOf', [faucetAddress]);
+      return Object.freeze({ nativeWei, tokenUsdCents: token / unit });
+    } catch {
+      // Fixed text: never an RPC URL, a server message or a cause.
+      throw new ChainError('rpc_unavailable');
+    }
+  };
+
+  return Object.freeze({ chainId, faucetAddress, credit, balances });
 }

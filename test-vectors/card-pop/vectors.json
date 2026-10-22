@@ -1,0 +1,2364 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "card-pop",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
+    "version": "cpython 3.13.11",
+    "script": "tools/vectors/generate_card_pop.py"
+  },
+  "cases": [
+    {
+      "id": "message-base",
+      "source": "04 \u00a72.9 (D-102): taggedHash(\"agentlink/card-pop/v1\", sha256(JCS(card))); the card hash of 04 \u00a73.6",
+      "input": {
+        "op": "cardPopMessage",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        }
+      },
+      "expected": {
+        "tag": "agentlink/card-pop/v1",
+        "cardHash": "b372c59318d6cc84129d267361d17c3ef8a9c9fd92faf6f77420d410815a62ac",
+        "message": "4154d49b16ba03b5c208aea16ff46c94da020a29b4e262ccca89056431879277"
+      }
+    },
+    {
+      "id": "message-key-epoch",
+      "source": "04 \u00a72.9 (D-102): taggedHash(\"agentlink/card-pop/v1\", sha256(JCS(card))); the card hash of 04 \u00a73.6",
+      "input": {
+        "op": "cardPopMessage",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        }
+      },
+      "expected": {
+        "tag": "agentlink/card-pop/v1",
+        "cardHash": "d134877fadfec7d49662733b4cefea9ab0ce80f8c0ac539675211b3fa1849221",
+        "message": "68e5e1ed7ff767d96598344465c375ccece2dd4ce83a970621c7fffa3b1176b7"
+      }
+    },
+    {
+      "id": "message-expires-at",
+      "source": "04 \u00a72.9 (D-102): taggedHash(\"agentlink/card-pop/v1\", sha256(JCS(card))); the card hash of 04 \u00a73.6",
+      "input": {
+        "op": "cardPopMessage",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        }
+      },
+      "expected": {
+        "tag": "agentlink/card-pop/v1",
+        "cardHash": "d0a6c48b1f24a21aaf9482f4854348b07d3db54d9c9fab939b2bd07f2eac2c69",
+        "message": "3eea2234677b69c56494de27ab8c89201ddcd4b9dcec10cbbed19c2f176c5e5d"
+      }
+    },
+    {
+      "id": "sign-base",
+      "source": "04 \u00a72.9 (D-102): BIP-340 by agentNostr over the card-pop message, auxRand fixed for the vector",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "1975b3f28e69d1403073a699336c7e2fb3e53e1ccbf80970faaf4cbdbb97da68",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      }
+    },
+    {
+      "id": "sign-base-other-aux",
+      "source": "04 \u00a72.9 (D-102): BIP-340 by agentNostr over the card-pop message, auxRand fixed for the vector",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "1975b3f28e69d1403073a699336c7e2fb3e53e1ccbf80970faaf4cbdbb97da68",
+        "auxRand": "88ba93b1eaa61f8b53d1920833987c0e96a942e7679e09644d813c8d7103fc03"
+      },
+      "expected": {
+        "cardPop": "6ee6b42a70c78075e6bdc97f4aa2d896f4c5dcbeb09e336bb731a991bcf1b5500445d903b86d4b82f9a7491e521ab22b9774961f5a6a4697a0dd637c0fe01f8f"
+      }
+    },
+    {
+      "id": "sign-key-epoch",
+      "source": "04 \u00a72.9 (D-102): BIP-340 by agentNostr over the card-pop message, auxRand fixed for the vector",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "secretKey": "220624427b5fb743f2e9a48b5f3ebed581a0052a3ccae149c6fe2150fc757bdf",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "cardPop": "809f8b19c23c334aa0a301116b8e81b86bac2a26e9ea6eb978708b79f240ca033a48bf15c4f5ca718563b1293659c01610c36cebf2fcb55d15e78d97972c4402"
+      }
+    },
+    {
+      "id": "sign-expires-at",
+      "source": "04 \u00a72.9 (D-102): BIP-340 by agentNostr over the card-pop message, auxRand fixed for the vector",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "secretKey": "1975b3f28e69d1403073a699336c7e2fb3e53e1ccbf80970faaf4cbdbb97da68",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "cardPop": "21bb4a9722023a038f3feea20a52a74ac00683d64167248d84683ae0e9c616713f14ccb93c706ddcbd63a80d258178ee29a14dfaaca8b04a8bdf934d34d6634d"
+      }
+    },
+    {
+      "id": "sign-agent",
+      "source": "04 \u00a72.9 (D-102): BIP-340 by agentNostr over the card-pop message, auxRand fixed for the vector",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x2daeb5d8ceadc0e960da67ab879483401843d126",
+          "agentNostr": "0xbb2534817e2656d82f2a320f3042a732a82633311726c1d66c368e88b43884e2",
+          "agentEnc": "0x33bbd022fe7986cbeeb421a1399e8a2aa0299f2d3d65d42b945290027aa87759",
+          "ownerEvm": "0xcdf3e14d1d750183ef28f182a18f62e7f62205ef",
+          "ownerNostr": "0x0a12cb75f2253ab5f1b0ae2305cd147458f90d8e28acdc02653b5f088d8cc642",
+          "ownerEnc": "0xb108fed39b2f605ed3e065797a0c343d96019e1cd104d36aa9089f3a5b254a62",
+          "nameHash": "0xa430e49a6bbe5e18d043edfd1ba3560a10b179c94e46922c975270f8c98a9653",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "00c0c33fe2a7a7a9d98cea36c1f19eba12bcbfd9db573afdfbb3b4bd9508549e",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "cardPop": "4060a1d2e523b5797d39ebb7d83e6941c608790bed879634b32726e13ace88bdd824999b273aed01887e903101935e368712773a202326efe72559d5a6ec0e55"
+      }
+    },
+    {
+      "id": "sign-reject-owner-nostr-key",
+      "source": "04 \u00a72.9 (D-102): refused: the owner's Nostr key is not the card's agentNostr",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "86ac5d96bbf779ea7e6b9cf6865590fb23c10a48914c08bc3ac8b24684a7556a",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-reject-previous-epoch-key",
+      "source": "04 \u00a72.9 (D-102): refused: the epoch-0 Nostr key for the epoch-1 card",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "secretKey": "1975b3f28e69d1403073a699336c7e2fb3e53e1ccbf80970faaf4cbdbb97da68",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-reject-evm-key",
+      "source": "04 \u00a72.9 (D-102): refused: the agent EVM key is not the card's agentNostr",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "d8b8a589587087e751f6dae9d2114ecabcb47c20ffd82805b2adc08e0c73de7f",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-reject-agent-equals-owner",
+      "source": "04 \u00a72.9 (D-102): refused: a card whose agentEvm equals its ownerEvm (04 \u00a72.9)",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "1975b3f28e69d1403073a699336c7e2fb3e53e1ccbf80970faaf4cbdbb97da68",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-reject-upper-case-card",
+      "source": "04 \u00a72.9 (D-102): refused: a card with an upper-case agentNostr (04 \u00a72.4.1)",
+      "input": {
+        "op": "signCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64EB6179C58EFE67426A19260500FA23FADF02BE4BAED19E3AEDEA4D5934FA6E",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "secretKey": "1975b3f28e69d1403073a699336c7e2fb3e53e1ccbf80970faaf4cbdbb97da68",
+        "auxRand": "3480b6f043bb936211518752b26413cc09cb0fff3d05f0e39a249426d1ad5b5d"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-valid-base",
+      "source": "04 \u00a72.9 (D-102): cardPop by this card's agentNostr over this card",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "pop-valid-base-other-aux",
+      "source": "04 \u00a72.9 (D-102): cardPop by this card's agentNostr over this card",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "6ee6b42a70c78075e6bdc97f4aa2d896f4c5dcbeb09e336bb731a991bcf1b5500445d903b86d4b82f9a7491e521ab22b9774961f5a6a4697a0dd637c0fe01f8f"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "pop-valid-key-epoch",
+      "source": "04 \u00a72.9 (D-102): cardPop by this card's agentNostr over this card",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardPop": "809f8b19c23c334aa0a301116b8e81b86bac2a26e9ea6eb978708b79f240ca033a48bf15c4f5ca718563b1293659c01610c36cebf2fcb55d15e78d97972c4402"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "pop-valid-agent",
+      "source": "04 \u00a72.9 (D-102): cardPop by this card's agentNostr over this card",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x2daeb5d8ceadc0e960da67ab879483401843d126",
+          "agentNostr": "0xbb2534817e2656d82f2a320f3042a732a82633311726c1d66c368e88b43884e2",
+          "agentEnc": "0x33bbd022fe7986cbeeb421a1399e8a2aa0299f2d3d65d42b945290027aa87759",
+          "ownerEvm": "0xcdf3e14d1d750183ef28f182a18f62e7f62205ef",
+          "ownerNostr": "0x0a12cb75f2253ab5f1b0ae2305cd147458f90d8e28acdc02653b5f088d8cc642",
+          "ownerEnc": "0xb108fed39b2f605ed3e065797a0c343d96019e1cd104d36aa9089f3a5b254a62",
+          "nameHash": "0xa430e49a6bbe5e18d043edfd1ba3560a10b179c94e46922c975270f8c98a9653",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "4060a1d2e523b5797d39ebb7d83e6941c608790bed879634b32726e13ace88bdd824999b273aed01887e903101935e368712773a202326efe72559d5a6ec0e55"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "pop-replay-key-epoch",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to another key epoch with the rotated keys (04 \u00a72.6)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-key-epoch-only",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to the same keys with only keyEpoch changed",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-owner",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to the same agent keys under another owner",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0x2fb1533d269cf1e2bbfe61e1a775c2c03a992c00",
+          "ownerNostr": "0x3857521a14427bb202d063f3a35e9fcb7cbeb0814c6f6c5a50ec2d95a6394b53",
+          "ownerEnc": "0x5f9cc41d2567663e1244e4f3f5779773a76e9c2b4d8d198e99487043eed7e176",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-display-name",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to another display name (nameHash)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x4ca9a91ff2a2b4c428b1d8a29eec7565d1a5e7617c2185274ea25bf3ef03ae51",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-relays",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to another relay list (relaysHash)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-issued-at",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to another issuedAt",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000001,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-expires-at",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to another expiresAt",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-agent",
+      "source": "04 \u00a72.9 (D-102) Replay: the base card's cardPop moved to another agent's card",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x2daeb5d8ceadc0e960da67ab879483401843d126",
+          "agentNostr": "0xbb2534817e2656d82f2a320f3042a732a82633311726c1d66c368e88b43884e2",
+          "agentEnc": "0x33bbd022fe7986cbeeb421a1399e8a2aa0299f2d3d65d42b945290027aa87759",
+          "ownerEvm": "0xcdf3e14d1d750183ef28f182a18f62e7f62205ef",
+          "ownerNostr": "0x0a12cb75f2253ab5f1b0ae2305cd147458f90d8e28acdc02653b5f088d8cc642",
+          "ownerEnc": "0xb108fed39b2f605ed3e065797a0c343d96019e1cd104d36aa9089f3a5b254a62",
+          "nameHash": "0xa430e49a6bbe5e18d043edfd1ba3560a10b179c94e46922c975270f8c98a9653",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-replay-key-epoch-back",
+      "source": "04 \u00a72.9 (D-102) Replay: the epoch-1 card's cardPop moved back to the epoch-0 card",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "809f8b19c23c334aa0a301116b8e81b86bac2a26e9ea6eb978708b79f240ca033a48bf15c4f5ca718563b1293659c01610c36cebf2fcb55d15e78d97972c4402"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-previous-epoch-key",
+      "source": "04 \u00a72.9 (D-102): the epoch-1 card signed by the epoch-0 Nostr key, which the card does not name",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardPop": "fa534f345d54c8ff558ced8b76e1534fee8dbd15c0abf7d4c57ceb7ceb6b027225d7cc73a4148244ff305b724cf7f9909b601ef13eb8666fd8d7f1d21102b5cc"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-owner-nostr-key",
+      "source": "04 \u00a72.9 (D-102): a BIP-340 signature by the owner's Nostr key instead of agentNostr",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "1aab28d75e22518e3ea5019eefa37402271d875e2db444d5c97e9b50394cbfbd656d4443ddbb5b40efd16795f7623d56a0e13d968903c8ca2335b1ae981c2611"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-envelope-tag",
+      "source": "04 \u00a72.9 (D-102): a BIP-340 signature by the envelope tag agentlink/envelope/v1 (04 \u00a73.1)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "76a692c05db0396b4f97ad48807e6ab3d9df2e4b91475411142d51711bd48a1578e0bd2f49de0540f0c08e289476c65d7a1fb4417515402fae44a8bef4139594"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-owner-action-tag",
+      "source": "04 \u00a72.9 (D-102): a BIP-340 signature by the owner-action tag agentlink/owner-action/v1 (04 \u00a72.5.1)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "8c373657fb2ab6865b254e157d666397fda013ab8088f873167a2ec0a75ede1494ec33d27288c845a99a13c3ee8c2fb2fe52df8fd896ef80e9930ba41f44b1c1"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-untagged",
+      "source": "04 \u00a72.9 (D-102): a BIP-340 signature by the untagged card hash sha256(JCS(card))",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "786a8638fcf5bb06130756ab69f7fe9633682005ac10d145d66dbcee5d3b8aef2145830f2c96778df83e1f66713b7b84920c951c982612624001b04fadb5c0b7"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-tag-over-jcs",
+      "source": "04 \u00a72.9 (D-102): a BIP-340 signature by the tag over the JCS bytes, not their hash",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "0fb313992c52df822d6594c8a4bd66202810acb675bd487f1f2a33296aff1578fb0911991042f2413afec3eabb39ebfedd80a1e8d59b6b76e5ee0a74250f38c5"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-reject-eip712-digest",
+      "source": "04 \u00a72.9 (D-102): a BIP-340 signature by the card's EIP-712 digest",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9ef7dcd39dba1238f40bf3b67748f070c562ea2f64aeecc24ee20665c1850c03a7cf923fe63c32c361d74ccde70527a050548554b2ee57b2f9c03c7d606557f9"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-upper-case",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as upper-case hex",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9E8501FF495772BC85000ED30F55F8B997844DC0DF87A46A6A5BE745B1334C473BCD9C75D16F60EE376D5B9AF9EF024362ED388B694EDAFCC25222484092EAFB"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-prefixed-0x",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as a 0x prefix",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "0x9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-short",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as 63 bytes",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092ea"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-long",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as 65 bytes",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb00"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-empty",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as an empty string",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": ""
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-number",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as a JSON number",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": 1
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-null",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as null",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": null
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-array",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as an array",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": [
+          "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        ]
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-card-agent-sig",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as the card's cardAgentSig in the cardPop field",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-r-equals-p",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as r = p (BIP-340: r must be below the field size)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f3bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-s-equals-n",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as s = n (BIP-340: s must be below the group order)",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c47fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-malformed-flipped-bit",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4.1 (bare 128 hex): cardPop as the last bit flipped",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafa"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-card-reject-agent-equals-owner",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4: a card with agentEvm equals ownerEvm (04 \u00a72.9) is refused before any signature check",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "c3e1b770f16934485a9a6ba594e6134764dc2033cf2a45051fef93bcab98e3673b756e2cbf8dd38be8df0b077349e9e5743ea6f75932f3ca42986a9017b4c713"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-card-reject-extra-field",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4: a card with a thirteenth field is refused before any signature check",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0,
+          "extra": 1
+        },
+        "cardPop": "b7c8dfd3f5e4ae6b5cf1db0720a11988d405ef274b179cc62220dcab324b9ced0a1623c6a19367f323ca875eeb435776771da2d9756bf164ceaf0c87a2dff1da"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-card-reject-version-2",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4: a card with version 2 is refused before any signature check",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 2,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "41af566d3b18f77f854d26d96001b14fc0df3dff56c42bdc8a115462fe909195df62f6fa784cf179b541365629154b33151799d3bc89fa0a9d1952f128cac8e3"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "pop-card-reject-upper-case-owner",
+      "source": "04 \u00a72.9 (D-102), 04 \u00a72.4: a card with an upper-case ownerEvm is refused before any signature check",
+      "input": {
+        "op": "verifyCardPop",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xBD441D8D5891FB48C6FF9F59B0FCCFF178C50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "77615341befa0fedfb2dd853a5a6083b5e65d1642f366c57d1814b5bdd6ba5f0790c1ea6eaa650ebe6d3fa200fb911ba5d8667068ca33cf80425597df5e45294"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-valid-base",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): both signatures over this card",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "possession-valid-key-epoch",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): both over the epoch-1 card (the EVM key is the same at every epoch)",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardAgentSig": "0xe4155129a5cafe92d9ed7755a60e1b7c72d9934773d3e75c7670788b6288dc173204cfb1f496400d1622e31ba5ebe022ef44aa97a7016deb42410e96709696c71b",
+        "cardPop": "809f8b19c23c334aa0a301116b8e81b86bac2a26e9ea6eb978708b79f240ca033a48bf15c4f5ca718563b1293659c01610c36cebf2fcb55d15e78d97972c4402"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "possession-valid-agent",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): another agent's own pair",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x2daeb5d8ceadc0e960da67ab879483401843d126",
+          "agentNostr": "0xbb2534817e2656d82f2a320f3042a732a82633311726c1d66c368e88b43884e2",
+          "agentEnc": "0x33bbd022fe7986cbeeb421a1399e8a2aa0299f2d3d65d42b945290027aa87759",
+          "ownerEvm": "0xcdf3e14d1d750183ef28f182a18f62e7f62205ef",
+          "ownerNostr": "0x0a12cb75f2253ab5f1b0ae2305cd147458f90d8e28acdc02653b5f088d8cc642",
+          "ownerEnc": "0xb108fed39b2f605ed3e065797a0c343d96019e1cd104d36aa9089f3a5b254a62",
+          "nameHash": "0xa430e49a6bbe5e18d043edfd1ba3560a10b179c94e46922c975270f8c98a9653",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x325976dad3a2ad92bb8fea36ea3b870aa7ca83dbcfed1af62f763ed1f0731ac21baeee7c38f700f32c406dd378d7a47b24697663a5509b2fa4d4026f08859d5f1c",
+        "cardPop": "4060a1d2e523b5797d39ebb7d83e6941c608790bed879634b32726e13ace88bdd824999b273aed01887e903101935e368712773a202326efe72559d5a6ec0e55"
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "possession-missing-card-pop",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): cardAgentSig without cardPop",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-missing-card-agent-sig",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): cardPop without cardAgentSig",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-missing-both",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): neither signature",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-crossed-epoch-pop",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): cardAgentSig for this card, cardPop from the epoch-1 card",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "809f8b19c23c334aa0a301116b8e81b86bac2a26e9ea6eb978708b79f240ca033a48bf15c4f5ca718563b1293659c01610c36cebf2fcb55d15e78d97972c4402"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-crossed-epoch-agent-sig",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): cardPop for this card, cardAgentSig from the epoch-1 card",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0xe4155129a5cafe92d9ed7755a60e1b7c72d9934773d3e75c7670788b6288dc173204cfb1f496400d1622e31ba5ebe022ef44aa97a7016deb42410e96709696c71b",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-crossed-agent",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): cardAgentSig for this card, cardPop from another agent's card",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "4060a1d2e523b5797d39ebb7d83e6941c608790bed879634b32726e13ace88bdd824999b273aed01887e903101935e368712773a202326efe72559d5a6ec0e55"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-swapped-fields",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the two signatures in each other's fields",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb",
+        "cardPop": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-owner-sig-as-agent-sig",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the owner's cardSig as cardAgentSig (05 \u00a74)",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-key-epoch",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to another key epoch with the rotated keys (04 \u00a72.6)",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x9f680f9d28e143ca2746dfc97daa49e297586026da45a25a5c51ad5ad029d882",
+          "agentEnc": "0x93b8631f5ab3d97bb8baffd48c35d8e64722f74b7f06fdaa43c1c2e52f5c482c",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-key-epoch-only",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to the same keys with only keyEpoch changed",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 1
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-owner",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to the same agent keys under another owner",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0x2fb1533d269cf1e2bbfe61e1a775c2c03a992c00",
+          "ownerNostr": "0x3857521a14427bb202d063f3a35e9fcb7cbeb0814c6f6c5a50ec2d95a6394b53",
+          "ownerEnc": "0x5f9cc41d2567663e1244e4f3f5779773a76e9c2b4d8d198e99487043eed7e176",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-display-name",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to another display name (nameHash)",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x4ca9a91ff2a2b4c428b1d8a29eec7565d1a5e7617c2185274ea25bf3ef03ae51",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-relays",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to another relay list (relaysHash)",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0xc60d3a113f82b977fb5ba83503e44038127a84415fb21af98beec8b612b3f358",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-issued-at",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to another issuedAt",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000001,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-expires-at",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to another expiresAt",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+          "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+          "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+          "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+          "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+          "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 1791536000,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "possession-replay-agent",
+      "source": "04 \u00a72.9 (D-102), 07 \u00a78 signer (D-102): the base pair moved to another agent's card",
+      "input": {
+        "op": "verifyCardPossession",
+        "card": {
+          "version": 1,
+          "agentEvm": "0x2daeb5d8ceadc0e960da67ab879483401843d126",
+          "agentNostr": "0xbb2534817e2656d82f2a320f3042a732a82633311726c1d66c368e88b43884e2",
+          "agentEnc": "0x33bbd022fe7986cbeeb421a1399e8a2aa0299f2d3d65d42b945290027aa87759",
+          "ownerEvm": "0xcdf3e14d1d750183ef28f182a18f62e7f62205ef",
+          "ownerNostr": "0x0a12cb75f2253ab5f1b0ae2305cd147458f90d8e28acdc02653b5f088d8cc642",
+          "ownerEnc": "0xb108fed39b2f605ed3e065797a0c343d96019e1cd104d36aa9089f3a5b254a62",
+          "nameHash": "0xa430e49a6bbe5e18d043edfd1ba3560a10b179c94e46922c975270f8c98a9653",
+          "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+          "issuedAt": 1760000000,
+          "expiresAt": 0,
+          "keyEpoch": 0
+        },
+        "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+        "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-accept-both",
+      "source": "07 \u00a78 signer (D-102): agentCard with cardAgentSig and cardPop; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "signer-accept-neither",
+      "source": "07 \u00a78 signer (D-102): agentCard without them (a pack stays record_only, card_pop_missing); any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "signer-accept-evm-only",
+      "source": "07 \u00a78 signer (D-102): evm only; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "signer-reject-only-card-agent-sig",
+      "source": "07 \u00a78 signer (D-102): cardAgentSig without cardPop; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-only-card-pop",
+      "source": "07 \u00a78 signer (D-102): cardPop without cardAgentSig; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-without-card",
+      "source": "07 \u00a78 signer (D-102): both without agentCard; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-pop-upper-case",
+      "source": "07 \u00a78 signer (D-102): cardPop in upper case; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9E8501FF495772BC85000ED30F55F8B997844DC0DF87A46A6A5BE745B1334C473BCD9C75D16F60EE376D5B9AF9EF024362ED388B694EDAFCC25222484092EAFB"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-pop-prefixed-0x",
+      "source": "07 \u00a78 signer (D-102): cardPop with 0x; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "0x9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-pop-short",
+      "source": "07 \u00a78 signer (D-102): cardPop of 63 bytes; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092ea"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-pop-null",
+      "source": "07 \u00a78 signer (D-102): cardPop null; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": null
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-agent-sig-bare",
+      "source": "07 \u00a78 signer (D-102): cardAgentSig without 0x; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-agent-sig-high-s",
+      "source": "07 \u00a78 signer (D-102): cardAgentSig in its high-s form (04 \u00a72.4.1); any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0fed6d1c35ba8ea2d4d4061b09f193994f117cb3a4c582139ad55fde476b4498211b",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-agent-sig-v-0",
+      "source": "07 \u00a78 signer (D-102): cardAgentSig with v = 0; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a92001",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "signer-reject-extra-key",
+      "source": "07 \u00a78 signer (D-102): an unknown key next to the signatures; any other combination is malformed_pack",
+      "input": {
+        "op": "signerShape",
+        "signer": {
+          "evm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+          "agentCard": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb",
+          "cardPops": [
+            "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-update-accept-both",
+      "source": "04 \u00a73.4.1 card-update (D-102): cardAgentSig and cardPop; together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ],
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "card-update-accept-neither",
+      "source": "04 \u00a73.4.1 card-update (D-102): neither (a peer before M1-4d-d); together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "card-update-reject-only-card-agent-sig",
+      "source": "04 \u00a73.4.1 card-update (D-102): cardAgentSig without cardPop; together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ],
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-update-reject-only-card-pop",
+      "source": "04 \u00a73.4.1 card-update (D-102): cardPop without cardAgentSig; together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ],
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-update-reject-pop-upper-case",
+      "source": "04 \u00a73.4.1 card-update (D-102): cardPop in upper case; together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ],
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9E8501FF495772BC85000ED30F55F8B997844DC0DF87A46A6A5BE745B1334C473BCD9C75D16F60EE376D5B9AF9EF024362ED388B694EDAFCC25222484092EAFB"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-update-reject-pop-long",
+      "source": "04 \u00a73.4.1 card-update (D-102): cardPop of 65 bytes; together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ],
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0f1292e3ca45715d2b2bf9e4f60e6c66afa9322941e9c68ca0ea72804564f1a9201c",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb00"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-update-reject-agent-sig-high-s",
+      "source": "04 \u00a73.4.1 card-update (D-102): cardAgentSig in its high-s form; together or not at all",
+      "input": {
+        "op": "cardUpdateShape",
+        "body": {
+          "card": {
+            "version": 1,
+            "agentEvm": "0x73743a88b359c9fe14f34617813ca94a15d40a66",
+            "agentNostr": "0x64eb6179c58efe67426a19260500fa23fadf02be4baed19e3aedea4d5934fa6e",
+            "agentEnc": "0x6f5e04654438523d8c89b1e66665a4d46b757276575db7a320071b9e9a570a55",
+            "ownerEvm": "0xbd441d8d5891fb48c6ff9f59b0fccff178c50906",
+            "ownerNostr": "0x3ea342cb9ed11844e267dd3f65164bde144f75b7e196af6c136953bade4b2145",
+            "ownerEnc": "0x8fdd604afbb021652c97c7cb96139eb411a84663dda6b84e51e77664dcfbfe26",
+            "nameHash": "0x6a41b055edd23646c48e9696292b55690f95f8c7b8e699d5a41e90d47f2b5134",
+            "relaysHash": "0x47f550449425f99b9e948ac8b620c0550c4b566efd402e266c8bc0811b7479c7",
+            "issuedAt": 1760000000,
+            "expiresAt": 0,
+            "keyEpoch": 0
+          },
+          "cardSig": "0xbf6828617d49d9dd3dd262a23c346e366971d5e22ff248d1db0f436cac71e15250cc6669ac90d0817832b320a2c2704fc8828be60c92376e596c7d0a4d842a041c",
+          "name": "Alice's agent",
+          "relays": [
+            "wss://relay.example.com",
+            "wss://relay.example.net"
+          ],
+          "cardAgentSig": "0x5f8228d000fee8fc4572d1dc277dd70b3c3b40e21dbc73e2a15a5b53320e0b0fed6d1c35ba8ea2d4d4061b09f193994f117cb3a4c582139ad55fde476b4498211b",
+          "cardPop": "9e8501ff495772bc85000ed30f55f8b997844dc0df87a46a6a5be745b1334c473bcd9c75d16f60ee376d5b9af9ef024362ed388b694edafcc25222484092eafb"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    }
+  ]
+}

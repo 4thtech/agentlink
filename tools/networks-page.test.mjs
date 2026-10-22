@@ -64,10 +64,11 @@ describe('networks-and-contracts page', () => {
     }
   });
 
-  it('shows Chiado as live with its deploy transactions and a pending smoke test', () => {
+  it('shows Chiado as live with its deploy transactions and a passed smoke test', () => {
     expect(page).toMatch(/\| Gnosis Chiado[^\n]*Live/);
     expect(page).not.toMatch(/\| Gnosis Chiado[^\n]*planned/i);
-    expect(page).toMatch(/smoke test pending/i);
+    expect(page).toMatch(/smoke test passed/i);
+    expect(page).not.toMatch(/smoke test pending/i);
     const hashes = page.match(/gnosis-chiado\.blockscout\.com\/tx\/0x[0-9a-f]{64}\b/g) ?? [];
     expect(new Set(hashes).size).toBe(3);
   });

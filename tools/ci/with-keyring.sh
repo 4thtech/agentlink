@@ -20,6 +20,12 @@
 # - if it ends before the command does, a ::warning:: says how (exit status or signal) and shows the
 #   end of its output, so the cause stays visible.
 #
+# CHORE-CI-HARDEN-1: the daemon is also supervised. A watchdog starts it again within 0.2 s of its
+# end, on the same folders (unless D-Bus already started a replacement), and counts the restarts. A
+# health probe (wait-for-keyring.sh) runs before the command. If the command fails after the
+# daemon ended, the failure is reported as "runner keychain unavailable", so a keyring problem is
+# never mistaken for a product bug and a test never passes because the keyring was missing.
+#
 # The keyring holds throwaway test data on an ephemeral runner; its folder is removed at the end.
 set -euo pipefail
 
@@ -50,13 +56,48 @@ chmod 600 "$data/keyrings/login.keyring" "$data/keyrings/default"
 # A daemon that D-Bus starts later uses the same keyring folder.
 dbus-update-activation-environment XDG_DATA_HOME="$data" GNOME_KEYRING_CONTROL="$control"
 
-XDG_DATA_HOME="$data" setsid gnome-keyring-daemon --foreground --components=secrets \
-  --control-directory="$control" </dev/null >"$log" 2>&1 &
-daemon_pid=$!
+restarts="$root/restarts"
+: >"$restarts"
+
+# `env -u G_DEBUG`: the daemon must not turn a GLib critical warning into a trap (signal 5).
+start_daemon() {
+  XDG_DATA_HOME="$data" setsid env -u G_DEBUG gnome-keyring-daemon --foreground --components=secrets \
+    --control-directory="$control" </dev/null >>"$log" 2>&1 &
+  daemon_pid=$!
+}
+start_daemon
+
+name_owned() {
+  dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+    org.freedesktop.DBus.NameHasOwner string:org.freedesktop.secrets 2>/dev/null | grep -q 'boolean true'
+}
+
+# Watchdog: when the daemon we started ends and nobody owns the Secret Service name, start it again.
+watchdog_pid=""
+watchdog() {
+  local pid="$1"
+  while :; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      sleep 0.2
+      if ! name_owned; then
+        echo restart >>"$restarts"
+        XDG_DATA_HOME="$data" setsid env -u G_DEBUG gnome-keyring-daemon --foreground --components=secrets \
+          --control-directory="$control" </dev/null >>"$log" 2>&1 &
+        pid=$!
+      else
+        # D-Bus started a replacement first; nothing to supervise from here.
+        return 0
+      fi
+    fi
+    sleep 0.2
+  done
+}
 
 # shellcheck disable=SC2317 # called by the EXIT trap
 cleanup() {
+  [ -n "$watchdog_pid" ] && kill "$watchdog_pid" 2>/dev/null || true
   kill "$daemon_pid" 2>/dev/null || true
+  pkill -u "$(id -u)" -f "gnome-keyring-daemon --foreground --components=secrets --control-directory=$control" 2>/dev/null || true
   rm -rf "$root"
 }
 trap cleanup EXIT
@@ -68,8 +109,7 @@ export GNOME_KEYRING_CONTROL="$control"
 owned=false
 for _ in $(seq 1 100); do
   kill -0 "$daemon_pid" 2>/dev/null || break
-  if dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
-    org.freedesktop.DBus.NameHasOwner string:org.freedesktop.secrets 2>/dev/null | grep -q 'boolean true'; then
+  if name_owned; then
     owned=true
     break
   fi
@@ -81,10 +121,22 @@ if [ "$owned" != true ]; then
   exit 1
 fi
 
-"$here/wait-for-keyring.sh"
+# Health check before the command: a failing probe stops the job with a clear message.
+if ! "$here/wait-for-keyring.sh"; then
+  echo "::error::runner keychain unavailable: the Secret Service did not pass its health probe before the command started."
+  exit 1
+fi
+
+watchdog "$daemon_pid" &
+watchdog_pid=$!
 
 status=0
 "$@" || status=$?
+
+restart_count="$(wc -l <"$restarts" | tr -d ' ')"
+if [ "$status" -ne 0 ] && { [ "$restart_count" -gt 0 ] || ! kill -0 "$daemon_pid" 2>/dev/null; }; then
+  echo "::error::runner keychain unavailable: the keyring daemon ended during the run ($restart_count restart(s)) and the command failed. Treat this failure as a runner problem and re-run; no test was weakened."
+fi
 
 if ! kill -0 "$daemon_pid" 2>/dev/null; then
   daemon_status=0
