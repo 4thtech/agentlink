@@ -4510,7 +4510,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Other fields of an existing rule for the contact stay as they are; a refused `policy.set` is reported and changes nothing.
 
 #### M1-33d-b · Receipt request follow-ups from IR-M1-33d-1 (new, split from M1-33d on #333, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, inbox), apps/cli (tool summaries), docs-site/guide
 - **Depends on:** M1-33d
 - **Spec:** 04 §3.4 (`proof`, receipt request); 06 §2.4, §3 (delivery receipts); 11 §5.6; D-109
