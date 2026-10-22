@@ -82,13 +82,16 @@ function bodyFor(folders: readonly string[]): JsonObject {
 
 const hashOf = (jcs: string): string => encodeBase64url(sha256(encodeUtf8(jcs)));
 
-const ADDED: PolicyEditWarning = { code: 'allowed_folders_added', fields: ['files.allowedFolders'] };
+const ADDED: PolicyEditWarning = {
+  code: 'allowed_folders_added',
+  fields: ['files.allowedFolders'],
+};
 
 interface Fake {
   configured: string[];
   resolved: string[] | 'throw';
   warnings: PolicyEditWarning[];
-  refusal?: 'policy_not_valid' | 'patch_invalid' | 'identity_missing' | 'stale_version';
+  refusal?: 'policy_not_valid' | 'patch_invalid' | 'identity_missing' | 'stale_version' | undefined;
   askKeep: boolean;
   prepareThrows: boolean;
   patches: unknown[];
@@ -143,9 +146,9 @@ function fakeClient(): LocalUiReadClient {
   } as unknown as LocalUiReadClient;
 }
 
-function ctx(client: LocalUiReadClient | undefined = fakeClient(), now = 1_100_000): LocalUiContext {
+function ctx(client: LocalUiReadClient | null = fakeClient(), now = 1_100_000): LocalUiContext {
   return {
-    client,
+    client: client ?? undefined,
     ownerContext: () => Promise.reject(new Error('not used')),
     applyOwnerAction: (signed) => {
       fake.applied.push(signed as { body: JsonObject; sig: string });
@@ -195,7 +198,11 @@ function setup(now?: number) {
   const review = (query: string) =>
     read(routes, '/api/ui/files/review').handler(context, req(query));
   const commit = (input: unknown, calls: SignCall[] = []) =>
-    write(routes).handler(context, { params: {}, query: new URLSearchParams(), input: input as never }, owner(calls));
+    write(routes).handler(
+      context,
+      { params: {}, query: new URLSearchParams(), input: input as never },
+      owner(calls),
+    );
   return { routes, context, review, commit };
 }
 
@@ -282,7 +289,7 @@ describe('GET /api/ui/files: the allowed folders', () => {
   it('is 409 not_set_up without an agent, 503 when core fails, 400 for any query', async () => {
     const routes = createFilesRoutes({ home, flavor: 'posix' });
     const list = read(routes, '/api/ui/files');
-    expect(await list.handler(ctx(undefined), req())).toEqual(UI_NOT_SET_UP);
+    expect(await list.handler(ctx(null), req())).toEqual(UI_NOT_SET_UP);
     fake.resolved = 'throw';
     const failed = await list.handler(ctx(), req());
     expect(failed).toEqual(UI_UNAVAILABLE);
@@ -333,7 +340,11 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     const res = await review(q('add', join(home, 'Library')));
     expect(res).toEqual({
       status: 422,
-      body: { error: 'folder_refused', reason: 'contains_protected', protectedFolder: '~/Library/Keychains' },
+      body: {
+        error: 'folder_refused',
+        reason: 'contains_protected',
+        protectedFolder: '~/Library/Keychains',
+      },
     });
     expect(fake.patches).toEqual([]);
   });
@@ -427,9 +438,9 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
 
   it('is 409 not_set_up without an agent', async () => {
     const routes = createFilesRoutes({ home, flavor: 'posix' });
-    expect(await read(routes, '/api/ui/files/review').handler(ctx(undefined), req(q('add', shared)))).toEqual(
-      UI_NOT_SET_UP,
-    );
+    expect(
+      await read(routes, '/api/ui/files/review').handler(ctx(null), req(q('add', shared))),
+    ).toEqual(UI_NOT_SET_UP);
   });
 });
 
@@ -444,7 +455,10 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
     const s = setup();
     const r = await reviewed(s);
     const calls: SignCall[] = [];
-    const res = await s.commit({ review: r.review, acknowledged: ['allowed_folders_added'] }, calls);
+    const res = await s.commit(
+      { review: r.review, acknowledged: ['allowed_folders_added'] },
+      calls,
+    );
     expect(res).toEqual({ status: 200, body: { status: 'applied', confirmed: true } });
     expect(calls).toHaveLength(1);
     const [call] = calls;
@@ -463,7 +477,10 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
     const r = await reviewed(s);
     expect(r.warnings).toEqual(['allowed_folders_added', 'limits_raised']);
     const calls: SignCall[] = [];
-    const res = await s.commit({ review: r.review, acknowledged: ['allowed_folders_added'] }, calls);
+    const res = await s.commit(
+      { review: r.review, acknowledged: ['allowed_folders_added'] },
+      calls,
+    );
     expect(res.status).toBe(409);
     expect(res.body).toEqual({ error: 'not_acknowledged' });
     expect(calls).toEqual([]);
@@ -495,14 +512,20 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
     const remove = await reviewed(s, q('remove', work));
     const calls: SignCall[] = [];
     // The add's acknowledgement sent with the remove's token: the codes don't match that body.
-    expect((await s.commit({ review: remove.review, acknowledged: add.warnings }, calls)).status).toBe(409);
+    expect(
+      (await s.commit({ review: remove.review, acknowledged: add.warnings }, calls)).status,
+    ).toBe(409);
     // An unknown token (a hash of another body) is refused.
     const other = hashOf(canonicalize(bodyFor([shared])));
     expect((await s.commit({ review: other, acknowledged: add.warnings }, calls)).status).toBe(409);
     expect(calls).toEqual([]);
     // Each token is used once, whatever the outcome.
-    expect((await s.commit({ review: add.review, acknowledged: add.warnings }, calls)).status).toBe(200);
-    expect((await s.commit({ review: add.review, acknowledged: add.warnings }, calls)).status).toBe(409);
+    expect((await s.commit({ review: add.review, acknowledged: add.warnings }, calls)).status).toBe(
+      200,
+    );
+    expect((await s.commit({ review: add.review, acknowledged: add.warnings }, calls)).status).toBe(
+      409,
+    );
     expect((await s.commit({ review: remove.review, acknowledged: [] }, calls)).status).toBe(409);
     expect(calls).toHaveLength(1);
   });
@@ -516,7 +539,11 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
     const calls: SignCall[] = [];
     const other = await write(routes).handler(
       b,
-      { params: {}, query: new URLSearchParams(), input: { review: token, acknowledged: ['allowed_folders_added'] } as never },
+      {
+        params: {},
+        query: new URLSearchParams(),
+        input: { review: token, acknowledged: ['allowed_folders_added'] } as never,
+      },
       owner(calls),
     );
     expect(other.status).toBe(409);
@@ -532,7 +559,11 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
     const calls: SignCall[] = [];
     const late = await write(routes).handler(
       context,
-      { params: {}, query: new URLSearchParams(), input: { review: body(res)['review'], acknowledged: ['allowed_folders_added'] } as never },
+      {
+        params: {},
+        query: new URLSearchParams(),
+        input: { review: body(res)['review'], acknowledged: ['allowed_folders_added'] } as never,
+      },
       owner(calls),
     );
     expect(late).toEqual({ status: 409, body: { error: 'expired' } });
@@ -574,13 +605,20 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
     }
     // The review is still usable after malformed attempts that never named it validly.
     const calls: SignCall[] = [];
-    expect((await s.commit({ review: r.review, acknowledged: r.warnings }, calls)).status).toBe(200);
+    expect((await s.commit({ review: r.review, acknowledged: r.warnings }, calls)).status).toBe(
+      200,
+    );
   });
 
   it('maps a core refusal at apply to a fixed answer', async () => {
     const s = setup();
     const r = await reviewed(s);
-    fake.outcome = { status: 'refused', op: 'policy.set', reason: 'version_not_newer', nonceBurnt: true };
+    fake.outcome = {
+      status: 'refused',
+      op: 'policy.set',
+      reason: 'version_not_newer',
+      nonceBurnt: true,
+    };
     const res = await s.commit({ review: r.review, acknowledged: r.warnings });
     expect(res).toEqual({ status: 409, body: { error: 'changed' } });
     const r2 = await reviewed(s);

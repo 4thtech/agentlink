@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/// <reference types="vite/client" />
 // M1-11c-a3: the Files page (d1 Local-files with DESIGN-ADJ-1 FI-3; 04 §4; 06 §3; 11 §5, §6.2; D-99,
 // D-118, D-119; UX audit 4b, 10a).
 //
@@ -11,8 +12,6 @@
 // - The browser never signs: the confirm sends the owner's passkey gesture or owner code to the
 //   local server, which signs.
 // - Server values render as text; the copy has no web3 words and never says "policy".
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -81,7 +80,9 @@ const COMMIT = '/api/ui/files/folders';
 const reviewUrl = (key: 'add' | 'remove', path: string): string =>
   `/api/ui/files/review?${new URLSearchParams({ [key]: path }).toString()}`;
 const TOKEN = 'R'.repeat(43);
-const NO_PASSKEY = { passkey: { registered: false, rpId: 'localhost', userId: 'dQ', prfSalt: 'cw' } };
+const NO_PASSKEY = {
+  passkey: { registered: false, rpId: 'localhost', userId: 'dQ', prfSalt: 'cw' },
+};
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 6; i += 1) {
@@ -236,7 +237,16 @@ describe('allow a folder (04 §4, D-119)', () => {
   });
 
   it('a change without warnings needs no tick', async () => {
-    await toConfirm({ ...twoWarnings, warnings: [], elsewhere: false, typed: '/Users/t/Docs', folder: '/Users/t/Docs' }, '/Users/t/Docs');
+    await toConfirm(
+      {
+        ...twoWarnings,
+        warnings: [],
+        elsewhere: false,
+        typed: '/Users/t/Docs',
+        folder: '/Users/t/Docs',
+      },
+      '/Users/t/Docs',
+    );
     expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
     expect(host.textContent).not.toContain(S.elsewhere('/Users/t/Docs'));
   });
@@ -266,7 +276,13 @@ describe('allow a folder (04 §4, D-119)', () => {
   it('a wrong owner code changes nothing and says so', async () => {
     const s = server({
       [LIST]: { folders: [], max: 32 },
-      [reviewUrl('add', '/x/y')]: { ...twoWarnings, warnings: [], typed: '/x/y', folder: '/x/y', elsewhere: false },
+      [reviewUrl('add', '/x/y')]: {
+        ...twoWarnings,
+        warnings: [],
+        typed: '/x/y',
+        folder: '/x/y',
+        elsewhere: false,
+      },
       [PASSKEY]: NO_PASSKEY,
       [`POST ${COMMIT}`]: new Answer(403, { status: 'presence_rejected' }),
     });
@@ -275,9 +291,15 @@ describe('allow a folder (04 §4, D-119)', () => {
     });
     await flush();
     await click(button(S.allowFolder));
-    await type(host.querySelector<HTMLInputElement>('input[name="folder"]') as HTMLInputElement, '/x/y');
+    await type(
+      host.querySelector<HTMLInputElement>('input[name="folder"]') as HTMLInputElement,
+      '/x/y',
+    );
     await click(button(S.check));
-    await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]') as HTMLInputElement, 'X');
+    await type(
+      host.querySelector<HTMLInputElement>('input[name="owner-code"]') as HTMLInputElement,
+      'X',
+    );
     await click(button(S.confirmAdd));
     expect(host.textContent).toContain(S.presenceRejected);
   });
@@ -301,7 +323,10 @@ describe('remove a folder', () => {
     });
     await click(button('Stop sending from /Users/tali/Work'));
     expect(host.textContent).toContain(S.confirmRemoveTitle);
-    await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]') as HTMLInputElement, 'C');
+    await type(
+      host.querySelector<HTMLInputElement>('input[name="owner-code"]') as HTMLInputElement,
+      'C',
+    );
     await click(button(S.confirmRemove));
     expect(decodeInput(s.calls.find((c) => c.method === 'POST')?.headers as Headers)).toEqual({
       review: TOKEN,
@@ -312,7 +337,8 @@ describe('remove a folder', () => {
 });
 
 describe('copy and source rules (11 §5, CSP)', () => {
-  const FORBIDDEN = /\b(wallet|gas|seed phrase|transaction|policy|hash|chain|blockchain|token|nonce|signature)\b/i;
+  const FORBIDDEN =
+    /\b(wallet|gas|seed phrase|transaction|policy|hash|chain|blockchain|token|nonce|signature)\b/i;
 
   it('has plain words for every warning code core can return', () => {
     const codes = [
@@ -343,8 +369,8 @@ describe('copy and source rules (11 §5, CSP)', () => {
   });
 
   it('page copy has no web3 words and never says policy', () => {
-    const all = [
-      ...Object.values(S).filter((v): v is string => typeof v === 'string'),
+    const all: string[] = [
+      ...Object.values(S).filter((v) => typeof v === 'string'),
       S.elsewhere('~/x'),
       ...[
         'not_full_path',
@@ -362,13 +388,18 @@ describe('copy and source rules (11 §5, CSP)', () => {
         'unknown',
       ].map((r) => refusalText(r, '~/.ssh')),
     ];
-    for (const text of all) expect(text).not.toMatch(FORBIDDEN);
+    // A command the owner types (in backticks) is shown exactly; the words around it are checked.
+    for (const text of all) expect(text.replace(/`[^`]*`/g, '')).not.toMatch(FORBIDDEN);
   });
 
   it('uses no inline styles and no raw HTML', () => {
-    const dir = __dirname;
-    for (const name of readdirSync(dir).filter((n) => /\.tsx?$/.test(n) && !n.includes('.test.'))) {
-      const src = readFileSync(join(dir, name), 'utf8');
+    const sources = import.meta.glob<string>(['./*.ts', './*.tsx', '!./*.test.tsx'], {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    });
+    expect(Object.keys(sources).length).toBeGreaterThanOrEqual(4);
+    for (const [name, src] of Object.entries(sources)) {
       expect(src, name).not.toContain('dangerouslySetInnerHTML');
       expect(src, name).not.toMatch(/style=\{/);
     }

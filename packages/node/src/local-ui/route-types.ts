@@ -68,6 +68,23 @@ export interface LocalUiOwnerRoute {
 
 export type LocalUiRoute = LocalUiReadRoute | LocalUiOwnerRoute;
 
+/**
+ * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A
+ * page's success answer is 200 with its own body. Never an error's text in any of these.
+ */
+const answer = (status: number, error: string): LocalUiResult =>
+  Object.freeze({ status, body: Object.freeze({ error }) });
+
+/** 409: no agent on this computer yet (the page shows its not-set-up state). */
+export const UI_NOT_SET_UP: LocalUiResult = answer(409, 'not_set_up');
+/** 400: a query parameter is unknown, repeated or malformed; the input is never echoed. */
+export const UI_INVALID_QUERY: LocalUiResult = answer(400, 'invalid_query');
+/**
+ * 503: the data could not be read just now (the store or a proof network did not answer); the page
+ * says "try again in a minute". An unexpected failure stays 500 `failed`.
+ */
+export const UI_UNAVAILABLE: LocalUiResult = answer(503, 'unavailable');
+
 /** A page stub's answer until its card fills it. */
 export const NOT_IMPLEMENTED: LocalUiResult = Object.freeze({
   status: 501,
