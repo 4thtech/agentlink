@@ -18,6 +18,10 @@
 //   (a relay's cap is at least that), reports T as a gap with a fixed reason. The walk goes on and
 //   the cursor still moves: reading the relay again cannot fetch that second, and the wraps are sent
 //   to every relay of the list.
+// - Closing gaps (M2-19, 07 §4.2): after the pages, a gap of relay R at T is closed when another
+//   relay of the pass read T in full (positive evidence from its pages, never "no gap" alone), served every wrap R showed at T, and one bounded `ids` query on R returns every wrap that relay
+//   served at T and R did not show. One query per gap, bounded ids, queries, time and memory; every
+//   other gap stays in the result. Live subscriptions do not re-query.
 // - Cursor (07 §4.2): per relay, `last_seen` is the local time the pass started, written only after
 //   the relay reached EOSE and every event of the pass was handled. The next REQ asks for
 //   `since = last_seen - 48 h - S` (NIP-59 randomises wrap times by up to 2 days; S = 300 s, 04 §2.5.1),
@@ -84,6 +88,17 @@ export const SYNC_PAGE_LIMIT = 500;
  * relay that returns a single event per filter is not treated as capped.
  */
 export const MIN_GAP_EVENTS = 2;
+/** M2-19: `ids` re-queries one sync pass may send to close gaps, at most one per gap. */
+export const MAX_GAP_REQUERIES_PER_PASS = 16;
+/** M2-19: ids one gap's re-query may ask for. A gap with more missing ids is not queried. */
+export const MAX_GAP_REQUERY_IDS = 64;
+/** M2-19: how long one re-query may wait for its EOSE (it also ends with the pass budget). */
+export const GAP_REQUERY_TIMEOUT_MS = 1_000;
+/**
+ * M2-19: wrap ids remembered per relay in a pass, by second, to close another relay's gap. A relay
+ * that returns more is not used to close any gap in that pass.
+ */
+export const MAX_LEARNED_IDS_PER_RELAY = 2_048;
 /** Pages one relay may take in a pass (about 50 000 events at the page limit). */
 export const MAX_PAGES_PER_PASS = 100;
 /** A saved page position older than this is not resumed. */
@@ -229,8 +244,8 @@ export interface SyncResult {
   /** True when any relay did not complete (budget, failure, retry): more may be waiting. */
   readonly partial: boolean;
   /**
-   * Seconds that may not have been read in full on one relay (M1-5d). Omitted or empty: none. At
-   * most MAX_PAGES_PER_PASS per relay.
+   * Seconds that may not have been read in full on one relay (M1-5d) and that no bounded `ids`
+   * re-query closed (M2-19). Omitted or empty: none. At most MAX_PAGES_PER_PASS per relay.
    */
   readonly gaps?: readonly SyncGap[];
   /** Items handed to the handler and reported processed. */
@@ -272,6 +287,8 @@ export interface SyncEngineOptions {
   readonly timers?: Timers;
   /** Entries of each in-memory dedup cache (default DEDUP_CACHE_ENTRIES); tests lower it. */
   readonly dedupCacheEntries?: number;
+  /** Wrap ids remembered per relay in a pass (default MAX_LEARNED_IDS_PER_RELAY); tests lower it. */
+  readonly learnedIdsPerRelay?: number;
 }
 
 /**
@@ -359,6 +376,57 @@ interface Run {
   readonly tasks: Set<Promise<void>>;
   /** sync(): seconds a relay may hold more events in than it returned (M1-5d). Live runs log them. */
   readonly gaps: SyncGap[];
+  /** sync(): per relay, the wrap ids it served in this pass, by second (M2-19). Empty when live. */
+  readonly learned: Map<string, Learned>;
+}
+
+/**
+ * The wraps one relay served in a sync pass that opened or were already seen, by `created_at`
+ * (M2-19). Bounded by `max` (MAX_LEARNED_IDS_PER_RELAY); past it `full` is set and the relay closes
+ * no gap. `pages` records each page of the walk, so a second counts as read in full only on positive
+ * evidence (IR-M2-19-1 H-1), and `untrusted` is set when the walk ended because the relay ignores
+ * `until`.
+ */
+interface Learned {
+  readonly since: number;
+  readonly max: number;
+  readonly bySecond: Map<number, Set<string>>;
+  readonly pages: PageRecord[];
+  count: number;
+  full: boolean;
+  untrusted: boolean;
+}
+
+/**
+ * One page of a walk: its `until` (undefined: the first page), the oldest second of a wrap on it that
+ * is for us and opened or was seen before (stray or junk frames never count, AUDIT-FABLE-M2-19-1
+ * L-1), whether an event sat at `until` (the relay applies `until` inclusively), and its size.
+ */
+interface PageRecord {
+  readonly until: number | undefined;
+  readonly oldest: number | undefined;
+  readonly sawAtUntil: boolean;
+  readonly count: number;
+}
+
+/**
+ * True when the walk of `learned` read second `t` in full (IR-M2-19-1 H-1, IR-M2-19-2 H-2). The one
+ * piece of evidence: a page whose range holds `t` also held a verified wrap older than `t`, so a
+ * newest-first cap cut that page below `t`. `t` equal to the page's `until` counts only when an
+ * event sat at `until` on that page: a relay that applies `until` exclusively never served `t` there
+ * (AUDIT-FABLE-M2-19-1 M-1). A page smaller than the largest is no proof (a lower cap can cut it).
+ * `t` must lie above the walk's `since` (a walk may stop in the middle of its oldest second), and a
+ * walk that ended because the relay ignores `until` proves nothing. Assumes the relay returns stored
+ * events newest first and applies `until` inclusively (NIP-01); see 07 §4.2 for the residual.
+ */
+function readInFull(learned: Learned, t: number): boolean {
+  if (learned.full || learned.untrusted || t <= learned.since) return false;
+  return learned.pages.some(
+    (page) =>
+      (page.until === undefined || t < page.until || (t === page.until && page.sawAtUntil)) &&
+      page.oldest !== undefined &&
+      page.oldest < t,
+  );
 }
 
 interface RelayOutcome {
@@ -390,6 +458,8 @@ export class SyncEngine {
   private readonly junk: BoundedSet;
   /** Wraps being opened right now (key `id:sig`), so the same wrap from two relays is handled once. */
   private readonly inflight = new Map<string, Promise<EventResult>>();
+  /** Wrap ids a sync pass remembers per relay (M2-19). */
+  private readonly learnedMax: number;
 
   constructor(options: SyncEngineOptions) {
     this.pool = options.pool;
@@ -401,6 +471,11 @@ export class SyncEngine {
     const entries = options.dedupCacheEntries ?? DEDUP_CACHE_ENTRIES;
     this.processed = new BoundedSet(entries);
     this.junk = new BoundedSet(entries);
+    const learnedMax = options.learnedIdsPerRelay ?? MAX_LEARNED_IDS_PER_RELAY;
+    this.learnedMax =
+      Number.isSafeInteger(learnedMax) && learnedMax > 0
+        ? Math.min(learnedMax, MAX_LEARNED_IDS_PER_RELAY)
+        : MAX_LEARNED_IDS_PER_RELAY;
   }
 
   /** Sizes of the in-memory dedup state, for tests and `doctor`. Each cache is bounded. */
@@ -435,14 +510,15 @@ export class SyncEngine {
         })),
       ),
     );
-    this.timers.clearTimeout(timer);
-    this.stop(run, 'stopped'); // ends nothing that is still running except stray subscriptions
     const results = relays.map((relay, i) => ({
       relay,
       status: (outcomes[i] as RelayOutcome).status,
       reason: (outcomes[i] as RelayOutcome).reason,
     }));
-    const gaps = [...run.gaps];
+    // M2-19: inside the same budget, a bounded `ids` re-query closes a gap another relay covers.
+    const { gaps, closed } = await this.closeGaps(run, results);
+    this.timers.clearTimeout(timer);
+    this.stop(run, 'stopped'); // ends nothing that is still running except stray subscriptions
     const partial = results.some((r) => r.status !== 'complete');
     this.logger?.info('sync pass', {
       relays: results.length,
@@ -452,6 +528,7 @@ export class SyncEngine {
       dropped: run.counters.dropped,
       deferred: run.counters.deferred,
       gaps: gaps.length,
+      gapsClosed: closed,
     });
     return { partial, ...run.counters, gaps, relays: results };
   }
@@ -522,6 +599,7 @@ export class SyncEngine {
       hooks: new Set(),
       tasks: new Set(),
       gaps: [],
+      learned: new Map(),
     };
   }
 
@@ -647,6 +725,8 @@ export class SyncEngine {
       // This page, relative to its `until`: did an event sit at it, and did one lie above it (a relay
       // that ignores `until`)?
       let sawAtUntil = false;
+      // M2-19: the oldest in-window second of a verified wrap for us on this page (page evidence).
+      let proofOldest: number | undefined;
       let sawNewer = false;
       // Events of this page inside the window and at or below its `until` (repeats included), and
       // the most any page of this walk returned: a relay's cap is at least that (M1-5d).
@@ -685,6 +765,20 @@ export class SyncEngine {
       let queuedChars = 0;
       let lastCursorWrite = startedAt;
       let chain: Promise<void> = Promise.resolve();
+      // M2-19: what this relay served in a sync pass, so another relay's gap can be closed.
+      let learned: Learned | undefined;
+      if (!run.live) {
+        learned = {
+          since,
+          max: this.learnedMax,
+          bySecond: new Map(),
+          pages: [],
+          count: 0,
+          full: false,
+          untrusted: false,
+        };
+        run.learned.set(relay, learned);
+      }
 
       const finish = (outcome: Omit<RelayOutcome, 'reachedLive'>): void => {
         if (finished) return;
@@ -735,6 +829,19 @@ export class SyncEngine {
         // stop. More events than the relay's cap within one single second cannot all be fetched
         // (Nostr has no sub-second paging): that second is reported as a gap (M1-5d).
         maxPageCount = Math.max(maxPageCount, pageCount);
+        if (learned !== undefined) {
+          if (sawNewer) learned.untrusted = true;
+          if (learned.pages.length < MAX_PAGES_PER_PASS) {
+            learned.pages.push({
+              until: pageUntil,
+              oldest: proofOldest,
+              sawAtUntil,
+              count: pageCount,
+            });
+          } else {
+            learned.full = true;
+          }
+        }
         if (
           pageUntil !== undefined &&
           !sawNewer &&
@@ -770,6 +877,7 @@ export class SyncEngine {
           pageUntil = next.until;
           skipIds = new Set(next.skip);
           pageOldest = undefined;
+          proofOldest = undefined;
           pageOldestIds = [];
           sawAtUntil = false;
           sawNewer = false;
@@ -812,6 +920,27 @@ export class SyncEngine {
         if (result === 'keys_unavailable') {
           finish({ status: 'failed', reason: 'keys_unavailable' });
           return;
+        }
+        if (
+          learned !== undefined &&
+          phase === 'backlog' &&
+          (result === 'delivered' || result === 'duplicate') &&
+          isRecord(event) &&
+          event.kind === NOSTR_KIND_GIFT_WRAP &&
+          pickIdentity(event.tags, run.identities) !== undefined
+        ) {
+          learn(learned, event);
+          // This event's page is still the current one: the page's EOSE work is chained behind it.
+          const at = event.created_at;
+          if (
+            typeof at === 'number' &&
+            Number.isSafeInteger(at) &&
+            at >= since &&
+            (pageUntil === undefined || at <= pageUntil) &&
+            (proofOldest === undefined || at < proofOldest)
+          ) {
+            proofOldest = at;
+          }
         }
         if (result === 'retry') hold = true;
         if (result === 'bound') {
@@ -1087,6 +1216,186 @@ export class SyncEngine {
     }
   }
 
+  // --- gaps (M2-19) ------------------------------------------------------------------------------
+
+  /**
+   * After the pass: a gap of relay R at second T is closed when another relay S of the same pass
+   * completed, has no gap at T, read T in full on positive evidence (`readInFull`), served every wrap
+   * R showed at T plus some R did not show, and one `ids` query on R for those (at most
+   * MAX_GAP_REQUERY_IDS) returns every one of them. Then S read that second in full and R holds what
+   * S holds there. One query per gap, at most
+   * MAX_GAP_REQUERIES_PER_PASS per pass, inside the pass budget. Every other gap stays reported.
+   */
+  private async closeGaps(
+    run: Run,
+    results: readonly SyncRelayResult[],
+  ): Promise<{ gaps: SyncGap[]; closed: number }> {
+    const gaps = [...run.gaps];
+    if (gaps.length === 0 || run.stopped) return { gaps, closed: 0 };
+    const key = (relay: string, second: number): string => `${relay}\n${second}`;
+    const gapKeys = new Set(gaps.map((g) => key(g.relay, g.second)));
+    const complete = results.filter((r) => r.status === 'complete').map((r) => r.relay);
+    const queries: Promise<{ key: string; closed: boolean }>[] = [];
+    const queried = new Set<string>();
+    for (const gap of gaps) {
+      const k = key(gap.relay, gap.second);
+      if (queried.has(k) || queries.length >= MAX_GAP_REQUERIES_PER_PASS) continue;
+      const ownRecord = run.learned.get(gap.relay);
+      // What R showed at T must be known to check that S holds all of it (IR-M2-19-1 H-1 (d)).
+      if (ownRecord === undefined || ownRecord.full) continue;
+      const own = ownRecord.bySecond.get(gap.second) ?? new Set<string>();
+      let ids: string[] | undefined;
+      for (const source of complete) {
+        if (source === gap.relay || gapKeys.has(key(source, gap.second))) continue;
+        const learned = run.learned.get(source);
+        if (learned === undefined || !readInFull(learned, gap.second)) continue;
+        const theirs = learned.bySecond.get(gap.second) ?? new Set<string>();
+        if ([...own].some((id) => !theirs.has(id))) continue;
+        const missing = [...theirs].filter((id) => !own.has(id));
+        if (missing.length > 0 && missing.length <= MAX_GAP_REQUERY_IDS) {
+          ids = missing.sort();
+          break;
+        }
+      }
+      if (ids === undefined) continue;
+      queried.add(k);
+      queries.push(
+        this.requeryGap(gap.relay, run, gap.second, ids).then(
+          (closed) => ({ key: k, closed }),
+          () => ({ key: k, closed: false }),
+        ),
+      );
+    }
+    const closedKeys = new Set(
+      (await Promise.all(queries)).filter((q) => q.closed).map((q) => q.key),
+    );
+    return {
+      gaps: gaps.filter((g) => !closedKeys.has(key(g.relay, g.second))),
+      closed: closedKeys.size,
+    };
+  }
+
+  /**
+   * One `ids` query on `relay` for wraps at `second` (M2-19). True when every asked id comes back as
+   * a wrap at that second that opens or was already seen. The relay's answer is untrusted (I-5):
+   * events not asked for are dropped, the frames are bounded, and nothing of it is logged.
+   */
+  private async requeryGap(
+    relay: string,
+    run: Run,
+    second: number,
+    ids: readonly string[],
+  ): Promise<boolean> {
+    if (run.stopped || !isAllowedRelayUrl(relay)) return false;
+    const link = await this.pool.connect(relay);
+    if (typeof link === 'string') return false;
+    if (run.stopped) {
+      link.release();
+      return false;
+    }
+    const wanted = new Set(ids);
+    const confirmed = new Set<string>();
+    const subId = `al-${encodeHex(randomBytes(6))}`;
+    const reqFrame = JSON.stringify([
+      'REQ',
+      subId,
+      {
+        ids: [...ids],
+        kinds: [NOSTR_KIND_GIFT_WRAP],
+        '#p': run.pubkeys,
+        since: second,
+        until: second,
+        limit: ids.length,
+      },
+    ]);
+    return new Promise<boolean>((resolve) => {
+      let finished = false;
+      let authTried = false;
+      let eose = false;
+      let frames = 0;
+      let openings = 0;
+      const pending: Promise<void>[] = [];
+      const finish = (closed: boolean): void => {
+        if (finished) return;
+        finished = true;
+        unFrame();
+        unClose();
+        run.hooks.delete(onStop);
+        this.timers.clearTimeout(timeout);
+        if (link.isOpen()) link.send(JSON.stringify(['CLOSE', subId]));
+        link.release();
+        resolve(closed);
+      };
+      const onStop = (): void => finish(false);
+      run.hooks.add(onStop);
+      const timeout = this.timers.setTimeout(() => finish(false), GAP_REQUERY_TIMEOUT_MS);
+      const unFrame = this.pool.onFrame((from, frame) => {
+        if (finished || from !== relay || frame[1] !== subId) return;
+        switch (frame[0]) {
+          case 'EVENT': {
+            if (eose) return;
+            frames += 1;
+            if (frames > ids.length) {
+              finish(false); // more than was asked for: not an honest answer
+              return;
+            }
+            const event = frame[2];
+            if (
+              !isRecord(event) ||
+              typeof event.id !== 'string' ||
+              !wanted.has(event.id) ||
+              event.created_at !== second
+            ) {
+              run.counters.dropped += 1;
+              return;
+            }
+            const id = event.id;
+            const task = this.handleEvent(event, relay, run, () => {
+              openings += 1;
+              return openings <= ids.length;
+            }).then(
+              (result) => {
+                if (result === 'delivered' || result === 'duplicate') confirmed.add(id);
+              },
+              () => undefined,
+            );
+            pending.push(task);
+            run.tasks.add(task);
+            void task.then(() => run.tasks.delete(task));
+            return;
+          }
+          case 'EOSE':
+            if (eose) return;
+            eose = true;
+            void Promise.all(pending).then(() => finish(ids.every((id) => confirmed.has(id))));
+            return;
+          case 'CLOSED': {
+            const text = typeof frame[2] === 'string' ? frame[2] : '';
+            if (text.startsWith(AUTH_REQUIRED) && !authTried) {
+              authTried = true;
+              void link.authenticate().then(
+                (ok) => {
+                  if (finished) return;
+                  if (!(ok && link.send(reqFrame))) finish(false);
+                },
+                () => finish(false),
+              );
+              return;
+            }
+            finish(false);
+            return;
+          }
+          default:
+            return;
+        }
+      });
+      const unClose = this.pool.onRelayClose((closed) => {
+        if (closed === relay) finish(false);
+      });
+      if (!link.send(reqFrame)) finish(false);
+    });
+  }
+
   /**
    * A second this relay may hold more events in than it returned (M1-5d). sync() returns it; a live
    * run logs it by host only, never the second (it is a wrap's created_at).
@@ -1126,6 +1435,32 @@ function eventWeight(event: unknown): number {
   } catch {
     return MAX_QUEUED_CHARS; // cannot be measured: counts as the largest
   }
+}
+
+/**
+ * Remembers a wrap a relay served in a sync pass, by second (M2-19). Only wraps that opened or were
+ * already seen get here, so their id is 64 hex. Bounded: past `learned.max` ids the record
+ * is marked full and closes no gap.
+ */
+function learn(learned: Learned, event: unknown): void {
+  if (learned.full || !isRecord(event)) return;
+  const at = event.created_at;
+  const id = event.id;
+  if (typeof id !== 'string' || typeof at !== 'number' || !Number.isSafeInteger(at)) return;
+  if (at < learned.since) return;
+  let ids = learned.bySecond.get(at);
+  if (ids?.has(id) === true) return;
+  if (learned.count >= learned.max) {
+    learned.full = true;
+    learned.bySecond.clear();
+    return;
+  }
+  if (ids === undefined) {
+    ids = new Set();
+    learned.bySecond.set(at, ids);
+  }
+  ids.add(id);
+  learned.count += 1;
 }
 
 /** The first own key named by a `p` tag of the wrap. The tags are untrusted: read defensively. */

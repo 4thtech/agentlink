@@ -57,6 +57,7 @@ jobs:
       has_vectors_script: ${{ steps.detect.outputs.has_vectors_script }}
       needs_playwright: ${{ steps.detect.outputs.needs_playwright }}
       e2e_relevant: ${{ steps.e2e_scope.outputs.e2e_relevant }}
+      code_changed: ${{ steps.e2e_scope.outputs.e2e_relevant }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,17 +157,21 @@ jobs:
           esac
           if [[ "$base" =~ ^[0-9a-f]{40}$ ]] && git fetch --quiet --no-tags --depth=1 origin "$base" 2> /dev/null; then
             if files="$(git diff --no-renames --name-only "$base" HEAD 2> /dev/null)"; then
-              if [ -z "$(printf '%s\n' "$files" | grep -Ev '^(docs/|docs-site/|knowledge/|changelog\.d/|\.changeset/|[^/]+\.md$)' || true)" ]; then
+              if [ -z "$(printf '%s\n' "$files" | grep -Ev '^(docs/|docs-site/|knowledge/|changelog\.d/|\.changeset/[^/]+\.md$|[^/]+\.md$)' || true)" ]; then
                 relevant=false
               fi
             fi
           fi
           echo "e2e_relevant=$relevant" >> "$GITHUB_OUTPUT"
+          # Same rule for every heavy job (CHORE-CI-MATRIX-QUEUE-ONLY): a merge group or pull request
+          # with any file outside the docs set, or an unreadable diff, runs everything.
           echo "Deterministic e2e needed: $relevant"
 
   checks:
     name: checks
     needs: detect
+    # CHORE-CI-MATRIX-QUEUE-ONLY: runs on EVERY change, docs-only included: it holds the doc-drift tests
+    # (spec, README, docs-site, knowledge), and listing them by hand would rot.
     if: needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -217,7 +222,8 @@ jobs:
   vectors:
     name: vectors
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -317,7 +323,8 @@ jobs:
   keychain:
     name: keychain (${{ matrix.os }})
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -328,7 +335,9 @@ jobs:
         # Exact runner images, no `*-latest` (M1-8a-d): an image change must not silently change the
         # keychain behaviour under test. These are the images `*-latest` resolved to when pinned
         # (2026-10-15); a bump is its own reviewed change.
-        os: [macos-26, windows-2025-vs2026, ubuntu-24.04]
+        # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows only in the merge queue and on `main`;
+        # a pull request or feature-branch push runs the Linux leg alone.
+        os: ${{ fromJSON((github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && '["macos-26","windows-2025-vs2026","ubuntu-24.04"]' || '["ubuntu-24.04"]') }}
     env:
       AGENTLINK_REQUIRE_KEYCHAIN: "1"
     steps:
@@ -433,7 +442,11 @@ jobs:
   path-guard:
     name: path-guard (${{ matrix.os }})
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows run in the merge queue and on `main` only, not
+    # on a pull request or a feature-branch push. Skipped counts as success in `ci-gate`; the queue
+    # run is what must pass before a merge.
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     permissions:
@@ -487,7 +500,11 @@ jobs:
   node-os:
     name: node-os (${{ matrix.os }})
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows run in the merge queue and on `main` only, not
+    # on a pull request or a feature-branch push. Skipped counts as success in `ci-gate`; the queue
+    # run is what must pass before a merge.
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -523,7 +540,8 @@ jobs:
   relays-docker:
     name: relays-docker
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -574,7 +592,8 @@ jobs:
   storage-minio:
     name: storage-minio
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -683,7 +702,8 @@ jobs:
   bundle-check:
     name: bundle-check
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
