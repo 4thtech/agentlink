@@ -30,6 +30,15 @@ Add exactly these four to the `main` ruleset: **`ci-gate`**, **`security-gate`**
 
 `ci-gate` and `security-gate` are aggregator jobs that always run. They fail if any upstream job failed or was cancelled; a skipped job counts as success. That is what keeps the repository green while it is docs-only, and why individual jobs (which come and go) are never listed as required. `pr-hygiene` is skipped on merge-queue runs, which GitHub treats as a pass. `review-gate` checks only `DEPLOY_FREEZE` on merge-queue runs.
 
+### Where the heavy jobs run (CHORE-CI-MATRIX-QUEUE-ONLY)
+
+The runner queue on GitHub Free is the scarce resource, so `ci.yml` spends it where it protects `main`. Only the four aggregators above are required, and `ci-gate` counts a skipped job as a pass, so no job needs a placeholder; a skipped job simply reports "skipped".
+
+- **macOS and Windows legs** (`node-os`, `path-guard`, and the `macos-26` and `windows-2025-vs2026` legs of `keychain`) run only on `merge_group` and on `push` to `main`. A pull request and a feature-branch push run the Ubuntu leg of `keychain` and every other Ubuntu job. A PR cannot reach `main` without the full matrix passing in the merge queue, where nothing is weakened.
+- **Docs-only changes** skip `vectors`, `keychain`, `path-guard`, `node-os`, `relays-docker`, `storage-minio`, `bundle-check` and `e2e-deterministic`. `detect` decides from the list of changed file names against the pull request base (or the merge group base): the change is docs-only when every file is under `docs/`, `docs-site/`, `knowledge/`, `changelog.d/`, `.changeset/` or is a root `*.md`. An unreadable diff, a push, or any other file runs everything (fail towards running). A merge group with any code change in it runs everything. `checks` (lint, typecheck, build and every unit test on Ubuntu, which includes all the doc-drift tests for the specs, README, docs-site and knowledge), `context-budget`, `changesets`, `pr-hygiene`, `review-gate` and the secret scan still run on every change. `.changeset/config.json` and other non-`.md` files under `.changeset/` count as code; only `.changeset/*.md` counts as docs.
+- **Concurrency:** the existing group `ci-<event>-<PR number or ref>` cancels a superseded pull request run (and a feature-branch push run); runs on `main` and in the merge queue are never cancelled.
+
+
 ### Review gate (`review-gate`)
 
 `review-gate` and `CODEOWNERS` together are the GitHub-enforced half of `audit-rules.md` §3:

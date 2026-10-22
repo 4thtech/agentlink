@@ -1,0 +1,618 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/recovery-kit/case.schema.json",
+  "title": "recovery-kit case",
+  "description": "04 \u00a72.3.3 recovery kit ALKK v1 (D-115). `kek`: the key-encryption key for a code, salt and KDF parameters. `seal`: the whole kit and its kek for a fixed code, salt, nonce prefix and chunk size, the owner seed, the manifest fields and per agent its items (in any order) and store. `open` (with the code; an empty `expectedOwnerNostr` means no expected owner) and `openWithKek`: entry names (comma-separated, in kit order) and each value as `entry:<name>` hex, or a rejection. `header`: the public header fields read before the code is asked for, or a rejection. `crossType`: another format's reader (ALKP with `key` as the PRF output, ALKR and ALKS and ALKO with `code`, ALF1 with `key` as the file key) given an ALKK kit, which it refuses. `credentialDigest` (04 \u00a72.5.1 storage.set): the digest as 64 lowercase hex and the `s3:<id>` item bytes (04 \u00a72.2) for a salt and the access key ID and secret as UTF-8 bytes, or a rejection. `credentialItem`: the digest of a stored item, which must be exactly its canonical JCS form, or a rejection. Hex without 0x except agent and owner keys in the ALKO and ALKS inputs; codes as text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "code",
+            "salt",
+            "memoryKiB",
+            "iterations",
+            "parallelism"
+          ],
+          "properties": {
+            "op": {
+              "const": "kek"
+            },
+            "code": {
+              "type": "string"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "memoryKiB": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer"
+            },
+            "parallelism": {
+              "type": "integer"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kek"
+          ],
+          "properties": {
+            "kek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "code",
+            "salt",
+            "noncePrefix",
+            "chunkSize",
+            "memoryKiB",
+            "iterations",
+            "parallelism",
+            "ownerSeed",
+            "kitId",
+            "createdAt",
+            "contents",
+            "agents"
+          ],
+          "properties": {
+            "op": {
+              "const": "seal"
+            },
+            "code": {
+              "type": "string"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "noncePrefix": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{16}$"
+            },
+            "chunkSize": {
+              "type": "integer"
+            },
+            "memoryKiB": {
+              "type": "integer"
+            },
+            "iterations": {
+              "type": "integer"
+            },
+            "parallelism": {
+              "type": "integer"
+            },
+            "ownerSeed": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "kitId": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "integer"
+            },
+            "contents": {
+              "enum": [
+                "full",
+                "identity"
+              ]
+            },
+            "agents": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "agentId",
+                  "name",
+                  "items",
+                  "store"
+                ],
+                "properties": {
+                  "agentId": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{40}$"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "value"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string",
+                          "pattern": "^([0-9a-f]{2})*$"
+                        }
+                      }
+                    }
+                  },
+                  "store": {
+                    "type": "string",
+                    "pattern": "^([0-9a-f]{2})*$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kit",
+                "kek"
+              ],
+              "properties": {
+                "kit": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                },
+                "kek": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kit",
+            "code",
+            "source",
+            "expectedOwnerNostr"
+          ],
+          "properties": {
+            "op": {
+              "const": "open"
+            },
+            "kit": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "code": {
+              "type": "string"
+            },
+            "source": {
+              "enum": [
+                "prompt",
+                "file"
+              ]
+            },
+            "expectedOwnerNostr": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "entryNames"
+              ],
+              "properties": {
+                "entryNames": {
+                  "type": "string"
+                }
+              },
+              "patternProperties": {
+                "^entry:": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kit",
+            "kek"
+          ],
+          "properties": {
+            "op": {
+              "const": "openWithKek"
+            },
+            "kit": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "kek": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "entryNames"
+              ],
+              "properties": {
+                "entryNames": {
+                  "type": "string"
+                }
+              },
+              "patternProperties": {
+                "^entry:": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "kit"
+          ],
+          "properties": {
+            "op": {
+              "const": "header"
+            },
+            "kit": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ownerNostr",
+                "chunkSize",
+                "memoryKiB",
+                "iterations",
+                "parallelism"
+              ],
+              "properties": {
+                "ownerNostr": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "chunkSize": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "memoryKiB": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "iterations": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                },
+                "parallelism": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9][0-9]*)$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "reader",
+            "blob",
+            "code",
+            "key",
+            "agentId",
+            "ownerEvm",
+            "ownerNostr"
+          ],
+          "properties": {
+            "op": {
+              "const": "crossType"
+            },
+            "reader": {
+              "enum": [
+                "ALKP",
+                "ALKR",
+                "ALKO",
+                "ALKS",
+                "ALF1"
+              ]
+            },
+            "blob": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "code": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "agentId": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "ownerEvm": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{40}$"
+            },
+            "ownerNostr": {
+              "type": "string",
+              "pattern": "^0x[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "outcome"
+          ],
+          "properties": {
+            "outcome": {
+              "const": "reject"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "salt",
+            "accessKeyId",
+            "secretAccessKey"
+          ],
+          "properties": {
+            "op": {
+              "const": "credentialDigest"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "accessKeyId": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "secretAccessKey": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "credentialDigest",
+                "item"
+              ],
+              "properties": {
+                "credentialDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "item": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "item"
+          ],
+          "properties": {
+            "op": {
+              "const": "credentialItem"
+            },
+            "item": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "credentialDigest"
+              ],
+              "properties": {
+                "credentialDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

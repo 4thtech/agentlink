@@ -60,6 +60,12 @@ const SEED_OR_SECRET = [
   'openPasskeySeed',
   'sealRecoverySeed',
   'openRecoverySeed',
+  // M1-9i-b (04 §2.3.3): the recovery kit ALKK, which takes or returns the owner and agent seeds.
+  'sealRecoveryKit',
+  'openRecoveryKit',
+  // M1-9i-b2 (04 §2.2): the s3:<id> item, which holds the storage secret (KeyStore backends only).
+  'encodeStorageCredentialItem',
+  'parseStorageCredentialItem',
 ];
 
 // The one deterministic test seam (@4thtech-io/crypto/testing, never built or exported).
@@ -81,6 +87,10 @@ const TEST_SEAM = [
   // M1-1k: fixed nonce (and salt) for ALKP and ALKR.
   'sealPasskeySeedWithNonce',
   'sealRecoverySeedWithSaltAndNonce',
+  // M1-9i-b: the ALKK kit with a fixed code, salt and nonce prefix, its kek, and opening with a kek.
+  'sealRecoveryKitWith',
+  'deriveRecoveryKitKek',
+  'openRecoveryKitWithKek',
   // IR-M1-1f-1 L-7: pairingDigest for the labels vectors.
   'pairingDigest',
   // M1-1g (IR-M1-1g-G2-1 M-2): the in-memory KeyStore doubles, which hold a seed in plain memory.
@@ -176,6 +186,12 @@ describe('@4thtech-io/crypto/keystore', () => {
       'safetyCodeForRole',
       'KEYSTORE_KDF_DEFAULTS',
       'KEYSTORE_KDF_BOUNDS',
+      // M1-9i-b2 (04 §2.5.1 storage.set): the digest the core checks on every own-storage load. It
+      // returns a keyed digest, never the secret.
+      'credentialDigest',
+      'credentialDigestOfItem',
+      'STORAGE_CREDENTIAL_SALT_LENGTH',
+      'STORAGE_CREDENTIAL_MAX_VALUE_BYTES',
     ]) {
       expect(Object.keys(main), name).toContain(name);
     }
@@ -215,6 +231,14 @@ describe('@4thtech-io/crypto/keystore', () => {
       'sealRecoverySeedWithSaltAndNonceUnsafe',
       'sealPasskeySeedWithNonce',
       'sealRecoverySeedWithSaltAndNonce',
+      // M1-9i-b: the ALKK seam and the STREAM internals it shares with ALF1.
+      'sealRecoveryKitWithUnsafe',
+      'sealRecoveryKitWith',
+      'openRecoveryKitWithKek',
+      'deriveRecoveryKitKek',
+      'createStreamSealerAt',
+      'createStreamOpenerAt',
+      'streamKeyOf',
       // M1-1d: the ALF1 internals with a caller-chosen nonce prefix or start index.
       'sealAlf1At',
       'createAlf1SealerAt',

@@ -3,7 +3,7 @@
 // proofs/platform.ts); this module supplies them from the shipped chain list, plus the file and
 // network halves of the proof tools:
 //
-// - nodeProofs: for every automatically selectable chain (`autoSelectableChains()`, the `chainRegistry()` set minus Chiado until M1-3j-b: the shipped testnets with a deployment
+// - nodeProofs: for every automatically selectable chain (`autoSelectableChains()`: the `chainRegistry()` chains the testnet faucet serves, so Chiado joins once the faucet does, M1-3j-b; the shipped testnets with a deployment
 //   in the pinned contracts release) an address-checked read client (`nodeRpcFetch`, 04 §4), its
 //   chain-state port and a proof submitter (the 4thTech submitter, failover per 07 §6.2); the
 //   chain package's own functions as the core's `kit`; one chain selector shared by the core and the
@@ -204,7 +204,7 @@ export interface NodeProofsOptions extends NodeProofPacksOptions {
   readonly fetchFn?: chain.RpcFetchFn;
   /** Submitter base URLs. Default: SUBMITTER_DEFAULT_URLS. */
   readonly submitterUrls?: readonly string[];
-  /** The supported chains. Default: `autoSelectableChains()` (Chiado is held back, M1-3j-b). */
+  /** The supported chains. Default: `autoSelectableChains()` (the chains the faucet serves, M1-3j-b). */
   readonly configs?: readonly chain.ChainConfig[];
 }
 

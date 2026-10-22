@@ -146,6 +146,14 @@ export {
   sealRecoverySeedWithSaltAndNonceUnsafe as sealRecoverySeedWithSaltAndNonce,
 } from './owner-seed-wrap.js';
 
+// M1-9i-b: the ALKK recovery kit with a fixed code, salt, nonce prefix and chunk size, its kek, and
+// opening with a known kek (the `recovery-kit` vectors; the 4 GiB cap with a lower limit in tests).
+export {
+  deriveRecoveryKitKek,
+  openRecoveryKitWithKek,
+  sealRecoveryKitWithUnsafe as sealRecoveryKitWith,
+} from './recovery-kit.js';
+
 // IR-M1-1f-1 L-7: pairingDigest without the commitment check is not public; the `labels` vectors
 // (the same input under both tags) reach it here.
 export { pairingDigest } from './safety-code.js';

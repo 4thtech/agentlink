@@ -70,3 +70,22 @@ export {
   type StoreColumnCipher,
   type StoreColumnContext,
 } from './store-cipher.js';
+// M1-9i-b (04 §2.3.3, D-115): the recovery kit `ALKK` v1. Sealing takes the owner seed and the agent
+// items, opening returns them, so only KeyStore backends (the export and import controls) reach it.
+export {
+  openRecoveryKit,
+  sealRecoveryKit,
+  type OpenRecoveryKitOptions,
+  type OpenedRecoveryKit,
+  type OpenedRecoveryKitAgent,
+  type OpenedRecoveryKitItem,
+  type RecoveryKitAgentInput,
+  type RecoveryKitInput,
+  type RecoveryKitItem,
+  type RecoveryKitStoreSink,
+  type RecoveryKitStoreSource,
+  type RecoveryKitWrite,
+} from './recovery-kit.js';
+// M1-9i-b2 (04 §2.2): the s3:<id> item holds the storage secret, so only KeyStore backends (the
+// StorageCredentialControl and the credentials provider) write or read it.
+export { encodeStorageCredentialItem, parseStorageCredentialItem } from './credential-digest.js';
