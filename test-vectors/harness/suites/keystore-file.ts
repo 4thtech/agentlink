@@ -128,7 +128,16 @@ async function evaluateInput(input: KeystoreFileInput): Promise<readonly Compari
   }
 }
 
+// CHORE-VECTORS-KDF-TIMEOUT: the Argon2id cases are memory-hard and outgrew the 5 s Vitest default
+// on loaded runners. `open-cap-memory` (m = 256 MiB, t = 2) takes 1.8 s on an idle M-series Mac and
+// 2.1 to 4.97 s on passing CI runs (ubuntu-24.04, 2026-10-21); it timed out at 5000 ms on 23 CI runs
+// that day. The 64 MiB cases (kek-default and others) took up to 3.6 s on CI. With 40 copies of the
+// suite in parallel on a 14-core Mac, every copy timed out (cases cut at 5.0 to 5.5 s); with this
+// limit all 40 passed and open-cap-memory took 8.5 to 10.8 s. 60 s matches the crypto package's
+// Argon2id files (M0-10e): about 12x the slowest CI pass and 5.5x the loaded local run.
+// No KDF parameter, vector or assertion changed.
 export const keystoreFile: SuiteModule = {
+  timeoutMs: 60_000,
   async evaluate(testCase) {
     const input = parseInput(testCase.input);
     try {
