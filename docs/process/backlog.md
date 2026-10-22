@@ -2100,7 +2100,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Snapshot tests of CLI and MCP default outputs contain no chain prompt and no chain name outside Advanced; a proof pack verifies with no chain configured.
 
 #### M1-26-c · cli/core: paid tools and `agentlink_status` use `selectPayingChain` (new, M1-26-b follow-up)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#322, merged 2026-10-20) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/**`), packages/core
 - **Depends on:** M1-26-b; M1-26-d for the top-up link
 - **Spec:** D-40, D-108; 06 §2.1 (`credits`, `topUpUrl`), §2.4 (`chain?`, `needs_credits`); 07 §6.3
@@ -2920,7 +2920,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - One conformance suite runs against every backend; the node package keeps no copy of the sign and decrypt logic.
 
 #### M1-8a-d · CI: pin the keychain job's runner images; gating decision (new, IR-M1-8a-b-1 notes)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#83, merged 2026-10-15) · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
 - **Repo/path:** agentlink · .github/workflows/ci.yml
 - **Depends on:** M1-8a-b (PR #57, open: the `keychain` job does not exist on `main` yet). Pinning can start only after #57 merges; the gating decision needs 5–10 green PR runs of the job after that
 - **Spec:** M1-8a-b; docs/process/ci-cd.md
@@ -3531,7 +3531,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `init` with the passkey option on a virtual authenticator completes; the recovery kit offered by `init` restores on a clean machine (with M1-9i).
 
 #### M1-9h-b · CLI: verify and credits polish (new, M1-9h review)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#321, merged 2026-10-20) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/commands/{verify,credits}.ts`, `src/tools/**`)
 - **Depends on:** M1-9h
 - **Spec:** 06 §2.4, §8 (D-108); 11 §5
@@ -3801,7 +3801,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
-- **Status:** ready · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#361, merged 2026-10-21) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/ui (`src/tokens/**`, `fonts/**`, a third-party notices file, `package.json` exports, `src/index.ts`). This card owns `src/index.ts`; M1-35b only appends component exports to it after this card lands
 - **Depends on:** — (parallel with DESIGN-ADJ-1)
 - **Spec:** 11 §11.7; 08 §4; D-30, D-116; `docs/design/d1/tokens/`, `d1/design-system/contrast.md`
@@ -3853,7 +3853,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - Met for Claude Code (2026-10-16, E2E run 38866218869, L06, L10, L11; wording of L10 and L11 for human review): the transcripts are in the run artifact and the test report. Codex has no passing L06 to L11 transcript with this skill yet.
 
 #### M1-12c · skill file: file and proof workflows (new, split from M1-12a)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#341, merged 2026-10-21) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · skills/agentlink/SKILL.md
 - **Depends on:** M1-12a, M1-9d
 - **Spec:** 06 §5; 02 F-43, F-51, J2, J3, J5, J8; 04 §3.4 (proof of agreement); 11 §5, §6.1; D-32, D-40
@@ -4071,7 +4071,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - **Deploy (D-25)** block as in M1-19.
 
 #### M1-33a · Delivery receipts off by default; sender request and recipient opt-in (new, D-109)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#325, merged 2026-10-21) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types (policy default, `ContactRule.receipts`, `proof` body `receiptRequest`), packages/core (proofs, inbox, policy engine), apps/cli (tool inputs, policy review, local UI rule)
 - **Depends on:** M1-7g, M1-7g-b, M1-9d-2
 - **Spec:** 04 §3.4 (`proof`, receipt request), §5, §5.1; 06 §2.2, §2.4, §3 (delivery receipts, contact rules); 11 §5.6; D-109
@@ -4100,7 +4100,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Snapshot tests of each summary and card; a vocabulary test (11 §5.1) over the new strings; the user-guide privacy page and the proof page match the strings.
 
 #### M1-33c · `parentRecordId` rule: zero or the agent's own record (new, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#323, merged 2026-10-20) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs), packages/chain (record builder)
 - **Depends on:** M1-7g
 - **Spec:** 05 §3.1 (`parentRecordId` rule); 04 §5.1; D-109
