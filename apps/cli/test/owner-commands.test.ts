@@ -16,6 +16,7 @@ import {
   type StoreCipher,
 } from '@4thtech-io/core';
 import {
+  KeyStoreError,
   canonicalize,
   decodeBase64url,
   decodeUtf8,
@@ -41,6 +42,7 @@ import {
   type OwnerAgent,
   type OwnerCommandDeps,
 } from '../src/commands/owner/index.js';
+import { OWNER_TEXT } from '../src/commands/owner/strings.js';
 import { createDispatcher, DISPATCH_TEXT } from '../src/dispatch.js';
 import { createOutput } from '../src/output.js';
 import {
@@ -613,6 +615,57 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
     expect(await w.run(['approve'])).toBe(0);
     expect(opened).toEqual(['work']);
     expect(w.codeEntries).toHaveLength(1);
+  });
+});
+
+describe('the owner code prompt says where the code goes (M1-9zd; 11 §5.5, §6.10)', () => {
+  /** Records the output lines printed so far each time an owner step would prompt for the code. */
+  function atPrompt(w: World): string[][] {
+    const seen: string[][] = [];
+    const { decide, signOwnerAction } = w.deps;
+    w.deps.decide = (context, reviewed) => {
+      seen.push([...w.out]);
+      return decide(context, reviewed);
+    };
+    w.deps.signOwnerAction = (owner, item) => {
+      seen.push([...w.out]);
+      return signOwnerAction(owner, item);
+    };
+    return seen;
+  }
+
+  it('approve <id>, deny <id>, approve and cancel <id>: the reminder comes right before the prompt', async () => {
+    const w = await world();
+    const seen = atPrompt(w);
+    const a = await w.request();
+    const b = await w.request();
+    await w.request();
+    expect(await w.run(['approve', a.approvalId])).toBe(0);
+    expect(await w.run(['deny', b.approvalId])).toBe(0);
+    w.answers.push('a', 'y');
+    expect(await w.run(['approve'])).toBe(0);
+    expect(await w.run(['cancel', a.approvalId])).toBe(0);
+    expect(seen).toHaveLength(4);
+    for (const lines of seen) expect(lines.at(-1)).toBe(OWNER_TEXT.codeHint);
+  });
+
+  it('no reminder when no code is asked for', async () => {
+    const w = await world();
+    expect(await w.run(['approve', `apr_${encodeBase64url(randomBytes(16))}`])).toBe(1);
+    expect(await w.run(['approve'])).toBe(0);
+    expect(w.out).not.toContain(OWNER_TEXT.codeHint);
+  });
+
+  it('a wrong owner code: nothing is decided, and the reminder says to type only the code', async () => {
+    const w = await world();
+    const r = await w.request();
+    w.deps.decide = () => Promise.reject(new KeyStoreError('presence_rejected', 'presence'));
+    w.deps.signOwnerAction = () =>
+      Promise.reject(new KeyStoreError('presence_rejected', 'presence'));
+    expect(await w.run(['approve', r.approvalId])).toBe(1);
+    expect(await w.run(['cancel', r.approvalId])).toBe(1);
+    expect(w.err).toEqual([OWNER_TEXT.wrongCode, OWNER_TEXT.wrongCode]);
+    expect((await row(w, r.approvalId))?.status).toBe('pending');
   });
 });
 

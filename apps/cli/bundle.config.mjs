@@ -15,10 +15,15 @@
 //   holds only the allowlisted publish fields: no devDependencies, no scripts, no workspace
 //   (`@4thtech-io/*`) name. `publishConfig.directory` in apps/cli/package.json makes `pnpm pack`
 //   (Changesets in release.yml) and `npm publish` pack that directory, never apps/cli itself.
+// - M1-11s-b (D-118): the local UI's built files (apps/local-ui/dist) are embedded as the constant
+//   `__AGENTLINK_LOCAL_UI__` (scripts/local-ui-embed.mjs), read by src/mcp/local-ui-assets.ts and
+//   served from memory by the approval server. Build apps/local-ui first; without it the bundle
+//   is empty and the app pages answer 404.
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { localUiAssetEntries } from './scripts/local-ui-embed.mjs';
 
 const packageDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -93,6 +98,11 @@ export default defineConfig({
   publicDir: false,
   envDir: false,
   logLevel: 'warn',
+  define: {
+    __AGENTLINK_LOCAL_UI__: JSON.stringify(
+      localUiAssetEntries(join(packageDir, '..', 'local-ui', 'dist')),
+    ),
+  },
   ssr: {
     target: 'node',
     noExternal: [/^@4thtech-io\//],
