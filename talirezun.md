@@ -1,6 +1,10 @@
 # @talirezun — sync
 **Headline:** D-118 to D-123 recorded in PR #416; about 25 PRs passed review and wait on CI runners, and the merge queue has been stalled since 10:03Z (#386 and #395 jumped to the front).
-_Updated 2026-10-22T12:05Z · claude-code / claude-haiku-5-5 · orchestrator, afternoon_
+_Updated 2026-10-22T18:00Z · claude-code / claude-haiku-5-5 · orchestrator, evening_
+
+## Merge plan (2026-10-22 evening)
+Approved drafts merge after their bases, each with a fresh review: #370→#407,#427,#428; #410→#424→#426→#431; #411→#417,#418,#419→#435 (+#425); #414→#415→#429,#430,#432; #406→#416→#437; #413→#422.
+Follow-up cards are recorded in #416/#437. Contracts: occ-v2-contracts #25 and #26 merged; testnet vault upgrade is the owner's next step.
 
 ## Now
 - **Merge rule (standing, from Tali):** merge once an independent review PASSes and checks are green.
