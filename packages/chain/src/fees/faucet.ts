@@ -24,7 +24,11 @@
 //   often only the previous claim's own `depositFor`, not yet mined, so the faucet first polls
 //   `latest` until it reaches the `pending` nonce it read, and refuses only if it has not by the
 //   deadline (M1-10b-d). The poll and the approve's receipt wait share one `receiptTimeoutMs`
-//   budget per claim, so a claim waits no longer in total than before.
+//   budget per claim, so a claim waits no longer in total than before. A nonce found stuck at the
+//   deadline is remembered: claims against the same nonce within FAUCET_STUCK_NONCE_COOLDOWN_MS
+//   are refused at once, so a stuck approve does not hold the claim queue for a full budget each
+//   time. A nonce that settles with less than FAUCET_MIN_APPROVE_BUDGET_SHARE of the budget left
+//   is also `busy`: the approve would likely time out and stall the faucet on its own approve.
 import { decodeFunctionResult, encodeFunctionData, erc20Abi, keccak256 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { ChainConfigError, type ChainConfig, type FeeTokenSymbol } from '../config/index.js';
@@ -45,6 +49,20 @@ export const FAUCET_CHAIN_IDS: readonly number[] = Object.freeze([84532]);
  * not clamped (M1-10b-c).
  */
 export const FAUCET_MAX_GAS = 300_000n;
+
+/**
+ * After a pending nonce is found still stuck at the deadline, claims against the same nonce are
+ * refused `busy` at once for this long, without polling: a stuck approve would otherwise hold the
+ * serialised claim queue for a whole receipt budget per claim (IR-M1-10b-d-1 L1).
+ */
+export const FAUCET_STUCK_NONCE_COOLDOWN_MS = 60_000;
+
+/**
+ * The share of the receipt budget that must be left when a pending nonce settles for the faucet
+ * to send its approve; with less, the approve would likely time out and the faucet stall behind
+ * its own approve, so the claim is `busy` and nothing is sent (IR-M1-10b-d-1 L2).
+ */
+export const FAUCET_MIN_APPROVE_BUDGET_SHARE = 0.5;
 
 /** The most one claim may credit, in US cents ($10). */
 export const FAUCET_MAX_USD_CENTS = 1_000;
@@ -225,6 +243,8 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
   const tokenAddress = offered.token.address?.toLowerCase() as Hex | undefined;
   const unit = 10n ** BigInt(offered.token.decimals - 2);
   let chainChecked = false;
+  /** The pending nonce last found stuck at a deadline, and when (IR-M1-10b-d-1 L1). */
+  let stuck: { nonce: bigint; at: number } | null = null;
 
   /** A JSON-RPC read whose every failure is `unavailable`. */
   const read = async (method: string, params: readonly unknown[]): Promise<unknown> => {
@@ -427,7 +447,30 @@ export function createFaucetChain(config: ChainConfig, options: FaucetChainOptio
           faucetAddress,
           'latest',
         ]);
-        if (firstNonce > latestNonce) await settled(firstNonce, deadline);
+        if (firstNonce > latestNonce) {
+          const now = Date.now();
+          if (
+            stuck !== null &&
+            stuck.nonce === firstNonce &&
+            now >= stuck.at &&
+            now - stuck.at < FAUCET_STUCK_NONCE_COOLDOWN_MS
+          ) {
+            throw new NotSent('busy');
+          }
+          try {
+            await settled(firstNonce, deadline);
+          } catch (error) {
+            if (error instanceof NotSent && error.reason === 'busy') {
+              stuck = { nonce: firstNonce, at: Date.now() };
+            }
+            throw error;
+          }
+          stuck = null;
+          // Too little budget left for the approve's receipt: refuse rather than stall on it.
+          if (deadline - Date.now() < receiptTimeout * FAUCET_MIN_APPROVE_BUDGET_SHARE) {
+            throw new NotSent('busy');
+          }
+        }
         // The depositFor pulls the token with the allowance, so it can be simulated only once the
         // approve is mined. A failed, lost, reverted or slow approve sends no depositFor: nothing
         // was credited (a leftover allowance is used by the next claim).
