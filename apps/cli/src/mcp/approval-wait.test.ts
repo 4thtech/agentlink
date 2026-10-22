@@ -38,7 +38,22 @@ describe('the per-harness wait budget (M1-36j)', () => {
   });
 
   it('gives no wait to an unknown, missing or odd client name', () => {
-    for (const name of [undefined, '', 'cursor-vscode', 'windsurf', 'opencode', 'Claude-Code', 'claude-code ', 'claude-codex', 42, null, {}, 'toString', '__proto__', 'constructor']) {
+    for (const name of [
+      undefined,
+      '',
+      'cursor-vscode',
+      'windsurf',
+      'opencode',
+      'Claude-Code',
+      'claude-code ',
+      'claude-codex',
+      42,
+      null,
+      {},
+      'toString',
+      '__proto__',
+      'constructor',
+    ]) {
       expect(approvalWaitMsFor(name as unknown), String(name)).toBe(0);
     }
   });
@@ -51,8 +66,11 @@ describe('the per-harness wait budget (M1-36j)', () => {
 // ---- Over a real SDK client ---------------------------------------------------------------------
 
 const display = (name: string): ContactDisplayName =>
-  ({ name: name as RestrictedName, label: 'self-declared', nameSource: 'counterparty' }) as
-    ContactDisplayName;
+  ({
+    name: name as RestrictedName,
+    label: 'self-declared',
+    nameSource: 'counterparty',
+  }) as ContactDisplayName;
 
 function setup(states: readonly string[]): { context: ToolContext; reads: () => number } {
   let reads = 0;
@@ -92,6 +110,12 @@ function setup(states: readonly string[]): { context: ToolContext; reads: () => 
         expiresAt: VALID_UNTIL,
       } as ApprovalState);
     },
+    self: () =>
+      Promise.resolve({
+        agentId: `0x${'a'.repeat(40)}`,
+        agentFingerprint: '1111·2222',
+        ownerFingerprint: '3333·4444',
+      }),
     contacts: () => Promise.resolve([]),
     terms,
   } as unknown as ToolClient;
@@ -124,7 +148,10 @@ async function connect(context: ToolContext, clientName: string): Promise<Client
   return client;
 }
 
-const ARGS = { name: 'agentlink_respond_to_terms', arguments: { envelopeId: ENVELOPE, decision: 'accept' } };
+const ARGS = {
+  name: 'agentlink_respond_to_terms',
+  arguments: { envelopeId: ENVELOPE, decision: 'accept' },
+};
 
 describe('the wait over MCP (M1-36j)', () => {
   it('a known harness gets the decision inside the same call', async () => {
@@ -155,9 +182,7 @@ describe('the wait over MCP (M1-36j)', () => {
     const controller = new AbortController();
     const started = Date.now();
     setTimeout(() => controller.abort(), 30);
-    await expect(
-      client.callTool(ARGS, undefined, { signal: controller.signal }),
-    ).rejects.toThrow();
+    await expect(client.callTool(ARGS, undefined, { signal: controller.signal })).rejects.toThrow();
     const at = reads();
     await new Promise((resolve) => setTimeout(resolve, 80));
     expect(reads()).toBe(at);

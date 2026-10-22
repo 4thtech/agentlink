@@ -35,6 +35,7 @@ import {
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
+import { approvalWaitMsFor } from './approval-wait.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
@@ -98,7 +99,12 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         ? agentToolContext(opened.agent, logger, deps.clock, approvalUi)
         : { needsSetup: { message: opened.message }, logger };
 
-    const server = createMcpServer(env, deps.version);
+    // M1-36j (D4): only with the approval page can a call wait for the owner's decision.
+    const server = createMcpServer(
+      env,
+      deps.version,
+      approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor },
+    );
     const loop =
       agent === undefined
         ? undefined
