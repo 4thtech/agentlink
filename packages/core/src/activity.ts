@@ -19,6 +19,7 @@
 import { decodeHex, formatFingerprint, senderCode as senderDigest } from '@4thtech-io/crypto';
 import type { CoreContext } from './context.js';
 import {
+  candidatesByTimeTx,
   candidatesTx,
   pageLimit,
   pageOf,
@@ -101,7 +102,8 @@ export class ActivityService {
     const cursor = parseCursor(query.cursor);
     const candidates = await this.#ctx.store.transaction((tx): Candidate[] => {
       const out: Candidate[] = [];
-      // `position` orders the feed and makes the cursor: `<kind>:<the row key the store orders by>`.
+      // `position` orders the feed and makes the cursor; it is always the entry's own `id`, a value
+      // the caller already received (paging.ts).
       const add = (at: number, position: string, entry: () => ActivityEntry): void => {
         out.push({ at, id: position, entry });
       };
@@ -160,13 +162,14 @@ export class ActivityService {
         }));
       }
 
-      const blocked = candidatesTx(
+      // Blocked senders are positioned by their long sender code, the entry's own ID, never by the
+      // key (IR-M1-11r-a-2 M-2). The store cannot order by that digest, so rows that share one
+      // second are read whole (candidatesByTimeTx); each row is one owner Block.
+      const blocked = candidatesByTimeTx(
         tx,
         'blocked_keys',
-        {},
         'blocked_at',
         'from_key',
-        BLOCKED,
         cursor,
         limit,
       );
@@ -174,12 +177,9 @@ export class ActivityService {
       for (const r of blocked) {
         const code = codes.get(r.from_key);
         if (code === undefined || !NOSTR_KEY.test(r.from_key)) continue;
-        // The entry ID is the long sender code: unique per key, and never the key itself. The
-        // page position (and so a cursor that ends on this entry) uses the key, the column the
-        // store orders by; the cursor is opaque and only ever handed back to this read.
         const long = formatFingerprint(senderDigest(decodeHex(r.from_key, { length: 32 })), 'long');
         const id = `${BLOCKED}${long}`;
-        add(r.blocked_at, `${BLOCKED}${r.from_key}`, () => ({
+        add(r.blocked_at, id, () => ({
           kind: 'sender_blocked',
           id,
           at: r.blocked_at,

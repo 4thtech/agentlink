@@ -80,6 +80,43 @@ export function pageOf<T extends PagePosition>(
 }
 
 /**
+ * Inside a transaction: candidates of a table whose items are ordered at equal time by a value the
+ * store cannot order by (a digest the caller holds, where the stored key must not reach a cursor;
+ * IR-M1-11r-a-2 M-2). It reads the `limit + 1` newest rows before the cursor time, and then every
+ * row at the time of the last of them and at the cursor time, so pageOf can order ties itself. Only
+ * the rows that share one second are read without a bound, so use it only for a table whose rows
+ * the owner writes one at a time (blocked senders).
+ */
+export function candidatesByTimeTx<T extends TableName>(
+  tx: StoreTx,
+  table: T,
+  time: ColumnName<T>,
+  key: ColumnName<T>,
+  cursor: PagePosition | undefined,
+  limit: number,
+): Row<T>[] {
+  const at = (condition: unknown): Where<T> => ({ [time]: condition }) as Where<T>;
+  const rows = tx.select(table, at(cursor === undefined ? { gte: 0 } : { lt: cursor.at }), {
+    orderBy: [[time, 'desc']],
+    limit: limit + 1,
+  });
+  const extra: Row<T>[] = [];
+  const last = rows[rows.length - 1];
+  if (rows.length === limit + 1 && last !== undefined) {
+    extra.push(...tx.select(table, at(last[time as keyof Row<T>])));
+  }
+  if (cursor !== undefined) extra.push(...tx.select(table, at(cursor.at)));
+  const seen = new Set(rows.map((r) => r[key as keyof Row<T>]));
+  for (const r of extra) {
+    const k = r[key as keyof Row<T>];
+    if (seen.has(k)) continue;
+    seen.add(k);
+    rows.push(r);
+  }
+  return rows;
+}
+
+/**
  * Inside a transaction: the first `limit + 1` rows of one table after the cursor, in newest-first
  * order on the composite (`time`, `key`), so a page never reads more than `limit + 1` rows of a
  * table (IR-M1-11r-a-1 L-2), however many share one time.
