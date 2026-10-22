@@ -27,7 +27,11 @@ const FORBIDDEN = [
     `export const k = () => globalThis.crypto.subtle.digest('SHA-256', new Uint8Array());\n`,
   ],
   ['a deep import', `import { x } from '@4thtech-io/crypto/src/testing';\nvoid x;\n`],
-  ['a retired scope', `import { x } from '@agentlink/core';\nvoid x;\n`],
+];
+
+// Covered by the repository scan only, as in every other zone (ESLint has no retired-scope rule).
+const SCAN_ONLY = [
+  ['a retired scope', `import { x } from '${'@' + 'agentlink'}/core';\nvoid x;\n`],
 ];
 
 const ALLOWED = [
@@ -37,10 +41,7 @@ const ALLOWED = [
   ],
   ['a workspace package', `import { openAgent } from '@4thtech-io/node';\nvoid openAgent;\n`],
   ['a Node built-in', `import { readFile } from 'node:fs/promises';\nvoid readFile;\n`],
-  [
-    'the built CLI modules',
-    `import { x } from '../../apps/cli/dist/runtime/index.js';\nvoid x;\n`,
-  ],
+  ['the built CLI modules', `import { x } from '../../apps/cli/dist/runtime/index.js';\nvoid x;\n`],
 ];
 
 describe('deps-check repository scan covers e2e/', () => {
@@ -64,7 +65,7 @@ describe('deps-check repository scan covers e2e/', () => {
     return root;
   };
 
-  it.each(FORBIDDEN)('reports %s planted in e2e/', (_label, code) => {
+  it.each([...FORBIDDEN, ...SCAN_ONLY])('reports %s planted in e2e/', (_label, code) => {
     const { problems } = runChecks(repo(code));
     expect(problems.some((problem) => problem.includes('e2e/test/a.test.ts'))).toBe(true);
   });
