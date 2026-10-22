@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28))) |
+| M1 Local beta | 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)))) |
 | M2 Console, desktop apps, self-host, design | 44 (incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -4851,19 +4851,22 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests for the prefix helper and each rewritten string; the approval text is audited by an Opus reviewer.
 
-#### M1-36b · agent UX: init flow, end of run and diff layout (UX-B) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+#### M1-36b · agent UX: init flow; global install, automatic agent names, default send folder (UX-B) (new, UX audit, agent side, 2026-10-22; D-121)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (D6 changes a policy default) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests, `apps/cli/src/harness/**` as needed
 - **Depends on:** M1-36a
-- **Spec:** 06 §5; 11 §5
-- **Invariants:** I-5
+- **Spec:** 06 §5; 11 §5; D-121
+- **Invariants:** I-4, I-5
 - **Scope:**
-  - Clear end-of-run message and a readable diff layout (findings F8, F9). Global install (D1) and automatic agent names (D5) are separate, owner-decided follow-ups.
+  - Clear end-of-run message and a readable diff layout (findings F8, F9).
+  - D1: `init` offers a global install after the diff (y/N); MCP entries point at the installed program, `npx` stays the fallback.
+  - D5: `init` names agents from the harness; owner commands infer the agent when there is one.
+  - D6: `init` creates an empty `~/AgentLink/Send` and allows only that folder for sending; the owner can remove it (orchestrator wording: a policy default change, S2 review).
 - **Acceptance:**
-  - Tests for the end-of-run text and the diff layout; `init` still shows the diff and requires `--confirm <code>`.
+  - Tests for each point; `init` still shows the diff and requires `--confirm <code>`; the created folder is empty and no existing file becomes sendable; threat note and tests-first evidence (S2).
 
 #### M1-36c · agent UX: no dead-end commands, help, registered-command test (UX-C) (new, UX audit, agent side, 2026-10-22)
-- **Status:** in-review (#409) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** in-review (#409) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/dispatch.ts`, `apps/cli/src/commands/contacts.ts`, `apps/cli/src/commands/shared.ts`, new `apps/cli/src/commands/registered-commands.test.ts`
 - **Depends on:** none
 - **Spec:** 06 §5; 11 §5
@@ -4885,7 +4888,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Each tool result with a pending step carries one next action; vocabulary lint passes.
 
 #### M1-36e · agent UX: vocabulary lint everywhere, fix terminal leaks (UX-E) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (touches `packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · new `apps/cli/src/vocabulary.ts` and `vocabulary.test.ts`, `packages/node/src/approval-page.test.ts`, docs-site lint in `tools/`
 - **Depends on:** M1-36a, M1-36c, M1-36d
 - **Spec:** 11 §5
@@ -4931,20 +4934,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Spec and code agree on every line of the sync list; `tool-surface.json` is regenerated and the tool-surface test passes.
 
 #### M1-36i · agent UX: automatic free test credits (UX-I) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog (waits on owner decision D2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` proofs, `apps/cli/src/tools/notarize.ts` and `send.ts`, `apps/submitter` route if needed
-- **Depends on:** owner decision D2 (faucet claim from the agent, testnet only); M1-36f
+- **Depends on:** D-120 (3) (decided); M1-36f
 - **Spec:** 06; 07 §5
 - **Invariants:** I-1, I-4
 - **Scope:**
-  - On testnets only, the first `needs_credits` claims the faucet once for this agent after one plain sentence of disclosure, then retries (finding F3). Not started until Tali decides D2.
+  - On testnets only, the first `needs_credits` claims the faucet once for this agent after one plain sentence of disclosure, then retries (finding F3). Decided in D-120 (3): auto-claim once per agent, a small fixed amount, testnet only, within the faucet rate limits; the pool alert is M1-10b-e.
 - **Acceptance:**
   - Mainnet is unaffected; faucet rate limits and caps hold; no secret reaches the faucet; threat note and tests-first evidence (S2).
 
 #### M1-36a-b · remaining bare `agentlink` prefixes; owner init on fresh machines (new, IR-M1-36a-1 scope low)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, doctor strings (`tools/strings/en.ts`), `packages/node/src/approval-page.ts`, the owner-init redirect message, owner `strings.ts:65`
-- **Depends on:** M1-36a
+- **Depends on:** M1-36a, M1-36b, M1-36d
 - **Spec:** 06 §2.5; 11 §5
 - **Invariants:** I-5
 - **Scope:**
@@ -4974,9 +4977,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - 1b: demote the "Weaker setup" box to one neutral line and remove dead "Get the desktop app" links (first run, approvals footer, storage) until M2.
   - 1c and 10a: draw "Ready" as the hand-back to chat with a Copy prompt; empty states with a "Try: ..." prompt on every page.
-  - 2a and 2b: approval done and denied state ("your AI carries on, close this tab"); the expired link leads with "Ask your AI: 'Open AgentLink'".
+  - 2a and 2b: approval done and denied state (copy final after D-121 D4: "your AI carries on, close this tab" is true only once the tool waits for the decision; until then the AI resumes when the user says so); the expired link leads with "Ask your AI: 'Open AgentLink'".
   - 2c and 5b: status bar reads "Connected · N proofs left"; the credits card leads with proofs left; Agent ID and QR only under Advanced while the pay page is off.
-  - 9a, 9b and 9c: invite landing "about 5 minutes", AI-app tabs that work in M1, inviter block order, a 3-bullet "what happens next"; build the prompt from the source string (`@4thtech-io`).
+  - 9a, 9b and 9c: invite landing "about 5 minutes", AI-app tabs that work in M1, inviter block order, a 3-bullet "what happens next" (worded neutrally, or per D-120 (1) once page-first setup lands); build the prompt from the source string (`@4thtech-io`).
   - 4c and 10d: plain-language error and jargon sweep (integrity check, localhost, document key, OWNER ACTIONS BLOCKED).
   - 1e: harness-specific restart line in `init`.
 - **Acceptance:**
@@ -5019,7 +5022,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A paging test with malformed rows returns the right page and cursor.
 
 #### M1-5b-d · outbox notices in tool results and the activity feed (new, IR-M1-5b-c-2 low, 07 §4.2)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli` tool results and activity feed, `packages/core` outbox notice mapping
 - **Depends on:** M1-11r-a
 - **Spec:** 07 §4.2
@@ -5030,7 +5033,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Each reason code maps to one plain sentence; no relay URL or payload appears.
 
 #### M1-3j-d · docs pass: README Chiado line and wording (new, IR-M1-3j-c-2 lows)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `README.md`, `docs/process/backlog.md`
 - **Depends on:** M1-3j-c
 - **Spec:** 11 §5
@@ -5039,6 +5042,58 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass.
 - **Acceptance:**
   - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/**` (accept_invite, respond_to_terms), `packages/node` approval wait
+- **Depends on:** M1-36d
+- **Spec:** 06 §2.5; D-121
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - When the local approval page has opened, the tool waits up to about 45 s for the owner's decision and returns the finished result; otherwise it returns `pending_approval` as today. Approval and owner presence are unchanged.
+  - Check each harness's tool timeout first (Codex about 60 s) and pick the wait per harness (orchestrator wording).
+- **Acceptance:**
+  - Tests: approved, denied and timed-out waits; a decision made after the timeout is picked up by the retry; no approval is granted by waiting; threat note and tests-first evidence (S2).
+
+#### M1-10b-e · submitter faucet and gas pool: low signal and alert (new, D-120 (3))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/submitter`, `apps/faucet` and their tests
+- **Depends on:** M1-10b-c
+- **Spec:** 07 §5; D-120
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - Grant set to 50 cents of test credits (5 proofs) per agent, claimed once. When the pool is low the claim returns a fixed "test credits paused" status that the tools word plainly.
+  - Alert when the faucet or gas balance falls under $20 (orchestrator wording: threshold and grant are the orchestrator's figures from the decision).
+- **Acceptance:**
+  - Tests for the low-pool status and the alert threshold; the status leaks no balance, address or key; threat note and tests-first evidence (S2).
+
+#### M1-11s-a-b · local UI navigation from 10 to 7 items (new, D-120 (4))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/nav.ts`, `apps/local-ui/src/router.tsx` and their tests
+- **Depends on:** #407 (M1-11s-a)
+- **Spec:** 08 §1; 11 §6.2.1; D-120
+- **Invariants:** I-5
+- **Scope:**
+  - Navigation becomes Approvals, Activity, Contacts, Files (storage folded in), Proofs and credits, Rules, Settings (Backup, Passkeys, Advanced). Keep old paths redirecting.
+- **Acceptance:**
+  - Router and nav tests list exactly seven items; old routes redirect; default views pass `lintVocabulary`. Spec edits to 11 §6.2.1 and 08 §1 are proposed, owner confirms at merge.
+
+#### M1-37b · app UX P1 copy and flow fixes (Wave 1) (new, UX audit, app, 2026-10-22, section 12 items 8 to 14)
+- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` is S1 by path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/**`
+- **Depends on:** M1-37a, M1-11c-a1..a6
+- **Spec:** 08 §1; 11 §5, §6.2; D-116, D-118, D-120
+- **Invariants:** I-5
+- **Scope:**
+  - 8 (4a): folder access as a prefilled approval card from the failed send, so the AI retries itself.
+  - 9 (3a): the recipient's first run continues straight into the pending contact approval.
+  - 10 (3b and 3c): safety-code nudge with They match, Don't match and Skip; a sender "waiting for Marko" row.
+  - 11 (6a to 6c): Rules in two groups, selling warning only when turning it on, unsaved-changes bar (record as a D-116 deviation).
+  - 12 (5c): one-time first-proof disclosure banner.
+  - 13 (10b): getting-started checklist (deviation note).
+  - 14 (7b, 8a, 8b): Backup simplified with B-3, passkeys under Settings, Copy diagnostics, network change confirm.
+- **Acceptance:**
+  - Each item has a Playwright step; default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; deviations from D-116 recorded in the PR.
 
 #### M1-GATE · Milestone 1 gate: internal audit and user testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2 · **Phase:** M1b

@@ -4,3 +4,4 @@ section: Changed
 
 - Policy loosening (D-119, docs only): an owner-signed policy edit that loosens a rule is allowed with warnings, and the local UI does not sign until every warning is acknowledged. Anything the strict schema forbids stays impossible.
 - Backlog: follow-up cards from the 22 October UX audits (M1-36a to M1-36i, M1-37a) and review follow-ups.
+- Owner decisions D-120 (app UX: page-first setup, recovery kit later, automatic test credits, seven-item navigation) and D-121 (agent-side install, approval wait, automatic agent names, default send folder), docs only; new cards M1-36b, M1-36j, M1-10b-e, M1-11s-a-b and M1-37b.
