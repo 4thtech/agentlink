@@ -340,7 +340,7 @@ export function ActivityPage({ api }: ActivityPageProps): ReactElement {
           {view.more !== 'idle' && view.more !== 'loading' ? (
             <ProblemView problem={view.more} onRetry={() => void loadMore(view)} />
           ) : null}
-          {view.nextCursor !== undefined && view.more !== 'error' && view.more !== 'offline' ? (
+          {view.nextCursor !== undefined && (view.more === 'idle' || view.more === 'loading') ? (
             <div className="al-activity-more">
               <Button
                 onClick={() => void loadMore(view)}

@@ -201,6 +201,57 @@ describe('Activity page (M1-11c-a1)', () => {
     expect(host.querySelector('table')).toBeNull();
   });
 
+  it('labels a sent proof neutrally, whatever its state (IR-M1-11c-a1-1 L-1)', async () => {
+    await mount(
+      apiWith(async () =>
+        ok({
+          items: [
+            { kind: 'proof', at: AT + 2, direction: 'sent', state: 'failed' },
+            { kind: 'proof', at: AT + 1, direction: 'sent', state: 'needs_credits' },
+          ],
+        }),
+      ),
+    );
+    for (const row of host.querySelectorAll('tbody tr')) {
+      expect(row.textContent).toContain(S.proofSent);
+      expect(row.textContent).not.toMatch(/\badded\b/i);
+    }
+  });
+
+  it('names an unknown sender "Sender", not "Contact" (IR-M1-11c-a1-1 L-2)', async () => {
+    await mount(
+      apiWith(async () =>
+        ok({ items: [{ kind: 'sender_blocked', at: AT, senderCode: '2B9E·04D1' }] }),
+      ),
+    );
+    const fp = host.querySelector('.al-fp');
+    expect(fp?.textContent).toMatch(/^Sender /);
+    expect(fp?.textContent).not.toContain('Contact');
+  });
+
+  it.each([
+    [{ kind: 'session_expired' }, 'sessionTitle'],
+    [{ kind: 'error', status: 409 }, 'notSetUpTitle'],
+    [{ kind: 'offline' }, 'offlineTitle'],
+  ] as const)(
+    'hides "Show more" while a problem from the next page is shown (%j; IR-M1-11c-a1-1 L-3)',
+    async (failure, key) => {
+      const api = apiWith(async (path) =>
+        path.includes('cursor=')
+          ? (failure as ApiResult<unknown>)
+          : ok({ items: ALL_KINDS.slice(0, 2), nextCursor: '1~x' }),
+      );
+      await mount(api);
+      const more = [...host.querySelectorAll('button')].find((b) => b.textContent === S.showMore);
+      await act(async () => more?.click());
+      expect(text()).toContain(S[key]);
+      expect(host.querySelectorAll('tbody tr')).toHaveLength(2);
+      expect([...host.querySelectorAll('button')].some((b) => b.textContent === S.showMore)).toBe(
+        false,
+      );
+    },
+  );
+
   it('retries a failed first load', async () => {
     let calls = 0;
     const api = apiWith(async () =>

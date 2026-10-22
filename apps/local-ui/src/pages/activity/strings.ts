@@ -15,11 +15,11 @@ export const ACTIVITY_STRINGS = {
   cancelled: 'You cancelled a request',
   cancelledChip: 'Cancelled',
   // Proofs
-  proofSent: 'Proof added to a message you sent',
+  proofSent: 'Proof for a message you sent',
   proofReceived: 'A contact added proof to a message for you',
   // Blocks and rules
   senderBlocked: 'You blocked an unknown sender',
-  senderPrefix: 'Contact',
+  senderPrefix: 'Sender',
   contactBlocked: 'You blocked a contact',
   rulesChanged: 'Your rules were updated',
   none: '—',
