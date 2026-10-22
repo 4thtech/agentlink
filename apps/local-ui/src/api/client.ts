@@ -18,12 +18,40 @@ export interface ApiClientOptions {
   readonly token?: string;
 }
 
+/**
+ * An owner operation's answer (M1-11c-a4c): the central presence gate's own outcomes, or the
+ * route's JSON. The owner code is never echoed back or logged.
+ */
+export type OwnerApiResult =
+  | { readonly kind: 'ok'; readonly status: number; readonly data: unknown }
+  /** The gate: no owner code, a wrong one, a wait after wrong codes, or another operation running. */
+  | { readonly kind: 'presence_required' | 'presence_rejected' | 'wait' | 'busy' }
+  /** The route signed nothing (409 `refused`) or answered a fixed error word. */
+  | { readonly kind: 'answer'; readonly status: number; readonly data: unknown }
+  | { readonly kind: 'session_expired' }
+  | { readonly kind: 'offline' }
+  | { readonly kind: 'error'; readonly status: number };
+
 export interface ApiClient {
   get<T = unknown>(path: string): Promise<ApiResult<T>>;
   post<T = unknown>(path: string, body?: unknown): Promise<ApiResult<T>>;
+  /**
+   * One owner operation (M1-11c-a4c; 04 §2.5): `input` travels base64url JSON in
+   * `X-AgentLink-Input`, the owner code is the octet-stream body (the server's presence gate reads
+   * it once and wipes it). Never in the URL.
+   */
+  owner(path: string, input: unknown, ownerCode: string): Promise<OwnerApiResult>;
 }
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
+
+/** base64url without padding of a UTF-8 string. */
+function base64url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
 
 function pageToken(): string {
   if (typeof document === 'undefined') return '';
@@ -83,8 +111,46 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     return { kind: 'ok', status: res.status, data: parsed.value as T };
   }
 
+  async function owner(path: string, input: unknown, ownerCode: string): Promise<OwnerApiResult> {
+    checkPath(path);
+    const headers = new Headers({
+      [CSRF_HEADER]: options.token ?? pageToken(),
+      'content-type': 'application/octet-stream',
+      'X-AgentLink-Input': base64url(JSON.stringify(input)),
+    });
+    let res: Response;
+    try {
+      res = await doFetch(path, {
+        method: 'POST',
+        headers,
+        body: ownerCode,
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+    } catch {
+      return { kind: 'offline' };
+    }
+    const parsed = await readJson(res);
+    const value = parsed.ok ? parsed.value : undefined;
+    const gate =
+      typeof value === 'object' && value !== null ? (value as { status?: unknown }).status : null;
+    if (res.status === 401) return { kind: 'session_expired' };
+    if (
+      gate === 'presence_required' ||
+      gate === 'presence_rejected' ||
+      gate === 'wait' ||
+      gate === 'busy'
+    ) {
+      return { kind: gate };
+    }
+    if (!parsed.ok) return { kind: 'error', status: res.status };
+    if (res.ok) return { kind: 'ok', status: res.status, data: value };
+    return { kind: 'answer', status: res.status, data: value };
+  }
+
   return {
     get: (path) => request('GET', path),
     post: (path, body) => request('POST', path, body),
+    owner,
   };
 }

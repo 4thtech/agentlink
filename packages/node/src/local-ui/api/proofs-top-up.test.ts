@@ -48,7 +48,7 @@ const OTHER = '0x' + '22'.repeat(20);
 const XDAI = 10n ** 18n;
 const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8('owner code') });
 const OWNER = new MemoryOwnerKeyStore(new Uint8Array(32).fill(7), presence());
-let OWNER_NOSTR = new Uint8Array(32);
+let OWNER_NOSTR: Uint8Array = new Uint8Array(32);
 beforeAll(async () => {
   OWNER_NOSTR = (await OWNER.getPublicKeys()).ownerNostr;
 });

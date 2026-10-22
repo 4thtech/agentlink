@@ -9,11 +9,13 @@
 // signed `policy.set` applied by core).
 import type {
   AgentLinkClient,
+  CreditsMoveResult,
   CreditsView,
   OwnerActionOutcome,
   Page,
   PageQuery,
   ProofListItem,
+  TopUpView,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
@@ -53,6 +55,8 @@ export interface LocalUiReadClient {
   readonly proofs: {
     list(query: PageQuery): Promise<Page<ProofListItem>>;
     creditsBalance(): Promise<CreditsView>;
+    /** M1-11c-a4c: where funds can be sent to add credits, and what can move (reads only). */
+    topUp(): Promise<TopUpView>;
   };
 }
 
@@ -64,13 +68,41 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),
       creditsBalance: () => client.proofs.creditsBalance(),
+      topUp: () => client.proofs.topUp(),
     }),
+  });
+}
+
+/**
+ * M1-11c-a4c: the two credits moves, for `presence: true` routes only. Each takes an owner-signed
+ * object that the route's one-use owner operation produced (the presence gate ran first); core
+ * verifies the owner signature, the op and its rules again before anything is sent (I-4). Nothing
+ * else of the client is reachable through it.
+ */
+export interface LocalUiCreditsPort {
+  addReceivedFunds(signed: {
+    readonly body: JsonObject;
+    readonly sig: string;
+  }): Promise<CreditsMoveResult>;
+  withdrawCredits(signed: {
+    readonly body: JsonObject;
+    readonly sig: string;
+  }): Promise<CreditsMoveResult>;
+}
+
+/** The credits port over `client` (a fresh frozen object of two bound methods). */
+export function creditsPort(client: AgentLinkClient): LocalUiCreditsPort {
+  return Object.freeze<LocalUiCreditsPort>({
+    addReceivedFunds: (signed) => client.proofs.addReceivedFunds(signed),
+    withdrawCredits: (signed) => client.proofs.withdrawCredits(signed),
   });
 }
 
 export interface LocalUiContext {
   /** Read-only access to the agent's core; undefined when not set up. */
   readonly client: LocalUiReadClient | undefined;
+  /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
+  readonly credits?: LocalUiCreditsPort;
   /** The agent and its owner; undefined when no identity or owner is set up. */
   ownerContext(): Promise<ApprovalContext | undefined>;
   /** core `ownerActions.apply`: verifies the owner signature, then applies (I-4). */

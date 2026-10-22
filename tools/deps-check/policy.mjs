@@ -370,6 +370,11 @@ export const ZONES = {
     [
       { pattern: 'react', reason: 'the local web app renders with React (D-118, 08 §1)' },
       { pattern: 'react-dom', reason: 'the local web app mounts with react-dom (D-118, 08 §1)' },
+      {
+        pattern: 'qrcode-generator',
+        reason:
+          'the QR code of the agent address under Add credits (M1-11c-a4c, D-122): MIT, no dependencies, no install script; drawn as React SVG rects, never as markup',
+      },
     ],
   ),
   'apps/console': entry('@4thtech-io/console', NO_NODE),

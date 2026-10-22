@@ -121,6 +121,7 @@ import {
   type PasskeyAssertion,
 } from './owner-passkey.js';
 import {
+  creditsPort,
   readOnlyClient,
   type LocalUiAssets,
   type LocalUiContext,
@@ -676,6 +677,10 @@ export async function startApprovalServerWith(
     // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
     client:
       options.localUi?.client === undefined ? undefined : readOnlyClient(options.localUi.client),
+    // M1-11c-a4c: for the presence routes only; core re-verifies the owner signature (I-4).
+    ...(options.localUi?.client === undefined
+      ? {}
+      : { credits: creditsPort(options.localUi.client) }),
     ownerContext: () => source.context(),
     applyOwnerAction: (signed) => source.apply(signed),
     now: () => now(),
