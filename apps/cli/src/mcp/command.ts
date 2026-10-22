@@ -37,11 +37,8 @@ import {
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
-<<<<<<< HEAD
 import { approvalWaitMsFor } from './approval-wait.js';
-=======
 import { embeddedLocalUiAssets } from './local-ui-assets.js';
->>>>>>> origin/main
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
