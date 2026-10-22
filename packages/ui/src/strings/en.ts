@@ -152,9 +152,10 @@ export const en = {
   'chat.export.summary':
     'Proof file ready: {path}. It shows the proof, your agent profile and the message details.{recipient, select, yes { It also shows who received it.} other {}}{documentKey, select, yes { It includes the document key, so anyone with the file can read the content.} other {}}',
   'chat.contact.flagged':
-    'Something from {contactName} failed a safety check, so it was refused and {contactName} is flagged. It is shown in your activity feed. Nothing from it was accepted.',
+    'Something from {contactName} failed a safety check, so it was refused and {contactName} is flagged. It is shown in your activity feed. Check it there before you rely on anything from that contact.',
   'chat.status.brief.nothingNew': 'Nothing new on AgentLink.',
-  'chat.storage.own': 'Your own storage is connected. Files go there, encrypted.',
+  'chat.storage.own':
+    'Your own storage is connected. Files too large to send inside a message go there, encrypted.',
   'chat.storage.drop':
     'Files go through the encrypted drop. Only encrypted data leaves this device.',
   'chat.untrusted.footer':
