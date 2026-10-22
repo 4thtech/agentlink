@@ -15,7 +15,7 @@
 //   passkey (`ALKP`) and signs the agent's first card, all or nothing. The owner code is returned
 //   once, for the page's collapsed "backup way to approve", and never logged.
 // - The pending seed is wiped on expiry, on error, on completion and when the server closes.
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -60,7 +60,7 @@ import {
   OWNER_PASSKEY_ACCOUNT,
   newOwnerSeed,
 } from '../owner-keystore.js';
-import { SETUP_HOLD_MS, encodeSetupRegistration } from '../owner-setup.js';
+import { SETUP_HOLD_MS, defaultOwnerFiles, encodeSetupRegistration } from '../owner-setup.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
@@ -73,6 +73,8 @@ class MapKeychain implements KeychainBackend {
   failSet = new Set<string>();
   /** Accounts whose read-back returns other bytes after a set (another writer won the race). */
   swapAfterSet = new Set<string>();
+  /** Accounts whose delete the keychain refuses. */
+  failDelete = new Set<string>();
   async get(account: string): Promise<Uint8Array | null> {
     await Promise.resolve();
     return this.items.get(account)?.slice() ?? null;
@@ -87,6 +89,7 @@ class MapKeychain implements KeychainBackend {
   }
   async delete(account: string): Promise<boolean> {
     await Promise.resolve();
+    if (this.failDelete.has(account)) throw new Error('keychain refused');
     return this.items.delete(account);
   }
 }
@@ -237,6 +240,9 @@ function send(
   });
 }
 
+/** The file-KeyStore owner files of the test home (absent unless a test creates them). */
+const testOwnerFiles = (): readonly string[] => defaultOwnerFiles(join(dir, 'home'));
+
 interface Harness {
   readonly server: ApprovalServer;
   readonly port: number;
@@ -255,7 +261,12 @@ interface Session {
 
 async function harness(
   agent: Agent,
-  options: { setup?: false; firstCard?: FirstAgentCard; internals?: ApprovalServerInternals } = {},
+  options: {
+    setup?: false;
+    firstCard?: FirstAgentCard;
+    internals?: ApprovalServerInternals;
+    ownerFiles?: readonly string[];
+  } = {},
 ): Promise<Harness> {
   const opened: string[] = [];
   const events: ApprovalServerEvent[] = [];
@@ -268,7 +279,13 @@ async function harness(
       localUi:
         options.setup === false
           ? {}
-          : { ownerSetup: { firstCard: options.firstCard ?? firstCardOf(agent) } },
+          : {
+              ownerSetup: {
+                firstCard: options.firstCard ?? firstCardOf(agent),
+                // IR-M1-11s-c-1 L-6: a test home, never the real ~/.agentlink.
+                ownerFiles: options.ownerFiles ?? testOwnerFiles(),
+              },
+            },
     },
     {
       keychain: agent.keychain,
@@ -553,13 +570,18 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     expect(setupEvents(h)).toEqual(['ready', 'done', 'not_pending']);
   }, 60_000);
 
-  it('never logs the owner code: no event or console line carries it (canary)', async () => {
+  it('never logs the owner code: no event, console line or stream write carries it (canary)', async () => {
     const lines: string[] = [];
     for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
       vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
         lines.push(args.map(String).join(' '));
       });
     }
+    // Spies only: the canary reads what anything writes to the streams; it writes nothing itself.
+    // eslint-disable-next-line no-restricted-syntax -- a spy, not output (IR-M1-11s-c-1 L-5)
+    const stdout = vi.spyOn(process.stdout, 'write');
+    // eslint-disable-next-line no-restricted-syntax -- a spy, not output (IR-M1-11s-c-1 L-5)
+    const stderr = vi.spyOn(process.stderr, 'write');
     const agent = await initAgent();
     const h = await harness(agent);
     const s = await h.session();
@@ -575,6 +597,8 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     const written = [
       JSON.stringify(h.events),
       ...lines,
+      ...stdout.mock.calls.map((c) => String(c[0])),
+      ...stderr.mock.calls.map((c) => String(c[0])),
     ].join('\n');
     expect(compact).toHaveLength(24);
     expect(written).not.toContain(compact);
@@ -899,7 +923,7 @@ describe('finish is all or nothing: a failure at any step leaves no owner (rollb
     const agent = await initAgent();
     const { res, h } = await failingFinish(agent, (a) => a.keychain.failSet.add(OWNER_ACCOUNT));
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body)).toEqual({ status: 'failed' });
+    expect(JSON.parse(res.body)).toEqual({ status: 'failed', reason: 'rolled_back' });
     await nothingLeft(agent, h);
   });
 
@@ -945,10 +969,15 @@ describe('finish is all or nothing: a failure at any step leaves no owner (rollb
       firstCardOf(agent, ['wss://one.relay-alpha.net', 'wss://one.relay-alpha.net']),
     );
     expect(res.status).toBe(500);
-    expect(JSON.parse(res.body)).toEqual({ status: 'failed' });
+    expect(JSON.parse(res.body)).toEqual({ status: 'failed', reason: 'rolled_back' });
     expect(res.body).not.toMatch(/[A-Z2-9]{4} [A-Z2-9]{4}/);
     await nothingLeft(agent, h);
     expect(setupEvents(h)).toEqual(['ready', 'failed']);
+    expect(h.events.at(-1)).toEqual({
+      kind: 'owner_setup',
+      outcome: 'failed',
+      reason: 'rolled_back',
+    });
   }, 60_000);
 
   it('a card for another agent is refused by the one-card session and rolled back', async () => {
@@ -959,5 +988,151 @@ describe('finish is all or nothing: a failure at any step leaves no owner (rollb
     expect(res.status).toBe(500);
     await nothingLeft(agent, h);
     expect(await other.client.identity.get()).toBeUndefined();
+  }, 60_000);
+
+  it('a rollback the keychain refuses is reason keychain (items may remain)', async () => {
+    const agent = await initAgent();
+    const { res } = await failingFinish(
+      agent,
+      (a) => a.keychain.failDelete.add(OWNER_ACCOUNT),
+      firstCardOf(agent, ['wss://one.relay-alpha.net', 'wss://one.relay-alpha.net']),
+    );
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body)).toEqual({ status: 'failed', reason: 'keychain' });
+  }, 60_000);
+});
+
+describe('IR-M1-11s-c-1 M-1: card read-back unknown keeps the owner and still hands out its code', () => {
+  /** The agent's identity service, whose read-back fails once the card was issued. */
+  function flakyReadBack(agent: Agent): FirstAgentCard {
+    let issued = false;
+    return {
+      ...firstCardOf(agent),
+      identity: {
+        get: () => (issued ? Promise.reject(new Error('store busy')) : agent.client.identity.get()),
+        init: async (input) => {
+          const view = await agent.client.identity.init(input);
+          issued = true;
+          return view;
+        },
+      },
+    };
+  }
+
+  for (const prf of [true, false]) {
+    it(`returns done_unconfirmed with the owner code, which unlocks the kept owner (PRF ${String(prf)})`, async () => {
+      const agent = await initAgent();
+      const h = await harness(agent, { firstCard: flakyReadBack(agent) });
+      const s = await h.session();
+      const begun = await begin(h, s);
+      const res = await post(
+        h,
+        FINISH,
+        s,
+        new Authenticator({ prf }).create(begun.publicKey, { origin: h.origin }),
+      );
+      expect(res.status).toBe(200);
+      const body = JSON.parse(res.body) as {
+        status: string;
+        ownerCode: string;
+        passkey: boolean;
+        fingerprint: string;
+      };
+      expect(body.status).toBe('done_unconfirmed');
+      expect(body.passkey).toBe(prf);
+      expect(body.fingerprint).toBe(begun.fingerprint);
+      expect(body.ownerCode).toMatch(/^[A-Z2-9]{4}( [A-Z2-9]{4}){5}$/);
+      // The owner was kept, and the human is not locked out: the code unlocks it.
+      expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+      const owner = await ownerOf(begun, agent);
+      if (owner === undefined) throw new Error('no card');
+      const store = await KeychainOwnerKeyStore.open(agent.keychain, owner);
+      const session = await store.unlock(
+        { kind: 'passphrase', secret: encodeUtf8(body.ownerCode) },
+        { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+      );
+      await session.close();
+      await store.close();
+      expect(h.events.at(-1)).toEqual({
+        kind: 'owner_setup',
+        outcome: 'done_unconfirmed',
+        fingerprint: begun.fingerprint,
+      });
+      expect(JSON.stringify(h.events)).not.toContain(body.ownerCode);
+      expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);
+    }, 60_000);
+  }
+});
+
+describe('IR-M1-11s-c-1 L-2: the done event names the owner fingerprint (for the CLI line)', () => {
+  it('emits done with the public fingerprint shown at begin', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    await post(h, FINISH, s, new Authenticator().create(begun.publicKey, { origin: h.origin }));
+    expect(h.events.filter((e) => e.kind === 'owner_setup')).toEqual([
+      { kind: 'owner_setup', outcome: 'ready' },
+      { kind: 'owner_setup', outcome: 'done', fingerprint: begun.fingerprint },
+    ]);
+  }, 60_000);
+});
+
+describe('IR-M1-11s-c-1 L-6: a file-KeyStore owner refuses setup too (D-78)', () => {
+  for (const name of ['owner.alko', 'owner.alkp']) {
+    it(`refuses begin when ~/.agentlink/keystore/${name} exists, before any seed`, async () => {
+      const agent = await initAgent();
+      const files = testOwnerFiles();
+      const target = files.find((f) => f.endsWith(name)) ?? '';
+      await mkdir(join(dir, 'home', '.agentlink', 'keystore'), { recursive: true });
+      await writeFile(target, randomBytes(90));
+      const h = await harness(agent, { ownerFiles: files });
+      const res = await post(h, BEGIN, await h.session(), new Uint8Array(0));
+      expect(res.status).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({ status: 'owner_exists' });
+      expect(h.seeds).toHaveLength(0);
+    });
+  }
+
+  it('defaults to the owner files under the home folder', () => {
+    expect(defaultOwnerFiles('/home/u')).toEqual([
+      '/home/u/.agentlink/keystore/owner.alko',
+      '/home/u/.agentlink/keystore/owner.alkp',
+    ]);
+  });
+});
+
+describe('IR-M1-11s-c-1 M-2: the wrong-code backoff holds setup back first (429 before owner_exists)', () => {
+  it('answers 429 wait with Retry-After after failed presence, creates no seed', async () => {
+    const agent = await initAgent();
+    const routes = createLocalUiRoutes();
+    routes.register({
+      method: 'POST',
+      path: '/api/ui/test/check',
+      presence: true,
+      handler: () => Promise.resolve({ status: 200, body: {} }),
+    });
+    const h = await harness(agent, { internals: { routes } });
+    const s = await h.session();
+    // An owner exists (set up here), so setup alone would answer owner_exists.
+    const begun = await begin(h, s);
+    expect(
+      (await post(h, FINISH, s, new Authenticator().create(begun.publicKey, { origin: h.origin })))
+        .status,
+    ).toBe(200);
+    for (let i = 0; i < 3; i += 1) {
+      const wrong = await post(h, '/api/ui/test/check', s, encodeUtf8('WRONGCODEWRONGCODEWRONGC'));
+      expect(wrong.status).toBe(403);
+    }
+    const res = await post(h, BEGIN, s, new Uint8Array(0));
+    expect(res.status).toBe(429);
+    expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
+    const body = JSON.parse(res.body) as { status: string; retryAfter: number };
+    expect(body.status).toBe('wait');
+    expect(body.retryAfter).toBeGreaterThan(0);
+    expect(h.events.at(-1)).toEqual({ kind: 'owner_setup', outcome: 'wait' });
+    expect(h.seeds).toHaveLength(1);
+    // Finish is held back the same way.
+    expect((await post(h, FINISH, s, new Uint8Array(0))).status).toBe(429);
   }, 60_000);
 });

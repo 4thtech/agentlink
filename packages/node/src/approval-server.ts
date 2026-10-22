@@ -443,9 +443,26 @@ export type ApprovalServerEvent =
         | 'expired'
         | 'presence_required'
         | 'presence_rejected'
+        /** IR-M1-11s-c-1 M-1: the owner was kept and its code handed out, the card unconfirmed. */
+        | 'done_unconfirmed'
         | 'failed';
+      /** IR-M1-11s-c-1 L-4: with `failed`, which kind of failure (a fixed code). */
+      readonly reason?: OwnerSetupFailure;
+      /**
+       * IR-M1-11s-c-1 L-2: with `done` and `done_unconfirmed`, the new owner's fingerprint (public,
+       * 11 §5.2), so the CLI can show it outside the browser for comparing with `agentlink doctor`.
+       */
+      readonly fingerprint?: string;
     }
   | { readonly kind: 'closed' };
+
+/**
+ * IR-M1-11s-c-1 L-4: why an owner setup step failed. `rolled_back`: nothing of this setup was kept,
+ * start again. `keychain`: the keychain refused, setup items may remain (`agentlink doctor`).
+ * `check_failed`: whether an owner exists could not be checked (nothing was written). `internal`:
+ * anything else (nothing is known to be kept).
+ */
+export type OwnerSetupFailure = 'rolled_back' | 'keychain' | 'check_failed' | 'internal';
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
@@ -1415,9 +1432,15 @@ export async function startApprovalServerWith(
     status: number,
     outcome: OwnerSetupOutcome,
     extra: Record<string, unknown> = {},
+    fixed: { readonly reason?: OwnerSetupFailure; readonly fingerprint?: string } = {},
   ): void => {
-    emit({ kind: 'owner_setup', outcome });
-    sendJson(res, status, { status: outcome, ...extra });
+    // Fixed values only in the event: never the owner code or anything from the request.
+    emit({ kind: 'owner_setup', outcome, ...fixed });
+    sendJson(res, status, {
+      status: outcome,
+      ...(fixed.reason === undefined ? {} : { reason: fixed.reason }),
+      ...extra,
+    });
   };
 
   /** M1-11s-c: wipes and forgets the held setup, if it is still `which` (default: whatever is held). */
@@ -1440,7 +1463,7 @@ export async function startApprovalServerWith(
   /** M1-11s-c: true when an owner exists anywhere (card or any owner item). Rejects on errors. */
   const ownerExistsAnywhere = async (setup: LocalUiOwnerSetupOption): Promise<boolean> =>
     (await source.context()) !== undefined ||
-    !(await noOwnerAnywhere(keychainOf(), setup.firstCard));
+    !(await noOwnerAnywhere(keychainOf(), setup.firstCard, undefined, setup.ownerFiles));
 
   /**
    * M1-11s-c: the setup gate for the two `presence: 'setup'` routes (never ownerGate). The caller
@@ -1497,7 +1520,7 @@ export async function startApprovalServerWith(
       try {
         exists = await ownerExistsAnywhere(setup);
       } catch {
-        finishSetup(res, 500, 'failed');
+        finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
         return;
       }
       if (exists) {
@@ -1581,7 +1604,7 @@ export async function startApprovalServerWith(
       try {
         exists = await ownerExistsAnywhere(setup);
       } catch {
-        finishSetup(res, 500, 'failed');
+        finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
         return;
       }
       if (exists) {
@@ -1599,23 +1622,34 @@ export async function startApprovalServerWith(
             prfOutput: registration.prfOutput,
             firstCard: setup.firstCard,
           },
-          internals.ownerKdf === undefined ? {} : { kdf: internals.ownerKdf },
+          {
+            ...(internals.ownerKdf === undefined ? {} : { kdf: internals.ownerKdf }),
+            ...(setup.ownerFiles === undefined ? {} : { ownerFiles: setup.ownerFiles }),
+          },
         );
       } catch (error) {
-        if (error instanceof NodeKeyStoreError && error.code === 'owner_exists') {
-          finishSetup(res, 409, 'owner_exists');
-        } else {
-          finishSetup(res, 500, 'failed');
-        }
+        const code = error instanceof NodeKeyStoreError ? error.code : undefined;
+        if (code === 'owner_exists') finishSetup(res, 409, 'owner_exists');
+        else if (code === 'owner_card_failed') {
+          finishSetup(res, 500, 'failed', {}, { reason: 'rolled_back' });
+        } else if (code === 'keychain_failed') {
+          finishSetup(res, 500, 'failed', {}, { reason: 'keychain' });
+        } else if (code === 'owner_operation_refused') {
+          finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
+        } else finishSetup(res, 500, 'failed', {}, { reason: 'internal' });
         return;
       }
       try {
+        const fingerprint = ownerFingerprintText(held.keys);
         // The owner code goes to the page once, for the collapsed backup display; never an event.
-        finishSetup(res, 200, 'done', {
-          passkey: result.passkey,
-          ownerCode: grouped(result.ownerCode),
-          fingerprint: ownerFingerprintText(held.keys),
-        });
+        // IR-M1-11s-c-1 M-1: also when the card is unconfirmed, since the owner was kept.
+        finishSetup(
+          res,
+          200,
+          result.confirmed ? 'done' : 'done_unconfirmed',
+          { passkey: result.passkey, ownerCode: grouped(result.ownerCode), fingerprint },
+          { fingerprint },
+        );
       } finally {
         wipe(result.ownerCode);
       }

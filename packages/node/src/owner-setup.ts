@@ -25,8 +25,12 @@
 //
 // Threat note (G-1, D-67; 04 §2.5): the setup routes run in the MCP/CLI process, which the agent
 // controls. A same-user process holding a session link (the opener's argv) can race the human and
-// set up an owner it controls; the page then shows "Approvals are already protected on this
-// computer" to the human, and `agentlink doctor` shows the owner fingerprint to compare. The passkey
+// set up an owner it controls. If it used the human's one-shot link, the human sees an expired page
+// and never a setup step. The signal is: "I never finished a setup, yet approvals are already
+// protected" (or the link has expired); the human must then treat the owner as not theirs.
+// `agentlink doctor` names the owner fingerprint; the CLI logs a fixed line with the fingerprint of
+// an owner set up from the page, and the page shows it after setup, so a human who did finish setup
+// can compare. The passkey
 // response's attestation statement is not verified ("none"): what is checked binds it to this begin
 // (challenge, origin, type), to `localhost` (rpIdHash) and to a gesture with user verification
 // (UP, UV), and names the credential the PRF output belongs to. A same-user process can forge all of
@@ -43,6 +47,9 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
+import { lstat } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
@@ -214,14 +221,38 @@ export function checkSetupRegistration(
 }
 
 /**
- * True when no owner key exists for this OS user and agent: `first.identity` has no card, and none
- * of the `owner`, `owner-passkey` and `owner-next` keychain items exists. Reads ciphertext only and
- * wipes it. A keychain or store error rejects (callers fail closed).
+ * IR-M1-11s-c-1 L-6: the file-KeyStore owner files (04 §2.2, §2.8) of this OS user,
+ * `~/.agentlink/keystore/owner.alko` and its passkey copy `owner.alkp`. An owner there is an owner
+ * too, so setup must not create a second one in the keychain (D-78).
+ */
+export function defaultOwnerFiles(home: string = homedir()): readonly string[] {
+  const dir = join(home, '.agentlink', 'keystore');
+  return [join(dir, 'owner.alko'), join(dir, 'owner.alkp')];
+}
+
+/** True when anything is at `path` (a file, a link, a folder): only a missing entry is absent. */
+async function entryExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === 'ENOENT') return false;
+    // Unreadable: fail closed (the caller refuses setup).
+    throw new NodeKeyStoreError('owner_operation_refused', 'The owner files could not be checked.');
+  }
+}
+
+/**
+ * True when no owner key exists for this OS user and agent: `first.identity` has no card, none of
+ * the `owner`, `owner-passkey` and `owner-next` keychain items exists, and none of `ownerFiles` (the
+ * file-KeyStore owner files, defaultOwnerFiles) exists. Reads ciphertext only and wipes it; never
+ * reads a file's content. A keychain, store or file-system error rejects (callers fail closed).
  */
 export async function noOwnerAnywhere(
   keychain: KeychainBackend,
   first: FirstAgentCard,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+  ownerFiles: readonly string[] = defaultOwnerFiles(),
 ): Promise<boolean> {
   if ((await first.identity.get()) !== undefined) return false;
   for (const account of [OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT, OWNER_NEXT_ACCOUNT]) {
@@ -230,6 +261,9 @@ export async function noOwnerAnywhere(
       wipe(item);
       return false;
     }
+  }
+  for (const path of ownerFiles) {
+    if (await entryExists(path)) return false;
   }
   return true;
 }
@@ -251,11 +285,22 @@ export interface OwnerSetupOptions {
   /** Argon2id parameters for the owner code's wrap; default KEYSTORE_KDF_DEFAULTS. */
   readonly kdf?: Argon2idParams;
   readonly timeoutMs?: number;
+  /** The file-KeyStore owner files to check; default defaultOwnerFiles(). */
+  readonly ownerFiles?: readonly string[];
 }
 
 export interface OwnerSetupResult {
-  /** The first card, signed by the new owner, stored and verified. */
-  readonly card: AgentCard;
+  /**
+   * The first card, signed by the new owner, stored and verified; undefined when `confirmed` is
+   * false (core could not be read back after signing).
+   */
+  readonly card: AgentCard | undefined;
+  /**
+   * IR-M1-11s-c-1 M-1: false when core could not be read back after signing. The owner is kept
+   * (rolling it back could leave a stored card whose owner key is gone, locking the agent), so the
+   * owner code is still handed out: the owner is the human's and the code is their way in.
+   */
+  readonly confirmed: boolean;
   /** The generated owner code (24 characters). Shown once; the caller wipes it. Never logged. */
   readonly ownerCode: Uint8Array;
   /** True when the passkey item was stored too. */
@@ -274,17 +319,11 @@ const setupFailed = (): NodeKeyStoreError =>
     "Setup didn't finish, so nothing was saved. Start again on this page.",
   );
 
-const setupUnknown = (): NodeKeyStoreError =>
-  new NodeKeyStoreError(
-    'owner_card_failed',
-    "Setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
-  );
-
 /**
  * Completes an owner setup (steps 1 to 5 above), all or nothing. Errors: `owner_exists` (nothing
- * written), `owner_card_failed` (rolled back; or, when core could not be read back or a rollback
- * found another writer's item, the state is left for `agentlink doctor`), `keychain_failed` (a
- * rollback delete failed). Error texts are fixed.
+ * written), `owner_card_failed` (rolled back), `keychain_failed` (a rollback delete failed; items may
+ * remain). When core cannot be read back after signing, the owner is kept and the result has
+ * `confirmed: false` (with the owner code). Error texts are fixed.
  */
 export async function completeOwnerSetup(
   keychain: KeychainBackend,
@@ -293,7 +332,9 @@ export async function completeOwnerSetup(
 ): Promise<OwnerSetupResult> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const { seed, keys, credentialId, prfOutput, firstCard } = input;
-  if (!(await noOwnerAnywhere(keychain, firstCard, timeoutMs))) throw ownerExists();
+  if (!(await noOwnerAnywhere(keychain, firstCard, timeoutMs, options.ownerFiles))) {
+    throw ownerExists();
+  }
   const withPasskey = prfOutput.length > 0;
   let ownerBlob: Uint8Array | undefined;
   let passkeyBlob: Uint8Array | undefined;
@@ -352,11 +393,25 @@ export async function completeOwnerSetup(
     const outcome = await signFirstCardWith(keychain, keys, code, firstCard, timeoutMs);
     if (outcome.kind === 'signed') {
       handedOut = true;
-      return Object.freeze({ card: outcome.card, ownerCode: code, passkey: withPasskey });
+      return Object.freeze({
+        card: outcome.card,
+        confirmed: true,
+        ownerCode: code,
+        passkey: withPasskey,
+      });
     }
-    // Unknown whether a card names this owner: keep the owner (a card without its owner key would
-    // lock the agent out); `agentlink doctor` shows what is there.
-    if (outcome.kind === 'unknown') throw setupUnknown();
+    if (outcome.kind === 'unknown') {
+      // IR-M1-11s-c-1 M-1: unknown whether a card names this owner. Keep the owner (a card without
+      // its owner key would lock the agent out for good) and hand the owner code out anyway, so the
+      // human holds the way into what was created; the page points to `agentlink doctor`.
+      handedOut = true;
+      return Object.freeze({
+        card: undefined,
+        confirmed: false,
+        ownerCode: code,
+        passkey: withPasskey,
+      });
+    }
     const removal = await rollback();
     if (removal === 'failed') {
       throw new NodeKeyStoreError(

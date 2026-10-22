@@ -39,6 +39,11 @@ export interface LocalUiOptions {
 export interface LocalUiOwnerSetup {
   /** The agent whose first card the new owner signs (owner-first-card.ts). */
   readonly firstCard: FirstAgentCard;
+  /**
+   * IR-M1-11s-c-1 L-6: the file-KeyStore owner files whose presence refuses setup. Default:
+   * `~/.agentlink/keystore/owner.alko` and `owner.alkp` (owner-setup.ts defaultOwnerFiles).
+   */
+  readonly ownerFiles?: readonly string[];
 }
 
 /**
