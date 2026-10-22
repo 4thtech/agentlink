@@ -16,6 +16,7 @@ export const METRICS = [
   'request_health',
   'request_faucet',
   'faucet_credited',
+  'faucet_paused',
   'item_submitted',
   'item_held',
   'item_skipped',

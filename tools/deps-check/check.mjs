@@ -41,6 +41,7 @@ import {
   SUBTLE_ONLY_ZONES,
   SUBTLE_ZONES,
   ZONES,
+  allowedManifestNames,
   allowedWorkspaceNames,
   relativeEscapeAllowed,
   isRetiredScope,
@@ -183,7 +184,7 @@ export function checkManifest(zone, manifest, { bundledRuntime = new Map() } = {
       `${zone}: the package.json "imports" map is not allowed (its targets are not checked)`,
     );
   }
-  const allowed = allowedWorkspaceNames(zone);
+  const allowed = allowedManifestNames(zone);
   const bundles = policy.bundles === true;
 
   for (const field of ALL_FIELDS) {

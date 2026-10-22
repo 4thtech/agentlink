@@ -87,7 +87,7 @@ async function cancelOne(
 
 export function cancelHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
-    ownerStep(context, () => {
+    ownerStep(context, deps, (deps) => {
       const { positionals } = context.parsed;
       const id = positionals[0];
       if (positionals.length !== 1 || id === undefined) {
