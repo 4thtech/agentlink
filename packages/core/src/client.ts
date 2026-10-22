@@ -26,7 +26,11 @@ import { DeliveryAcks } from './acks.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
-import { deleteFilesOnReceipt, type ReceiptRetentionResult } from './files/retention.js';
+import {
+  deleteExpiredFiles,
+  deleteFilesOnReceipt,
+  type ReceiptRetentionResult,
+} from './files/retention.js';
 import { InboxService } from './inbox.js';
 import { policyLimits } from './policy-engine.js';
 import { RevocationService } from './revocation.js';
@@ -292,7 +296,22 @@ export class AgentLinkClient {
     await this.deleteFilesOnReceipt().catch(() => {
       this.#ctx.log.warn('delete on receipt not run');
     });
+    // M1-7f-2: retention at expiry on both sides. Best effort, as above.
+    await this.deleteExpiredFiles().catch(() => {
+      this.#ctx.log.warn('expiry retention not run');
+    });
     return result;
+  }
+
+  /**
+   * Retention at expiry (M1-7f-2; 04 §4, 06 §3, D-98), under every policy: for each file whose
+   * `expiresAt` has passed, the sender deletes the stored object (the drop with a DELETE signed at
+   * the upload epoch) and its `files` row with the sealed file key; the receiver deletes its own
+   * row, after which the file cannot be opened. Nothing is deleted before `expiresAt` (I-9).
+   * `syncInbox` runs it; idempotent, and a failed delete is retried on the next pass.
+   */
+  deleteExpiredFiles(): Promise<ReceiptRetentionResult> {
+    return deleteExpiredFiles(this.#ctx, this.#filesPlatform);
   }
 
   /**

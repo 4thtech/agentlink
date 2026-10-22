@@ -221,7 +221,7 @@ async function changeCodeOne(deps: OwnerCommandDeps, context: CommandContext): P
 
 export function ownerHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
-    ownerStep(context, () => {
+    ownerStep(context, deps, (deps) => {
       const { positionals } = context.parsed;
       if (positionals.length === 1 && positionals[0] === 'init') return initOne(deps, context);
       if (positionals.length === 1 && positionals[0] === 'add-agent') {

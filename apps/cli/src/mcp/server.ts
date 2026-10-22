@@ -33,19 +33,41 @@ export function toMcpTool(tool: ToolDefinition): Tool {
   };
 }
 
-export function createMcpServer(env: HandlerEnvironment, version: string): Server {
+/** M1-36j: the per-harness approval wait (approval-wait.ts). Absent: no wait. */
+export interface McpServerOptions {
+  /** The wait in ms for the client's `clientInfo.name` (undefined before `initialize`). */
+  readonly approvalWaitMs?: (clientName: string | undefined) => number;
+  /** The approval read interval (tests). */
+  readonly approvalWaitIntervalMs?: number;
+}
+
+export function createMcpServer(
+  env: HandlerEnvironment,
+  version: string,
+  options: McpServerOptions = {},
+): Server {
   const server = new Server(
     { name: SERVER_NAME, version },
     { capabilities: { tools: { listChanged: false } }, instructions: SERVER_INSTRUCTIONS },
   );
   const tools = TOOLS.map(toMcpTool);
   server.setRequestHandler(ListToolsRequestSchema, () => ({ tools }));
-  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
-    const finished = await callTool(request.params.name, request.params.arguments, env);
-    return {
-      content: [{ type: 'text', text: finished.text }],
-      structuredContent: { ...finished.structured },
-    };
-  });
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    async (request, extra): Promise<CallToolResult> => {
+      const clientName = server.getClientVersion()?.name;
+      const finished = await callTool(request.params.name, request.params.arguments, env, {
+        signal: extra.signal,
+        approvalWaitMs: options.approvalWaitMs?.(clientName) ?? 0,
+        ...(options.approvalWaitIntervalMs === undefined
+          ? {}
+          : { approvalWaitIntervalMs: options.approvalWaitIntervalMs }),
+      });
+      return {
+        content: [{ type: 'text', text: finished.text }],
+        structuredContent: { ...finished.structured },
+      };
+    },
+  );
   return server;
 }
