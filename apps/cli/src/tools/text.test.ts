@@ -24,10 +24,7 @@ describe('noOwnerCard (M1-36a)', () => {
   });
 
   it('never says "card" and never inserts an unchecked name', () => {
-    for (const s of [
-      noOwnerCard().summary,
-      noOwnerCard('Bad;rm', { ownerExists: true }).summary,
-    ]) {
+    for (const s of [noOwnerCard().summary, noOwnerCard('Bad;rm', { ownerExists: true }).summary]) {
       expect(s).not.toMatch(/\bcard\b/i);
       expect(s).not.toContain('Bad;rm');
     }

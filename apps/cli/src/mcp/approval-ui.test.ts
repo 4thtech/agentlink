@@ -28,6 +28,7 @@ import {
 } from '@4thtech-io/node';
 import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import type { OpenedAgent } from '../runtime/index.js';
 import type { TermsTools } from '../tools/context.js';
 import { TOOLS, callTool, type ToolClient, type ToolContext } from '../tools/index.js';
@@ -263,12 +264,12 @@ describe('the nextStep with the link (06 §2.5; 11 §6.10)', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;
     const text = approvalLinkNextStep(APPROVAL, url, 'default');
     expect(text).toContain(url);
-    expect(text).toContain(`agentlink approve ${APPROVAL}`);
+    expect(text).toContain(`${cliPrefix()} approve ${APPROVAL}`);
     expect(text).toMatch(NEVER_FETCH);
     expect(text).toContain("Your AI can't approve this for you.");
     expect(text).toContain('call the same tool again with approvalId');
     expect(approvalLinkNextStep(APPROVAL, url, 'work')).toContain(
-      `agentlink approve ${APPROVAL} --agent work`,
+      `${cliPrefix()} approve ${APPROVAL} --agent work`,
     );
     for (const word of [/\bwallet/i, /\bgas\b/i, /seed phrase/i, /transaction/i]) {
       expect(text).not.toMatch(word);
@@ -364,7 +365,7 @@ describe('pending_approval carries the approval url (M1-11a-b)', () => {
     expect(result.structured.approvalId).toBe(APPROVAL);
     expect(result.structured.url).toBe(`http://localhost:47321/approve/${APPROVAL}`);
     expect(result.structured.nextStep).toContain(`http://localhost:47321/approve/${APPROVAL}`);
-    expect(result.structured.nextStep).toContain(`agentlink approve ${APPROVAL}`);
+    expect(result.structured.nextStep).toContain(`${cliPrefix()} approve ${APPROVAL}`);
     expect(result.structured.nextStep).toMatch(NEVER_FETCH);
     expect(result.text).toContain(result.structured.url as string);
     expect(result.text).toMatch(NEVER_FETCH);
@@ -375,7 +376,7 @@ describe('pending_approval carries the approval url (M1-11a-b)', () => {
     const result = await respond(contextWith(undefined));
     expect(result.structured.status).toBe('pending_approval');
     expect(result.structured.url).toBeUndefined();
-    expect(result.structured.nextStep).toContain(`agentlink approve ${APPROVAL}`);
+    expect(result.structured.nextStep).toContain(`${cliPrefix()} approve ${APPROVAL}`);
   });
 
   it('a link outside the local UI origin never reaches the result (origin pin)', async () => {
@@ -391,7 +392,7 @@ describe('pending_approval carries the approval url (M1-11a-b)', () => {
     const result = await respond(context);
     expect(JSON.stringify(result)).not.toContain('evil.example');
     expect(result.structured.status).toBe('pending_approval');
-    expect(result.structured.nextStep).toContain(`agentlink approve ${APPROVAL}`);
+    expect(result.structured.nextStep).toContain(`${cliPrefix()} approve ${APPROVAL}`);
   });
 
   it('a failing link provider leaves the M1a result', async () => {
