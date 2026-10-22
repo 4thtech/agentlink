@@ -123,6 +123,22 @@ CI reads back each Worker's own settings after every deploy, but its narrow API 
 24. **Each Worker's settings:** <https://dash.cloudflare.com/?to=/:account/workers-and-pages> → the Worker → **Settings** → **Observability**: Workers Logs off, Traces off, Logpush off, no Tail Workers. (CI checks this too; this is the owner's spot check.)
 25. **No live tailing:** never open **Real-time logs** / `wrangler tail` on these Workers, and never use the CI deploy tokens to tail (the permission comes with Workers Scripts Edit, so it cannot be withheld; the workflow tests refuse any `wrangler tail` step). Live tails store nothing but would show requests, IPs and paths to whoever watches.
 
+**Part F · Add Gnosis Chiado (chain 10200; M1-3j-b; laptop, then phone)**
+
+Automatic selection uses exactly the chains the testnet faucet serves (`autoSelectableChains()` in `packages/chain`, gated on `FAUCET_CHAIN_IDS`). Chiado is not routed to until a later reviewed PR adds 10200 to that allowlist, so these steps can run at any time and nothing changes for users until that PR merges. Do them **before** that PR: its deploy waits (skips with "Worker secrets not set") until all four keys exist.
+
+26. Part B steps 3 to 5, then the four Chiado keys, each with its own address (write each one down):
+    ```sh
+    newkey SUBMITTER_GAS_KEY_10200 staging
+    newkey SUBMITTER_FAUCET_KEY_10200 staging
+    newkey SUBMITTER_GAS_KEY_10200 production
+    newkey SUBMITTER_FAUCET_KEY_10200 production
+    ```
+    Then step 12 (`unset -f newkey`) and step 14's name check: the two new names are listed in each environment, and `SUBMITTER_FAUCET_ADDRESS_10200`, `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` are **not** Worker secrets (they are reviewed `wrangler.toml` vars).
+27. Send the two **faucet** addresses (staging, production; public) to the orchestrator in chat. They go into `wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_10200` in the enabling PR, together with `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` = `"84532,10200"`, the two 10200 names in the workflow's `SUBMITTER_REQUIRED_SECRETS` and 10200 in `FAUCET_CHAIN_IDS`.
+28. Fund the production gas and faucet wallets with Chiado test xDAI (the native coin, used for gas and as the fee token, D-46). Use the official Gnosis Chiado faucet; this runbook names no link until one is confirmed. Check balances on <https://gnosis-chiado.blockscout.com/>.
+29. After the enabling PR merges and deploys: `https://submit.agentlink.4thtech.io/v1/health` shows chain `10200` with `"available":true`.
+
 Residual (04 §4): Cloudflare, as the infrastructure operator, still sees request metadata, and the zone's Security Events show the IPs of requests a WAF rule blocks (the drop's rate-limit rule). These cannot be turned off and are not logged by us.
 
 ### What CI does (for reference)
@@ -141,8 +157,14 @@ Residual (04 §4): Cloudflare, as the infrastructure operator, still sees reques
 - **`has a Worker secret SUBMITTER_CHAINS`** (or `SUBMITTER_FAUCET_CHAINS`): `pnpm exec wrangler secret delete <name> --env <staging|production> --config wrangler.toml`, then step 17.
 - **Health shows a chain `"available":false`**: its gas key is missing or malformed (must be `0x` + 64 lowercase hex), or the RPC URLs are unreachable. Create and store a new key (step 6 or 9; then fund the new address) and rerun.
 - **Faucet answers `faucet_empty` or `unavailable`**: fund the faucet wallet (step 15); check that its key differs from the gas key, and that its address is that environment's `SUBMITTER_FAUCET_ADDRESS_84532` in `wrangler.toml` (steps 7 and 10).
+- **Faucet answers `unavailable` to every new agent, and the faucet address on the Base Sepolia explorer shows a pending transaction**: an earlier `approve` is stuck in the mempool (its fee was too low, for example under `SUBMITTER_MAX_FEE_PER_GAS_WEI`). The faucet then refuses claims that need a new approve at once and sends nothing, so nothing queues behind it (M1-10b-c). It clears by itself once the stuck transaction is mined or dropped. If it stays stuck for more than an hour, raise or remove `SUBMITTER_MAX_FEE_PER_GAS_WEI` through a PR; claims resume once the faucet's pending and latest nonces match again.
 - **Production failed after deploying**: CI rolled back and set `DEPLOY_FREEZE`. Read the run summary; only the owner clears the freeze ([RB-11](rollback-and-freeze.md)).
 - **Rolled back to a version before M1-10b-b**: the older faucet does not read the newer per-agent claim records. An agent who claimed earlier that UTC day can claim once more. The per-IP daily limit (3 claims by default) and the global daily cap still hold, because their records did not change format. The extra credits are therefore bounded by that day's global cap (by default 200 claims at $1 testnet USDC, at most $200 of testnet funds), and the risk ends with the one-day agent window.
+- **Before rolling the faucet back to a version before M1-10b-b, account for the clean-up** (M1-10b-c). The older version's daily clean-up (the faucet's alarm, just after 00:00 UTC) deletes **every** per-agent claim record in the newer format, whatever its age, because it keeps only plain numbers. Rolling forward again does not bring them back. So:
+  - every agent who claimed inside its window before the rollback can claim again, once, after that clean-up has run (on the old version or after rolling forward);
+  - a claim whose broadcast answer was lost loses its saved transaction: a retry becomes a new claim, and the agent may be credited twice;
+  - the per-IP daily limit and the global daily cap are not affected, so the extra credits stay bounded by the global cap for each UTC day the old version runs, plus one agent window after rolling forward (by default 200 claims a day at $1 testnet USDC).
+  Testnet funds only; if that bound is too much, fund the faucet wallet with no more than one day's cap during the rollback (step 15).
 - A key leaked or is suspected: put a new one (Part B) and move the remaining funds from the old address; follow `audit-rules.md` §10.3.
 
 ## Related

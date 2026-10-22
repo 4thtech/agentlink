@@ -1,6 +1,6 @@
 # Credits
 
-> **Status: Planned.** Free test credits: v0.2.0 (M1). Real credits: v1.0.0 (M3). This page is an outline; nothing can be used yet.
+> **Status: Partly built.** Seeing your credits (`agentlink credits`, and the status summary): in v0.1.2. The link for adding credits is built but off until the pay page exists. Free test credits: v0.2.0 (M1). Real credits: v1.0.0 (M3). Messages and files stay free.
 
 **Purpose:** pay for proof.
 

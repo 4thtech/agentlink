@@ -135,20 +135,48 @@ const argument = (message: string): CryptoInputError =>
   new CryptoInputError('invalid_argument', message);
 const refused = (message: string): CryptoInputError => new CryptoInputError('open_failed', message);
 
-const NOT_OPEN = 'alf1: the object does not open';
-const BAD_HEADER = 'alf1: the object header is not a valid ALF1 v1 header';
-const TOO_MANY_OPEN = 'alf1: an object has at most 2^32 chunks';
-const TOO_MANY_SEAL = 'alf1: a file has at most 2^32 chunks';
 const HASH_MISMATCH = 'alf1: the object does not match its expected hash';
 
 /**
- * The file key, copied in, imported into WebCrypto on first use (once per file, not per chunk) and
+ * A format built on the STREAM body (04 §4): its header length and how a complete header gives the
+ * chunk size and the 8-byte nonce prefix. ALF1 (04 §4) and the recovery kit ALKK (04 §2.3.3) share
+ * every chunk rule; only the header differs, and the whole header is the AAD prefix of each chunk.
+ * Internal to the package: recovery-kit.ts is the only other user.
+ */
+export interface StreamFormat {
+  /** Prefix of every error message, for example `alf1`. */
+  readonly name: string;
+  readonly headerLength: number;
+  /**
+   * The chunk size and nonce prefix of a complete header, or `undefined` when the header is refused
+   * (checked before anything is decrypted).
+   */
+  readHeader(header: Uint8Array): { chunkSize: number; noncePrefix: Uint8Array } | undefined;
+}
+
+/** A 32-byte AES-256-GCM key, imported on first use; `drop` wipes it and forgets the import. */
+export interface StreamKey {
+  get(): Promise<Aes256GcmKey>;
+  drop(): void;
+}
+
+const messagesOf = (format: StreamFormat) => ({
+  notOpen: `${format.name}: the object does not open`,
+  badHeader: `${format.name}: the object header is not a valid ${format.name.toUpperCase()} v1 header`,
+  tooManyOpen: `${format.name}: an object has at most 2^32 chunks`,
+  tooManySeal: `${format.name}: a file has at most 2^32 chunks`,
+  oneCall: `${format.name}: one call at a time`,
+  closed: `${format.name}: the stream is finished, failed or aborted`,
+});
+
+/**
+ * The key, copied in, imported into WebCrypto on first use (once per object, not per chunk) and
  * then wiped from our copy; `drop` wipes it and forgets the imported key.
  */
-function fileKeyOf(fileKey: unknown): { get(): Promise<Aes256GcmKey>; drop(): void } {
-  assertBytes(fileKey, 'alf1: fileKey');
+export function streamKeyOf(fileKey: unknown, what = 'alf1: fileKey'): StreamKey {
+  assertBytes(fileKey, what);
   if (fileKey.length !== ALF1_FILE_KEY_LENGTH) {
-    throw new CryptoInputError('invalid_length', 'alf1: fileKey must be 32 bytes');
+    throw new CryptoInputError('invalid_length', `${what} must be 32 bytes`);
   }
   const bytes = fileKey.slice();
   let imported: Aes256GcmKey | undefined;
@@ -167,7 +195,8 @@ function fileKeyOf(fileKey: unknown): { get(): Promise<Aes256GcmKey>; drop(): vo
   };
 }
 
-const isChunkSize = (value: unknown): value is number =>
+/** 1 ≤ chunkSize ≤ 16 MiB, for ALF1 and ALKK alike (04 §4, §2.3.3). */
+export const isStreamChunkSize = (value: unknown): value is number =>
   typeof value === 'number' &&
   Number.isInteger(value) &&
   value >= ALF1_MIN_CHUNK_SIZE &&
@@ -188,18 +217,37 @@ function encodeHeader(chunkSize: number, noncePrefix: Uint8Array): Uint8Array {
   return header;
 }
 
-/** AAD for one chunk: header (17 B) ‖ u8(isFinal) (D-80). */
+/** 04 §4: "ALF1" ‖ version 0x01 ‖ chunkSize u32be (1..16 MiB) ‖ noncePrefix (8 B). */
+const ALF1_FORMAT: StreamFormat = Object.freeze({
+  name: 'alf1',
+  headerLength: ALF1_HEADER_LENGTH,
+  readHeader(header: Uint8Array) {
+    const chunkSize = new DataView(header.buffer, header.byteOffset, header.byteLength).getUint32(
+      5,
+    );
+    if (
+      MAGIC.some((byte, i) => header[i] !== byte) ||
+      header[4] !== ALF1_VERSION ||
+      !isStreamChunkSize(chunkSize)
+    ) {
+      return undefined;
+    }
+    return { chunkSize, noncePrefix: header.subarray(9, ALF1_HEADER_LENGTH) };
+  },
+});
+
+/** AAD for one chunk: the whole header ‖ u8(isFinal) (D-80; 04 §2.3.3 for ALKK). */
 function chunkAad(header: Uint8Array, isFinal: boolean): Uint8Array {
-  const aad = new Uint8Array(ALF1_HEADER_LENGTH + 1);
+  const aad = new Uint8Array(header.length + 1);
   aad.set(header, 0);
-  aad[ALF1_HEADER_LENGTH] = isFinal ? 1 : 0;
+  aad[header.length] = isFinal ? 1 : 0;
   return aad;
 }
 
 /** Nonce for chunk `index`: noncePrefix (8 B) ‖ u32be(index). `index` is below 2^32. */
-function chunkNonce(header: Uint8Array, index: number): Uint8Array {
+function chunkNonce(noncePrefix: Uint8Array, index: number): Uint8Array {
   const nonce = new Uint8Array(12);
-  nonce.set(header.subarray(9, ALF1_HEADER_LENGTH), 0);
+  nonce.set(noncePrefix, 0);
   new DataView(nonce.buffer).setUint32(8, index);
   return nonce;
 }
@@ -207,17 +255,17 @@ function chunkNonce(header: Uint8Array, index: number): Uint8Array {
 type State = 'open' | 'busy' | 'closed';
 
 /** Serialises calls and closes the processor on the first error, wiping through `cleanup`. */
-function guarded(cleanup: () => void) {
+function guarded(cleanup: () => void, messages: ReturnType<typeof messagesOf>) {
   let state: State = 'open';
   return {
     async run<T>(work: () => Promise<T>, closesAfter: boolean): Promise<T> {
-      if (state === 'busy') throw argument('alf1: one call at a time');
-      if (state === 'closed') throw argument('alf1: the stream is finished, failed or aborted');
+      if (state === 'busy') throw argument(messages.oneCall);
+      if (state === 'closed') throw argument(messages.closed);
       state = 'busy';
       try {
         const result = await work();
         // `abort` during the call closed the processor: its result is not handed out.
-        if (state !== 'busy') throw argument('alf1: the stream is finished, failed or aborted');
+        if (state !== 'busy') throw argument(messages.closed);
         state = closesAfter ? 'closed' : 'open';
         if (closesAfter) cleanup();
         return result;
@@ -248,12 +296,36 @@ export function createAlf1SealerAt(
   if (noncePrefix.length !== ALF1_NONCE_PREFIX_LENGTH) {
     throw new CryptoInputError('invalid_length', 'alf1: noncePrefix must be 8 bytes');
   }
-  if (!isChunkSize(chunkSize)) {
+  if (!isStreamChunkSize(chunkSize)) {
     throw argument('alf1: chunkSize must be an integer from 1 to 16 MiB');
   }
   checkStartIndex(startIndex);
-  const key = fileKeyOf(fileKey);
-  const header = encodeHeader(chunkSize, noncePrefix);
+  return createStreamSealerAt(
+    ALF1_FORMAT,
+    streamKeyOf(fileKey),
+    encodeHeader(chunkSize, noncePrefix),
+    startIndex,
+  );
+}
+
+/**
+ * The STREAM sealer of any format: `header` is emitted first and is the AAD prefix of every chunk.
+ * The header must be valid for `format` (the caller built it). Takes ownership of `key`.
+ */
+export function createStreamSealerAt(
+  format: StreamFormat,
+  key: StreamKey,
+  header: Uint8Array,
+  startIndex: number,
+): Alf1Processor {
+  const messages = messagesOf(format);
+  const layout = header.length === format.headerLength ? format.readHeader(header) : undefined;
+  if (layout === undefined) {
+    key.drop();
+    throw argument(messages.badHeader);
+  }
+  const { chunkSize } = layout;
+  const noncePrefix = layout.noncePrefix.slice();
   const aadMiddle = chunkAad(header, false);
   const aadFinal = chunkAad(header, true);
   const buffer = new Uint8Array(chunkSize);
@@ -267,21 +339,21 @@ export function createAlf1SealerAt(
   const guard = guarded(() => {
     key.drop();
     wipe(buffer);
-  });
+  }, messages);
 
   const emitHeader = (out: Uint8Array[]): void => {
     if (headerSent) return;
     headerSent = true;
     ctHash.update(header);
-    ciphertextLength += ALF1_HEADER_LENGTH;
+    ciphertextLength += header.length;
     out.push(header.slice());
   };
 
   const sealChunk = async (plaintext: Uint8Array, isFinal: boolean): Promise<Uint8Array> => {
-    if (index >= ALF1_MAX_CHUNKS) throw argument(TOO_MANY_SEAL);
+    if (index >= ALF1_MAX_CHUNKS) throw argument(messages.tooManySeal);
     const sealed = await aes256GcmSealWithKey(
       await key.get(),
-      chunkNonce(header, index),
+      chunkNonce(noncePrefix, index),
       plaintext,
       isFinal ? aadFinal : aadMiddle,
     );
@@ -294,7 +366,7 @@ export function createAlf1SealerAt(
   return Object.freeze({
     update(plaintext: Uint8Array): Promise<readonly Uint8Array[]> {
       return guard.run(async () => {
-        assertBytes(plaintext, 'alf1: plaintext');
+        assertBytes(plaintext, `${format.name}: plaintext`);
         const out: Uint8Array[] = [];
         emitHeader(out);
         ptHash.update(plaintext);
@@ -344,12 +416,32 @@ export function createAlf1OpenerAt(
   checkStartIndex(startIndex);
   const expectedCt = expectedHash(options.expectedCiphertextSha256, 'expectedCiphertextSha256');
   const expectedPt = expectedHash(options.expectedPlaintextSha256, 'expectedPlaintextSha256');
-  const key = fileKeyOf(fileKey);
-  const header = new Uint8Array(ALF1_HEADER_LENGTH);
+  return createStreamOpenerAt(ALF1_FORMAT, streamKeyOf(fileKey), startIndex, (digests) =>
+    (expectedCt !== undefined && !equalBytes(expectedCt, digests.ciphertextSha256)) ||
+    (expectedPt !== undefined && !equalBytes(expectedPt, digests.plaintextSha256))
+      ? HASH_MISMATCH
+      : undefined,
+  );
+}
+
+/**
+ * The STREAM opener of any format. The input starts with the header, which `format.readHeader`
+ * checks before anything is decrypted; it is the AAD prefix of every chunk. `checkDigests`, run at
+ * `finish`, returns a refusal message or `undefined`. Takes ownership of `key`.
+ */
+export function createStreamOpenerAt(
+  format: StreamFormat,
+  key: StreamKey,
+  startIndex: number,
+  checkDigests: (digests: Alf1Digests) => string | undefined = () => undefined,
+): Alf1Processor {
+  const messages = messagesOf(format);
+  const header = new Uint8Array(format.headerLength);
   let headerFilled = 0;
   let pieceSize = 0;
   let piece: Uint8Array = new Uint8Array(0);
   let filled = 0;
+  let noncePrefix: Uint8Array = new Uint8Array(0);
   let aadMiddle: Uint8Array = new Uint8Array(0);
   let aadFinal: Uint8Array = new Uint8Array(0);
   let index = startIndex;
@@ -361,37 +453,31 @@ export function createAlf1OpenerAt(
   const guard = guarded(() => {
     key.drop();
     wipe(piece);
-  });
+  }, messages);
 
-  /** Checks the header before anything is decrypted: magic, version 0x01, chunkSize bounds. */
+  /** Checks the header before anything is decrypted (for ALF1: magic, version 0x01, chunkSize). */
   const acceptHeader = (): void => {
-    const view = new DataView(header.buffer);
-    const chunkSize = view.getUint32(5);
-    if (
-      MAGIC.some((byte, i) => header[i] !== byte) ||
-      header[4] !== ALF1_VERSION ||
-      !isChunkSize(chunkSize)
-    ) {
-      throw refused(BAD_HEADER);
-    }
-    pieceSize = chunkSize + ALF1_TAG_LENGTH;
+    const layout = format.readHeader(header);
+    if (layout === undefined) throw refused(messages.badHeader);
+    pieceSize = layout.chunkSize + ALF1_TAG_LENGTH;
     piece = new Uint8Array(pieceSize);
+    noncePrefix = layout.noncePrefix.slice();
     aadMiddle = chunkAad(header, false);
     aadFinal = chunkAad(header, true);
   };
 
   const openChunk = async (sealed: Uint8Array, isFinal: boolean): Promise<Uint8Array> => {
-    if (index >= ALF1_MAX_CHUNKS) throw refused(TOO_MANY_OPEN);
+    if (index >= ALF1_MAX_CHUNKS) throw refused(messages.tooManyOpen);
     // Only the empty file has an empty (tag-only) final chunk, and it is the only chunk.
-    if (sealed.length < ALF1_TAG_LENGTH) throw refused(NOT_OPEN);
-    if (sealed.length === ALF1_TAG_LENGTH && chunksOpened > 0) throw refused(NOT_OPEN);
+    if (sealed.length < ALF1_TAG_LENGTH) throw refused(messages.notOpen);
+    if (sealed.length === ALF1_TAG_LENGTH && chunksOpened > 0) throw refused(messages.notOpen);
     const plaintext = await aes256GcmOpenWithKey(
       await key.get(),
-      chunkNonce(header, index),
+      chunkNonce(noncePrefix, index),
       sealed,
       isFinal ? aadFinal : aadMiddle,
     );
-    if (plaintext === undefined) throw refused(NOT_OPEN);
+    if (plaintext === undefined) throw refused(messages.notOpen);
     index += 1;
     chunksOpened += 1;
     ptHash.update(plaintext);
@@ -402,17 +488,17 @@ export function createAlf1OpenerAt(
   return Object.freeze({
     update(ciphertext: Uint8Array): Promise<readonly Uint8Array[]> {
       return guard.run(async () => {
-        assertBytes(ciphertext, 'alf1: ciphertext');
+        assertBytes(ciphertext, `${format.name}: ciphertext`);
         ctHash.update(ciphertext);
         ciphertextLength += ciphertext.length;
         const out: Uint8Array[] = [];
         let at = 0;
-        if (headerFilled < ALF1_HEADER_LENGTH) {
-          const n = Math.min(ALF1_HEADER_LENGTH - headerFilled, ciphertext.length);
+        if (headerFilled < format.headerLength) {
+          const n = Math.min(format.headerLength - headerFilled, ciphertext.length);
           header.set(ciphertext.subarray(0, n), headerFilled);
           headerFilled += n;
           at = n;
-          if (headerFilled === ALF1_HEADER_LENGTH) acceptHeader();
+          if (headerFilled === format.headerLength) acceptHeader();
         }
         while (at < ciphertext.length) {
           // A full piece is a middle chunk only once more bytes follow it; else it is the final one.
@@ -430,9 +516,9 @@ export function createAlf1OpenerAt(
     },
     finish(): Promise<Alf1Finished> {
       return guard.run(async () => {
-        if (headerFilled < ALF1_HEADER_LENGTH) throw refused(BAD_HEADER);
+        if (headerFilled < format.headerLength) throw refused(messages.badHeader);
         // No piece after the header: the final chunk is missing.
-        if (filled === 0) throw refused(NOT_OPEN);
+        if (filled === 0) throw refused(messages.notOpen);
         const last = await openChunk(piece.subarray(0, filled), true);
         const digests: Alf1Digests = {
           ciphertextSha256: ctHash.digest(),
@@ -440,12 +526,10 @@ export function createAlf1OpenerAt(
           ciphertextLength,
           plaintextLength,
         };
-        if (
-          (expectedCt !== undefined && !equalBytes(expectedCt, digests.ciphertextSha256)) ||
-          (expectedPt !== undefined && !equalBytes(expectedPt, digests.plaintextSha256))
-        ) {
+        const mismatch = checkDigests(digests);
+        if (mismatch !== undefined) {
           wipe(last);
-          throw refused(HASH_MISMATCH);
+          throw refused(mismatch);
         }
         return { output: [last], digests };
       }, true);

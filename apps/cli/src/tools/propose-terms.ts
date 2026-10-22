@@ -5,8 +5,11 @@
 // 2. The `to` argument is resolved to an active, paired contact (ID or shown name; AMBIGUOUS_CONTACT).
 // 3. Core `proposeTerms` (M1-32) fills `termsId`, `version`, `parties`, `previousTermsHash` and
 //    `termsHash`, checks `revises` (only the caller's own newest unanswered offer, else
-//    USE_RESPOND_TO_TERMS) and sends the `offer`. Free and not a commitment; a firm offer
-//    (`notarize`) arrives with M1-9d, so no M1a call returns `pending_approval`.
+//    USE_RESPOND_TO_TERMS) and sends the `offer`. Free and not a commitment.
+// 4. With `notarize` (M1-9d-3): a firm offer, a commitment. The core quotes the proof first
+//    (`needs_credits`: nothing sent, nothing asked), then asks the owner once for the offer and
+//    its proof (`pending_approval`, the 11 §5.6 proof lines in the summary); the call again with
+//    the approvalId sends the offer and adds its proof (`proof`, a ProofStatus).
 //
 // `clientRequestId` goes to the core, which makes the call idempotent (M1-32-b; 06 §1 rule 6,
 // 07 §3.3): a repeat returns the original result and sends nothing; another request under the key is
@@ -34,7 +37,9 @@ import {
   termsApprovalState,
   termsCoreError,
   termsInProgress,
+  termsNeedsCredits,
   termsRefusal,
+  termsWithProof,
 } from './terms-common.js';
 import { proofDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
@@ -58,7 +63,8 @@ export async function proposeTermsHandler(
   if (terms === undefined) return notAvailable();
   const { to, revises, note, notarize, approvalId, clientRequestId } = input as ProposeInput;
 
-  if ((await client.self()) === undefined) {
+  const self = await client.self();
+  if (self === undefined) {
     return fail(
       'needs_setup',
       noOwnerCard(context.agentName).summary,
@@ -93,21 +99,40 @@ export async function proposeTermsHandler(
   }
 
   switch (result.status) {
-    case 'ok':
+    case 'ok': {
       logger.info('terms offer sent', { offers: 1 });
-      return ok(TERMS_TEXT.offerSent(result.version, nameOf(ref), dateOf(result.validUntil)), {
+      const fields = {
         envelopeId: result.envelopeId,
         thread: result.thread,
         termsId: result.termsId,
         version: result.version,
         termsHash: result.termsHash,
         validUntil: isoOf(result.validUntil),
-      });
+      };
+      if (result.proof === undefined) {
+        return ok(
+          TERMS_TEXT.offerSent(result.version, nameOf(ref), dateOf(result.validUntil)),
+          fields,
+        );
+      }
+      return termsWithProof(
+        TERMS_TEXT.firmOfferSent(result.version, nameOf(ref), dateOf(result.validUntil)),
+        fields,
+        result.proof,
+        context,
+        self.agentId,
+        nameOf(ref),
+      );
+    }
+    case 'needs_credits':
+      logger.info('propose terms needs credits', { offers: 0 });
+      return termsNeedsCredits(self.agentId, result.topUp);
     case 'rejected':
       logger.info('propose terms refused', { kind: 'terms' });
       return termsRefusal(result.code, false);
     case 'pending_approval':
-      // A firm offer (M1-9d); unreachable in M1a, handled so the result is never undefined.
+      // A firm offer (M1-9d-3): one approval for the offer and its proof.
+      logger.info('terms approval requested', { requests: 1 });
       return pendingApproval(
         context,
         result.approvalId,

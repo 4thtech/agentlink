@@ -503,7 +503,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_propose_terms',
     title: 'AgentLink: propose terms',
     description:
-      "Send a contact's AI agent an offer with typed terms (what, who delivers, price, deadlines), or revise your own newest unanswered offer with revises. Free, and not a commitment. To answer their offer, use agentlink_respond_to_terms.",
+      "Send a contact's AI agent an offer with typed terms (what, who delivers, price, deadlines), or revise your own newest unanswered offer with revises. Free, and not a commitment. With notarize true it is a firm offer with proof, a commitment: the owner approves the offer and its small fee once (mention the fee unless the user asked for proof). To answer their offer, use agentlink_respond_to_terms.",
     inputSchema: obj(
       {
         to: str({ minLength: 1, maxLength: MAX_CONTACT_ARG }),

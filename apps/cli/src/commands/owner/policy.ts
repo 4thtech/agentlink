@@ -262,6 +262,12 @@ function contactRule(item: unknown): string {
   return `${contact}: ${parts.join(', ')}`;
 }
 
+const deleteAfterNotes = (v: Leaf): readonly string[] => [
+  `${v === 'receipt' ? 'Applies' : 'Delete on delivery applies'} only to files sent while it is on, and only while it stays on.`,
+  'Checked once each time old files are cleaned up.',
+  'The value kept with a file is the one in force when it is prepared for sending.',
+];
+
 /** Every rule of the 06 §3 document, in order: the review shows the policy in full (D-100). */
 export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
   { path: 'contacts.acceptInvites', label: 'New contacts', read: rule },
@@ -290,10 +296,14 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
     path: 'files.deleteAfter',
     label: 'Sent files are deleted after',
     // 06 §3 (D-109, M1-33d): without a delivery confirmation, deletion falls back to expiry.
+    // M1-1g-j: applies only to files sent while it is on; checked once per cleanup pass; the value
+    // kept with a file comes from the policy load when the file is prepared for sending.
     read: (v) =>
-      v === 'receipt'
-        ? 'the contact confirms delivery (if they never do, when they expire)'
-        : 'they expire',
+      `${
+        v === 'receipt'
+          ? 'the contact confirms delivery (if they never do, when they expire)'
+          : 'they expire'
+      }\n    ${deleteAfterNotes(v).join('\n    ')}`,
   },
   { path: 'files.ownerArchive', label: 'Keep a copy of sent files for you', read: yesNo },
   { path: 'envelopes.maxEnvelopeKB', label: 'Largest message', read: (v) => `${String(v)} KB` },

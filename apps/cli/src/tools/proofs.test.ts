@@ -1087,18 +1087,26 @@ describe('notarize on agentlink_send (06 §2.2: the proofs policy as for agentli
   });
 });
 
-describe('notarize on the terms tools (06 §2.2a, D-55)', () => {
-  it('propose passes notarize to the core; the core refusal is fixed text, nothing sent', async () => {
+describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
+  const TERMS_OK = Object.freeze({
+    termsId: 'VGVybXNUZXJtc1Rlcm1zVA',
+    version: 1,
+    termsHash: 'ab'.repeat(32),
+    validUntil: 1_761_000_000,
+  });
+  const topUp = {
+    chainId: 84532,
+    chain: 'base-sepolia',
+    token: 'USDC',
+    usd: '1.00',
+    feeUsd: '0.10',
+    agentAddress: A as `0x${string}`,
+  };
+  const firm = { subject: 'Logo', deliverables: [{ description: 'A logo', by: 'them' }] };
+
+  it('propose passes notarize to the core; a core refusal is fixed text, nothing sent', async () => {
     const { client, calls } = fake();
-    const r = await call(
-      'agentlink_propose_terms',
-      {
-        to: B,
-        terms: { subject: 'Logo', deliverables: [{ description: 'A logo', by: 'them' }] },
-        notarize: true,
-      },
-      client,
-    );
+    const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client);
     expect(calls.proposed[0]?.notarize).toBe(true);
     expect(r.structured).toMatchObject({ status: 'error', code: 'NOTARIZE_UNAVAILABLE' });
   });
@@ -1112,6 +1120,125 @@ describe('notarize on the terms tools (06 §2.2a, D-55)', () => {
     );
     expect(calls.responded[0]?.notarize).toBe(true);
     expect(r.structured).toMatchObject({ status: 'error', code: 'NOTARIZE_UNAVAILABLE' });
+  });
+
+  it('a firm offer sent and recorded: ok with `proof` (ProofStatus), the fee in $, no network named', async () => {
+    const { client } = fake({
+      propose: () => ({
+        status: 'ok',
+        envelopeId: ENVELOPE,
+        thread: THREAD,
+        ...TERMS_OK,
+        proof: recorded(),
+      }),
+    });
+    const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client);
+    expect(r.structured).toMatchObject({
+      status: 'ok',
+      envelopeId: ENVELOPE,
+      version: 1,
+      proof: {
+        status: 'ok',
+        recordId: RECORD,
+        fee: FEE,
+        receipts: [],
+        advanced: { chain: 'base-sepolia' },
+      },
+    });
+    expect(r.structured.summary).toContain('$0.10');
+    expect(r.structured.summary).not.toMatch(/base|sepolia|chain|on-chain|transaction|gas/i);
+    expectOurTextClean(r);
+  });
+
+  it('needs_credits before anything is sent: the top-up link and agent ID in nextStep, nothing else from the route', async () => {
+    const { client } = fake({ propose: () => ({ status: 'needs_credits', topUp }) });
+    const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client);
+    expect(r.structured.status).toBe('needs_credits');
+    // The terms tools' output has no agentAddress or topUpUrl field (no tool-surface change), and
+    // `url` is reserved for the local approval UI's origins: the link travels in nextStep.
+    expect(r.structured.url).toBeUndefined();
+    expect(r.structured.nextStep).toContain(`${PAY_ORIGIN}/`);
+    expect(r.structured.summary).toContain('Nothing was sent.');
+    expect(r.structured.nextStep).toContain(A);
+    expect(r.structured.summary).toContain('$0.10');
+    expect(r.structured).toMatchObject({ proof: { status: 'needs_credits', receipts: [] } });
+    expect(dump(r)).not.toMatch(/wallet|\bgas\b|transaction|USDC|sepolia/i);
+  });
+
+  it('a firm offer that needs the owner: one approval, the proof disclosure lines (11 §5.6)', async () => {
+    const { client } = fake({
+      propose: () => ({
+        status: 'pending_approval',
+        approvalId: APPROVAL,
+        actionDigest: 'cd'.repeat(32),
+        summary: 'x',
+        expiresAt: 1_761_000_000,
+        card: { decision: 'offer', counterparty: { shown: 'Contact 7F3A·19C2' } },
+      }),
+    });
+    const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(r.structured.summary).toContain(copy('common.privacy.proof'));
+    expectOurTextClean(r);
+  });
+
+  it('an accept recorded with notarize: ok with `proof`; a proof still being recorded is `submitted`', async () => {
+    const { client } = fake({
+      respond: () => ({
+        status: 'ok',
+        decision: 'accept',
+        thread: THREAD,
+        ...TERMS_OK,
+        envelopeId: ENVELOPE,
+        proof: recorded(),
+      }),
+    });
+    const r = await call(
+      'agentlink_respond_to_terms',
+      { envelopeId: ENVELOPE, decision: 'accept', notarize: true, approvalId: APPROVAL },
+      client,
+    );
+    expect(r.structured).toMatchObject({
+      status: 'ok',
+      decision: 'accept',
+      proof: { status: 'ok', recordId: RECORD, fee: FEE, receipts: [] },
+    });
+    expectOurTextClean(r);
+
+    const submitting = fake({
+      respond: () => ({
+        status: 'ok',
+        decision: 'accept',
+        thread: THREAD,
+        ...TERMS_OK,
+        envelopeId: ENVELOPE,
+        proof: { ...recorded(), status: 'submitted' },
+      }),
+    });
+    const s = await call(
+      'agentlink_respond_to_terms',
+      { envelopeId: ENVELOPE, decision: 'accept', notarize: true, approvalId: APPROVAL },
+      submitting.client,
+    );
+    expect(s.structured).toMatchObject({
+      status: 'submitted',
+      decision: 'accept',
+      envelopeId: ENVELOPE,
+      proof: { status: 'submitted', recordId: RECORD },
+    });
+  });
+
+  it('a proof refusal of the core (CHAIN_UNAVAILABLE, CARD_EXPIRED) is fixed proof text', async () => {
+    for (const code of ['CHAIN_UNAVAILABLE', 'CARD_EXPIRED'] as const) {
+      const { client } = fake({ propose: () => ({ status: 'rejected', code }) });
+      const r = await call(
+        'agentlink_propose_terms',
+        { to: B, terms: firm, notarize: true },
+        client,
+      );
+      expect(r.structured).toMatchObject({ code });
+      expect(r.structured.summary).toMatch(/nothing was recorded/);
+    }
   });
 });
 
