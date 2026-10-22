@@ -91,6 +91,15 @@ describe('deps-check repository scan covers e2e/', () => {
     expect(problems.join('\n')).toMatch(/leaves e2e/);
   });
 
+  it.each([
+    '../../packages/core/src/testing/chain.js.bak',
+    '../../packages/core/src/testing/chain.jsx',
+    '../../packages/chain/dist/index.js2',
+  ])('refuses a sibling with the same prefix as an allowed file: %s', (target) => {
+    const { problems } = runChecks(repo(`import { x } from '${target}';\nvoid x;\n`));
+    expect(problems.join('\n')).toMatch(/leaves e2e/);
+  });
+
   it('reports the real repository clean', () => {
     expect(runChecks(REPO).problems).toEqual([]);
   });

@@ -34,7 +34,7 @@ export const nodeBuiltinsAllowed = (zone) =>
 /**
  * Relative imports that may leave their zone, narrowly (M1-1g-c): e2e drives the real CLI through
  * the built modules under apps/cli/dist/ (the runtime, the owner approve handler, the verifier). The
- * target must be inside that directory; the test seam rule still applies on top. Each entry needs a
+ * target must be inside that directory (a target ending in `/`) or exactly that file (otherwise); the test seam rule still applies on top. Each entry needs a
  * reason.
  */
 export const RELATIVE_ESCAPES = [
@@ -60,7 +60,11 @@ export const RELATIVE_ESCAPES = [
 
 /** True when `zone` may import the repo-relative path `target` although it lies outside the zone. */
 export const relativeEscapeAllowed = (zone, target) =>
-  RELATIVE_ESCAPES.some((entry) => entry.zone === zone && target.startsWith(entry.target));
+  RELATIVE_ESCAPES.some(
+    (entry) =>
+      entry.zone === zone &&
+      (entry.target.endsWith('/') ? target.startsWith(entry.target) : target === entry.target),
+  );
 
 /** Built-ins that exist only with the prefix (node:test, node:sqlite) are covered by `node:`. */
 export const BUILTINS = builtinModules.filter((name) => !name.startsWith('node:'));
@@ -254,7 +258,7 @@ export const NODE_CRYPTO_EXEMPT_FILES = [
   {
     file: 'e2e/src/rendezvous.mjs',
     reason:
-      'OPS-CI-7: CI glue that seals the nightly invite between two runners (AES-256-GCM, HKDF) for throwaway test agents. It runs as a plain Node script before any build, so it cannot use @4thtech-io/crypto; it is not product crypto and handles no product keys.',
+      '@4thtech-io/crypto exports no general AEAD; retire via card CHORE-E2E-RENDEZVOUS-AEAD (OPS-CI-7 CI glue, throwaway test agents, not product crypto)',
   },
 ];
 
