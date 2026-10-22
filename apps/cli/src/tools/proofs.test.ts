@@ -1176,12 +1176,17 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
 
   it('needs_credits with a live pay page: the exact top-up link for the agent in nextStep', async () => {
     const { client } = fake({ propose: () => ({ status: 'needs_credits', topUp }) });
-    const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client, {
-      payPage: LIVE_PAY,
-    });
+    const r = await call(
+      'agentlink_propose_terms',
+      { to: B, terms: firm, notarize: true },
+      client,
+      {
+        payPage: LIVE_PAY,
+      },
+    );
     expect(r.structured.status).toBe('needs_credits');
     expect(r.structured.url).toBeUndefined();
-    expect(r.structured.nextStep).toContain(linkFor('1.00'));
+    expect(r.structured.nextStep).toContain(linkFor('5'));
     expect(r.structured.nextStep).not.toContain('not available yet');
   });
 
