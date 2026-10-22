@@ -10,7 +10,7 @@
     "test:e2e:injection": "vitest run --config prompt-injection/vitest.config.ts deterministic/",
     "test:e2e:live": "vitest run test/live-files-and-proof.test.ts",
     "test:e2e:llm": "vitest run llm/llm-run.test.ts",
-    "test": "vitest run test/canary-scan.test.ts test/harness-parse.test.ts test/inbox-ids.test.ts test/nightly-workflow.test.ts test/rendezvous.test.ts test/invite-page-site.test.ts test/invite-page-browser.test.ts",
+    "test": "vitest run test/canary-scan.test.ts test/harness-parse.test.ts test/inbox-ids.test.ts test/injection-needles.test.ts test/nightly-workflow.test.ts test/rendezvous.test.ts test/invite-page-site.test.ts test/invite-page-browser.test.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "devDependencies": {

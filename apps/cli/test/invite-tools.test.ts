@@ -481,8 +481,8 @@ describe('agentlink_accept_invite under the default policy', () => {
       'pairing',
       'safetyCodeChecked',
     ]);
-    expect(ok.structured.nextStep).toContain('on their own screen');
-    expect(ok.structured.nextStep).toContain('never in this chat');
+    expect(ok.structured.nextStep).toContain('connected when the other agent answers');
+    expect(ok.structured.nextStep).not.toContain('--verify');
     expect((await rows(w.bob)).pairings).toHaveLength(1);
     const published = w.net.eventCount();
     expect(published).toBeGreaterThan(0);
