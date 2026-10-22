@@ -18,6 +18,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
+import { stderr as processStderr, stdout as processStdout } from 'node:process';
 import { join } from 'node:path';
 import {
   AgentLinkClient,
@@ -577,11 +578,10 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
         lines.push(args.map(String).join(' '));
       });
     }
-    // Spies only: the canary reads what anything writes to the streams; it writes nothing itself.
-    // eslint-disable-next-line no-restricted-syntax -- a spy, not output (IR-M1-11s-c-1 L-5)
-    const stdout = vi.spyOn(process.stdout, 'write');
-    // eslint-disable-next-line no-restricted-syntax -- a spy, not output (IR-M1-11s-c-1 L-5)
-    const stderr = vi.spyOn(process.stderr, 'write');
+    // Spies only (IR-M1-11s-c-1 L-5): the canary reads what anything writes to the process's
+    // streams (the same objects as process.stdout and process.stderr); it writes nothing itself.
+    const stdout = vi.spyOn(processStdout, 'write');
+    const stderr = vi.spyOn(processStderr, 'write');
     const agent = await initAgent();
     const h = await harness(agent);
     const s = await h.session();
