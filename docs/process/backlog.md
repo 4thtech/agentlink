@@ -3209,7 +3209,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** docs checks pass; no implementation; the build cards below cite the new sections.
 
 #### M1-9i-a · types and core: storage and backup owner ops (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#408) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types/src/{constants,owner-action}.ts; packages/core/src/{owner-action,owner-actions,own-storage}.ts, the store migration and `Store` contract for `own_storage`, packages/core/src/files/outgoing.ts; owner-action vectors for the new ops
 - **Depends on:** M1-9i-s, M1-9i-b2 (`credentialDigest`)
 - **Spec:** 04 §2.5.1 (new rows); 07 §3.4 (`own_storage`), §5.6
