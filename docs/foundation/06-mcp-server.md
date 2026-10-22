@@ -83,8 +83,6 @@ Notation: `?` = optional. `Contact` = contact ID, display name or invite alias (
 
 Why two tools and not one (14) or a third (16): proposing needs a contact and full terms, while responding needs only a received envelope and a decision. One `agentlink_terms {action}` tool would need a union input schema, which models fill less reliably, and would put a free action and a commitment behind the same permission prompt. `counter` stays in `agentlink_respond_to_terms` because it answers a specific received version, like `accept` and `reject`. A separate receipt tool for terms would bring back the second approval this change removes.
 
-Older names that remain in other documents (for example `create_invite` and `fetch_file` in 04) mean the `agentlink_` tools above; backlog M1-30 renames them.
-
 ### 2.1 Setup and identity
 
 | Tool | Input | Output (structured) | Notes |
