@@ -19,6 +19,9 @@ import type { FilesPlatform } from './files/platform.js';
 import type { ProofsPlatform } from './proofs/platform.js';
 import { MemoryStore } from './store/memory-store.js';
 import type { Sealed } from './store/schema.js';
+import type { StoreTx } from './store/store.js';
+import { voidPendingScopeTx } from './approvals.js';
+import { voidPendingScopesTx } from './terms-store.js';
 import { BASE_SEPOLIA, FakeNotary } from './testing/chain.js';
 import { makeAgent, pairWith, type TestAgent, type TestOwner } from './testing/envelopes.js';
 import {
@@ -95,6 +98,10 @@ async function insertApproval(
     status: 'pending' | 'approved' | 'denied' | 'expired' | 'cancelled' | 'void';
     decidedAt: number | null;
     decision?: boolean;
+    source?: 'owner' | 'policy_grant';
+    scopeKey?: string;
+    answers?: string;
+    cancel?: boolean;
   },
 ): Promise<void> {
   const c = ctxOf(agent);
@@ -105,12 +112,12 @@ async function insertApproval(
       approval_id: row.id,
       action_json: action,
       scope_json: null,
-      answers_envelope_id: null,
-      scope_key: null,
-      source: 'owner',
+      answers_envelope_id: row.answers ?? null,
+      scope_key: row.scopeKey ?? null,
+      source: row.source ?? 'owner',
       policy_hash: null,
       signed_decision: row.decision === false ? null : '{"sig":"SIGNED-MUST-NOT-LEAK"}',
-      signed_cancel: null,
+      signed_cancel: row.cancel === true ? '{"sig":"CANCEL-MUST-NOT-LEAK"}' : null,
       summary,
       status: row.status,
       expires_at: 2_000_000_000,
@@ -141,11 +148,11 @@ async function applyPolicy(agent: TestAgent, clock: FakeClock, edit: (p: Policy)
 async function openAgent(
   clock: FakeClock,
   n: number,
-  options: { files?: FilesPlatform; proofs?: ProofsPlatform } = {},
+  options: { files?: FilesPlatform; proofs?: ProofsPlatform; store?: MemoryStore } = {},
 ): Promise<TestAgent> {
   const keyStore = new MemoryKeyStore(seed(n));
   const owner = asOwner(new MemoryOwnerKeyStore(seed(n + 100), passphrase()));
-  const store = new MemoryStore();
+  const store = options.store ?? new MemoryStore();
   const cipher = new TestStoreCipher();
   const client = await AgentLinkClient.create({
     keyStore,
@@ -615,5 +622,212 @@ describe('ActivityService.list (M1-11r-a)', () => {
     await expect(a.client.activity.list({ limit: 3, cursor: '12' })).rejects.toMatchObject({
       code: 'page_query_invalid',
     });
+  });
+});
+
+// ---- Fix round IR-M1-11r-a-1 -------------------------------------------------------------------
+
+/** A MemoryStore that counts the rows its `select` calls return (the read bound, L-2). */
+class CountingStore extends MemoryStore {
+  rows = 0;
+  override transaction<R>(body: (tx: StoreTx) => R): Promise<R> {
+    return super.transaction((tx) => {
+      const counted: StoreTx = {
+        get: (table, key) => tx.get(table, key),
+        select: (table, where, options) => {
+          const out = tx.select(table, where, options);
+          this.rows += out.length;
+          return out;
+        },
+        count: (table, where) => tx.count(table, where),
+        insert: (table, row) => tx.insert(table, row),
+        update: (table, where, patch) => tx.update(table, where, patch),
+        delete: (table, where) => tx.delete(table, where),
+      } as StoreTx;
+      return body(counted);
+    });
+  }
+}
+
+async function pageAll<T extends { readonly id?: string; readonly recordId?: string }>(
+  read: (cursor: string | undefined) => Promise<{ items: readonly T[]; nextCursor?: string }>,
+): Promise<string[]> {
+  const ids: string[] = [];
+  let cursor: string | undefined;
+  for (let i = 0; i < 1000; i += 1) {
+    const page = await read(cursor);
+    ids.push(...page.items.map((x) => x.id ?? x.recordId ?? ''));
+    cursor = page.nextCursor;
+    if (cursor === undefined) break;
+  }
+  return ids;
+}
+
+describe('activity: approval decisions (IR-M1-11r-a-1 M-1)', () => {
+  it('labels each stored approval shape by its status and source, never inventing a denial', async () => {
+    const a = await openAgent(clock, 70);
+    // Owner-signed approve, and an approve later used (void) or lapsed (expired): approved.
+    await insertApproval(a, { id: 'apr_owner_yes', status: 'approved', decidedAt: 10 });
+    await insertApproval(a, { id: 'apr_owner_used', status: 'void', decidedAt: 11 });
+    await insertApproval(a, { id: 'apr_owner_lapsed', status: 'expired', decidedAt: 12 });
+    // Owner-signed deny, and an owner cancel of a pending request (denied with a signed cancel).
+    await insertApproval(a, { id: 'apr_owner_no', status: 'denied', decidedAt: 13 });
+    await insertApproval(a, {
+      id: 'apr_owner_cancel_pending',
+      status: 'denied',
+      decidedAt: 14,
+      decision: false,
+      cancel: true,
+    });
+    // An owner cancel of an approved approval.
+    await insertApproval(a, {
+      id: 'apr_owner_cancelled',
+      status: 'cancelled',
+      decidedAt: 15,
+      cancel: true,
+    });
+    // A rules grant (terms-flow.ts: policy_grant, approved, no signed decision), fresh and used.
+    await insertApproval(a, {
+      id: 'apr_rules',
+      status: 'approved',
+      decidedAt: 16,
+      decision: false,
+      source: 'policy_grant',
+    });
+    await insertApproval(a, {
+      id: 'apr_rules_used',
+      status: 'void',
+      decidedAt: 17,
+      decision: false,
+      source: 'policy_grant',
+    });
+    // An expired request the owner never decided (defensive: a decided_at without a decision).
+    await insertApproval(a, {
+      id: 'apr_lapsed_undecided',
+      status: 'expired',
+      decidedAt: 18,
+      decision: false,
+    });
+    // Pending requests voided by the system: approvals.ts voidPendingScopeTx, terms-store
+    // voidPendingScopesTx, and the revocation shape (revocation.ts: pending -> void, decided_at).
+    await insertApproval(a, {
+      id: 'apr_void_scope',
+      status: 'pending',
+      decidedAt: null,
+      decision: false,
+      scopeKey: 'scope-1',
+    });
+    await insertApproval(a, {
+      id: 'apr_void_terms',
+      status: 'pending',
+      decidedAt: null,
+      decision: false,
+      answers: 'env-answered',
+    });
+    await a.store.transaction((tx) => {
+      voidPendingScopeTx(tx, 'scope-1', 19);
+      voidPendingScopesTx(tx, ['env-answered'], 20);
+    });
+    await insertApproval(a, {
+      id: 'apr_void_revoked',
+      status: 'void',
+      decidedAt: 21,
+      decision: false,
+    });
+
+    const all = await a.client.activity.list({ limit: 100 });
+    const decisions = Object.fromEntries(
+      all.items.map((i) => [
+        i.kind === 'approval_decided' ? i.approvalId : i.id,
+        i.kind === 'approval_decided' ? i.decision : i.kind,
+      ]),
+    );
+    expect(decisions).toEqual({
+      apr_owner_yes: 'approved',
+      apr_owner_used: 'approved',
+      apr_owner_lapsed: 'approved',
+      apr_owner_no: 'denied',
+      apr_owner_cancel_pending: 'denied',
+      apr_owner_cancelled: 'cancelled',
+      apr_rules: 'approved_by_rules',
+      apr_rules_used: 'approved_by_rules',
+    });
+    expect(JSON.stringify(all)).not.toContain('CANCEL-MUST-NOT-LEAK');
+  });
+});
+
+describe('large inputs (IR-M1-11r-a-1 L-1)', () => {
+  it('pages 205 proofs at distinct times with limit 100: no duplicates, no gaps', async () => {
+    const a = await openAgent(clock, 71);
+    for (let n = 1; n <= 205; n += 1) {
+      await insertProof(a, { n, status: 'recorded', createdAt: 1_000 + n });
+    }
+    const first = await a.client.proofs.list({ limit: 100 });
+    expect(first.items).toHaveLength(100);
+    expect(first.items[0]?.recordId).toBe(recordId(205));
+    const ids = await pageAll((cursor) => a.client.proofs.list({ limit: 100, cursor }));
+    expect(ids).toHaveLength(205);
+    expect(new Set(ids).size).toBe(205);
+    expect(ids).toEqual(Array.from({ length: 205 }, (_, i) => recordId(205 - i)));
+
+    const feed = await pageAll((cursor) => a.client.activity.list({ limit: 100, cursor }));
+    expect(feed).toHaveLength(205);
+    expect(new Set(feed).size).toBe(205);
+  });
+
+  it('pages a mixed feed of 101+ entries with limit 100 to the end', async () => {
+    const a = await openAgent(clock, 72);
+    for (let n = 1; n <= 60; n += 1) {
+      await insertProof(a, { n, status: 'recorded', createdAt: 2_000 + (n % 7) });
+      await insertApproval(a, {
+        id: `apr_${String(n)}`,
+        status: 'approved',
+        decidedAt: 2_000 + (n % 5),
+      });
+    }
+    const all = await a.client.activity.list({ limit: 100 });
+    expect(all.items).toHaveLength(100);
+    expect(all.nextCursor).toBeTypeOf('string');
+    const feed = await pageAll((cursor) => a.client.activity.list({ limit: 100, cursor }));
+    expect(feed).toHaveLength(120);
+    expect(new Set(feed).size).toBe(120);
+    const small = await pageAll((cursor) => a.client.activity.list({ limit: 7, cursor }));
+    expect(small).toEqual(feed);
+  });
+});
+
+describe('ties at one time are read with a bound (IR-M1-11r-a-1 L-2)', () => {
+  it('150 proofs sharing one timestamp: every page reads at most limit + 1 rows', async () => {
+    const store = new CountingStore();
+    const a = await openAgent(clock, 73, { store });
+    for (let n = 1; n <= 150; n += 1) {
+      await insertProof(a, { n, status: 'recorded', createdAt: 5_000 });
+    }
+    const limit = 10;
+    const ids: string[] = [];
+    let cursor: string | undefined;
+    for (let i = 0; i < 100; i += 1) {
+      store.rows = 0;
+      const page = await a.client.proofs.list({ limit, cursor });
+      expect(store.rows).toBeLessThanOrEqual(limit + 1);
+      ids.push(...page.items.map((x) => x.recordId));
+      cursor = page.nextCursor;
+      if (cursor === undefined) break;
+    }
+    expect(ids).toEqual(Array.from({ length: 150 }, (_, i) => recordId(150 - i)));
+
+    const feed: string[] = [];
+    cursor = undefined;
+    for (let i = 0; i < 100; i += 1) {
+      store.rows = 0;
+      const page = await a.client.activity.list({ limit, cursor });
+      // One source holds rows here; the others are empty.
+      expect(store.rows).toBeLessThanOrEqual(limit + 1);
+      feed.push(...page.items.map((x) => x.id));
+      cursor = page.nextCursor;
+      if (cursor === undefined) break;
+    }
+    expect(feed).toHaveLength(150);
+    expect(new Set(feed).size).toBe(150);
   });
 });
