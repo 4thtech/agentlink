@@ -319,7 +319,7 @@ describe('agentlink_respond_to_terms: results (06 §2.2a, §2.5; 11 §6.1)', () 
         TERMS_TEXT.askAccept(3, '“Marko” (self-declared)'),
         proofDisclosure('“Marko” (self-declared)'),
       ),
-      nextStep: nextStepOf(APPROVAL),
+      nextStep: `${nextStepOf(APPROVAL)} To check the decision, call agentlink_get_approval.`,
     });
     expect(client.responded).toEqual([{ envelopeId: ENVELOPE, decision: 'accept' }]);
     expectNoCanary(result, lines);
