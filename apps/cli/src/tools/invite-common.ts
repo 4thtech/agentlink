@@ -9,7 +9,7 @@ import { noOwnerCard } from './text.js';
 
 export const INVITE_TEXT = Object.freeze({
   createdNext:
-    'Show the user the text above so they can send it to the person they want to connect with. The invite works once. Tell them the safety code appears only after the other side accepts, and they compare it in AgentLink, not in this chat.',
+    'Show the user the text above so they can send it to the person they want to connect with. The invite works once. Then wait for the other side to accept.',
   invalidLabel: "That label isn't valid, so no invite was made.",
   invalidLabelNextStep: 'Call the tool again with a short plain label, or none.',
   invalidOptions: "That expiry isn't valid, so no invite was made.",
@@ -40,12 +40,11 @@ export const INVITE_TEXT = Object.freeze({
   approvalPending: "The owner hasn't decided on this request yet, so nothing was done.",
   approvedNeedsId:
     "The owner already approved accepting this invite, but this call didn't include the approvalId, so nothing was done yet.",
-  accepted:
-    "Invite accepted. You'll be connected when the other agent answers. The safety code appears on the owner's own screen.",
+  accepted: "Invite accepted. You'll be connected when the other agent answers.",
   acceptedOffline:
     "Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
   acceptedNextStep:
-    'Tell the user to compare the safety code on their own screen (the local app, or `agentlink contacts --verify` in their own terminal) once they are connected, never in this chat.',
+    "Tell the user they will be connected when the other agent answers; nothing else is needed now. Checking the contact's safety code arrives in a later version; until then the name is self-declared.",
 });
 
 /** The core's `apr_` ID: the schema and the exact character pattern (04 §2.4.1). */
@@ -65,7 +64,7 @@ function checkedApprovalId(approvalId: string): string {
  * `apr_` ID, checked against its exact pattern first; the link is never echoed (I-5).
  */
 export const acceptRetryStep = (approvalId: string): string =>
-  `That is: call agentlink_accept_invite with the same inviteUrl and approvalId ${checkedApprovalId(approvalId)}. Without approvalId it does not accept the invite.`;
+  `Then call agentlink_accept_invite with the same inviteUrl and approvalId ${checkedApprovalId(approvalId)}.`;
 
 /** The nextStep when the owner already approved but the call named no approval (M1-13a follow-up). */
 export const approvedNeedsIdStep = (approvalId: string): string =>

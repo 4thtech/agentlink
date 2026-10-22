@@ -227,7 +227,8 @@ jobs:
       # Package tests that run in browsers (Playwright) need the engines (M1-2c).
       - name: Install Playwright browsers
         if: needs.detect.outputs.needs_playwright == 'true' && needs.detect.outputs.affected_playwright == 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright
 
       # Task ordering and caching are turbo's job; the root scripts call `turbo run ...`.
       # CHORE-CI-SPEED-2: TEST_SCOPE is `full` everywhere except a pull request whose selection
@@ -316,7 +317,8 @@ jobs:
       # The vectors run in all three Playwright engines (M0-9).
       - name: Install Playwright browsers
         if: needs.detect.outputs.needs_playwright == 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright
 
       # Python for the independent vector generators, fixed at the version requirements.txt was
       # compiled for (every pinned package has a cp312 wheel), whatever the runner image ships.
@@ -434,8 +436,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=10
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=10 --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       # The workspace dependencies of @4thtech-io/node (core, crypto) are consumed from dist/. The
       # CLI package and its dependencies are built too: the child processes of the CLI two-process

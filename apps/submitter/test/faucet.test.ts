@@ -18,6 +18,9 @@ const DAILY_CAP = 10;
 const faucet = new FakeFaucet(CHAIN_ID);
 beforeEach(() => {
   faucet.mode = 'sent';
+  faucet.tokenUsdCents = 10_000n;
+  faucet.nativeWei = 10n ** 17n;
+  faucet.failBalances = false;
   fakeFaucets.set(CHAIN_ID, faucet);
 });
 
@@ -144,7 +147,8 @@ describe('POST /v1/faucet: claims', () => {
     expect(body.chainId).toBe(CHAIN_ID);
     expect(body.txHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(Object.keys(body).sort()).toEqual(['chainId', 'txHash']);
-    expect(faucet.calls.slice(before)).toEqual([{ agent, usdCents: 100, outcome: 'sent' }]);
+    // M1-10b-e: one grant is 50 cents by default (5 proofs at the beta price).
+    expect(faucet.calls.slice(before)).toEqual([{ agent, usdCents: 50, outcome: 'sent' }]);
   });
 
   it('accepts an EIP-55 address and credits it in lowercase; refuses a bad checksum', async () => {
@@ -226,6 +230,66 @@ describe('POST /v1/faucet: claims', () => {
     const res = await claim({ chainId: CHAIN_ID, agent: newAgent() }, newIp());
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: 'unavailable' });
+  });
+});
+
+// M1-10b-e: a faucet below one grant refuses with the stable code `paused`, before its wallet is
+// empty; `/v1/health` reports the faucet's state per chain. Paused claims charge no limit.
+describe('POST /v1/faucet: paused below one grant (M1-10b-e)', () => {
+  it('answers 503 `paused`, sends nothing, and claims resume once topped up', async () => {
+    const agent = newAgent();
+    const ip = newIp();
+    faucet.tokenUsdCents = 49n;
+    const before = faucet.calls.length;
+    const res = await claim({ chainId: CHAIN_ID, agent }, ip);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'paused' });
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(faucet.calls.length).toBe(before);
+    faucet.tokenUsdCents = 50n;
+    expect((await claim({ chainId: CHAIN_ID, agent }, ip)).status).toBe(200);
+  });
+});
+
+describe('GET /v1/health: the faucet pool (M1-10b-e)', () => {
+  async function faucetState(): Promise<unknown> {
+    const res = await SELF.fetch(`${HOST}/v1/health`, { headers: { 'cf-connecting-ip': newIp() } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { chains: Record<string, unknown>[] };
+    const entry = body.chains.find((c) => c.chainId === CHAIN_ID);
+    // Only states: no address, no balance of the faucet wallet.
+    expect(JSON.stringify(body)).not.toContain('fa'.repeat(20));
+    expect(Object.keys(entry ?? {}).sort()).toEqual([
+      'available',
+      'chainId',
+      'faucet',
+      'gas',
+      'gasBalance',
+      'queueDepth',
+    ]);
+    return entry?.faucet;
+  }
+
+  it('ok at $20 or more, low under it, paused under one grant or when unreadable', async () => {
+    faucet.tokenUsdCents = 2_000n;
+    expect(await faucetState()).toBe('ok');
+    faucet.tokenUsdCents = 1_999n;
+    expect(await faucetState()).toBe('low');
+    faucet.tokenUsdCents = 49n;
+    expect(await faucetState()).toBe('paused');
+    faucet.tokenUsdCents = 10_000n;
+    faucet.failBalances = true;
+    expect(await faucetState()).toBe('paused');
+  });
+
+  it('low when the faucet wallet is short of its own gas', async () => {
+    faucet.nativeWei = 1n;
+    expect(await faucetState()).toBe('low');
+  });
+
+  it('paused when the faucet wallet is not configured', async () => {
+    fakeFaucets.delete(CHAIN_ID);
+    expect(await faucetState()).toBe('paused');
   });
 });
 
