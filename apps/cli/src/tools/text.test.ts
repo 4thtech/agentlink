@@ -6,11 +6,25 @@ import { noOwnerCard } from './text.js';
 const NPX = 'npx -y @4thtech-io/agentlink';
 
 describe('noOwnerCard (M1-36a)', () => {
-  it('a new machine: owner init with the npx form by default', () => {
-    const { summary } = noOwnerCard('default');
+  it('a machine known to have no owner: owner init with the npx form', () => {
+    const { summary } = noOwnerCard('default', { ownerExists: false });
     expect(summary).toBe(
       `AgentLink isn't protected yet. In a terminal you opened yourself, run \`${NPX} owner init\`. Your AI can't do this for you.`,
     );
+  });
+
+  it('unknown state keeps the add-agent step, never owner init', () => {
+    const { summary } = noOwnerCard('default');
+    expect(summary).toContain(`\`${NPX} owner add-agent --agent default\``);
+    expect(summary).not.toContain('owner init');
+  });
+
+  it('a non-default agent always carries --agent', () => {
+    expect(noOwnerCard('work', { ownerExists: false }).summary).toContain(
+      `\`${NPX} owner init --agent work\``,
+    );
+    expect(noOwnerCard('work', { ownerExists: true }).summary).toContain('--agent work`');
+    expect(noOwnerCard('work').summary).toContain('--agent work`');
   });
 
   it('an owner exists here: owner add-agent for this agent', () => {
@@ -20,11 +34,16 @@ describe('noOwnerCard (M1-36a)', () => {
   });
 
   it('uses the prefix it is given', () => {
-    expect(noOwnerCard('x', { prefix: 'agentlink' }).summary).toContain('`agentlink owner init`');
+    expect(noOwnerCard('x', { prefix: 'agentlink', ownerExists: false }).summary).toContain(
+      '`agentlink owner init --agent x`',
+    );
   });
 
   it('never says "card" and never inserts an unchecked name', () => {
-    for (const s of [noOwnerCard().summary, noOwnerCard('Bad;rm', { ownerExists: true }).summary]) {
+    for (const s of [
+      noOwnerCard().summary,
+      noOwnerCard('Bad;rm', { ownerExists: false }).summary,
+    ]) {
       expect(s).not.toMatch(/\bcard\b/i);
       expect(s).not.toContain('Bad;rm');
     }

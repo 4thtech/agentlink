@@ -250,6 +250,14 @@ describe('the owner’s browser opens with the one-shot link, not the agent', ()
 });
 
 describe('the link nextStep command prefix (M1-36a)', () => {
+  it('says "in your terminal" and stays within 500 characters for the longest agent name', () => {
+    const url = `http://localhost:47321/approve/${APPROVAL}`;
+    const npx = 'npx -y @4thtech-io/agentlink';
+    const text = approvalLinkNextStep(APPROVAL, url, `a${'b'.repeat(31)}`, npx);
+    expect(text).toContain(' or in your terminal run ');
+    expect(Array.from(text).length).toBeLessThanOrEqual(500);
+  });
+
   it('prints the npx form when given it, never a bare name that is not on PATH', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;
     const npx = 'npx -y @4thtech-io/agentlink';

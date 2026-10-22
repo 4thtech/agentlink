@@ -64,7 +64,7 @@ export const TOOL_TEXT = Object.freeze({
 
 /**
  * The `needs_setup` text for an open agent that is not set up with an owner (M1-9u, M1-36a; 04
- * §2.8). On a new machine the step is `owner init`; when an owner exists here it is `owner
+ * §2.8). `owner init` only when the machine is known to have no owner; otherwise `owner
  * add-agent`. The name goes into the text only after the 06 §6 name check; otherwise the
  * placeholder `<name>` is shown.
  */
@@ -74,8 +74,12 @@ export function noOwnerCard(
 ): { summary: string; nextStep: string } {
   const prefix = options.prefix ?? DEFAULT_PREFIX;
   const agent = agentName !== undefined && AGENT_NAME.test(agentName) ? agentName : '<name>';
-  const withOwner = options.ownerExists === true;
-  const command = withOwner ? `${prefix} owner add-agent --agent ${agent}` : `${prefix} owner init`;
+  // `owner init` only when this machine is known to have no owner; unknown keeps the add-agent step.
+  const withOwner = options.ownerExists !== false;
+  const agentFlag = agent === 'default' ? '' : ` --agent ${agent}`;
+  const command = withOwner
+    ? `${prefix} owner add-agent --agent ${agent}`
+    : `${prefix} owner init${agentFlag}`;
   return {
     summary: (withOwner ? TOOL_TEXT.noOwnerCardAgent : TOOL_TEXT.noOwnerCard).replace(
       '{command}',
