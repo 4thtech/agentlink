@@ -1,6 +1,6 @@
 # Networks and contract addresses
 
-> **Status: testnet only, pre-audit.** Two test networks have contracts today: Base Sepolia and Gnosis Chiado. Only Base Sepolia is used by default. AgentLink chooses automatically only among networks the test-credits faucet serves, so Chiado is used by default from the release in which the faucet serves it, after its smoke test has passed (M1-3j-b). There are no mainnet deployments. Nothing here holds real value, and testnet deployments may be redeployed. No released AgentLink version records proof yet (planned for v0.2.0, M1).
+> **Status: testnet only, pre-audit.** Two test networks have contracts today: Base Sepolia and Gnosis Chiado. Only Base Sepolia is used by default. AgentLink chooses automatically only among networks the test-credits faucet serves, so Chiado is used by default from the release in which the faucet serves it, after its smoke test, which has passed (M1-3j-b). There are no mainnet deployments. Nothing here holds real value, and testnet deployments may be redeployed. No released AgentLink version records proof yet (planned for v0.2.0, M1).
 
 This page lists every network the OCC v2 contracts are deployed on, or planned for, with the contract addresses and a way to check on a public block explorer that they are in use. For what the contracts do, see [Contracts](contracts.md).
 
@@ -11,7 +11,7 @@ This page lists every network the OCC v2 contracts are deployed on, or planned f
 | Network | Chain ID | Status | Deployed | Explorer |
 |---|---|---|---|---|
 | Base Sepolia (testnet) | 84532 | Live (pre-audit) | 2026-10-14, block 48120712, campaign-1 | [sepolia.basescan.org](https://sepolia.basescan.org) |
-| Gnosis Chiado (testnet) | 10200 | Live (pre-audit; smoke test pending; not used by default), at the same addresses as Base Sepolia | 2026-10-19, block 23594957, campaign-1 | [gnosis-chiado.blockscout.com](https://gnosis-chiado.blockscout.com) |
+| Gnosis Chiado (testnet) | 10200 | Live (pre-audit; smoke test passed 2026-10-21; not used by default), at the same addresses as Base Sepolia | 2026-10-19, block 23594957, campaign-1 | [gnosis-chiado.blockscout.com](https://gnosis-chiado.blockscout.com) |
 | Base (mainnet) | 8453 | Not deployed (planned for v1.0.0, M3, after the external audit) | Not yet | Not applicable |
 | Gnosis (mainnet) | 100 | Not deployed (planned for v1.0.0, M3, after the external audit) | Not yet | Not applicable |
 
@@ -47,7 +47,7 @@ Deployed on 2026-10-19 (campaign-1). The contracts use CREATE3 through CreateX, 
 | 23594956 | [0x51c4bd8f775635cc9023c7baaceae95c0743a2c59b0399f8736d2b234e8f258b](https://gnosis-chiado.blockscout.com/tx/0x51c4bd8f775635cc9023c7baaceae95c0743a2c59b0399f8736d2b234e8f258b) |
 | 23594957 | [0xd3e08d823f43f3be4e3c319d51e0960eda87ca208aff06169b60ef4db5f06e4d](https://gnosis-chiado.blockscout.com/tx/0xd3e08d823f43f3be4e3c319d51e0960eda87ca208aff06169b60ef4db5f06e4d) |
 
-**Smoke test pending.** The live smoke test that passed on Base Sepolia has not been run on Chiado yet (it needs test xDAI). Until it has, treat Chiado as deployed but unverified in use, and AgentLink does not pick it automatically. This page will say so when it passes.
+**Smoke test passed.** The live smoke test (deposit, notarize, acknowledge) passed on Chiado on 2026-10-21, in the contracts repository's `Deploy testnet` run [39587157618](https://github.com/4thtech/occ-v2-contracts/actions/runs/39587157618) (job "live smoke (gnosis-chiado)"; recorded in contracts#24). AgentLink still does not pick Chiado automatically until the test-credits faucet serves it (M1-3j-b, M1-3j-c).
 
 ## Mainnets
 
