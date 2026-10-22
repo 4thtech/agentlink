@@ -738,7 +738,7 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     });
     expect(res.status).toBe(200);
     expect(client).not.toBe(full);
-    expect(Object.keys(client as object).sort()).toEqual(['agentId', 'getProof']);
+    expect(Object.keys(client as object).sort()).toEqual(['agentId', 'getProof', 'policy']);
     expect(Object.isFrozen(client)).toBe(true);
   });
 });
