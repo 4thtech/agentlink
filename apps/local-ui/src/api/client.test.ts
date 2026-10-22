@@ -90,7 +90,12 @@ describe('createApiClient', () => {
   it('refuses a path outside /api/ before any request', async () => {
     const fetchMock = vi.fn();
     const api = createApiClient({ fetch: fetchMock, token: 't' });
-    for (const bad of ['/settings', 'https://evil.example/api/x', '//evil.example/api/x', 'api/x']) {
+    for (const bad of [
+      '/settings',
+      'https://evil.example/api/x',
+      '//evil.example/api/x',
+      'api/x',
+    ]) {
       await expect(api.get(bad)).rejects.toThrow();
     }
     expect(fetchMock).not.toHaveBeenCalled();
