@@ -16,12 +16,14 @@ import {
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_DEFAULTS,
   defaultPolicy,
+  policySchema,
   type Policy,
 } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import {
   POLICY_EDIT_WARNING_CODES,
+  POLICY_FIELD_LOOSENING,
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
   buildOwnerActionBody,
   policyEditWarnings,
@@ -496,7 +498,7 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
       [
         'a folder added',
         (p) => void (p.files.allowedFolders = ['~/b', FOLDER]),
-        [{ code: 'allowed_folders_added', folders: [FOLDER] }],
+        [{ code: 'allowed_folders_added' }],
         (p) => void (p.files.allowedFolders = ['~/b']),
       ],
       [
@@ -601,6 +603,69 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
         [],
         (p) => void (p.proofs.notarize = 'deny'),
       ],
+      // IR-M1-11r-b-2 M: a removed rule falls back to a looser global rule.
+      [
+        'removing a deny + receipts-false rule under global allow + receipts true (reviewer probe)',
+        (p) => void (p.contactRules = []),
+        [{ code: 'contact_rule_removed_loosens', contacts: [C1] }],
+        (p) => {
+          p.receipts.autoDelivered = true;
+          p.contactRules = [
+            { contact: C1, proofs: { notarize: 'deny' }, receipts: { autoDelivered: false } },
+          ];
+        },
+      ],
+      [
+        'removing a lower per-proof maximum rule',
+        (p) => void (p.contactRules = [{ contact: C2, proofs: { notarize: 'allow' } }]),
+        [{ code: 'contact_rule_removed_loosens', contacts: [C1] }],
+        (p) =>
+          void (p.contactRules = [
+            { contact: C1, proofs: { perActionMaxUSD: '0.5' } },
+            { contact: C2, proofs: { notarize: 'allow' } },
+          ]),
+      ],
+      [
+        'removing a rule that was looser than the global rule: nothing',
+        (p) => void (p.contactRules = []),
+        [],
+        (p) => void (p.contactRules = [{ contact: C1, proofs: { perActionMaxUSD: '3' } }]),
+      ],
+      // IR-M1-11r-b-2 L: unknown senders and the write folders.
+      [
+        'unknown senders drop -> queue',
+        (p) => void (p.contacts.unknownSenders = 'queue'),
+        [{ code: 'unknown_senders_queued' }],
+        (p) => void (p.contacts.unknownSenders = 'drop'),
+      ],
+      [
+        'inbox and export folders changed: fields only, no path',
+        (p) => {
+          p.files.inboxFolder = '/';
+          p.proofs.exportFolder = '~/.ssh';
+        },
+        [{ code: 'folder_changed', fields: ['files.inboxFolder', 'proofs.exportFolder'] }],
+      ],
+      [
+        'retention longer',
+        (p) => {
+          p.files.deleteAfter = 'expiry';
+          p.files.ownerArchive = true;
+        },
+        [{ code: 'retention_longer', fields: ['files.deleteAfter', 'files.ownerArchive'] }],
+        (p) => void (p.files.deleteAfter = 'receipt'),
+      ],
+      [
+        'default chain changed',
+        (p) => void (p.proofs.defaultChain = 'gnosis'),
+        [{ code: 'proofs_chain_changed' }],
+      ],
+      [
+        'commitments deny -> approval',
+        (p) => void (p.commitments.accept = 'approval'),
+        [{ code: 'commitments_looser' }],
+        (p) => void (p.commitments.accept = 'deny'),
+      ],
       [
         'only stricter values',
         (p) => {
@@ -619,6 +684,29 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
         expect(edit(f, from)).toEqual(expected);
       });
     }
+
+    it('every policy field has a loosening classification (a new field fails here)', () => {
+      const leaves = (p: object) =>
+        Object.entries(p)
+          .flatMap(([section, value]) =>
+            Array.isArray(value) || typeof value !== 'object' || value === null
+              ? [section]
+              : Object.keys(value as object).map((f) => `${section}.${f}`),
+          )
+          .sort();
+      expect(leaves(POLICY_FIELD_LOOSENING)).toEqual(leaves(POLICY_DEFAULTS));
+      expect(Object.keys(POLICY_FIELD_LOOSENING).sort()).toEqual(
+        Object.keys(policySchema.shape).sort(),
+      );
+    });
+
+    it('a warning never carries a path, only codes, fields and agent IDs', () => {
+      const all = edit((p) => {
+        p.files.inboxFolder = '~/secret-place';
+        p.files.allowedFolders = ['~/another-place'];
+      });
+      expect(JSON.stringify(all)).not.toMatch(/place/);
+    });
 
     it('every code is in the stable list, in its order', () => {
       expect(POLICY_EDIT_WARNING_CODES).toContain('commitments_allow');

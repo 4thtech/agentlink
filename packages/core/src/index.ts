@@ -118,12 +118,14 @@ export {
 // after presence. Owner surfaces only: no MCP tool uses them (I-4).
 export {
   POLICY_EDIT_WARNING_CODES,
+  POLICY_FIELD_LOOSENING,
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
   buildOwnerActionBody,
   mergePolicyPatch,
   newOwnerActionNonce,
   policyEditWarnings,
   type BuiltOwnerAction,
+  type FieldLoosening,
   type OwnerActionBodyInput,
   type PolicyEditOptions,
   type PolicyEditWarning,
