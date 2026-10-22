@@ -21,6 +21,7 @@ import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { approvalStateOf } from './get-approval.js';
 import { INVITE_TEXT } from './invite-common.js';
+import type { PayPageConfig } from '@4thtech-io/chain';
 import { needsCredits, notarizeOutput, proofRefusal, proofThrown } from './proofs-common.js';
 import {
   fail,
@@ -208,8 +209,9 @@ function proofObject(result: Readonly<Record<string, unknown>>): Record<string, 
 export function termsNeedsCredits(
   agentId: string,
   route: { readonly feeUsd?: string } | undefined,
+  payPage?: PayPageConfig,
 ): HandlerOutput {
-  const out = needsCredits(agentId, route).result;
+  const out = needsCredits(agentId, route, {}, payPage).result;
   return {
     result: {
       status: out.status,

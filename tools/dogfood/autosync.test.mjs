@@ -1,6 +1,6 @@
 // M1-23-e: auto-sync two-Mac dogfood (autosync.mjs). A fake `ssh` runs the remote command locally
 // with HOME set to a temp folder, so the file protocol is tested end to end; no network, no harness.
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -8,6 +8,9 @@ import { buildSteps, parseArgs, planText } from './lib.mjs';
 import { encodeLine, keychainOverSshCheck, sealLine } from './remote.mjs';
 import {
   FILES,
+  abortPeer,
+  clearStaleInvite,
+  clearStaleInvites,
   discoverWaiting,
   inviteText,
   localTransport,
@@ -15,6 +18,7 @@ import {
   parseInviteFile,
   parseStatusFile,
   parseWaiting,
+  runWithExitHooks,
   sshTransport,
   statusLine,
   waitingText,
@@ -220,9 +224,11 @@ describe('--two-mac keychain-over-ssh preflight', () => {
     ]) {
       const r = keychainOverSshCheck(o, parse, fake(text));
       expect(r.ok).toBe(false);
-      expect(r.help).toBe(
-        'macOS blocks the keychain over SSH; use --auto-sync (start role b on Mac B first)',
-      );
+      // M1-23-f: names the macOS limitation and where the agent must run.
+      expect(r.help).toMatch(/login keychain/);
+      expect(r.help).toMatch(/SSH/);
+      expect(r.help).toMatch(/own terminal/);
+      expect(r.help).toMatch(/--auto-sync/);
     }
   });
 
@@ -240,5 +246,116 @@ describe('--two-mac keychain-over-ssh preflight', () => {
     expect(calls[0][0]).toBe('ssh');
     expect(calls[0][1]).toContain('BatchMode=yes');
     expect(calls[0][1].join(' ')).toMatch(/doctor --agent oc-test/);
+  });
+});
+
+describe('auto-sync cleanup and early exit (M1-23-f)', () => {
+  let dir;
+  let home;
+  let ssh;
+  let bTransport;
+  const syncDir = `~/agentlink-dogfood/${RUN}/sync`;
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'al-autosync-f-'));
+    home = join(dir, 'home');
+    await mkdir(home, { recursive: true });
+    ssh = join(dir, 'ssh');
+    await writeFile(
+      ssh,
+      `#!/bin/sh
+for last; do :; done
+HOME="${home}"; export HOME
+exec sh -c "$last"
+`,
+    );
+    await chmod(ssh, 0o755);
+    bTransport = localTransport(join(home, 'agentlink-dogfood', RUN, 'sync'));
+    await bTransport.init();
+  });
+  afterAll(() => rm(dir, { recursive: true, force: true }));
+
+  it('Mac B removes a stale invite file left behind by an earlier run', async () => {
+    await bTransport.write(FILES.invite, inviteText(NONCE, 'INVITE', INVITE));
+    await clearStaleInvite(bTransport);
+    expect(await bTransport.read(FILES.invite)).toBeUndefined();
+    await expect(clearStaleInvite(bTransport)).resolves.toBeUndefined();
+  });
+
+  it('Mac A sends ABORT to Mac B on an early exit; B reads it and no invite file stays', async () => {
+    const a = sshTransport('u@mini.local', syncDir, { ssh });
+    const channel = makeChannel({ transport: a, nonce: NONCE, role: 'a', sleep: async () => {} });
+    await abortPeer({ transport: a, channel, nonce: NONCE });
+    expect(parseInviteFile(await bTransport.read(FILES.invite), NONCE)).toEqual({ kind: 'ABORT' });
+    const bChannel = makeChannel({
+      transport: bTransport,
+      nonce: NONCE,
+      role: 'b',
+      sleep: async () => {},
+    });
+    const got = await bChannel.take((m) => m.kind === 'ABORT', 0);
+    expect(got.kind).toBe('ABORT');
+    await clearStaleInvite(bTransport);
+    expect(await bTransport.read(FILES.invite)).toBeUndefined();
+  });
+
+  it('abortPeer never throws when ssh is down', async () => {
+    const down = sshTransport('u@mini.local', syncDir, { ssh: '/nonexistent/ssh' });
+    const channel = makeChannel({
+      transport: down,
+      nonce: NONCE,
+      role: 'a',
+      sleep: async () => {},
+    });
+    await expect(abortPeer({ transport: down, channel, nonce: NONCE })).resolves.toBeUndefined();
+  });
+
+  it('exit hooks run last-first after main returns or throws, and a failing hook is ignored', async () => {
+    const order = [];
+    const hooks = [
+      () => order.push('first'),
+      () => {
+        throw new Error('hook failed');
+      },
+      () => order.push('third'),
+    ];
+    expect(await runWithExitHooks(() => Promise.resolve(7), hooks)).toBe(7);
+    expect(order).toEqual(['third', 'first']);
+    order.length = 0;
+    await expect(
+      runWithExitHooks(() => Promise.reject(new Error('main failed')), hooks),
+    ).rejects.toThrow('main failed');
+    expect(order).toEqual(['third', 'first']);
+  });
+});
+
+describe('stale invites from earlier runs (IR-M1-23-f-1)', () => {
+  it('sweeps <out>/<run>/sync/invite of every earlier run, and nothing else', async () => {
+    const out = await mkdtemp(join(tmpdir(), 'al-sweep-'));
+    try {
+      const runs = ['20261016-090000', '20261017-101500'];
+      for (const r of runs) {
+        await mkdir(join(out, r, 'sync'), { recursive: true });
+        await writeFile(join(out, r, 'sync', FILES.invite), inviteText(NONCE, 'INVITE', INVITE));
+        await writeFile(join(out, r, 'sync', FILES.b), 'keep\n');
+      }
+      // Not a run folder, and a symlinked sync folder: neither is followed.
+      await mkdir(join(out, 'other', 'sync'), { recursive: true });
+      await writeFile(join(out, 'other', 'sync', FILES.invite), 'x');
+      const outside = await mkdtemp(join(tmpdir(), 'al-outside-'));
+      await writeFile(join(outside, FILES.invite), 'x');
+      await mkdir(join(out, '20261018-000000'), { recursive: true });
+      await symlink(outside, join(out, '20261018-000000', 'sync'));
+      await clearStaleInvites(out);
+      for (const r of runs) {
+        expect(await localTransport(join(out, r, 'sync')).read(FILES.invite)).toBeUndefined();
+        expect(await localTransport(join(out, r, 'sync')).read(FILES.b)).toBe('keep\n');
+      }
+      expect(await readFile(join(out, 'other', 'sync', FILES.invite), 'utf8')).toBe('x');
+      expect(await readFile(join(outside, FILES.invite), 'utf8')).toBe('x');
+      await rm(outside, { recursive: true, force: true });
+      await expect(clearStaleInvites(join(out, 'missing'))).resolves.toBeUndefined();
+    } finally {
+      await rm(out, { recursive: true, force: true });
+    }
   });
 });
