@@ -6,9 +6,14 @@
 // from the recipient the record commits to). Then the sender's core deletes the stored object of
 // every file of that envelope through deleteFileObject: own storage, or the drop with a DELETE
 // signed by the drop key of the epoch the object was uploaded under (the sealed locator records
-// it), so a receipt seen after a key rotation still deletes it. The row is then marked deleted
-// (`deleted_at`) and never deleted again. Discarding the file key on both sides and the expiry
-// fallback (no receipt: the object stays until it expires) are M1-7f-2's.
+// it), so a receipt seen after a key rotation still deletes it. The row, and with it the sealed
+// file key, is then deleted (M1-7f-2, crypto-shredding; 04 §4).
+//
+// Retention at expiry (M1-7f-2; 04 §4, 06 §3): deleteExpiredFiles runs under every policy. At
+// `expiresAt` the sender deletes the stored object of each of its rows (under `expiry`, under
+// `receipt` without a DELIVERED receipt (M1-33d), and for rows stored before the snapshot) and then
+// the row; the receiver deletes its own row (D-98), never an object. Before `expiresAt` nothing is
+// deleted, so the owner keeps access until then (I-9).
 //
 // Per file, the policy at send time (M1-1g-i): a row is deleted on receipt only if it was sent under
 // `receipt` (`files.delete_after`) and the policy in effect now still says `receipt` (the caller's
@@ -24,6 +29,9 @@ import { CoreError } from '../errors.js';
 import type { Row } from '../store/schema.js';
 import type { FilesPlatform } from './platform.js';
 import { deleteFileObject } from './records.js';
+
+/** At most this many expired files are handled in one expiry pass. */
+export const MAX_EXPIRY_RETENTION_PER_PASS = 200;
 
 /** At most this many sent envelopes are checked against the chain in one pass. */
 export const MAX_RECEIPT_RETENTION_PER_PASS = 50;
@@ -114,15 +122,66 @@ export async function deleteFilesOnReceipt(
         });
         continue;
       }
-      const now = nowOf(ctx);
+      // The file key goes with the row (crypto-shredding, 04 §4).
       await ctx.store.transaction((tx) => {
-        const current = tx.get('files', { envelope_id: row.envelope_id, idx: row.idx });
-        if (current !== undefined && current.deleted_at === null) {
-          tx.update('files', { envelope_id: row.envelope_id, idx: row.idx }, { deleted_at: now });
-        }
+        tx.delete('files', { envelope_id: row.envelope_id, idx: row.idx });
       });
       deleted += 1;
     }
+  }
+  return { deleted, failed };
+}
+
+/**
+ * One expiry pass (see the header): every `files` row whose `expires_at` has passed, oldest first,
+ * at most MAX_EXPIRY_RETENTION_PER_PASS. A row of a received envelope is deleted on its own; a row of
+ * a sent envelope (or one whose envelope row is gone) after its stored object is deleted (nothing to
+ * delete for an inline file, or when the receipt pass already did). A failed delete keeps the row
+ * for the next pass; busy or unavailable storage ends the pass. Never throws.
+ */
+export async function deleteExpiredFiles(
+  ctx: CoreContext,
+  platform: FilesPlatform | undefined,
+): Promise<ReceiptRetentionResult> {
+  const now = nowOf(ctx);
+  const due = await ctx.store.transaction((tx) =>
+    tx
+      .select(
+        'files',
+        { expires_at: { lte: now } },
+        {
+          orderBy: [
+            ['expires_at', 'asc'],
+            ['envelope_id', 'asc'],
+            ['idx', 'asc'],
+          ],
+          limit: MAX_EXPIRY_RETENTION_PER_PASS,
+        },
+      )
+      .map((row) => ({
+        row,
+        received: tx.get('envelopes', { envelope_id: row.envelope_id })?.direction === 'in',
+      })),
+  );
+  let deleted = 0;
+  let failed = 0;
+  for (const { row, received } of due) {
+    if (!received && row.deleted_at === null) {
+      try {
+        if (platform === undefined) throw new CoreError('storage_failed', 'not deleted');
+        await deleteFileObject(ctx, platform, row);
+      } catch (error) {
+        failed += 1;
+        const code = error instanceof CoreError ? error.code : 'storage_failed';
+        ctx.log.warn('file not deleted at expiry', { code });
+        if (code === 'storage_unavailable') break;
+        continue;
+      }
+    }
+    await ctx.store.transaction((tx) => {
+      tx.delete('files', { envelope_id: row.envelope_id, idx: row.idx });
+    });
+    deleted += 1;
   }
   return { deleted, failed };
 }

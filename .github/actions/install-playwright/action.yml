@@ -1,0 +1,66 @@
+name: Install Playwright browsers
+description: >-
+  CHORE-CI-HARDEN-1. Restores the Playwright browser downloads from a cache keyed by the Playwright
+  version, then installs the browsers and their system libraries with bounded apt timeouts and one
+  retry, so a slow Ubuntu mirror cannot hold a job until its 30-minute limit. Needs Node and pnpm
+  already set up (the repository's setup-node-pnpm action) and `playwright` as a root devDependency.
+
+inputs:
+  browsers:
+    description: Space-separated Playwright browsers to install.
+    required: false
+    default: chromium firefox webkit
+
+runs:
+  using: composite
+  steps:
+    # The version comes from the root package.json (exact pin), never from the network.
+    - name: Resolve the Playwright version
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="$(jq -r '(.devDependencies.playwright // .devDependencies["@playwright/test"] // "unknown")' package.json | sed 's/^[^0-9]*//')"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    # Browser downloads only (no system packages). The key holds the version, the OS and the browser
+    # list, so a new version or a different list gets a fresh download.
+    - name: Cache the Playwright browsers
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
+
+    # Short apt timeouts and retries: the failure seen in CI was ~250 timeouts of 30 s from
+    # azure.archive.ubuntu.com, one after another. The settings only apply to this runner.
+    - name: Bound the apt network waits (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "10";' 'Acquire::https::Timeout "10";' \
+          | sudo tee /etc/apt/apt.conf.d/99agentlink-ci-network > /dev/null
+
+    - name: Install the Playwright system libraries and browsers (attempt 1)
+      id: install1
+      continue-on-error: true
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        # shellcheck disable=SC2086 # BROWSERS is a fixed, space-separated list of browser names
+        timeout 300 pnpm exec playwright install --with-deps $BROWSERS
+
+    - name: Install the Playwright system libraries and browsers (attempt 2)
+      if: steps.install1.outcome == 'failure'
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        echo "::warning::Playwright install failed once (slow or unreachable mirror); retrying."
+        sudo apt-get update -o Acquire::Retries=3 || true
+        # shellcheck disable=SC2086
+        timeout 300 pnpm exec playwright install --with-deps $BROWSERS

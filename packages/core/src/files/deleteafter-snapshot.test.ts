@@ -126,7 +126,7 @@ describe('files.deleteAfter is snapshotted per file at send time (M1-1g-i)', () 
 
     expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 1, failed: 0 });
     expect(own.objects.size).toBe(0);
-    expect((await fileRow(envelopeId))?.deleted_at).toBe(clock.t);
+    expect(await fileRow(envelopeId)).toBeUndefined();
   });
 
   it('after the switch, a new send under receipt is deleted and the older expiry send is kept', async () => {
@@ -140,7 +140,7 @@ describe('files.deleteAfter is snapshotted per file at send time (M1-1g-i)', () 
 
     expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 1, failed: 0 });
     expect((await fileRow(older))?.deleted_at).toBeNull();
-    expect((await fileRow(newer))?.deleted_at).toBe(clock.t);
+    expect(await fileRow(newer)).toBeUndefined();
     expect(own.objects.size).toBe(1);
   });
 

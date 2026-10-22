@@ -699,3 +699,42 @@ describe('createFaucetChain().credit: a pending nonce that settles (M1-10b-d)', 
     expect(chain.latestReads).toBe(0);
   });
 });
+
+describe('createFaucetChain().balances (M1-10b-e)', () => {
+  it('reads the native balance in wei and the fee token in whole US cents, and sends nothing', async () => {
+    // 20.004999 USDC is 2 000 whole cents (rounded down); 0.0201 ETH.
+    const chain = newChain({ tokenBalance: 20_004_999n, gasBalance: 20_100_000_000_000_000n });
+    expect(await faucet(chain).balances()).toEqual({
+      nativeWei: 20_100_000_000_000_000n,
+      tokenUsdCents: 2_000n,
+    });
+    expect(chain.attempted).toEqual([]);
+    expect(chain.methods).not.toContain('eth_sendRawTransaction');
+    expect(chain.methods).not.toContain('eth_estimateGas');
+  });
+
+  it('refuses an RPC on another chain', async () => {
+    await expect(faucet(newChain({ chainId: 8453 })).balances()).rejects.toThrow();
+  });
+
+  it('refuses an unreachable RPC with fixed text (no URL)', async () => {
+    const fetchFn = vi.fn(async () => {
+      throw new TypeError(`network down ${RPC_URL}`);
+    });
+    Object.defineProperty(fetchFn, ADDRESS_CHECKED, { value: true });
+    const port = createFaucetChain(config, {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      faucetKey: FAUCET_KEY,
+      rpcUrls: [RPC_URL],
+      timeoutMs: 1000,
+    });
+    let message = '';
+    try {
+      await port.balances();
+    } catch (error) {
+      message = String((error as Error).message);
+    }
+    expect(message).not.toBe('');
+    expect(message).not.toContain('secret-path-key');
+  });
+});
