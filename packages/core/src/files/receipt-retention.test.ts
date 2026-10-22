@@ -82,7 +82,7 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
     });
   });
 
-  it('a DELIVERED receipt on-chain: the object is deleted once and the row is marked deleted', async () => {
+  it('a DELIVERED receipt on-chain: the object is deleted once and the file-key row is gone', async () => {
     const envelopeId = await sendFile();
     const recordId = await notarize(envelopeId);
     expect(chain.records.get(recordId)?.receiptAt[0]).not.toBe(0n);
@@ -91,7 +91,8 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
     expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 1, failed: 0 });
     expect(own.objects.size).toBe(0);
     expect(own.deleted).toHaveLength(1);
-    expect((await fileRows())[0]?.deleted_at).toBe(clock.t);
+    // M1-7f-2: the file key is discarded with the row (04 §4 crypto-shredding).
+    expect(await fileRows()).toHaveLength(0);
 
     // Idempotent: a deleted row is never deleted again.
     expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 0, failed: 0 });
@@ -171,7 +172,11 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
       // As a sender row under `receipt` would be: only the direction keeps it out (M1-1g-i).
       delete_after: 'receipt' as const,
     };
-    await a.store.transaction((tx) => tx.insert('files', row));
+    // M1-7f-2 stores A's own inbound row at ingest; the planted one replaces it.
+    await a.store.transaction((tx) => {
+      tx.delete('files', { envelope_id: sent.envelopeId, idx: 0 });
+      tx.insert('files', row);
+    });
 
     expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 0, failed: 0 });
     expect(own.deleted).toHaveLength(0);
@@ -201,7 +206,7 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
     const row = await a.store.transaction((tx) =>
       tx.get('files', { envelope_id: envelopeId, idx: 0 }),
     );
-    expect(row?.deleted_at).toBe(clock.t);
+    expect(row).toBeUndefined();
   });
 });
 
