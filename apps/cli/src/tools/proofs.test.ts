@@ -29,6 +29,7 @@ import type {
   ToolContext,
 } from './context.js';
 import { callTool } from './index.js';
+import { PROOF_TEXT } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
 import { TOOLS, findTool } from './registry.js';
@@ -1407,6 +1408,55 @@ describe('requestReceipt on agentlink_notarize and agentlink_send (06 §2.4, 11 
       client,
     );
     expect(r.structured.summary).not.toContain(RECEIPT_LINE_GENERIC);
+  });
+
+  it('M1-33d-b: a request the core did not add is said in the result field and the summary', async () => {
+    const { client } = fake({
+      notarize: () => ({ ...recorded(), receiptRequestNotAdded: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: true },
+      client,
+    );
+    expect(r.structured).toMatchObject({ status: 'ok', receiptRequestNotAdded: true });
+    expect(r.structured).not.toHaveProperty('receiptRequested');
+    expect(r.structured.summary).toContain(PROOF_TEXT.receiptRequestNotAdded);
+    expect(r.structured.summary).not.toContain(RECEIPT_LINE_GENERIC);
+    expectOurTextClean(r);
+  });
+
+  it('M1-33d-b: a kept request or no request never carries the not-added line', async () => {
+    const { client } = fake({
+      notarize: () => ({ ...recorded(), receiptRequested: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: true },
+      client,
+    );
+    expect(r.structured).not.toHaveProperty('receiptRequestNotAdded');
+    expect(r.structured.summary).not.toContain(PROOF_TEXT.receiptRequestNotAdded);
+    const plain = await call('agentlink_notarize', { envelopeId: ENVELOPE }, fake().client);
+    expect(plain.structured).not.toHaveProperty('receiptRequestNotAdded');
+    expect(plain.structured.summary).not.toContain(PROOF_TEXT.receiptRequestNotAdded);
+  });
+
+  it('M1-33d-b: send with a request the core did not add says so in proof and summary', async () => {
+    const { client } = fake({
+      notarize: () => ({ ...recorded(), receiptRequestNotAdded: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_send',
+      { to: B, text: 'hi', notarize: true, requestReceipt: true },
+      client,
+    );
+    expect(r.structured).toMatchObject({
+      status: 'ok',
+      proof: { status: 'ok', receiptRequestNotAdded: true },
+    });
+    expect(r.structured.summary).toContain(PROOF_TEXT.receiptRequestNotAdded);
+    expectOurTextClean(r);
   });
 
   it('a non-boolean requestReceipt is refused by the schema; nothing runs', async () => {
