@@ -2004,7 +2004,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only` (`card_pop_missing`); a pack with a valid proof becomes `verified`; a forged `cardPop` or `cardAgentSig`, and one replayed from another card (another key epoch, owner or display name), are refused with `card_pop_invalid`; one signature without the other is `malformed_pack`; a contract-account signer with both stays `record_only`; a recipient-exported pack with the sender's received signatures becomes `verified`; a `card-update` or `handshake` whose `cardPop` does not verify is dropped, and one without it from an older peer is accepted (RED commit).
 
 #### M1-4c-b · crypto and chain: KeyStore `signTransaction` for direct-mode sends (new, M1-4c follow-up)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (pulled forward by D-123, 22 Oct 2026) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface and backends), packages/chain (direct mode)
 - **Depends on:** M1-4c
 - **Spec:** 04 §2; 07 §6.2
@@ -5117,12 +5117,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-11c-a4c · local UI: add credits by QR, and Withdraw credits (new, D-122, D-123)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (money path) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`, `packages/node/src/local-ui/api/proofs.ts` and its tests, `e2e/test/local-ui-proofs-topup.test.ts`, its `changelog.d/` fragment and changeset
-- **Depends on:** #418, M1-11c-a4, core withdraw and top-up ops, M1-3c, M3-4b-t
+- **Depends on:** #418, M1-4c-b (KeyStore `signTransaction`), M1-11c-a4, core withdraw and top-up ops, M1-3c, M3-4b-t
 - **Spec:** 08 §1; 11 §5.6, §6.2; 12 §4; D-122, D-123
 - **Invariants:** I-1, I-4
 - **Scope:**
   - Add credits by QR: shows the agent's address and the named network in plain words with a privacy note; Chiado now (D-123: xDAI sent to the agent's address, then the agent's deposit), gasless USDC top-up once M3-4b-t lands. A card-to-stablecoin provider comes later, when the legal entity exists (D-122).
   - Withdraw credits under Advanced on the Proofs page: owner presence, a confirm screen with the amount and destination, signed server-side by the existing owner-operation helper. Orchestrator wording: the destination is typed or pasted by the owner and shown in full before signing.
+  - New core owner actions `credits.deposit` and `credits.withdraw` (owner-signed, presence-gated) back the two controls; 04 §2.5.1 gets the two rows (proposed, owner confirms at merge).
+  - The QR ships only together with crediting: the QR and the deposit/withdraw actions land in this card, never the QR alone.
+  - New dependency `qrcode-generator` (MIT, no dependencies): renders the QR in the browser with no network call; justify it in the PR (a hand-written QR encoder would be riskier than a small audited library).
 - **Acceptance:**
   - Playwright flow for both controls; withdraw requires presence (enforced centrally); the QR and copy pass `lintVocabulary` outside Advanced; no secret or URL is logged; threat note, tests-first evidence and a Fable audit (S2).
 
