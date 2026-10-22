@@ -253,6 +253,11 @@ export interface StoreOwnerSeedOptions {
   /** Argon2id parameters; default KEYSTORE_KDF_DEFAULTS. Tests use the 04 §2.8 floor. */
   readonly kdf?: Argon2idParams;
   readonly timeoutMs?: number;
+  /**
+   * M1-11s-c: called with the sealed `ALKO` blob (ciphertext) before it is written, so a caller can
+   * still roll back an item whose write or read-back failed (removeOwnerItemIfOurs).
+   */
+  readonly sealed?: (blob: Uint8Array) => void;
 }
 
 /**
@@ -292,6 +297,7 @@ export async function storeOwnerSeed(
   } finally {
     wipe(kek.kek);
   }
+  options.sealed?.(blob);
   await guarded(() => keychain.set(OWNER_ACCOUNT, blob), timeoutMs);
   const back = await readOwnerItem(keychain, timeoutMs);
   const same = back !== null && equalBytes(back, blob);

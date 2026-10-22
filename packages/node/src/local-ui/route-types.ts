@@ -5,7 +5,8 @@
 // declare `presence: true` (routes.ts refuses it otherwise): the approval server's central gate
 // checks owner presence before its handler runs, and the handler gets a one-use owner operation that
 // signs with the presence this request carried. No handler ever sees the owner code, the passkey
-// assertion or the session values.
+// assertion or the session values. M1-11s-c adds a third kind, `presence: 'setup'`, for owner setup
+// on the first-run page: no handler, run by the server's own setup gate.
 import type { JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
@@ -66,7 +67,23 @@ export interface LocalUiOwnerRoute {
   ) => Promise<LocalUiResult>;
 }
 
-export type LocalUiRoute = LocalUiReadRoute | LocalUiOwnerRoute;
+/** M1-11s-c: the two steps of owner setup on the first-run page. */
+export type LocalUiSetupStep = 'begin' | 'finish';
+
+/**
+ * M1-11s-c: an owner setup route (D-120 (1)). It has no page handler: the approval server's own
+ * setupGate runs the step (approval-server.ts, owner-setup.ts), so no page file ever touches the
+ * owner seed, the PRF output or the owner code. Only POST, only under /api/ui/first-run/, one route
+ * per step (routes.ts). Reached only while no owner exists anywhere.
+ */
+export interface LocalUiSetupRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'setup';
+  readonly step: LocalUiSetupStep;
+}
+
+export type LocalUiRoute = LocalUiReadRoute | LocalUiOwnerRoute | LocalUiSetupRoute;
 
 /** A page stub's answer until its card fills it. */
 export const NOT_IMPLEMENTED: LocalUiResult = Object.freeze({
