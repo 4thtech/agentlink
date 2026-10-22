@@ -831,3 +831,43 @@ describe('ties at one time are read with a bound (IR-M1-11r-a-1 L-2)', () => {
     expect(new Set(feed).size).toBe(150);
   });
 });
+
+describe('cursors carry no sender key (IR-M1-11r-a-2 M-2)', () => {
+  it('pages many blocked senders with ties at limits 1, 3, 7 and 13: no from_key in any cursor', async () => {
+    const a = await openAgent(clock, 74);
+    const keys: string[] = [];
+    for (let n = 1; n <= 40; n += 1) {
+      const key = hex64(0xabc000 + n * 7919);
+      keys.push(key);
+      // Ties: groups of up to 6 share one time.
+      await a.store.transaction((tx) =>
+        tx.insert('blocked_keys', {
+          from_key: key,
+          blocked_at: 9_000 + Math.floor(n / 6),
+          via_envelope_id: `env-b${String(n)}`,
+        }),
+      );
+    }
+    // Other sources at the same times.
+    for (let n = 1; n <= 9; n += 1) {
+      await insertProof(a, { n, status: 'recorded', createdAt: 9_000 + (n % 4) });
+    }
+    const full = await a.client.activity.list({ limit: 100 });
+    expect(full.items).toHaveLength(49);
+    for (const limit of [1, 3, 7, 13]) {
+      const ids: string[] = [];
+      let cursor: string | undefined;
+      for (let i = 0; i < 200; i += 1) {
+        const page = await a.client.activity.list({ limit, cursor });
+        ids.push(...page.items.map((x) => x.id));
+        cursor = page.nextCursor;
+        if (cursor === undefined) break;
+        for (const key of keys) expect(cursor.toLowerCase()).not.toContain(key);
+        // A cursor names only what the caller already holds: the last entry's time and ID.
+        const last = page.items[page.items.length - 1];
+        expect(cursor).toBe(`${String(last?.at)}~${String(last?.id)}`);
+      }
+      expect(ids).toEqual(full.items.map((x) => x.id));
+    }
+  });
+});
