@@ -32,10 +32,10 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/settings/activity', 'Activity'],
   ['/settings/contacts', 'Contacts'],
   ['/settings/files', 'Files'],
-  ['/settings/storage', 'Storage'],
   ['/settings/proofs', 'Proofs & credits'],
   ['/settings/rules', 'Rules'],
   ['/settings/backup', 'Backup'],
+  ['/settings/passkeys', 'Passkeys'],
   ['/settings/advanced', 'Advanced'],
 ];
 
@@ -73,12 +73,48 @@ describe('nav', () => {
       'Activity',
       'Contacts',
       'Files',
-      'Storage',
       'Proofs & credits',
       'Rules',
+      'Settings',
+    ]);
+    expect(NAV_ITEMS).toHaveLength(7);
+  });
+
+  it('keeps every nav label in plain words', () => {
+    // 11 §5: no wallet, gas, seed phrase or transaction words in the default UI.
+    const text = [...NAV_ITEMS.map((i) => i.label), 'Backup', 'Passkeys', 'Advanced'].join(' ');
+    expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
+  });
+
+  it('redirects the old storage path to Files', () => {
+    mountAt('/settings/storage');
+    expect(location.pathname).toBe('/settings/files');
+    expect(host.querySelector('main h1')?.textContent).toBe('Files');
+  });
+
+  it('shows a Settings sub-navigation with Backup, Passkeys and Advanced', () => {
+    mountAt('/settings/passkeys');
+    const sub = host.querySelector('nav[aria-label="Settings"]');
+    expect(sub).not.toBeNull();
+    expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Backup',
+      'Passkeys',
       'Advanced',
     ]);
+    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
+    expect(host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent).toContain(
+      'Settings',
+    );
+  });
+
+  it('has no Settings sub-navigation on other pages', () => {
+    mountAt('/settings/rules');
+    expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
+  });
+
+  it('does not claim to be connected before the connection is known', () => {
+    mountAt('/settings/rules');
+    expect(host.querySelector('footer.al-statusbar')?.textContent).not.toContain('Connected');
   });
 
   it('marks only the active item with aria-current', () => {
