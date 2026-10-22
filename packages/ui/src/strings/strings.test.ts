@@ -1,6 +1,7 @@
 // M1-35c: the shipped English strings. Vocabulary lint (11 §5.1), key coverage in both directions,
 // the 11 §5.6 disclosure lines, and the DESIGN-ADJ-1 (a) copy items.
 import { describe, expect, it } from 'vitest';
+import { awaitingUse } from './awaiting-use.js';
 import { en, formatMessage, pendingStrings, t } from './index.js';
 
 const strings = Object.entries(en) as [string, string][];
@@ -132,42 +133,68 @@ describe('key hygiene (11 §5.4)', () => {
     expect(missing).toEqual([]);
   });
 
-  // Surfaces whose building card has not landed yet may hold keys nothing references. An entry here
-  // leaves the list when its card references the keys. A stale entry fails the test below.
-  const NOT_YET_USED = [
-    'common.',
-    'chat.',
-    'cli.',
-    'os.',
-    'local.',
-    'desktop.',
-    'console.',
-    'cloud.',
-    'verify.',
-    'print.',
-    'invite.',
-    'accept.',
-    'onboarding.',
-    'pay.',
-    'pricing.',
-    'advanced.',
-    'devconfig.',
-  ];
+  // Keys nothing references yet are listed one by one in awaiting-use.ts.
+  const findUnused = (
+    keys: readonly string[],
+    refs: ReadonlySet<string>,
+    awaiting: readonly string[],
+  ) => keys.filter((k) => !refs.has(k) && !awaiting.includes(k));
 
-  it('has no unused key outside the surfaces still waiting for their card', () => {
-    const unused = Object.keys(en).filter(
-      (k) => !referenced.has(k) && !NOT_YET_USED.some((p) => k.startsWith(p)),
-    );
-    expect(unused).toEqual([]);
+  it('has no unused key that is not listed as awaiting its card', () => {
+    expect(findUnused(Object.keys(en), new Set(referenced.keys()), awaitingUse)).toEqual([]);
   });
 
-  it('keeps the waiting list honest', () => {
-    for (const p of NOT_YET_USED) {
-      expect(
-        Object.keys(en).some((k) => k.startsWith(p)),
-        p,
-      ).toBe(true);
+  it('fails on an unreferenced, typo-d key', () => {
+    const keys = [...Object.keys(en), 'chat.status.ok.sentt.summary'];
+    expect(findUnused(keys, new Set(referenced.keys()), awaitingUse)).toEqual([
+      'chat.status.ok.sentt.summary',
+    ]);
+  });
+
+  it('keeps the awaiting list honest: no stale, duplicate or referenced entry', () => {
+    expect(new Set(awaitingUse).size).toBe(awaitingUse.length);
+    for (const k of awaitingUse) {
+      expect(k in en, `${k} no longer exists`).toBe(true);
+      expect(referenced.has(k), `${k} is referenced now; remove it from awaiting-use.ts`).toBe(
+        false,
+      );
     }
+  });
+});
+
+describe('spec-faithful chat and terminal lines (IR-M1-35c-1)', () => {
+  it('flags a contact only in the activity feed (04 §3.1.1), with no promised hold', () => {
+    expect(en['chat.contact.flagged']).toContain('activity feed');
+    expect(en['chat.contact.flagged']).not.toMatch(/wait for your review|held|hold/i);
+  });
+
+  it('covers both recover paths (06 §8, D-100)', () => {
+    expect(en['cli.policy.recover']).toMatch(/rules you had/);
+    expect(en['cli.policy.recover']).toMatch(/recommended defaults/);
+  });
+
+  it('splits storage by rule (07): own storage and the encrypted drop', () => {
+    expect(en).not.toHaveProperty('chat.storage.connected');
+    expect(en['chat.storage.own']).toMatch(/own storage/);
+    expect(en['chat.storage.drop']).toMatch(/encrypted drop/);
+    expect(en['chat.storage.drop']).not.toMatch(/own storage/);
+  });
+
+  it('keeps backup commands on the terminal surface and warns about the old copy', () => {
+    for (const k of Object.keys(en)) expect(k.startsWith('chat.backup.'), k).toBe(false);
+    expect(en['cli.backup.restored']).toMatch(/Stop the agent on your old computer now/);
+    expect(en['cli.backup.restored']).toContain('agentlink storage connect');
+  });
+
+  it('discloses the recipient and the document key in the export summary', () => {
+    const base = { path: '/p.zip', recipient: 'no', documentKey: 'no' };
+    expect(formatMessage(en['chat.export.summary'], base)).not.toMatch(/received|document key/);
+    expect(formatMessage(en['chat.export.summary'], { ...base, recipient: 'yes' })).toMatch(
+      /who received it/,
+    );
+    expect(formatMessage(en['chat.export.summary'], { ...base, documentKey: 'yes' })).toMatch(
+      /document key, so anyone with the file can read the content/,
+    );
   });
 });
 
