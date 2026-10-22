@@ -179,15 +179,21 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
   ): Promise<Answer | 'offline'> {
     const headers = new Headers({ [CSRF_HEADER]: options.token ?? pageToken() });
     const init: RequestInit = { method, headers, credentials: 'same-origin', cache: 'no-store' };
+    // The copy sent (for finish, it holds the PRF output) is zeroed once fetch has it
+    // (IR-M1-11b-1-1 L-3); the caller zeroes its own buffer.
+    let sent: Uint8Array<ArrayBuffer> | undefined;
     if (method === 'POST') {
       headers.set('content-type', 'application/octet-stream');
-      init.body = body === undefined ? new Uint8Array(0) : new Uint8Array(body);
+      sent = body === undefined ? new Uint8Array(0) : new Uint8Array(body);
+      init.body = sent;
     }
     let res: Response;
     try {
       res = await doFetch(path, init);
     } catch {
       return 'offline';
+    } finally {
+      sent?.fill(0);
     }
     let json: Record<string, unknown> | undefined;
     try {

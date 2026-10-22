@@ -118,7 +118,10 @@ export function FirstRunPage({
       if (!live) return;
       if (result.kind === 'ok') {
         if (result.owner === 'set_up') setView({ k: 'already' });
-        else setView(available() ? { k: 'protect', working: false } : { k: 'unsupported' });
+        // IR-M1-11b-1-1 L-1: a failed check is never "no owner": doctor, not setup.
+        else if (result.owner === 'unknown') {
+          setView({ k: 'stuck', message: SETUP_MESSAGES.unknown });
+        } else setView(available() ? { k: 'protect', working: false } : { k: 'unsupported' });
       } else if (result.problem === 'session_expired') setView({ k: 'expired' });
       else if (result.problem === 'offline') setView({ k: 'down' });
       else setView({ k: 'stuck', message: setupMessage(result) });
@@ -150,6 +153,22 @@ export function FirstRunPage({
     if (finished.kind === 'owner_exists') return setView({ k: 'already' });
     if (finished.kind === 'error') {
       if (finished.problem === 'session_expired') return setView({ k: 'expired' });
+      if (finished.problem === 'offline') {
+        // IR-M1-11b-1-1 L-2: the server may have saved the owner before the answer was lost, so
+        // check again before offering anything; never a plain retry over a kept owner.
+        const now = await api.status();
+        if (now.kind === 'ok' && now.owner === 'missing') {
+          return setView({ k: 'protect', working: false, message: SETUP_MESSAGES.notFinished });
+        }
+        if (now.kind === 'ok' && now.owner === 'set_up') {
+          return setView({ k: 'stuck', message: SETUP_MESSAGES.finishedNoCode });
+        }
+        if (now.kind === 'error' && now.problem === 'offline') return setView({ k: 'down' });
+        if (now.kind === 'error' && now.problem === 'session_expired') {
+          return setView({ k: 'expired' });
+        }
+        return setView({ k: 'stuck', message: SETUP_MESSAGES.unknown });
+      }
       if (
         finished.problem === 'keychain' ||
         finished.problem === 'check_failed' ||

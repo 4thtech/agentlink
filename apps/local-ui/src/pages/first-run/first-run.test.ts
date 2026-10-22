@@ -351,7 +351,9 @@ describe('the setup calls (setup-api.ts)', () => {
     const calls: { path: string; init: RequestInit }[] = [];
     const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const path = String(input);
-      calls.push({ path, init: init ?? {} });
+      // A copy as sent: the client zeroes its own copy afterwards (L-3).
+      const body = init?.body instanceof Uint8Array ? init.body.slice() : init?.body;
+      calls.push({ path, init: { ...init, ...(body === undefined ? {} : { body }) } });
       const a = answers[path];
       if (a === undefined) return Promise.reject(new TypeError('network'));
       return Promise.resolve(new Response(JSON.stringify(a.body), { status: a.status }));

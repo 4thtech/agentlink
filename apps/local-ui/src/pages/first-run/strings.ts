@@ -94,4 +94,9 @@ export const SETUP_MESSAGES = {
   session_expired: 'This link has expired. Ask your AI to open AgentLink again.',
   forbidden: "This page couldn't be checked. Ask your AI to open AgentLink again.",
   unknown: "Setup didn't finish. Run `agentlink doctor` in your own terminal.",
+  // IR-M1-11b-1-1 L-2: the connection dropped after finish was sent, and the re-check says the owner
+  // exists: the setup probably finished, but its answer (with the backup code) never arrived.
+  finishedNoCode:
+    "Setup probably finished, but the connection dropped before your backup code could be shown. Approve with your passkey. If your passkey doesn't work, run `agentlink doctor` in your own terminal.",
+  notFinished: "The connection dropped and setup didn't finish. Nothing was kept. Try again.",
 } as const;
