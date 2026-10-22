@@ -175,8 +175,8 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
 
 /**
  * The testnet credits faucet (05 §9; SUB-7; M1-10b). Off unless SUBMITTER_FAUCET_CHAINS names
- * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia until
- * Chiado's smoke test has passed, M1-3j-b) and a testnet in the shipped config. Anything invalid turns the faucet off
+ * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia and
+ * Gnosis Chiado, M1-3j-c) and a testnet in the shipped config. Anything invalid turns the faucet off
  * (null) and leaves the rest of the submitter running.
  *
  * Vars: SUBMITTER_FAUCET_CHAINS, SUBMITTER_FAUCET_ADDRESS_<chainId> (below) and the bounded

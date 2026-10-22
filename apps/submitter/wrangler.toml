@@ -18,9 +18,9 @@
 # and production pin different addresses, so the two environments cannot share a faucet key.
 #
 # Vars are reviewed in PRs and asserted by test/smoke-config.test.ts. SUBMITTER_CHAINS and
-# SUBMITTER_FAUCET_CHAINS name Base Sepolia (84532) only: Gnosis Chiado (10200) joins with M1-3j-b,
-# together with its keys and the workflow's required-secret list. Never set a var as a Worker secret
-# too (the deploy fails if one exists: it would shadow the reviewed value).
+# SUBMITTER_FAUCET_CHAINS name Base Sepolia (84532) and Gnosis Chiado (10200, M1-3j-c); each chain
+# has its keys in the workflow's required-secret list. Never set a var as a Worker secret too (the
+# deploy fails if one exists: it would shadow the reviewed value).
 #
 # Bindings and logging are NOT inherited by environments, so each one repeats them; the assertions
 # in test/smoke-config.test.ts read this file back for each environment.
@@ -93,9 +93,10 @@ invocation_logs = false
 enabled = false
 
 [env.staging.vars]
-SUBMITTER_CHAINS = "84532"
-SUBMITTER_FAUCET_CHAINS = "84532"
+SUBMITTER_CHAINS = "84532,10200"
+SUBMITTER_FAUCET_CHAINS = "84532,10200"
 SUBMITTER_FAUCET_ADDRESS_84532 = "0x8846edc0bb0181b8b92c295cd3405a6914fbdb69"
+SUBMITTER_FAUCET_ADDRESS_10200 = "0x30a95fe88f21e9559565a034a44dea0f66fde19d"
 
 [[env.staging.durable_objects.bindings]]
 name = "SUBMITTER_QUEUE"
@@ -130,9 +131,10 @@ invocation_logs = false
 enabled = false
 
 [env.production.vars]
-SUBMITTER_CHAINS = "84532"
-SUBMITTER_FAUCET_CHAINS = "84532"
+SUBMITTER_CHAINS = "84532,10200"
+SUBMITTER_FAUCET_CHAINS = "84532,10200"
 SUBMITTER_FAUCET_ADDRESS_84532 = "0x194b23b695c9a20949ca321615678bd6cac651e9"
+SUBMITTER_FAUCET_ADDRESS_10200 = "0x606358eaf242a51c15c776b2f9c1c7bb98badc71"
 
 [[env.production.durable_objects.bindings]]
 name = "SUBMITTER_QUEUE"

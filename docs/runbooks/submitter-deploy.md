@@ -125,6 +125,8 @@ CI reads back each Worker's own settings after every deploy, but its narrow API 
 
 **Part F · Add Gnosis Chiado (chain 10200; M1-3j-b; laptop, then phone)**
 
+> **Done (2026-10-22).** Steps 26 and 27 are done: the owner set the four Chiado keys in both environments and sent the two faucet addresses. The enabling PR (M1-3j-c) pins them in `wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_10200`, with `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` = `"84532,10200"`, the two 10200 names in `SUBMITTER_REQUIRED_SECRETS` and 10200 in `FAUCET_CHAIN_IDS`. Step 28 (fund the wallets) stays with the owner. Step 29 is checked after that PR deploys: production `/v1/health` shows `10200` with `"available":true` before an npm release that routes to Chiado is promoted.
+
 Automatic selection uses exactly the chains the testnet faucet serves (`autoSelectableChains()` in `packages/chain`, gated on `FAUCET_CHAIN_IDS`). Chiado is not routed to until a later reviewed PR adds 10200 to that allowlist, so these steps can run at any time and nothing changes for users until that PR merges. Do them **before** that PR: its deploy waits (skips with "Worker secrets not set") until all four keys exist.
 
 26. Part B steps 3 to 5, then the four Chiado keys, each with its own address (write each one down):

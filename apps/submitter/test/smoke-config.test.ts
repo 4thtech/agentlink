@@ -128,7 +128,7 @@ describe('wrangler.toml', () => {
     }
   });
 
-  it('pins the owner\'s Gnosis Chiado faucet wallets, one per environment (M1-3j-c)', () => {
+  it("pins the owner's Gnosis Chiado faucet wallets, one per environment (M1-3j-c)", () => {
     expect(readFaucetAddress(read('staging').vars, 10200)).toBe(
       '0x30a95fe88f21e9559565a034a44dea0f66fde19d',
     );
