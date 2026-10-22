@@ -69,7 +69,7 @@ describe('Cursor', () => {
     await mkdir(join(home, '.cursor'), { mode: 0o700 });
     await writeFile(
       join(home, '.cursor', 'mcp.json'),
-      JSON.stringify({ mcpServers: { other: { command: 'x' } } }),
+      `${JSON.stringify({ mcpServers: { other: { command: 'x' } } }, null, 2)}\n`,
       { mode: 0o600 },
     );
     const c = ctx({ agent: 'cursor' });
@@ -86,7 +86,7 @@ describe('Cursor', () => {
     await mkdir(join(home, '.cursor'), { mode: 0o700 });
     await writeFile(
       join(home, '.cursor', 'mcp.json'),
-      JSON.stringify({ mcpServers: { agentlink: { command: 'evil' } } }),
+      `${JSON.stringify({ mcpServers: { agentlink: { command: 'evil' } } }, null, 2)}\n`,
       { mode: 0o600 },
     );
     expect((await planHarness(harnessById(CURSOR), ctx())).status).toBe('conflict');

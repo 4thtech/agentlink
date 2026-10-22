@@ -6,7 +6,7 @@
 // Antigravity only, resolved and checked by resolveConfigTarget under the 06 §7 write rules. The entry
 // runs `npx -y @4thtech-io/agentlink mcp`, as 06 §7 shows for every harness; a non-default agent adds
 // `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop (M1-9w) has its own file
-// per system. The printed snippets for Cursor, VS Code, Windsurf and Cline follow in M1b.
+// per system. Cursor and Windsurf are table entries too (M1-36g); VS Code and Cline follow.
 //
 // Nothing here puts a secret in a config: the entry holds the command and its arguments only.
 import { lstat, realpath, stat } from 'node:fs/promises';
@@ -18,7 +18,14 @@ import { addJsonMcpServer } from './json-config.js';
 import { addTomlMcpServer, agentlinkTable } from './toml-config.js';
 
 export type HarnessId =
-  'claude-code' | 'claude-desktop' | 'codex' | 'gemini-cli' | 'opencode' | 'antigravity';
+  | 'claude-code'
+  | 'claude-desktop'
+  | 'codex'
+  | 'gemini-cli'
+  | 'opencode'
+  | 'antigravity'
+  | 'cursor'
+  | 'windsurf';
 
 /** The `--harness` values (06 §7, D-78): one harness id, or `none` for the identity only. */
 export const HARNESS_IDS: readonly HarnessId[] = Object.freeze([
@@ -28,12 +35,15 @@ export const HARNESS_IDS: readonly HarnessId[] = Object.freeze([
   'gemini-cli',
   'opencode',
   'antigravity',
+  'cursor',
+  'windsurf',
 ]);
 
 /** The harnesses whose config may be named with `--config <path>` (06 §7, D-78). */
 export const CONFIG_PATH_HARNESSES: readonly HarnessId[] = Object.freeze([
   'opencode',
   'antigravity',
+  'windsurf',
 ]);
 
 export const isHarnessId = (value: string): value is HarnessId =>
@@ -76,7 +86,7 @@ export interface HarnessDef {
   readonly byPlatform?: Readonly<
     Partial<
       Record<
-        'darwin' | 'win32',
+        'darwin' | 'linux' | 'win32',
         {
           readonly parts: readonly string[];
           readonly installedMarks: readonly (readonly string[])[];
@@ -175,6 +185,53 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     binary: 'antigravity',
     edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
   },
+  {
+    // https://cursor.com/docs/context/mcp (checked 2026-10-22): global `~/.cursor/mcp.json`,
+    // `mcpServers.<name>` with `type: "stdio"`, `command` and `args`.
+    id: 'cursor',
+    appName: 'Cursor',
+    parts: ['.cursor', 'mcp.json'],
+    installedMarks: [['.cursor']],
+    binary: 'cursor',
+    edit: (text, args) =>
+      addJsonMcpServer(text, { type: 'stdio', command: 'npx', args: [...args] }),
+  },
+  {
+    // https://docs.devin.ai/windsurf/plugins/cascade/mcp (checked 2026-10-22; docs.windsurf.com
+    // redirects there): Cascade's file is `~/.config/devin/mcp_config.json` (macOS and Linux) and
+    // `%AppData%/devin/mcp_config.json` (Windows, ~/AppData/Roaming/devin); XDG_CONFIG_HOME and
+    // APPDATA are not followed. Older installs keep `~/.codeium/windsurf/mcp_config.json`: detected,
+    // and named with `--config`. `mcpServers.<name>` with `command` and `args`.
+    id: 'windsurf',
+    appName: 'Windsurf',
+    parts: [],
+    byPlatform: {
+      darwin: {
+        parts: ['.config', 'devin', 'mcp_config.json'],
+        installedMarks: [
+          ['.config', 'devin'],
+          ['.codeium', 'windsurf'],
+        ],
+      },
+      linux: {
+        parts: ['.config', 'devin', 'mcp_config.json'],
+        installedMarks: [
+          ['.config', 'devin'],
+          ['.codeium', 'windsurf'],
+        ],
+      },
+      win32: {
+        parts: ['AppData', 'Roaming', 'devin', 'mcp_config.json'],
+        installedMarks: [
+          ['AppData', 'Roaming', 'devin'],
+          ['.codeium', 'windsurf'],
+        ],
+      },
+    },
+    installedMarks: [],
+    binary: 'windsurf',
+    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+  },
 ]);
 
 /** The table entry for a harness id. */
@@ -190,7 +247,7 @@ export function configParts(
   platform: NodeJS.Platform = process.platform,
 ): readonly string[] | undefined {
   if (def.byPlatform === undefined) return def.parts;
-  return platform === 'darwin' || platform === 'win32'
+  return platform === 'darwin' || platform === 'linux' || platform === 'win32'
     ? def.byPlatform[platform]?.parts
     : undefined;
 }
@@ -304,7 +361,7 @@ export async function detectHarnesses(context: HarnessContext): Promise<HarnessD
     const marks =
       def.byPlatform === undefined
         ? def.installedMarks
-        : ((platform === 'darwin' || platform === 'win32'
+        : ((platform === 'darwin' || platform === 'linux' || platform === 'win32'
             ? def.byPlatform[platform]?.installedMarks
             : undefined) ?? []);
     for (const mark of marks) {

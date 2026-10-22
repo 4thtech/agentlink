@@ -4955,7 +4955,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests for the `needs_credits` text and the credits command output.
 
 #### M1-36g · agent UX: Cursor and Windsurf init targets (UX-G) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/harness/harnesses.ts`, `apps/cli/src/harness/files.ts`, docs-site `get-started/cursor.md` and `windsurf.md`
 - **Depends on:** none
 - **Spec:** 06 §5; 08
