@@ -47,6 +47,9 @@ interface MockChain {
   nonce: number;
   /** The `pending` nonce when it differs from the `latest` one (a transaction still in the mempool). */
   pendingNonce?: number;
+  /** Called on every `latest` nonce read with its 1-based count, before it answers (M1-10b-d). */
+  onLatestRead?: (count: number) => void;
+  latestReads: number;
   estimate: bigint;
   /** What `eth_estimateGas` answers for a `depositFor` (it reverts while the allowance is short). */
   depositEstimate: bigint;
@@ -81,6 +84,7 @@ function newChain(overrides: Partial<MockChain> = {}): MockChain {
     sent: [],
     attempted: [],
     depositEstimates: 0,
+    latestReads: 0,
     ...overrides,
   };
 }
@@ -104,6 +108,10 @@ function mockFetch(chain: MockChain) {
       case 'eth_getBalance':
         return reply(`0x${chain.gasBalance.toString(16)}`);
       case 'eth_getTransactionCount': {
+        if (p[1] === 'latest') {
+          chain.latestReads += 1;
+          chain.onLatestRead?.(chain.latestReads);
+        }
         const n = p[1] === 'pending' ? (chain.pendingNonce ?? chain.nonce) : chain.nonce;
         return reply(`0x${n.toString(16)}`);
       }
@@ -440,7 +448,7 @@ describe('createFaucetChain().credit', () => {
 });
 
 describe('createFaucetChain().credit robustness (M1-10b-c)', () => {
-  it('with a stuck approve (pending nonce above latest), a claim that needs an approve is refused at once and sends nothing', async () => {
+  it('with a stuck approve (pending nonce above latest), a claim that needs an approve is refused and sends nothing', async () => {
     const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n });
     expect(await faucet(chain).credit(AGENT, 100)).toEqual({ state: 'not_sent', reason: 'busy' });
     expect(chain.attempted).toEqual([]);
@@ -516,5 +524,100 @@ describe('createFaucetChain().credit robustness (M1-10b-c)', () => {
       reason: 'unavailable',
     });
     expect(chain.attempted).toEqual([]);
+  });
+});
+
+describe('createFaucetChain().credit: a pending nonce that settles (M1-10b-d)', () => {
+  const POLL = 10;
+  const DEADLINE = 40;
+
+  function timedFaucet(chain: MockChain) {
+    return createFaucetChain(config, {
+      fetchFn: mockFetch(chain) as unknown as typeof fetch,
+      faucetKey: FAUCET_KEY,
+      rpcUrls: [RPC_URL],
+      timeoutMs: 1000,
+      receiptPollMs: POLL,
+      receiptTimeoutMs: DEADLINE,
+    });
+  }
+
+  /** Runs one credit on fake timers; answers the result and the fake time it took. */
+  async function timedCredit(port: ReturnType<typeof timedFaucet>) {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] });
+    try {
+      const start = Date.now();
+      const pending = port.credit(AGENT, 100);
+      await vi.advanceTimersByTimeAsync(10 * DEADLINE);
+      const result = await pending;
+      return { result, elapsed: Date.now() - start };
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it('two claims within one block both succeed when the first depositFor mines within the poll window', async () => {
+    const chain = newChain({ nonce: 7, allowance: 0n });
+    const port = timedFaucet(chain);
+    const first = await timedCredit(port);
+    expect(first.result.state).toBe('sent');
+    // The first claim's approve (7) is mined; its depositFor (8) is still in the mempool, and
+    // it consumed the allowance. The second claim needs a fresh approve.
+    chain.nonce = 8;
+    chain.pendingNonce = 9;
+    chain.allowance = 0n;
+    const readsBefore = chain.latestReads;
+    chain.onLatestRead = (count) => {
+      if (count - readsBefore === 3) {
+        chain.nonce = 9; // the depositFor is mined
+        delete chain.pendingNonce;
+      }
+    };
+    const second = await timedCredit(port);
+    expect(second.result.state).toBe('sent');
+    const nonces = chain.sent.map((s) => decodeSent(s.raw).tx.nonce);
+    expect(nonces).toEqual([7, 8, 9, 10]);
+    expect(chain.sent.map((s) => decodeSent(s.raw).functionName)).toEqual([
+      'approve',
+      'depositFor',
+      'approve',
+      'depositFor',
+    ]);
+  });
+
+  it('a truly stuck approve still gets busy after the deadline, and sends nothing', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n });
+    const { result, elapsed } = await timedCredit(timedFaucet(chain));
+    expect(result).toEqual({ state: 'not_sent', reason: 'busy' });
+    expect(chain.latestReads).toBeGreaterThan(1);
+    expect(elapsed).toBeGreaterThanOrEqual(DEADLINE - POLL);
+    expect(elapsed).toBeLessThanOrEqual(DEADLINE);
+    expect(chain.attempted).toEqual([]);
+    expect(chain.methods).not.toContain('eth_estimateGas');
+  });
+
+  it('the nonce poll and the approve receipt wait share one receiptTimeoutMs budget', async () => {
+    // The pending nonce settles late in the window and the approve is then never mined: the whole
+    // credit still waits at most receiptTimeoutMs, not one deadline per wait.
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n, receipt: 'pending' });
+    chain.onLatestRead = (count) => {
+      if (count === 4) {
+        chain.nonce = 8;
+        delete chain.pendingNonce;
+      }
+    };
+    const { result, elapsed } = await timedCredit(timedFaucet(chain));
+    expect(result).toEqual({ state: 'not_sent', reason: 'unavailable' });
+    expect(chain.sent.map((s) => decodeSent(s.raw).functionName)).toEqual(['approve']);
+    expect(elapsed).toBeLessThanOrEqual(DEADLINE);
+    const receiptPolls = chain.methods.filter((m) => m === 'eth_getTransactionReceipt').length;
+    expect(receiptPolls).toBeLessThanOrEqual(2);
+  });
+
+  it('the depositFor-only path reads no latest nonce', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: ONE_USDC });
+    const { result } = await timedCredit(timedFaucet(chain));
+    expect(result.state).toBe('sent');
+    expect(chain.latestReads).toBe(0);
   });
 });
