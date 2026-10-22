@@ -228,6 +228,32 @@ describe('submitter answers are parsed strictly', () => {
     ).toHaveLength(1);
   });
 
+  it('health: reads the optional per-chain pool states (M1-10b-e) and refuses unknown ones', () => {
+    const chain = { chainId: CHAIN_ID, available: true, gasBalance: '12', queueDepth: 0 };
+    expect(
+      parseHealthResponse({ ok: true, chains: [{ ...chain, gas: 'low', faucet: 'paused' }] })
+        .chains[0],
+    ).toEqual({ ...chain, gas: 'low', faucet: 'paused' });
+    expect(
+      parseHealthResponse({ ok: true, chains: [{ ...chain, gas: 'ok', faucet: 'low' }] }).chains[0],
+    ).toMatchObject({ gas: 'ok', faucet: 'low' });
+    expect(
+      parseHealthResponse({ ok: true, chains: [{ ...chain, gas: null, faucet: null }] }).chains[0],
+    ).toMatchObject({ gas: null, faucet: null });
+    // An older submitter sends neither field.
+    expect(parseHealthResponse({ ok: true, chains: [chain] }).chains[0]).toEqual(chain);
+    for (const extra of [
+      { gas: 'paused' },
+      { gas: 'empty' },
+      { faucet: 'empty' },
+      { faucet: 1 },
+      { gas: true },
+      { faucetAddress: `0x${'ab'.repeat(20)}` },
+    ]) {
+      expect(() => parseHealthResponse({ ok: true, chains: [{ ...chain, ...extra }] })).toThrow();
+    }
+  });
+
   it('refuses unknown statuses, fields, mismatched IDs and odd error text', () => {
     const bad: unknown[] = [
       { chainId: CHAIN_ID, items: [{ id, recordId: id, status: 'done' }] },
