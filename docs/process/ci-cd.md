@@ -39,6 +39,12 @@ The runner queue on GitHub Free is the scarce resource, so `ci.yml` spends it wh
 - **Concurrency:** the existing group `ci-<event>-<PR number or ref>` cancels a superseded pull request run (and a feature-branch push run); runs on `main` and in the merge queue are never cancelled.
 
 
+### Slow mirrors and the e2e keyring (CHORE-CI-HARDEN-1)
+
+- **Playwright install.** `ci.yml` (`checks`, `vectors`) uses the local action `.github/actions/install-playwright`: it caches `~/.cache/ms-playwright` keyed by OS, the exact Playwright version from `package.json` and the browser list (all three engines are needed by both jobs), writes short apt timeouts and retries (`Acquire::Retries 3`, `Timeout 10`), runs `playwright install --with-deps` bounded by `timeout 300`, retries once after an `apt-get update`, and the step has `timeout-minutes: 12`. A slow Ubuntu mirror now costs at most about 12 minutes and does not cancel the 30-minute `checks` job. System libraries are still installed by apt on every run (they are not cached).
+- **Other apt installs** (gnome-keyring and D-Bus in `ci.yml` and `e2e.yml`) use the same retries and timeout options.
+- **e2e keyring.** `tools/ci/with-keyring.sh` now supervises the throwaway gnome-keyring: a watchdog starts it again within about 0.2 s of its end on the same passwordless keyring (unless D-Bus already started a replacement), the daemon runs without `G_DEBUG`, and a health probe must pass before the command starts. If the command fails after the daemon ended, the log carries `::error::runner keychain unavailable` so the cause is plain. No test assertion was changed; a failing keychain still fails the job.
+
 ### Review gate (`review-gate`)
 
 `review-gate` and `CODEOWNERS` together are the GitHub-enforced half of `audit-rules.md` §3:
@@ -87,6 +93,7 @@ Every action is pinned to a full commit SHA with the release tag in a trailing c
 | `pnpm/action-setup` | v6.1.0 | `ea17c68df8912ef543352723c149a84f56e3d413` | setup action | **Third party.** Official pnpm action; installs the exact pnpm from `packageManager`. Alternative is `corepack`, which is not pinned by hash |
 | `changesets/action` (`select-mode`, `version`, `pack`, `publish`) | v2.1.2 | `ae32849d5ba541f9ae29e40e22a623bc13562f51` | release | **Third party.** Official Changesets action; its split sub-actions keep `id-token: write` on the publish jobs only |
 | `zizmorcore/zizmor-action` | v0.6.4 | `cc914d7f3750a2d13d75c7f184a1060aa0e9d482` | security | **Third party.** Official zizmor action; runs a container image pinned by digest inside the action. Version input pinned to zizmor 1.30.1 |
+| `actions/cache` | v6.1.0 | `55cc8345863c7cc4c66a329aec7e433d2d1c52a9` | install-playwright action | GitHub-owned; caches the Playwright browser downloads only (`~/.cache/ms-playwright`), keyed by OS, Playwright version and browser list (resolved 2026-10-22) |
 | `actions/upload-artifact` | v7.0.2 | `cf430e030ddbb5b0abf93d22962f4752f3646cd9` | e2e, deploy-drop | GitHub-owned; uploads e2e logs and transcripts after the canary scan, and the drop's Worker bundle |
 | `actions/download-artifact` | v8.0.2 | `9000827ccba6bdab643e8b6fd33ac0654aef8333` | deploy-drop | GitHub-owned; the deploy jobs fetch the bundle `build` made (resolved 2026-10-18; checked against the SHA-256 from `build`) |
 
