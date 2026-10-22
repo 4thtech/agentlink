@@ -108,7 +108,7 @@ export async function respondToTermsHandler(
       return termsInProgress();
     case 'needs_credits':
       logger.info('respond to terms needs credits', { answers: 0 });
-      return termsNeedsCredits(self.agentId, result.topUp);
+      return termsNeedsCredits(self.agentId, result.topUp, context.payPage);
     case 'approval_state':
       return termsApprovalState(context, 'agentlink_respond_to_terms', result);
     case 'pending_approval':

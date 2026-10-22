@@ -65,6 +65,14 @@ export {
   type PendingContact,
 } from './pairing.js';
 export {
+  TOP_UP_MAX_USD,
+  TOP_UP_MIN_USD,
+  TOP_UP_PRESETS_USD,
+  buildTopUpLink,
+  suggestTopUpUsd,
+  type TopUpLinkInput,
+} from './top-up-link.js';
+export {
   INVITE_INFLATE_SLICE_BYTES,
   INVITE_LINK_PREFIX,
   INVITE_MAX_JSON_BYTES,
