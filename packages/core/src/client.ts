@@ -59,6 +59,7 @@ import {
   type NotarizeInput,
   type NotarizeResult,
   type ProofView,
+  PROOF_LOG_CODES,
 } from './proofs/service.js';
 
 export interface AgentLinkClientOptions {
@@ -395,10 +396,24 @@ export class AgentLinkClient {
     // An accept whose offer is already recorded: its ACCEPTED receipt is signed now, under the
     // same approval (07 §2.1 step 3; D-55). Never fails the call.
     if (result.status === 'ok') {
+      // The proof flow's fixed codes: any other `code` value is redacted (I-7).
+      const log = this.#ctx.log.withCodes(PROOF_LOG_CODES);
       try {
         await this.proofs.runDeferredReceipts();
       } catch {
-        this.#ctx.log.warn('deferred receipt failed', { code: 'deferred_error' });
+        log.warn('deferred receipt failed', { code: 'deferred_error' });
+      }
+      // The result says what happened to the receipt in that run, not the state before it
+      // (M1-7g-f): the part is read again. Never fails the call.
+      if (result.receipt !== undefined) {
+        try {
+          const status = await this.terms.receiptStatus(input.envelopeId);
+          if (status !== undefined && status !== result.receipt.status) {
+            return { ...result, receipt: { ...result.receipt, status } };
+          }
+        } catch {
+          log.warn('deferred receipt failed', { code: 'deferred_error' });
+        }
       }
     }
     return result;

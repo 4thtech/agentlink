@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/recovery-kit/case.schema.json",
   "title": "recovery-kit case",
-  "description": "04 \u00a72.3.3 recovery kit ALKK v1 (D-115). `kek`: the key-encryption key for a code, salt and KDF parameters. `seal`: the whole kit and its kek for a fixed code, salt, nonce prefix and chunk size, the owner seed, the manifest fields and per agent its items (in any order) and store. `open` (with the code; an empty `expectedOwnerNostr` means no expected owner) and `openWithKek`: entry names (comma-separated, in kit order) and each value as `entry:<name>` hex, or a rejection. `header`: the public header fields read before the code is asked for, or a rejection. `crossType`: another format's reader (ALKP with `key` as the PRF output, ALKR and ALKS and ALKO with `code`, ALF1 with `key` as the file key) given an ALKK kit, which it refuses. Hex without 0x except agent and owner keys in the ALKO and ALKS inputs; codes as text.",
+  "description": "04 \u00a72.3.3 recovery kit ALKK v1 (D-115). `kek`: the key-encryption key for a code, salt and KDF parameters. `seal`: the whole kit and its kek for a fixed code, salt, nonce prefix and chunk size, the owner seed, the manifest fields and per agent its items (in any order) and store. `open` (with the code; an empty `expectedOwnerNostr` means no expected owner) and `openWithKek`: entry names (comma-separated, in kit order) and each value as `entry:<name>` hex, or a rejection. `header`: the public header fields read before the code is asked for, or a rejection. `crossType`: another format's reader (ALKP with `key` as the PRF output, ALKR and ALKS and ALKO with `code`, ALF1 with `key` as the file key) given an ALKK kit, which it refuses. `credentialDigest` (04 \u00a72.5.1 storage.set): the digest as 64 lowercase hex and the `s3:<id>` item bytes (04 \u00a72.2) for a salt and the access key ID and secret as UTF-8 bytes, or a rejection. `credentialItem`: the digest of a stored item, which must be exactly its canonical JCS form, or a rejection. Hex without 0x except agent and owner keys in the ALKO and ALKS inputs; codes as text.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -494,6 +494,123 @@
               "const": "reject"
             }
           }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "salt",
+            "accessKeyId",
+            "secretAccessKey"
+          ],
+          "properties": {
+            "op": {
+              "const": "credentialDigest"
+            },
+            "salt": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "accessKeyId": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            },
+            "secretAccessKey": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "credentialDigest",
+                "item"
+              ],
+              "properties": {
+                "credentialDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                },
+                "item": {
+                  "type": "string",
+                  "pattern": "^([0-9a-f]{2})*$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "item"
+          ],
+          "properties": {
+            "op": {
+              "const": "credentialItem"
+            },
+            "item": {
+              "type": "string",
+              "pattern": "^([0-9a-f]{2})*$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "credentialDigest"
+              ],
+              "properties": {
+                "credentialDigest": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
         }
       }
     }
