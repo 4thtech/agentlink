@@ -1150,16 +1150,20 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     expectOurTextClean(r);
   });
 
-  it('needs_credits before anything is sent: the top-up link and agent ID in nextStep, nothing else from the route', async () => {
+  it('needs_credits before anything is sent: the gated no-link text in nextStep (the shipped pay page is not live; M1-26-e), nothing else from the route', async () => {
     const { client } = fake({ propose: () => ({ status: 'needs_credits', topUp }) });
     const r = await call('agentlink_propose_terms', { to: B, terms: firm, notarize: true }, client);
     expect(r.structured.status).toBe('needs_credits');
     // The terms tools' output has no agentAddress or topUpUrl field (no tool-surface change), and
-    // `url` is reserved for the local approval UI's origins: the link travels in nextStep.
+    // `url` is reserved for the local approval UI's origins; and the shipped pay page is not live,
+    // so nextStep carries the fixed no-link text (M1-26-e), with neither a link nor the agent ID.
     expect(r.structured.url).toBeUndefined();
-    expect(r.structured.nextStep).toContain(`${PAY_ORIGIN}/`);
+    expect(r.structured.nextStep).toBe(
+      'Tell the user there are not enough credits to add proof, and that adding credits is not available yet in this version of AgentLink (messages and files stay free). Do not give a link.',
+    );
+    expect(dump(r)).not.toMatch(/https?:\/\/|pay\.agentlink|#v=1/);
     expect(r.structured.summary).toContain('Nothing was sent.');
-    expect(r.structured.nextStep).toContain(A);
+    expect(dump(r)).not.toContain(A);
     expect(r.structured.summary).toContain('$0.10');
     expect(r.structured).toMatchObject({ proof: { status: 'needs_credits', receipts: [] } });
     expect(dump(r)).not.toMatch(/wallet|\bgas\b|transaction|USDC|sepolia/i);
