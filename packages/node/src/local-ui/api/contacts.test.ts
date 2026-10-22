@@ -160,7 +160,7 @@ function ownerRoute(path: string): LocalUiOwnerRoute {
 const req = (params: Record<string, string> = {}, query = '', input?: unknown): LocalUiRequest => ({
   params,
   query: new URLSearchParams(query),
-  ...(input === undefined ? {} : { input: input as LocalUiRequest['input'] }),
+  ...(input === undefined ? {} : { input: input as NonNullable<LocalUiRequest['input']> }),
 });
 
 const body = (r: LocalUiResult): Record<string, unknown> => r.body as Record<string, unknown>;

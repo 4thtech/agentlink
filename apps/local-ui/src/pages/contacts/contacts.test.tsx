@@ -64,7 +64,7 @@ function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
     const body =
       raw === undefined || raw === null
         ? ''
-        : raw instanceof Uint8Array
+        : ArrayBuffer.isView(raw)
           ? new TextDecoder().decode(raw)
           : String(raw);
     calls.push({ url, method, headers: new Headers(init?.headers), body });
