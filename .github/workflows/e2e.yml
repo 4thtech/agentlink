@@ -113,7 +113,7 @@ jobs:
           node -e '
             const r = JSON.parse(require("node:fs").readFileSync(process.env.E2E_REPORT, "utf8"));
             let failed = false;
-            for (const [name, count] of [["pair-and-message", 2], ["negotiate-and-agree", 5], ["files-and-proof", 10]]) {
+            for (const [name, count] of [["pair-and-message", 2], ["negotiate-and-agree", 5], ["files-and-proof", 9]]) {
               const f = r.testResults.filter((x) => x.name.endsWith(`/${name}.test.ts`));
               const t = f.length === 1 ? f[0].assertionResults : [];
               const bad = t.filter((x) => x.status !== "passed");
@@ -122,6 +122,39 @@ jobs:
                 console.error(`::error::${name}.test.ts must run ${count} tests, all passed`);
                 failed = true;
               }
+            }
+            if (failed) process.exit(1);
+          '
+
+      # M1-13b, M1-13d: the deterministic prompt-injection suites (e2e/prompt-injection/). No Docker,
+      # keychain or secret needed. Run even when the scenarios failed, so one report shows both. The
+      # LLM layer (llm/) is not selected: it stays opt-in (AGENTLINK_E2E_LLM).
+      - name: Run the deterministic prompt-injection suites
+        if: always()
+        run: |
+          set -euo pipefail
+          pnpm --filter @4thtech-io/e2e exec vitest run --config prompt-injection/vitest.config.ts deterministic/ --reporter=default --reporter=json --outputFile.json="$AGENTLINK_E2E_ARTIFACTS/injection-report.json" 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/injection-output.log"
+
+      - name: Check that the prompt-injection suites ran in full, with no skipped test
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.AGENTLINK_E2E_ARTIFACTS + "/injection-report.json", "utf8"));
+            let failed = false;
+            for (const [name, count] of [["checker", 13], ["talk", 10], ["files-proofs", 9]]) {
+              const f = r.testResults.filter((x) => x.name.endsWith(`/deterministic/${name}.test.ts`));
+              const t = f.length === 1 ? f[0].assertionResults : [];
+              const bad = t.filter((x) => x.status !== "passed");
+              console.log(`injection ${name}.test.ts: ${t.length} tests, ${bad.length} not passed`);
+              if (t.length !== count || bad.length > 0) {
+                console.error(`::error::prompt-injection ${name}.test.ts must run ${count} tests, all passed`);
+                failed = true;
+              }
+            }
+            if (r.testResults.length !== 3) {
+              console.error("::error::the prompt-injection suites must be exactly 3 test files");
+              failed = true;
             }
             if (failed) process.exit(1);
           '
@@ -361,8 +394,8 @@ jobs:
             const skipped = t.filter((x) => x.status !== "passed" && x.status !== "failed");
             const j2 = t.find((x) => x.title.startsWith("J2:"));
             console.log(`live-files-and-proof.test.ts: ${t.length} tests, ${failed.length} failed, ${skipped.length} skipped`);
-            if (t.length !== 10 || failed.length > 0 || j2?.status !== "passed") {
-              console.error("::error::the live scenario must run 10 tests, none failed, J2 passed");
+            if (t.length !== 9 || failed.length > 0 || j2?.status !== "passed") {
+              console.error("::error::the live scenario must run 9 tests, none failed, J2 passed");
               process.exit(1);
             }
             if (skipped.length > 0) console.log("::warning::the faucet gave no credits; the proof tests were skipped");

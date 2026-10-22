@@ -19,6 +19,7 @@ import { pairing } from './pairing';
 import { pairingBodies } from './pairing-bodies';
 import { placeholderSha256 } from './placeholder-sha256';
 import { prfWrap } from './prf-wrap';
+import { recoveryKit } from './recovery-kit';
 import { safetyCode } from './safety-code';
 import { safetyCodeRecompute } from './safety-code-recompute';
 import { stream } from './stream';
@@ -52,6 +53,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['pairing-bodies', pairingBodies],
   ['placeholder-sha256', placeholderSha256],
   ['prf-wrap', prfWrap],
+  ['recovery-kit', recoveryKit],
   ['safety-code', safetyCode],
   ['safety-code-recompute', safetyCodeRecompute],
   ['stream', stream],

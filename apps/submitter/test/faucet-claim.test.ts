@@ -117,6 +117,20 @@ describe('runClaim: charge before the broadcast (M1-10b-b)', () => {
     expect((await claim(store, faucet)).ok).toBe(true);
   });
 
+  it('a faucet busy with a stuck approve: unavailable (retryable), refunded, the agent may retry at once (M1-10b-c)', async () => {
+    const store = new MemoryStore();
+    const faucet = new FakeFaucet(CHAIN_ID);
+    faucet.mode = 'not_sent';
+    faucet.notSentReason = 'busy';
+    // The answer on the wire is unchanged for deployed clients: the retryable `unavailable`.
+    expect(await claim(store, faucet)).toEqual({ ok: false, error: 'unavailable' });
+    expect(store.data.get('g')).toEqual([Math.floor(NOW / DAY), 0]);
+    expect(store.data.get(`i:${IP_A}`)).toEqual([Math.floor(NOW / DAY), 0]);
+    faucet.mode = 'sent';
+    expect((await claim(store, faucet)).ok).toBe(true);
+    expect(faucet.charged()).toBe(1);
+  });
+
   it('a credit that throws before any request is refunded', async () => {
     const store = new MemoryStore();
     const faucet = new FakeFaucet(CHAIN_ID);

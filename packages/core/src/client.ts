@@ -246,6 +246,8 @@ export class AgentLinkClient {
       idempotency: this.idempotency,
       // The verified records this agent knows (M1-7g); a caller-supplied lookup replaces it.
       records: records ?? this.proofs,
+      // Records for `notarize` on the terms tools (M1-9d-3), only with the proof platform.
+      ...(proofs === undefined ? {} : { recorder: this.proofs }),
     });
     this.acks = new DeliveryAcks(
       ctx,
