@@ -102,9 +102,9 @@ describe('nav', () => {
       'Advanced',
     ]);
     expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
-    expect(host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent).toContain(
-      'Settings',
-    );
+    expect(
+      host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent,
+    ).toContain('Settings');
   });
 
   it('has no Settings sub-navigation on other pages', () => {
