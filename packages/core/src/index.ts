@@ -114,6 +114,23 @@ export {
   type PolicyVersionMark,
   type ReceiptsKeptMark,
 } from './owner-actions.js';
+// M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
+// after presence. Owner surfaces only: no MCP tool uses them (I-4).
+export {
+  PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+  buildOwnerActionBody,
+  mergePolicyPatch,
+  newOwnerActionNonce,
+  policyEditWarnings,
+  type BuiltOwnerAction,
+  type OwnerActionBodyInput,
+  type PolicyEditOptions,
+  type PolicyEditWarning,
+  type PreparableOp,
+  type PreparedOwnerAction,
+  type PreparedPolicyEdit,
+  type PrepareRefusal,
+} from './owner-prepare.js';
 // M1-9i-a (D-115; 04 §2.2, §2.5.1; 07 §3.4, §5.6): own storage as the owner signed it.
 export {
   OwnStorage,

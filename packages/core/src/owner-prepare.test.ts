@@ -3,14 +3,13 @@
 // they hold no owner key and sign nothing, so a prepared body alone is never applied (I-4).
 //
 // - Bodies are byte-exact: the strict schema, JCS (RFC 8785), a fresh 16-byte nonce, `issuedAt` from
-//   the core's clock and `expiresAt` within L(op). The builder reproduces the M1-1h signing vectors.
+//   the core's clock and `expiresAt` within L(op). The M1-1h vector check is in the harness.
 // - `preparePolicyEdit` builds the complete 06 §3 document from the verified policy and a typed
 //   patch, at the version above both the KeyStore mark and the stored row. It refuses a stale base,
 //   a patch the strict schema refuses, and any edit while the policy fails closed (no value is ever
 //   taken from an invalid policy; recovery is `policy recover`, D-100). Delivery receipts on from an
 //   older default turn off unless the owner explicitly keeps them (06 §3, D-109).
 // - Every prepared body round-trips through OwnerActions.apply with a test owner signature.
-import { readFileSync } from 'node:fs';
 import type { JsonObject } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import {
@@ -59,70 +58,49 @@ async function signAndApply(
   return client.ownerActions.apply(JSON.stringify(signed));
 }
 
-// --- the builder against the M1-1h vectors ---------------------------------------------------------
-
-interface SignVector {
-  readonly id: string;
-  readonly input: { readonly op: string; readonly body: Record<string, unknown> };
-  readonly expected: { readonly jcs: string };
+/**
+ * Another owner's attempt: its key store refuses to sign a body that names a different owner, and the
+ * body re-signed under its own key (its `owner` swapped in) is refused by the agent.
+ */
+async function applyAsOther(
+  client: AgentLinkClient,
+  other: MemoryOwnerKeyStore,
+  prepared: PreparedOwnerAction,
+) {
+  if (prepared.status !== 'prepared') throw new Error(`not prepared: ${prepared.reason}`);
+  await expect(signWith(other, prepared.body as unknown as JsonObject)).rejects.toThrow();
+  const forged = { ...(prepared.body as unknown as JsonObject), owner: await ownerHex(other) };
+  return client.ownerActions.apply(JSON.stringify(await signWith(other, forged)));
 }
 
-const vectors = (
-  JSON.parse(
-    readFileSync(
-      new URL('../../../test-vectors/owner-action/vectors.json', import.meta.url),
-      'utf8',
-    ),
-  ) as { cases: SignVector[] }
-).cases.filter(
-  (c) =>
-    c.input.op === 'sign' &&
-    ['policy.set', 'contact.check', 'contact.rename', 'contact.remove'].includes(
-      c.input.body.op as string,
-    ),
-);
+// --- the builder (the M1-1h vector check is test-vectors/harness/prepare-form.test.ts) -----------
 
 describe('buildOwnerActionBody (M1-11r-b; 04 §2.5.1)', () => {
-  it('covers the six signing vectors for the ops it prepares', () => {
-    expect(vectors.map((v) => v.id).sort()).toEqual([
-      'sign-contact-check',
-      'sign-contact-remove',
-      'sign-contact-rename',
-      'sign-policy-set',
-      'sign-policy-set-contact-rules',
-      'sign-policy-set-receipts-rule',
-    ]);
+  const base = () => ({
+    agent: `0x${'ab'.repeat(20)}`,
+    owner: 'cd'.repeat(32),
+    op: 'contact.remove' as const,
+    params: { contact: `0x${'12'.repeat(20)}` },
+    nonce: 'AAECAwQFBgcICQoLDA0ODw',
+    issuedAt: 1_760_000_000,
+    expiresAt: 1_760_000_600,
   });
 
-  for (const vector of vectors) {
-    it(`reproduces the JCS bytes of ${vector.id}`, () => {
-      const b = vector.input.body;
-      const { body, jcs } = buildOwnerActionBody({
-        agent: b.agent as string,
-        owner: b.owner as string,
-        op: b.op as 'policy.set',
-        params: b.params as never,
-        nonce: b.nonce as string,
-        issuedAt: b.issuedAt as number,
-        expiresAt: b.expiresAt as number,
-      });
-      expect(jcs).toBe(vector.expected.jcs);
-      expect(Object.keys(body).sort()).toEqual(BODY_KEYS);
-    });
-  }
+  it('returns the body and its JCS text, with exactly the OwnerAction keys', () => {
+    const { body, jcs } = buildOwnerActionBody(base());
+    expect(Object.keys(body).sort()).toEqual(BODY_KEYS);
+    expect(jcs).toBe(
+      '{"agent":"0x' +
+        'ab'.repeat(20) +
+        '","expiresAt":1760000600,"issuedAt":1760000000,' +
+        '"nonce":"AAECAwQFBgcICQoLDA0ODw","op":"contact.remove","owner":"' +
+        'cd'.repeat(32) +
+        '","params":{"contact":"0x' +
+        '12'.repeat(20) +
+        '"},"v":1}',
+    );
+  });
 
-  const base = () => {
-    const b = vectors.find((v) => v.id === 'sign-contact-remove')!.input.body;
-    return {
-      agent: b.agent as string,
-      owner: b.owner as string,
-      op: 'contact.remove' as const,
-      params: b.params as { contact: string },
-      nonce: b.nonce as string,
-      issuedAt: b.issuedAt as number,
-      expiresAt: b.expiresAt as number,
-    };
-  };
   const bad: [string, (i: ReturnType<typeof base>) => unknown][] = [
     ['a checksummed agent', (i) => ({ ...i, agent: i.agent.toUpperCase().replace('0X', '0x') })],
     ['a 0x on owner', (i) => ({ ...i, owner: `0x${i.owner}` })],
@@ -309,9 +287,10 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
     if (loaded.mode === 'signed') expect(loaded.policy.files.allowedFolders).toEqual(['~/one']);
     expect(await store.transaction((tx) => tx.select('owner_action_nonces').length)).toBe(1);
     // A fresh prepare from the new base is accepted again.
-    expect(
-      await client.ownerActions.preparePolicyEdit({}, { baseVersion: 1 }),
-    ).toMatchObject({ status: 'prepared', version: 2 });
+    expect(await client.ownerActions.preparePolicyEdit({}, { baseVersion: 1 })).toMatchObject({
+      status: 'prepared',
+      version: 2,
+    });
   });
 
   const badPatches: [string, unknown][] = [
@@ -454,9 +433,9 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
     expect(
       await client.ownerActions.apply({ body: prepared.body, sig: '00'.repeat(64) }),
     ).toMatchObject({ status: 'refused', reason: 'signature_invalid' });
-    expect(await signAndApply(client, stranger, prepared)).toMatchObject({
+    expect(await applyAsOther(client, stranger, prepared)).toMatchObject({
       status: 'refused',
-      reason: 'signature_invalid',
+      reason: 'owner_mismatch',
     });
     expect((await client.ownerActions.loadPolicy()).mode).toBe('defaults');
     expect(await store.transaction((tx) => tx.select('owner_action_nonces').length)).toBe(0);
@@ -555,7 +534,10 @@ describe('prepareContactCheck (M1-11r-b; 04 §2.5.1, §3.6.1)', () => {
     expect(await a.client.ownerActions.apply({ body: prepared.body })).toMatchObject({
       status: 'refused',
     });
-    expect(await signAndApply(a.client, ownerB, prepared)).toMatchObject({ status: 'refused' });
+    expect(await applyAsOther(a.client, ownerB, prepared)).toMatchObject({
+      status: 'refused',
+      reason: 'owner_mismatch',
+    });
     expect((await a.client.contacts.get(b.id)).safetyCodeChecked).toBe(false);
   });
 });
@@ -579,7 +561,7 @@ describe('prepareContactRename (M1-11r-b; 04 §2.5.1; 06 §2.1 rule 1)', () => {
     expect((await a.client.contacts.get(b.id)).display.name).toBe('Tali laptop');
   });
 
-  for (const alias of ['', ' padded ', 'Owner Tali', 'rtl‮evil', 'a'.repeat(33)]) {
+  for (const alias of ['', ' padded ', 'Owner Tali', 'rtl\u202Eevil', 'a'.repeat(33)]) {
     it(`refuses an alias that is not its own restricted form (${JSON.stringify(alias).slice(0, 16)})`, async () => {
       const { a, b } = await contactsSetup();
       expect(await a.client.ownerActions.prepareContactRename(b.id, alias)).toEqual({
@@ -641,9 +623,9 @@ describe('prepareContactRemove (M1-11r-b; 04 §2.5.1; 07 §3)', () => {
   it('a prepared contact.remove signed by another owner is refused and removes nothing', async () => {
     const { a, b } = await contactsSetup();
     const prepared = await a.client.ownerActions.prepareContactRemove(b.id);
-    expect(await signAndApply(a.client, ownerC, prepared)).toMatchObject({
+    expect(await applyAsOther(a.client, ownerC, prepared)).toMatchObject({
       status: 'refused',
-      reason: 'signature_invalid',
+      reason: 'owner_mismatch',
     });
     expect((await a.client.contacts.get(b.id)).status).toBe('active');
   });
