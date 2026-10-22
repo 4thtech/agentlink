@@ -1253,6 +1253,54 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     });
   });
 
+  it('a counter recorded with notarize (M1-9d-5): ok with `proof`, said as a firm offer, the fee in $', async () => {
+    const { client, calls } = fake({
+      respond: () => ({
+        status: 'ok',
+        decision: 'counter',
+        thread: THREAD,
+        ...TERMS_OK,
+        version: 2,
+        envelopeId: ENVELOPE,
+        proof: recorded(),
+      }),
+    });
+    const r = await call(
+      'agentlink_respond_to_terms',
+      {
+        envelopeId: ENVELOPE,
+        decision: 'counter',
+        terms: firm,
+        notarize: true,
+        approvalId: APPROVAL,
+      },
+      client,
+    );
+    expect(calls.responded[0]).toMatchObject({ decision: 'counter', notarize: true });
+    expect(r.structured).toMatchObject({
+      status: 'ok',
+      decision: 'counter',
+      version: 2,
+      envelopeId: ENVELOPE,
+      proof: { status: 'ok', recordId: RECORD, fee: FEE, receipts: [] },
+    });
+    expect(r.structured.summary).toContain('firm offer');
+    expect(r.structured.summary).toContain('$0.10');
+    expect(r.structured.summary).not.toMatch(/base|sepolia|chain|on-chain|transaction|gas/i);
+    expectOurTextClean(r);
+  });
+
+  it('the unavailable text names a counter as a place proof works (M1-9d-5)', async () => {
+    const { client } = fake();
+    const r = await call(
+      'agentlink_respond_to_terms',
+      { envelopeId: ENVELOPE, decision: 'reject', notarize: true },
+      client,
+    );
+    expect(r.structured).toMatchObject({ code: 'NOTARIZE_UNAVAILABLE' });
+    expect(r.structured.nextStep).toContain('counter');
+  });
+
   it('a proof refusal of the core (CHAIN_UNAVAILABLE, CARD_EXPIRED) is fixed proof text', async () => {
     for (const code of ['CHAIN_UNAVAILABLE', 'CARD_EXPIRED'] as const) {
       const { client } = fake({ propose: () => ({ status: 'rejected', code }) });
