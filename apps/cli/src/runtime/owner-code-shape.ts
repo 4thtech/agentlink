@@ -3,35 +3,46 @@
 // keeps in its history, and lets the dispatcher stop before anything runs. It is a shape check, not
 // a secret check: nothing is unlocked or compared, and the argument is never stored or printed.
 //
-// The shape is 04 §2.8 `password` kind 1, read the same way: ASCII only, spaces and dashes ignored,
-// upper case, `0`/`1`/`8` read as `O`/`I`/`B`, then exactly 24 characters of `A–Z2–7`.
+// A generated owner code is 24 RFC 4648 base32 characters (`A–Z2–7`), shown in upper case as six
+// groups of four separated by spaces (@4thtech-io/node `grouped`). Only the forms a code is shown,
+// copied or retyped in are matched, so ordinary text is not (IR-M1-9zd-1 L-1):
+// - the 24 characters in one word, in one case;
+// - six groups of four in one word, separated by spaces or dashes, in one case;
+// - six argv words that are each one group of four (the code typed with spaces, unquoted).
+// The joined characters must then read as a code under 04 §2.8 kind 1 (`0`/`1`/`8` as `O`/`I`/`B`,
+// then exactly 24 of `A–Z2–7`). Lower case is matched only with a digit in it, so lower-case words
+// never are, and the solid form never matches a whole local agent name (06 §6).
+
 import { isAgentName } from './agent-name.js';
 
 const CODE_LENGTH = 24;
+const GROUPS = 6;
+const SOLID = /^[A-Za-z0-9]{24}$/;
+const GROUPED = /^[A-Za-z0-9]{4}(?:[ -][A-Za-z0-9]{4}){5}$/;
 const GROUP = /^[A-Za-z0-9]{4}$/;
-const DASHED_GROUPS = /^[A-Za-z0-9]{4}(?:-[A-Za-z0-9]{4}){5}$/;
-const BASE32 = /^[A-Z2-7]+$/;
+const BASE32 = /^[A-Z2-7]{24}$/;
 
-/** The kind 1 reading of `text`, or undefined when it is not 24 base32 characters after it. */
-function kind1Shape(text: string): string | undefined {
-  // eslint-disable-next-line no-control-regex -- step 1: refuse any byte outside ASCII.
-  if (!/^[\x00-\x7f]*$/.test(text)) return undefined;
-  const read = text
-    .replace(/[ -]/g, '')
-    .toUpperCase()
-    .replace(/0/g, 'O')
-    .replace(/1/g, 'I')
-    .replace(/8/g, 'B');
-  return read.length === CODE_LENGTH && BASE32.test(read) ? read : undefined;
+/** One case only; lower case only together with a digit (a code always has the case it was shown). */
+function caseLooksLikeCode(text: string): boolean {
+  const upper = /[A-Z]/.test(text);
+  const lower = /[a-z]/.test(text);
+  if (upper && lower) return false;
+  return !lower || /[0-9]/.test(text);
 }
 
-/**
- * One word that reads as an owner code. A whole valid local agent name (lower case, 06 §6) is not
- * one, unless it is written in the code's own six dashed groups: agent names are typed on purpose.
- */
+/** The joined characters read as a code under 04 §2.8 kind 1. */
+function readsAsCode(chars: string): boolean {
+  if (chars.length !== CODE_LENGTH || !caseLooksLikeCode(chars)) return false;
+  const read = chars.toUpperCase().replace(/0/g, 'O').replace(/1/g, 'I').replace(/8/g, 'B');
+  return BASE32.test(read);
+}
+
+/** One word in a form a code is shown or pasted in. */
 function wordIsCode(word: string): boolean {
-  if (kind1Shape(word) === undefined) return false;
-  return !isAgentName(word) || DASHED_GROUPS.test(word);
+  // A whole local agent name is typed on purpose (`--agent`), so the solid form never matches one.
+  if (SOLID.test(word)) return !isAgentName(word) && readsAsCode(word);
+  if (GROUPED.test(word)) return readsAsCode(word.replace(/[ -]/g, ''));
+  return false;
 }
 
 /** The value part of `--option=value`, or the word itself. */
@@ -41,17 +52,16 @@ const valueOf = (word: string): string => {
 };
 
 /**
- * True when any argument, or six consecutive four-character arguments (a code typed with spaces,
- * which the shell splits into six words), reads as a generated owner code.
+ * True when any argument, or six consecutive arguments that are each one group of four (a code
+ * typed with spaces, which the shell splits into six words), is in a form an owner code is shown in.
  */
 export function looksLikeOwnerCode(argv: readonly string[]): boolean {
   const words = argv.map(valueOf);
   for (let i = 0; i < words.length; i += 1) {
-    const word = words[i] ?? '';
-    if (wordIsCode(word)) return true;
-    const run = words.slice(i, i + CODE_LENGTH / 4);
-    if (run.length === CODE_LENGTH / 4 && run.every((w) => GROUP.test(w))) {
-      if (kind1Shape(run.join('')) !== undefined) return true;
+    if (wordIsCode(words[i] ?? '')) return true;
+    const run = words.slice(i, i + GROUPS);
+    if (run.length === GROUPS && run.every((w) => GROUP.test(w)) && readsAsCode(run.join(''))) {
+      return true;
     }
   }
   return false;

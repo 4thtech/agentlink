@@ -122,6 +122,15 @@ describe('an owner code typed as part of a command (M1-9zd)', () => {
   });
 
   const ordinary: string[][] = [
+    // IR-M1-9zd-1 L-1: ordinary text whose letters happen to number 24 once spaces are removed.
+    ['contacts', 'rename', 'c1', 'Northwind Legal Department'],
+    ['contacts', 'rename', 'c1', 'Sales Team Acme Corporation'],
+    ['policy', 'allow-folder', 'ProjectAlphaQuarterlyRpt'],
+    // Six four-letter words in a row, as six words and as one quoted name.
+    ['contacts', 'rename', 'c1', 'Team', 'Plan', 'Work', 'Note', 'Acme', 'Sale'],
+    ['contacts', 'rename', 'c1', 'Team Plan Work Note Acme Sale'],
+    ['contacts', 'rename', 'c1', 'team', 'plan', 'work', 'note', 'acme', 'sale'],
+    ['contacts', 'rename', 'c1', 'team plan work note acme sale'],
     ['approve', 'apr_AAAAAAAAAAAAAAAAAAAAAA'],
     ['approve', '--agent', 'abcdefghijklmnopqrstuvwx'],
     ['status', '--agent=work-agent-2'],
