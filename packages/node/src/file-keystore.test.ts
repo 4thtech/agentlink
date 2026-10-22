@@ -96,10 +96,7 @@ async function createWithPassphrase(passphrase = CANARY): Promise<string> {
 }
 
 /** A prompt that answers `value` (bytes, as the TTY prompt returns them). */
-const promptWith =
-  (value: string) =>
-  (): Promise<Uint8Array> =>
-    Promise.resolve(utf8(value));
+const promptWith = (value: string) => (): Promise<Uint8Array> => Promise.resolve(utf8(value));
 
 describe('selection (04 §2.8 "Selection", 07 §9.1)', () => {
   it('refuses the file KeyStore while the keychain works (no forced file mode)', async () => {
@@ -184,7 +181,11 @@ describe('selection (04 §2.8 "Selection", 07 §9.1)', () => {
   });
 
   it('never replaces an existing agent file', async () => {
-    const kek = await newKeystoreKek('ALKS', { secret: utf8(CANARY), secretKind: 2, source: 'prompt' }, FAST);
+    const kek = await newKeystoreKek(
+      'ALKS',
+      { secret: utf8(CANARY), secretKind: 2, source: 'prompt' },
+      FAST,
+    );
     await writeAgentFile(dir, SEED, kek);
     const before = await readFile(join(dir, `${SEED_ID}.alks`));
     const error = await rejection(writeAgentFile(dir, SEED, kek));
@@ -288,20 +289,32 @@ describe('unlock sources (04 §2.8 "Unlocking the agent key", 07 §9.2)', () => 
   });
 
   it.each([
-    ['writable by group', async (p: string) => {
-      await writeFile(p, CANARY);
-      await chmod(p, 0o620);
-    }],
-    ['writable by others', async (p: string) => {
-      await writeFile(p, CANARY);
-      await chmod(p, 0o602);
-    }],
-    ['larger than 1 KiB', async (p: string) => {
-      await writeFile(p, 'x'.repeat(1025), { mode: 0o600 });
-    }],
-    ['a directory', async (p: string) => {
-      await mkdir(p, { mode: 0o700 });
-    }],
+    [
+      'writable by group',
+      async (p: string) => {
+        await writeFile(p, CANARY);
+        await chmod(p, 0o620);
+      },
+    ],
+    [
+      'writable by others',
+      async (p: string) => {
+        await writeFile(p, CANARY);
+        await chmod(p, 0o602);
+      },
+    ],
+    [
+      'larger than 1 KiB',
+      async (p: string) => {
+        await writeFile(p, 'x'.repeat(1025), { mode: 0o600 });
+      },
+    ],
+    [
+      'a directory',
+      async (p: string) => {
+        await mkdir(p, { mode: 0o700 });
+      },
+    ],
   ])('refuses a passphrase file that is %s', async (_name, make) => {
     const agentId = await createWithPassphrase();
     const secretPath = join(home, 'secret');
@@ -336,9 +349,7 @@ describe('wrong secret, tamper and agent binding (04 §2.8)', () => {
     const b = await createWithPassphrase();
     await copyFile(join(dir, `${a}.alks`), join(dir, `${b}.alks`));
     await chmod(join(dir, `${b}.alks`), 0o600);
-    const error = await rejection(
-      unlockFileAgent(b, { dir, env: {}, prompt: promptWith(CANARY) }),
-    );
+    const error = await rejection(unlockFileAgent(b, { dir, env: {}, prompt: promptWith(CANARY) }));
     expect(codeOf(error)).toBe('keystore_open_failed');
   });
 
@@ -349,7 +360,9 @@ describe('wrong secret, tamper and agent binding (04 §2.8)', () => {
     '../../etc/passwd',
     '',
   ])('refuses the agent ID %j before any path is built', async (agentId) => {
-    const error = await rejection(unlockFileAgent(agentId, { dir, env: {}, prompt: promptWith(CANARY) }));
+    const error = await rejection(
+      unlockFileAgent(agentId, { dir, env: {}, prompt: promptWith(CANARY) }),
+    );
     expect(codeOf(error)).toBe('agent_id_invalid');
   });
 
@@ -433,7 +446,10 @@ describe('file permissions (04 §2.8 "File handling")', () => {
 
   it('accepts a symlinked home directory that still resolves inside', async () => {
     const agentId = await createWithPassphrase();
-    const linkedHome = join(tmpdir(), `agentlink-home-link-${encodeHex(SEED.subarray(0, 4))}-${process.pid}`);
+    const linkedHome = join(
+      tmpdir(),
+      `agentlink-home-link-${encodeHex(SEED.subarray(0, 4))}-${process.pid}`,
+    );
     await symlink(home, linkedHome);
     try {
       const unlocked = await unlockFileAgent(agentId, {
@@ -503,7 +519,9 @@ describe('the write protocol (04 §2.8 "Writes")', () => {
       prompt: promptWith(CANARY),
       passphrase: utf8(next),
     });
-    const write = await rejection(keychain.set(keychainAccount(agentId, 'receipts-kept'), utf8('1')));
+    const write = await rejection(
+      keychain.set(keychainAccount(agentId, 'receipts-kept'), utf8('1')),
+    );
     expect(codeOf(write)).toBe('keystore_locked');
     // Stays locked until restarted, reads included.
     const read = await rejection(keychain.get(keychainAccount(agentId, 'policy-version')));
@@ -602,7 +620,11 @@ describe('the write protocol (04 §2.8 "Writes")', () => {
 describe('agent ≠ owner (04 §2.8 "Passphrase strength")', () => {
   async function plantOwner(): Promise<string> {
     const code = new TextDecoder().decode(generateSecretCode());
-    const kek = await newKeystoreKek('ALKO', { secret: utf8(code), secretKind: 1, source: 'prompt' }, FAST);
+    const kek = await newKeystoreKek(
+      'ALKO',
+      { secret: utf8(code), secretKind: 1, source: 'prompt' },
+      FAST,
+    );
     const blob = await sealOwnerSeed(kek, new Uint8Array(32).fill(5), {
       destination: 'local',
       fileKeystoreMachine: true,
@@ -665,7 +687,9 @@ describe('canary (I-7)', () => {
         FAST,
       );
       await writeAgentFile(dir, SEED, kek);
-      await record(unlockFileAgent(SEED_ID, { dir, env: {}, prompt: promptWith('wrong passphrase!!') }));
+      await record(
+        unlockFileAgent(SEED_ID, { dir, env: {}, prompt: promptWith('wrong passphrase!!') }),
+      );
       await record(unlockFileAgent(SEED_ID, { dir, env: { [PASSPHRASE_ENV]: `${CANARY}x` } }));
       const unlocked = await unlockFileAgent(SEED_ID, { dir, env: { [PASSPHRASE_ENV]: CANARY } });
       const store = await openRecordedKeyStore('keychain', SEED_ID, {

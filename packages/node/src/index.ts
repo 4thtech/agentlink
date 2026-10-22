@@ -18,11 +18,24 @@ export {
   type ProbeOptions,
 } from './keychain.js';
 export {
+  createFileKeyStoreAgent,
   createOsKeychainAgent,
   openAgentKeyStore,
   probeOsKeychain,
   type KeychainKeyStoreOptions,
+  type OpenAgentKeyStoreOptions,
 } from './keychain-keystore.js';
+// M1-8f (04 §2.8, D-54): the passphrase-locked file KeyStore for headless machines. Only the unlock
+// and passphrase-change entry points and an opaque handle: no kek, file reader, directory or KDF seam.
+export {
+  PASSPHRASE_ENV,
+  PASSPHRASE_FILE_ENV,
+  changeFileKeyStorePassphrase,
+  unlockFileKeyStoreAgent,
+  type FileKeyStoreSetupOptions,
+  type FileKeyStoreWarning,
+  type UnlockedFileAgent,
+} from './file-keystore.js';
 // M1-8c: owner steps at a TTY prompt (04 §2.2, §2.5, D-67). Only the prompting entry points are
 // exported: no OwnerKeyStore, session, owner item or presence argument is reachable from here.
 export {

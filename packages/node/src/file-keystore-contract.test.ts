@@ -2,13 +2,14 @@
 // (M1-1g-h) over the `ALKS` file, and the M1-8g policy-version mark contract with the mark as the
 // `ALKS` entry `policy-version`, written with the 04 §2.8 write protocol. The KDF runs at the floor
 // so each open stays fast.
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encodeUtf8, type Argon2idParams } from '@4thtech-io/crypto';
 import { deriveAgentId, newKeystoreKek } from '@4thtech-io/crypto/keystore';
 import { runKeyStoreConformance } from '@4thtech-io/crypto/testing';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { openAgentStoreWith } from './agent-store.js';
 import { fileKeychain, unlockFileAgent, writeAgentFile } from './file-keystore.js';
 import { withInterProcessLock } from './inter-process-lock.js';
 import { KeychainKeyStore, openRecordedKeyStore } from './keychain-keystore.js';
@@ -33,7 +34,9 @@ afterAll(async () => {
 /** A fresh keystore directory holding the SEED agent, unlocked from the prompt. */
 async function freshUnlocked(): Promise<{ dir: string; keychain: KeychainBackend; close(): void }> {
   counter += 1;
-  const dir = join(root, `home-${counter}`, '.agentlink', 'keystore');
+  const home = join(root, `home-${counter}`);
+  await mkdir(home);
+  const dir = join(home, '.agentlink', 'keystore');
   const kek = await newKeystoreKek(
     'ALKS',
     { secret: encodeUtf8(PASSPHRASE), secretKind: 2, source: 'prompt' },
@@ -152,3 +155,29 @@ async function fileHarness(): Promise<MarkHarness> {
 }
 
 describePolicyMarkContract('ALKS entry policy-version (file KeyStore)', fileHarness);
+
+describe('openAgentStoreWith over the file backend (M1-8f, M1-8g)', () => {
+  it('opens the store with the file store key and hands the file entry as the policy mark', async () => {
+    const { dir, keychain, close } = await freshUnlocked();
+    const unlocked = await unlockFileAgent(AGENT_ID, {
+      dir,
+      env: {},
+      prompt: () => Promise.resolve(encodeUtf8(PASSPHRASE)),
+    });
+    const opened = await openAgentStoreWith('file', AGENT_ID, join(dir, '..', 'agent.sqlite'), {
+      keychain: failingKeychain,
+      file: unlocked,
+    });
+    try {
+      expect(await opened.policyMark.read()).toBe(0);
+      expect(await opened.policyMark.raise(4)).toBe(4);
+      expect(await keychain.get(keychainAccount(AGENT_ID, POLICY_MARK_ITEM))).toEqual(
+        encodeUtf8('4'),
+      );
+    } finally {
+      await opened.close();
+      unlocked.close();
+      close();
+    }
+  });
+});

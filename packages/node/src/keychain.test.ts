@@ -602,8 +602,9 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
     expect(Object.isFrozen(store)).toBe(true);
     await store.close();
     expect(await codeOf(() => store.getPublicBundle())).toBe('keystore_closed');
+    // M1-8f: a file agent opens only from its unlocked file, never from the keychain.
     expect(await codeOf(() => openRecordedKeyStore('file', ID_A, { keychain }))).toBe(
-      'backend_unavailable',
+      'keystore_locked',
     );
     const unknown = 'other' as 'file';
     expect(await codeOf(() => openRecordedKeyStore(unknown, ID_A, { keychain }))).toBe(
