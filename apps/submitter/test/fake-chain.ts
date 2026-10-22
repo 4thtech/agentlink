@@ -44,6 +44,17 @@ export class FakeChain implements SubmitterChain {
   readonly code = new Set<string>();
   /** Item IDs already on-chain in identical form. */
   readonly onChain = new Set<string>();
+  /**
+   * Record IDs the Notary stores, each charged its NOTARIZE fee in the call that stored it
+   * (05 §3.3). A record item in `onChain` counts too. A receipt's types set are its `onChain` IDs.
+   */
+  readonly records = new Set<string>();
+  /** Make only `recordReceipts` throw (a chain read without an answer). */
+  recordReadFails = false;
+  /** Record IDs whose receipt allowance was read, in order. */
+  readonly recordReads: string[] = [];
+  /** Item IDs simulated alone, in order. */
+  readonly itemSimulations: string[] = [];
   /** Item ID -> the contract error its simulation reverts with. */
   readonly simulationErrors = new Map<string, string>();
   /** Item IDs that pass simulation but make an including transaction revert. */
@@ -85,8 +96,19 @@ export class FakeChain implements SubmitterChain {
     return Promise.resolve(this.code.has(address));
   }
 
+  recordReceipts(recordId: Hex): Promise<{ charged: boolean; set: number[] }> {
+    if (this.readFails || this.recordReadFails) {
+      return Promise.reject(new Error('The chain returned an error.'));
+    }
+    this.recordReads.push(recordId);
+    const charged = this.records.has(recordId) || this.onChain.has(recordId);
+    const set = [1, 2, 3, 4].filter((t) => this.onChain.has(`${recordId}:${String(t)}`));
+    return Promise.resolve({ charged, set });
+  }
+
   simulateItem(item: SubmitItem): Promise<ItemSimulation> {
     if (this.readFails) return Promise.reject(new Error('The chain returned an error.'));
+    this.itemSimulations.push(item.id);
     if (this.onChain.has(item.id)) return Promise.resolve({ outcome: 'skipped' });
     if (this.paused) return Promise.resolve({ outcome: 'paused' });
     const error = this.simulationErrors.get(item.id);
@@ -219,6 +241,30 @@ export function fakeRecordItem(signer: string, deadline = 4_000_000_000): Submit
     signer: signer as Hex,
     deadline,
     record: { signer, nonce: String(itemCounter), deadline } as never,
+    signature: '0x00' as Hex,
+  };
+}
+
+/** A synthetic record ID for receipt tests. */
+export function fakeRecordId(): Hex {
+  itemCounter += 1;
+  return `0x${itemCounter.toString(16).padStart(64, 'b')}` as Hex;
+}
+
+/** A synthetic receipt item for engine tests (never parsed or signed). */
+export function fakeReceiptItem(
+  signer: string,
+  recordId: Hex,
+  receiptType: number,
+  deadline = 4_000_000_000,
+): SubmitItem {
+  return {
+    type: 'receipt',
+    id: `${recordId}:${String(receiptType)}`,
+    recordId,
+    signer: signer as Hex,
+    deadline,
+    receipt: { signer, recordId, receiptType, salt: `0x${'5'.repeat(64)}`, deadline } as never,
     signature: '0x00' as Hex,
   };
 }

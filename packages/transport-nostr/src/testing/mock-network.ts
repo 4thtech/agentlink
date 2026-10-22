@@ -43,8 +43,19 @@ export interface MockRelayConfig {
    * is 500). The cap applies below any `limit` the client asks for.
    */
   maxLimit?: number;
+  /**
+   * M2-19: a cap that changes between REQs on one connection: the n-th REQ without `ids` gets
+   * `capSequence[n]` (the last entry repeats). Overrides `maxLimit` for those REQs.
+   */
+  capSequence?: number[];
   /** M1-5c: ignores `limit` and `until` (a relay that does not paginate). */
   ignoreLimit?: boolean;
+  /** M2-19: applies `until` exclusively (`created_at < until`), against NIP-01. */
+  exclusiveUntil?: boolean;
+  /** M2-19: accepts a REQ with an `ids` filter but never answers it. */
+  silentIdsReq?: boolean;
+  /** M2-19: raw frames sent before the stored events of every REQ with an `ids` filter (hostile input). */
+  idsExtraFrames?: (subId: string) => string[];
 }
 
 const microtask = (fn: () => void): void => {
@@ -55,6 +66,7 @@ export const PUBLIC_ADDRESS = '93.184.216.34';
 
 /** A NIP-01 filter, as far as the mock relay reads it. */
 interface MockFilter {
+  ids?: string[];
   kinds?: number[];
   '#p'?: string[];
   since?: number;
@@ -68,6 +80,8 @@ export class MockSocket implements RelaySocket {
   /** Open subscriptions on this connection (M1-5c): sub id to filter. */
   readonly subs = new Map<string, MockFilter>();
   private extrasSent = false;
+  /** REQs without an `ids` filter on this connection (for `capSequence`). */
+  private pageReqs = 0;
   readonly challenge: string;
 
   constructor(
@@ -163,13 +177,17 @@ export class MockSocket implements RelaySocket {
 
   /** Whether `event` matches the filter of subscription `subId`. */
   matches(filter: MockFilter, event: NostrEvent): boolean {
+    if (filter.ids !== undefined && !filter.ids.includes(event.id)) return false;
     if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
     if (filter['#p'] !== undefined) {
       const wanted = filter['#p'];
       if (!event.tags.some((t) => t[0] === 'p' && wanted.includes(t[1] as string))) return false;
     }
     if (filter.since !== undefined && event.created_at < filter.since) return false;
-    return filter.until === undefined || event.created_at <= filter.until;
+    if (filter.until === undefined) return true;
+    return this.config.exclusiveUntil === true
+      ? event.created_at < filter.until
+      : event.created_at <= filter.until;
   }
 
   private handleReq(subId: string, filter: MockFilter, config: MockRelayConfig): void {
@@ -178,7 +196,11 @@ export class MockSocket implements RelaySocket {
       return;
     }
     if (config.silentReq === true) return;
+    if (config.silentIdsReq === true && filter.ids !== undefined) return;
     this.subs.set(subId, filter);
+    if (filter.ids !== undefined) {
+      for (const raw of config.idsExtraFrames?.(subId) ?? []) this.push(raw);
+    }
     const ignore = config.ignoreLimit === true;
     const withoutUntil: MockFilter = { ...filter };
     delete withoutUntil.until;
@@ -189,7 +211,13 @@ export class MockSocket implements RelaySocket {
     if (config.newestFirst === true) stored.reverse();
     const limit = ignore ? undefined : filter.limit;
     if (limit === 0) stored = []; // limit 0: no stored events, live only
-    const cap = Math.min(limit ?? Infinity, config.maxLimit ?? Infinity);
+    let relayCap = config.maxLimit ?? Infinity;
+    const sequence = config.capSequence;
+    if (sequence !== undefined && sequence.length > 0 && filter.ids === undefined) {
+      relayCap = sequence[Math.min(this.pageReqs, sequence.length - 1)] as number;
+      this.pageReqs += 1;
+    }
+    const cap = Math.min(limit ?? Infinity, relayCap);
     if (cap !== Infinity) {
       // Newest created_at first (stable), then cut: what a relay with a result cap does.
       stored = stored

@@ -2652,6 +2652,29 @@ export class TermsService {
   }
 
   /**
+   * What the receipt part of the scopes for an answered envelope is doing now (06 §2.2a; M1-7g-f),
+   * read after the deferred run: `recorded` once done, `submitted` once signed and not yet landed,
+   * `waiting_for_record` while unclaimed. At most one scope per answered envelope claims its
+   * receipt part (claimReceiptPartTx), so that one wins over an unclaimed one. Undefined when no
+   * scope has a live receipt part. Read-only.
+   */
+  async receiptStatus(answeredEnvelopeId: string): Promise<ReceiptState['status'] | undefined> {
+    return this.#ctx.store.transaction((tx) => {
+      let status: ReceiptState['status'] | undefined;
+      for (const approval of tx.select('approvals', { scope_key: answeredEnvelopeId })) {
+        const part = tx.get('commitment_parts', {
+          approval_id: approval.approval_id,
+          part: 'receipt',
+        });
+        if (part?.state === 'done') return 'recorded';
+        if (part?.state === 'claimed') status = 'submitted';
+        else if (part?.state === 'unclaimed') status ??= 'waiting_for_record';
+      }
+      return status;
+    });
+  }
+
+  /**
    * The atomic claim of a receipt part (07 §3.5), for M1-7g: inside its store transaction that stores
    * the signed receipt. True only for the one call that moved it `unclaimed` → `claimed`, and only if
    * no other scope with the same scope key has its receipt part claimed or done.

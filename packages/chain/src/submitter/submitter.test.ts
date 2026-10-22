@@ -22,6 +22,7 @@ import type { ChainConfig } from '../config/index.js';
 import { buildReceipt, buildRecord, RECORD_KIND } from '../typed-data/index.js';
 import type { Hex } from '../ids/index.js';
 import {
+  MAX_RECEIPTS_PER_RECORD,
   SUBMITTER_MAX_ITEMS,
   SUBMITTER_RPC_METHODS,
   SubmitterError,
@@ -536,6 +537,39 @@ describe('createSubmitterChain (the Worker’s chain port)', () => {
       receiptAt: [5n, 0n, 0n, 0n],
     });
     expect(await p.simulateItem(item)).toEqual({ outcome: 'skipped' });
+  });
+
+  it('reads a record’s receipt allowance: charged when the Notary stores it, with the types set (D-114)', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    const recordId = hash32('35');
+    // Unknown to the Notary (RecordNotFound): never charged, so no receipt is covered.
+    expect(await p.recordReceipts(recordId)).toEqual({ charged: false, set: [] });
+    chain.records.set(recordId, {
+      signer: AGENT,
+      structHash: hash32('77'),
+      receiptAt: [0n, 0n, 0n, 0n],
+    });
+    expect(await p.recordReceipts(recordId)).toEqual({ charged: true, set: [] });
+    chain.records.set(recordId, {
+      signer: AGENT,
+      structHash: hash32('77'),
+      receiptAt: [5n, 0n, 6n, 0n],
+    });
+    expect(await p.recordReceipts(recordId)).toEqual({ charged: true, set: [1, 3] });
+    // One read: getRecord only; no estimate, no balance or credit read of anyone.
+    expect(chain.methods.filter((m) => m !== 'eth_call')).toEqual([]);
+    expect(MAX_RECEIPTS_PER_RECORD).toBe(3);
+  });
+
+  it('keeps a failed allowance read an infrastructure error, never "not charged"', async () => {
+    const chain = newChain();
+    chain.getRecordRevert = 'EnforcedPause';
+    const p = port(chain);
+    await expect(p.recordReceipts(hash32('35'))).rejects.toMatchObject({ code: 'rpc_error' });
+    chain.getRecordRevert = null;
+    chain.failNetwork = true;
+    await expect(p.recordReceipts(hash32('35'))).rejects.toBeInstanceOf(Error);
   });
 
   it('reads the pending and the latest nonce of the gas wallet apart (M1-10a-b)', async () => {
