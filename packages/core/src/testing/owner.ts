@@ -84,7 +84,7 @@ export async function signWith(owner: OwnerKeyStore, body: JsonObject): Promise<
 }
 
 /** A recognisable S3 secret: it must never reach a log line, a row or an error (I-7). */
-export const S3_SECRET_CANARY = 'S3-SECRET-CANARY-c0ffee';
+export const S3_CANARY = 'canary-s3-value';
 
 /**
  * The own-storage KeyStore items in memory (04 §2.2: `storage-mark` and `s3:<id>`; M1-9i-a). The
@@ -120,7 +120,7 @@ export class MemoryOwnStorageKeys implements OwnStorageKeys {
     return Promise.resolve(credentialDigest(item));
   }
 
-  connect(id: string, accessKeyId = 'AKIATESTKEY', secretAccessKey = S3_SECRET_CANARY): string {
+  connect(id: string, accessKeyId = 'AKIATESTKEY', secretAccessKey = S3_CANARY): string {
     const item: StorageCredentialItemFields = {
       accessKeyId: encodeUtf8(accessKeyId),
       secretAccessKey: encodeUtf8(secretAccessKey),

@@ -41,7 +41,7 @@ import {
 import {
   MemoryOwnStorageKeys,
   MemoryPolicyMark,
-  S3_SECRET_CANARY,
+  S3_CANARY,
   ownerHex,
   signWith,
 } from './testing/owner.js';
@@ -233,7 +233,7 @@ describe('storage.set (04 §2.5.1; 07 §3.4)', () => {
     for (const over of [
       { endpoint: `${ENDPOINT}/` },
       { id: id.toUpperCase() },
-      { secretAccessKey: S3_SECRET_CANARY },
+      { secretAccessKey: S3_CANARY },
     ]) {
       const signed = await sign(a, 'storage.set', setParams(id, digest, over));
       expect(await a.client.ownerActions.apply(JSON.stringify(signed))).toMatchObject({
@@ -242,7 +242,7 @@ describe('storage.set (04 §2.5.1; 07 §3.4)', () => {
       });
     }
     expect(await rows(a)).toEqual([]);
-    expect(await dump(a)).not.toContain(S3_SECRET_CANARY);
+    expect(await dump(a)).not.toContain(S3_CANARY);
   });
 
   it('without the own-storage KeyStore items, nothing applies (fail closed)', async () => {
@@ -554,10 +554,10 @@ describe('ownStorage.load() (07 §3.4; 04 §2.5.1 "Stored objects are re-verifie
     keys.mark = encodeUtf8('{}');
     await a.client.ownStorage.load();
     const logs = a.lines.join('\n');
-    for (const secret of [S3_SECRET_CANARY, BUCKET, 'acct.r2']) {
+    for (const secret of [S3_CANARY, BUCKET, 'acct.r2']) {
       expect(logs).not.toContain(secret);
     }
-    expect(await dump(a)).not.toContain(S3_SECRET_CANARY);
+    expect(await dump(a)).not.toContain(S3_CANARY);
   });
 });
 
