@@ -235,6 +235,22 @@ async function deliverRaw(
 }
 
 /**
+ * Text envelopes from `from` to `to` for the flood tests, crafted directly: the same recipients as
+ * `envelopes.build` (04 §3.2), signed and verified for real, without the sender-side store work that
+ * dominated the runtime. The keys are looked up once, so call it after any rotation.
+ */
+async function textCrafter(from: Agent, to: Agent): Promise<(body: string) => Promise<Envelope>> {
+  const signer = await agentSigner(from.keyStore);
+  const entries = [
+    { pk: await agentEnc(to) },
+    { pk: await ownerEnc(to.owner) },
+    { pk: await ownerEnc(from.owner) },
+    { pk: await agentEnc(from) },
+  ];
+  return (body) => craft({ signer, entries, payload: textPayload(body), createdAt: clock.t });
+}
+
+/**
  * M1-5g: `n` junk kind-1059 events for `to` at one second on one relay (a flood). The sync drops each
  * one as not a gift wrap for us; on a relay that caps below `n`, that second is a gap (M1-5d).
  */
@@ -473,10 +489,9 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
 // --- Rate limit -----------------------------------------------------------------------------------
 
 describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
-  // Timeout: 300 s. Real signing and verification of 300-500 envelopes: about 18 s alone on a laptop, but
-  // 87-113 s on the loaded CI runner (all packages' tests run in parallel) in green runs, and over 120 s
-  // on main run 39107965796. Nothing in the code under test changed; the assertions are unchanged.
-  it('500 envelopes from one contact are limited without delaying another contact', async () => {
+  // M1-7h-d: the envelopes are crafted and signed directly (`textCrafter`), not built through the sender's
+  // store; the sync still verifies every one. The assertions are unchanged.
+  it('twice the limit of envelopes from one contact are limited without delaying another contact', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
     const b = await openAgent(2, 'bob', RELAYS_B, net);
@@ -484,12 +499,10 @@ describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
     await pair(a, b);
     await pair(c, b);
     const limit = POLICY_DEFAULTS.contacts.rateLimitPerContactPerHour;
-    for (let i = 0; i < 500; i += 1) {
-      const built = await a.client.envelopes.build({
-        to: { contact: b.id },
-        payload: textPayload(`flood ${i}`),
-      });
-      await deliverRaw(net, a, b, built.envelope, [RELAYS_B[0] as string]);
+    const total = 2 * limit;
+    const crafter = await textCrafter(a, b);
+    for (let i = 0; i < total; i += 1) {
+      await deliverRaw(net, a, b, await crafter(`flood ${i}`), [RELAYS_B[0] as string]);
     }
     const fromC = await c.client.envelopes.build({
       to: { contact: b.id },
@@ -499,7 +512,7 @@ describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
 
     const result = await b.client.syncInbox({ budgetMs: 60_000 });
     expect(result.partial).toBe(false);
-    expect(result.rateLimited).toEqual([{ contactId: a.id, dropped: 500 - limit }]);
+    expect(result.rateLimited).toEqual([{ contactId: a.id, dropped: total - limit }]);
     const fromA = result.items.filter((i) => i.from.contactId === a.id);
     expect(fromA).toHaveLength(limit);
     expect(result.items.filter((i) => i.from.contactId === c.id).map((i) => i.envelopeId)).toEqual([
@@ -524,7 +537,7 @@ describe('per-contact rate limit (07 §3.2 rate_counters; 06 §3)', () => {
       later.envelope.id,
     ]);
     expect((await rowsOf(b)).rate.every((r) => r.bucket > clock.t - 3_600)).toBe(true);
-  }, 300_000);
+  }, 60_000);
 });
 
 // --- Fetch-only catch-up --------------------------------------------------------------------------
@@ -915,13 +928,14 @@ describe('IR-M1-7h-1 F01: revoke envelopes are applied or dropped, never parked'
 // --- IR-M1-7h-1 F02: the rate limit counts where the contact envelope is stored (07 §3.2) ---------
 
 describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
-  it('a card-update with 300 texts from the new key in one pass delivers no more than the limit', async () => {
+  it('a card-update with twice the limit of texts from the new key in one pass delivers no more than the limit', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
     const b = await openAgent(2, 'bob', RELAYS_B, net);
     await pair(a, b);
     await rotate(a);
     const limit = POLICY_DEFAULTS.contacts.rateLimitPerContactPerHour;
+    const total = 2 * limit;
     const update = await a.client.envelopes.build({
       to: { contact: b.id },
       payload: await cardUpdatePayload(a),
@@ -930,18 +944,15 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
     // The texts are dated after the card-update, so the pass applies it before any of them and none
     // is held (the held pool keeps at most 100 per owner kid, 07 §3.2, which would evict the rest).
     clock.t += 1;
-    for (let i = 0; i < 300; i += 1) {
-      const built = await a.client.envelopes.build({
-        to: { contact: b.id },
-        payload: textPayload(`new key ${i}`),
-      });
-      await deliverRaw(net, a, b, built.envelope, [RELAYS_B[0] as string]);
+    const crafter = await textCrafter(a, b);
+    for (let i = 0; i < total; i += 1) {
+      await deliverRaw(net, a, b, await crafter(`new key ${i}`), [RELAYS_B[0] as string]);
     }
     const result = await b.client.syncInbox({ budgetMs: 60_000 });
     expect((await b.client.contacts.get(a.id)).keyEpoch).toBe(1);
     // The card-update is the contact's envelope too, so it counts toward the hour.
     expect(result.items).toHaveLength(limit - 1);
-    expect(result.rateLimited).toEqual([{ contactId: a.id, dropped: 300 - (limit - 1) }]);
+    expect(result.rateLimited).toEqual([{ contactId: a.id, dropped: total - (limit - 1) }]);
     const okFromA = (await rowsOf(b)).envelopes.filter(
       (r) =>
         r.direction === 'in' &&
@@ -950,7 +961,7 @@ describe('IR-M1-7h-1 F02: rate limit at processing time', () => {
         (r.type === 'text' || r.type === 'card-update'),
     );
     expect(okFromA).toHaveLength(limit);
-  }, 300_000);
+  }, 60_000);
 });
 
 describe('proof flags join the pass reports (04 §3.4, M1-7g-c)', () => {

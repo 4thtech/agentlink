@@ -5,19 +5,30 @@
 //     (`SUBMITTER_SMOKE_URL`), with plain fetch and no credentials.
 //
 // Steps (§4.5): `GET /v1/health` answers with every served chain available; a simulated notarize on
-// each served chain; the faucet refuses a mainnet chain ID (SUB-7).
+// each served chain; an uncovered receipt on each served chain (D-114, M1-34-b); the faucet refuses
+// a mainnet chain ID (SUB-7).
 //
 // The simulated notarize never spends gas: its Record is signed by a fresh random agent key (a test
 // key, never stored) that holds no credits, with `maxFee` 0, so the Notary's simulation reverts and
 // the submitter answers `failed` with the contract's error without sending anything. A `submitted`
 // or `held` answer fails the smoke: something accepted a record it must not have.
 //
+// The uncovered receipt never spends gas either: a correctly signed Receipt from a fresh agent that
+// holds nothing, for a random record ID the Notary does not store. No proof fee was charged for that
+// record, so the submitter must refuse it with `RecordNotFound` after reading the chain, never ask
+// the recipient for credits (`InsufficientCredits`) and never send it (D-114). Limit (IR-M1-34-b-1
+// L-2, accepted): the step cannot tell whether the submitter's own record pre-check ran, because
+// the Notary's simulation answers `RecordNotFound` for an unknown record too. It shows the receipt
+// route works end to end and refuses an uncovered receipt; the engine tests cover the pre-check.
+//
 // Zero access (AGENTS.md, I-7): nothing here prints a URL, address, signature or response body.
 // Failures carry fixed text, HTTP status codes and the submitter's fixed error codes only.
 import {
   RECORD_KIND,
+  buildReceipt,
   buildRecord,
   getChainConfig,
+  signReceipt,
   signRecord,
   type TypedDataSigner,
 } from '@4thtech-io/chain';
@@ -177,6 +188,51 @@ export async function smokeSimulatedNotarize(
   return error;
 }
 
+/**
+ * An uncovered receipt on `chainId` (D-114): a correctly signed DELIVERED Receipt from an agent that
+ * holds nothing, for a record ID the Notary does not store (no proof fee was charged for it). The
+ * submitter must read the chain and answer `failed` with `RecordNotFound`; nothing is sent, and the
+ * recipient is never asked for credits.
+ */
+export async function smokeUncoveredReceipt(
+  target: SmokeTarget,
+  chainId: number,
+  agent: SmokeAgent,
+): Promise<void> {
+  const step = `uncovered receipt on chain ${String(chainId)}`;
+  const config = getChainConfig(chainId);
+  check(config !== undefined, step, 'this release has no deployment for the chain');
+  if (!config) throw new SmokeFailure(step, 'unreachable');
+  const built = buildReceipt({
+    chainId,
+    notary: config.contracts.notary,
+    signer: agent.address,
+    recordId: `0x${encodeHex(randomBytes(32))}`,
+    receiptType: 1,
+    salt: `0x${encodeHex(randomBytes(32))}`,
+    deadline: Math.floor(Date.now() / 1000) + 600,
+  });
+  const signature = await signReceipt(agent.signer, built);
+  const response = await post(target, '/v1/receipt', {
+    chainId,
+    receipts: [{ receipt: built.receipt, signature }],
+  });
+  check(response.status === 200, step, `HTTP ${String(response.status)}`);
+  const body = await readJson(response, step);
+  const items = body.items;
+  check(Array.isArray(items) && items.length === 1, step, 'not exactly one item in the answer');
+  const item = (items as Record<string, unknown>[])[0] ?? {};
+  check(
+    item.status !== 'submitted' && item.status !== 'held',
+    step,
+    `the receipt was accepted for sending (${String(item.status)}): no fee covers it`,
+  );
+  check(item.status === 'failed', step, `status ${String(item.status)}, expected failed`);
+  const error = typeof item.error === 'string' ? item.error : '';
+  check(error !== 'InsufficientCredits', step, 'the recipient was asked for credits');
+  check(error === 'RecordNotFound', step, `${error || 'no error code'}, expected RecordNotFound`);
+}
+
 /** The faucet refuses a mainnet chain ID (SUB-7): 400 `unsupported_chain`, nothing credited. */
 export async function smokeFaucetRefusesMainnet(
   target: SmokeTarget,
@@ -201,6 +257,7 @@ export async function smokeAll(
   const chains = await smokeHealth(target);
   for (const chainId of chains) {
     await smokeSimulatedNotarize(target, chainId, await newAgent());
+    await smokeUncoveredReceipt(target, chainId, await newAgent());
   }
   await smokeFaucetRefusesMainnet(target, await newAgent());
 }

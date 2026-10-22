@@ -683,6 +683,20 @@ export function statusOfCall(call) {
   return call.result.trim() === '' ? undefined : 'ok';
 }
 
+/** The longest note, and the longest error token, copied into a result (M1-23-f). */
+export const NOTE_MAX = 200;
+const TRUNCATED = '[truncated]';
+
+/** `text` cut to at most `max` characters; a cut ends with the marker `[truncated]`. */
+export function capText(text, max = NOTE_MAX) {
+  // Redact first: a cut must never split a secret into a prefix the scan no longer recognises.
+  let s = String(text);
+  for (const { name, re } of SECRET_PATTERNS) {
+    s = s.replace(new RegExp(re.source, `${re.flags.replace('g', '')}g`), `[redacted: ${name}]`);
+  }
+  return s.length <= max ? s : `${s.slice(0, Math.max(0, max - TRUNCATED.length))}${TRUNCATED}`;
+}
+
 const ERROR_CODE_TEXT = Object.freeze({
   AMBIGUOUS_CONTACT: 'two contacts share that name',
 });
@@ -699,13 +713,14 @@ export function errorCodeOf(call) {
       : undefined;
   }
   if (statusOfCall(call) !== 'error') return undefined;
-  return CODE_IN_TEXT.exec(call.result)?.[0];
+  const token = CODE_IN_TEXT.exec(call.result)?.[0];
+  return token === undefined ? undefined : capText(token, 64);
 }
 
 /** One note per distinct error code in the run, e.g. `AMBIGUOUS_CONTACT: two contacts share that name`. */
 export function errorCodeNotes(run) {
   const codes = [...new Set(run.calls.map(errorCodeOf).filter((c) => c !== undefined))];
-  return codes.map((c) => (ERROR_CODE_TEXT[c] ? `${c}: ${ERROR_CODE_TEXT[c]}` : c));
+  return codes.map((c) => capText(ERROR_CODE_TEXT[c] ? `${c}: ${ERROR_CODE_TEXT[c]}` : c));
 }
 
 /** The shown names of the contacts that match `name` in an `agentlink contacts` listing. */
@@ -1371,7 +1386,9 @@ export async function runPlan(steps, deps, only) {
       }
     } catch (error) {
       notes.push(
-        `could not run: ${error instanceof Error ? error.message.split('\n')[0] : 'error'}`,
+        capText(
+          `could not run: ${error instanceof Error ? error.message.split('\n')[0] : 'error'}`,
+        ),
       );
     }
     const result = {
