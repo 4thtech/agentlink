@@ -240,8 +240,7 @@ export const en = {
   'cli.status.brief.requests':
     '{count, plural, one {1 request from an unknown sender.} other {# requests from unknown senders.}}',
   'cli.status.brief.nothing': 'Nothing new on AgentLink.',
-  'local.linkExpired':
-    'This link has expired. Ask your AI to open AgentLink again.',
+  'local.linkExpired': 'This link has expired. Ask your AI to open AgentLink again.',
 } as const;
 
 export type CopyKey = keyof typeof en;
