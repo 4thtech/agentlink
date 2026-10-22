@@ -47,7 +47,7 @@ Deployed on 2026-10-19 (campaign-1). The contracts use CREATE3 through CreateX, 
 | 23594956 | [0x51c4bd8f775635cc9023c7baaceae95c0743a2c59b0399f8736d2b234e8f258b](https://gnosis-chiado.blockscout.com/tx/0x51c4bd8f775635cc9023c7baaceae95c0743a2c59b0399f8736d2b234e8f258b) |
 | 23594957 | [0xd3e08d823f43f3be4e3c319d51e0960eda87ca208aff06169b60ef4db5f06e4d](https://gnosis-chiado.blockscout.com/tx/0xd3e08d823f43f3be4e3c319d51e0960eda87ca208aff06169b60ef4db5f06e4d) |
 
-**Smoke test passed (21 Oct 2026).** The live smoke test that passed on Base Sepolia also passed on Chiado. The test-credits faucet grants Chiado's fee token, the native xDAI, with one `depositFor` that carries the amount (D-46). Chiado joins automatic selection once deployed (M1-3j-c): the submitter and the faucet serve it after their next deploy, and the CLI and tools choose it from the next npm release.
+**Smoke test passed.** The live smoke test (deposit, notarize, acknowledge) passed on Chiado on 2026-10-21, in the contracts repository's `Deploy testnet` run [39587157618](https://github.com/4thtech/occ-v2-contracts/actions/runs/39587157618) (job "live smoke (gnosis-chiado)"; recorded in contracts#24). The test-credits faucet grants Chiado's fee token, the native xDAI, with one `depositFor` that carries the amount (D-46). Chiado joins automatic selection once deployed (M1-3j-c): the submitter and the faucet serve it after their next deploy, and the CLI and tools choose it from the next npm release.
 
 ## Mainnets
 
