@@ -38,7 +38,8 @@ const hex64 = (n: number): string => n.toString(16).padStart(64, '0');
 const recordId = (n: number): string => `0x${hex64(n)}`;
 
 /** Anything that must never appear in a UI read (zero access, I-7). */
-const FORBIDDEN = /salt|secret|seed|private|record_?json|signed|signature|sig\b|url|presign|key\b|fileKey|tx_?hash|txHash|wallet|gas/i;
+const FORBIDDEN =
+  /salt|secret|seed|private|record_?json|signed|signature|sig\b|url|presign|key\b|fileKey|tx_?hash|txHash|wallet|gas/i;
 
 function assertNoSecretFields(value: unknown, path = '$'): void {
   if (Array.isArray(value)) {
@@ -284,7 +285,12 @@ describe('ProofService.list (M1-11r-a)', () => {
     await insertProof(a, { n: 5, status: 'announced', createdAt: 400 });
     // Not records: a replaced one, a stored receipt, a waiting proof, a receipt request.
     await insertProof(a, { n: 6, status: 'replaced', createdAt: 500 });
-    await insertProof(a, { n: 7, status: 'receipt_signed', createdAt: 500, key: `${recordId(1)}:1` });
+    await insertProof(a, {
+      n: 7,
+      status: 'receipt_signed',
+      createdAt: 500,
+      key: `${recordId(1)}:1`,
+    });
     await insertProof(a, { n: 8, status: 'awaiting', createdAt: 500, key: 'await:x' });
     await insertProof(a, { n: 9, status: 'receipt_request', createdAt: 500, key: 'request:y' });
 
@@ -538,7 +544,15 @@ describe('ActivityService.list (M1-11r-a)', () => {
           expect(keysOf(item)).toEqual(['approvalId', 'at', 'decision', 'id', 'kind']);
           break;
         case 'proof':
-          expect(keysOf(item)).toEqual(['at', 'chainId', 'direction', 'id', 'kind', 'recordId', 'status']);
+          expect(keysOf(item)).toEqual([
+            'at',
+            'chainId',
+            'direction',
+            'id',
+            'kind',
+            'recordId',
+            'status',
+          ]);
           break;
         case 'sender_blocked':
           expect(keysOf(item)).toEqual(['at', 'id', 'kind', 'senderCode']);

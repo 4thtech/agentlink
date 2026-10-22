@@ -11,6 +11,8 @@ export type {
 } from './approval-channel.js';
 export {
   IdentityService,
+  type FingerprintForms,
+  type OwnFingerprints,
   type IdentityView,
   type InitIdentityInput,
   type RotateIdentityInput,
@@ -297,7 +299,23 @@ export {
 } from './terms-flow.js';
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
-export type { ProofChain, ProofKit, ProofsPlatform } from './proofs/platform.js';
+export type {
+  FreeCreditsAnswer,
+  FreeCreditsPort,
+  ProofChain,
+  ProofKit,
+  ProofsPlatform,
+} from './proofs/platform.js';
+// The local UI reads (M1-11r-a): proof list, credits, free test credits, activity feed, folders.
+export type {
+  ChainCredits,
+  CreditsView,
+  FreeCreditsResult,
+  ProofListItem,
+} from './proofs/reads.js';
+export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
+export { ActivityService, type ActivityEntry } from './activity.js';
+export type { FilesView, ResolvedFolders } from './files/view.js';
 export {
   PROOF_AWAITING_PER_CONTACT,
   PROOF_LOG_CODES,
