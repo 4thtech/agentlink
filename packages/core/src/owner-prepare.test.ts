@@ -16,12 +16,14 @@ import {
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_DEFAULTS,
   defaultPolicy,
+  contactRuleSchema,
   policySchema,
   type Policy,
 } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import {
+  CONTACT_RULE_FIELD_LOOSENING,
   POLICY_EDIT_WARNING_CODES,
   POLICY_FIELD_LOOSENING,
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
@@ -568,6 +570,93 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
         'buy maximum raised',
         (p) => void (p.commitments.autoAcceptMaxUSD = '10'),
         [{ code: 'auto_accept_widened' }],
+        (p) => {
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '5';
+        },
+      ],
+      [
+        'buy maximum raised with an empty allowlist: buy stays off, nothing',
+        (p) => void (p.commitments.autoAcceptMaxUSD = '10'),
+        [],
+      ],
+      // IR-M1-11r-b-3 M: every direction transition.
+      [
+        'sell -> buy turns buy auto-accept on (reviewer probe)',
+        (p) => void (p.commitments.autoAcceptDirection = 'buy'),
+        [{ code: 'auto_accept_widened', contacts: [C1] }],
+        (p) => {
+          p.commitments.autoAcceptDirection = 'sell';
+          p.commitments.autoAcceptMinUSD = null;
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '100';
+        },
+      ],
+      [
+        'buy -> sell turns sell auto-accept on',
+        (p) => void (p.commitments.autoAcceptDirection = 'sell'),
+        [{ code: 'sell_auto_accept', contacts: [C1] }],
+        (p) => {
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '100';
+          p.commitments.autoAcceptMinUSD = '20';
+        },
+      ],
+      [
+        'off (deny) -> buy',
+        (p) => void (p.commitments.accept = 'approval'),
+        [{ code: 'commitments_looser' }, { code: 'auto_accept_widened', contacts: [C1] }],
+        (p) => {
+          p.commitments.accept = 'deny';
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '100';
+        },
+      ],
+      [
+        'off (deny) -> sell',
+        (p) => void (p.commitments.accept = 'approval'),
+        [{ code: 'commitments_looser' }, { code: 'sell_auto_accept' }],
+        (p) => {
+          p.commitments.accept = 'deny';
+          p.commitments.autoAcceptDirection = 'sell';
+          p.commitments.autoAcceptMinUSD = '20';
+        },
+      ],
+      [
+        'sell minimum lowered',
+        (p) => void (p.commitments.autoAcceptMinUSD = '10'),
+        [{ code: 'sell_auto_accept' }],
+        (p) => {
+          p.commitments.autoAcceptDirection = 'sell';
+          p.commitments.autoAcceptMinUSD = '20';
+        },
+      ],
+      [
+        'sell minimum raised: stricter, nothing',
+        (p) => void (p.commitments.autoAcceptMinUSD = '30'),
+        [],
+        (p) => {
+          p.commitments.autoAcceptDirection = 'sell';
+          p.commitments.autoAcceptMinUSD = '20';
+        },
+      ],
+      [
+        'buy -> sell with no minimum: sell stays off, buy turns off, nothing',
+        (p) => void (p.commitments.autoAcceptDirection = 'sell'),
+        [],
+        (p) => {
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '100';
+        },
+      ],
+      [
+        'either -> off (accept deny): nothing',
+        (p) => void (p.commitments.accept = 'deny'),
+        [],
+        (p) => {
+          p.commitments.autoAcceptContacts = [C1];
+          p.commitments.autoAcceptMaxUSD = '100';
+        },
       ],
       [
         'sell auto-accept on',
@@ -698,6 +787,27 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
       expect(Object.keys(POLICY_FIELD_LOOSENING).sort()).toEqual(
         Object.keys(policySchema.shape).sort(),
       );
+    });
+
+    it('every contact-rule field has a loosening classification (a new field fails here)', () => {
+      const ruleShape = contactRuleSchema.shape as Record<string, unknown>;
+      const schemaLeaves = Object.entries(ruleShape)
+        .filter(([key]) => key !== 'contact')
+        .flatMap(([section, field]) =>
+          Object.keys(
+            (field as { unwrap(): { shape: Record<string, unknown> } }).unwrap().shape,
+          ).map((f) => `${section}.${f}`),
+        )
+        .sort();
+      const tableLeaves = Object.entries(CONTACT_RULE_FIELD_LOOSENING)
+        .flatMap(([section, entry]) => Object.keys(entry.fields).map((f) => `${section}.${f}`))
+        .sort();
+      expect(tableLeaves).toEqual(schemaLeaves);
+      expect(tableLeaves).toEqual([
+        'proofs.notarize',
+        'proofs.perActionMaxUSD',
+        'receipts.autoDelivered',
+      ]);
     });
 
     it('a warning never carries a path, only codes, fields and agent IDs', () => {

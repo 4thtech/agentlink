@@ -117,6 +117,7 @@ export {
 // M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
 // after presence. Owner surfaces only: no MCP tool uses them (I-4).
 export {
+  CONTACT_RULE_FIELD_LOOSENING,
   POLICY_EDIT_WARNING_CODES,
   POLICY_FIELD_LOOSENING,
   PREPARED_OWNER_ACTION_LIFETIME_SECONDS,

@@ -20,6 +20,7 @@ import {
   ownerActionSchema,
   type PolicyRule,
   type ContactCheckParams,
+  type ContactRule,
   type ContactRemoveParams,
   type ContactRenameParams,
   type OwnerAction,
@@ -263,16 +264,6 @@ const added = (from: readonly string[], to: readonly string[]): string[] =>
   to.filter((x) => !from.includes(x)).sort();
 const usdRaised = (from: string, to: string): boolean => compareUsd(to, from) > 0;
 
-/** A contact's effective proof rule and DELIVERED setting (06 §3 evaluation; a global deny wins). */
-function contactEffect(p: Policy, contact: string) {
-  const rule = p.contactRules.find((r) => r.contact === contact);
-  return {
-    notarize: p.proofs.notarize === 'deny' ? 'deny' : (rule?.proofs?.notarize ?? p.proofs.notarize),
-    perActionMaxUSD: rule?.proofs?.perActionMaxUSD ?? p.proofs.perActionMaxUSD,
-    autoDelivered: rule?.receipts?.autoDelivered ?? p.receipts.autoDelivered,
-  };
-}
-
 /** One field's loosening check: the warning it raises from `b` to `n`, or none. */
 export type FieldLoosening = (b: Policy, n: Policy) => readonly PolicyEditWarning[];
 
@@ -289,57 +280,140 @@ const anyChange =
   (b, n) =>
     when(get(n) !== get(b), { code, fields: [field] });
 
-const sellOn = (p: Policy) =>
-  p.commitments.accept !== 'deny' && p.commitments.autoAcceptMinUSD !== null;
-const sellChanged: FieldLoosening = (b, n) =>
-  when(
-    sellOn(n) &&
-      (!sellOn(b) ||
-        b.commitments.autoAcceptMinUSD !== n.commitments.autoAcceptMinUSD ||
-        b.commitments.autoAcceptDirection !== n.commitments.autoAcceptDirection ||
-        canonicalize(b.commitments.autoAcceptContacts as never) !==
-          canonicalize(n.commitments.autoAcceptContacts as never)),
-    { code: 'sell_auto_accept' },
-  );
-const buyWidened: FieldLoosening = (b, n) => {
-  if (n.commitments.accept === 'deny') return [];
-  const ids = added(b.commitments.autoAcceptContacts, n.commitments.autoAcceptContacts);
-  const higher = usdRaised(b.commitments.autoAcceptMaxUSD, n.commitments.autoAcceptMaxUSD);
-  const fromDeny = b.commitments.accept === 'deny' && n.commitments.autoAcceptContacts.length > 0;
-  return when(ids.length > 0 || higher || fromDeny, {
-    code: 'auto_accept_widened',
-    ...(ids.length > 0 ? { contacts: ids } : {}),
-  });
-};
+// --- auto-accept, per direction (06 §3 "Commitments", D-55) ---------------------------------------
 
-/** Per contact: a kept or new rule that loosens, and a removed rule whose fallback is looser. */
-const contactRulesLoosening: FieldLoosening = (b, n) => {
-  const contacts = new Set([...b.contactRules, ...n.contactRules].map((r) => r.contact));
-  const proofs: string[] = [];
-  const receipts: string[] = [];
-  const removed: string[] = [];
-  for (const contact of contacts) {
-    const before = contactEffect(b, contact);
-    const after = contactEffect(n, contact);
-    const proofsLooser =
-      looserRule(before.notarize, after.notarize) ||
-      usdRaised(before.perActionMaxUSD, after.perActionMaxUSD);
-    const receiptsOn = after.autoDelivered && !before.autoDelivered;
-    if (!proofsLooser && !receiptsOn) continue;
-    if (!n.contactRules.some((r) => r.contact === contact)) {
-      removed.push(contact);
-      continue;
-    }
-    if (proofsLooser) proofs.push(contact);
-    if (receiptsOn) receipts.push(contact);
+type Direction = Policy['commitments']['autoAcceptDirection'];
+
+/** What auto-accepts in one direction: off, or on for these contacts within this bound. */
+interface AutoAccept {
+  readonly on: boolean;
+  readonly contacts: readonly string[];
+  /** buy: the maximum price; sell: the minimum. */
+  readonly bound: string | null;
+}
+
+/**
+ * The effective auto-accept of `p` in `dir`. Only the configured direction is ever live, and never
+ * under `accept: deny`. Buy needs an allowlisted contact and a maximum above 0 (a price is > 0 and
+ * at most the maximum). Sell needs `autoAcceptMinUSD`; it is counted as on even with an empty
+ * allowlist (the stricter reading for warnings).
+ */
+function autoAccept(p: Policy, dir: Direction): AutoAccept {
+  const c = p.commitments;
+  const live = c.accept !== 'deny' && c.autoAcceptDirection === dir;
+  if (dir === 'buy') {
+    const on = live && c.autoAcceptContacts.length > 0 && compareUsd(c.autoAcceptMaxUSD, '0') > 0;
+    return { on, contacts: c.autoAcceptContacts, bound: c.autoAcceptMaxUSD };
   }
+  return {
+    on: live && c.autoAcceptMinUSD !== null,
+    contacts: c.autoAcceptContacts,
+    bound: c.autoAcceptMinUSD,
+  };
+}
+
+/** More permissive in one direction: turned on, or on with new contacts or a looser bound. */
+function autoAcceptLooser(b: Policy, n: Policy, dir: Direction): readonly string[] | undefined {
+  const before = autoAccept(b, dir);
+  const after = autoAccept(n, dir);
+  if (!after.on) return undefined;
+  if (!before.on) return [...after.contacts].sort();
+  const ids = added(before.contacts, after.contacts);
+  const bound =
+    dir === 'buy'
+      ? usdRaised(before.bound!, after.bound!)
+      : compareUsd(after.bound!, before.bound!) < 0;
+  return ids.length > 0 || bound ? ids : undefined;
+}
+
+/**
+ * Every direction transition (sell → buy, buy → sell, off → either, a bound or allowlist change, the
+ * `accept` rule) compares the effective auto-accept of both directions before and after, and warns
+ * for each direction that became more permissive. The direction is one value, so both directions
+ * are never on at once.
+ */
+const autoAcceptLoosening: FieldLoosening = (b, n) => {
   const out: PolicyEditWarning[] = [];
-  if (proofs.length > 0) out.push({ code: 'contact_proof_rules_looser', contacts: proofs.sort() });
-  if (receipts.length > 0) out.push({ code: 'contact_receipts_public', contacts: receipts.sort() });
-  if (removed.length > 0) {
-    out.push({ code: 'contact_rule_removed_loosens', contacts: removed.sort() });
+  const buy = autoAcceptLooser(b, n, 'buy');
+  if (buy !== undefined) {
+    out.push({ code: 'auto_accept_widened', ...(buy.length > 0 ? { contacts: buy } : {}) });
+  }
+  const sell = autoAcceptLooser(b, n, 'sell');
+  if (sell !== undefined) {
+    out.push({ code: 'sell_auto_accept', ...(sell.length > 0 ? { contacts: sell } : {}) });
   }
   return out;
+};
+
+// --- contact rules (06 §3 "Per-contact rules") ----------------------------------------------------
+
+type RuleSection = Exclude<keyof ContactRule, 'contact'>;
+
+/** One contact-rule field's check: true when the field's effective value for `contact` loosened. */
+type RuleFieldLoosening = (b: Policy, n: Policy, contact: string) => boolean;
+
+const ruleOf = (p: Policy, contact: string) => p.contactRules.find((r) => r.contact === contact);
+/** The effective `notarize` for a contact's proofs: a global deny always wins (06 §3 step 1). */
+const effNotarize = (p: Policy, contact: string): PolicyRule =>
+  p.proofs.notarize === 'deny'
+    ? 'deny'
+    : (ruleOf(p, contact)?.proofs?.notarize ?? p.proofs.notarize);
+
+/**
+ * The loosening check for every field of a ContactRule, and the code it raises for a kept or new
+ * rule. The type makes a new ContactRule field a compile error here until it is classified, and a
+ * test compares the keys with the schema. `contact` is the rule's key, not a setting.
+ */
+export const CONTACT_RULE_FIELD_LOOSENING: {
+  readonly [S in RuleSection]-?: {
+    readonly code: PolicyEditWarningCode;
+    readonly fields: { readonly [F in keyof NonNullable<ContactRule[S]>]-?: RuleFieldLoosening };
+  };
+} = {
+  proofs: {
+    code: 'contact_proof_rules_looser',
+    fields: {
+      notarize: (b, n, c) => looserRule(effNotarize(b, c), effNotarize(n, c)),
+      perActionMaxUSD: (b, n, c) =>
+        usdRaised(
+          ruleOf(b, c)?.proofs?.perActionMaxUSD ?? b.proofs.perActionMaxUSD,
+          ruleOf(n, c)?.proofs?.perActionMaxUSD ?? n.proofs.perActionMaxUSD,
+        ),
+    },
+  },
+  receipts: {
+    code: 'contact_receipts_public',
+    fields: {
+      autoDelivered: (b, n, c) =>
+        (ruleOf(n, c)?.receipts?.autoDelivered ?? n.receipts.autoDelivered) &&
+        !(ruleOf(b, c)?.receipts?.autoDelivered ?? b.receipts.autoDelivered),
+    },
+  },
+};
+
+/**
+ * Per contact in the old or new rules: each ContactRule field's check. A loosening under a kept or
+ * new rule raises its section's code; under a removed rule (the contact now falls back to the global
+ * values) it raises `contact_rule_removed_loosens`. Only agent IDs are carried.
+ */
+const contactRulesLoosening: FieldLoosening = (b, n) => {
+  const contacts = new Set([...b.contactRules, ...n.contactRules].map((r) => r.contact));
+  const hits = new Map<PolicyEditWarningCode, string[]>();
+  const hit = (code: PolicyEditWarningCode, contact: string) => {
+    const list = hits.get(code) ?? [];
+    if (!list.includes(contact)) list.push(contact);
+    hits.set(code, list);
+  };
+  for (const contact of contacts) {
+    const removed = ruleOf(n, contact) === undefined;
+    for (const section of Object.values(CONTACT_RULE_FIELD_LOOSENING)) {
+      const checks = Object.values(section.fields) as RuleFieldLoosening[];
+      if (checks.some((looser) => looser(b, n, contact))) {
+        hit(removed ? 'contact_rule_removed_loosens' : section.code, contact);
+      }
+    }
+  }
+  return [...hits].map(([code, list]) => ({ code, contacts: list.sort() }));
 };
 
 /**
@@ -446,10 +520,10 @@ export const POLICY_FIELD_LOOSENING: {
         { code: n.commitments.accept === 'allow' ? 'commitments_allow' : 'commitments_looser' },
       ];
     },
-    autoAcceptContacts: buyWidened,
-    autoAcceptMaxUSD: buyWidened,
-    autoAcceptDirection: sellChanged,
-    autoAcceptMinUSD: sellChanged,
+    autoAcceptContacts: autoAcceptLoosening,
+    autoAcceptMaxUSD: autoAcceptLoosening,
+    autoAcceptDirection: autoAcceptLoosening,
+    autoAcceptMinUSD: autoAcceptLoosening,
   },
   contactRules: contactRulesLoosening,
 };
