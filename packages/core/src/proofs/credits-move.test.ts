@@ -395,6 +395,26 @@ describe('addReceivedFunds: received xDAI becomes credits (owner presence)', () 
     expect(reverted).toEqual({ status: 'failed', reason: 'reverted' });
     expectClean(reverted);
   });
+
+  it('a revert after the nonce was recorded burns the object: a replay is refused', async () => {
+    const chiado = fakeChain(CHIADO);
+    const a = await openAgent(clock, 76, platformOf(chiado));
+    chiado.native = 5n * XDAI;
+    chiado.status = 'reverted';
+    const once = await signedOp(a, 'credits.deposit', deposit(XDAI));
+    expect(await a.client.proofs.addReceivedFunds(once)).toEqual({
+      status: 'failed',
+      reason: 'reverted',
+    });
+    expect(chiado.sent).toHaveLength(1);
+    chiado.status = 'success';
+    expect(await a.client.proofs.addReceivedFunds(once)).toEqual({
+      status: 'refused',
+      reason: 'nonce_used',
+    });
+    expect(chiado.sent).toHaveLength(1);
+    expect(chiado.directAsked).toBe(1);
+  });
 });
 
 describe('withdrawCredits: credits back to the agent account (owner presence)', () => {

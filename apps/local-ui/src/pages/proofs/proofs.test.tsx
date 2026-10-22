@@ -362,6 +362,9 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
   it('the default view stays plain: an Add credits button, no address, QR or network yet', async () => {
     await mount(base());
     expect(button(PROOFS_STRINGS.addCredits)).toBeDefined();
+    // IR-M1-11c-a4c-1 L-1: Withdraw credits is under Advanced, not in the default view.
+    expect(button(PROOFS_STRINGS.withdraw)).toBeUndefined();
+    expect(button(PROOFS_STRINGS.advanced)?.getAttribute('aria-expanded')).toBe('false');
     expect(text()).not.toMatch(/wallet|\bgas\b|seed phrase|transaction|address|network|0x/i);
     expect(host.querySelector('svg[aria-label]')).toBeNull();
   });
@@ -447,6 +450,8 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
 
   it('withdraws credits to the agent own account after a confirm screen', async () => {
     const calls = await mount(base({ [`POST /api/ui/proofs/withdraw`]: { status: 'done' } }));
+    await click(PROOFS_STRINGS.advanced);
+    expect(button(PROOFS_STRINGS.advanced)?.getAttribute('aria-expanded')).toBe('true');
     await click(PROOFS_STRINGS.withdraw);
     const confirm = host.querySelector('section[aria-label="Confirm"]');
     expect(confirm?.textContent).toContain('$2.00');
@@ -466,6 +471,7 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     const calls = await mount(
       base({ [`POST ${TOP_UP}`]: new Answer(403, { status: 'presence_rejected' }) }),
     );
+    await click(PROOFS_STRINGS.advanced);
     await click(PROOFS_STRINGS.withdraw);
     await click(PROOFS_STRINGS.cancel);
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);

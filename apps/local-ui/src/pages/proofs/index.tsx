@@ -157,6 +157,8 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
   const [panel, setPanel] = useState<'none' | 'add'>('none');
   const [move, setMove] = useState<Move | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  // IR-M1-11c-a4c-1 L-1 (owner, 11 §14 Q7): Withdraw credits lives under Advanced.
+  const [advanced, setAdvanced] = useState(false);
 
   const readMoney = useCallback(() => {
     void api.get(CREDITS_PATH).then((res) => {
@@ -255,17 +257,31 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
           </Button>
         )}
         {withdrawable === undefined ? null : (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setNotice(undefined);
-              setPanel('none');
-              setMove({ kind: 'withdraw', money: withdrawable.credits, net: withdrawable });
-            }}
-          >
-            {S.withdraw}
-          </Button>
+          <div className="pf-advanced">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-expanded={advanced}
+              aria-controls="pf-advanced-actions"
+              onClick={() => setAdvanced(!advanced)}
+            >
+              {S.advanced}
+            </Button>
+            {advanced ? (
+              <div id="pf-advanced-actions" className="pf-actions">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setNotice(undefined);
+                    setPanel('none');
+                    setMove({ kind: 'withdraw', money: withdrawable.credits, net: withdrawable });
+                  }}
+                >
+                  {S.withdraw}
+                </Button>
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
     );

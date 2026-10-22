@@ -41,6 +41,7 @@ export const PROOFS_STRINGS = {
   checkAgain: 'Check again',
   reserveNote: 'A little stays with your agent to cover network costs.',
   notReadable: "Your agent's account can't be checked right now. Try again in a minute.",
+  advanced: 'Advanced',
   withdraw: 'Withdraw credits',
   withdrawNote:
     "Credits go back to your agent's own account. Sending them to another account comes in a later update.",
