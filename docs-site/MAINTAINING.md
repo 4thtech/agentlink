@@ -87,6 +87,7 @@ Milestones map to versions per [versioning.md](../docs/process/versioning.md): M
 | Guide: Desktop app; Always-on cloud agent | — | — | Fill in | Review |
 | Guide: What leaves your computer | Check against the build | Files and proof | Desktop, console, cloud | Audit outcome |
 | Guide: Pricing | — | Test credits | — | Live prices, status "Available" |
+| Guide: Credits and payments | — | Free test credits, automatic claim | Top-up paths (exchange, own account) | Real credits, withdraw button, card path, status "Available" |
 | Guide: Troubleshooting; FAQ; Glossary | Fill in | Extend | Extend | Extend |
 | Technical: Architecture; Protocol pages; Security model; Threat model | Mark what shipped | Mark what shipped | Mark what shipped | Audit summary, frozen formats |
 | Technical: MCP tools; Policies; CLI; Harness configuration | Fill in (Talk) | Fill in (files, proof) | Cloud and desktop | Review |
@@ -94,6 +95,7 @@ Milestones map to versions per [versioning.md](../docs/process/versioning.md): M
 | Technical: Crypto suites; Test vectors; Run the test vectors | Fill in | Proof-layer suites | — | Review |
 | Technical: Proof pack format; Verify a proof; Your first integration | — | Fill in | Web verify page | Mainnet addresses |
 | Technical: Contracts | — | Testnet addresses | Registry | Mainnet addresses, audit reports |
+| Technical: Payments, credits and trust; Verify it yourself | — | Gasless top-up once enabled, event topics on a new contracts release | Top-up paths | Mainnet addresses, verified source, audit summary, licence |
 | Technical: Self-host the cloud agent | — | — | Fill in | Review |
 | Technical: Status and roadmap; Versioning | Update | Update | Update | Update |
 

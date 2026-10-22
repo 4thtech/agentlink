@@ -26,7 +26,7 @@ Apps built by other companies on AgentLink may add their own fee. It is always s
 
 ## How you pay
 
-You pay from **credits**: a prepaid balance in US dollars. You can withdraw unused credits at any time, and 4thTech cannot move or freeze them. (The companies behind some digital dollars can freeze funds; see Advanced.) See [Credits](everyday-use/credits.md).
+You pay from **credits**: a prepaid balance in US dollars. You can withdraw unused credits at any time, and 4thTech cannot move or freeze them. (The companies behind some digital dollars can freeze funds; see Advanced.) See [Credits](everyday-use/credits.md) and [Credits and payments](credits-and-payments.md).
 
 There is no AgentLink token. During the beta, credits are paid with digital dollars only; card and bank payments are not offered.
 

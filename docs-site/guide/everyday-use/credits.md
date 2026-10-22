@@ -13,6 +13,8 @@
 - **Adding credits is public.** Every way of adding credits says: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."
 - **Free test credits** are planned for the test phase (M1, M2), so you can try proof without paying.
 
+How adding, spending and taking back credits works, and who holds what: [Credits and payments](../credits-and-payments.md).
+
 ## Outline
 
 - Checking your credits ("How many AgentLink credits do I have?")

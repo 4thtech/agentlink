@@ -31,6 +31,9 @@ function creditsOf(address payer, address token) external view returns (uint256)
 
 ## Guarantees by design
 
+The full trust model (what the contracts guarantee, what 4thTech can and cannot do, and how to check it without the source) is in [Payments, credits and trust](../concepts/payments-credits-and-trust.md); hands-on checks are in [Verify it yourself](../guides/verify-it-yourself.md).
+
+
 - No admin function can move, freeze or reduce a payer's credits; pausing blocks new charges, never withdrawals.
 - Fees are bounded by on-chain caps; raising a cap has a 7-day delay; every record carries the signer's maximum fee.
 - Governance by Safe multisigs through `AccessManager` with per-function delays; the Notary can be frozen against upgrades.
