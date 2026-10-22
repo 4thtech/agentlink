@@ -1541,18 +1541,23 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const kept = await this.#ctx.store.transaction((tx) => {
       tx.delete('proofs', { status: AWAITING, created_at: { lt: now - AWAITING_SECONDS } });
       if (tx.get('proofs', { record_id: key }) !== undefined) return 'kept';
-      const waiting = tx.select('proofs', { status: AWAITING });
-      if (waiting.length >= MAX_AWAITING) return 'full';
-      // The contact's share: a waiting row belongs to the contact of its proof envelope, while that
-      // envelope is held and not refused.
+      // A waiting row whose proof envelope was refused, or is gone, can never be checked: it is
+      // removed here and releases its slot, as a pending row is (04 §3.4, M1-7g-f).
+      const waiting: Row<'proofs'>[] = [];
       let mine = 0;
-      for (const r of waiting) {
-        if (!r.record_id.startsWith(AWAITING_PREFIX)) continue;
-        const proofEnvelope = tx.get('envelopes', {
-          envelope_id: r.record_id.slice(AWAITING_PREFIX.length),
-        });
-        if (proofEnvelope?.state === 'ok' && proofEnvelope.contact_id === contactId) mine += 1;
+      for (const r of tx.select('proofs', { status: AWAITING })) {
+        const proofEnvelope = r.record_id.startsWith(AWAITING_PREFIX)
+          ? tx.get('envelopes', { envelope_id: r.record_id.slice(AWAITING_PREFIX.length) })
+          : undefined;
+        if (proofEnvelope?.state !== 'ok') {
+          tx.delete('proofs', { record_id: r.record_id, status: AWAITING });
+          continue;
+        }
+        waiting.push(r);
+        // The contact's share: a waiting row belongs to the contact of its proof envelope.
+        if (proofEnvelope.contact_id === contactId) mine += 1;
       }
+      if (waiting.length >= MAX_AWAITING) return 'full';
       if (mine >= PROOF_AWAITING_PER_CONTACT) return 'full';
       tx.insert('proofs', {
         record_id: key,
