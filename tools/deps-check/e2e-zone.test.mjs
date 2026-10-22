@@ -100,7 +100,12 @@ describe('deps-check repository scan covers e2e/', () => {
     expect(problems.join('\n')).toMatch(/leaves e2e/);
   });
 
-  it('reports the real repository clean', () => {
+  // The same whole-repository scan as policy.test.mjs ('passes every boundary check'): its cost is
+  // TypeScript parsing (CPU, synchronous), about 0.7 s locally for ~750 files, with nothing wasted
+  // (one git listing, each file read and parsed once). On CI the Unit tests step runs every
+  // package's tests at once; there this file took 52 s and this test exceeded 20 s twice. Same
+  // assertion, the 120 s timeout policy.test.mjs already uses for the scan.
+  it('reports the real repository clean', { timeout: 120_000 }, () => {
     expect(runChecks(REPO).problems).toEqual([]);
   });
 });
