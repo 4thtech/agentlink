@@ -58,6 +58,9 @@ jobs:
       needs_playwright: ${{ steps.detect.outputs.needs_playwright }}
       e2e_relevant: ${{ steps.e2e_scope.outputs.e2e_relevant }}
       code_changed: ${{ steps.e2e_scope.outputs.e2e_relevant }}
+      test_scope: ${{ steps.affected.outputs.test_scope || 'full' }}
+      turbo_filters: ${{ steps.affected.outputs.turbo_filters }}
+      affected_playwright: ${{ steps.affected.outputs.needs_playwright || 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -167,6 +170,37 @@ jobs:
           # with any file outside the docs set, or an unreadable diff, runs everything.
           echo "Deterministic e2e needed: $relevant"
 
+      # CHORE-CI-SPEED-2: a pull request lints, typechecks, builds and tests only the packages it
+      # touches, their dependents, and the packages whose tests read a changed doc
+      # (tools/ci/select-affected.mjs, rules in docs/process/ci-cd.md "What runs where"). The merge
+      # queue and every push run the full suite and never reach the selector. A change under
+      # `.github/` or `tools/` (the selector itself) runs everything before the selector is read.
+      - name: Select the affected packages (pull requests only)
+        id: affected
+        if: github.event_name == 'pull_request' && steps.detect.outputs.has_skeleton == 'true'
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          list="$RUNNER_TEMP/changed-files.txt"
+          if [[ "$PR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] && git fetch --quiet --no-tags --depth=1 origin "$PR_BASE_SHA" 2> /dev/null \
+            && git diff --no-renames --name-only "$PR_BASE_SHA" HEAD > "$list" 2> /dev/null; then
+            if grep -Eq '^(\.github|tools)/' "$list"; then
+              echo "test_scope=full" >> "$GITHUB_OUTPUT"
+              echo "Full suite: the change touches .github/ or tools/"
+              exit 0
+            fi
+            # The selector writes its outputs in one append at the end, so a crash leaves none.
+            if ! node tools/ci/select-affected.mjs "$list"; then
+              echo "::warning::The affected-package selector failed; running the full suite."
+              echo "test_scope=full" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "test_scope=full" >> "$GITHUB_OUTPUT"
+            echo "Full suite: the diff could not be read"
+          fi
+
   checks:
     name: checks
     needs: detect
@@ -192,31 +226,70 @@ jobs:
 
       # Package tests that run in browsers (Playwright) need the engines (M1-2c).
       - name: Install Playwright browsers
-        if: needs.detect.outputs.needs_playwright == 'true'
+        if: needs.detect.outputs.needs_playwright == 'true' && needs.detect.outputs.affected_playwright == 'true'
         run: pnpm exec playwright install --with-deps chromium firefox webkit
 
       # Task ordering and caching are turbo's job; the root scripts call `turbo run ...`.
+      # CHORE-CI-SPEED-2: TEST_SCOPE is `full` everywhere except a pull request whose selection
+      # (detect, step `affected`) is narrower; then the same turbo tasks run with one --filter per
+      # selected package (names checked against ^@4thtech-io/[a-z0-9-]+$ by the selector).
       - name: Lint
         if: needs.detect.outputs.has_lint == 'true'
-        run: pnpm lint
+        env:
+          TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
+          TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+        run: |
+          if [ "$TEST_SCOPE" = filtered ]; then
+            # shellcheck disable=SC2086 # one word per --filter
+            pnpm exec turbo run lint check $TURBO_FILTERS && pnpm exec prettier --check .
+          else
+            pnpm lint
+          fi
 
       - name: Typecheck
         if: needs.detect.outputs.has_typecheck == 'true'
-        run: pnpm typecheck
+        env:
+          TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
+          TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+        run: |
+          if [ "$TEST_SCOPE" = filtered ]; then
+            # shellcheck disable=SC2086 # one word per --filter
+            pnpm exec turbo run typecheck $TURBO_FILTERS
+          else
+            pnpm typecheck
+          fi
 
       - name: Build
         if: needs.detect.outputs.has_build == 'true'
-        run: pnpm build
+        env:
+          TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
+          TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+        run: |
+          if [ "$TEST_SCOPE" = filtered ]; then
+            # shellcheck disable=SC2086 # one word per --filter
+            pnpm exec turbo run build $TURBO_FILTERS
+          else
+            pnpm build
+          fi
 
       - name: Unit tests
         if: needs.detect.outputs.has_test == 'true'
-        run: pnpm test
+        env:
+          TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
+          TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+        run: |
+          if [ "$TEST_SCOPE" = filtered ]; then
+            # shellcheck disable=SC2086 # one word per --filter
+            pnpm exec turbo run test $TURBO_FILTERS
+          else
+            pnpm test
+          fi
 
       # Named so the MCP conformance gate (06 §9, M1-9e) is visible in the CI log: the tool-surface
       # snapshot and rules, and an MCP SDK client validating every tool over real stdio. Both also run
       # inside `pnpm test` above; this step repeats them on purpose (about a second).
       - name: MCP tool surface and conformance
-        if: needs.detect.outputs.has_test == 'true'
+        if: needs.detect.outputs.has_test == 'true' && (needs.detect.outputs.test_scope != 'filtered' || contains(needs.detect.outputs.turbo_filters, '--filter=@4thtech-io/agentlink'))
         run: pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
 
   vectors:

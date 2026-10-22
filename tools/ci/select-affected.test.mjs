@@ -11,8 +11,20 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const fake = [
   { name: '@4thtech-io/types', dir: 'packages/types', deps: [], refs: [], playwright: true },
   { name: '@4thtech-io/crypto', dir: 'packages/crypto', deps: [], refs: [], playwright: false },
-  { name: '@4thtech-io/core', dir: 'packages/core', deps: ['@4thtech-io/crypto'], refs: [], playwright: false },
-  { name: '@4thtech-io/chain', dir: 'packages/chain', deps: ['@4thtech-io/types'], refs: [], playwright: false },
+  {
+    name: '@4thtech-io/core',
+    dir: 'packages/core',
+    deps: ['@4thtech-io/crypto'],
+    refs: [],
+    playwright: false,
+  },
+  {
+    name: '@4thtech-io/chain',
+    dir: 'packages/chain',
+    deps: ['@4thtech-io/types'],
+    refs: [],
+    playwright: false,
+  },
   { name: '@4thtech-io/log', dir: 'packages/log', deps: [], refs: [], playwright: false },
   {
     name: '@4thtech-io/ui',
@@ -95,7 +107,10 @@ describe('selectAffected: package changes select the package and its dependents'
   });
 
   it('a package README counts as that package', () => {
-    expect(sel(['apps/cli/README.md']).packages).toEqual(['@4thtech-io/agentlink', '@4thtech-io/tools']);
+    expect(sel(['apps/cli/README.md']).packages).toEqual([
+      '@4thtech-io/agentlink',
+      '@4thtech-io/tools',
+    ]);
   });
 
   it('a package whose sources name a changed path is selected too', () => {
@@ -132,7 +147,9 @@ describe('selectAffected: docs-only changes run only the docs checks', () => {
   });
 
   it('changeset notes and knowledge files are docs', () => {
-    expect(sel(['.changeset/brave-fox.md', 'knowledge/x.md']).packages).toEqual(['@4thtech-io/tools']);
+    expect(sel(['.changeset/brave-fox.md', 'knowledge/x.md']).packages).toEqual([
+      '@4thtech-io/tools',
+    ]);
   });
 });
 
@@ -155,12 +172,18 @@ describe('the real workspace', () => {
 
   it('finds every workspace package with its internal dependencies', () => {
     const names = ws.map((p) => p.name);
-    expect(names).toEqual(expect.arrayContaining(['@4thtech-io/tools', '@4thtech-io/core', '@4thtech-io/agentlink']));
+    expect(names).toEqual(
+      expect.arrayContaining(['@4thtech-io/tools', '@4thtech-io/core', '@4thtech-io/agentlink']),
+    );
     expect(ws.find((p) => p.name === '@4thtech-io/core').deps).toContain('@4thtech-io/storage');
   });
 
   it('a shared package change runs everything', () => {
-    for (const f of ['packages/types/src/x.ts', 'packages/crypto/src/x.ts', 'packages/core/src/x.ts']) {
+    for (const f of [
+      'packages/types/src/x.ts',
+      'packages/crypto/src/x.ts',
+      'packages/core/src/x.ts',
+    ]) {
       expect(real([f]).scope).toBe('full');
     }
   });
