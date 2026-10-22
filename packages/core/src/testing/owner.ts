@@ -1,12 +1,16 @@
-// Test doubles for owner actions and the policy-version mark (M1-7d). Not part of the build
-// (tsconfig.json excludes src/testing).
+// Test doubles for owner actions, the policy-version mark (M1-7d) and the own-storage items
+// (M1-9i-a). Not part of the build (tsconfig.json excludes src/testing).
 import {
+  credentialDigest,
   encodeBase64url,
   encodeHex,
+  encodeUtf8,
   randomBytes,
   type JsonObject,
   type OwnerKeyStore,
+  type StorageCredentialItemFields,
 } from '@4thtech-io/crypto';
+import { encodeStorageMark, type OwnStorageKeys } from '../own-storage.js';
 import type { PolicyVersionMark } from '../owner-actions.js';
 import { passphrase } from './fixtures.js';
 
@@ -76,5 +80,53 @@ export async function signWith(owner: OwnerKeyStore, body: JsonObject): Promise<
     return { body, sig: await session.signOwnerAction(body) };
   } finally {
     await session.close();
+  }
+}
+
+/** A recognisable S3 secret: it must never reach a log line, a row or an error (I-7). */
+export const S3_SECRET_CANARY = 'S3-SECRET-CANARY-c0ffee';
+
+/**
+ * The own-storage KeyStore items in memory (04 §2.2: `storage-mark` and `s3:<id>`; M1-9i-a). The
+ * real ones are KeyStore items the Node backends implement (M1-9i-c); this one keeps the item bytes,
+ * records the mark writes and can be made to fail. `connect` writes an `s3:<id>` item as the
+ * StorageCredentialControl would and returns its credentialDigest.
+ */
+export class MemoryOwnStorageKeys implements OwnStorageKeys {
+  mark: Uint8Array | null = null;
+  /** The `s3:<id>` items, as their fields (the real item is their canonical JCS bytes). */
+  readonly items = new Map<string, StorageCredentialItemFields>();
+  failRead = false;
+  failWrite = false;
+  failDigest = false;
+  readonly writes: (string | null)[] = [];
+
+  readMark(): Promise<Uint8Array | null> {
+    if (this.failRead) return Promise.reject(new Error('mark unreadable'));
+    return Promise.resolve(this.mark === null ? null : this.mark.slice());
+  }
+
+  writeMark(active: string | null): Promise<void> {
+    if (this.failWrite) return Promise.reject(new Error('mark not written'));
+    this.writes.push(active);
+    this.mark = encodeStorageMark(active);
+    return Promise.resolve();
+  }
+
+  credentialDigest(id: string): Promise<string | null> {
+    if (this.failDigest) return Promise.reject(new Error('item unreadable'));
+    const item = this.items.get(id);
+    if (item === undefined) return Promise.resolve(null);
+    return Promise.resolve(credentialDigest(item));
+  }
+
+  connect(id: string, accessKeyId = 'AKIATESTKEY', secretAccessKey = S3_SECRET_CANARY): string {
+    const item: StorageCredentialItemFields = {
+      accessKeyId: encodeUtf8(accessKeyId),
+      secretAccessKey: encodeUtf8(secretAccessKey),
+      salt: randomBytes(16),
+    };
+    this.items.set(id, item);
+    return credentialDigest(item);
   }
 }
