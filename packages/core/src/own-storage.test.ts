@@ -92,6 +92,8 @@ const newId = (): string => encodeHex(randomBytes(8));
 const newKitId = (): string => encodeBase64url(randomBytes(16));
 
 interface SignOptions {
+  /** Another owner key, which names itself as `owner` (the seam signs only its own key; a forged
+   * `sig` under the right `owner` is the vectors' `reject-*-other-signer` cases). */
   readonly signer?: MemoryOwnerKeyStore;
   readonly agentId?: string;
   readonly issuedAt?: number;
@@ -104,7 +106,7 @@ async function sign(a: Agent, op: string, params: JsonObject, o: SignOptions = {
   return signWith(o.signer ?? a.owner, {
     v: 1,
     agent: o.agentId ?? a.id,
-    owner: await ownerHex(a.owner),
+    owner: await ownerHex(o.signer ?? a.owner),
     op,
     params,
     nonce: o.nonce ?? encodeBase64url(randomBytes(16)),
@@ -200,7 +202,7 @@ describe('storage.set (04 §2.5.1; 07 §3.4)', () => {
     const keys = a.keys as MemoryOwnStorageKeys;
     const stranger = new MemoryOwnerKeyStore(seed(199), passphrase());
     const cases: [SignOptions, string][] = [
-      [{ signer: stranger }, 'signature_invalid'],
+      [{ signer: stranger }, 'owner_mismatch'],
       [{ agentId: `0x${'1a'.repeat(20)}` }, 'agent_mismatch'],
       [{ life: 601 }, 'lifetime_exceeded'],
       [{ issuedAt: START - 700 }, 'expired'],
@@ -307,7 +309,7 @@ describe('storage.remove (04 §2.5.1)', () => {
     const stranger = new MemoryOwnerKeyStore(seed(198), passphrase());
     for (const [over, reason] of [
       [{ life: 601 }, 'lifetime_exceeded'],
-      [{ signer: stranger }, 'signature_invalid'],
+      [{ signer: stranger }, 'owner_mismatch'],
     ] as const) {
       expect(
         await a.client.ownerActions.apply(
@@ -346,7 +348,7 @@ describe('backup.export (04 §2.5.1, §2.3.3)', () => {
     const stranger = new MemoryOwnerKeyStore(seed(197), passphrase());
     for (const [over, reason] of [
       [{ life: 601 }, 'lifetime_exceeded'],
-      [{ signer: stranger }, 'signature_invalid'],
+      [{ signer: stranger }, 'owner_mismatch'],
     ] as const) {
       expect(
         await a.client.ownerActions.apply(
@@ -388,7 +390,11 @@ describe('ownStorage.load() (07 §3.4; 04 §2.5.1 "Stored objects are re-verifie
   it('a tampered row reads broken, and is not repaired', async () => {
     const a = await agent();
     const id = await connect(a);
-    const context = { table: 'own_storage' as const, column: 'signed_json', rowKey: rowKeyOf([id]) };
+    const context = {
+      table: 'own_storage' as const,
+      column: 'signed_json',
+      rowKey: rowKeyOf([id]),
+    };
     const row = (await rows(a))[0];
     const text = await a.cipher.open(context, row?.signed_json as Sealed);
     const edited = text.replace(BUCKET, 'attacker-bucket');
@@ -503,7 +509,10 @@ describe('ownStorage.load() (07 §3.4; 04 §2.5.1 "Stored objects are re-verifie
     const other = newId();
     const row = (await rows(a))[0];
     const context = { table: 'own_storage' as const, column: 'signed_json' };
-    const text = await a.cipher.open({ ...context, rowKey: rowKeyOf([id]) }, row?.signed_json as Sealed);
+    const text = await a.cipher.open(
+      { ...context, rowKey: rowKeyOf([id]) },
+      row?.signed_json as Sealed,
+    );
     const resealed = await a.cipher.seal({ ...context, rowKey: rowKeyOf([other]) }, text);
     await a.store.transaction((tx) => {
       tx.delete('own_storage', {});
@@ -520,14 +529,21 @@ describe('ownStorage.load() (07 §3.4; 04 §2.5.1 "Stored objects are re-verifie
     // b's storage.set, moved into a's store with a's own mark and item.
     const id = await connect(b);
     const row = (await rows(b))[0];
-    const context = { table: 'own_storage' as const, column: 'signed_json', rowKey: rowKeyOf([id]) };
+    const context = {
+      table: 'own_storage' as const,
+      column: 'signed_json',
+      rowKey: rowKeyOf([id]),
+    };
     const text = await b.cipher.open(context, row?.signed_json as Sealed);
     const sealed = await a.cipher.seal(context, text);
     await a.store.transaction((tx) =>
       tx.insert('own_storage', { id, signed_json: sealed, applied_at: START }),
     );
     (a.keys as MemoryOwnStorageKeys).mark = encodeStorageMark(id);
-    (a.keys as MemoryOwnStorageKeys).items.set(id, b.keys?.items.get(id) as StorageCredentialItemFields);
+    (a.keys as MemoryOwnStorageKeys).items.set(
+      id,
+      b.keys?.items.get(id) as StorageCredentialItemFields,
+    );
     expect(await a.client.ownStorage.load()).toMatchObject({ state: 'broken' });
   });
 

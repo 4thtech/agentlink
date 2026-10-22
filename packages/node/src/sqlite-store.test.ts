@@ -641,7 +641,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
       )
       .run();
     raw.close();
-    // Opening runs versions 2, 3 (M1-7k-b, new tables only) and 4 (M1-1g-i, a nullable column).
+    // Opening runs versions 2, 3 (M1-7k-b, new tables only), 4 (M1-1g-i, a nullable column) and 5
+    // (M1-9i-a, a new table).
     const v2 = await SqliteStore.open(path());
     expect(v2.schemaVersion).toBe(5);
     expect(await v2.transaction((tx) => tx.get('envelopes', { envelope_id: 'e1' }))).toMatchObject({
@@ -685,7 +686,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const error = await rejects(SqliteStore.open(path()));
     expect((error as NodeStoreError).code).toBe('store_too_new');
     const raw = new Database(path(), { readonly: true });
-    expect(raw.pragma('user_version', { simple: true })).toBe(5);
+    expect(raw.pragma('user_version', { simple: true })).toBe(6);
     raw.close();
   });
 
