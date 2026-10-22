@@ -509,14 +509,15 @@ describe('confirmation', () => {
 describe('an existing agent', () => {
   it('is reused, never replaced, so init can add another harness later', async () => {
     await mkdir(join(home, '.codex'));
-    // A named agent: without --agent, M1-36b (D5) names a lone app's agent after the app.
-    const first = await init(['--agent', 'work']);
-    await init(['--agent', 'work', '--confirm', codeOf(first)]);
+    const first = await init([]);
+    await init(['--confirm', codeOf(first)]);
     const env = await geminiOnPath();
-    const second = await init(['--agent', 'work'], { terminal: { ...PIPE, env } });
+    const second = await init([], { terminal: { ...PIPE, env } });
     expect(second.out).not.toContain(INIT_TEXT.identity);
-    await init(['--agent', 'work', '--confirm', codeOf(second)], { terminal: { ...PIPE, env } });
-    expect((await readAgentConfig(home, 'work'))?.config.agentId).toBe(AGENT_ID);
+    await init(['--confirm', codeOf(second)], { terminal: { ...PIPE, env } });
+    // M1-36b (D5): the first run named the agent after Codex; the second run reuses it.
+    expect((await readAgentConfig(home, 'codex'))?.config.agentId).toBe(AGENT_ID);
+    expect(await readAgentConfig(home, 'default')).toBeUndefined();
     expect(await exists('.gemini', 'settings.json')).toBe(true);
   });
 });

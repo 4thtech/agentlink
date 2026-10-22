@@ -2,11 +2,11 @@
 // this computer (never without a yes; npx stays the fallback), agents named after their app (the
 // name can still be given), and each app's change shown together with its question (UX-B F9).
 // The keychain and the install are doubles; the files are real, in a temporary home folder.
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { EXIT_OK, createDispatcher, type DispatchIO } from '../dispatch.js';
+import { EXIT_OK, EXIT_USAGE, createDispatcher, type DispatchIO } from '../dispatch.js';
 import { readAgentConfig } from '../runtime/index.js';
 import type { TerminalContext } from '../runtime/guards.js';
 import { copy } from '../tools/strings/index.js';
@@ -84,6 +84,8 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
   const code = await dispatch(['init', ...argv], io);
   return { code, out: out.join('\n'), err: err.join('\n'), asked, installs };
 }
+
+const withApp = (text: string, appName: string): string => text.replaceAll('{appName}', appName);
 
 function codeOf(run: Run): string {
   const match = /--confirm ([0-9a-f]{4}-[0-9a-f]{4})/.exec(run.out);
@@ -257,6 +259,49 @@ describe('D5: agents are named after their app', () => {
     const plan = await init([]);
     expect(plan.out).not.toContain('--agent');
     expect(plan.out).not.toContain(INIT_TEXT.identity);
+  });
+
+  it('IR-M1-36b-1 probe: Codex first, then Gemini, keeps one agent and Codex untouched', async () => {
+    await mkdir(join(home, '.codex'));
+    const first = await init([]);
+    await init(['--confirm', codeOf(first)]);
+    const codexBefore = await readFile(join(home, '.codex', 'config.toml'), 'utf8');
+    const env = await geminiOnPath();
+    const second = await init([], { terminal: { ...PIPE, env } });
+    expect(second.out).not.toContain(INIT_TEXT.identity);
+    expect(second.out).not.toContain('Codex already has an entry');
+    expect(second.out).toContain(withApp(INIT_TEXT.present, 'Codex'));
+    const run = await init(['--confirm', codeOf(second)], { terminal: { ...PIPE, env } });
+    expect(run.code).toBe(EXIT_OK);
+    expect(await readAgentConfig(home, 'default')).toBeUndefined();
+    expect(await readFile(join(home, '.codex', 'config.toml'), 'utf8')).toBe(codexBefore);
+    expect(
+      JSON.parse(await readFile(join(home, '.gemini', 'settings.json'), 'utf8')).mcpServers
+        .agentlink.args,
+    ).toEqual(['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'codex']);
+  });
+
+  it('the only agent is reused for another single app, never a second one', async () => {
+    await mkdir(join(home, '.codex'));
+    const first = await init([]);
+    await init(['--confirm', codeOf(first)]);
+    const plan = await init(['--harness', 'opencode']);
+    expect(plan.out).not.toContain(INIT_TEXT.identity);
+    expect(plan.out).toContain('--agent codex');
+  });
+
+  it('several agents and no --agent: refuses with fixed text, creates nothing', async () => {
+    for (const name of ['one', 'two']) {
+      const plan = await init(['--agent', name, '--harness', 'none']);
+      await init(['--agent', name, '--harness', 'none', '--confirm', codeOf(plan)]);
+    }
+    await mkdir(join(home, '.codex'));
+    const run = await init([]);
+    expect(run.code).toBe(EXIT_USAGE);
+    expect(run.err).toContain(INIT_TEXT.chooseAgent.replaceAll('{prefix}', NPX));
+    expect(run.err).not.toMatch(/\bone\b|\btwo\b/);
+    expect(await readAgentConfig(home, 'codex')).toBeUndefined();
+    expect(await readAgentConfig(home, 'default')).toBeUndefined();
   });
 
   it('every app name is a valid agent name', async () => {
