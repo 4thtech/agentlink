@@ -1,7 +1,5 @@
 // M1-35c: the shipped English strings. Vocabulary lint (11 §5.1), key coverage in both directions,
 // the 11 §5.6 disclosure lines, and the DESIGN-ADJ-1 (a) copy items.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { en, formatMessage, pendingStrings, t } from './index.js';
 
@@ -39,6 +37,8 @@ const BANNED: [string, RegExp][] = [
 const EXEMPT: Record<string, string[]> = {
   // Reassures that invites never ask for a password; it does not name one of our codes (11 §5.5).
   'invite.noPasswords': ['password'],
+  // A literal terminal command that names its flag (keystore is terminal only, 11 §5.1, D-54).
+  'chat.status.needs_setup.keychain': ['keystore'],
 };
 
 const prefixOf = (key: string): string => key.split('.')[0] ?? '';
@@ -73,8 +73,24 @@ describe('vocabulary lint (11 §5.1)', () => {
 
 describe('key hygiene (11 §5.4)', () => {
   const PREFIXES = new Set([
-    'chat', 'cli', 'local', 'desktop', 'os', 'console', 'cloud', 'verify', 'print',
-    'invite', 'accept', 'onboarding', 'pay', 'pricing', 'site', 'common', 'advanced', 'devconfig',
+    'chat',
+    'cli',
+    'local',
+    'desktop',
+    'os',
+    'console',
+    'cloud',
+    'verify',
+    'print',
+    'invite',
+    'accept',
+    'onboarding',
+    'pay',
+    'pricing',
+    'site',
+    'common',
+    'advanced',
+    'devconfig',
   ]);
 
   it('uses the 11 §5.4 surface prefixes', () => {
@@ -89,20 +105,27 @@ describe('key hygiene (11 §5.4)', () => {
 
   // Source files outside this folder that reference keys. Components (M1-35b) and the building
   // cards add references over time.
-  const srcRoot = resolve(import.meta.dirname, '..');
-  const REF = /['"`]((?:common|chat|cli|os|local|desktop|console|cloud|verify|print|invite|accept|onboarding|pay|pricing|site|advanced|devconfig)\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)['"`]/g;
-  const walk = (dir: string): string[] =>
-    readdirSync(dir).flatMap((name) => {
-      const p = join(dir, name);
-      if (statSync(p).isDirectory()) return p === join(srcRoot, 'strings') ? [] : walk(p);
-      return /\.(ts|tsx)$/.test(name) && !/\.test\.ts$/.test(name) && !/\.fixture\.ts$/.test(name)
-        ? [p]
-        : [];
-    });
+  // The ui zone allows no Node built-ins, so the sources are read through Vite.
+  const sources = import.meta.glob(
+    [
+      '../**/*.{ts,tsx}',
+      '!../**/*.test.ts',
+      '!../**/*.fixture.ts',
+      '!../**/*.d.ts',
+      '!../strings/**',
+    ],
+    { query: '?raw', import: 'default', eager: true },
+  );
+  const REF =
+    /['"`]((?:common|chat|cli|os|local|desktop|console|cloud|verify|print|invite|accept|onboarding|pay|pricing|site|advanced|devconfig)\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)['"`]/g;
   const referenced = new Map<string, string>();
-  for (const f of walk(srcRoot)) {
-    for (const m of readFileSync(f, 'utf8').matchAll(REF)) referenced.set(m[1]!, relative(srcRoot, f));
+  for (const [file, text] of Object.entries(sources)) {
+    for (const m of text.matchAll(REF)) referenced.set(m[1]!, file);
   }
+
+  it('scans the package sources', () => {
+    expect(Object.keys(sources).length).toBeGreaterThan(0);
+  });
 
   it('every key a component references exists', () => {
     const missing = [...referenced].filter(([k]) => !(k in en));
@@ -112,8 +135,23 @@ describe('key hygiene (11 §5.4)', () => {
   // Surfaces whose building card has not landed yet may hold keys nothing references. An entry here
   // leaves the list when its card references the keys. A stale entry fails the test below.
   const NOT_YET_USED = [
-    'common.', 'chat.', 'cli.', 'os.', 'local.', 'desktop.', 'console.', 'cloud.', 'verify.',
-    'print.', 'invite.', 'accept.', 'onboarding.', 'pay.', 'pricing.', 'advanced.', 'devconfig.',
+    'common.',
+    'chat.',
+    'cli.',
+    'os.',
+    'local.',
+    'desktop.',
+    'console.',
+    'cloud.',
+    'verify.',
+    'print.',
+    'invite.',
+    'accept.',
+    'onboarding.',
+    'pay.',
+    'pricing.',
+    'advanced.',
+    'devconfig.',
   ];
 
   it('has no unused key outside the surfaces still waiting for their card', () => {
@@ -125,7 +163,10 @@ describe('key hygiene (11 §5.4)', () => {
 
   it('keeps the waiting list honest', () => {
     for (const p of NOT_YET_USED) {
-      expect(Object.keys(en).some((k) => k.startsWith(p)), p).toBe(true);
+      expect(
+        Object.keys(en).some((k) => k.startsWith(p)),
+        p,
+      ).toBe(true);
     }
   });
 });
@@ -210,7 +251,7 @@ describe('DESIGN-ADJ-1 (a) copy items', () => {
 
   it('uses the full config args and the package scope (X-9)', () => {
     expect(en['devconfig.args']).toBe('["-y", "@4thtech-io/agentlink", "mcp"]');
-    expect(en['devconfig.args.agent']).toContain('--agent {agentName}');
+    expect(en['devconfig.args.agent']).toContain('"--agent", "{agentName}"');
     expect(en['onboarding.paste.prompt']).toContain('npx -y @4thtech-io/agentlink init');
     for (const [, v] of strings) expect(v).not.toMatch(/@4thtech\/|@4thtech\b(?!-io)/);
   });
