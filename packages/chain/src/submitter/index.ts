@@ -24,10 +24,12 @@ export {
 export { itemSignatureMatches } from './signature.js';
 export { SUBMITTER_RPC_METHODS } from './rpc.js';
 export {
+  MAX_RECEIPTS_PER_RECORD,
   batchCalldata,
   createSubmitterChain,
   type BatchSimulation,
   type ItemSimulation,
+  type RecordReceipts,
   type SubmitterChain,
   type SendOptions,
   type SubmitterChainOptions,
