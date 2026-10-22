@@ -46,6 +46,9 @@ export function topUpUrl(agentId: string): string | undefined {
 export const PROOF_TEXT = Object.freeze({
   recorded: 'Proof recorded. {fee} from credits.',
   recordedNoFee: 'Proof recorded.',
+  // M1-33d-b: `requestReceipt` on a message that already had proof. Fixed text, no slot (I-5).
+  receiptRequestNotAdded:
+    'This message already had proof, so no delivery confirmation was asked for.',
   recording: 'The proof is being recorded; this usually takes under a minute.',
   recordingNextStep:
     'Call agentlink_get_proof with this envelopeId in a minute to check that it was recorded.',
@@ -242,11 +245,19 @@ export function notarizeOutput(
   const disclosure = proofDisclosure(options.contactName);
   // M1-33d (06 §2.4, 11 §5.6): a proof that asks for a delivery receipt always says what the
   // receipt makes public; any other proof says it the first time in a session.
-  const disclose = (text: string): string =>
-    firstProofOfSession(context) ||
-    ((result.status === 'ok' || result.status === 'submitted') && result.receiptRequested === true)
+  const recorded = result.status === 'ok' || result.status === 'submitted';
+  // M1-33d-b: a request on a message that already had proof was not added; the result says so in
+  // a field and a fixed line, so the agent cannot claim it asked.
+  const notAdded = recorded && result.receiptRequestNotAdded === true;
+  // Nothing new was recorded or asked then, so that result has the not-added line instead of the
+  // disclosure (and leaves the session's first-proof disclosure for the next proof).
+  const disclose = (text: string): string => {
+    if (notAdded) return `${text} ${PROOF_TEXT.receiptRequestNotAdded}`;
+    return firstProofOfSession(context) || (recorded && result.receiptRequested === true)
       ? withDisclosure(text, disclosure)
       : text;
+  };
+  const notAddedField = notAdded ? { receiptRequestNotAdded: true } : {};
   switch (result.status) {
     case 'ok': {
       const fee = dollars(result.fee.usd);
@@ -255,6 +266,7 @@ export function notarizeOutput(
       return ok(disclose(text), {
         ...fields,
         ...proofFields(result),
+        ...notAddedField,
       });
     }
     case 'submitted':
@@ -263,7 +275,7 @@ export function notarizeOutput(
         disclose(PROOF_TEXT.recording),
         PROOF_TEXT.recordingNextStep,
         undefined,
-        { ...fields, ...proofFields(result) },
+        { ...fields, ...proofFields(result), ...notAddedField },
       );
     case 'needs_credits':
       return needsCredits(agentId, result.topUp, {

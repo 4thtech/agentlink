@@ -234,6 +234,7 @@ type ProofStatus = {
   fee?: { token: `0x${string}`; amount: string; usd: string; protocolUsd: string; integratorUsd: string };
   receipts: { type: "DELIVERED" | "OPENED" | "ACCEPTED" | "REJECTED"; at: string }[];
   explorerUrl?: string; verifyUrl?: string;
+  receiptRequestNotAdded?: true;          // M1-33d-b (proposed, owner confirms at merge): requestReceipt on an envelope that already had a proof without one; no request was added, and the summary says so
 };
 ```
 
