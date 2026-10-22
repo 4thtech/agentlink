@@ -34,6 +34,11 @@ export type ChainErrorCode =
   | 'signer_mismatch'
   /** Direct mode: the account cannot pay the gas for the call. Nothing was signed. */
   | 'no_gas'
+  /**
+   * Direct mode (M1-4c-b): the KeyStore refused to sign the transaction (not one direct mode may
+   * send on this chain). Nothing was signed or sent.
+   */
+  | 'signing_refused'
   /** A sent transaction reverted on-chain. */
   | 'tx_reverted'
   /** A sent transaction was not included within the wait. */
@@ -51,6 +56,7 @@ const MESSAGES: Record<ChainErrorCode, string> = {
   bad_answer: 'The chain returned an answer that does not add up.',
   signer_mismatch: 'The signed transaction does not match the contract call.',
   no_gas: 'The account cannot pay the chain fee for this contract call.',
+  signing_refused: 'The account key refused to sign this contract call.',
   tx_reverted: 'The contract refused the transaction.',
   tx_not_included: 'The transaction was not included on the chain in time.',
   rpc_failed: 'The chain request failed.',

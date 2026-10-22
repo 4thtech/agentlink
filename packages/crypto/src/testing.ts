@@ -324,6 +324,8 @@ const epochUnavailable = (): KeyStoreError =>
  */
 interface KeyStoreState {
   readonly seed: Uint8Array;
+  /** The agent's EVM address (agentId, 04 §2.9): public, so policy checks need no seed read. */
+  readonly agentId: string;
   epoch: number;
   closed: boolean;
 }
@@ -348,8 +350,10 @@ export class MemoryKeyStore implements KeyStore {
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
     const keyEpoch = options.keyEpoch ?? 0;
     assertEpoch(keyEpoch);
+    const seed = copySeed(masterSeed, 'MemoryKeyStore: the master seed');
     this.#state = {
-      seed: copySeed(masterSeed, 'MemoryKeyStore: the master seed'),
+      seed,
+      agentId: deriveAgentId(seed),
       epoch: keyEpoch,
       closed: false,
     };
@@ -436,6 +440,17 @@ export class MemoryKeyStore implements KeyStore {
         signTypedData(typedData, secretKey),
       ),
     );
+  }
+
+  signTransaction(tx: DirectTransaction): Promise<string> {
+    // M1-4c-b: checked against the direct-mode rules before the seed is used; the EVM key is
+    // always epoch 0 (04 §2.1).
+    return Promise.resolve().then(() => {
+      const snapshot = directTransactionSnapshot(tx, this.#state.agentId);
+      return withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
+        signDirectTransaction(secretKey, snapshot, this.#state.agentId),
+      );
+    });
   }
 
   signCardPop(card: AgentCard): Promise<string> {
@@ -1326,7 +1341,11 @@ function runConformanceSignTransaction(
           ['Ethereum mainnet', conformanceTx({ chainId: 1 }), 'chain_not_allowed'],
           ['Gnosis mainnet', conformanceTx({ chainId: 100 }), 'chain_not_allowed'],
           ['Base mainnet', conformanceTx({ chainId: 8453 }), 'chain_not_allowed'],
-          ['a destination that is not an AgentLink contract', conformanceTx({ to: other }), 'destination_not_allowed'],
+          [
+            'a destination that is not an AgentLink contract',
+            conformanceTx({ to: other }),
+            'destination_not_allowed',
+          ],
           ['contract creation', conformanceTx({ to: null }), 'contract_creation'],
           ['a legacy transaction', conformanceTx({ type: 'legacy' }), 'not_eip1559'],
           [

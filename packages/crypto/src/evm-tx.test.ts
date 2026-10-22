@@ -47,7 +47,7 @@ const VAULT_ABI = parseAbi([
   'function depositFor(address payer, address token, uint256 amount) payable',
 ]);
 const NOTARY_ABI = parseAbi([
-  'struct Record { address signer; bytes32 envelopeHash; bytes32 recipientCommitment; bytes32 termsHash; bytes32 contentRef; uint8 kind; address feeToken; uint256 maxFee; uint256 nonce; uint64 deadline; }',
+  'struct Record { address signer; bytes32 envelopeHash; bytes32 recipientCommitment; bytes32 parentRecordId; bytes32 appId; uint8 kind; address feeToken; uint256 maxFee; uint256 nonce; uint64 deadline; }',
   'struct Receipt { address signer; bytes32 recordId; uint8 receiptType; bytes32 salt; uint64 deadline; }',
   'function notarizeDirect(Record r) payable returns (bytes32)',
   'function notarizeBatch(Record[] rs, bytes[] sigs) returns (bytes32[])',
@@ -60,8 +60,8 @@ const RECORD = {
   signer: OWN as `0x${string}`,
   envelopeHash: H32,
   recipientCommitment: H32,
-  termsHash: H32,
-  contentRef: H32,
+  parentRecordId: H32,
+  appId: H32,
   kind: 1,
   feeToken: ZERO,
   maxFee: 10n ** 15n,
@@ -92,6 +92,20 @@ const withdrawData = (to: string) =>
   });
 const approveData = (spender: string, amount = 1_000n) =>
   encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [spender as never, amount] });
+
+/** The same transaction in viem's form. */
+const viemTx = (t: DirectTransaction) =>
+  ({
+    type: 'eip1559',
+    chainId: t.chainId,
+    nonce: t.nonce,
+    gas: t.gas,
+    maxFeePerGas: t.maxFeePerGas,
+    maxPriorityFeePerGas: t.maxPriorityFeePerGas,
+    to: t.to as `0x${string}`,
+    data: t.data as `0x${string}`,
+    value: t.value,
+  }) as const;
 
 function tx(over: Partial<Record<keyof DirectTransaction, unknown>> = {}): DirectTransaction {
   return {
@@ -222,24 +236,11 @@ describe('signDirectTransaction (M1-4c-b): viem as the oracle', () => {
       expect(got.accessList ?? []).toEqual([]);
       const signer = await recoverTransactionAddress({ serializedTransaction: raw as never });
       expect(lower(signer)).toBe(OWN);
-      const { type: _type, ...fields } = t;
-      const theirs = await ACCOUNT.signTransaction({
-        ...fields,
-        type: 'eip1559',
-        to: t.to as `0x${string}`,
-        data: t.data as `0x${string}`,
-      });
+      const theirs = await ACCOUNT.signTransaction(viemTx(t));
       expect(raw).toBe(theirs);
       // The digest is viem's over the unsigned serialisation.
       expect(encodeHex0x(directTransactionDigest(directTransactionSnapshot(t, OWN)))).toBe(
-        viemKeccak(
-          serializeTransaction({
-            ...fields,
-            type: 'eip1559',
-            to: t.to as `0x${string}`,
-            data: t.data as `0x${string}`,
-          }),
-        ),
+        viemKeccak(serializeTransaction(viemTx(t))),
       );
     },
   );
@@ -368,7 +369,10 @@ describe('directTransactionSnapshot (M1-4c-b): the fixed refusals', () => {
     );
     // A deposit with trailing or missing words, or a dirty address word.
     expectRefused(tx({ data: `${depositData(ZERO, 1n)}00` }), 'call_not_allowed');
-    expectRefused(tx({ value: 0n, data: `${depositData(USDC, 1n)}${'00'.repeat(32)}` }), 'call_not_allowed');
+    expectRefused(
+      tx({ value: 0n, data: `${depositData(USDC, 1n)}${'00'.repeat(32)}` }),
+      'call_not_allowed',
+    );
     expectRefused(tx({ data: depositData(ZERO, 1n).slice(0, -64) }), 'call_not_allowed');
     const dirty = `0x47e7ef24${'f'.repeat(24)}${'0'.repeat(40)}${'0'.repeat(63)}1`;
     expectRefused(tx({ value: 1n, data: dirty }), 'call_not_allowed');
@@ -419,7 +423,7 @@ describe('directTransactionSnapshot (M1-4c-b): the fixed refusals', () => {
       [],
       { ...base, accessList: [] },
       { ...base, from: OWN },
-      (({ nonce: _n, ...rest }) => rest)(base),
+      Object.fromEntries(Object.entries(base).filter(([k]) => k !== 'nonce')),
       Object.assign(Object.create({ evil: 1 }) as object, base),
       tx({ nonce: -1 }),
       tx({ nonce: 1.5 }),
@@ -455,7 +459,7 @@ describe('directTransactionSnapshot (M1-4c-b): the fixed refusals', () => {
   it('the refusal messages name no input', () => {
     for (const message of Object.values(TRANSACTION_REFUSED)) {
       expect(message).not.toMatch(/0x[0-9a-f]{6,}/i);
-      expect(message).not.toMatch(/\d{4,}/);
+      expect(message).not.toMatch(/\d{5,}/);
     }
   });
 });

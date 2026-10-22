@@ -72,15 +72,21 @@ describe('direct mode signs through the KeyStore (M1-4c-b)', () => {
       signer: agent,
       envelopeHash: H32,
       recipientCommitment: H32,
-      termsHash: H32,
-      contentRef: H32,
+      parentRecordId: H32,
+      appId: H32,
       kind: 1,
       feeToken: ZERO,
       maxFee: 1_000n,
       nonce: 5n,
       deadline: 1_800_000_000n,
     };
-    const receipt = { signer: agent, recordId: H32, receiptType: 1, salt: H32, deadline: 1_800_000_000n };
+    const receipt = {
+      signer: agent,
+      recordId: H32,
+      receiptType: 1,
+      salt: H32,
+      deadline: 1_800_000_000n,
+    };
     const sig = `0x${'cd'.repeat(65)}`;
     const notary = CHIADO.contracts.notary as Hex;
     const a = await sendDirect(state, direct, {
@@ -133,10 +139,15 @@ describe('direct mode signs through the KeyStore (M1-4c-b)', () => {
     const agent = (await keys.getPublicBundle()).agentId;
     const { direct, sent } = await directMode(keys);
     const { state, simulated } = chain(CHIADO);
-    const out = await sendWithdraw(state, direct, { token: 'NATIVE', amount: 4n }, {
-      pollMs: 1,
-      waitMs: 1,
-    });
+    const out = await sendWithdraw(
+      state,
+      direct,
+      { token: 'NATIVE', amount: 4n },
+      {
+        pollMs: 1,
+        waitMs: 1,
+      },
+    );
     expect(out.txHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(simulated[0]?.args).toEqual([ZERO, 4n, agent]);
     expect(sent).toHaveLength(1);

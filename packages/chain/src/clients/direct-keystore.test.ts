@@ -61,12 +61,16 @@ function fakeKeys(address: Hex = AGENT) {
     signTransaction: vi.fn(async (tx: DirectTransaction) => {
       asked.push(tx);
       const snap = directTransactionSnapshot(tx, address);
-      const { type: _type, ...fields } = snap;
       return ACCOUNT.signTransaction({
-        ...fields,
         type: 'eip1559',
+        chainId: snap.chainId,
+        nonce: snap.nonce,
+        gas: snap.gas,
+        maxFeePerGas: snap.maxFeePerGas,
+        maxPriorityFeePerGas: snap.maxPriorityFeePerGas,
         to: snap.to as ViemHex,
         data: snap.data as ViemHex,
+        value: snap.value,
       });
     }),
   };
@@ -90,7 +94,10 @@ function fakeState(config: ChainConfig) {
   return { state, simulated };
 }
 
-function directOver(config: ChainConfig, keys: Pick<KeyStore, 'getPublicBundle' | 'signTransaction'>) {
+function directOver(
+  config: ChainConfig,
+  keys: Pick<KeyStore, 'getPublicBundle' | 'signTransaction'>,
+) {
   const sent: Hex[] = [];
   return {
     sent,
@@ -129,7 +136,9 @@ describe('keyStoreDirectSigner (M1-4c-b)', () => {
     expect(asked).toHaveLength(1);
     expect(asked[0]).toMatchObject({ type: 'eip1559', chainId: 10200, nonce: 9, value: 5n });
     const raw = d.sent[0] as Hex;
-    expect((await recoverTransactionAddress({ serializedTransaction: raw as never })).toLowerCase()).toBe(AGENT);
+    expect(
+      (await recoverTransactionAddress({ serializedTransaction: raw as never })).toLowerCase(),
+    ).toBe(AGENT);
   });
 
   it('a KeyStore refusal is ChainError signing_refused: nothing is broadcast, no input in the text', async () => {
@@ -223,7 +232,11 @@ describe('buildWithdraw and sendWithdraw (M1-4c-b): the typed withdraw API', () 
     expect(step.value).toBe(0n);
     const call = decodeFunctionData({ abi: FEE_VAULT_CLIENT_ABI, data: step.data });
     expect(call.functionName).toBe('withdraw');
-    expect(call.args).toEqual([ZERO, 7n, AGENT]);
+    expect(call.args.map((a) => (typeof a === 'string' ? a.toLowerCase() : a))).toEqual([
+      ZERO,
+      7n,
+      AGENT,
+    ]);
   });
 
   it('buildWithdraw refuses a bad amount, a malformed recipient and a token not offered', () => {
@@ -236,16 +249,25 @@ describe('buildWithdraw and sendWithdraw (M1-4c-b): the typed withdraw API', () 
     const { keys, asked } = fakeKeys();
     const { state } = fakeState(CHIADO);
     const d = directOver(CHIADO, keys);
-    const out = await sendWithdraw(state, await d.make(), { token: 'NATIVE', amount: 3n }, {
-      pollMs: 1,
-      waitMs: 1,
-    });
+    const out = await sendWithdraw(
+      state,
+      await d.make(),
+      { token: 'NATIVE', amount: 3n },
+      {
+        pollMs: 1,
+        waitMs: 1,
+      },
+    );
     expect(out.txHash).toMatch(/^0x[0-9a-f]{64}$/);
     expect(asked).toHaveLength(1);
     const got = parseTransaction(d.sent[0] as ViemHex);
     expect(got.value ?? 0n).toBe(0n);
     const call = decodeFunctionData({ abi: FEE_VAULT_CLIENT_ABI, data: got.data as ViemHex });
-    expect(call.args).toEqual([ZERO, 3n, AGENT]);
+    expect(call.args.map((a) => (typeof a === 'string' ? a.toLowerCase() : a))).toEqual([
+      ZERO,
+      3n,
+      AGENT,
+    ]);
   });
 
   it('a withdraw to another account is refused by the KeyStore, whatever path built it', async () => {
