@@ -140,13 +140,10 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       'backup',
       'advanced',
     ];
-    expect(
-      registry
-        .routes()
-        .map((r) => r.path)
-        .sort(),
-    ).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
-    for (const route of registry.routes() as readonly LocalUiRoute[]) {
+    // M1-11s-c: the first-run page's two owner setup routes are covered in owner-setup-route.test.ts.
+    const stubs = registry.routes().filter((r) => r.presence !== 'setup');
+    expect(stubs.map((r) => r.path).sort()).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
+    for (const route of stubs as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');
       expect(route.presence).toBe(false);
       if (route.presence) throw new Error('unreachable');

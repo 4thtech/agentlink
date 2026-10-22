@@ -37,6 +37,7 @@ import {
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
+import { approvalWaitMsFor } from './approval-wait.js';
 import { embeddedLocalUiAssets } from './local-ui-assets.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
@@ -101,7 +102,12 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         ? agentToolContext(opened.agent, logger, deps.clock, approvalUi)
         : { needsSetup: { message: opened.message }, logger };
 
-    const server = createMcpServer(env, deps.version);
+    // M1-36j (D4): only with the approval page can a call wait for the owner's decision.
+    const server = createMcpServer(
+      env,
+      deps.version,
+      approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor },
+    );
     const loop =
       agent === undefined
         ? undefined
@@ -201,7 +207,22 @@ export const mcpCommand = (version: string): CommandHandler => {
             source,
             localUi: { assets: embeddedLocalUiAssets(), client: agent.client },
             // Fixed values only (ApprovalServerEvent, I-7).
-            onEvent: (event) => logger.debug('approval ui event', { ...event }),
+            onEvent: (event) => {
+              logger.debug('approval ui event', { ...event });
+              // IR-M1-11s-c-1 L-2: an owner set up from the first-run page is named outside the
+              // browser too (a fixed line and the public fingerprint), to compare with
+              // `agentlink doctor`.
+              if (
+                event.kind === 'owner_setup' &&
+                (event.outcome === 'done' || event.outcome === 'done_unconfirmed') &&
+                event.fingerprint !== undefined
+              ) {
+                logger.info(
+                  'Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with `agentlink doctor`.',
+                  { fingerprint: event.fingerprint },
+                );
+              }
+            },
           });
         },
       });

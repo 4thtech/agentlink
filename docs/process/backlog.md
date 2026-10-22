@@ -2179,7 +2179,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Outcome (2026-10-21):** D-114: B, with D as the fallback when the submitter is unreachable; a recipient is never charged without asking. Spec lines in 12 §2, §11, 07 §7 and `docs/design/topup-ux.md` §8. The submitter work is M1-34-b. The specs state no contract change; if M1-34-b finds one is needed, it opens a card noting the work happens in the private `occ-v2-contracts` repo.
 
 #### M1-34-b · submitter: receipts covered by the sender's proof fee, and the deferred fallback (new, D-114)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
+- **Status:** done (4thtech/agentlink#377, merged 2026-10-22) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
 - **Repo/path:** agentlink · the submitter (07 §7), packages/chain (submitter port, deferred posting), packages/core (receipt queue)
 - **Depends on:** M1-34, M1-10a, M1-4c
 - **Spec:** 07 §7; 12 §2, §11; `docs/design/topup-ux.md` §8; D-114, D-111
@@ -2813,7 +2813,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** Tests first: a mismatch sets the flag; no MCP tool clears it (I-4).
 
 #### M1-7g-f · proofs spec and `respondToTerms` confirm status (new, IR-M1-7g-d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#375, merged 2026-10-22) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, terms-flow), docs/foundation (04 §3.4)
 - **Depends on:** M1-7g-d
 - **Spec:** 04 §3.4; 07 §2.1, §3.2
@@ -2852,7 +2852,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
 #### M1-7h-d · core: faster sync rate-limit tests (new, follow-up from #252)
-- **Status:** in review (4thtech/agentlink#371) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#371, merged 2026-10-22) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h
 - **Spec:** `development-process.md` (CI budget)
@@ -4648,7 +4648,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests with a fake ssh for the file protocol (nonce, invite via stdin, status parsing, timeouts); existing modes unchanged.
 
 #### M1-23-f · Dogfood lows: error text cap, SSH keychain wording, auto-sync cleanup (new, review lows 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#384, merged 2026-10-22) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17)
 - **Depends on:** M1-23-e
 - **Scope:** source: review lows, 2026-10-18.
@@ -5570,7 +5570,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - No payment data is sent to or stored by any 4thTech service; the record names no network outside Advanced.
 
 #### M2-19 · transport-nostr: bounded `ids` re-query for a relay-cap gap (new, IR-M1-5d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2
+- **Status:** done (4thtech/agentlink#374, merged 2026-10-22) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2
 - **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M1-5d, M1-5g
 - **Spec:** 07 §4.2 (Sync); 04 §3.5
