@@ -77,6 +77,9 @@ export {
   type ApprovalServerSource,
   type PendingApprovalView,
 } from './approval-server.js';
+// M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
+// agent's core client. The route registry and the presence gate stay inside the package.
+export type { LocalUiAssets, LocalUiContext, LocalUiOptions } from './local-ui/context.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';

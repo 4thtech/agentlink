@@ -165,6 +165,10 @@ describe('constants (04, 05, 06)', () => {
         'contact.remove',
         'contact.rename',
         'policy.set',
+        // M1-9i-a (D-115): own storage and the recovery kit.
+        'storage.set',
+        'storage.remove',
+        'backup.export',
       ].sort(),
     );
     expect(APPROVAL_DECISIONS).toEqual(['approve', 'deny']);
@@ -235,6 +239,9 @@ describe('constants (04, 05, 06)', () => {
       'contact.check': 86_400,
       'contact.rename': 600,
       'contact.remove': 600,
+      'storage.set': 600,
+      'storage.remove': 600,
+      'backup.export': 600,
       'agent.revoke': null,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);
