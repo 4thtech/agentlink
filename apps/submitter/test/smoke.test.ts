@@ -17,6 +17,7 @@ import {
   smokeHealth,
   smokeOrigin,
   smokeSimulatedNotarize,
+  smokeUncoveredReceipt,
   type SmokeAgent,
   type SmokeTarget,
 } from './smoke-steps.js';
@@ -73,6 +74,12 @@ describe('deploy smoke (local Worker)', () => {
     expect(chain.sent).toHaveLength(0);
   });
 
+  it('an uncovered receipt is refused after a chain read, without asking for credits (D-114)', async () => {
+    await smokeUncoveredReceipt(target(), CHAIN_ID, await newSmokeAgent());
+    expect(chain.sent).toHaveLength(0);
+    expect(chain.recordReads).toHaveLength(1);
+  });
+
   it('the faucet refuses a mainnet chain ID', async () => {
     await smokeFaucetRefusesMainnet(target(), await newSmokeAgent());
   });
@@ -103,6 +110,18 @@ describe('deploy smoke negative controls', () => {
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(SmokeFailure);
     expect(String(error)).toMatch(/InvalidSignature: the simulation did not reach the chain/);
+  });
+
+  it('fails when a receipt for an uncharged record would be accepted for sending', async () => {
+    chain.recordReceipts = (): Promise<{ charged: boolean; set: number[] }> =>
+      Promise.resolve({ charged: true, set: [] });
+    chain.simulateItem = (): Promise<ItemSimulation> =>
+      Promise.resolve({ outcome: 'ok', gas: 160_000n });
+    const error = await smokeUncoveredReceipt(target(), CHAIN_ID, await newSmokeAgent()).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(SmokeFailure);
+    expect(String(error)).toMatch(/accepted for sending/);
   });
 
   it('fails when a chain is unavailable, without a URL in the message', async () => {

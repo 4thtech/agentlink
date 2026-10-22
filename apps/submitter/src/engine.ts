@@ -36,13 +36,23 @@
 //   (IR-M1-10a-1 M-2, M1-10a-b). If that read fails, the given-up nonce is used again. A send never
 //   takes a nonce that a transaction still in flight holds: it skips to the next free one.
 // - Nonces are serialised per chain: the engine holds one lock per state object.
-import type {
-  Hex,
-  StatusResponse,
-  SubmitItem,
-  SubmitItemResult,
-  SubmitStatus,
-  SubmitterChain,
+// - Receipts (D-114; 12 §2): the sender's proof fee covers up to MAX_RECEIPTS_PER_RECORD receipts
+//   of a record, whatever the recipient holds (receipts carry no fee, 05 §3.3, and nothing here
+//   reads the recipient's credits or gas). Before simulation, each record named by a receipt is read
+//   once: a record the Notary does not store was never charged, so its receipts are `failed`
+//   (`RecordNotFound`); the types set on-chain plus those in flight here count against the cap, and
+//   a new type over it is `failed` (`receipt_limit`); below the cap, ACCEPTED while REJECTED is set
+//   or in flight, or the reverse, is `failed` (`ConflictingReceipt`), never sent into a batch it
+//   would revert. A replay of a type already set passes on, and simulation reports it `skipped`. A
+//   failed read throws (the Worker answers `unavailable`); no signer cools off for it.
+import {
+  MAX_RECEIPTS_PER_RECORD,
+  type Hex,
+  type StatusResponse,
+  type SubmitItem,
+  type SubmitItemResult,
+  type SubmitStatus,
+  type SubmitterChain,
 } from '@4thtech-io/chain';
 
 export interface EngineSettings {
@@ -356,6 +366,59 @@ async function dispatch(
   }
 }
 
+/** The ACCEPTED/REJECTED counterpart of a receipt type (05 §3.3), or 0. */
+const conflictingType = (t: number): number => (t === 3 ? 4 : t === 4 ? 3 : 0);
+
+/**
+ * D-114: keeps the items whose receipts the sender's proof fee covers (records pass unchanged) and
+ * answers the others in `out`. One `recordReceipts` read per record; a failed read throws.
+ */
+async function coveredItems(
+  port: SubmitterChain,
+  state: QueueState,
+  items: readonly SubmitItem[],
+  out: Map<string, SubmitItemResult>,
+): Promise<SubmitItem[]> {
+  const recordIds = [...new Set(items.filter((i) => i.type === 'receipt').map((i) => i.recordId))];
+  if (recordIds.length === 0) return [...items];
+  const reads = await Promise.all(recordIds.map((id) => port.recordReceipts(id)));
+  const charged = new Set<string>();
+  const types = new Map<string, Set<number>>();
+  recordIds.forEach((id, i) => {
+    const read = reads[i];
+    if (read?.charged === true) charged.add(id);
+    types.set(id, new Set(read?.set ?? []));
+  });
+  for (const entry of state.items.values()) {
+    if (entry.item.type !== 'receipt' || !inFlight(entry.status)) continue;
+    types.get(entry.item.recordId)?.add(entry.item.receipt.receiptType);
+  }
+  return items.filter((item) => {
+    if (item.type !== 'receipt') return true;
+    if (!charged.has(item.recordId)) {
+      out.set(item.id, plain(item, 'failed', 'RecordNotFound'));
+      return false;
+    }
+    const set = types.get(item.recordId) ?? new Set<number>();
+    const type = item.receipt.receiptType;
+    // A replay of a type already set (or in flight): simulation answers it, never the cap.
+    if (set.has(type)) return true;
+    // The cap first: it is the D-114 rule. A client reads the chain after any `failed` answer, so
+    // the code changes nothing it does (07 §7 Client).
+    if (set.size >= MAX_RECEIPTS_PER_RECORD) {
+      out.set(item.id, plain(item, 'failed', 'receipt_limit'));
+      return false;
+    }
+    const other = conflictingType(type);
+    if (other !== 0 && set.has(other)) {
+      out.set(item.id, plain(item, 'failed', 'ConflictingReceipt'));
+      return false;
+    }
+    set.add(type);
+    return true;
+  });
+}
+
 /**
  * Validates, simulates and sends a request's items; returns their status in request order. A
  * chain read that fails throws (the Worker answers `unavailable`) before anything is sent.
@@ -382,11 +445,12 @@ export function submitItems(
     const signers = [...new Set(fresh.map((i) => i.signer))];
     const codes = await Promise.all(signers.map((s) => port.hasCode(s)));
     const hasCode = new Map(signers.map((s, i) => [s, codes[i] === true]));
-    const checked = fresh.filter((item) => {
+    const signed = fresh.filter((item) => {
       if (hasCode.get(item.signer) || port.signatureMatches(item)) return true;
       out.set(item.id, plain(item, 'failed', 'InvalidSignature'));
       return false;
     });
+    const checked = await coveredItems(port, state, signed, out);
     const sims = await Promise.all(checked.map((item) => port.simulateItem(item)));
     const accepted: { item: SubmitItem; held: boolean; gas: bigint }[] = [];
     checked.forEach((item, i) => {
