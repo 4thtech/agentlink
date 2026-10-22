@@ -8,6 +8,8 @@ import { buildSteps, parseArgs, planText } from './lib.mjs';
 import { encodeLine, keychainOverSshCheck, sealLine } from './remote.mjs';
 import {
   FILES,
+  abortPeer,
+  clearStaleInvite,
   discoverWaiting,
   inviteText,
   localTransport,
@@ -15,6 +17,7 @@ import {
   parseInviteFile,
   parseStatusFile,
   parseWaiting,
+  runWithExitHooks,
   sshTransport,
   statusLine,
   waitingText,
@@ -220,9 +223,11 @@ describe('--two-mac keychain-over-ssh preflight', () => {
     ]) {
       const r = keychainOverSshCheck(o, parse, fake(text));
       expect(r.ok).toBe(false);
-      expect(r.help).toBe(
-        'macOS blocks the keychain over SSH; use --auto-sync (start role b on Mac B first)',
-      );
+      // M1-23-f: names the macOS limitation and where the agent must run.
+      expect(r.help).toMatch(/login keychain/);
+      expect(r.help).toMatch(/SSH/);
+      expect(r.help).toMatch(/own terminal/);
+      expect(r.help).toMatch(/--auto-sync/);
     }
   });
 
@@ -240,5 +245,79 @@ describe('--two-mac keychain-over-ssh preflight', () => {
     expect(calls[0][0]).toBe('ssh');
     expect(calls[0][1]).toContain('BatchMode=yes');
     expect(calls[0][1].join(' ')).toMatch(/doctor --agent oc-test/);
+  });
+});
+
+describe('auto-sync cleanup and early exit (M1-23-f)', () => {
+  let dir;
+  let home;
+  let ssh;
+  let bTransport;
+  const syncDir = `~/agentlink-dogfood/${RUN}/sync`;
+  beforeAll(async () => {
+    dir = await mkdtemp(join(tmpdir(), 'al-autosync-f-'));
+    home = join(dir, 'home');
+    await mkdir(home, { recursive: true });
+    ssh = join(dir, 'ssh');
+    await writeFile(
+      ssh,
+      `#!/bin/sh
+for last; do :; done
+HOME="${home}"; export HOME
+exec sh -c "$last"
+`,
+    );
+    await chmod(ssh, 0o755);
+    bTransport = localTransport(join(home, 'agentlink-dogfood', RUN, 'sync'));
+    await bTransport.init();
+  });
+  afterAll(() => rm(dir, { recursive: true, force: true }));
+
+  it('Mac B removes a stale invite file left behind by an earlier run', async () => {
+    await bTransport.write(FILES.invite, inviteText(NONCE, 'INVITE', INVITE));
+    await clearStaleInvite(bTransport);
+    expect(await bTransport.read(FILES.invite)).toBeUndefined();
+    await expect(clearStaleInvite(bTransport)).resolves.toBeUndefined();
+  });
+
+  it('Mac A sends ABORT to Mac B on an early exit; B reads it and no invite file stays', async () => {
+    const a = sshTransport('u@mini.local', syncDir, { ssh });
+    const channel = makeChannel({ transport: a, nonce: NONCE, role: 'a', sleep: async () => {} });
+    await abortPeer({ transport: a, channel, nonce: NONCE });
+    expect(parseInviteFile(await bTransport.read(FILES.invite), NONCE)).toEqual({ kind: 'ABORT' });
+    const bChannel = makeChannel({
+      transport: bTransport,
+      nonce: NONCE,
+      role: 'b',
+      sleep: async () => {},
+    });
+    const got = await bChannel.take((m) => m.kind === 'ABORT', 0);
+    expect(got.kind).toBe('ABORT');
+    await clearStaleInvite(bTransport);
+    expect(await bTransport.read(FILES.invite)).toBeUndefined();
+  });
+
+  it('abortPeer never throws when ssh is down', async () => {
+    const down = sshTransport('u@mini.local', syncDir, { ssh: '/nonexistent/ssh' });
+    const channel = makeChannel({ transport: down, nonce: NONCE, role: 'a', sleep: async () => {} });
+    await expect(abortPeer({ transport: down, channel, nonce: NONCE })).resolves.toBeUndefined();
+  });
+
+  it('exit hooks run last-first after main returns or throws, and a failing hook is ignored', async () => {
+    const order = [];
+    const hooks = [
+      () => order.push('first'),
+      () => {
+        throw new Error('hook failed');
+      },
+      () => order.push('third'),
+    ];
+    expect(await runWithExitHooks(() => Promise.resolve(7), hooks)).toBe(7);
+    expect(order).toEqual(['third', 'first']);
+    order.length = 0;
+    await expect(
+      runWithExitHooks(() => Promise.reject(new Error('main failed')), hooks),
+    ).rejects.toThrow('main failed');
+    expect(order).toEqual(['third', 'first']);
   });
 });
