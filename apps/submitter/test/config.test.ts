@@ -136,10 +136,17 @@ describe('readFaucetConfig', () => {
     });
   });
 
-  it('refuses every mainnet chain ID and Chiado until it is deployed (SUB-7)', () => {
-    for (const chains of ['1', '8453', '100', '42161', '10', '137', '10200', '84532,8453']) {
+  it('refuses every mainnet chain ID, Gnosis 100 included (SUB-7)', () => {
+    for (const chains of ['1', '8453', '100', '42161', '10', '137', '84532,8453', '10200,100']) {
       expect(readFaucetConfig({ SUBMITTER_FAUCET_CHAINS: chains }), chains).toBeNull();
     }
+  });
+
+  it('serves Gnosis Chiado beside Base Sepolia (M1-3j-c)', () => {
+    expect(readFaucetConfig({ SUBMITTER_FAUCET_CHAINS: '10200' })?.chains).toEqual([10200]);
+    expect(readFaucetConfig({ SUBMITTER_FAUCET_CHAINS: '84532,10200' })?.chains).toEqual([
+      84532, 10200,
+    ]);
   });
 
   it('turns off on anything invalid', () => {

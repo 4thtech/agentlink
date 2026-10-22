@@ -78,7 +78,9 @@ async function claim(body: unknown, ip: string): Promise<Response> {
 }
 
 describe('POST /v1/faucet: chains (SUB-7)', () => {
-  it('rejects every mainnet chain ID, and Chiado until it is deployed, before any send', async () => {
+  it('rejects every mainnet chain ID, and a testnet this environment does not serve, before any send', async () => {
+    // The test environment's SUBMITTER_FAUCET_CHAINS names Base Sepolia only (vitest.config.ts), so
+    // Chiado, on the allowlist since M1-3j-c, is still refused here.
     const ip = newIp();
     for (const chainId of [1, 8453, 100, 42161, 10, 137, 10200]) {
       const res = await claim({ chainId, agent: newAgent() }, ip);
