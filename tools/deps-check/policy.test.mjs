@@ -93,6 +93,35 @@ describe('policy data', () => {
   });
 });
 
+describe('M1-11s-b: the local UI app zone (D-118)', () => {
+  it('is a browser zone: the UI library and React only, nothing from core, node or crypto', () => {
+    const zone = ZONES['apps/local-ui'];
+    expect(zone?.name).toBe('@4thtech-io/local-ui');
+    expect(allowedWorkspaceNames('apps/local-ui')).toEqual([
+      '@4thtech-io/local-ui',
+      '@4thtech-io/types',
+      '@4thtech-io/ui',
+    ]);
+    expect(zone?.external.map((e) => e.pattern)).toEqual(['react', 'react-dom']);
+    for (const name of ['core', 'node', 'crypto', 'chain', 'storage', 'transport-nostr', 'log']) {
+      expect(violationFor('apps/local-ui', `@4thtech-io/${name}`), name).toMatch(/layering/);
+    }
+    expect(violationFor('apps/local-ui', 'node:fs')).not.toBeNull();
+    expect(NODE_ZONES).not.toContain('apps/local-ui');
+    expect(violationFor('apps/local-ui', '@4thtech-io/ui')).toBeNull();
+  });
+
+  it('lets only the CLI declare it, as a build-time embed (never a runtime dependency)', () => {
+    expect(ZONES['apps/cli']?.embeds).toEqual(['apps/local-ui']);
+    expect(allowedWorkspaceNames('apps/cli')).toContain('@4thtech-io/local-ui');
+    for (const [zone, policy] of Object.entries(ZONES)) {
+      if (zone === 'apps/cli' || zone === 'apps/local-ui') continue;
+      expect(policy.embeds, zone).toBeUndefined();
+      expect(allowedWorkspaceNames(zone), zone).not.toContain('@4thtech-io/local-ui');
+    }
+  });
+});
+
 describe('the repository itself', () => {
   // The scan reads only packages/*, apps/* and test-vectors/ (434 source files) and never lists
   // docs/. Its cost is TypeScript parsing (CPU), not git: 0.46 s cold locally (git listing 20 ms;
