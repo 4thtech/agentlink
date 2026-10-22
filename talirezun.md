@@ -1,49 +1,43 @@
 # @talirezun — sync
-**Headline:** Evening: 12 PRs merged (faucet robustness, recovery kit, prompt-injection suites in CI, Chiado auto-selection gated); 10 in review or queue; owner approval needed for the submitter deploy (#372).
-_Updated 2026-10-21T20:30Z · claude-code / claude-opus-5-5 · orchestrator_
+**Headline:** Standing merge rule: the orchestrator merges a PR once it has an independent review PASS and green checks. Release 0.2.0 waits on main's e2e (#396). Chiado keys are set; #402 is in review.
+_Updated 2026-10-22 · claude-code / claude-haiku-5-5 · orchestrator_
 
 ## Now
-- **Merged this evening (12):** #366 M1-5g, #360, #357, #364 (D-117), #353 M1-9ze, #365, #363 M1-9d-3 (J8 terms tools), #372 M1-10b-c (faucet robustness), #367 M1-9i-b (recovery kit ALKK v1), #373 M1-3j-b (Chiado auto-selection, gated until the faucet serves Chiado), #368 (prompt-injection suites in CI), #369 M1-1g-j.
-- #362 closed as superseded.
+- **Merge rule (standing, from Tali):** merge once an independent review PASSes and checks are green.
+- **CI:** #395 runs the macOS and Windows legs in the merge queue only. Merge-queue batching is on (groups of 5, 2 concurrent builds).
+- **Release 0.2.0** is next. Blocked until main's e2e is green; #396 is the flake fix.
+- **Chiado:** submitter keys are set. Enabling it (#402) is in review. Production funding is coming through the community.
+- **UI:** M1-11b (first interactive local app) starts once #370 (UI components) merges. M1-35c (UI strings, #398) is reviewed.
+- **Main** has landed through #384 (2026-10-22). 30 PRs are open.
 
 ## In flight
-| Task | Branch / PR | Status | Next step |
+| Task | PR | Status | Next step |
 |---|---|---|---|
-| M1-26-e top-up link | #344 | review, off | on until the pay page is live |
-| M1-19 invite page | #348 | review | — |
-| Review cards | #350 | review | — |
-| M1-35b UI components | #370 | review | then M1-35c |
-| M1-7h-d | #371 | queue | — |
-| M2-19 | #374 | review | owner confirms spec wording |
-| M1-7g-f | #375 | review | owner confirms spec wording |
-| M1-9i-b2 | #376 | review | owner confirms spec wording; then M1-9i-a and M1-9i-c |
-| M1-34-b | #377 | queue | — |
-| Docs pass | #378 | queue | — |
-
-## Next
-1. M1-9i-a and M1-9i-c, after #376.
-2. M1-35c, after #370.
-3. Local UI cards wait on the B-1…B-10 redesigns.
-4. M1-3j-c (Chiado card), after the submitter keys and xDAI.
-5. Release 0.1.3 once the queue drains.
+| UI components (M1-35b) | #370 | review | unblocks M1-11b, then M1-35c |
+| UI strings (M1-35c) | #398 | reviewed | merge under the standing rule |
+| e2e flake fix | #396 | open | unblocks main e2e and 0.2.0 |
+| CI matrix, queue-only legs | #395 | open | — |
+| Chiado enable | #402 | review | needs Chiado funding |
+| Transport hardening (M1-5b-c) | #403 | open | — |
+| Counter-offers (M1-9d-5) | #401 | open | — |
+| Receiver file-key rows (M1-7f-2) | #400 | open | — |
+| Version packages | #324 | open | release 0.2.0 |
+| Top-up link (M1-26-e) | #344 | review | on until the pay page is live |
+| Invite page (M1-19) | #348 | review | — |
 
 ## Waiting on owner
-- Production approval for the submitter deploy (#372).
-- Spec wording in #374, #375 and #376.
-- Chiado submitter keys and xDAI (then M1-3j-c).
-- Release 0.1.3 go-ahead, after the queue drains.
+- Design briefs B-2, B-3 and B-9.
 - e2e-live environment.
-- M1-29 transcript run.
+- npm `latest` approval click for the release.
+- Chiado funding.
 
 ## Owner to-dos
-- Redesigns from the design audit briefs (B-1…B-10).
 - E2e API-key secrets.
 - M1-23 dogfood with Denis.
 - Trademark check (M1-24).
 
 ## Decisions made (still relevant)
-- D-112 to D-116: free messages and files; top-up link format; receipts payer; backup and restore; design exists and needs adjusting.
-- D-117 merged in #364.
+- D-112 to D-117: free messages and files; top-up link format; receipts payer; backup and restore; design exists and needs adjusting; merge rule above.
 
 ## Asks
 - None for @denisjazbec. No new input from Denis.
