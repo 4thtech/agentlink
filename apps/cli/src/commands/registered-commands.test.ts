@@ -21,12 +21,14 @@ const isPlaceholder = (token: string): boolean => /^[<[{$]/.test(token);
 /** Returns what is wrong with one `agentlink ...` instruction, or undefined when it is real. */
 function problemWith(instruction: string): string | undefined {
   const tokens = instruction
-    .replace(/[…|]/g, ' ')
+    .replace(/[…|\\]/g, ' ')
     .split(/\s+/)
     .filter((t) => t !== '' && t !== '†');
   if (tokens[0] !== 'agentlink' || tokens[1] === undefined) return undefined;
   const name = tokens[1];
-  if (isPlaceholder(name)) return undefined;
+  if (isPlaceholder(name) || (name.startsWith('--') && EXTRA_FLAGS.has(name.slice(2)))) {
+    return undefined;
+  }
   const spec = COMMANDS.find((c) => c.name === name);
   if (spec === undefined) return `unknown command "${name}"`;
   const options = spec.options ?? {};

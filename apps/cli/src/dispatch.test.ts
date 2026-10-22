@@ -72,7 +72,6 @@ describe('--help (06 §8)', () => {
       'agentlink invite',
       'agentlink accept <url>',
       'agentlink contacts',
-      'agentlink contacts --verify <id>',
       // M1-9za.
       'agentlink contacts rename <contactId> <name> [--agent <name>]',
       'agentlink contacts remove <contactId> [--agent <name>]',
@@ -83,7 +82,6 @@ describe('--help (06 §8)', () => {
       'agentlink policy remove-folder <path> [--agent <name>]',
       // M1-9m-b (D-100).
       'agentlink policy recover [--agent <name>]',
-      'agentlink policy set <key> <value>',
       // M1-9h.
       'agentlink credits [--topup] [--agent <name>]',
       'agentlink verify <proof.json> [--agent <name>]',
@@ -201,8 +199,8 @@ describe('an MCP-side process cannot approve (04 §2.5, I-4)', () => {
     ['deny', newId()],
     ['cancel', newId()],
     ['owner', 'init'],
-    ['policy', 'set', 'contacts', 'open'],
-    ['contacts', '--verify', 'c1'],
+    ['contacts', 'remove', 'c1'],
+    ['policy', 'show'],
   ];
 
   it.each(ownerCommands)(
@@ -265,7 +263,7 @@ describe('an MCP-side process cannot approve (04 §2.5, I-4)', () => {
     expect(r.calls).toHaveLength(1);
   });
 
-  it('`contacts` without --verify and `mcp` are not owner commands', async () => {
+  it('plain `contacts` and `mcp` are not owner commands', async () => {
     const r = recorder();
     const dispatch = createDispatcher({ contacts: r.handler, mcp: r.handler });
     expect(await dispatch(['contacts'], io(MCP_PIPE).value)).toBe(EXIT_OK);
