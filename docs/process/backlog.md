@@ -2736,7 +2736,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
 #### M1-7h-d · core: faster sync rate-limit tests (new, follow-up from #252)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#371) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h
 - **Spec:** `development-process.md` (CI budget)
