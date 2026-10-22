@@ -1,13 +1,15 @@
-/* Proofs and credits layout (d1 Local-proofs): the list beside the credits card, one column on a
-   narrow window. Design tokens only. */
+/* Proofs and credits layout (d1 Local-proofs): the list beside the credits card; on a narrow
+   window the card wraps below the list (no breakpoint needed). Design tokens only: the side column
+   is half the content width token, the credits card's own size (360px, .al-credits). */
 .pf-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--al-space-7);
-  align-items: start;
+  align-items: flex-start;
   margin-top: var(--al-space-6);
 }
 .pf-side {
+  flex: 1 1 calc(var(--al-layout-max-content) / 2);
   display: flex;
   flex-direction: column;
   gap: var(--al-space-5);
@@ -16,10 +18,11 @@
   margin: 0;
 }
 .pf-list {
+  flex: 999 1 0;
+  min-inline-size: 55%;
   display: flex;
   flex-direction: column;
   gap: var(--al-space-4);
-  min-width: 0;
 }
 .pf-table-wrap {
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
@@ -51,9 +54,4 @@
 }
 .pf-more {
   align-self: flex-start;
-}
-@media (max-width: 900px) {
-  .pf-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }

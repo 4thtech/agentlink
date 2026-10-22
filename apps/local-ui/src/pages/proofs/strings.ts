@@ -19,11 +19,15 @@ export const PROOFS_STRINGS = {
   addCreditsNotAvailable: 'Adding credits is not available yet in this version of AgentLink.',
   creditsUnavailable: "Credits can't be checked right now. Try again in a minute.",
   creditsPartial: "Some credits couldn't be checked just now, so you may have more.",
-  price: 'A proof costs $0.10, including up to 3 receipts. Messages and files are always free.',
 } as const;
 
 export function proofsLeft(n: number): string {
   return n === 1 ? '1 proof left' : `${String(n)} proofs left`;
+}
+
+/** The price line; `price` comes from the server (core's schedule), never a literal here. */
+export function priceLine(price: string): string {
+  return `A proof costs ${price}, including up to 3 receipts. Messages and files are always free.`;
 }
 
 export function inCredits(balance: string): string {

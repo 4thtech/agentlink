@@ -6,7 +6,7 @@
 // page is live (X-6). Reads only: the page sends GET requests and nothing else.
 import { Button, EmptyState, Icon, ProofBadge } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import { createApiClient, type ApiClient } from '../../api/client.js';
+import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { PAGE_TITLES } from '../../strings.js';
 import {
   CREDITS_PATH,
@@ -16,7 +16,7 @@ import {
   type CreditsAnswer,
   type ProofRow,
 } from './data.js';
-import { PROOFS_STRINGS as S, inCredits, proofsLeft } from './strings.js';
+import { PROOFS_STRINGS as S, inCredits, priceLine, proofsLeft } from './strings.js';
 import './proofs.css';
 
 type ListState =
@@ -118,11 +118,15 @@ function CreditsCard({ credits }: { credits: CreditsState }): ReactElement {
       {credits.test ? <p className="al-text-caption al-muted">{S.testCredits}</p> : null}
       {/* X-6: no "Add credits" until the pay page is live (D-113, M1-26-e). */}
       <p className="al-text-caption al-muted">{S.addCreditsNotAvailable}</p>
-      {/* TODO(D2): free test credits. The owner has not decided between a button and the agent
-          claiming them by itself on the first needs_credits (UX audit 5a); nothing until then. */}
+      {/* No free test credits button: the agent claims them once by itself (D-120 (3), M1-36i). */}
     </section>
   );
 }
+
+/** 409 is the shared not-set-up answer (route-types.ts); anything else that isn't 200 is an error. */
+const isNotSetUp = (res: ApiResult<unknown>): boolean => res.kind === 'error' && res.status === 409;
+const problem = (res: ApiResult<unknown>): { kind: 'not_set_up' } | { kind: 'error' } =>
+  isNotSetUp(res) ? { kind: 'not_set_up' } : { kind: 'error' };
 
 export interface ProofsPageProps {
   /** For tests; the page's own same-origin client by default. */
@@ -138,7 +142,7 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
     let live = true;
     void api.get(listPath()).then((res) => {
       if (!live) return;
-      const answer = res.kind === 'ok' ? parseList(res.data) : ({ kind: 'error' } as const);
+      const answer = res.kind === 'ok' ? parseList(res.data) : problem(res);
       if (answer.kind === 'ok') {
         setList({
           phase: 'ok',
@@ -152,7 +156,13 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
     });
     void api.get(CREDITS_PATH).then((res) => {
       if (!live) return;
-      setCredits(res.kind === 'ok' ? parseCredits(res.data) : { kind: 'unavailable' });
+      setCredits(
+        res.kind === 'ok'
+          ? parseCredits(res.data)
+          : isNotSetUp(res)
+            ? { kind: 'not_set_up' }
+            : { kind: 'unavailable' },
+      );
     });
     return () => {
       live = false;
@@ -225,7 +235,9 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
         </div>
         <aside className="pf-side">
           <CreditsCard credits={credits} />
-          <p className="al-text-body-sm al-muted">{S.price}</p>
+          {credits.kind === 'ok' ? (
+            <p className="al-text-body-sm al-muted">{priceLine(credits.price)}</p>
+          ) : null}
         </aside>
       </div>
     </>

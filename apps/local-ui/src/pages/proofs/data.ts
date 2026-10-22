@@ -1,4 +1,5 @@
-// The page's reads (packages/node/src/local-ui/api/proofs.ts), checked before use: every value is a
+// The page's reads (packages/node/src/local-ui/api/proofs.ts; the shared answers 409 not_set_up and
+// 503 unavailable are in its route-types.ts), checked before use: every value is a
 // fixed word, a number or a dollar amount of a known shape. Anything else is left out (a row) or
 // treated as "can't check right now" (credits), so nothing free-form from the server is shown.
 import type { ProofState } from '@4thtech-io/ui';
@@ -22,6 +23,8 @@ export type CreditsAnswer =
       readonly kind: 'ok';
       readonly proofsLeft: number;
       readonly balance: string;
+      /** One proof, `$N.NN` (core's price, from the chain schedule). */
+      readonly price: string;
       readonly test: boolean;
       readonly partial: boolean;
     }
@@ -54,7 +57,6 @@ function row(v: unknown): ProofRow | undefined {
 
 export function parseList(data: unknown): ListAnswer {
   if (!isObject(data)) return { kind: 'error' };
-  if (data.status === 'not_set_up') return { kind: 'not_set_up' };
   if (data.status !== 'ok' || !Array.isArray(data.items)) return { kind: 'error' };
   const items: ProofRow[] = [];
   for (const v of data.items as unknown[]) {
@@ -69,8 +71,7 @@ export function parseList(data: unknown): ListAnswer {
 
 export function parseCredits(data: unknown): CreditsAnswer {
   if (!isObject(data)) return { kind: 'unavailable' };
-  if (data.status === 'not_set_up') return { kind: 'not_set_up' };
-  const { status, proofsLeft, balance, test, partial } = data;
+  const { status, proofsLeft, balance, price, test, partial } = data;
   if (
     status !== 'ok' ||
     typeof proofsLeft !== 'number' ||
@@ -78,12 +79,14 @@ export function parseCredits(data: unknown): CreditsAnswer {
     proofsLeft < 0 ||
     typeof balance !== 'string' ||
     !BALANCE.test(balance) ||
+    typeof price !== 'string' ||
+    !BALANCE.test(price) ||
     typeof test !== 'boolean' ||
     typeof partial !== 'boolean'
   ) {
     return { kind: 'unavailable' };
   }
-  return { kind: 'ok', proofsLeft, balance, test, partial };
+  return { kind: 'ok', proofsLeft, balance, price, test, partial };
 }
 
 /** The list path: the first page, or the page after `cursor`. */
