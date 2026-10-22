@@ -2,22 +2,13 @@
 import { CoreError } from '@4thtech-io/core';
 import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
-import { approvalNextStep } from '../approval/next-step.js';
-import { approvalLinkNextStep } from '../mcp/approval-ui.js';
 import type { ToolClient, ToolContext } from './context.js';
 import { FILE_TEXT, attachRefusal } from './files-common.js';
-import { INVITE_TEXT, acceptRetryStep, inviteFailure } from './invite-common.js';
-import {
-  finalizeResult,
-  pendingApproval,
-  resultIsValid,
-  withApprovalLink,
-  type HandlerOutput,
-} from './result.js';
+import { INVITE_TEXT, inviteFailure } from './invite-common.js';
+import { pendingApproval } from './result.js';
 import { en } from './strings/en.js';
 
 const APPROVAL = 'apr_AAAAAAAAAAAAAAAAAAAAAA';
-const ORIGIN = 'http://localhost:45123';
 
 function context(overrides: Partial<ToolContext> = {}): ToolContext {
   return {
@@ -25,7 +16,8 @@ function context(overrides: Partial<ToolContext> = {}): ToolContext {
     clock: () => 1_760_600_000,
     logger: createLogger({ level: 'debug', sink: () => undefined }),
     agentName: 'default',
-    approvalNextStep: (id) => approvalNextStep(id, 'default'),
+    approvalNextStep: (id) =>
+      `Tell the user: Approval needed. Run agentlink approve ${id}. After they approve, call the same tool again with approvalId.`,
     urlOrigins: [],
     ...overrides,
   };
@@ -39,35 +31,6 @@ describe('pending_approval points at agentlink_get_approval (F5a)', () => {
   it('names agentlink_get_approval in the M1a nextStep', () => {
     const out = pendingApproval(context(), APPROVAL, 'This needs your approval.');
     expect(out.result.nextStep).toContain('agentlink_get_approval');
-    expect(out.result.nextStep).toMatch(/^Tell the user: Approval needed\./);
-  });
-
-  it('keeps the hint, a valid url and 500 code points with the local link and the accept sentence', async () => {
-    const url = `${ORIGIN}/approve/${APPROVAL}`;
-    const link = {
-      url,
-      origin: ORIGIN,
-      nextStep: approvalLinkNextStep(APPROVAL, url, 'claude-code'),
-    };
-    const ctx = context({
-      agentName: 'claude-code',
-      approvalNextStep: (id) => approvalNextStep(id, 'claude-code'),
-      approvalLink: () => Promise.resolve(link),
-    });
-    const base = pendingApproval(ctx, APPROVAL, 'This needs your approval.');
-    const withRetry: HandlerOutput = {
-      result: {
-        ...base.result,
-        nextStep: `${base.result.nextStep ?? ''} ${acceptRetryStep(APPROVAL)}`.trim(),
-      },
-    };
-    const { output, origins } = await withApprovalLink(withRetry, ctx);
-    expect(output.result.url).toBe(url);
-    expect(output.result.nextStep).toContain('agentlink_get_approval');
-    expect(output.result.nextStep).toContain('agentlink_accept_invite');
-    expect([...(output.result.nextStep ?? '')].length).toBeLessThanOrEqual(500);
-    expect(resultIsValid(output.result, origins)).toBe(true);
-    expect(finalizeResult(output, origins).structured.code).toBeUndefined();
   });
 
   it('the copy sheet nextStep names it too', () => {

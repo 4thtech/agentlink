@@ -20,11 +20,11 @@ export const en = {
     'Sent to {contactName}. End-to-end encrypted: only you, {contactFirstName} and your agents can read it.',
   'chat.status.ok.proof': 'Sent with proof. Recorded {date} at {time}. {fee} from credits.',
   'chat.status.ok.invite':
-    "Invite ready: it works once, until {date}. Send it only to {contactFirstName}: whoever uses it first is connected. Once they accept, you'll both see a safety code to compare in AgentLink, not in this chat.",
+    "Invite ready: it works once, until {date}. Send it only to {contactFirstName}: whoever uses it first is connected. You'll be connected as soon as they accept.",
   'chat.status.ok.inviteShare':
     "Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until {date}: {inviteUrl}",
   'chat.status.ok.acceptedInvite':
-    'You are connected to {contactName}. Compare the safety code on your own screen (local app or terminal), not in this chat.',
+    'You are connected to {contactName}. Nothing else is needed now.',
   'chat.status.ok.contacts':
     '{count, plural, one {You have 1 contact: {contacts}.} other {You have # contacts: {contacts}.}}',
   'chat.status.ok.contactsNone':
@@ -40,7 +40,7 @@ export const en = {
     'This needs your approval: {action} ({fee}).\nApprove here: {url}',
   'chat.status.pending_approval.free': 'This needs your approval: {action}.\nApprove here: {url}',
   'chat.status.pending_approval.nextStep':
-    'Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId.',
+    'Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId. To check the decision, call agentlink_get_approval.',
 
   // ---- Tool results: needs setup / credits ------------------------------------------------
   'chat.status.needs_setup.fileLimit':
@@ -49,7 +49,7 @@ export const en = {
   'chat.status.needs_setup.storage':
     "Your settings keep files in your own storage, which isn't connected yet: {url}.",
   'chat.status.needs_setup.keychain':
-    "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`.",
+    "AgentLink can't find a system keychain on this machine. Run `agentlink doctor` in a terminal to see how to fix it.",
   'chat.status.needs_setup.keyLocked':
     "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code.",
   'chat.status.needs_credits':
@@ -241,7 +241,7 @@ export const en = {
     '{count, plural, one {1 request from an unknown sender.} other {# requests from unknown senders.}}',
   'cli.status.brief.nothing': 'Nothing new on AgentLink.',
   'local.linkExpired':
-    'This link has expired. Open AgentLink again from your AI, or run `agentlink ui`.',
+    'This link has expired. Ask your AI to open AgentLink again.',
 } as const;
 
 export type CopyKey = keyof typeof en;

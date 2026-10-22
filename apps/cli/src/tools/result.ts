@@ -1,6 +1,6 @@
 // Tool results (06 §1 rules 2 and 3, §2.5; M1-9c). Every tool returns a `status`, a one-sentence
 // `summary` and, when the status is not `ok`, a `nextStep`; `pending_approval` adds the
-// `approvalId`. The handlers build results only through these helpers, and `finalizeResult` checks
+// `approvalId` and points at `agentlink_get_approval` to check the decision (M1-36d). The handlers build results only through these helpers, and `finalizeResult` checks
 // each one before it leaves the server:
 //
 // - `summary` and `nextStep` are our text: I-JSON, 1 to 500 code points, no control or format
@@ -45,6 +45,7 @@ export const RESULT_TEXT = Object.freeze({
   invalidNextStep: "Check the tool's input fields and call it again.",
   notAvailableSummary:
     "This AgentLink tool isn't available in this version yet, so nothing was done.",
+  approvalCheckHint: 'To check the decision, call agentlink_get_approval.',
   notAvailableNextStep:
     'Tell the user this AgentLink feature is coming in a later version. Nothing else is needed now.',
 });
@@ -91,7 +92,7 @@ export function pendingApproval(
       status: 'pending_approval',
       summary,
       approvalId,
-      nextStep: context.approvalNextStep(approvalId),
+      nextStep: `${context.approvalNextStep(approvalId)} ${RESULT_TEXT.approvalCheckHint}`,
     },
   };
 }
