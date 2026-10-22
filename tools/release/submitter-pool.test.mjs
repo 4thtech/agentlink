@@ -39,7 +39,8 @@ const chain = (over = {}) => ({
   faucet: 'ok',
   ...over,
 });
-const LINE = /^(pool: ok|alert chain [0-9]+: (not available|gas [a-z]+|faucet [a-z]+)|alert: [a-z ]+)$/;
+const LINE =
+  /^(pool: ok|alert chain [0-9]+: (not available|gas [a-z]+|faucet [a-z]+)|alert: [a-z ]+)$/;
 
 describe('the pool alert program (M1-10b-e)', () => {
   it('is quiet when every chain is available with gas and faucet ok', () => {
@@ -91,7 +92,7 @@ describe('the pool alert workflow (M1-10b-e)', () => {
   const source = readFileSync(WORKFLOW, 'utf8');
 
   it('runs on a schedule and by dispatch, never for a pull request, with no permissions or secrets', () => {
-    expect(source).toMatch(/\n {2}schedule:\n {4}- cron: "[0-9*/ ,-]+"\n/);
+    expect(source).toMatch(/\n {2}schedule:\n(?: {4}#.*\n)* {4}- cron: "[0-9*/ ,-]+"\n/);
     expect(source).toContain('workflow_dispatch:');
     expect(source).not.toMatch(/pull_request/);
     expect(source).toMatch(/\npermissions: \{\}\n/);
