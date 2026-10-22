@@ -111,6 +111,15 @@ import type {
   TermsService,
 } from '../terms-flow.js';
 import type { ProofChain, ProofKit, ProofsPlatform } from './platform.js';
+import type { Page, PageQuery } from '../paging.js';
+import {
+  listProofs,
+  readCredits,
+  requestFreeCredits,
+  type CreditsView,
+  type FreeCreditsResult,
+  type ProofListItem,
+} from './reads.js';
 import { RECEIPT_REQUEST, receiptRequestKey, senderRequestedTx } from './receipt-request.js';
 
 /** A Record's `deadline` is this far after signing (proposed; 04 §5 replacement window). */
@@ -162,6 +171,18 @@ type OwnStatus =
   /** A refused (`failed`) Record whose reservation was released once it could never land. */
   | 'released';
 const LIVE: readonly OwnStatus[] = ['signed', 'pending', 'needs_credits'];
+/** The rows the proof list shows (M1-11r-a): every record, own or received, except a replaced one. */
+export const LISTED_PROOF_STATUSES: readonly (Exclude<OwnStatus, 'replaced'> | 'received')[] = [
+  'signed',
+  'pending',
+  'needs_credits',
+  'failed',
+  'conflict',
+  'recorded',
+  'announced',
+  'released',
+  'received',
+];
 const ON_CHAIN: readonly string[] = ['recorded', 'announced'];
 /**
  * A signed Receipt of this agent, kept so the same bytes are resent until they land (04 §5). Its
@@ -1541,18 +1562,23 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const kept = await this.#ctx.store.transaction((tx) => {
       tx.delete('proofs', { status: AWAITING, created_at: { lt: now - AWAITING_SECONDS } });
       if (tx.get('proofs', { record_id: key }) !== undefined) return 'kept';
-      const waiting = tx.select('proofs', { status: AWAITING });
-      if (waiting.length >= MAX_AWAITING) return 'full';
-      // The contact's share: a waiting row belongs to the contact of its proof envelope, while that
-      // envelope is held and not refused.
+      // A waiting row whose proof envelope was refused, or is gone, can never be checked: it is
+      // removed here and releases its slot, as a pending row is (04 §3.4, M1-7g-f).
+      const waiting: Row<'proofs'>[] = [];
       let mine = 0;
-      for (const r of waiting) {
-        if (!r.record_id.startsWith(AWAITING_PREFIX)) continue;
-        const proofEnvelope = tx.get('envelopes', {
-          envelope_id: r.record_id.slice(AWAITING_PREFIX.length),
-        });
-        if (proofEnvelope?.state === 'ok' && proofEnvelope.contact_id === contactId) mine += 1;
+      for (const r of tx.select('proofs', { status: AWAITING })) {
+        const proofEnvelope = r.record_id.startsWith(AWAITING_PREFIX)
+          ? tx.get('envelopes', { envelope_id: r.record_id.slice(AWAITING_PREFIX.length) })
+          : undefined;
+        if (proofEnvelope?.state !== 'ok') {
+          tx.delete('proofs', { record_id: r.record_id, status: AWAITING });
+          continue;
+        }
+        waiting.push(r);
+        // The contact's share: a waiting row belongs to the contact of its proof envelope.
+        if (proofEnvelope.contact_id === contactId) mine += 1;
       }
+      if (waiting.length >= MAX_AWAITING) return 'full';
       if (mine >= PROOF_AWAITING_PER_CONTACT) return 'full';
       tx.insert('proofs', {
         record_id: key,
@@ -2296,6 +2322,38 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       ...(fee === undefined ? {} : { fee }),
       receipts: Object.freeze(receipts),
     });
+  }
+
+  /**
+   * The stored proofs, own and received, newest first and paged (M1-11r-a, the local UI's proof
+   * list). Store only: no chain read. IDs, chain, status and time; never the salt, the signed
+   * Record or a transaction hash.
+   */
+  list(query: PageQuery = {}): Promise<Page<ProofListItem>> {
+    return listProofs(this.#ctx, this.#platform, LISTED_PROOF_STATUSES, query);
+  }
+
+  /**
+   * The agent's credits on every supported chain (M1-11r-a): read-only, per chain, with a chain
+   * that cannot be read marked `available: false`. `unavailable` without the proofs platform or
+   * before init.
+   */
+  async creditsBalance(): Promise<CreditsView> {
+    return readCredits(this.#platform, await this.#deps.identity.agentAddress());
+  }
+
+  /**
+   * Free test credits on `chainId` (M1-11r-a; 05 §9, M1-10b). Testnets on the hard-coded allowlist
+   * only: any other chain, mainnets included, is refused before anything is sent. Sends only the
+   * chain ID and the agent ID. The one call of the local UI reads that is not a read.
+   */
+  async requestFaucet(chainId: number): Promise<FreeCreditsResult> {
+    return requestFreeCredits(
+      this.#ctx,
+      this.#platform,
+      await this.#deps.identity.agentAddress(),
+      chainId,
+    );
   }
 
   /**

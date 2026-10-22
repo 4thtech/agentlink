@@ -26,6 +26,8 @@ import { DeliveryAcks } from './acks.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
+import { FilesView } from './files/view.js';
+import { ActivityService } from './activity.js';
 import { deleteFilesOnReceipt, type ReceiptRetentionResult } from './files/retention.js';
 import { InboxService } from './inbox.js';
 import { policyLimits } from './policy-engine.js';
@@ -59,6 +61,7 @@ import {
   type NotarizeInput,
   type NotarizeResult,
   type ProofView,
+  PROOF_LOG_CODES,
 } from './proofs/service.js';
 
 export interface AgentLinkClientOptions {
@@ -155,6 +158,10 @@ export class AgentLinkClient {
    * Notarize, receipts, proof envelopes, replacement and the proof-pack export (M1-7g).
    */
   readonly proofs: ProofService;
+  /** The allowed folders as the rules name them and as resolved (M1-11r-a, the local UI). Read-only. */
+  readonly files: FilesView;
+  /** The non-message activity feed (M1-11r-a, the local UI): approvals, proofs, blocks, rules. */
+  readonly activity: ActivityService;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -222,6 +229,8 @@ export class AgentLinkClient {
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.#filesPlatform = files;
+    this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
+    this.activity = new ActivityService(ctx);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,
@@ -395,10 +404,24 @@ export class AgentLinkClient {
     // An accept whose offer is already recorded: its ACCEPTED receipt is signed now, under the
     // same approval (07 §2.1 step 3; D-55). Never fails the call.
     if (result.status === 'ok') {
+      // The proof flow's fixed codes: any other `code` value is redacted (I-7).
+      const log = this.#ctx.log.withCodes(PROOF_LOG_CODES);
       try {
         await this.proofs.runDeferredReceipts();
       } catch {
-        this.#ctx.log.warn('deferred receipt failed', { code: 'deferred_error' });
+        log.warn('deferred receipt failed', { code: 'deferred_error' });
+      }
+      // The result says what happened to the receipt in that run, not the state before it
+      // (M1-7g-f): the part is read again. Never fails the call.
+      if (result.receipt !== undefined) {
+        try {
+          const status = await this.terms.receiptStatus(input.envelopeId);
+          if (status !== undefined && status !== result.receipt.status) {
+            return { ...result, receipt: { ...result.receipt, status } };
+          }
+        } catch {
+          log.warn('deferred receipt failed', { code: 'deferred_error' });
+        }
       }
     }
     return result;

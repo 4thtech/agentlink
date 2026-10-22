@@ -86,3 +86,6 @@ export {
   type RecoveryKitStoreSource,
   type RecoveryKitWrite,
 } from './recovery-kit.js';
+// M1-9i-b2 (04 §2.2): the s3:<id> item holds the storage secret, so only KeyStore backends (the
+// StorageCredentialControl and the credentials provider) write or read it.
+export { encodeStorageCredentialItem, parseStorageCredentialItem } from './credential-digest.js';
