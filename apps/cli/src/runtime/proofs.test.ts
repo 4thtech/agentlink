@@ -402,3 +402,22 @@ describe('nodeProofs: paid calls and status follow the automatic selection (M1-2
     for (const host of hosts) expect(chiadoHosts).not.toContain(host);
   });
 });
+
+describe('free test credits wiring (M1-36i)', () => {
+
+  it('the platform carries the free-credits port, and the tools call only a shipped testnet one', () => {
+    const proofs = nodeProofs({ home });
+    expect(proofs).toBeDefined();
+    expect(proofs!.platform.faucet).toBeDefined();
+    expect(proofs!.tools.isFreeCreditsChain?.(84532)).toBe(true);
+    // A mainnet is never a free-credits chain.
+    expect(proofs!.tools.isFreeCreditsChain?.(8453)).toBe(false);
+    expect(proofs!.tools.isFreeCreditsChain?.(100)).toBe(false);
+  });
+
+  it('the second check: an allowlisted chain whose config is not a testnet is refused', () => {
+    const sepolia = chain.chainRegistry().find((c) => c.chainId === 84532)!;
+    const proofs = nodeProofs({ home, configs: [{ ...sepolia, testnet: false }] });
+    expect(proofs!.tools.isFreeCreditsChain?.(84532)).toBe(false);
+  });
+});
