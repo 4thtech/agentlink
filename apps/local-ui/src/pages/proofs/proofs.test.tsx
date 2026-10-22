@@ -9,7 +9,7 @@
 // - An empty list shows one next step: what to ask the AI.
 // - Server values render as text; a row the page does not recognise is left out. Reads only: the
 //   page never sends anything but GET.
-import { act, createElement as h } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
@@ -66,7 +66,7 @@ async function mount(routes: Routes): Promise<Call[]> {
   const s = server(routes);
   const api = createApiClient({ fetch: s.fetch, token: 't' });
   await act(async () => {
-    root.render(h(ProofsPage, { api }));
+    root.render(<ProofsPage api={api} />);
     await Promise.resolve();
   });
   // Let both reads settle.
@@ -228,7 +228,10 @@ describe('ProofsPage', () => {
     expect(text()).toContain(PROOFS_STRINGS.creditsUnavailable);
     act(() => root.unmount());
     root = createRoot(host);
-    await mount({ [LIST]: { status: 'ok', items: [] }, [CREDITS]: { ...OK_CREDITS, partial: true } });
+    await mount({
+      [LIST]: { status: 'ok', items: [] },
+      [CREDITS]: { ...OK_CREDITS, partial: true },
+    });
     expect(text()).toContain(PROOFS_STRINGS.creditsPartial);
   });
 

@@ -1,0 +1,59 @@
+/* Proofs and credits layout (d1 Local-proofs): the list beside the credits card, one column on a
+   narrow window. Design tokens only. */
+.pf-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: var(--al-space-7);
+  align-items: start;
+  margin-top: var(--al-space-6);
+}
+.pf-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+}
+.pf-side > p {
+  margin: 0;
+}
+.pf-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  min-width: 0;
+}
+.pf-table-wrap {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow-x: auto;
+}
+.pf-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.pf-table th,
+.pf-table td {
+  text-align: left;
+  padding: var(--al-space-4) var(--al-space-5);
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-default);
+  vertical-align: middle;
+}
+.pf-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.pf-table th {
+  color: var(--al-color-fg-muted);
+}
+.pf-dir {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.pf-more {
+  align-self: flex-start;
+}
+@media (max-width: 900px) {
+  .pf-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

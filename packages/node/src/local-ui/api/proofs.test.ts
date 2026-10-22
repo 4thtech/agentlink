@@ -76,8 +76,10 @@ function chain(
   };
 }
 
-const okCredits = (chains: Extract<CreditsView, { status: 'ok' }>['chains']): CreditsFn => () =>
-  Promise.resolve({ status: 'ok', agentId: AGENT, chains });
+const okCredits =
+  (chains: Extract<CreditsView, { status: 'ok' }>['chains']): CreditsFn =>
+  () =>
+    Promise.resolve({ status: 'ok', agentId: AGENT, chains });
 
 /** No ID, chain, token or address in a body. */
 function expectNoLeak(body: unknown): void {
