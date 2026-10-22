@@ -7,7 +7,7 @@
 // The global cap test runs last: it fills what is left of the day's cap with concurrent claims.
 // The canary at the end searches the console for every IP and agent address used.
 import { SELF } from 'cloudflare:test';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Hex } from '@4thtech-io/chain';
 import { FakeFaucet, fakeFaucets } from './fake-faucet.js';
 
@@ -86,6 +86,26 @@ describe('POST /v1/faucet: chains (SUB-7)', () => {
       expect(await res.json()).toEqual({ error: 'unsupported_chain' });
     }
     expect(faucet.calls).toHaveLength(0);
+  });
+});
+
+describe('POST /v1/faucet: the per-IP window resets at the clock hour (CHORE-DEFLAKE-1)', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('refuses inside the hour and allows again once the clock crosses the hour boundary', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-01T11:59:50Z'));
+    const ip = newIp();
+    for (let i = 0; i < 20; i += 1) {
+      expect((await claim({ chainId: 1, agent: newAgent() }, ip)).status).toBe(400);
+    }
+    const blocked = await claim({ chainId: CHAIN_ID, agent: newAgent() }, ip);
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get('retry-after'))).toBe(10);
+    vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
+    expect((await claim({ chainId: 1, agent: newAgent() }, ip)).status).toBe(400);
   });
 });
 
