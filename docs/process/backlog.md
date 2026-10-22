@@ -760,11 +760,18 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** the PR names the slow hook with its measured Windows duration; the fix or the per-file timeout lands with that measurement; no test or gate weakened.
 
 #### CHORE-DROP-5MB-FLAKE · packages/storage drop.worker.test.ts: 5 MB round trip timed out at 90 s in merge-group CI (new, flake 2026-10-21)
-- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only)
+- **Status:** done (4thtech/agentlink#365, merged 2026-10-21) · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only)
 - **Repo/path:** agentlink · `packages/storage/src/drop.worker.test.ts`
 - **Depends on:** —
 - **Scope:** Merge-group runs 39604257053 and 39600881141 ejected PRs: "5 MB round trip (single PUT)" timed out at 90000 ms (the 6 MiB test took 34.6 and 35.9 s, the small round trip 15.4 s). Locally the test takes 2.9 s (encrypt and upload 1.5 s, download and decrypt 0.7 s, two SHA-256 of the file 0.7 s: pure JS in workerd, CPU-bound), so the cause is a CPU-starved runner while turbo runs all packages in parallel, not Miniflare startup or chunking. Both large round trips now share a measured 300 s per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). The payload stays 5 MB (card M1-6c) and no assertion changed. No retries.
 - **Acceptance:** the PR cites the local and CI timings; no test or gate weakened.
+
+#### CHORE-VECTORS-KDF-TIMEOUT · test-vectors: measured timeout for memory-hard keystore-file cases (new, flake 2026-10-21)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: `test-vectors/**`; test only)
+- **Repo/path:** agentlink · `test-vectors/harness/suite.ts`, `test-vectors/harness/vectors.test.ts`, `test-vectors/harness/suites/{keystore-file,owner-wrap,prf-wrap,recovery-kit}.ts`
+- **Depends on:** —
+- **Scope:** The `vectors` job failed on 23 CI runs on 2026-10-21 (for example 39675991371, 39669358010 on main, 39655613628 for #367) with `keystore-file v1 > open-cap-memory` "Test timed out in 5000ms". The case runs Argon2id at the cap (m = 256 MiB, t = 2): 1.8 s on an idle Mac, 2.1 to 4.97 s on passing CI runs; the 64 MiB keystore-file cases take up to 3.6 s on CI. A suite module may now declare a measured per-case `timeoutMs`, which the shared test file applies in every runtime; `keystore-file` sets 60 s, the crypto package's Argon2id value (test timeout policy, `repo-reference.md`, M0-10e). Under load (40 parallel copies on a 14-core Mac) every copy timed out before and passed after (open-cap-memory 8.5 to 10.8 s). The global timeout, KDF parameters, vectors and assertions are unchanged. No retries. The other Argon2id suites, `owner-wrap`, `prf-wrap` and `recovery-kit` (up to 5.4, 4.1 and 2.7 s in WebKit on CI, 2.6, 1.8 and 1.6 s in workerd), get the same measured 60 s.
+- **Acceptance:** the PR cites the CI failures and the local loaded runs before and after; no assertion, KDF parameter, vector or global timeout changed.
 
 #### CHORE-CI-SUPERSEDED · A deploy or release whose CI was superseded ends skipped, and main's head still deploys (new, 2026-10-21)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
@@ -772,6 +779,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Depends on:** CHORE-DEPLOY-PATH-TRIGGERS
 - **Scope:** GitHub keeps one pending run per concurrency group, so a newer push to main cancels an older commit's CI run while it still waits for a runner. Runs 39579893615 (deploy-submitter) and 39579893549 (Release) for 52613475 then failed with "CI of this commit is not green", and the newer commit did not touch the submitter's paths, so the fix never deployed. `wait-for-ci.mjs --superseded-ok` now ends such a run green with `result=superseded` and a notice (only when no gate failed and main's head descends from the commit); every workflow's `guard` requires `result == 'green'`. The deploy workflows get a `catch-up` job (only `actions: write`): when a run did not deploy because main moved on (CI superseded, or the production head check found a newer head), it dispatches the same workflow on main unless a run already exists for the head. Also: the `roll-changelog` CLI tests rolled with the default `changelog.d` relative to the current directory and deleted the repository's fragments when run from the repo root; they now use temp directories only, and a guard test runs them from a scratch directory whose fragment must survive.
 - **Acceptance:** RED tests first; a superseded run deploys and releases nothing; nothing is deployed without its own commit's green CI, the staging smoke, the production environment, `DEPLOY_FREEZE` and the head check; actionlint clean; no gate or test weakened.
+
+#### CHORE-CI-MATRIX-QUEUE-ONLY · Run macOS and Windows legs in the merge queue only, skip heavy jobs for docs-only changes (new, 2026-10-22)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 by path (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `docs/process/ci-cd.md`
+- **Depends on:** —
+- **Scope:** On GitHub Free 30 to 60 runs queue behind 5 runners, mostly the macOS and Windows matrix legs, which ran on every PR push and again in the merge queue. They now run on `merge_group` and `push` to `main` only; docs-only changes skip the heavy jobs. `ci-gate` counts skipped as success, so the four required checks are unchanged.
+- **Acceptance:** nothing that runs in `merge_group` is weakened; no deploy workflow touched; no auto-merge.
 
 #### CHORE-CI-FOLLOWUPS · Main CI never cancelled while pending; openssl hook timeouts in packages/node (new, 2026-10-21)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
@@ -1800,7 +1814,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The native-xDAI fee configuration reads back as configured; Chiado addresses published in the next prerelease.
 
 #### M1-3j-b · enable Chiado in automatic selection after smoke test and faucet (new, M1-3j review)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#373, merged 2026-10-21; enabling Chiado itself is M1-3j-c) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`NOT_AUTO_SELECTED` in clients/registry.ts, faucet allowlist), apps/submitter (faucet config), apps/cli (default proof chains)
 - **Depends on:** M1-3j (Chiado deployed, `@4thtech-io/occ-v2-abi` v0.1.0-testnet.3 imported), the Chiado smoke test, M1-10b-b, M1-10c
 - **Spec:** 07 §6.3; 05 §9; D-40, D-46
@@ -2019,6 +2033,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-3
 - **Scope:** the `SubmitterChain` port's `getRecord` treats only the Notary's `RecordNotFound` revert as "absent", as the client's `getRecord` now does; any other revert or read error is an error, never "absent", so no replacement is signed on a failed read.
 - **Acceptance:** tests first: `RecordNotFound` gives absent; another revert, a transport error and an empty result do not.
+
+#### M1-4c-d · chain: the chain-state `getRecord` fails closed on a zero-signer struct (new, M1-4c-c review)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain/src/clients/state.ts
+- **Depends on:** M1-4c-c
+- **Spec:** 04 §5; 07 §6.2
+- **Invariants:** I-3
+- **Scope:** the chain-state port's `getRecord` reads only the Notary's `RecordNotFound` revert as "absent". A returned struct with a zero signer cannot come from the deployed Notary, so it is ChainError `bad_answer` (retryable), never "absent": `replacementAllowed` refuses, and no record or receipt is sent on it.
+- **Acceptance:** tests first: a zero-signer struct is not absent; `replacementAllowed` refuses on it (record and receipt); `readInclusion`, `notarize` and `acknowledge` fail with a ChainError and send nothing; `RecordNotFound` still means absent.
 
 #### M1-4d-e · chain: card confirmation for contract-account signers (new, D-102 follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** later (not M1)
@@ -2278,7 +2301,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Revisit in M2 (D-71 (5)); the alternatives are recorded in G-49.
 
 #### M1-5g · core: sync carries the transport's incomplete flag up to the user (new, IR-M1-5d-1 M-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
+- **Status:** done (4thtech/agentlink#366, merged 2026-10-21) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before M1-GATE)
 - **Repo/path:** agentlink · packages/core (inbox sync), apps/cli (`agentlink_inbox`, `agentlink_status`)
 - **Depends on:** M1-5d
 - **Spec:** 07 §4.2 (Sync); 06 §2.1; 04 §3.5
@@ -3415,7 +3438,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** the proof lines of the M1-9d acceptance, as tool-layer tests: `agentlink_notarize` with zero credits → `needs_credits` with agent address and `topUpUrl`; `agentlink_notarize` on an `offer`, `accept` or `reject` envelope → `USE_TERMS_TOOLS` with no record submitted; `agentlink_acknowledge` `accepted` on a record with terms → `USE_RESPOND_TO_TERMS`; export with the content key creates an approval and writes nothing before it; `agentlink_verify_proof_pack` outside the D-87 folders → `PATH_NOT_ALLOWED` with the file never opened; the name canary returns `signerName` only restricted, with `signerLabel`; schema and behaviour test per `status` value of each tool; RED commit.
 
 #### M1-9d-3 · Terms tools: firm offers and recorded accepts (new, from IR-M1-13c-1)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (commitments and paid actions, D-31, D-55) · **Phase:** M1b · **Blocks:** M1 GATE (J8)
+- **Status:** done (4thtech/agentlink#363, merged 2026-10-21) · **Size:** M · **Tier:** Opus · **Security:** S2 (commitments and paid actions, D-31, D-55) · **Phase:** M1b · **Blocks:** M1 GATE (J8)
 - **Repo/path:** agentlink · packages/core (`src/terms-flow.ts`, `src/proofs/service.ts`), apps/cli (`src/tools/propose-terms.ts`, `respond-to-terms.ts`, `terms-common.ts`)
 - **Depends on:** M1-32 (done), M1-7g, M1-7g-d (done: the deferred ACCEPTED receipt), M1-9d-2 (done); D-114 (the submitter side of receipts is M1-34-b, not this card)
 - **Spec:** 06 §2.2a, §2.4, §3 "Commitments"; 04 §3.4, §3.4.2; 05 §3.1 (kinds `OFFER`, `ACCEPT`), 05 §3.3; 07 §2.1, §6.3, §8; 02 J8; 11 §5, §5.6; D-31, D-55, D-109, D-111, D-114
@@ -4385,7 +4408,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
 
 #### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#353, merged 2026-10-21) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
 - **Depends on:** M1-9zb
 - **Scope:** when an invite is accepted, require the contact id derived from the invite to equal the counterparty's verified card id; refuse otherwise with no state change. Source: review low, 2026-10-18.
