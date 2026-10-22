@@ -147,8 +147,10 @@ describe('deploy-drop.yml structure', () => {
     expect(production).toMatch(/deployments status/);
     expect(production).toMatch(/wrangler rollback/);
     expect(production).toMatch(/\/v1\/health/);
+    // M1-27b-b: keyed on the deploy step's outcome, not on an output that a step cancelled or
+    // timed out mid-way may never have written.
     expect(production).toMatch(
-      /if: \(failure\(\) \|\| cancelled\(\)\) && steps\.deploy\.outputs\.deployed == 'true'\n/,
+      /if: \(failure\(\) \|\| cancelled\(\)\) && contains\(fromJSON\('\["success", "failure", "cancelled"\]'\), steps\.deploy\.outcome\)\n/,
     );
     // The rollback is verified by the live version, not only by /v1/health.
     const rollback = production.slice(production.indexOf('id: rollback'));
@@ -176,13 +178,25 @@ describe('deploy-drop.yml structure', () => {
     expect(job('deploy-production')).toMatch(/concurrency:\n {6}group: deploy-drop-production/);
   });
 
-  it('reads back the lifecycle rule and the logging settings after each deploy', () => {
+  it('checks the lifecycle rule before each deploy, the logging settings after it (M1-27b-b)', () => {
     for (const name of ['deploy-staging', 'deploy-production']) {
       const body = job(name);
-      expect(body).toMatch(/READBACK-LIFECYCLE-BEGIN/);
-      expect(body).toMatch(/READBACK-SETTINGS-BEGIN/);
-      expect(body).toMatch(/\/script-settings/);
-      expect(body).toMatch(/\/lifecycle/);
+      const deploy = body.indexOf('id: deploy\n');
+      expect(deploy).toBeGreaterThan(-1);
+      // The bucket rule is fetched and checked before anything goes live: a missing rule fails
+      // the job with nothing deployed (no rollback, no freeze needed).
+      const check = body.indexOf('READBACK-LIFECYCLE-BEGIN');
+      expect(check).toBeGreaterThan(-1);
+      expect(check).toBeLessThan(deploy);
+      expect(body.indexOf('/lifecycle"')).toBeGreaterThan(-1);
+      expect(body.lastIndexOf('/lifecycle"')).toBeLessThan(check);
+      const step = body.slice(body.lastIndexOf('- name:', check), check);
+      expect(step).toMatch(/\n {8}id: lifecycle\n {8}if: steps\.ready\.outputs\.ready == 'true'\n/);
+      // The deploy runs only after the check passed.
+      expect(body).toMatch(/id: deploy\n {8}if: steps\.lifecycle\.outcome == 'success'\n/);
+      // The logging settings belong to the deployed Worker: read back after the deploy.
+      expect(body.indexOf('READBACK-SETTINGS-BEGIN')).toBeGreaterThan(deploy);
+      expect(body.indexOf('/script-settings')).toBeGreaterThan(deploy);
     }
   });
 
@@ -641,16 +655,20 @@ function scriptedTools({
   body = '{"ok":true}',
   rollback = { output: 'Rolled back', exit: 0 },
   live = '',
+  liveBefore = 'fedcba98-0000-4000-8000-000000000002',
   gh = { output: '', exit: 0 },
 } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'drop-scripted-'));
   const bin = join(dir, 'bin');
   mkdirSync(bin);
   const q = (value) => JSON.stringify(String(value));
-  const versions = live ? [{ version_id: live, percentage: 100 }] : [];
+  const status = (id) =>
+    JSON.stringify({ versions: id ? [{ version_id: id, percentage: 100 }] : [] });
   writeFileSync(join(dir, 'body.json'), body);
   writeFileSync(join(dir, 'curl.txt'), curl.map(([code, exit]) => `${code} ${exit}\n`).join(''));
   writeFileSync(join(dir, 'calls'), '');
+  writeFileSync(join(dir, 'pnpm-calls'), '');
+  writeFileSync(join(dir, 'sleeps'), '');
   writeFileSync(
     join(bin, 'curl'),
     [
@@ -670,14 +688,20 @@ function scriptedTools({
       'exit "$rc"',
     ].join('\n'),
   );
-  writeFileSync(join(bin, 'sleep'), '#!/usr/bin/env bash\nexit 0\n');
+  writeFileSync(
+    join(bin, 'sleep'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> ${q(join(dir, 'sleeps'))}\nexit 0\n`,
+  );
+  // `deployments status` answers `liveBefore` until a rollback ran, then `live`.
+  const rolled = join(dir, 'rolled');
   writeFileSync(
     join(bin, 'pnpm'),
     [
       '#!/usr/bin/env bash',
+      `printf '%s\\n' "$*" >> ${q(join(dir, 'pnpm-calls'))}`,
       'case " $* " in',
-      `  *" rollback "*) printf '%s\\n' ${q(rollback.output)}; exit ${rollback.exit} ;;`,
-      `  *" deployments status "*) printf '%s\\n' ${q(JSON.stringify({ versions }))}; exit 0 ;;`,
+      `  *" rollback "*) : > ${q(rolled)}; printf '%s\\n' ${q(rollback.output)}; exit ${rollback.exit} ;;`,
+      `  *" deployments status "*) if [ -e ${q(rolled)} ]; then printf '%s\\n' ${q(status(live))}; else printf '%s\\n' ${q(status(liveBefore))}; fi; exit 0 ;;`,
       'esac',
       'exit 99',
     ].join('\n'),
@@ -704,6 +728,8 @@ function runScripted(script, fakes, env) {
   return {
     ...result,
     curlCalls: readFileSync(join(fakes.dir, 'calls'), 'utf8').split('\n').filter(Boolean).length,
+    pnpmCalls: readFileSync(join(fakes.dir, 'pnpm-calls'), 'utf8').split('\n').filter(Boolean),
+    sleeps: readFileSync(join(fakes.dir, 'sleeps'), 'utf8').split('\n').filter(Boolean),
     summary: readFileSync(fakes.summary, 'utf8'),
   };
 }
@@ -836,6 +862,7 @@ describe('production rollback (M1-27b-c)', () => {
   const run = (fake, env = {}) =>
     runScripted(script, scriptedTools(fake), {
       PREVIOUS,
+      DEPLOY_OUTCOME: 'success',
       RUN_ID: '1',
       DROP_PRODUCTION_ORIGIN: 'https://drop.example.test',
       CLOUDFLARE_API_TOKEN: 'test-token-value',
@@ -892,6 +919,99 @@ describe('production rollback (M1-27b-c)', () => {
     const none = run({}, { PREVIOUS: '' });
     expect(none.ok).toBe(false);
     expect(none.github).toContain('result=no-target');
+  });
+
+  // M1-27b-b: a deploy step cancelled or timed out mid-way. Its wrangler process is killed, but a
+  // request it already sent may still land, so the step waits before it reads the live version.
+  it('waits for an interrupted deploy request to settle, only when the deploy step did not succeed', () => {
+    for (const outcome of ['cancelled', 'failure']) {
+      const result = run({ live: PREVIOUS }, { DEPLOY_OUTCOME: outcome });
+      expect(result.ok, result.output).toBe(true);
+      expect(result.sleeps[0], outcome).toBe('30');
+    }
+    expect(run({ live: PREVIOUS }).sleeps).not.toContain('30');
+  });
+
+  it('rolls back a cancelled deploy that went live', () => {
+    const result = run({ live: PREVIOUS }, { DEPLOY_OUTCOME: 'cancelled' });
+    expect(result.ok, result.output).toBe(true);
+    expect(result.github).toContain('result=rolled-back');
+    expect(result.pnpmCalls.some((call) => / rollback /.test(` ${call} `))).toBe(true);
+  });
+
+  it('does not roll back when the recorded version is still live, and still checks health', () => {
+    const result = run(
+      { liveBefore: PREVIOUS, live: PREVIOUS, curl: [['200', 0]] },
+      { DEPLOY_OUTCOME: 'cancelled' },
+    );
+    expect(result.ok, result.output).toBe(true);
+    expect(result.github).toContain('result=previous-live');
+    expect(result.pnpmCalls.some((call) => / rollback /.test(` ${call} `))).toBe(false);
+    expect(result.curlCalls).toBeGreaterThan(0);
+    expect(result.output).toMatch(/::warning::[^\n]*still live/);
+  });
+
+  it('rolls back when the live version cannot be read before the rollback', () => {
+    const result = run({ liveBefore: '', live: PREVIOUS }, { DEPLOY_OUTCOME: 'cancelled' });
+    expect(result.ok, result.output).toBe(true);
+    expect(result.github).toContain('result=rolled-back');
+  });
+});
+
+describe('cancellation and timeouts of the production deploy (M1-27b-b)', () => {
+  const production = job('deploy-production');
+  const steps = production
+    .slice(production.indexOf('\n    steps:\n'))
+    .split(/\n {6}- (?=name: )/)
+    .slice(1);
+  const minutes = (text, indent) =>
+    Number(new RegExp(`\\n {${indent}}timeout-minutes: (\\d+)\\n`).exec(`\n${text}`)?.[1] ?? NaN);
+  const DEPLOYED = `contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome)`;
+
+  it('gives every production step its own timeout', () => {
+    expect(steps.length).toBeGreaterThanOrEqual(15);
+    for (const step of steps) {
+      expect(minutes(step, 8), step.split('\n')[0]).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps the job timeout above the sum of the step timeouts, so a slow step fails as a step and the rollback still runs', () => {
+    const total = steps.reduce((sum, step) => sum + minutes(step, 8), 0);
+    const jobTimeout = minutes(production, 4);
+    expect(total).toBeGreaterThan(0);
+    expect(jobTimeout).toBeGreaterThan(total);
+    // The health check keeps its 20-minute bound for a new Custom Domain's certificate (M1-27b-c).
+    const health = steps.find((step) => step.startsWith('name: Health check\n'));
+    expect(minutes(health ?? '', 8)).toBe(20);
+    const rollback = steps.find((step) => /\n {8}id: rollback\n/.test(step));
+    expect(minutes(rollback ?? '', 8)).toBeGreaterThanOrEqual(5);
+  });
+
+  it('counts a cancelled or failed deploy step as deployed for the rollback, the record and the freeze', () => {
+    expect(production).toContain(`deployed: \${{ ${DEPLOYED} && 'true' || 'false' }}`);
+    expect(production).toContain(`if: always() && ${DEPLOYED}\n`);
+    expect(production).toMatch(/DEPLOY_OUTCOME: \$\{\{ steps\.deploy\.outcome \}\}/);
+    expect(production).not.toMatch(/steps\.deploy\.outputs\.deployed/);
+    // The freeze job runs after a cancelled run too (`always()`), keyed on the job output.
+    expect(job('freeze')).toMatch(
+      /always\(\) && vars\.DEPLOY_FREEZE != 'true' &&\n\s+needs\.deploy-production\.outputs\.deployed == 'true' && needs\.deploy-production\.result != 'success'/,
+    );
+  });
+
+  it('states the same tighter cpu_ms in wrangler.toml and the deploy contract', () => {
+    const toml = readFileSync(
+      resolve(import.meta.dirname, '../../apps/drop/wrangler.toml'),
+      'utf8',
+    );
+    const values = [...toml.matchAll(/^cpu_ms = (\d+)$/gm)].map((m) => Number(m[1]));
+    expect(values.length).toBe(3);
+    expect(new Set(values).size).toBe(1);
+    expect(values[0]).toBeLessThan(30_000);
+    const contract = readFileSync(
+      resolve(import.meta.dirname, '../../docs/process/release-and-deployment.md'),
+      'utf8',
+    );
+    expect(contract).toContain(`\`limits.cpu_ms = ${values[0]}\` in every environment`);
   });
 });
 
