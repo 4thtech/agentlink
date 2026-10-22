@@ -54,7 +54,9 @@ describe('approval nextStep with the get_approval hint', () => {
       const { output, origins } = await withApprovalLink(withRetry, ctx);
       expect(output.result.url).toBe(url);
       expect(output.result.nextStep).toContain('agentlink_get_approval');
-      expect(output.result.nextStep).toContain(`approvalId ${APPROVAL}`);
+      expect(output.result.nextStep).toContain(
+        `retry this call with the same inviteUrl and approvalId ${APPROVAL}`,
+      );
       expect([...(output.result.nextStep ?? '')].length).toBeLessThanOrEqual(500);
       expect(resultIsValid(output.result, origins)).toBe(true);
       expect(finalizeResult(output, origins).structured.code).toBeUndefined();

@@ -581,7 +581,7 @@ describe('agentlink_accept_invite called again without approvalId (M1-13a follow
     const id = pendingId(asked);
     const next = String(asked.structured.nextStep);
     expect(next).toContain(`agentlink approve ${id}`);
-    expect(next).toContain('same inviteUrl');
+    expect(next).toContain('retry this call with the same inviteUrl');
     expect(next).toContain(`approvalId ${id}`);
     expect(next).not.toContain(url);
   });
