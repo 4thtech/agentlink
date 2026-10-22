@@ -14,6 +14,7 @@ import {
   ChainError,
   FEE_VAULT_CLIENT_ABI,
   NOTARY_CLIENT_ABI,
+  checkDirectCall,
   createBroadcaster,
   createChainState,
   createReadClient,
@@ -179,7 +180,8 @@ describe('createChainState', () => {
   it('simulate: refuses any function outside the direct-mode set before a request', async () => {
     const { state, seen } = stateWith(() => ({ result: '0x' }));
     for (const [contract, functionName] of [
-      ['vault', 'withdraw'],
+      ['vault', 'depositFor'],
+      ['vault', 'withdrawIntegrator'],
       ['vault', 'depositWithAuthorization'],
       ['notary', 'pause'],
       ['erc20', 'transfer'],
@@ -196,6 +198,15 @@ describe('createChainState', () => {
       ).rejects.toMatchObject({ code: 'invalid_call' });
     }
     expect(seen).toHaveLength(0);
+  });
+});
+
+describe('checkDirectCall (M1-4c-b)', () => {
+  it('allows withdraw on the vault, for the typed withdraw API (sendWithdraw)', () => {
+    expect(() => checkDirectCall({ contract: 'vault', functionName: 'withdraw' })).not.toThrow();
+    expect(() => checkDirectCall({ contract: 'notary', functionName: 'withdraw' })).toThrow(
+      ChainError,
+    );
   });
 });
 
