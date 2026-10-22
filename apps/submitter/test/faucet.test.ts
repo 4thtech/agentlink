@@ -16,9 +16,19 @@ const CHAIN_ID = 84532;
 const DAILY_CAP = 10;
 
 const faucet = new FakeFaucet(CHAIN_ID);
+// CHORE-DEFLAKE-1: the per-IP limiter is a fixed window aligned to the clock hour (src/limits.ts),
+// so a run that crosses the hour could reset a counter mid-test. The clock is pinned to half past
+// an hour (the date is far enough ahead that the real clock never reaches the limiter's cleanup
+// alarm), so the window cannot roll inside a test; tests that cross a boundary set their own time.
+const PINNED_NOW = new Date('2030-01-01T11:30:00Z');
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(PINNED_NOW);
   faucet.mode = 'sent';
   fakeFaucets.set(CHAIN_ID, faucet);
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const secrets = new Set<string>();
@@ -90,12 +100,7 @@ describe('POST /v1/faucet: chains (SUB-7)', () => {
 });
 
 describe('POST /v1/faucet: the per-IP window resets at the clock hour (CHORE-DEFLAKE-1)', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('refuses inside the hour and allows again once the clock crosses the hour boundary', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2030-01-01T11:59:50Z'));
     const ip = newIp();
     for (let i = 0; i < 20; i += 1) {
