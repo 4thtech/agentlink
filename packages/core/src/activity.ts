@@ -2,7 +2,9 @@
 // not messages, merged from the stores that already hold them. No table of its own and no write.
 //
 // Sources (each row's own time):
-// - `approvals` with a `decided_at`: the owner's decision (approved, denied, cancelled);
+// - `approvals` with a `decided_at`: the owner's signed decision (approved, denied, cancelled), or
+//   a grant by the owner's signed rules (`approved_by_rules`); a request voided by the system or
+//   lapsed undecided is not a decision and is left out (IR-M1-11r-a-1 M-1);
 // - `proofs` records, own and received (not replaced; not stored receipts or waiting rows);
 // - `blocked_keys`: an unknown sender the owner blocked, shown by its sender code (04 §2.9, D-72);
 // - `contacts` with status `blocked`, at the row's `updated_at` (the store keeps no separate block
@@ -27,7 +29,8 @@ import {
 } from './paging.js';
 import { LISTED_PROOF_STATUSES } from './proofs/service.js';
 import { senderCodesFor } from './sender-codes.js';
-import { SINGLETON_SLOT } from './store/schema.js';
+import { SINGLETON_SLOT, type Row } from './store/schema.js';
+import type { Where } from './store/store.js';
 
 interface EntryBase {
   /** Stable and unique in the feed: `<kind>:<row ID>`. Pass it back only through a cursor. */
@@ -40,7 +43,11 @@ export type ActivityEntry =
   | (EntryBase & {
       readonly kind: 'approval_decided';
       readonly approvalId: string;
-      readonly decision: 'approved' | 'denied' | 'cancelled';
+      /**
+       * `approved` / `denied` / `cancelled`: the owner's signed decision. `approved_by_rules`: the
+       * owner's signed rules granted it without asking (a rules grant, 04 §3.4.2).
+       */
+      readonly decision: ApprovalDecision;
     })
   | (EntryBase & {
       readonly kind: 'proof';
@@ -57,9 +64,29 @@ export type ActivityEntry =
   | (EntryBase & { readonly kind: 'contact_blocked'; readonly contactId: string })
   | (EntryBase & { readonly kind: 'rules_changed'; readonly version: number });
 
+export type ApprovalDecision = 'approved' | 'approved_by_rules' | 'denied' | 'cancelled';
+
 type Candidate = PagePosition & { readonly entry: () => ActivityEntry };
 
 const NOSTR_KEY = /^[0-9a-f]{64}$/;
+const BLOCKED = 'sender_blocked:';
+
+/**
+ * What a decided approval row shows (display only: the status cache authorises nothing, 04
+ * §2.5.1). Undefined for a row that records no decision: a request voided by the system (a newer
+ * scope, a revoked contact, a terms conflict) or one that lapsed undecided.
+ */
+function decisionOf(r: Row<'approvals'>): ApprovalDecision | undefined {
+  // A denial is always owner-signed: a signed deny, or a signed cancel of a pending request.
+  if (r.status === 'denied') {
+    return r.signed_decision !== null || r.signed_cancel !== null ? 'denied' : undefined;
+  }
+  if (r.status === 'cancelled') return r.signed_cancel !== null ? 'cancelled' : undefined;
+  if (r.status === 'pending') return undefined;
+  // approved, or void / expired after it was granted (used or lapsed).
+  if (r.source === 'policy_grant') return 'approved_by_rules';
+  return r.signed_decision !== null ? 'approved' : undefined;
+}
 
 export class ActivityService {
   readonly #ctx: CoreContext;
@@ -74,31 +101,33 @@ export class ActivityService {
     const cursor = parseCursor(query.cursor);
     const candidates = await this.#ctx.store.transaction((tx): Candidate[] => {
       const out: Candidate[] = [];
-      const add = (at: number, id: string, entry: () => ActivityEntry): void => {
-        out.push({ at, id, entry });
+      // `position` orders the feed and makes the cursor: `<kind>:<the row key the store orders by>`.
+      const add = (at: number, position: string, entry: () => ActivityEntry): void => {
+        out.push({ at, id: position, entry });
       };
 
-      const approvals = candidatesTx(
-        tx,
-        'approvals',
-        {},
-        'decided_at',
-        'approval_id',
-        cursor,
-        limit,
+      // Three disjoint selections, so a row that is not shown never takes a row's place on a page:
+      // (1) denied, cancelled and approved rows; (2) `void` or `expired` rows with an owner-signed
+      // decision (an approve later used or lapsed); (3) `void` or `expired` rules grants (used or
+      // lapsed). A `void` or `expired` owner request without a decision (voided by the system, or
+      // never decided) is not a decision and is left out, as approvals.ts readApproval does.
+      const AP = 'approval_decided:';
+      const ENDED = { in: ['void', 'expired'] } as const;
+      const approvals = (
+        [
+          { status: { in: ['approved', 'denied', 'cancelled'] } },
+          { status: ENDED, signed_decision: { gte: '' } },
+          { status: ENDED, source: 'policy_grant' },
+        ] satisfies Where<'approvals'>[]
+      ).flatMap((where) =>
+        candidatesTx(tx, 'approvals', where, 'decided_at', 'approval_id', AP, cursor, limit),
       );
       for (const r of approvals) {
         const at = r.decided_at;
-        if (at === null || r.status === 'pending') continue;
-        // A cancel of an undecided request denied it (04 §2.5.1); `void` and `expired` after an
-        // approve were approved (then used or lapsed).
-        const decision =
-          r.signed_decision === null || r.status === 'denied'
-            ? 'denied'
-            : r.status === 'cancelled'
-              ? 'cancelled'
-              : 'approved';
-        const id = `approval_decided:${r.approval_id}`;
+        if (at === null) continue;
+        const decision = decisionOf(r);
+        if (decision === undefined) continue;
+        const id = `${AP}${r.approval_id}`;
         add(at, id, () => ({
           kind: 'approval_decided',
           id,
@@ -114,6 +143,7 @@ export class ActivityService {
         { status: { in: [...LISTED_PROOF_STATUSES] } },
         'created_at',
         'record_id',
+        'proof:',
         cursor,
         limit,
       );
@@ -130,15 +160,26 @@ export class ActivityService {
         }));
       }
 
-      const blocked = candidatesTx(tx, 'blocked_keys', {}, 'blocked_at', 'from_key', cursor, limit);
+      const blocked = candidatesTx(
+        tx,
+        'blocked_keys',
+        {},
+        'blocked_at',
+        'from_key',
+        BLOCKED,
+        cursor,
+        limit,
+      );
       const codes = senderCodesFor(blocked.map((r) => r.from_key));
       for (const r of blocked) {
         const code = codes.get(r.from_key);
         if (code === undefined || !NOSTR_KEY.test(r.from_key)) continue;
-        // The ID is the long sender code: unique per key, and never the key itself.
+        // The entry ID is the long sender code: unique per key, and never the key itself. The
+        // page position (and so a cursor that ends on this entry) uses the key, the column the
+        // store orders by; the cursor is opaque and only ever handed back to this read.
         const long = formatFingerprint(senderDigest(decodeHex(r.from_key, { length: 32 })), 'long');
-        const id = `sender_blocked:${long}`;
-        add(r.blocked_at, id, () => ({
+        const id = `${BLOCKED}${long}`;
+        add(r.blocked_at, `${BLOCKED}${r.from_key}`, () => ({
           kind: 'sender_blocked',
           id,
           at: r.blocked_at,
@@ -152,6 +193,7 @@ export class ActivityService {
         { status: 'blocked' },
         'updated_at',
         'contact_id',
+        'contact_blocked:',
         cursor,
         limit,
       );

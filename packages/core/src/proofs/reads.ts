@@ -87,6 +87,7 @@ export async function listProofs(
       { status: { in: [...statuses] } },
       'created_at',
       'record_id',
+      '',
       cursor,
       limit,
     ),

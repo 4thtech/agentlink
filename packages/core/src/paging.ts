@@ -63,8 +63,8 @@ export function isAfter(item: PagePosition, cursor: PagePosition | undefined): b
 }
 
 /**
- * The page from candidates that include, for every source, its `limit + 1` newest items before the
- * cursor time and all its items at the cursor time: sorted, the cursor applied, cut at `limit`.
+ * The page from candidates that include, for every source, its `limit + 1` first items after the
+ * cursor (candidatesTx): sorted, the cursor applied, cut at `limit`.
  */
 export function pageOf<T extends PagePosition>(
   candidates: readonly T[],
@@ -80,12 +80,15 @@ export function pageOf<T extends PagePosition>(
 }
 
 /**
- * Inside a transaction: the candidate rows of one table for a page (see pageOf), every row whose
- * `time` is not null and could be on it. `where` narrows the table (its `time` condition, if any,
- * is replaced). It takes the `limit + 1` newest rows before the cursor time, every other row at the
- * time of the last of them, and every row at the cursor time, so the page does not depend on how
- * the store orders rows of equal time: pageOf orders them by the item's own ID. `key` (the primary
- * key column) only removes duplicates.
+ * Inside a transaction: the first `limit + 1` rows of one table after the cursor, in newest-first
+ * order on the composite (`time`, `key`), so a page never reads more than `limit + 1` rows of a
+ * table (IR-M1-11r-a-1 L-2), however many share one time.
+ *
+ * Each item's ID is `prefix + <key value>`, and the store orders `key` by code unit as pageOf orders
+ * IDs, so the cursor's ID maps to a position in this table: with the prefix, the key below which
+ * rows at the cursor time follow; otherwise all or none of them (no source prefix is a prefix of
+ * another, so the prefix alone decides). `where` narrows the table; its `time` and `key`
+ * conditions, if any, are replaced. Rows whose `time` is null are never read.
  */
 export function candidatesTx<T extends TableName>(
   tx: StoreTx,
@@ -93,26 +96,30 @@ export function candidatesTx<T extends TableName>(
   where: Where<T>,
   time: ColumnName<T>,
   key: ColumnName<T>,
+  prefix: string,
   cursor: PagePosition | undefined,
   limit: number,
 ): Row<T>[] {
-  const at = (condition: unknown): Where<T> => ({ ...where, [time]: condition }) as Where<T>;
-  const rows = tx.select(table, at(cursor === undefined ? { gte: 0 } : { lt: cursor.at }), {
-    orderBy: [[time, 'desc']],
-    limit: limit + 1,
+  const want = limit + 1;
+  const orderBy: readonly (readonly [ColumnName<T>, 'asc' | 'desc'])[] = [
+    [time, 'desc'],
+    [key, 'desc'],
+  ];
+  const cond = (t: unknown, k?: unknown): Where<T> =>
+    ({ ...where, [time]: t, ...(k === undefined ? {} : { [key]: k }) }) as Where<T>;
+  if (cursor === undefined) return tx.select(table, cond({ gte: 0 }), { orderBy, limit: want });
+  // Rows at the cursor time that follow it.
+  let ties: Row<T>[] = [];
+  if (cursor.id.startsWith(prefix)) {
+    const below = cursor.id.slice(prefix.length);
+    ties = tx.select(table, cond(cursor.at, { lt: below }), { orderBy, limit: want });
+  } else if (prefix < cursor.id) {
+    ties = tx.select(table, cond(cursor.at), { orderBy, limit: want });
+  }
+  if (ties.length >= want) return ties;
+  const older = tx.select(table, cond({ lt: cursor.at }), {
+    orderBy,
+    limit: want - ties.length,
   });
-  const extra: Row<T>[] = [];
-  const last = rows[rows.length - 1];
-  if (rows.length === limit + 1 && last !== undefined) {
-    extra.push(...tx.select(table, at(last[time as keyof Row<T>])));
-  }
-  if (cursor !== undefined) extra.push(...tx.select(table, at(cursor.at)));
-  const seen = new Set(rows.map((r) => r[key as keyof Row<T>]));
-  for (const r of extra) {
-    const k = r[key as keyof Row<T>];
-    if (seen.has(k)) continue;
-    seen.add(k);
-    rows.push(r);
-  }
-  return rows;
+  return [...ties, ...older];
 }
