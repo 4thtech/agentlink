@@ -132,14 +132,43 @@ describe('selection (04 §2.8 "Selection", 07 §9.1)', () => {
     },
   );
 
+  it('refuses a generated code without the re-type step, writing nothing (AUDIT-FABLE-M1-8f-1 L-1)', async () => {
+    const error = await rejection(
+      createFileAgent({ probe: NO_KEYCHAIN, interactive: true, env: {}, dir, kdf: FAST }),
+    );
+    expect(codeOf(error)).toBe('keystore_passphrase_refused');
+    await expect(stat(dir)).rejects.toThrow();
+  });
+
+  it('writes nothing when the re-type step is not confirmed', async () => {
+    const error = await rejection(
+      createFileAgent({
+        probe: NO_KEYCHAIN,
+        interactive: true,
+        env: {},
+        dir,
+        kdf: FAST,
+        confirmCode: () => Promise.resolve(false),
+      }),
+    );
+    expect(codeOf(error)).toBe('keystore_passphrase_refused');
+    expect(await readdir(dir).catch(() => [])).toEqual([]);
+  });
+
   it('creates a generated unlock code by default: 24 base32 characters, shown once', async () => {
+    const shown: string[] = [];
     const { agentId, unlockCode } = await createFileAgent({
       probe: NO_KEYCHAIN,
       interactive: true,
       env: {},
       dir,
       kdf: FAST,
+      confirmCode: (code) => {
+        shown.push(new TextDecoder().decode(code));
+        return Promise.resolve(true);
+      },
     });
+    expect(shown).toHaveLength(1);
     expect(agentId).toMatch(/^0x[0-9a-f]{40}$/);
     expect(unlockCode).toBeInstanceOf(Uint8Array);
     const code = new TextDecoder().decode(unlockCode as Uint8Array);
