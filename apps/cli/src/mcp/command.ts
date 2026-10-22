@@ -71,6 +71,7 @@ export function agentToolContext(
     client: coreToolClient(agent.client, {
       ...(agent.files === undefined ? {} : { files: agent.files }),
       ...(agent.proofs === undefined ? {} : { proofs: agent.proofs }),
+      ...(agent.freeCredits === undefined ? {} : { freeCredits: agent.freeCredits }),
     }),
     clock,
     logger,

@@ -404,7 +404,6 @@ describe('nodeProofs: paid calls and status follow the automatic selection (M1-2
 });
 
 describe('free test credits wiring (M1-36i)', () => {
-
   it('the platform carries the free-credits port, and the tools call only a shipped testnet one', () => {
     const proofs = nodeProofs({ home });
     expect(proofs).toBeDefined();

@@ -32,7 +32,7 @@ interface Sent {
 
 function port(answer: () => Response | Promise<Response>) {
   const sent: Sent[] = [];
-  const fetchFn = ((input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchFn = ((input: string | URL | Request, init?: RequestInit) => {
     sent.push({ url: String(input), init });
     return Promise.resolve(answer());
   }) as never;
@@ -44,12 +44,17 @@ const json = (status: number, body: unknown) =>
 
 describe('nodeFreeCreditsPort (M1-36i)', () => {
   it('sends exactly {chainId, agent} to the fixed service path', async () => {
-    const { port: p, sent } = port(() => json(200, { chainId: BASE_SEPOLIA, txHash: '0x' + '1'.repeat(64) }));
+    const { port: p, sent } = port(() =>
+      json(200, { chainId: BASE_SEPOLIA, txHash: '0x' + '1'.repeat(64) }),
+    );
     expect(await p.request({ chainId: BASE_SEPOLIA, agent: AGENT })).toEqual({ status: 'sent' });
     expect(sent).toHaveLength(1);
     expect(sent[0]!.url).toBe(`${URL_BASE}/v1/faucet`);
     expect(sent[0]!.init?.method).toBe('POST');
-    expect(JSON.parse(String(sent[0]!.init?.body))).toEqual({ chainId: BASE_SEPOLIA, agent: AGENT });
+    expect(JSON.parse(String(sent[0]!.init?.body))).toEqual({
+      chainId: BASE_SEPOLIA,
+      agent: AGENT,
+    });
     // Nothing else leaves: one header (the content type), no credentials.
     const headers = new Headers(sent[0]!.init?.headers);
     expect([...headers.keys()]).toEqual(['content-type']);
