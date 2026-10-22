@@ -2669,7 +2669,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-6c-1, 2026-10-18): a drop object's `locator` is its signed GET URL, a bearer secret like any presigned URL (I-7). Store it encrypted at rest with the file key; send it only inside end-to-end-encrypted payloads or owner copies, never to any 4thTech service other than the drop itself; never log it. Also (IR-M1-6c-1 L2): `planInline` returns an all-stored plan even when that plan cannot fit; check the all-stored payload size before any upload so a send that can never fit is refused before anything reaches storage.
 
 #### M1-7f-2 · core: files refresh-link, retention and crypto-shredding (IR-M1-7f-1 L2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (receiver-side key rows, retention at expiry on both sides, the receipt pass deleting the key row; refresh-link, the MinIO round trip, D-53 re-hash, `SentFile` name and hash, and the receiver's receipt trigger moved to M1-7f-3) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7f (#278)
 - **Spec:** 04 §4 (delivery, retention and crypto-shredding, encrypted drop); 07 §3 (`files`), §3.3, §5.4; 06 §2.3; D-18, D-48, D-53
@@ -2683,6 +2683,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Added by M1-33d (#333): with `files.deleteAfter: receipt`, a file whose record never gets a DELIVERED receipt is deleted at `expiry` (06 §3), on both sides and for the drop.
 - **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
+
+#### M1-7f-3 · core: files refresh-link, MinIO round trip and the rest of M1-7f-2 (split from M1-7f-2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (files, client), packages/types if the `refresh-link` answer needs a body schema
+- **Depends on:** M1-7f-2
+- **Spec:** 04 §4 (delivery, retention and crypto-shredding); 07 §3, §5.4; 06 §2.3; D-18, D-48, D-53, D-98
+- **Invariants:** I-2, I-5, I-7, I-9
+- **Scope (left after M1-7f-2):**
+  - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`, the proposed body in packages/types) and the sender's answer from its sealed `files` row; an expired link on the recipient side leads into it; the answer updates the receiver row's `url` and `expires_at`. Decide how a refreshed link relates to retention at `expiresAt` (today both sides delete at the first `expiresAt`, so a refresh only helps before it).
+  - The receiver deleting its key row on its own DELIVERED receipt under `receipt` (today it deletes at `expiresAt`); keep it out of the proofs service files touched by open PRs, or land it after them.
+  - Payloads stored before M1-7f-2 still carry their `fileKey` and have no receiver row, so they keep their keys until this backfill (IR-M1-7f-2-1 L2): move each key into a capped receiver row and replace it in the stored payload with the placeholder.
+  - The expiry pass takes the oldest 200 due rows each time, so rows whose delete keeps failing can stall it for good (IR-M1-7f-2-1 L3): give it a rotating cursor like the receipt pass (`ReceiptRetentionDeps.cursor`).
+  - A sent copy (07 §4.3, another device of the same agent) keeps its payload's keys and gets no row; decide whether it should.
+  - The 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
+  - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
+  - From IR-M1-9d-1-1 L-1: `SentFile` also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again.
+  - A drop expiry test against the real Worker (the signed DELETE's timestamp after an advanced clock); M1-7f-2 covers the drop path through deleteFileObject only.
+- **Acceptance:** expired link → refresh-link returns a working URL; 5 MB via MinIO; a repeat send returns the original name and hash after the file on disk changed, and the platform's open is not called; tests first, a `RED (expected):` commit before the fix.
 
 #### M1-7g · core: proofs and receipts
 - **Status:** done (4thtech/agentlink#306, merged 2026-10-19); recipient export is M1-7g-b (done); follow-ups in M1-7g-c · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
