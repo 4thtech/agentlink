@@ -105,8 +105,11 @@ function mutated(name: string, edit: (source: string) => string): { file: string
 /** True when the trace shows a native module or addon. */
 const nativeLoaded = (trace: string): boolean => /@napi-rs\/keyring|\.node["'\s]/.test(trace);
 
-const withNativeImport = (source: string): string =>
-  source.replace('\n', '\nimport "@napi-rs/keyring";\n');
+/** Inserts the native import after the first line (an insertion, not a pattern replace). */
+const withNativeImport = (source: string): string => {
+  const at = source.indexOf('\n') + 1;
+  return `${source.slice(0, at)}import "@napi-rs/keyring";\n${source.slice(at)}`;
+};
 
 describe('Node version check comes before any native module (M1-9zc)', () => {
   it('the bundle has no native static import and runs the main program after the check', () => {
