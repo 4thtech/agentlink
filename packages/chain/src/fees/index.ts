@@ -41,6 +41,7 @@ export {
   createFaucetChain,
   isFaucetChain,
   type DepositForRequest,
+  type FaucetBalances,
   type FaucetChain,
   type FaucetChainOptions,
   type FaucetCredit,

@@ -12,6 +12,8 @@ export {
   parseSubmitRequest,
   parseSubmitResponse,
   submitRequestBody,
+  type FaucetPoolState,
+  type GasPoolState,
   type HealthResponse,
   type StatusResponse,
   type SubmitItem,
