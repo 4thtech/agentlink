@@ -21,6 +21,8 @@ import {
   FAUCET_CHAIN_IDS,
   FAUCET_MAX_GAS,
   FAUCET_MAX_USD_CENTS,
+  FAUCET_MIN_APPROVE_BUDGET_SHARE,
+  FAUCET_STUCK_NONCE_COOLDOWN_MS,
   buildDepositFor,
   createFaucetChain,
   isFaucetChain,
@@ -572,7 +574,7 @@ describe('createFaucetChain().credit: a pending nonce that settles (M1-10b-d)', 
     chain.allowance = 0n;
     const readsBefore = chain.latestReads;
     chain.onLatestRead = (count) => {
-      if (count - readsBefore === 3) {
+      if (count - readsBefore === 2) {
         chain.nonce = 9; // the depositFor is mined
         delete chain.pendingNonce;
       }
@@ -601,11 +603,11 @@ describe('createFaucetChain().credit: a pending nonce that settles (M1-10b-d)', 
   });
 
   it('the nonce poll and the approve receipt wait share one receiptTimeoutMs budget', async () => {
-    // The pending nonce settles late in the window and the approve is then never mined: the whole
+    // The pending nonce settles early in the window and the approve is then never mined: the whole
     // credit still waits at most receiptTimeoutMs, not one deadline per wait.
     const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n, receipt: 'pending' });
     chain.onLatestRead = (count) => {
-      if (count === 4) {
+      if (count === 2) {
         chain.nonce = 8;
         delete chain.pendingNonce;
       }
@@ -615,7 +617,79 @@ describe('createFaucetChain().credit: a pending nonce that settles (M1-10b-d)', 
     expect(chain.sent.map((s) => decodeSent(s.raw).functionName)).toEqual(['approve']);
     expect(elapsed).toBeLessThanOrEqual(DEADLINE);
     const receiptPolls = chain.methods.filter((m) => m === 'eth_getTransactionReceipt').length;
-    expect(receiptPolls).toBeLessThanOrEqual(2);
+    expect(receiptPolls).toBeLessThanOrEqual(4);
+  });
+
+  it('a nonce that settles with less than half the budget left sends no approve: busy (IR-M1-10b-d-1 L2)', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n });
+    chain.onLatestRead = (count) => {
+      if (count === 4) {
+        // settles at 30 ms of 40: only 10 ms left for the approve's receipt
+        chain.nonce = 8;
+        delete chain.pendingNonce;
+      }
+    };
+    const { result } = await timedCredit(timedFaucet(chain));
+    expect(result).toEqual({ state: 'not_sent', reason: 'busy' });
+    expect(chain.attempted).toEqual([]);
+    expect(chain.methods).not.toContain('eth_estimateGas');
+  });
+
+  it('a second claim against the same stuck nonce within the cooldown is busy at once (IR-M1-10b-d-1 L1)', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n });
+    const port = timedFaucet(chain);
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] });
+    try {
+      const run = async () => {
+        const start = Date.now();
+        let end = start;
+        const pending = port.credit(AGENT, 100).then((answer) => {
+          end = Date.now();
+          return answer;
+        });
+        await vi.advanceTimersByTimeAsync(10 * DEADLINE);
+        return { result: await pending, elapsed: end - start };
+      };
+      const first = await run();
+      expect(first.result).toEqual({ state: 'not_sent', reason: 'busy' });
+      expect(first.elapsed).toBeGreaterThanOrEqual(DEADLINE - POLL);
+
+      const readsBefore = chain.latestReads;
+      const second = await run();
+      expect(second.result).toEqual({ state: 'not_sent', reason: 'busy' });
+      expect(second.elapsed).toBe(0);
+      expect(chain.latestReads - readsBefore).toBe(1); // the one check, no poll
+
+      // After the cooldown the same stuck nonce is polled again.
+      vi.setSystemTime(Date.now() + FAUCET_STUCK_NONCE_COOLDOWN_MS + 1);
+      const third = await run();
+      expect(third.result).toEqual({ state: 'not_sent', reason: 'busy' });
+      expect(third.elapsed).toBeGreaterThanOrEqual(DEADLINE - POLL);
+      expect(chain.attempted).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a different pending nonce is polled again, even within the cooldown', async () => {
+    const chain = newChain({ nonce: 7, pendingNonce: 8, allowance: 0n });
+    const port = timedFaucet(chain);
+    expect((await timedCredit(port)).result).toEqual({ state: 'not_sent', reason: 'busy' });
+    chain.nonce = 8;
+    chain.pendingNonce = 9;
+    const readsBefore = chain.latestReads;
+    chain.onLatestRead = (count) => {
+      if (count - readsBefore === 2) {
+        chain.nonce = 9;
+        delete chain.pendingNonce;
+      }
+    };
+    expect((await timedCredit(port)).result.state).toBe('sent');
+  });
+
+  it('names the thresholds: a 60 s stuck-nonce cooldown and half the budget left for the approve', () => {
+    expect(FAUCET_STUCK_NONCE_COOLDOWN_MS).toBe(60_000);
+    expect(FAUCET_MIN_APPROVE_BUDGET_SHARE).toBe(0.5);
   });
 
   it('the depositFor-only path reads no latest nonce', async () => {
