@@ -6,7 +6,7 @@
 //   there yet) gives an empty bundle, and the build still works.
 // - `localUiAssets` turns the embedded entries into the server's map; with nothing embedded (tsc
 //   output, tests) it is empty, and the server then answers 404 for the app pages.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -34,6 +34,9 @@ describe('embedding the local UI build (M1-11s-b, D-118)', () => {
     writeFileSync(join(dist, 'assets', 'font-Cd34.woff2'), new Uint8Array([1, 2, 3]));
     writeFileSync(join(dist, '.vite', 'manifest.json'), '{}');
     writeFileSync(join(dist, 'robots.txt'), 'x');
+    // A symbolic link never pulls a file from outside dist/ into the bundle.
+    writeFileSync(join(work, 'outside.js'), 'secret');
+    symlinkSync(join(work, 'outside.js'), join(dist, 'assets', 'linked-Ef56.js'));
     const entries = localUiAssetEntries(dist);
     expect(entries.map(([name]) => name)).toEqual([
       'assets/font-Cd34.woff2',

@@ -30,7 +30,12 @@ describe('route registration (M1-11s-b, I-4)', () => {
       registry.register({ method: 'GET', path: '/api/ui/x', presence: true, handler: ok } as never),
     ).toThrow(/presence/);
     expect(() =>
-      registry.register({ method: 'HEAD', path: '/api/ui/x', presence: false, handler: ok } as never),
+      registry.register({
+        method: 'HEAD',
+        path: '/api/ui/x',
+        presence: false,
+        handler: ok,
+      } as never),
     ).toThrow(/method/);
     expect(() =>
       registry.register({ method: 'POST', path: '/api/ui/x', handler: ok } as never),
@@ -68,15 +73,30 @@ describe('route registration (M1-11s-b, I-4)', () => {
         path,
       ).toThrow();
     }
-    registry.register({ method: 'GET', path: '/api/ui/contacts/:id', presence: false, handler: ok });
+    registry.register({
+      method: 'GET',
+      path: '/api/ui/contacts/:id',
+      presence: false,
+      handler: ok,
+    });
     expect(() =>
-      registry.register({ method: 'GET', path: '/api/ui/contacts/:id', presence: false, handler: ok }),
+      registry.register({
+        method: 'GET',
+        path: '/api/ui/contacts/:id',
+        presence: false,
+        handler: ok,
+      }),
     ).toThrow(/already/);
   });
 
   it('matches fixed segments and strict parameters, and tells a wrong method apart', () => {
     const registry = new LocalUiRouteRegistry();
-    registry.register({ method: 'GET', path: '/api/ui/contacts/:id', presence: false, handler: ok });
+    registry.register({
+      method: 'GET',
+      path: '/api/ui/contacts/:id',
+      presence: false,
+      handler: ok,
+    });
     registry.register({
       method: 'DELETE',
       path: '/api/ui/contacts/:id',
@@ -120,9 +140,12 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       'backup',
       'advanced',
     ];
-    expect(registry.routes().map((r) => r.path).sort()).toEqual(
-      pages.map((p) => `/api/ui/${p}`).sort(),
-    );
+    expect(
+      registry
+        .routes()
+        .map((r) => r.path)
+        .sort(),
+    ).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
     for (const route of registry.routes() as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');
       expect(route.presence).toBe(false);

@@ -23,6 +23,7 @@ import {
   decodeBase64url,
   decodeHex,
   encodeBase64url,
+  encodeHex,
   encodeUtf8,
   sha256,
   taggedHash,
@@ -45,7 +46,7 @@ import type { OwnerSignature } from '../owner-operation.js';
 import type { OwnerTerminal } from '../owner-terminal.js';
 import type { LocalUiAssets } from './context.js';
 import type { LocalUiOwnerOperation } from './route-types.js';
-import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
+import { createLocalUiRoutes } from './routes.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 const root = mkdtempSync(join(tmpdir(), 'agentlink-m1-11s-b-'));
@@ -359,7 +360,9 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
 
   it('fills the token into an index.html with no csrf meta too, exactly once', async () => {
     const assets: LocalUiAssets = {
-      files: new Map([['index.html', encodeUtf8('<html><HEAD lang="x"><title>t</title></HEAD></html>')]]),
+      files: new Map([
+        ['index.html', encodeUtf8('<html><HEAD lang="x"><title>t</title></HEAD></html>')],
+      ]),
     };
     const h = await harness({ assets });
     const cookie = await h.cookie();
@@ -445,6 +448,7 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
           v: 1,
           op: 'contact.check',
           agent: agentId,
+          owner: encodeHex(owner.ownerNostr),
           nonce: 'n'.repeat(22),
           params: { contact: req.params['id'] ?? '' },
         };
@@ -542,9 +546,9 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     expect(signed?.kind).toBe('owner-action');
     if (signed?.kind !== 'owner-action') throw new Error('unreachable');
     const digest = taggedHash(TAGS.ownerAction, sha256(canonicalizeToBytes(signed.signed.body)));
-    expect(bip340Verify(owner.ownerNostr, digest, decodeHex(signed.signed.sig, { length: 64 }))).toBe(
-      true,
-    );
+    expect(
+      bip340Verify(owner.ownerNostr, digest, decodeHex(signed.signed.sig, { length: 64 })),
+    ).toBe(true);
     expect((signed.signed.body as JsonObject)['op']).toBe('contact.check');
     // The one entry served one owner operation: a second signature is refused.
     expect(calls[0]?.second).toBeInstanceOf(Error);

@@ -58,6 +58,23 @@
 //   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
 //   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
+// - M1-11s-b, the local UI shell (D-118): the React app (apps/local-ui) is served from an in-memory
+//   bundle the caller passes in (`localUi.assets`; the CLI embeds it), never from a file path.
+//   Only `index.html` and `assets/<one file name>` with a known type are accepted, checked before the
+//   server listens. `/assets/<name>` is an exact map lookup (no decoding, no path join), served with
+//   its fixed content type, nosniff, the strict CSP (plus `font-src 'self'`) and immutable caching;
+//   anything else is 404. The app's index.html, with this server's CSRF token filled in, is served
+//   only for `/first-run` and `/settings[/...]`; `/` and `/approve/<id>` keep the approval page.
+//   The session cookie gates the app pages, the assets and every /api/ui/ route.
+// - M1-11s-b, the /api/ui/ routes (local-ui/routes.ts): each declares `presence`; a mutating route
+//   must declare `presence: true`. Every route needs the session cookie, the CSRF header and
+//   same-origin fetch metadata; a mutating one also the page's Origin and an octet-stream body. The
+//   central presence gate then runs before the handler: the wrong-code backoff, the presence proof
+//   (the owner code, or the passkey assertion checked as for a decision), one owner operation at a
+//   time, and the owner being set up. The handler gets a one-use owner operation that signs with
+//   that proof (runOwnerGesture, the allowlist and one gesture, D-68); a wrong code counts towards
+//   the backoff and is answered 403 `presence_rejected` whatever the handler returns.
+//
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
 // by port, so another local server the owner's browser visits could receive the session cookie; it
@@ -68,6 +85,8 @@ import type { OwnerActionOutcome } from '@4thtech-io/core';
 import {
   KeyStoreError,
   canonicalizeToBytes,
+  decodeBase64url,
+  decodeUtf8,
   encodeBase64url,
   encodeHex,
   encodeUtf8,
@@ -75,6 +94,7 @@ import {
   randomBytes,
   sha256,
   ownerPrfSalt,
+  parseJson,
   wipe,
   type JsonObject,
   type JsonValue,
@@ -96,7 +116,18 @@ import {
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
-import type { PromptingOwnerKeyStore } from './owner-operation.js';
+import type { LocalUiAssets, LocalUiContext, LocalUiOptions } from './local-ui/context.js';
+import type { LocalUiOwnerOperation, LocalUiResult } from './local-ui/route-types.js';
+import {
+  LOCAL_UI_API_PREFIX,
+  LocalUiRouteRegistry,
+  createLocalUiRoutes,
+} from './local-ui/routes.js';
+import {
+  runOwnerGesture,
+  type OwnerSignature,
+  type PromptingOwnerKeyStore,
+} from './owner-operation.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
 /** 08 §1 (M1-31, D-79): the local UI's host name; its origin is `http://localhost:<port>`. */
@@ -148,6 +179,87 @@ const APPROVE_PAGE = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
 const API_ONE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})$/;
 const API_DECIDE = /^\/api\/approvals\/(apr_[A-Za-z0-9_-]{22})\/(approve|deny)$/;
 const REVIEW_ITEM = /^(apr_[A-Za-z0-9_-]{22}):([0-9a-f]{64}):([ad])$/;
+
+/** M1-11s-b: the local UI app's pages (D-118); everything else keeps its own route or is 404. */
+const APP_PAGE = /^\/(?:first-run|settings(?:\/[a-z0-9]+(?:-[a-z0-9]+)*){0,4})$/;
+const ASSETS_PREFIX = '/assets/';
+/** One file name: no separator, no leading dot, no escape. */
+const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+/** The file types the app may ship, by extension, with the content type they are served as. */
+const ASSET_TYPES: ReadonlyMap<string, string> = new Map([
+  ['js', 'text/javascript; charset=utf-8'],
+  ['css', 'text/css; charset=utf-8'],
+  ['woff2', 'font/woff2'],
+  ['woff', 'font/woff'],
+  ['svg', 'image/svg+xml'],
+  ['png', 'image/png'],
+  ['webp', 'image/webp'],
+  ['ico', 'image/x-icon'],
+]);
+const ASSET_CACHE = 'private, max-age=31536000, immutable';
+/** The CSRF meta the app's index.html carries empty, filled per server (apps/local-ui). */
+const CSRF_META = /<meta\s+name="agentlink-csrf"\s+content="([^"]*)"\s*\/?>/gi;
+const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
+/** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts. */
+const MAX_INPUT_CHARS = 8192;
+
+interface ServedAsset {
+  readonly body: Uint8Array;
+  readonly type: string;
+}
+
+/** The app's index.html around the CSRF token: `${before}<meta …token…>${after}`. */
+interface AppShell {
+  readonly before: string;
+  readonly after: string;
+}
+
+const badBundle = (why: string): Error => new Error(`The local UI bundle is not valid: ${why}.`);
+
+/** Checks the caller's bundle (fail closed) into the served assets and the app shell. */
+function loadLocalUi(assets: LocalUiAssets | undefined): {
+  readonly table: ReadonlyMap<string, ServedAsset>;
+  readonly shell: AppShell | undefined;
+} {
+  const table = new Map<string, ServedAsset>();
+  let shell: AppShell | undefined;
+  const files = assets?.files;
+  if (files === undefined) return { table, shell };
+  if (!(files instanceof Map)) throw badBundle('files must be a Map');
+  for (const [key, body] of files as ReadonlyMap<unknown, unknown>) {
+    if (typeof key !== 'string' || !(body instanceof Uint8Array)) throw badBundle('a bad entry');
+    if (key === 'index.html') {
+      let html: string;
+      try {
+        html = decodeUtf8(body);
+      } catch {
+        throw badBundle('index.html is not UTF-8');
+      }
+      const metas = [...html.matchAll(CSRF_META)];
+      if (metas.length > 1) throw badBundle('index.html has more than one CSRF meta');
+      const meta = metas[0];
+      if (meta !== undefined) {
+        if (meta[1] !== '') throw badBundle('index.html already holds a CSRF token');
+        shell = {
+          before: html.slice(0, meta.index),
+          after: html.slice(meta.index + meta[0].length),
+        };
+      } else {
+        const head = HEAD_OPEN.exec(html);
+        if (head === null) throw badBundle('index.html has no <head>');
+        const at = head.index + head[0].length;
+        shell = { before: html.slice(0, at), after: html.slice(at) };
+      }
+      continue;
+    }
+    const name = key.startsWith('assets/') ? key.slice('assets/'.length) : undefined;
+    if (name === undefined || !ASSET_NAME.test(name)) throw badBundle('a file name is not allowed');
+    const type = ASSET_TYPES.get(name.slice(name.lastIndexOf('.') + 1));
+    if (!name.includes('.') || type === undefined) throw badBundle('a file type is not allowed');
+    table.set(name, { body: body.slice(), type });
+  }
+  return { table, shell };
+}
 
 /**
  * What the approval card shows (11 §6.2.1, §8), built by the agent's runtime from the parsed stored
@@ -260,12 +372,28 @@ export type ApprovalServerEvent =
         | 'wait'
         | 'failed';
     }
+  /** M1-11s-b: the outcome of a /api/ui/ owner operation at the presence gate. */
+  | {
+      readonly kind: 'owner_operation';
+      readonly outcome:
+        | 'done'
+        | 'wait'
+        | 'invalid'
+        | 'presence_required'
+        | 'presence_rejected'
+        | 'busy'
+        | 'needs_setup'
+        | 'refused'
+        | 'failed';
+    }
   | { readonly kind: 'closed' };
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
   /** Receives fixed-value events (for the redacting logger). Exceptions in it are ignored. */
   readonly onEvent?: (event: ApprovalServerEvent) => void;
+  /** M1-11s-b: the local UI app's files and the agent's core client (D-118). */
+  readonly localUi?: LocalUiOptions;
 }
 
 /** One listen call: a loopback host, a port (0 = the OS picks), IPv6-only for ::1. */
@@ -286,6 +414,8 @@ export interface ApprovalServerInternals {
   readonly notifier?: OsNotifier;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
+  /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
+  readonly routes?: LocalUiRouteRegistry;
 }
 
 export interface ApprovalServer {
@@ -317,6 +447,7 @@ export interface ApprovalServer {
 type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outcome'];
 type PasskeyOutcome = Extract<ApprovalServerEvent, { kind: 'passkey' }>['outcome'];
 type RejectReason = Extract<ApprovalServerEvent, { kind: 'rejected' }>['reason'];
+type OwnerOperationOutcome = Extract<ApprovalServerEvent, { kind: 'owner_operation' }>['outcome'];
 
 /** The default listen: one `server.listen`, rejecting with the socket error. */
 function listenOnce(server: Server, options: ApprovalListenOptions): Promise<void> {
@@ -381,6 +512,7 @@ function setCommonHeaders(res: ServerResponse): void {
   res.setHeader(
     'Content-Security-Policy',
     "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self'; " +
+      "font-src 'self'; " +
       "frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
   );
 }
@@ -499,6 +631,9 @@ export async function startApprovalServerWith(
   internals: ApprovalServerInternals = {},
 ): Promise<ApprovalServer> {
   const { source } = options;
+  // M1-11s-b: the bundle is checked before anything listens (fail closed).
+  const localUi = loadLocalUi(options.localUi?.assets);
+  const routes = internals.routes ?? createLocalUiRoutes();
   let keychainInstance: KeychainBackend | undefined = internals.keychain;
   const keychainOf = (): KeychainBackend => (keychainInstance ??= osKeychain());
   const openOwnerStore =
@@ -527,6 +662,12 @@ export async function startApprovalServerWith(
   /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
   let failures = 0;
   let waitUntil = 0;
+  const uiContext: LocalUiContext = Object.freeze<LocalUiContext>({
+    client: options.localUi?.client,
+    ownerContext: () => source.context(),
+    applyOwnerAction: (signed) => source.apply(signed),
+    now: () => now(),
+  });
 
   // One request handler and one session behind both loopback listeners. Until both are bound, a
   // request (only possible on 127.0.0.1, in that short window) gets 503 and nothing else.
@@ -1012,6 +1153,228 @@ export async function startApprovalServerWith(
     }
   }
 
+  const finishOwner = (
+    res: ServerResponse,
+    status: number,
+    outcome: OwnerOperationOutcome,
+    extra: Record<string, unknown> = {},
+  ): void => {
+    emit({ kind: 'owner_operation', outcome });
+    sendJson(res, status, { status: outcome, ...extra });
+  };
+
+  /** A handler's answer as JSON; anything malformed is 500 (fail closed). */
+  const sendResult = (res: ServerResponse, result: LocalUiResult): void => {
+    const ok =
+      typeof result === 'object' &&
+      result !== null &&
+      Number.isSafeInteger(result.status) &&
+      result.status >= 200 &&
+      result.status <= 599;
+    if (!ok) {
+      sendJson(res, 500, { status: 'failed' });
+      return;
+    }
+    sendJson(res, result.status, result.body);
+  };
+
+  /**
+   * M1-11s-b, the central presence gate for a /api/ui/ owner route (04 §2.5, I-4). Everything that
+   * can be checked without unlocking is checked here, before `run` (the handler) is called: the
+   * wrong-code backoff, a presence proof in the body (the owner code, or a passkey assertion verified
+   * against the stored passkey and the owner), one owner operation at a time, and the owner set up.
+   * `run` gets a one-use owner operation; an owner code is checked when it unlocks, and a wrong one
+   * counts towards the backoff and is answered 403 whatever the handler returns.
+   */
+  async function ownerGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    run: (owner: LocalUiOwnerOperation) => Promise<LocalUiResult>,
+  ): Promise<void> {
+    const wait = waitSeconds();
+    if (wait > 0) {
+      req.resume();
+      res.setHeader('Retry-After', String(wait));
+      finishOwner(res, 429, 'wait', { retryAfter: wait });
+      return;
+    }
+    const mode = header(req, 'x-agentlink-presence');
+    const passkey = mode === 'passkey';
+    if (mode !== undefined && !passkey) {
+      req.resume();
+      finishOwner(res, 403, 'presence_required');
+      return;
+    }
+    const body = await boundedBody(req, res, passkey ? MAX_PASSKEY_BYTES : MAX_SECRET_BYTES);
+    if (body === undefined) return;
+    let assertion: PasskeyAssertion | undefined;
+    try {
+      if (body.length === 0) {
+        finishOwner(res, 403, 'presence_required');
+        return;
+      }
+      if (passkey) {
+        try {
+          assertion = parsePasskeyAssertion(body);
+        } catch {
+          finishOwner(res, 403, 'presence_required');
+          return;
+        }
+        if (assertion.prfOutput.length === 0) {
+          finishOwner(res, 403, 'presence_required');
+          return;
+        }
+      }
+      if (busy) {
+        finishOwner(res, 409, 'busy');
+        return;
+      }
+      busy = true;
+      try {
+        const context = await source.context();
+        if (context === undefined) {
+          finishOwner(res, 503, 'needs_setup');
+          return;
+        }
+        let presence: OwnerPresence;
+        if (assertion !== undefined) {
+          try {
+            const stored = await readOwnerPasskeyHeader(keychainOf());
+            if (stored === null) throw new KeyStoreError('presence_rejected', 'presence');
+            assertPasskeyAssertion(stored, context.owner, assertion);
+          } catch {
+            presenceFailed();
+            finishOwner(res, 403, 'presence_rejected');
+            return;
+          }
+          presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+        } else {
+          presence = { kind: 'passphrase', secret: body };
+        }
+        let used = false;
+        let rejected = false;
+        let noStore = false;
+        const owner: LocalUiOwnerOperation = Object.freeze<LocalUiOwnerOperation>({
+          sign: async (review, requests) => {
+            // One entry of the owner secret, one owner operation (D-68).
+            if (used) {
+              throw new NodeKeyStoreError(
+                'owner_operation_invalid',
+                'One owner operation signs once.',
+              );
+            }
+            used = true;
+            let store: PromptingOwnerKeyStore;
+            try {
+              store = await openOwnerStore(context.owner);
+            } catch (error) {
+              noStore = true;
+              throw error;
+            }
+            try {
+              const signed: readonly OwnerSignature[] = await runOwnerGesture(
+                store,
+                pageTerminal(presence),
+                review,
+                requests,
+              );
+              presenceSucceeded();
+              return signed;
+            } catch (error) {
+              if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+                rejected = true;
+                presenceFailed();
+              }
+              throw error;
+            } finally {
+              await store.close().catch(() => undefined);
+            }
+          },
+        });
+        let result: LocalUiResult;
+        try {
+          result = await run(owner);
+        } catch (error) {
+          if (rejected) finishOwner(res, 403, 'presence_rejected');
+          else if (noStore) finishOwner(res, 503, 'needs_setup');
+          else if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
+          else finishOwner(res, 500, 'failed');
+          return;
+        }
+        if (rejected) {
+          finishOwner(res, 403, 'presence_rejected');
+          return;
+        }
+        emit({ kind: 'owner_operation', outcome: 'done' });
+        sendResult(res, result);
+      } finally {
+        busy = false;
+      }
+    } finally {
+      wipe(body, assertion?.prfOutput);
+    }
+  }
+
+  /** The operation input of an owner route: absent, a JSON value, or 'invalid'. */
+  const operationInput = (req: IncomingMessage): JsonValue | undefined | 'invalid' => {
+    const raw = header(req, 'x-agentlink-input');
+    if (raw === undefined) return undefined;
+    if (raw.length === 0 || raw.length > MAX_INPUT_CHARS || !BASE64URL.test(raw)) return 'invalid';
+    try {
+      return parseJson(decodeUtf8(decodeBase64url(raw)));
+    } catch {
+      return 'invalid';
+    }
+  };
+
+  /** M1-11s-b: one /api/ui/ request (route registry, session, CSRF, presence gate). */
+  async function handleUi(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    method: string,
+    originHeader: string | undefined,
+  ): Promise<void> {
+    const found = routes.match(method, url.pathname);
+    if (found === undefined) {
+      req.resume();
+      return reject(res, 404, 'not_found');
+    }
+    if (found === 'method') {
+      req.resume();
+      return reject(res, 405, 'method');
+    }
+    const fail = (status: number, reason: RejectReason): void => {
+      req.resume();
+      reject(res, status, reason);
+    };
+    if (matchIndex(cookieToken(req), sessions) < 0) return fail(401, 'token');
+    if (!fetchSiteOk(req)) return fail(403, 'fetch_site');
+    const { route, params } = found;
+    if (route.presence && originHeader === undefined) return fail(403, 'origin');
+    if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
+    if (!route.presence) {
+      req.resume();
+      sendResult(res, await route.handler(uiContext, { params, query: url.searchParams }));
+      return;
+    }
+    const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
+    if (type !== 'application/octet-stream') return fail(415, 'content_type');
+    const input = operationInput(req);
+    if (input === 'invalid') {
+      req.resume();
+      finishOwner(res, 400, 'invalid');
+      return;
+    }
+    await ownerGate(req, res, (owner) =>
+      route.handler(
+        uiContext,
+        { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
+        owner,
+      ),
+    );
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     setCommonHeaders(res);
     const peer = req.socket.remoteAddress;
@@ -1043,7 +1406,27 @@ export async function startApprovalServerWith(
       return;
     }
 
-    const page = path === '/' || APPROVE_PAGE.test(path);
+    if (path.startsWith(ASSETS_PREFIX)) {
+      if (method !== 'GET') return reject(res, 405, 'method');
+      if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
+      const name = path.slice(ASSETS_PREFIX.length);
+      // An exact lookup of one checked name: nothing is decoded, joined or read from disk.
+      const asset = ASSET_NAME.test(name) ? localUi.table.get(name) : undefined;
+      if (asset === undefined) return reject(res, 404, 'not_found');
+      res.statusCode = 200;
+      res.setHeader('Content-Type', asset.type);
+      res.setHeader('Cache-Control', ASSET_CACHE);
+      res.end(asset.body);
+      return;
+    }
+
+    if (path.startsWith(LOCAL_UI_API_PREFIX)) {
+      await handleUi(req, res, url, method, originHeader);
+      return;
+    }
+
+    const appPage = APP_PAGE.test(path);
+    const page = path === '/' || APPROVE_PAGE.test(path) || appPage;
     if (page) {
       if (method !== 'GET') return reject(res, 405, 'method');
       const t = url.searchParams.get('t');
@@ -1062,6 +1445,14 @@ export async function startApprovalServerWith(
         return;
       }
       if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
+      if (appPage) {
+        const shell = localUi.shell;
+        if (shell === undefined) return reject(res, 404, 'not_found');
+        // The token is base64url, so it needs no escaping.
+        const meta = `<meta name="agentlink-csrf" content="${csrf}">`;
+        sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
+        return;
+      }
       sendText(res, 200, 'text/html; charset=utf-8', pageHtml(csrf));
       return;
     }
