@@ -16,6 +16,7 @@ _Updated 2026-10-22T12:05Z by @talirezun_
 | M1-4c-b KeyStore signTransaction | @talirezun (agents) | in-progress | m1-4c-b | 2026-10-22 |
 | M1-3c chain contracts (gasless top-up) | @talirezun (agents) | in-progress | branch not yet pushed | 2026-10-22 |
 | Core helpers, test credits, CLI UX, docs | @talirezun (agents) | in-progress | #415; #419, #420; #409, #412, #413, #421, #422; #416, #423 | 2026-10-22 |
+| Open PRs, IR PASS, waiting on merge queue | @talirezun (agents) | in-progress | #344 #348 #370 #398 #400 #401 #402 #403 | 2026-10-22 |
 | Release 0.2.0 | @talirezun | blocked | waits on main e2e (#396) | 2026-10-22 |
 | M1 gate two-machine test — Tali | @talirezun | in-progress | J1/J4/J8/J9 passed 17/17 (2026-10-18); J2/J3/J5 after M1b | 2026-10-18 |
 
