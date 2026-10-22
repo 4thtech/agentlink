@@ -170,8 +170,9 @@ jobs:
   checks:
     name: checks
     needs: detect
-    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: runs on EVERY change, docs-only included: it holds the doc-drift tests
+    # (spec, README, docs-site, knowledge), and listing them by hand would rot.
+    if: needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -217,38 +218,6 @@ jobs:
       - name: MCP tool surface and conformance
         if: needs.detect.outputs.has_test == 'true'
         run: pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts test/mcp-conformance.test.ts
-
-  # CHORE-CI-MATRIX-QUEUE-ONLY (IR F-High): the doc-drift tests live in `checks`, which a docs-only
-  # change skips. This light job always runs (pull request, merge queue, push; no `code_changed`
-  # condition) so a docs-only change still cannot merge spec, README or docs-site drift. It builds
-  # only the workspace dependencies the CLI tests import. In `ci-gate`'s `needs`.
-  docs-checks:
-    name: docs-checks
-    needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Set up Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-
-      - name: Build the workspace dependencies of the CLI
-        run: pnpm exec turbo run build --filter='@4thtech-io/agentlink^...'
-
-      - name: Doc-drift tests (06 tool surface, docs-site hooks and privacy)
-        run: pnpm --filter @4thtech-io/agentlink exec vitest run test/tool-surface.test.ts test/hook-docs.test.ts test/privacy-docs.test.ts
-
-      - name: Doc-status tests and check (README, docs-site, knowledge, status.yaml)
-        run: |
-          pnpm --filter @4thtech-io/tools exec vitest run docs-status/status.test.mjs
-          node tools/docs-status/index.mjs --check
 
   vectors:
     name: vectors
@@ -865,7 +834,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, docs-checks, vectors, keychain, path-guard, context-budget, relays-docker, storage-minio, bundle-check, changesets, e2e-deterministic]
+    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, storage-minio, bundle-check, changesets, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
