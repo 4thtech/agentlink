@@ -355,7 +355,23 @@ export const ZONES = {
       },
     ]),
     bundles: true,
+    // M1-11s-b (D-118): the local UI app is built separately and its dist/ files are embedded in
+    // the bundle by bundle.config.mjs (scripts/local-ui-embed.mjs). The CLI may declare it (a
+    // devDependency, for the build order); it is never imported (browser code, no exports).
+    embeds: ['apps/local-ui'],
   },
+  // M1-11s-b (D-118): the local web app (React, browser only), served by the approval server from
+  // the CLI bundle. The UI library and React only: nothing from core, node or crypto, and no Node
+  // built-ins (not a NODE_ZONES entry). Owner presence and signing stay in @4thtech-io/node; the
+  // browser never signs.
+  'apps/local-ui': entry(
+    '@4thtech-io/local-ui',
+    ['types', 'ui'],
+    [
+      { pattern: 'react', reason: 'the local web app renders with React (D-118, 08 §1)' },
+      { pattern: 'react-dom', reason: 'the local web app mounts with react-dom (D-118, 08 §1)' },
+    ],
+  ),
   'apps/console': entry('@4thtech-io/console', NO_NODE),
   'apps/verify': entry('@4thtech-io/verify', NO_NODE),
   'apps/invite': entry('@4thtech-io/invite', NO_NODE),
@@ -373,6 +389,16 @@ export function allowedWorkspaceNames(zone) {
   const found = ZONES[zone];
   if (!found) return [];
   return [found.name, ...found.uses.map((short) => ZONES[`packages/${short}`].name)];
+}
+
+/**
+ * Workspace package names a zone may declare in its manifest: what it may import, plus the apps it
+ * embeds at build time (M1-11s-b `embeds`; IR-M1-11s-b-1 L-1: declared, never imported).
+ */
+export function allowedManifestNames(zone) {
+  const found = ZONES[zone];
+  if (!found) return [];
+  return [...allowedWorkspaceNames(zone), ...(found.embeds ?? []).map((app) => ZONES[app].name)];
 }
 
 const matchesEntry = (specifier, pattern) =>

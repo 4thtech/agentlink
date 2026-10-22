@@ -17,6 +17,8 @@
 //   `approvalLink` that starts the local approval server on the first `pending_approval` and reuses
 //   it; the result then carries the approval page's url next to the `agentlink approve` command. On
 //   close the server stops after the loop and before the agent closes (its source reads the store).
+// - M1-11s-b, the local UI app (D-118): the same server serves the app embedded in this build
+//   (local-ui-assets.ts) at /settings and /first-run, with the agent's core client for its API.
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -35,7 +37,11 @@ import {
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
+<<<<<<< HEAD
 import { approvalWaitMsFor } from './approval-wait.js';
+=======
+import { embeddedLocalUiAssets } from './local-ui-assets.js';
+>>>>>>> origin/main
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
@@ -202,6 +208,7 @@ export const mcpCommand = (version: string): CommandHandler => {
           );
           return startApprovalServer({
             source,
+            localUi: { assets: embeddedLocalUiAssets(), client: agent.client },
             // Fixed values only (ApprovalServerEvent, I-7).
             onEvent: (event) => logger.debug('approval ui event', { ...event }),
           });

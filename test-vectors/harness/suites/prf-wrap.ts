@@ -118,7 +118,12 @@ async function evaluateInput(input: PrfWrapInput): Promise<readonly Comparison[]
   }
 }
 
+// CHORE-VECTORS-KDF-TIMEOUT: the recovery-default cases run Argon2id at 64 MiB (memory-hard). They
+// took 0.67 s locally (node) and, on CI main push 39670996155 (2026-10-21), up to 4.1 s in WebKit,
+// 3.2 s in Firefox, 1.8 s in workerd and 1.1 s in Node. 60 s matches the crypto package's Argon2id
+// files (M0-10e). No KDF parameter, vector or assertion changed.
 export const prfWrap: SuiteModule = {
+  timeoutMs: 60_000,
   async evaluate(testCase) {
     const input = parseInput(testCase.input);
     try {

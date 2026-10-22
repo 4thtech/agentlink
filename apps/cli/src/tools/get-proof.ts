@@ -42,5 +42,5 @@ export async function getProofHandler(
   if (view === undefined) {
     return fail('not_found', GET_PROOF_TEXT.notFound, GET_PROOF_TEXT.notFoundNextStep);
   }
-  return proofViewOutput(view, self.agentId);
+  return proofViewOutput(view, self.agentId, context.payPage);
 }
