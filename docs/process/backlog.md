@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 236 (M1a 87, M1b 149, recounted from the card headings and their Phase lines on 2026-10-22 and then 6 cards added; M1-4d-e is phase "later (not M1)" and not counted; M1-9zc-b, M1-9zd-b, M1-9zf-b, M1-34-c, M1-10a-d and M1-4c-e (M1b) added from the 2026-10-21 and 2026-10-22 reviews; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
+| M1 Local beta | 261 (M1a 87, M1b 174; 6 cards added on 2026-10-22: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b) from the 2026-10-21 and 2026-10-22 reviews; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
 | M2 Console, desktop apps, self-host, design | 45 (incl. M2-19-b from AUDIT-FABLE-M2-19-2; M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
 | M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
@@ -1024,7 +1024,7 @@ Goal (10 M1): two people on different harnesses exchange messages and files and 
 
 The owner designs in Claude Design and delivers in three drops (10 "Design deliveries"; intake and live status in `docs/design/README.md`). Until a surface's drop has landed, every UI card builds it **functional and unstyled, strings externalized, no invented visual design**. A late D2 slips M2: the M2 critical path starts from DESIGN-D2.
 
-**D-116 (build-plan deviation, 21 Oct 2026).** D1 and the D2 first pass have been in `docs/design/` since 14 Oct 2026. Every surface with a screen in the `docs/design/README.md` screen index is built **styled** from it, after DESIGN-ADJ-1 has listed its adjustments; only surfaces with no screen stay functional and unstyled. UI build order (*orchestrator plan, not the owner's words*): wave 0 DESIGN-ADJ-1 and M1-35a in parallel; wave 1 M1-35b and M1-35c (and the owner's redesigns from the (b) briefs); wave 2 M1-11b, M1-11c and M1-19-c; wave 3 (M2) M2-5a, M2-1a/b, then the console and desktop cards.
+**D-116 (build-plan deviation, 21 Oct 2026).** D1 and the D2 first pass have been in `docs/design/` since 14 Oct 2026. Every surface with a screen in the `docs/design/README.md` screen index is built **styled** from it, after DESIGN-ADJ-1 has listed its adjustments; only surfaces with no screen stay functional and unstyled. UI build order (*orchestrator plan, not the owner's words*): wave 0 DESIGN-ADJ-1 and M1-35a in parallel; wave 1 M1-35b and M1-35c (and the owner's redesigns from the (b) briefs); wave 2 M1-11b, M1-11c and M1-19-c, built as the D-118 `apps/local-ui` app (shell cards M1-11s-a/-b and core cards M1-11r-a/-b first, then the page cards); wave 3 (M2) M2-5a, M2-1a/b, then the console and desktop cards.
 
 #### DESIGN-D1 · Design drop D1: foundations and M1 surfaces
 - **Status:** done (4thtech/agentlink#33, merged 2026-10-14; partial points listed in `docs/design/README.md`) · **Size:** — · **Tier:** Owner · **Security:** S0 · **Phase:** M1a
@@ -1050,7 +1050,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
 
 #### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
-- **Status:** in review (4thtech/agentlink#362; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** done (landed through #356 and #364; #362 closed as superseded; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
 - **Depends on:** — (runs in parallel with M1-35a)
 - **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
@@ -2152,7 +2152,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A decision-log entry and 08 §1 updated.
 
 #### M1-26-e · top-up link in the tools and CLI (new, D-111)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
+- **Status:** in review (4thtech/agentlink#344) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
 - **Repo/path:** agentlink · packages/core, apps/cli
 - **Depends on:** M1-26-d (decided, D-113), M1-26-c
 - **Spec:** 06 §2.4 (`needs_credits`), §8 (`credits --topup`); 08 §1
@@ -2160,6 +2160,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Build the top-up link in the decided format from the shipped config; `needs_credits` `url` and `nextStep` per 06 §2.4; `agentlink credits --topup` prints the link, the agent's address with a terminal QR code, and opens the browser when one is available.
   - Agent-assisted funding (D-111, 06 §2.4): the skill file and server instructions tell the agent to explain the one step, share the link or address and QR, watch `credits` and confirm; never ask for keys, recovery codes or card details, never move funds.
+  - SKILL.md top-up rule lands with the live pay page (M2-10), together with relaxing `tools/skill-file.test.mjs:142`.
 - **Acceptance:**
   - Tests first: the link host comes only from the shipped config; no network, token or "wallet" in `nextStep` or the CLI default output; no tool or `nextStep` asks for a key, recovery code or card detail.
 
@@ -2703,7 +2704,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-6c-1, 2026-10-18): a drop object's `locator` is its signed GET URL, a bearer secret like any presigned URL (I-7). Store it encrypted at rest with the file key; send it only inside end-to-end-encrypted payloads or owner copies, never to any 4thTech service other than the drop itself; never log it. Also (IR-M1-6c-1 L2): `planInline` returns an all-stored plan even when that plan cannot fit; check the all-stored payload size before any upload so a send that can never fit is refused before anything reaches storage.
 
 #### M1-7f-2 · core: files refresh-link, retention and crypto-shredding (IR-M1-7f-1 L2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (receiver-side key rows, retention at expiry on both sides, the receipt pass deleting the key row; refresh-link, the MinIO round trip, D-53 re-hash, `SentFile` name and hash, and the receiver's receipt trigger moved to M1-7f-3) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7f (#278)
 - **Spec:** 04 §4 (delivery, retention and crypto-shredding, encrypted drop); 07 §3 (`files`), §3.3, §5.4; 06 §2.3; D-18, D-48, D-53
@@ -2717,6 +2718,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Added by M1-33d (#333): with `files.deleteAfter: receipt`, a file whose record never gets a DELIVERED receipt is deleted at `expiry` (06 §3), on both sides and for the drop.
 - **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
+
+#### M1-7f-3 · core: files refresh-link, MinIO round trip and the rest of M1-7f-2 (split from M1-7f-2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (files, client), packages/types if the `refresh-link` answer needs a body schema
+- **Depends on:** M1-7f-2
+- **Spec:** 04 §4 (delivery, retention and crypto-shredding); 07 §3, §5.4; 06 §2.3; D-18, D-48, D-53, D-98
+- **Invariants:** I-2, I-5, I-7, I-9
+- **Scope (left after M1-7f-2):**
+  - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`, the proposed body in packages/types) and the sender's answer from its sealed `files` row; an expired link on the recipient side leads into it; the answer updates the receiver row's `url` and `expires_at`. Decide how a refreshed link relates to retention at `expiresAt` (today both sides delete at the first `expiresAt`, so a refresh only helps before it).
+  - The receiver deleting its key row on its own DELIVERED receipt under `receipt` (today it deletes at `expiresAt`); keep it out of the proofs service files touched by open PRs, or land it after them.
+  - Payloads stored before M1-7f-2 still carry their `fileKey` and have no receiver row, so they keep their keys until this backfill (IR-M1-7f-2-1 L2): move each key into a capped receiver row and replace it in the stored payload with the placeholder.
+  - The expiry pass takes the oldest 200 due rows each time, so rows whose delete keeps failing can stall it for good (IR-M1-7f-2-1 L3): give it a rotating cursor like the receipt pass (`ReceiptRetentionDeps.cursor`).
+  - A sent copy (07 §4.3, another device of the same agent) keeps its payload's keys and gets no row; decide whether it should.
+  - The 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
+  - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
+  - From IR-M1-9d-1-1 L-1: `SentFile` also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again.
+  - A drop expiry test against the real Worker (the signed DELETE's timestamp after an advanced clock); M1-7f-2 covers the drop path through deleteFileObject only.
+- **Acceptance:** expired link → refresh-link returns a working URL; 5 MB via MinIO; a repeat send returns the original name and hash after the file on disk changed, and the platform's open is not called; tests first, a `RED (expected):` commit before the fix.
 
 #### M1-7g · core: proofs and receipts
 - **Status:** done (4thtech/agentlink#306, merged 2026-10-19); recipient export is M1-7g-b (done); follow-ups in M1-7g-c · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -3813,9 +3832,70 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - A `pending_approval` result carries the UI `url`; a test checks the origin pin; "Remember for this contact" adds the contact rule through a `policy.set` whose refusal or success is reported accurately.
 
-#### M1-11c · local UI: settings pages
+#### M1-11s-a · local UI: client shell (`apps/local-ui`) (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/node (new settings page modules; `approval-page.ts` belongs to M1-11b); consumes `packages/ui`
+- **Repo/path:** agentlink · `apps/local-ui/**`: `package.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `router.tsx`, `nav.ts`, `api/client.ts`, `layout/**`, its own `pnpm-lock.yaml` importer entry, stub pages `src/pages/{first-run,approvals,approve,activity,contacts,files,storage,proofs,rules,backup,advanced}/index.tsx` and `src/states/index.tsx`
+- **Depends on:** #370 (React components in `packages/ui`, lockfile); merges after M1-11s-b (the deps-check zone for `apps/local-ui` exists only then); lockfile conflicts are resolved by regenerating with `pnpm install` at merge
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - New zone `apps/local-ui` (D-118): a browser-only React app built with Vite, using `packages/ui`; no Node APIs. Owns the router, navigation, layout and the API client that sends the session token; every page card fills in its own stub.
+  - Page copy lives locally per page and is linted with `lintVocabulary` (the strings coverage scan is `packages/ui` only).
+  - The browser never signs and holds no key: owner presence and signing stay server-side.
+- **Acceptance:**
+  - Builds to static assets; the app renders every stub page in light and dark; no external URL, no inline style (08 §4 CSP); bundle-size limit recorded in the PR.
+
+#### M1-11s-b · local UI: server shell (static assets, routes, context, CLI embedding) (new, D-118)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` (static `/assets/*`, CSP `font-src 'self'`, SPA fallback for the new routes only), `packages/node/src/local-ui/{context.ts,route-types.ts,routes.ts}`, `packages/node/src/local-ui/api/{first-run,approvals,activity,contacts,files,storage,proofs,rules,backup,advanced}.ts` (501 stubs, so wave 1 never edits `routes.ts`), `packages/node/src/index.ts`, `apps/cli/src/mcp/command.ts` and `agentlink ui` wiring, the `apps/cli` build (embeds the built `apps/local-ui` assets), `tools/deps-check/policy.mjs` (zone `apps/local-ui`), the `pnpm-lock.yaml` entries other than the `apps/local-ui` importer
+- **Depends on:** #348, #370
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Serve the embedded `apps/local-ui` build from the existing approval server (D-118): static assets, SPA fallback for `/settings/*` and `/first-run` behind the existing session token. Approvals stay on the old page (`/`, `/approve/<id>`, `APP_JS`) until M1-11b-2.
+  - One `LocalUiContext` (core client, store, policy, owner-operation helper, presence check) for every handler. Every mutating route is declared `presence: true` in `route-types.ts` and presence is enforced centrally, not per handler.
+  - `packages/node` stays React-free (deps-check); `apps/cli` bundles the assets and passes them to the server. The deps-check policy gets the `apps/local-ui` zone (`react`, `react-dom`, `packages/ui`; no node).
+- **Acceptance:**
+  - Tests: a mutating route without `presence` fails to register; a missing or wrong token, wrong `Host` or foreign origin is rejected for the new routes as for the old; stub API routes return 501; deps-check rejects React in `packages/node`; the old approval flows pass unchanged. Threat note and tests-first evidence (S2).
+
+#### M1-11r-a · core read APIs for the local UI (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (new modules) and their `src/index.ts` exports
+- **Depends on:** —
+- **Spec:** 06; 07; 08 §1; 04 §4; D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Read-side APIs the local pages need (gaps from the core API audit, D-118): `identity.fingerprints()` for the agent and the owner; `files.resolvedFolders()`; `ProofService.list()`; `creditsBalance()` per chain; `requestFaucet(chain)`, testnet only; `identity.agentAddress()` for the QR code; read accessors for the relay list and for RPC and chain overrides; `ActivityService.list()`, a merged feed of non-message events.
+  - Read-only: no signing, no key material in any result; paths and URLs follow the 04 §4 realpath and SSRF rules.
+- **Acceptance:**
+  - Unit tests per API including empty and large inputs; no secret, key or URL of the user's storage appears in any result (fixture grep); `requestFaucet` refuses a mainnet chain. Threat note and tests-first evidence (S2).
+
+#### M1-11r-b · owner-operation prepare helpers for the local UI (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (the owner-action files shared with M1-9i-a) and their `src/index.ts` exports
+- **Depends on:** M1-9i-a (same owner-action files), M1-11r-a (both write `packages/core/src/index.ts`)
+- **Spec:** 04 §2.5; 06 §8; 07; 08 §1; D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Helpers that build the unsigned body the server then signs after the presence check (D-118): `preparePolicyEdit(patch)` with a version bump (for the Rules and Files writes); the unsigned `contact.check`, `contact.rename` and `contact.remove` bodies. Relay and RPC writes are not here: they depend on M1-7j and M1-9n (see M1-11c-a6).
+  - The browser never signs: these return unsigned bodies to the server-side handler only.
+- **Acceptance:**
+  - Tests-first: the version bump, rejection of a stale version, and byte-exact bodies against vectors where a vector exists; an unsigned body is never accepted by the core without an owner signature. Threat note and tests-first evidence (S2).
+
+#### M1-11r-c · core dropUsage and own-storage status (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (new module and `src/index.ts` export)
+- **Depends on:** M1-9i-a (shares own-storage), M1-11r-b (both write `packages/core/src/index.ts`)
+- **Spec:** 06 §8; 07; 08 §1; D-48, D-115, D-118
+- **Invariants:** I-7
+- **Scope:**
+  - `files.dropUsage()`: used bytes against the quota for the encrypted drop, and a read of the own-storage status (connected or not, last test result) for the Storage page. Read-only; no credential, presigned URL or share link in any result.
+- **Acceptance:**
+  - Unit tests for empty, partly used and over-quota states and for own storage connected and not; a fixture grep shows no credential or URL in any result. Threat note and tests-first evidence (S2).
+
+#### M1-11c · local UI: settings pages
+- **Status:** split into M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-11c-a1…a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c (D-118, 2026-10-22) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui` (pages) and `packages/node/src/local-ui` (server handlers); consumes `packages/ui`; see D-118
 - **Depends on:** M1-11a, M1-9b, M1-9i, M1-26; DESIGN-ADJ-1, M1-35a, M1-35b, M1-35c (D-116)
 - **Spec:** 08 §1 (pages); 11 §6.2; 10 M1-11; D-116; `docs/design/README.md` (screen index)
 - **Invariants:** I-4, I-10
@@ -3826,9 +3906,140 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Playwright flow per page; every mutating action requires presence; default views pass the vocabulary lint; owner confirms fidelity to the adjusted design.
 
+#### M1-11c-a1 · local UI page: Activity (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/activity.ts` and its test, `e2e/test/local-ui-activity.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Activity (Local-activity): the merged feed of non-message events from `ActivityService.list()`.
+  - The server handler in `packages/node/src/local-ui/api/activity.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a1b · local UI page: Activity, brief B-5 follow-up (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**` and its tests
+- **Depends on:** M1-11c-a1; design brief B-5
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Apply the owner's redesign from brief B-5 to the Activity page (D-118).
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a2 · local UI page: Contacts (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/contacts.ts` and its test, `e2e/test/local-ui-contacts.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a, M1-11r-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Contacts (Local-contacts): safety-code compare per 04 §3.6.1 ("They match" signs `contact.check` with presence, "They don't" blocks), rename, remove, block.
+  - The server handler in `packages/node/src/local-ui/api/contacts.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a3 · local UI page: Files (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/files.ts` and its test, `e2e/test/local-ui-files.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a, M1-11r-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Files (Local-files): allowed folders with resolved paths, inbox folder, expiry; edits through `preparePolicyEdit`.
+  - The server handler in `packages/node/src/local-ui/api/files.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a4 · local UI page: Proofs and credits (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/proofs.ts` and its test, `e2e/test/local-ui-proofs.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Proofs and credits (Local-proofs): proof list, balances, agent address QR, faucet on testnets. The Add credits control stays hidden until the pay page is live (`PAY_PAGE.live`).
+  - The server handler in `packages/node/src/local-ui/api/proofs.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a4b · local UI page: Proofs and credits, brief B-5 follow-up (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**` and its tests
+- **Depends on:** M1-11c-a4; design brief B-5
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Apply the owner's redesign from brief B-5 to the Proofs and credits page (D-118).
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a5 · local UI page: Rules (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/rules.ts` and its test, `e2e/test/local-ui-rules.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Rules (Local-rules): plain-language rules to owner-signed policy, including `commitments` limits.
+  - The server handler in `packages/node/src/local-ui/api/rules.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a5b · local UI page: Rules, brief B-5 follow-up (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**` and its tests
+- **Depends on:** M1-11c-a5; design brief B-5
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Apply the owner's redesign from brief B-5 to the Rules page (D-118).
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a6 · local UI page: Advanced (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/advanced/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/advanced.ts` and its test, `e2e/test/local-ui-advanced.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a, M1-11r-b, M1-7j, M1-9n; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Advanced (Local-advanced): fingerprints, relays, RPCs and chains; the only place a chain can be chosen (D-40). Relay and RPC writes go through the M1-7j relay republish and M1-9n owner operations, not through M1-11r-b; if no RPC or chain-override owner operation is specified by then, the page shows these read-only.
+  - The server handler in `packages/node/src/local-ui/api/advanced.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-b · local UI page: Storage (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/storage/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/storage.ts` and its test, `e2e/test/local-ui-storage.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-9i, M1-11r-c, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-4
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Storage (Local-storage): drop usage against the quota (`dropUsage`, M1-11r-c) and, under Advanced, the status of own storage with a "connect in terminal" step and a test. Credential entry stays in the terminal (D-117, `agentlink storage connect`); the page never takes a storage credential.
+- **Acceptance:**
+  - I-7 holds: no storage credential or URL of the user's storage reaches the page, a log or an error (fixture grep).
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+  - No storage credential, presigned URL or share link reaches the page or any log.
+
+#### M1-11c-c · local UI page: Backup (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/backup.ts` and its test, `e2e/test/local-ui-backup.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-9i, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-3
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5, I-7, I-10
+- **Scope:**
+  - Backup (Local-backup): recovery-kit export behind the owner's passkey; restore stays in the terminal only (D-117, 06 §8, 04 §2.3). The kit is shown through the `SecretDisplay` component and never logged.
+- **Acceptance:**
+  - I-7 and I-10 hold: the kit needs owner presence, is shown once through `SecretDisplay` and never reaches a log, URL or the 4thTech services.
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+  - The kit never appears in a URL, a log or an error.
+
 #### M1-11b · local UI: apply design drop D1 (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus for the passkey, approval and policy screens) · **Security:** S1 (S2 where a change touches owner-presence or approval flows) · **Phase:** M1b
-- **Repo/path:** agentlink · packages/node (`approval-page.ts` and its tests: first run, approvals, review together); consumes `packages/ui` (M1-35a, M1-35b), never edits it
+- **Status:** split into M1-11b-1…5 (D-118, 2026-10-22) · **Size:** M · **Tier:** Sonnet (Opus for the passkey, approval and policy screens) · **Security:** S1 (S2 where a change touches owner-presence or approval flows) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui` (first run, approvals, states) and `packages/node/src/local-ui`; `approval-page.ts` is deleted by M1-11b-2; consumes `packages/ui` (M1-35a, M1-35b), never edits it
 - **Depends on:** DESIGN-D1, DESIGN-ADJ-1, M1-35a, M1-35b, M1-35c, M1-11a
 - **Spec:** 11 §6.2, §8, §9, §11; D-30, D-116; `docs/design/README.md` (screen index), `docs/design/adjustments.md`
 - **Invariants:** I-4, I-5
@@ -3840,10 +4051,67 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - All M1-11a/M1-11c Playwright flows pass unchanged; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to D1.
   - Untrusted strings still render as text (XSS fixtures re-run); no external URL in the bundle.
 
+#### M1-11b-1 · local UI: first run and shared states (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the first run (Local-firstrun) and the shared states (Local-states) in `apps/local-ui` from the D1 screens with the DESIGN-ADJ-1 (a) fixes; the passkey registration calls the server; the browser never signs.
+  - Also owns `src/states/**` and `approval-passkey-browser.test.ts`.
+- **Acceptance:**
+  - Passkey browser test still passes; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-2 · local UI: approvals, and `/` switches to the new app (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/approvals.ts` and its test, `e2e/test/local-ui-approvals.test.ts`, its `changelog.d/` fragment and changeset; also `approval-page.ts`, `approval-server.ts`, `approval-ui-browser.test.ts`, `approval-review.test.ts`, `approval-ui.fixture.ts`
+- **Depends on:** M1-11b-1, M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the approvals list and the approval and commitment review (Local-approvals) in `apps/local-ui`, switch `/` and `/approve/<id>` to the new app and delete `APP_JS`.
+  - Sole editor of `approval-server.ts` in wave 1. Playwright selectors that #398 renamed are updated deliberately and listed in the PR. Merges after M1-11b-1.
+- **Acceptance:**
+  - All M1-11a approval flows pass; untrusted strings render as text (XSS fixtures re-run); no external URL in the bundle; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-3 · local UI: first-run recovery-code step per brief B-3 (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/recovery/**` and its tests only
+- **Depends on:** M1-11b-1, M1-9i; design brief B-3
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wave 2 follow-up to M1-11b-1/-2: apply first-run recovery-code step per brief B-3 in `apps/local-ui` (D-118). Owns only the files the brief names; the browser never signs.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-4 · local UI: states and cards using the components from M1-35b-b (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/states/**` and its tests only
+- **Depends on:** M1-11b-1, M1-11b-2, M1-35b-b
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wave 2 follow-up to M1-11b-1/-2: apply states and cards using the components from M1-35b-b in `apps/local-ui` (D-118). Owns only the files the brief names; the browser never signs.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-5 · local UI: approval and commitment cards per brief B-9 (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/cards/**` and `apps/local-ui/src/pages/approve/**` with their tests only
+- **Depends on:** M1-11b-2, M1-11b-4 (serial; no overlapping files); design brief B-9
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wave 2 follow-up to M1-11b-1/-2: apply approval and commitment cards per brief B-9 in `apps/local-ui` (D-118). Owns only the files the brief names; the browser never signs.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
-- **Status:** ready · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#361, merged 2026-10-21) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/ui (`src/tokens/**`, `fonts/**`, a third-party notices file, `package.json` exports, `src/index.ts`). This card owns `src/index.ts`; M1-35b only appends component exports to it after this card lands
 - **Depends on:** — (parallel with DESIGN-ADJ-1)
 - **Spec:** 11 §11.7; 08 §4; D-30, D-116; `docs/design/d1/tokens/`, `d1/design-system/contrast.md`
@@ -3865,6 +4133,39 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures render inert in every component; no `style=` attribute in rendered output; owner confirms visual match.
 
+#### M1-35b-b · ui: components, brief B-2 (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
+- **Depends on:** M1-35b, M1-35c-b; design brief B-2 (`docs/design/adjustments.md`)
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the components of brief B-2 from the component specs with the DESIGN-ADJ-1 fixes. M1-35b-b, -c and -d run serially (shared `components.css` and `index.ts`).
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures inert; no `style=` attribute in rendered output; owner confirms visual match.
+
+#### M1-35b-c · ui: components, brief B-1 (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
+- **Depends on:** M1-35b-b; design brief B-1 (`docs/design/adjustments.md`)
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the components of brief B-1 from the component specs with the DESIGN-ADJ-1 fixes. M1-35b-b, -c and -d run serially (shared `components.css` and `index.ts`).
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures inert; no `style=` attribute in rendered output; owner confirms visual match.
+
+#### M1-35b-d · ui: components, brief B-8 (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
+- **Depends on:** M1-35b-c; design brief B-8 (`docs/design/adjustments.md`)
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the components of brief B-8 from the component specs with the DESIGN-ADJ-1 fixes. M1-35b-b, -c and -d run serially (shared `components.css` and `index.ts`).
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures inert; no `style=` attribute in rendered output; owner confirms visual match.
+
 #### M1-35c · Copy audit of strings and screens against 11 §5 (new, D-116)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/ui (`src/strings/**`: the shipped English strings and their vocabulary test)
@@ -3875,6 +4176,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Audit `docs/design/d1/copy/strings.en.json` and the copy of every screen against 11 §5; ship the corrected strings in `packages/ui`. Known items: the Pay network line ("choose Base (cheapest)") leaves the default view; raw `0x…` record IDs move to Advanced or detail; the 11 §5.6 disclosure lines are present; the `@4thtech-io` package scope.
 - **Acceptance:**
   - A vocabulary test fails on any banned term in a default-view string; every changed string lists its 11 § reference in the PR.
+
+#### M1-35c-b · ui: strings export and `lintVocabulary` (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/index.ts`, `packages/ui/src/strings/{index.ts,lint.ts}` (`StringKey`, `lintVocabulary`)
+- **Depends on:** #370, #398 (M1-35c)
+- **Spec:** 11 §5, §5.1, §5.6; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Export the corrected strings as typed `StringKey`s and a `lintVocabulary` helper the page cards in `apps/local-ui` use to lint their local copy against 11 §5.
+  - `packages/ui/src/index.ts` is owned by #370, then this card.
+- **Acceptance:**
+  - Vocabulary test fails on any banned term in a default-view string; `lintVocabulary` is covered for each banned term and for the Advanced exemptions.
 
 ### Agent instructions, docs, end-to-end
 
@@ -4196,6 +4509,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - The concurrency test signs exactly one DELIVERED; the already-notarized case is reported in the result field and the summary line; the inbox page test shows one transaction per page; no test weakened.
 
+#### M1-33d-c · proofStatusShape follows 06 ProofStatus (new, from IR-M1-33d-b-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/types` (`proofStatusShape` and its schema test)
+- **Depends on:** M1-33d-b
+- **Spec:** 06 `ProofStatus`; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - Align `proofStatusShape` with 06 `ProofStatus`: add `receiptRequested`, `receiptRequestNotAdded` and `advanced`.
+- **Acceptance:**
+  - A schema test accepts each new field and rejects a malformed one; the existing proof tests pass unchanged.
+
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
 #### M1-20 · Commitments policy: owner approval for binding accepts and receipts (D-31) (new)
@@ -4449,8 +4773,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** the M1-9zc mutation copies of the bundle are written outside `dist/`, so a moved native import fails with `ERR_MODULE_NOT_FOUND` instead of a real `.node` load. Write the copies next to `dist/` so relative resolution works and the test catches an actual native module load before the Node version check. Source: IR-M1-9zc-1.
 - **Acceptance:** the mutated copy fails the test because a native module really loads (not because a module is missing); the unmutated bundle passes; existing tests unchanged.
 
+
 #### M1-9zd · cli: owner code typed at a shell prompt (new, UX review low 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`commands/owner/**`, `strings.ts`), docs-site troubleshooting; 11 §5
 - **Depends on:** M1-9z
 - **Scope:** `owner-code-typed-at-shell-prompt` (the M1-9z incident: a code typed into a shell and a chat). The code prompt states that it is not a shell command and not for chat; guard where feasible (for example a hint when the entry looks like a command). Never log or echo the entry (I-1).
@@ -4471,7 +4796,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit; test with a mismatching invite is refused and writes nothing; the matching case passes.
 
 #### M1-9zf · core: invite acceptance binds the counterparty's owner fingerprint or card hash (new, IR-M1-9ze-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
 - **Depends on:** M1-9ze
 - **Spec:** 04 §3.3 (pairing); 06 §2.1 (`accept_invite`)
