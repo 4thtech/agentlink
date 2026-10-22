@@ -34,6 +34,8 @@ import {
   type ApprovalServerSource,
 } from './approval-server.js';
 import { createKeychainAgent } from './keychain-keystore.js';
+import type { LocalUiOwnerOperation } from './local-ui/route-types.js';
+import { createLocalUiRoutes, type LocalUiRouteRegistry } from './local-ui/routes.js';
 import type { KeychainBackend } from './keychain.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
@@ -167,7 +169,7 @@ function fakeSource(): ApprovalServerSource & {
   };
 }
 
-async function start(): Promise<{
+async function start(routes?: LocalUiRouteRegistry): Promise<{
   server: ApprovalServer;
   source: ReturnType<typeof fakeSource>;
   sessionUrl: string;
@@ -184,6 +186,7 @@ async function start(): Promise<{
         return Promise.resolve(true);
       },
       notifier: () => Promise.resolve(true),
+      ...(routes === undefined ? {} : { routes }),
     },
   );
   servers.push(server);
@@ -228,6 +231,54 @@ function needBrowser(skip: () => void): void {
   if (process.env['CI'] !== undefined) throw launchError;
   skip();
 }
+
+/**
+ * In the page: one passkey assertion with PRF for the registered credential, encoded as the page's
+ * presence body (owner-passkey.ts encodePasskeyAssertion), POSTed to a /api/ui/ presence route.
+ */
+const PASSKEY_UI_POST = `(async () => {
+  const b64 = (s) => {
+    const t = s.replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(t + '='.repeat((4 - (t.length % 4)) % 4));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  };
+  const csrf = document.querySelector('meta[name="agentlink-csrf"]').getAttribute('content');
+  const info = await (await fetch('/api/owner/passkey', { headers: { 'X-AgentLink-CSRF': csrf } })).json();
+  const cred = await navigator.credentials.get({
+    publicKey: {
+      challenge: crypto.getRandomValues(new Uint8Array(32)),
+      rpId: 'localhost',
+      allowCredentials: [{ type: 'public-key', id: b64(info.passkey.credentialId) }],
+      userVerification: 'required',
+      extensions: { prf: { eval: { first: b64(info.passkey.prfSalt) } } },
+    },
+  });
+  const prf = cred.getClientExtensionResults().prf?.results?.first;
+  const fields = [
+    new Uint8Array(cred.rawId),
+    new Uint8Array(cred.response.authenticatorData),
+    new Uint8Array(cred.response.userHandle ?? new ArrayBuffer(0)),
+    new Uint8Array(prf ?? new ArrayBuffer(0)),
+  ];
+  const body = new Uint8Array(fields.reduce((n, f) => n + 2 + f.length, 0));
+  let at = 0;
+  for (const f of fields) {
+    body[at] = f.length >> 8;
+    body[at + 1] = f.length & 0xff;
+    body.set(f, at + 2);
+    at += 2 + f.length;
+  }
+  const res = await fetch('/api/ui/test/c1/check', {
+    method: 'POST',
+    headers: {
+      'X-AgentLink-CSRF': csrf,
+      'X-AgentLink-Presence': 'passkey',
+      'Content-Type': 'application/octet-stream',
+    },
+    body,
+  });
+  return { status: res.status, body: await res.json() };
+})()`;
 
 describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium)', () => {
   it('registers a passkey on http://localhost:<port> and approves with it', async (ctx) => {
@@ -284,6 +335,52 @@ describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium
     await page.getByRole('button', { name: 'Confirm approval' }).click();
     await page.getByText('Approved.').waitFor();
     expect(source.applied).toHaveLength(1);
+    await page.context().close();
+  }, 120_000);
+
+  // IR-M1-11s-b-2 Info-2 (M1-11b-1): a passkey gesture passes the central presence gate of a
+  // /api/ui/ owner route, and its one owner operation signs exactly the route's object.
+  it('a passkey assertion unlocks one owner operation on a /api/ui/ presence route', async (ctx) => {
+    needBrowser(() => ctx.skip());
+    const signed: JsonObject[] = [];
+    const routes = createLocalUiRoutes();
+    routes.register({
+      method: 'POST',
+      path: '/api/ui/test/:id/check',
+      presence: true,
+      handler: async (_context, req, ownerOp: LocalUiOwnerOperation) => {
+        const action = {
+          v: 1,
+          op: 'contact.check',
+          agent: agentId,
+          owner: encodeHex(owner.ownerNostr),
+          nonce: 'n'.repeat(22),
+          params: { contact: req.params['id'] ?? '' },
+        };
+        const [result] = await ownerOp.sign({ lines: ['Mark the safety code as checked'] }, [
+          { kind: 'owner-action', action },
+        ]);
+        if (result?.kind !== 'owner-action') throw new Error('unreachable');
+        signed.push(result.signed.body);
+        return {
+          status: 200,
+          body: { status: 'done', valid: ownerSigValid(result.signed.body, result.signed.sig) },
+        };
+      },
+    });
+    const { sessionUrl } = await start(routes);
+    const { page } = await pageWithAuthenticator(true);
+    await page.goto(sessionUrl);
+    await page.getByRole('button', { name: 'Set up a passkey' }).click();
+    await page.locator('input[type=password]').fill(code);
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByText('Passkey set up.').waitFor();
+
+    // Runs in the page (plain JS: this package is type-checked without DOM types).
+    const answer: unknown = await page.evaluate(PASSKEY_UI_POST);
+    expect(answer).toEqual({ status: 200, body: { status: 'done', valid: true } });
+    expect(signed).toHaveLength(1);
+    expect(signed[0]?.['op']).toBe('contact.check');
     await page.context().close();
   }, 120_000);
 

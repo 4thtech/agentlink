@@ -26,6 +26,8 @@ import { DeliveryAcks } from './acks.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
+import { FilesView } from './files/view.js';
+import { ActivityService } from './activity.js';
 import { deleteFilesOnReceipt, type ReceiptRetentionResult } from './files/retention.js';
 import { InboxService } from './inbox.js';
 import { policyLimits } from './policy-engine.js';
@@ -156,6 +158,10 @@ export class AgentLinkClient {
    * Notarize, receipts, proof envelopes, replacement and the proof-pack export (M1-7g).
    */
   readonly proofs: ProofService;
+  /** The allowed folders as the rules name them and as resolved (M1-11r-a, the local UI). Read-only. */
+  readonly files: FilesView;
+  /** The non-message activity feed (M1-11r-a, the local UI): approvals, proofs, blocks, rules. */
+  readonly activity: ActivityService;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -223,6 +229,8 @@ export class AgentLinkClient {
     });
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.#filesPlatform = files;
+    this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
+    this.activity = new ActivityService(ctx);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,

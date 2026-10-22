@@ -17,6 +17,8 @@
 //   `approvalLink` that starts the local approval server on the first `pending_approval` and reuses
 //   it; the result then carries the approval page's url next to the `agentlink approve` command. On
 //   close the server stops after the loop and before the agent closes (its source reads the store).
+// - M1-11s-b, the local UI app (D-118): the same server serves the app embedded in this build
+//   (local-ui-assets.ts) at /settings and /first-run, with the agent's core client for its API.
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -35,6 +37,7 @@ import {
 } from '../runtime/index.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
+import { embeddedLocalUiAssets } from './local-ui-assets.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
@@ -196,8 +199,24 @@ export const mcpCommand = (version: string): CommandHandler => {
           );
           return startApprovalServer({
             source,
+            localUi: { assets: embeddedLocalUiAssets(), client: agent.client },
             // Fixed values only (ApprovalServerEvent, I-7).
-            onEvent: (event) => logger.debug('approval ui event', { ...event }),
+            onEvent: (event) => {
+              logger.debug('approval ui event', { ...event });
+              // IR-M1-11s-c-1 L-2: an owner set up from the first-run page is named outside the
+              // browser too (a fixed line and the public fingerprint), to compare with
+              // `agentlink doctor`.
+              if (
+                event.kind === 'owner_setup' &&
+                (event.outcome === 'done' || event.outcome === 'done_unconfirmed') &&
+                event.fingerprint !== undefined
+              ) {
+                logger.info(
+                  'Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with `agentlink doctor`.',
+                  { fingerprint: event.fingerprint },
+                );
+              }
+            },
           });
         },
       });
