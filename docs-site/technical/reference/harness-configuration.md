@@ -153,7 +153,7 @@ Sources: [Cursor MCP](https://cursor.com/docs/context/mcp) (checked 2026-10-22: 
 
 ### Windsurf
 
-Cascade's config, `~/.config/devin/mcp_config.json` on macOS and Linux, `%AppData%/devin/mcp_config.json` on Windows (`~/AppData/Roaming/devin/mcp_config.json`). `XDG_CONFIG_HOME` and `APPDATA` are not followed. Older installs keep `~/.codeium/windsurf/mcp_config.json`: `init` still detects them, and `init --harness windsurf --config <that path>` writes there.
+Cascade's config, `~/.config/devin/mcp_config.json` on macOS and Linux, `%AppData%/devin/mcp_config.json` on Windows (`~/AppData/Roaming/devin/mcp_config.json`). If `XDG_CONFIG_HOME` (macOS, Linux) or `APPDATA` (Windows) is set to an absolute path inside your home folder, `init` uses `devin/mcp_config.json` there, as Windsurf does; an empty or relative value is ignored, and one outside your home folder is refused. Older installs keep `~/.codeium/windsurf/mcp_config.json`: `init` still detects them, and `init --harness windsurf --config <that path>` writes there.
 
 ```json
 {

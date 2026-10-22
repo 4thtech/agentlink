@@ -133,10 +133,51 @@ describe('Windsurf', () => {
     ).toEqual({ mcpServers: { agentlink: { command: 'npx', args: ARGS } } });
   });
 
-  it('does not follow XDG_CONFIG_HOME', async () => {
-    const c = ctx({ platform: 'linux', env: { XDG_CONFIG_HOME: '/tmp/elsewhere' } });
+  it('follows an absolute XDG_CONFIG_HOME inside the home folder', async () => {
+    const c = ctx({ platform: 'linux', env: { XDG_CONFIG_HOME: join(home, 'xdg') } });
     const plan = await planHarness(harnessById(WINDSURF), c);
-    expect(plan.status).toBe('change');
-    if (plan.status === 'change') expect(plan.diff.join('\n')).not.toContain('elsewhere');
+    if (plan.status !== 'change') throw new Error('expected change');
+    expect(plan.diff.join('\n')).toContain('~/xdg/devin/mcp_config.json');
+    await applyHarness(plan, c);
+    expect(
+      JSON.parse(await readFile(join(home, 'xdg', 'devin', 'mcp_config.json'), 'utf8')),
+    ).toEqual({ mcpServers: { agentlink: { command: 'npx', args: ARGS } } });
+    expect(await readdir(home)).toEqual(['xdg']);
+  });
+
+  it('ignores an empty or relative XDG_CONFIG_HOME', async () => {
+    for (const value of ['', 'relative/dir']) {
+      const plan = await planHarness(
+        harnessById(WINDSURF),
+        ctx({ platform: 'linux', env: { XDG_CONFIG_HOME: value } }),
+      );
+      expect(plan.status).toBe('change');
+      if (plan.status === 'change') {
+        expect(plan.diff.join('\n')).toContain('~/.config/devin/mcp_config.json');
+      }
+    }
+  });
+
+  it('refuses an XDG_CONFIG_HOME outside the home folder', async () => {
+    const plan = await planHarness(
+      harnessById(WINDSURF),
+      ctx({ platform: 'linux', env: { XDG_CONFIG_HOME: '/tmp/elsewhere' } }),
+    );
+    expect(plan).toMatchObject({ status: 'blocked', reason: 'unsafe_path' });
+  });
+
+  it('follows APPDATA on Windows, and falls back when unset', async () => {
+    const appdata = join(home, 'AppData', 'Roaming');
+    const plan = await planHarness(
+      harnessById(WINDSURF),
+      ctx({ platform: 'win32', env: { APPDATA: join(home, 'Data') } }),
+    );
+    if (plan.status !== 'change') throw new Error('expected change');
+    expect(plan.diff.join('\n')).toContain('~/Data/devin/mcp_config.json');
+    const fallback = await planHarness(harnessById(WINDSURF), ctx({ platform: 'win32' }));
+    expect(fallback.status === 'change' && fallback.diff.join('\n')).toContain(
+      '~/AppData/Roaming/devin/mcp_config.json',
+    );
+    expect(appdata).toContain('Roaming');
   });
 });
