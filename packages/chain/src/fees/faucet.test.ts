@@ -547,10 +547,14 @@ describe('createFaucetChain().credit: a pending nonce that settles (M1-10b-d)', 
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] });
     try {
       const start = Date.now();
-      const pending = port.credit(AGENT, 100);
+      let end = start;
+      const pending = port.credit(AGENT, 100).then((answer) => {
+        end = Date.now();
+        return answer;
+      });
       await vi.advanceTimersByTimeAsync(10 * DEADLINE);
       const result = await pending;
-      return { result, elapsed: Date.now() - start };
+      return { result, elapsed: end - start };
     } finally {
       vi.useRealTimers();
     }
