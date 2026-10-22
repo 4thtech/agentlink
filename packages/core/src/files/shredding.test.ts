@@ -9,7 +9,11 @@
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
 import type { Policy } from '@4thtech-io/types';
+import { createLogger } from '@4thtech-io/log';
+import { payloadSchema } from '@4thtech-io/types';
+import type { CoreContext } from '../context.js';
 import { rowKeyOf } from '../store/store.js';
+import { receivedFileRows } from './received.js';
 import type { Sealed } from '../store/schema.js';
 import { FakeClock, passphrase, seed } from '../testing/fixtures.js';
 import {
@@ -176,5 +180,35 @@ describe('retention at expiry, both sides (04 §4, 06 §3)', () => {
     own.delete = original;
     expect(await a.client.deleteExpiredFiles()).toEqual({ deleted: 1, failed: 0 });
     expect(own.objects.size).toBe(0);
+  });
+});
+
+describe('receiver rows: expiresAt is capped at receive time + 7 days (04 §4, IR-M1-7f-2-1 L4)', () => {
+  it('a sender-stated expiresAt beyond 7 days is cut to now + 7 days; a nearer one is kept', async () => {
+    await agents();
+    const envelopeId = await send(1_000);
+    const text = await storedPayload(b, envelopeId);
+    const ctx: CoreContext = {
+      keyStore: b.keyStore,
+      store: b.store,
+      cipher: b.cipher,
+      now: clock.now,
+      log: createLogger({ name: 'core', level: 'debug', sink: () => {} }),
+    };
+    const far = JSON.parse(text) as { files: { expiresAt: number }[] };
+    (far.files[0] as { expiresAt: number }).expiresAt = clock.t + 365 * DAY;
+    const farText = JSON.stringify(far);
+    const farRows = await receivedFileRows(ctx, envelopeId, payloadSchema.parse(far), farText);
+    expect(farRows.rows[0]?.expires_at).toBe(clock.t + 7 * DAY);
+
+    const near = JSON.parse(text) as { files: { expiresAt: number }[] };
+    (near.files[0] as { expiresAt: number }).expiresAt = clock.t + DAY;
+    const nearRows = await receivedFileRows(
+      ctx,
+      envelopeId,
+      payloadSchema.parse(near),
+      JSON.stringify(near),
+    );
+    expect(nearRows.rows[0]?.expires_at).toBe(clock.t + DAY);
   });
 });
