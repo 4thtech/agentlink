@@ -237,7 +237,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 
 | Metric | Target (first 3 months of beta) |
 |---|---|
-| Time from install to first delivered message | Median < 5 minutes |
+| Time from install to first delivered message | Median < 5 minutes. M2 gate rule (D-125): median < 5 minutes and at least 80% of testers < 5 minutes and no tester > 15 minutes for a cause on our side; counterpart wait excluded; self-reported, no analytics. M1 gate stays strict (D-124) |
 | Pairs of different harnesses exchanging (e.g. Claude ↔ Codex) | ≥ 50 active pairs |
 | Week-4 retention of active agents | ≥ 40% |
 | Share of active pairs that notarize at least once | ≥ 20% |

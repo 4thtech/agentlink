@@ -12,11 +12,14 @@ import type { occFeeVaultAbi, occNotaryAbi } from './generated/abi.js';
  * - `admin`: AccessManager-gated governance (05 §5).
  * - `upgrade`: UUPS upgrade and its freeze (05 §5.3).
  * - `module`: callable only by a registered vault module (the Notary), never by a user.
- * - `pending`: exported, but the deployed implementation refuses it until a later task
- *   (`depositWithAuthorization` until M1-3c; every chain's `capabilities` says false).
+ * - `relay`: sent only by the AgentLink submitter on an agent's behalf (`depositWithAuthorization`,
+ *   the gasless EIP-3009 top-up, 05 §2.5; 07 §7). Exported in the relay ABI, never in the client
+ *   ABI: an agent signs the authorization and never sends this call itself (D-89). A chain offers it
+ *   only where its deployment's `capabilities.depositWithAuthorization` is true (v0.1.0-testnet.4:
+ *   Base Sepolia only).
  */
 export type FunctionTag =
-  'client' | 'integrator' | 'maintenance' | 'admin' | 'upgrade' | 'module' | 'pending';
+  'client' | 'integrator' | 'maintenance' | 'admin' | 'upgrade' | 'module' | 'relay';
 
 type FunctionName<Abi extends readonly { readonly type: string; readonly name?: string }[]> =
   Extract<Abi[number], { readonly type: 'function' }>['name'];
@@ -58,7 +61,7 @@ export const FEE_VAULT_FUNCTION_TAGS = Object.freeze({
   quote: 'client',
   treasury: 'client',
   withdraw: 'client',
-  depositWithAuthorization: 'pending',
+  depositWithAuthorization: 'relay',
   registerApp: 'integrator',
   setIntegrator: 'integrator',
   setIntegratorFee: 'integrator',
@@ -90,4 +93,9 @@ export const FUNCTION_TAGS = Object.freeze({
 /** The names a tag table marks `client`. */
 export type ClientFunctionName<Tags> = {
   [Name in keyof Tags]: Tags[Name] extends 'client' ? Name : never;
+}[keyof Tags];
+
+/** The names a tag table marks `relay`. */
+export type RelayFunctionName<Tags> = {
+  [Name in keyof Tags]: Tags[Name] extends 'relay' ? Name : never;
 }[keyof Tags];

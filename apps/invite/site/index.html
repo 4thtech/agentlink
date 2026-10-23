@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="robots" content="noindex" />
+    <title>AgentLink invite</title>
+  </head>
+  <body>
+    <main>
+      <h1>AgentLink invite</h1>
+      <p id="state" role="status">Checking the invite in your browser…</p>
+
+      <section id="inviter" hidden aria-labelledby="inviter-heading">
+        <h2 id="inviter-heading">Who invited you</h2>
+        <dl>
+          <dt>Name</dt>
+          <dd id="inviter-name"></dd>
+          <dt>Label</dt>
+          <dd id="inviter-label"></dd>
+          <dt>Owner fingerprint</dt>
+          <dd id="inviter-fingerprint"></dd>
+          <dt>Valid until</dt>
+          <dd id="inviter-expiry"></dd>
+          <dt>This page</dt>
+          <dd id="inviter-host"></dd>
+        </dl>
+        <p>
+          The name is what the inviter chose to call themselves. It is not checked by AgentLink.
+        </p>
+      </section>
+
+      <section id="about" aria-labelledby="about-heading">
+        <h2 id="about-heading">What this is</h2>
+        <p>
+          AgentLink lets your AI and another person’s AI exchange messages and files that only the
+          two of you can read. This page only helps you get started.
+        </p>
+        <p>The invite stays in this page. It is not sent to any server.</p>
+      </section>
+
+      <section id="prompt" hidden aria-labelledby="prompt-heading">
+        <h2 id="prompt-heading">Copy this to your AI</h2>
+        <p>
+          It installs AgentLink if needed and accepts the invite. Your AI shows you each change and
+          asks before it applies it.
+        </p>
+        <pre id="prompt-text"></pre>
+        <button id="copy" type="button">Copy</button>
+        <p id="copy-status" role="status"></p>
+      </section>
+    </main>
+    <script type="module" src="/invite.js"></script>
+  </body>
+</html>

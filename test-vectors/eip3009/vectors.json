@@ -1,0 +1,1240 @@
+{
+  "$schema": "../schema/vector-file.schema.json",
+  "suite": "eip3009",
+  "version": 1,
+  "generator": {
+    "tool": "python (hashlib, coincurve 21.0.0, pycryptodome 3.23.0)",
+    "version": "cpython 3.12.13",
+    "script": "tools/vectors/generate_eip3009.py"
+  },
+  "cases": [
+    {
+      "id": "type-hash-constant",
+      "source": "EIP-3009: keccak256(\"ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)\"), equal to RECEIVE_WITH_AUTHORIZATION_TYPEHASH() (eth_call on Base Sepolia (84532) at block 49070689 to USDC 0x036CbD53842c5426634e7929541eC2318f3dCF7e); never the TransferWithAuthorization type hash",
+      "input": {
+        "op": "typeHashConstant"
+      },
+      "expected": {
+        "typeHash": "d099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8"
+      }
+    },
+    {
+      "id": "domain-usdc-base-sepolia",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain; Circle USDC on Base Sepolia: name \"USDC\", version \"2\"; equals DOMAIN_SEPARATOR() (eth_call on Base Sepolia (84532) at block 49070689 to USDC 0x036CbD53842c5426634e7929541eC2318f3dCF7e)",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+      }
+    },
+    {
+      "id": "domain-usdc-base-sepolia-eip55",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain; the same domain with the address in its EIP-55 form, as a chain read returns it",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        }
+      },
+      "expected": {
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+      }
+    },
+    {
+      "id": "domain-usdc-other-name",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain; the name \"USD Coin\" (Circle's mainnet name): another separator",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USD Coin",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "domainSeparator": "2f5ab5eec6c6d261a8ad2b303ae4ef05c8509de2250e072c3a2df0ad7f9f068b"
+      }
+    },
+    {
+      "id": "domain-usdc-base-mainnet-chain",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain; chainId 8453 (Base mainnet) with the same address: another separator",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 8453,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "domainSeparator": "fa238c9966b9fb47bb6cc3f915b541622ae7406c2c45a2510b835f46e2214895"
+      }
+    },
+    {
+      "id": "domain-reject-uppercase-address",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: verifyingContract in upper-case hex (neither lowercase nor EIP-55); rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036CBD53842C5426634E7929541EC2318F3DCF7E"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "domain-reject-bad-checksum",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: verifyingContract with a wrong EIP-55 checksum; rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cBd53842C5426634E7929541Ec2318F3Dcf7E"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "domain-reject-chain-id-zero",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: chainId 0; rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 0,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "domain-reject-chain-id-string",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: chainId as a string; rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "domain-reject-name-number",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: name as a number; rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": 1,
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "domain-reject-missing-version",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: version missing; rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "domain-reject-extra-salt",
+      "source": "EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract} read from chain: a fifth field salt; rejected",
+      "input": {
+        "op": "domainSeparator",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-accept-fallback-usdc-base-sepolia",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded; the real reading of USDC on Base Sepolia, which has no eip712Domain(): name(), version() and DOMAIN_SEPARATOR() (eth_call on Base Sepolia (84532) at block 49070689 to USDC 0x036CbD53842c5426634e7929541eC2318f3dCF7e)",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "accept",
+        "name": "USDC",
+        "version": "2",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+      }
+    },
+    {
+      "id": "verify-accept-fallback-configured-eip55",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded; the same with the configured address in EIP-55 form",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "accept",
+        "name": "USDC",
+        "version": "2",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+      }
+    },
+    {
+      "id": "verify-accept-eip5267",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded; a synthetic EIP-5267 reading of the same domain (fields 0x0f, zero salt, no extensions)",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "accept",
+        "name": "USDC",
+        "version": "2",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+      }
+    },
+    {
+      "id": "verify-accept-eip5267-with-separator",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded; a synthetic EIP-5267 reading plus a matching DOMAIN_SEPARATOR()",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": [],
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "accept",
+        "name": "USDC",
+        "version": "2",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-name-mismatch",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: name() reads \"USD Coin\" but DOMAIN_SEPARATOR() is the USDC one; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USD Coin",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-version-mismatch",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: version() reads \"1\"; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "1",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-other-chain",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: configured chainId 8453 (Base mainnet) against the Base Sepolia separator; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 8453,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-other-contract",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: another configured token address against the USDC separator; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0xd7a3e8a0bccc1585215ee79b7b62b4519b93b494"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-separator-of-other-domain",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: DOMAIN_SEPARATOR() of another domain; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x2f5ab5eec6c6d261a8ad2b303ae4ef05c8509de2250e072c3a2df0ad7f9f068b"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-no-separator",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: name() and version() without DOMAIN_SEPARATOR(): nothing to compare, so not read from chain; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-separator-uppercase",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: DOMAIN_SEPARATOR() in upper-case hex; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71F17A3B2FF373B803D70A5A07C046C1A2BC8E89C09EF722FCB047ABE94C9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-fallback-extra-field",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: a chainId the caller did not configure, in a fallback reading; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+          "chainId": "84532"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-other-chain",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: eip712Domain() reports chainId 8453; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "8453",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-other-contract",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: eip712Domain() reports another verifyingContract; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0xd7a3e8a0bccc1585215ee79b7b62b4519b93b494",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-fields-salt",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: fields 0x1f (a salt is part of the domain); refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x1f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-fields-no-chain",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: fields 0x0b (no chainId in the domain); refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0b",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-nonzero-salt",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: a non-zero salt; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x6f5e9cd5dcbad4cb75a6c73782294447a351872c3f65347b6d9dd0273e0c693e",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-extensions",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: a non-empty extensions list; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": [
+            "1"
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-chain-id-number",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: chainId as a JSON number (the reading form is a decimal string); refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": []
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-eip5267-separator-mismatch",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: a DOMAIN_SEPARATOR() that differs from the eip712Domain() fields; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "eip5267",
+          "fields": "0x0f",
+          "name": "USDC",
+          "version": "2",
+          "chainId": "84532",
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "salt": "0x0000000000000000000000000000000000000000000000000000000000000000",
+          "extensions": [],
+          "domainSeparator": "0x2f5ab5eec6c6d261a8ad2b303ae4ef05c8509de2250e072c3a2df0ad7f9f068b"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-unknown-source",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: an unknown source; refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "reading": {
+          "source": "config",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-reject-expected-extra-name",
+      "source": "M3-4b: the token domain is read from chain (EIP-5267 eip712Domain(), else name(), version() and DOMAIN_SEPARATOR() recomputed and compared), never hard-coded: a configured name (the name is never configured, it is read); refused",
+      "input": {
+        "op": "verifyTokenDomain",
+        "expected": {
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+          "name": "USDC"
+        },
+        "reading": {
+          "source": "domainSeparator",
+          "name": "USDC",
+          "version": "2",
+          "domainSeparator": "0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-usdc-base-sepolia",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; 5 USDC (6 decimals) from the agent to the fee vault under the on-chain USDC domain",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "typeHash": "d099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+        "structHash": "922b12b7296173d9b96131f0d62fe180469bcca59eb194702965373ae873b46a",
+        "digest": "0a7b966d48624dd7e6025e95b4d3835d02925f921a2a007cd81e806a26ad56ae"
+      }
+    },
+    {
+      "id": "auth-usdc-base-sepolia-eip55-domain",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; the same under the domain with an EIP-55 address: the same hashes",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036CbD53842c5426634e7929541eC2318f3dCF7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "typeHash": "d099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+        "structHash": "922b12b7296173d9b96131f0d62fe180469bcca59eb194702965373ae873b46a",
+        "digest": "0a7b966d48624dd7e6025e95b4d3835d02925f921a2a007cd81e806a26ad56ae"
+      }
+    },
+    {
+      "id": "auth-other-nonce",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; another 32-byte nonce: another struct hash and digest",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe4bdeacd342ae70d0eff2ee7a6bbba9eac14e5d89d31bc18d846ec11a8a16150"
+        }
+      },
+      "expected": {
+        "typeHash": "d099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+        "structHash": "5470b93ffd2ff81667f05bc6d036d5de511ea91711fa6ea4005c5db15758cc97",
+        "digest": "5091ecc751b21121d36b1733163405bce3de0a779baa3caa204c1d198efb116d"
+      }
+    },
+    {
+      "id": "auth-one-unit-window",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; value 1, validAfter 1760000000, validBefore 1760000001 (the shortest window)",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "1",
+          "validAfter": "1760000000",
+          "validBefore": "1760000001",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "typeHash": "d099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+        "structHash": "177aebde026c94e2bed259d89576c2fea459e6f921f0c422eee84e997c1f5a6c",
+        "digest": "0e5a8f1980e4b4333a4410e4ff748d280fb510eb1e877465d1c51c720022c48a"
+      }
+    },
+    {
+      "id": "auth-limits",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; every field at its maximum",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0xffffffffffffffffffffffffffffffffffffffff",
+          "to": "0xffffffffffffffffffffffffffffffffffffffff",
+          "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "validAfter": "115792089237316195423570985008687907853269984665640564039457584007913129639934",
+          "validBefore": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+          "nonce": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        }
+      },
+      "expected": {
+        "typeHash": "d099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8",
+        "domainSeparator": "71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818",
+        "structHash": "71f2f993daebb2c45e20399a92ed804eefc9fa52f55886b58b50b26441247098",
+        "digest": "e8577f0257097177947f278f01ee6e4b31208610ec3f3397fcc381a8eac7b02e"
+      }
+    },
+    {
+      "id": "auth-reject-value-number",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: value as a JSON number; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": 5000000,
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-value-leading-zero",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: value \"05000000\"; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "05000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-value-2-pow-256",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: value = 2^256 (above uint256); rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "115792089237316195423570985008687907853269984665640564039457584007913129639936",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-value-negative",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: value \"-1\"; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "-1",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-value-hex",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: value as 0x hex; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "0x4c4b40",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-valid-before-equal",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: validBefore equal to validAfter; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "1760003600",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-valid-before-earlier",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: validBefore before validAfter; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "1760003601",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-from-uppercase",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: from in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620DEC90BC7E6C6C738AA6DC59A90BB3F339BE66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-to-mixed-case",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: to in EIP-55 mixed case; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2AF80AD8345d86a4520B6942cdEF298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-to-no-prefix",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: to without 0x; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-nonce-uppercase",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: nonce in upper-case hex; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xE0C6767EADF93A14EC14D0FD025E8EAC2724EE0F181D5E7BB0B400969806164F"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-nonce-decimal",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: nonce as a decimal string; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "101668731622821544891480573294566533433614860359401921779877658778706802775631"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-nonce-31-bytes",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: nonce of 31 bytes; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b40096980616"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-missing-nonce",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: nonce missing; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "auth-reject-extra-key",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form: a seventh field; rejected, never normalised",
+      "input": {
+        "op": "receiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f",
+          "deadline": "1760003600"
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "sign-usdc-base-sepolia",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; deterministic ECDSA (RFC 6979, low s) by a test agent EVM key; the agent's signature over auth-usdc-base-sepolia; recovers `from`",
+      "input": {
+        "op": "signReceiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe0c6767eadf93a14ec14d0fd025e8eac2724ee0f181d5e7bb0b400969806164f"
+        },
+        "secretKey": "70243866ed8249f256c20a0043dca7201ff7872877ce2c1541e7177dea082f58"
+      },
+      "expected": {
+        "signature": "0xbc48a1cd78b73a7590ed06d55ca7ee2752b791e430e766ef46e173110dc119196b86ece131bed5e84daf4fe778b007f3c526aa8a8e63535a44db95454d7517f41c"
+      }
+    },
+    {
+      "id": "sign-other-nonce",
+      "source": "EIP-3009 ReceiveWithAuthorization; 03 \u00a74.4, 05 \u00a72.5 (payee = fee vault); 04 \u00a72.4.1 auth JSON form; deterministic ECDSA (RFC 6979, low s) by a test agent EVM key; the same with another nonce; recovers `from`",
+      "input": {
+        "op": "signReceiveWithAuthorization",
+        "domain": {
+          "name": "USDC",
+          "version": "2",
+          "chainId": 84532,
+          "verifyingContract": "0x036cbd53842c5426634e7929541ec2318f3dcf7e"
+        },
+        "authorization": {
+          "from": "0x620dec90bc7e6c6c738aa6dc59a90bb3f339be66",
+          "to": "0x05b2af80ad8345d86a4520b6942cdef298310083",
+          "value": "5000000",
+          "validAfter": "0",
+          "validBefore": "1760003600",
+          "nonce": "0xe4bdeacd342ae70d0eff2ee7a6bbba9eac14e5d89d31bc18d846ec11a8a16150"
+        },
+        "secretKey": "70243866ed8249f256c20a0043dca7201ff7872877ce2c1541e7177dea082f58"
+      },
+      "expected": {
+        "signature": "0xf56e4d448505bbe103b858062c79d2676d9f5257d5cbfee0931e36033d35b4ed3b83d76f634c70793e8bace12a8146a558051de612e031d41b45867cfc4019181b"
+      }
+    }
+  ]
+}

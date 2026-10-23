@@ -6,7 +6,12 @@
 // tools/release/deploy-submitter.test.mjs.
 import { unstable_readConfig } from 'wrangler';
 import { describe, expect, it } from 'vitest';
-import { readConfig, readFaucetAddress, readFaucetConfig } from '../src/config.js';
+import {
+  readConfig,
+  readDepositAuthConfig,
+  readFaucetAddress,
+  readFaucetConfig,
+} from '../src/config.js';
 import wranglerToml from '../wrangler.toml?raw';
 
 const ENVIRONMENTS = {
@@ -23,6 +28,7 @@ const DURABLE_OBJECTS = [
   { name: 'SUBMITTER_QUEUE', class_name: 'SubmitterQueue' },
   { name: 'SUBMITTER_LIMITS', class_name: 'SubmitterLimits' },
   { name: 'SUBMITTER_FAUCET', class_name: 'SubmitterFaucet' },
+  { name: 'SUBMITTER_DEPOSIT_RELAY', class_name: 'SubmitterDepositRelay' },
 ];
 
 function read(env?: EnvName) {
@@ -50,7 +56,7 @@ describe('wrangler.toml', () => {
         expect(config.compatibility_date).toBe('2026-08-01');
       });
 
-      it('binds the three Durable Objects with their migration', () => {
+      it('binds the four Durable Objects with their migrations', () => {
         const config = read(env);
         expect(config.durable_objects.bindings).toEqual(
           DURABLE_OBJECTS.map((binding) => expect.objectContaining(binding)),
@@ -63,6 +69,8 @@ describe('wrangler.toml', () => {
             tag: 'v1',
             new_sqlite_classes: ['SubmitterQueue', 'SubmitterLimits', 'SubmitterFaucet'],
           }),
+          // M3-4b-t-3: additive, forward-only (release-and-deployment.md §4.5).
+          expect.objectContaining({ tag: 'v2', new_sqlite_classes: ['SubmitterDepositRelay'] }),
         ]);
       });
 
@@ -82,15 +90,22 @@ describe('wrangler.toml', () => {
         const vars = read(env).vars;
         expect(Object.keys(vars).sort()).toEqual([
           'SUBMITTER_CHAINS',
+          'SUBMITTER_FAUCET_ADDRESS_10200',
           'SUBMITTER_FAUCET_ADDRESS_84532',
           'SUBMITTER_FAUCET_CHAINS',
         ]);
-        expect(chainList(vars.SUBMITTER_CHAINS)).toEqual([84532]);
-        expect(chainList(vars.SUBMITTER_FAUCET_CHAINS)).toEqual([84532]);
+        // Base Sepolia and Gnosis Chiado (M1-3j-c).
+        expect(chainList(vars.SUBMITTER_CHAINS)).toEqual([84532, 10200]);
+        expect(chainList(vars.SUBMITTER_FAUCET_CHAINS)).toEqual([84532, 10200]);
         // The Worker's own parsers accept the values (an invalid one would make it answer 503).
         const parsed = readConfig({ ...vars, SUBMITTER_IP_KEY: TEST_IP_KEY });
-        expect(parsed?.chains).toEqual([84532]);
-        expect(readFaucetConfig(vars)?.chains).toEqual([84532]);
+        expect(parsed?.chains).toEqual([84532, 10200]);
+        expect(readFaucetConfig(vars)?.chains).toEqual([84532, 10200]);
+        // M3-4b-t-3: gasless top-ups stay off until the owner sets SUBMITTER_DEPOSIT_AUTH_CHAINS.
+        expect(readDepositAuthConfig(vars)).toBeNull();
+        for (const chainId of [84532, 10200]) {
+          expect(readFaucetAddress(vars, chainId), `${env} ${String(chainId)}`).not.toBeNull();
+        }
       });
     });
   }
@@ -121,6 +136,15 @@ describe('wrangler.toml', () => {
           .sort(),
       );
     }
+  });
+
+  it("pins the owner's Gnosis Chiado faucet wallets, one per environment (M1-3j-c)", () => {
+    expect(readFaucetAddress(read('staging').vars, 10200)).toBe(
+      '0x30a95fe88f21e9559565a034a44dea0f66fde19d',
+    );
+    expect(readFaucetAddress(read('production').vars, 10200)).toBe(
+      '0x606358eaf242a51c15c776b2f9c1c7bb98badc71',
+    );
   });
 
   it('staging runs on workers.dev only', () => {
@@ -157,7 +181,7 @@ describe('wrangler.toml', () => {
       .filter((line) => !PIN.test(line))
       .join('\n');
     expect(lines).not.toMatch(/account_id/);
-    expect(lines).not.toMatch(/SUBMITTER_(IP|GAS|FAUCET)_KEY|SUBMITTER_RPC_URLS/);
+    expect(lines).not.toMatch(/SUBMITTER_(IP|GAS|FAUCET|DEPOSIT_GAS)_KEY|SUBMITTER_RPC_URLS/);
     expect(lines).not.toMatch(/0x[0-9a-f]{40,}/i);
     // No base64url or hex blob long enough to be a key or token.
     expect(lines).not.toMatch(/[A-Za-z0-9_-]{40,}/);

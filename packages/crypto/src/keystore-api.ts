@@ -27,6 +27,7 @@
 import type { AgentCard } from './agent-card.js';
 import type { DropAuthRequest } from './drop-auth.js';
 import type { TypedData } from './eip712.js';
+import type { DirectTransaction } from './evm-tx.js';
 import type { WrappedCek } from './hpke.js';
 import type { PublicIdentity } from './keys.js';
 import type { JsonObject } from './jcs.js';
@@ -180,6 +181,22 @@ export interface KeyStore extends EnvelopeKeys {
     createdAt: number,
     options?: EpochOptions,
   ): Promise<string>;
+
+  /**
+   * Signs one direct-mode transaction (M1-4c-b; 07 §6.2, 05 §2.5) with the agent EVM key (epoch 0)
+   * and returns the serialised signed transaction, `0x02…` lowercase hex. The agent's own account
+   * sends a Notary or vault call and pays the network fee itself.
+   *
+   * It is never a general transaction signer: only EIP-1559 on a chain of DIRECT_TX_ALLOWLIST (the
+   * launch testnets; never a mainnet), to that chain's Notary, fee vault or an offered fee token
+   * (never a contract creation), with one of the direct-mode calls (`notarizeDirect`,
+   * `notarizeBatch`, `acknowledge`, `acknowledgeBatch`; `deposit`, `withdraw` to this agent's own
+   * address; `approve` with the vault as spender), bounded value, calldata, gas and fees
+   * (directTransactionSnapshot). Anything else is CryptoInputError `transaction_refused` with the
+   * fixed message of the rule (TRANSACTION_REFUSED). Every check happens before a key is read.
+   * No MCP tool reaches it (I-4): only the chain package's direct mode calls it.
+   */
+  signTransaction(tx: DirectTransaction): Promise<string>;
 
   /** Wipes what the store holds in memory; every later call fails with `keystore_closed`. */
   close(): Promise<void>;

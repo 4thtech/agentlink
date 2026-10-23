@@ -50,6 +50,7 @@ import type {
   ProofPlatformTools,
 } from '../tools/context.js';
 import { resolveOwnFolder } from './files.js';
+import { isFreeCreditsChain, nodeFreeCreditsPort } from './free-credits.js';
 import { createPackVerifier } from './pack-verifier.js';
 
 const FLAVOR: PathFlavor = process.platform === 'win32' ? 'win32' : 'posix';
@@ -259,10 +260,16 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
   });
   const packs = nodeProofPacks(options);
 
-  const platform: ProofsPlatform = Object.freeze({ kit: chain, chains, selector });
+  // M1-36i: free test credits through the submitter's fixed URLs only, for a shipped testnet on the
+  // chain package's allowlist (checked here, in the port and again in the core).
+  const freeCreditsChain = (chainId: number): boolean => isFreeCreditsChain(chainId, configs);
+  const faucet = nodeFreeCreditsPort({ fetchFn, urls, configs });
+
+  const platform: ProofsPlatform = Object.freeze({ kit: chain, chains, selector, faucet });
 
   const tools = Object.freeze<ProofPlatformTools>({
     ...packs,
+    isFreeCreditsChain: freeCreditsChain,
     async verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck> {
       const result = await verifyPack(pack);
       if (!result.valid) return { valid: false, verdict: 'failed', reason: result.reason };

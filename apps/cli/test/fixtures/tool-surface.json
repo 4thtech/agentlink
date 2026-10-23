@@ -783,6 +783,9 @@
             },
             "receiptRequestNotAdded": {
               "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1092,10 +1095,22 @@
             },
             "receiptRequestNotAdded": {
               "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         },
         "candidates": {
           "type": "array",
@@ -1395,10 +1410,22 @@
             },
             "receiptRequestNotAdded": {
               "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         }
       },
       "required": ["status", "summary"],
@@ -2053,6 +2080,9 @@
         "receiptRequestNotAdded": {
           "type": "boolean"
         },
+        "receiptRequested": {
+          "type": "boolean"
+        },
         "agentAddress": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{40}$"
@@ -2278,6 +2308,9 @@
           }
         },
         "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
+        "receiptRequested": {
           "type": "boolean"
         },
         "agentAddress": {

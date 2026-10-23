@@ -64,12 +64,12 @@ describe('occ-v2-abi bundle check', () => {
     expect(checkPackage(PACKAGE_DIR)).toEqual([]);
   });
 
-  it('pins v0.1.0-testnet.3 of 4thtech/occ-v2-contracts at its published manifest hash', () => {
+  it('pins v0.1.0-testnet.4 of 4thtech/occ-v2-contracts at its published manifest hash', () => {
     expect(readPin(PACKAGE_DIR)).toEqual({
       repository: '4thtech/occ-v2-contracts',
-      tag: 'v0.1.0-testnet.3',
-      sourceCommit: '26e7d0a8da8c7dda67256ea05bf91a592fcc77f8',
-      manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
+      tag: 'v0.1.0-testnet.4',
+      sourceCommit: 'd4f4c79d783d87cca90409e5084b8c466bb67cfd',
+      manifestSha256: '4d2bfc98e71da1ed3b60fed574c0333ee945a17e701e32bfab10d6cab5bb436e',
     });
   });
 

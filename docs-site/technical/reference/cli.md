@@ -8,7 +8,7 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 
 ## Outline
 
-- `init [--agent <name>] [--harness <id|none>] [--config <path>]` (identity and harness setup, with diff and confirmation; `--harness` picks one app, `none` creates the identity only; `--config` names the OpenCode or Antigravity config file)
+- `init [--agent <name>] [--harness <id|none>] [--config <path>]` (identity and harness setup, with diff and confirmation; `--harness` picks one app (`claude-code`, `claude-desktop`, `codex`, `gemini-cli`, `opencode`, `antigravity`, `cursor`, `windsurf`; Cursor and Windsurf merged for the next release, M1-36g), `none` creates the identity only; `--config` names the OpenCode or Antigravity config file)
 - `mcp` (the MCP server over stdio, started by your AI app)
 - `init --hook [--agent <name>]` (optional start-of-session note for Claude Code, a separate opt-in with its own diff and confirmation; needs AgentLink installed with `npm install -g`)
 - `status [--brief]` (`--brief` prints one or two lines: counts and contact names under the name rule, never message text)

@@ -35,12 +35,15 @@ describe('production build', () => {
   it('has an index.html with only external scripts and no inline style', () => {
     const html = outputs.find((o) => o.fileName === 'index.html')?.text ?? '';
     expect(html).toContain('<div id="root">');
-    const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)];
+    // Case-insensitive and tolerant of an end tag with spaces or attributes (`</SCRIPT >`).
+    const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script[^>]*>/gi)];
     expect(scripts.length).toBeGreaterThan(0);
     for (const s of scripts) {
-      expect(s[0]).toMatch(/\bsrc="\/assets\//);
+      expect(s[0]).toMatch(/\bsrc="\/assets\//i);
       expect(s[1]).toBe('');
     }
+    // No script opening tag escapes the pairs above, whatever its case.
+    expect([...html.matchAll(/<script\b/gi)].length).toBe(scripts.length);
     expect(html).not.toMatch(/<style\b/i);
     expect(html).not.toMatch(/\sstyle=/i);
     expect(html).not.toMatch(/\son[a-z]+=/i);
