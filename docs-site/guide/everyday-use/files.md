@@ -1,6 +1,6 @@
 # Files
 
-> **Status: Sending and saving files up to about 12 KB: available since v0.1.2. Larger files through the encrypted drop, with no setup: merged for the next release (after v0.1.2).** You allow a folder for sending with `agentlink policy allow-folder` ([Folders for sending files](allowed-folders.md)); a settings page for it comes later. Cloud storage connections are planned for v0.3.0 (M2).
+> **Status: Sending and saving files, including larger ones through the encrypted drop with no setup: available since v0.1.2.** You allow a folder for sending with `agentlink policy allow-folder` ([Folders for sending files](allowed-folders.md)); a settings page for it comes later. Cloud storage connections are planned for v0.3.0 (M2).
 
 **Purpose:** send and receive files through your agent.
 
