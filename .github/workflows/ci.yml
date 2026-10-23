@@ -239,6 +239,8 @@ jobs:
         if: needs.detect.outputs.needs_playwright == 'true' && needs.detect.outputs.affected_playwright == 'true'
         timeout-minutes: 12
         uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium firefox webkit
 
       # Task ordering and caching are turbo's job; the root scripts call `turbo run ...`.
       # CHORE-CI-SPEED-2: TEST_SCOPE is `full` everywhere except a pull request whose selection
@@ -329,6 +331,8 @@ jobs:
         if: needs.detect.outputs.needs_playwright == 'true'
         timeout-minutes: 12
         uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium firefox webkit
 
       # Python for the independent vector generators, fixed at the version requirements.txt was
       # compiled for (every pinned package has a cp312 wheel), whatever the runner image ships.

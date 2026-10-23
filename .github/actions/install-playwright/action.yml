@@ -1,8 +1,9 @@
 name: Install Playwright browsers
 description: >-
-  CHORE-CI-HARDEN-1. Restores the Playwright browser downloads from a cache keyed by the Playwright
-  version, then installs the browsers and their system libraries with bounded apt timeouts and one
-  retry, so a slow Ubuntu mirror cannot hold a job until its 30-minute limit. Needs Node and pnpm
+  CHORE-CI-HARDEN-1, CHORE-CI-PLAYWRIGHT-2. Restores the Playwright browser downloads from a cache
+  keyed by OS, exact Playwright version and browser list, downloads whatever is missing (no apt),
+  and touches apt only when a browser needs a system library the runner lacks (bounded, one retry),
+  so a slow Ubuntu mirror cannot hold a job. Needs Node and pnpm
   already set up (the repository's setup-node-pnpm action) and `playwright` as a root devDependency.
 
 inputs:
@@ -20,7 +21,11 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        version="$(jq -r '(.devDependencies.playwright // .devDependencies["@playwright/test"] // "unknown")' package.json | sed 's/^[^0-9]*//')"
+        version="$(jq -r '(.devDependencies.playwright // .devDependencies["@playwright/test"] // "")' package.json | sed 's/^[^0-9]*//')"
+        if [ -z "$version" ]; then
+          echo "::error::playwright is not a root devDependency; cannot key the browser cache."
+          exit 1
+        fi
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     # Browser downloads only (no system packages). The key holds the version, the OS and the browser
@@ -32,35 +37,73 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
 
-    # Short apt timeouts and retries: the failure seen in CI was ~250 timeouts of 30 s from
-    # azure.archive.ubuntu.com, one after another. The settings only apply to this runner.
-    - name: Bound the apt network waits (Linux)
-      if: runner.os == 'Linux'
-      shell: bash
-      run: |
-        set -euo pipefail
-        printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "10";' 'Acquire::https::Timeout "10";' \
-          | sudo tee /etc/apt/apt.conf.d/99agentlink-ci-network > /dev/null
-
-    - name: Install the Playwright system libraries and browsers (attempt 1)
-      id: install1
-      continue-on-error: true
+    # Browser binaries only (CDN download, no apt). On a cache hit this verifies and returns at once;
+    # on a miss, or a partial cache, it downloads what is missing. Bounded, one retry.
+    - name: Download the Playwright browsers
       shell: bash
       env:
         BROWSERS: ${{ inputs.browsers }}
       run: |
         set -euo pipefail
         # shellcheck disable=SC2086 # BROWSERS is a fixed, space-separated list of browser names
-        timeout 300 pnpm exec playwright install --with-deps $BROWSERS
+        timeout 300 pnpm exec playwright install $BROWSERS || {
+          echo "::warning::Playwright browser download failed once; retrying."
+          timeout 300 pnpm exec playwright install $BROWSERS
+        }
 
-    - name: Install the Playwright system libraries and browsers (attempt 2)
-      if: steps.install1.outcome == 'failure'
+    # Linux only: ask the dynamic linker whether every browser executable finds its libraries. The
+    # GitHub image has most of them, so apt is normally skipped. A browser we cannot find counts as
+    # missing (fail towards installing).
+    - name: Check the browsers' system libraries
+      id: libs
+      shell: bash
+      run: |
+        set -uo pipefail
+        missing=false
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          mapfile -t bins < <(find "$HOME/.cache/ms-playwright" -type f \( -name chrome -o -name headless_shell -o -name firefox -o -name MiniBrowser -o -name WebKitWebProcess \) 2>/dev/null)
+          if [ "${#bins[@]}" -eq 0 ]; then
+            missing=true
+          fi
+          for b in "${bins[@]}"; do
+            if ldd "$b" 2>&1 | grep -q 'not found'; then
+              echo "missing libraries for ${b##*/}"
+              missing=true
+            fi
+          done
+        fi
+        echo "missing=$missing" >> "$GITHUB_OUTPUT"
+
+    # Only now apt. Short timeouts and retries: the CI failure was ~250 timeouts of 30 s from
+    # azure.archive.ubuntu.com, one after another. The settings only apply to this runner.
+    - name: Bound the apt network waits (Linux)
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "10";' 'Acquire::https::Timeout "10";' \
+          | sudo tee /etc/apt/apt.conf.d/99agentlink-ci-network > /dev/null
+
+    - name: Install the Playwright system libraries (attempt 1)
+      id: deps1
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true'
+      continue-on-error: true
       shell: bash
       env:
         BROWSERS: ${{ inputs.browsers }}
       run: |
         set -euo pipefail
-        echo "::warning::Playwright install failed once (slow or unreachable mirror); retrying."
+        # shellcheck disable=SC2086
+        timeout 300 pnpm exec playwright install-deps $BROWSERS
+
+    - name: Install the Playwright system libraries (attempt 2)
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true' && steps.deps1.outcome == 'failure'
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        echo "::warning::Playwright system libraries failed once (slow or unreachable mirror); retrying."
         sudo apt-get update -o Acquire::Retries=3 || true
         # shellcheck disable=SC2086
-        timeout 300 pnpm exec playwright install --with-deps $BROWSERS
+        timeout 300 pnpm exec playwright install-deps $BROWSERS
