@@ -68,9 +68,9 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28))))))) |
+| M1 Local beta | 307 (M1a 87, M1b 220, recounted on 2026-10-23 with M1-6b-d and M1-10b-e-c-b added; previously 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)))))))) |
 | M2 Console, desktop apps, self-host, design | 49 (recounted from the headings on 2026-10-23; previously stated 48 and, before that, 44; incl. M2-19-b from AUDIT-FABLE-M2-19-2; incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
-| M3 Mainnet beta | 24 (recounted from the headings on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
+| M3 Mainnet beta | 30 (recounted from the headings on 2026-10-23; M3-4b-t-T2-c and M3-4b-t-T4-a to T4-e added; previously stated 24, recounted on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -833,8 +833,8 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 
 #### DOCS-06-TOPUP · 06 §2.4: paid tools return `topUpUrl` and `agentAddress`, not `url` (new, 2026-10-23 review)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
-- **Repo/path:** agentlink · `docs/foundation/06-mcp-and-cli.md` (§2.4)
-- **Depends on:** none
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-server.md` (§2.4)
+- **Depends on:** none (implemented by PR #482)
 - **Spec:** 06 §2.4
 - **Scope:**
   - §2.4 says paid tools return `url`. Reword so every paid tool's `needs_credits` result carries `topUpUrl` and `agentAddress` (check each paid tool's result shape in the code first).
@@ -866,7 +866,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 #### DOCS-RUNBOOKS-1023-c · submitter-deploy.md step 30 names a check step 14 does not make (new, 2026-10-23 review)
 - **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (docs only)
 - **Repo/path:** agentlink · `docs/runbooks/submitter-deploy.md`
-- **Depends on:** none
+- **Depends on:** #479 merged
 - **Scope:**
   - Step 30 says step 14's name check lists `SUBMITTER_DEPOSIT_GAS_KEY_84532`; step 14 does not. Reword step 30 so it is true.
 - **Acceptance:**
@@ -875,7 +875,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 #### PROC-MECH-MERGE-IR-b · audit-rules §4.6 wording: the orchestrator records the `IR-` line (new, 2026-10-23 review)
 - **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (wording only; if the file is classed S1 by path, S1)
 - **Repo/path:** agentlink · `docs/process/audit-rules.md` (§4.6)
-- **Depends on:** none
+- **Depends on:** #475 merged
 - **Scope:**
   - Reword to "*Orchestrator wording:* it records `IR-…`".
 - **Acceptance:**
@@ -2520,7 +2520,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 #### M1-6b-d · storage: warn when a provider drops the abort-incomplete-multipart lifecycle element on read-back (new, follow-up of M1-6b-c, #457)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage (lifecycle read-back)
-- **Depends on:** M1-6b-c (#457)
+- **Depends on:** M1-6b-c (#457); implemented by PR #485
 - **Spec:** 07 §5.2, §5.4
 - **Invariants:** I-3
 - **Scope:**
@@ -5530,10 +5530,10 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests for the null-faucet reading and the same-block second claim.
 
-#### M1-10b-e-c-b · submitter-pool test: URL extraction catches more forms (new, 2026-10-23 review)
+#### M1-10b-e-c-b · submitter-pool test: URL extraction catches more forms (new, follow-up of M1-10b-e-c, PR #456)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
 - **Repo/path:** agentlink · the submitter-pool test
-- **Depends on:** M1-10b-e-b
+- **Depends on:** M1-10b-e-b, M1-10b-e-c (PR #456)
 - **Scope:**
   - Make the test's URL extraction also catch a scheme followed by a quote or a space, uppercase schemes and protocol-relative `//host`.
 - **Acceptance:**
@@ -6542,9 +6542,9 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
 
 #### M3-4b-t-T2-c · submitter precheckDepositAuthorization: window-boundary tests (new, 2026-10-23 review)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (tests only; `apps/submitter/**` is S2 if code changes)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (tests only; `apps/submitter/**` is S2 if code changes) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `apps/submitter` (`precheckDepositAuthorization`)
-- **Depends on:** M3-4b-t-T2-b (#451)
+- **Depends on:** M3-4b-t-T2-b (#481); implemented by PR #484
 - **Spec:** 07 §7
 - **Invariants:** I-3
 - **Scope:**
@@ -6582,6 +6582,56 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Refund the quota when the process crashes mid-send.
 - **Acceptance:**
   - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
+#### M3-4b-t-T4-a · gasless top-up: core executor `runGaslessTopUp` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (signs; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `packages/core/src/proofs/gasless-topup.ts` and test; additive hunk in `packages/core/src/proofs/platform.ts`
+- **Depends on:** M3-4b-t-T2-b (#481)
+- **Spec:** 04 §2.5.1; 07 §7
+- **Invariants:** I-1, I-3, I-4, I-7
+- **Scope:**
+  - An internal function `runGaslessTopUp(deps, {chainId, token, amount})`, run only after the caller verified an owner action: kill switch, chain and token gate, local rate limit (5 requests per agent per hour, counted from persistent applied-nonce rows), build and sign with the agent KeyStore (never the owner key), post through a `DepositAuthPort`, poll `creditsOf` for the rise. Fixed outcome words. Not exported from `packages/core/src/index.ts`.
+  - Owner decisions of 2026-10-23: owner approves each top-up; $5 minimum and $50 cap on testnet; normal deposit fee; the submitter pays the network cost; 15-minute window.
+- **Acceptance:** tests first (`RED (expected): M3-4b-t-T4-a …`): agent key only signs and the owner signer has 0 calls; the real registry (flag false) gives `refused:not_available` with 0 signs; chain and token gate; $4.99 and $50.01 refused, $5 and $50 signed with the exact value; window at most 900 s; the 6th call in an hour is `rate_limited` and survives a restart; `submitted` without a `creditsOf` rise is `pending`; no txHash, signature, nonce, address or URL in results or logs; no export from the core index; concurrent calls are serialised. Full threat note.
+
+#### M3-4b-t-T4-b · gasless top-up: runtime deposit-auth port (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `apps/cli/src/runtime/deposit-auth.ts` and test; two-line hook in `apps/cli/src/runtime/proofs.ts`
+- **Depends on:** M3-4b-t-T4-a (port type)
+- **Spec:** 07 §7
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Build the `DepositAuthPort` from `createDepositAuthClient` with the shipped submitter URLs only; map answers to fixed words (`submitted`, `rate_limited`, `already_used`, `unavailable`, `refused:<code>`); strip the txHash. Wire into `nodeProofs`.
+- **Acceptance:** tests first: an override URL failing `checkRpcUrl` is refused; 501 on all URLs is `unavailable`, 429 is `rate_limited`, 409 `already_used` is `already_used`, an unparsable answer is `unavailable`; the txHash never reaches core; the bundle check (proofs off) carries no deposit-auth code.
+
+#### M3-4b-t-T4-c · gasless top-up: `credits.deposit` gasless branch (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner action; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/core/src/proofs/credits-move.ts` and test, `packages/node/src/local-ui/api/proofs.ts` and `proofs-top-up.test.ts`, `docs/foundation/04` §2.5.1, `07` §7, changeset, `changelog.d/`
+- **Depends on:** M3-4b-t-T4-a, M3-4b-t-T4-b, draft PR #435 (stack on it or on main after it merges)
+- **Spec:** 04 §2.5, §2.5.1; 07 §7
+- **Invariants:** I-3, I-4
+- **Scope:**
+  - `credits.deposit` for Base Sepolia (84532) USDC goes to `runGaslessTopUp` after the object checks and after the nonce is recorded; `readTopUp` gains `method: 'gasless'` (addable clipped to $5..$50 and the balance) and stays `coming_soon` while the kit refuses. The node API accepts 84532/USDC behind presence. 04 §2.5.1 row extended and one line in 07 §7 (proposed, owner confirms at merge).
+- **Acceptance:** tests first: the nonce is recorded before signing (order spy); a replay gives 0 signs; an object signed by the agent key, an unknown key, another agent, or with expiry over 600 s or expired is refused with 0 signs and no nonce row; the amount comes only from the signed object; `coming_soon` while the flag is false; the API refuses without a presence session and returns no txHash; the Chiado tests from #435 pass unchanged.
+
+#### M3-4b-t-T4-d · gasless top-up: local UI method (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus audit · **Security:** S2 (money path UI, D-116 styling) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/{top-up.tsx,strings.ts,data.ts,proofs.test.tsx}`, `apps/local-ui/src/api/client.ts`, new `e2e/test/local-ui-gasless-topup.test.ts`
+- **Depends on:** M3-4b-t-T4-c, draft PR #435
+- **Spec:** 11 §5, §6.7; `docs/design/README.md`
+- **Scope:**
+  - "Add credits" for the Base Sepolia USDC method: the received amount, a picker within $5..$50, a confirm step behind presence, then pending, done and limited states, in plain words per 11 §5 (no wallet, gas, transaction, hashes or chain names in the default UI).
+- **Acceptance:** Playwright: received, pick $20, confirm with presence, pending, done; under $5 the button is disabled; above $50 the amount clamps with a note; the 6th try in an hour shows the limit copy; `lintVocabulary` and axe pass; the style matches the D-116 screens.
+
+#### M3-4b-t-T4-e · gasless top-up: switch on `GASLESS_TOPUP_ENABLED` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog (**needs the owner's go-ahead** before the flip) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner "merge") · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and tests, `README.md`, docs-site, `knowledge/`
+- **Depends on:** M3-4b-t-T4-c, M3-4b-t-T4-d, M3-4b-t-T3-c, and Tali enabling the staging submitter variables and smoke-testing them
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-3
+- **Scope:**
+  - Set `GASLESS_TOPUP_ENABLED = true`; keep the kill-switch test (S0-c) proving the refusal by injecting the flag; update the funding-detection and `pick` tests for Base Sepolia. README Status, the docs-site credits guide and `knowledge/` updated; X post.
+- **Acceptance:** with the flag true the real registry composes `eip3009` for Base Sepolia USDC only and Chiado is unchanged; the S0-c test still fails if the flag check is removed; no test weakened.
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
