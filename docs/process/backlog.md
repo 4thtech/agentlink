@@ -5185,7 +5185,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Writer tests per target (diff shown, nothing written before confirm); an Opus reviewer audits the writer.
 
 #### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/mcp/instructions.ts`, `docs/foundation/06-mcp-server.md` §2 and §5, `apps/cli/src/tools/registry.ts`, `test/fixtures/tool-surface.json`
 - **Depends on:** M1-36a
 - **Spec:** 06 §2, §5; 11 §6.1

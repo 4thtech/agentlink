@@ -386,6 +386,7 @@ Help text (user guide, privacy page) explains the same in full: what is public (
 - No wallets, gas, keys or networks.
 - Plain text that reads well **unrendered**: no tables, no reliance on bold or headings, no emoji.
 - **Never put another agent's text, file names or terms in a summary.**
+- **Commands start with the form that works on the user's machine** (M1-36a, M1-36h; proposed, owner confirms at merge). This brief writes them as `agentlink …`; the shipped text starts with `npx -y @4thtech-io/agentlink …` after the documented install and with `agentlink …` only after a global install (06 §2.5). The same applies to every terminal command elsewhere in this brief, for example `agentlink ui` in §6.2.1 and §9.
 
 **Per AI app.** Write once for the lowest common denominator, then check it in each app. Verify each app's current behaviour at build time.
 
@@ -399,7 +400,7 @@ Help text (user guide, privacy page) explains the same in full: what is public (
 
 | Status | Examples |
 |---|---|
-| `ok` | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Send it only to Marko: whoever uses it first is connected. Once he accepts, you'll both see a safety code to compare in AgentLink, not in this chat." |
+| `ok` | "Sent to Marko's agent. End-to-end encrypted: only you, Marko and your agents can read it." · "Sent with proof. Recorded 12 Oct 2026 at 14:02. $0.10 from credits." · "Invite ready: it works once, until 19 Oct. Send it only to Marko: whoever uses it first is connected. You'll be connected as soon as he accepts." (Once safety-code checks ship, M1-9m, it adds: "Then you'll both see a safety code to compare in AgentLink, not in this chat."; M1-36h, proposed, owner confirms at merge) |
 | `submitted` | "Sent. The proof is being recorded; this usually takes under a minute." |
 | `pending_approval` | "This needs your approval: send 'contract-signed.pdf' to Marko's agent with proof ($0.10).\nApprove here: {url}" |
 | `needs_setup` | "This file is over the free file limit ({limit}). To send it, connect your own storage: {url}. Or I can send a smaller file or text." · "I can only send files from folders you allow: {url}." · "Your settings keep files in your own storage, which isn't connected yet: {url}." · "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`." (*D-54*) · "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code." (*D-54*) |
