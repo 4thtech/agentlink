@@ -6,10 +6,11 @@ import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { approvalNextStep } from '../approval/next-step.js';
 import { NPX_PREFIX } from '../runtime/cli-prefix.js';
-import { FILE_TEXT } from '../tools/files-common.js';
 import type { ToolClient, ToolContext } from '../tools/context.js';
-import { INVITE_TEXT, acceptRetryStep, approvedNeedsIdStep } from '../tools/invite-common.js';
-import { PROOF_TEXT } from '../tools/proofs-common.js';
+import { PAY_PAGE } from '@4thtech-io/chain';
+import { readdirSync } from 'node:fs';
+import { acceptRetryStep, approvedNeedsIdStep } from '../tools/invite-common.js';
+import { needsCredits } from '../tools/proofs-common.js';
 import {
   RESULT_TEXT,
   finalizeResult,
@@ -20,8 +21,6 @@ import {
 } from '../tools/result.js';
 import { SEND_TEXT } from '../tools/send.js';
 import { en } from '../tools/strings/en.js';
-import { TERMS_TEXT } from '../tools/terms-common.js';
-import { TOOL_TEXT } from '../tools/text.js';
 import { approvalLinkNextStep } from './approval-ui.js';
 
 const LIMIT = 500;
@@ -107,26 +106,67 @@ describe('pending_approval nextStep worst cases stay within 500 code points', ()
   });
 });
 
+// ---- Discovery: every exported *_TEXT sheet and every nextStep builder -----------------------------
+
+type Exports = Record<string, unknown>;
+const toolsDir = new URL('../tools/', import.meta.url);
+const sourceFiles = (dir: URL): string[] =>
+  readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.includes('.test.'));
+const load = async (dir: string, files: string[]): Promise<Record<string, Exports>> => {
+  const out: Record<string, Exports> = {};
+  for (const f of files) {
+    // Discovery on purpose: a new tool module is picked up without editing this test.
+    // eslint-disable-next-line boundaries/no-bypass
+    const mod = (await import(`${dir}/${f.replace(/\.ts$/, '.js')}`)) as Exports;
+    out[`${dir}/${f}`] = mod;
+  }
+  return out;
+};
+const modules = {
+  ...(await load('../tools', sourceFiles(toolsDir))),
+  ...(await load('../approval', ['next-step.ts'])),
+  ...(await load('.', ['approval-ui.ts'])),
+};
+
+/** Every exported `*_TEXT` object, plus the copy sheet `en`. */
+const sheets: Record<string, Record<string, unknown>> = { en };
+for (const [file, exports] of Object.entries(modules)) {
+  for (const [name, value] of Object.entries(exports)) {
+    if (/_TEXT$/.test(name) && typeof value === 'object' && value !== null) {
+      sheets[`${file}#${name}`] = value as Record<string, unknown>;
+    }
+  }
+}
+const WANTED = /nextstep|hint|tail/i;
+const filler = (key: string): string => (/approvalId/i.test(key) ? APPROVAL : ENVELOPE);
+
 describe('every fixed nextStep and hint text stays within 500 code points', () => {
-  const sheets: Record<string, Record<string, unknown>> = {
-    FILE_TEXT,
-    INVITE_TEXT,
-    PROOF_TEXT,
-    RESULT_TEXT,
-    SEND_TEXT,
-    TERMS_TEXT,
-    TOOL_TEXT,
-    en,
-  };
-  const filler = (key: string): string => (/approvalId/i.test(key) ? APPROVAL : ENVELOPE);
   const entries = Object.entries(sheets).flatMap(([sheet, texts]) =>
     Object.entries(texts)
-      .filter(([key, value]) => /nextstep|hint|tail/i.test(key) && typeof value === 'string')
+      .filter(([key, value]) => WANTED.test(key) && typeof value === 'string')
       .map(([key, value]) => [`${sheet}.${key}`, value as string] as const),
   );
 
-  it('finds the texts to check', () => {
-    expect(entries.length).toBeGreaterThan(30);
+  it('discovers all the text sheets', () => {
+    const names = Object.keys(sheets).map((s) => s.split('#')[1]);
+    for (const expected of [
+      'ACK_TEXT',
+      'INBOX_TEXT',
+      'FETCH_FILE_TEXT',
+      'VERIFY_TEXT',
+      'EXPORT_TEXT',
+      'GET_PROOF_TEXT',
+      'FILE_TEXT',
+      'INVITE_TEXT',
+      'PROOF_TEXT',
+      'RESULT_TEXT',
+      'SEND_TEXT',
+      'TERMS_TEXT',
+      'TOOL_TEXT',
+    ]) {
+      expect(names, expected).toContain(expected);
+    }
+    expect(entries.length).toBeGreaterThan(40);
   });
 
   it.each(entries)('%s', (_name, text) => {
@@ -135,8 +175,69 @@ describe('every fixed nextStep and hint text stays within 500 code points', () =
     expect(len(filled)).toBeLessThanOrEqual(LIMIT);
   });
 
-  it('the invite retry sentences with the longest ID fit', () => {
-    expect(len(acceptRetryStep(APPROVAL))).toBeLessThanOrEqual(LIMIT);
-    expect(len(approvedNeedsIdStep(APPROVAL))).toBeLessThanOrEqual(LIMIT);
+  // Text builders inside a sheet (for example INBOX_TEXT.someMessages(count)): rendered with the
+  // largest count; a builder this test cannot render fails, so a new one is never skipped.
+  const builders = Object.entries(sheets).flatMap(([sheet, texts]) =>
+    Object.entries(texts)
+      .filter(([, value]) => typeof value === 'function' && value.length === 1)
+      .map(
+        ([key, value]) => [`${sheet}.${key}`, value as (...args: unknown[]) => unknown] as const,
+      ),
+  );
+  it('discovers one-argument text builders', () => expect(builders.length).toBeGreaterThan(0));
+  it.each(builders)('builder %s', (name, fn) => {
+    const rendered = fn(Number.MAX_SAFE_INTEGER);
+    expect(typeof rendered, `${name}: no worst-case renderer`).toBe('string');
+    expect(len(rendered as string)).toBeLessThanOrEqual(LIMIT);
+  });
+});
+
+/** Worst-case renderers for the exported nextStep builder functions and the composed nextSteps. */
+const RENDERERS: Record<string, () => string> = {
+  acceptRetryStep: () => acceptRetryStep(APPROVAL),
+  approvedNeedsIdStep: () => approvedNeedsIdStep(APPROVAL),
+  approvalNextStep: () => approvalNextStep(APPROVAL, LONG_NAME, NPX_PREFIX),
+  approvalLinkNextStep: () => approvalLinkNextStep(APPROVAL, URL_, LONG_NAME, NPX_PREFIX),
+};
+
+describe('nextStep builders', () => {
+  const found = Object.entries(modules).flatMap(([file, exports]) =>
+    Object.entries(exports)
+      .filter(([name, value]) => typeof value === 'function' && /(NextStep|Step)$/.test(name))
+      .map(([name]) => `${file}#${name}`),
+  );
+
+  it('finds the builders', () => {
+    expect(found.length).toBeGreaterThanOrEqual(Object.keys(RENDERERS).length);
+  });
+
+  it.each(found)('%s has a worst-case renderer within the limit', (id) => {
+    const name = id.split('#')[1] ?? '';
+    const render = RENDERERS[name];
+    expect(render, `${id}: add a worst-case renderer to RENDERERS`).toBeDefined();
+    expect(len(render?.())).toBeLessThanOrEqual(LIMIT);
+  });
+
+  const agentId = `0x${'f'.repeat(40)}`;
+  const livePay = { ...PAY_PAGE, live: true };
+  it.each([
+    ['fee and shortfall', { feeUsd: '0.000001', usd: '99999999.99' }],
+    ['fee and shortfall, small fee', { feeUsd: '0.01', usd: '4.99' }],
+    ['no amount', {}],
+    ['no route', undefined],
+  ] as const)('needs_credits (%s) with the link, covers and disclosure', (_n, route) => {
+    const out = needsCredits(agentId, route, {}, livePay);
+    expect(len(out.result.nextStep)).toBeLessThanOrEqual(LIMIT);
+    expect(len(out.result.summary)).toBeLessThanOrEqual(LIMIT);
+    expect(resultIsValid(out.result, [])).toBe(true);
+  });
+
+  it('inbox nextSteps joined (receipt, request and incomplete) fit', () => {
+    const joined = [
+      en['chat.inbox.receiptRequestNextStep'],
+      en['chat.inbox.requestNextStep'],
+      en['chat.inbox.incompleteNextStep'],
+    ].join(' ');
+    expect(len(joined)).toBeLessThanOrEqual(LIMIT);
   });
 });
