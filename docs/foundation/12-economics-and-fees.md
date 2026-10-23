@@ -31,7 +31,7 @@
 
 Prices are the protocol fee charged through official clients. A third-party app may add its own fee, always shown separately (§5).
 
-**Free:** install, identity, pairing, contacts; encrypted messages and off-chain acknowledgements; sending files, through the 4thTech encrypted drop within its quotas (proposed 100 MB per file and 1 GB per agent per week, D-48) or through your own storage (your provider may bill you); owner console, policies and approvals; verifying a proof pack (CLI and public page); fee quotes and credit balances; receipts on a notarized record (prepaid by the sender, so the recipient pays nothing).
+**Free:** install, identity, pairing, contacts; encrypted messages and off-chain acknowledgements; sending files, through the 4thTech encrypted drop within its quotas (100 MB per file and 1 GB per agent per week, D-48, confirmed by the owner, D-129) or through your own storage (your provider may bill you); owner console, policies and approvals; verifying a proof pack (CLI and public page); fee quotes and credit balances; receipts on a notarized record (prepaid by the sender, so the recipient pays nothing).
 
 **Network costs.** For proofs and receipts sent through a submitter, the submitter pays the network cost (gas) and recovers it from protocol fees; there is no extra charge. **Receipts (D-114):** the sender's proof fee covers up to 3 receipts for the record, so a recipient is never charged for a receipt without being asked; if the submitter cannot be reached, the receipt is queued locally and posted when possible, and the proof stays valid with fewer receipts (built by M1-34-b, testnets; 07 §7). Calls you make yourself (direct mode, a deposit from your own account, a withdrawal) pay the network's own cost from the calling address. AgentLink adds no fee to deposits or withdrawals.
 
@@ -228,7 +228,7 @@ Sybil considerations:
 | Native coins behind `PRICE_UPDATER` (§3.4) | Owner; design and security review first (M4) |
 | Welcome credits (§10) | Owner (optional) |
 | Tax and VAT assessment (§9) | Counsel, before paid mainnet (M3-7) |
-| Encrypted drop quotas: confirm the proposed 100 MB per file and 1 GB per agent per week (D-48) | Owner, before the drop goes live (M1b) |
+| Encrypted drop quotas: 100 MB per file and 1 GB per agent per week (D-48) | Decided (owner, 23 Oct 2026, D-129); the download limit per object stays as in 07 §5.4 until the owner confirms 10 vs 16 |
 | Paid larger drop quotas (D-48) | Owner, later; not offered now |
 | Billing profiles: data protection and VAT, accounting treatment of stablecoin revenue (§7.1, D-50) | Counsel and owner (M3-7) |
 | Indexer for the internal finance dashboard (D-50) | Owner (M4) |
