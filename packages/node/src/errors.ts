@@ -15,7 +15,7 @@ export type NodeKeyStoreErrorCode =
   | 'identity_exists'
   /** The OS keychain refused or failed the operation. */
   | 'keychain_failed'
-  /** The recorded backend is not available in this build (the file KeyStore is M1-8f). */
+  /** The recorded backend is not one this build knows. */
   | 'backend_unavailable'
   /** No owner is set up on this computer (`needs_setup`, reason `owner_missing`; 04 §2.2). */
   | 'owner_missing'
@@ -51,7 +51,22 @@ export type NodeKeyStoreErrorCode =
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
   /** M1-8e: the authenticator returned no PRF output; nothing is stored, the owner code stays. */
-  | 'passkey_unsupported';
+  | 'passkey_unsupported'
+  /**
+   * M1-8f: the file KeyStore has no unlock source, was closed, or its file changed under the
+   * in-memory key (a passphrase change elsewhere): `needs_setup` (`keystore_locked`) until restarted.
+   */
+  | 'keystore_locked'
+  /** M1-8f: a wrong unlock secret, or a damaged or foreign key file: one error for all (04 §2.8). */
+  | 'keystore_open_failed'
+  /** M1-8f: the key file, its folder or the passphrase file fails the 04 §2.8 file checks. */
+  | 'keystore_file_unsafe'
+  /** M1-8f: the key file could not be read or written (I/O or lock failure). */
+  | 'keystore_failed'
+  /** M1-8f: the file KeyStore opt-in was refused (a keychain works, or no interactive terminal). */
+  | 'keystore_opt_in_refused'
+  /** M1-8f: a new agent secret was refused (too short, invalid, the owner code, not confirmed). */
+  | 'keystore_passphrase_refused';
 
 export class NodeKeyStoreError extends Error {
   readonly code: NodeKeyStoreErrorCode;

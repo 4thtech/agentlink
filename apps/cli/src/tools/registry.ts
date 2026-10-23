@@ -125,6 +125,8 @@ const proofStatusFields = {
   receipts: arr(obj({ type: receiptType, at: timestamp }, ['type', 'at'])),
   /** M1-33d-b: `requestReceipt` on a message that already had proof; no request was added. */
   receiptRequestNotAdded: bool(),
+  /** M1-33d-d: this proof asks the recipient for a delivery receipt (D-109). */
+  receiptRequested: bool(),
 };
 /** `proof?: ProofStatus` inside a send or terms result (06 §2.2, §2.2a). */
 const proofStatus = obj(
@@ -518,7 +520,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
       },
       ['to', 'terms'],
     ),
-    outputSchema: output({ envelopeId, ...termsOutput, proof: proofStatus, candidates }, true),
+    // M1-9d-4: `needs_credits` carries the top-up link as agentlink_send does (06 §2.1).
+    outputSchema: output(
+      { envelopeId, ...termsOutput, proof: proofStatus, ...creditFields, candidates },
+      true,
+    ),
     annotations: WRITE(true),
     approval: true,
   },
@@ -545,6 +551,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         envelopeId,
         ...termsOutput,
         proof: proofStatus,
+        ...creditFields,
       },
       true,
     ),

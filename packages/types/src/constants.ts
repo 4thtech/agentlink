@@ -162,7 +162,8 @@ export type ApprovalToolName = (typeof APPROVAL_TOOL_NAMES)[number];
 
 /**
  * Ops defined in 04 §2.5.1 (`approval.cancel` from D-55, `approval.decideBatch` from D-68,
- * `contact.rename` and `contact.remove` from M1-9za). Other ops land with the tasks that build them.
+ * `contact.rename` and `contact.remove` from M1-9za, `storage.set`, `storage.remove` and
+ * `backup.export` from M1-9i-a, D-115). Other ops land with the tasks that build them.
  */
 export const OWNER_ACTION_OPS = freeze([
   'approval.decide',
@@ -172,6 +173,9 @@ export const OWNER_ACTION_OPS = freeze([
   'contact.check',
   'contact.rename',
   'contact.remove',
+  'storage.set',
+  'storage.remove',
+  'backup.export',
   'agent.revoke',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
@@ -189,6 +193,31 @@ export type ApprovalDecision = (typeof APPROVAL_DECISIONS)[number];
 /** `agent.revoke` reasons: fixed values, never free text (04 §2.5.1). */
 export const REVOKE_REASONS = freeze(['compromised', 'retired', 'other'] as const);
 export type RevokeReason = (typeof REVOKE_REASONS)[number];
+
+/**
+ * `storage.set` `provider` (04 §2.5.1; M1-9i-a, D-115): display and help links only; no behaviour
+ * depends on it.
+ */
+export const STORAGE_PROVIDERS = freeze([
+  'r2',
+  's3',
+  'b2',
+  'hetzner',
+  'scaleway',
+  'wasabi',
+  'minio',
+  'other',
+] as const);
+export type StorageProvider = (typeof STORAGE_PROVIDERS)[number];
+
+/** `backup.export` `contents` and the `ALKK` manifest `contents` (04 §2.3.3, §2.5.1; D-115 A). */
+export const BACKUP_KIT_CONTENTS = freeze(['full', 'identity'] as const);
+export type BackupKitContents = (typeof BACKUP_KIT_CONTENTS)[number];
+
+/** `storage.set` / `storage.remove` `id`: 8 CSPRNG bytes, 16 lowercase hex (04 §2.2, §2.5.1). */
+export const STORAGE_ID_BYTES = 8;
+/** `backup.export` `kitId`: 16 CSPRNG bytes, base64url without padding (04 §2.5.1). */
+export const BACKUP_KIT_ID_BYTES = 16;
 
 // --- Lifetimes, clock skew, nonces and the budget window (G-7) ----------------------------------
 //
@@ -213,6 +242,10 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   // M1-9za: applied on the agent's own machine within seconds; the default for later ops.
   'contact.rename': 600,
   'contact.remove': 600,
+  // M1-9i-a (D-115): signed and applied on the agent's own machine within seconds.
+  'storage.set': 600,
+  'storage.remove': 600,
+  'backup.export': 600,
   'agent.revoke': null,
 } as const);
 

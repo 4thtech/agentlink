@@ -209,6 +209,8 @@ export interface FileAgent {
 
 export interface FileAgentOptions {
   readonly own?: MemoryOwnStorage;
+  /** Any other own-storage adapter, such as the broken stub (M1-9i-a); `own` wins when both are set. */
+  readonly ownAdapter?: StorageAdapter;
   readonly drop?: FilesPlatform['drop'];
   readonly download?: FilesPlatform['download'];
   readonly relays: readonly string[];
@@ -233,7 +235,11 @@ export async function openFileAgent(
   const platform: FilesPlatform = {
     flavor: 'posix',
     allowedFolderRealpaths: () => Promise.resolve([WORK]),
-    ...(own === undefined ? {} : { ownStorage: own }),
+    ...(own !== undefined
+      ? { ownStorage: own }
+      : options.ownAdapter === undefined
+        ? {}
+        : { ownStorage: options.ownAdapter }),
     ...(options.drop === undefined ? {} : { drop: options.drop }),
     download:
       options.download ??

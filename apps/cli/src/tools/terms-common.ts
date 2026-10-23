@@ -205,9 +205,10 @@ function proofObject(result: Readonly<Record<string, unknown>>): Record<string, 
 
 /**
  * `needs_credits` before anything was sent or asked (06 §2.4, D-111; M1-9d-3): the fixed credits
- * text with the top-up link and agent ID in `nextStep`, and `proof`. The terms tools' output has no
- * `agentAddress` or `topUpUrl` field, and the link is not a local-UI `url` (result.ts), so neither
- * is set.
+ * text with the top-up link in `nextStep`, and `proof`. M1-9d-4: the link is also a structured
+ * field, in agentlink_send's form (06 §2.1 `topUpUrl` with `agentAddress`, D-113), never `url`,
+ * which is reserved for the local approval page's origins (result.ts). While the pay page is not
+ * live there is no link, and neither field is set.
  */
 export function termsNeedsCredits(
   agentId: string,
@@ -215,11 +216,13 @@ export function termsNeedsCredits(
   payPage?: PayPageConfig,
 ): HandlerOutput {
   const out = needsCredits(agentId, route, {}, payPage).result;
+  const link = out['topUpUrl'];
   return {
     result: {
       status: out.status,
       summary: `${out.summary} ${TERMS_TEXT.noCreditsSentNothing}`,
       ...(out.nextStep === undefined ? {} : { nextStep: out.nextStep }),
+      ...(typeof link === 'string' ? { agentAddress: out['agentAddress'], topUpUrl: link } : {}),
       proof: { status: 'needs_credits', receipts: [] },
     },
   };

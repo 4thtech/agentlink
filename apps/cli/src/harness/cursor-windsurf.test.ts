@@ -138,6 +138,9 @@ describe('Windsurf', () => {
     const plan = await planHarness(harnessById(WINDSURF), c);
     if (plan.status !== 'change') throw new Error('expected change');
     expect(plan.diff.join('\n')).toContain('~/xdg/devin/mcp_config.json');
+    // M1-36g-c: the plan names the path it will write, the one the confirmation code binds.
+    expect(plan.path).toBe('~/xdg/devin/mcp_config.json');
+    expect(plan.file).toBe(join(home, 'xdg', 'devin', 'mcp_config.json'));
     await applyHarness(plan, c);
     expect(
       JSON.parse(await readFile(join(home, 'xdg', 'devin', 'mcp_config.json'), 'utf8')),
