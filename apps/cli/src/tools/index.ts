@@ -23,7 +23,7 @@ import { notarizeHandler } from './notarize.js';
 import { proposeTermsHandler } from './propose-terms.js';
 import { respondToTermsHandler } from './respond-to-terms.js';
 import { listContactsHandler } from './list-contacts.js';
-import { findTool } from './registry.js';
+import { findTool, type ToolSurface } from './registry.js';
 import {
   fail,
   finalizeResult,
@@ -76,6 +76,11 @@ export interface CallToolOptions {
   readonly approvalWaitMs?: number;
   /** The approval read interval (tests). */
   readonly approvalWaitIntervalMs?: number;
+  /**
+   * M1-36h: the surface the server serves; inputs are checked against that surface's schema, so an
+   * argument the surface does not list (the Advanced `chain`) is refused. Default: `default`.
+   */
+  readonly surface?: ToolSurface;
 }
 
 /**
@@ -89,7 +94,7 @@ export async function callTool(
   options: CallToolOptions = {},
 ): Promise<FinishedResult> {
   const origins = 'needsSetup' in env ? [] : env.urlOrigins;
-  const tool = findTool(name);
+  const tool = findTool(name, options.surface);
   const handler = tool === undefined ? undefined : HANDLERS[tool.name];
   if (tool === undefined || handler === undefined)
     return finalizeResult(invalidArgument(), origins);
@@ -131,7 +136,15 @@ export async function callTool(
     : finalizeResult(waited, env.urlOrigins);
 }
 
-export { TOOLS, PENDING_M1A_TOOLS, findTool, type ToolDefinition } from './registry.js';
+export {
+  ADVANCED_TOOLS,
+  TOOLS,
+  PENDING_M1A_TOOLS,
+  findTool,
+  toolsFor,
+  type ToolDefinition,
+  type ToolSurface,
+} from './registry.js';
 export {
   coreToolClient,
   type ApprovalLink,

@@ -16,6 +16,7 @@ import {
   isFreeCreditsChain,
   nodeFreeCreditsPort,
 } from './free-credits.js';
+import { createFreeCreditsClaimer, memoryFreeCreditsMarker } from '../tools/free-credits.js';
 
 const AGENT = `0x${'ab'.repeat(20)}`;
 const OTHER = `0x${'cd'.repeat(20)}`;
@@ -101,7 +102,7 @@ describe('nodeFreeCreditsPort (M1-36i)', () => {
 
   it.each([
     ['503 (the pool is empty or the service is off)', () => json(503, { error: 'unavailable' })],
-    ['400', () => json(400, { error: SERVER_CANARY })],
+    ['500 json', () => json(500, { error: SERVER_CANARY })],
     ['500 with server text', () => new Response(SERVER_CANARY, { status: 500 })],
     ['200 is still sent, whatever its body', () => new Response(SERVER_CANARY, { status: 200 })],
     ['a 302', () => new Response(null, { status: 302, headers: { location: URL_BASE } })],
@@ -172,6 +173,123 @@ describe('fileFreeCreditsMarker (M1-36i)', () => {
     );
     expect(await fileFreeCreditsMarker(dir, AGENT).read(BASE_SEPOLIA)).toEqual({
       state: 'claimed',
+    });
+  });
+});
+
+describe('free credits claim lows (M1-36i-b)', () => {
+  const withHeaders = (status: number, body: string, headers: Record<string, string>) =>
+    new Response(body, { status, headers });
+  const retryOf = async (answer: () => Response) => {
+    const { port: p } = port(answer);
+    return (await p.request({ chainId: BASE_SEPOLIA, agent: AGENT })) as {
+      status: string;
+      retryAfter?: number;
+    };
+  };
+
+  it('L-3: a 429 body is read only up to a small cap, never in full', async () => {
+    let pulled = 0;
+    const chunk = new TextEncoder().encode('x'.repeat(1024));
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk.length;
+        controller.enqueue(chunk);
+      },
+    });
+    const { port: p } = port(() => new Response(stream, { status: 429 }));
+    const answer = await p.request({ chainId: BASE_SEPOLIA, agent: AGENT });
+    expect(answer.status).toBe('rate_limited');
+    expect(pulled).toBeLessThanOrEqual(8 * 1024); // an endless body is cut off, not drained
+  });
+
+  it('L-3: a short in-cap body still maps its fixed code', async () => {
+    expect((await retryOf(() => json(429, { error: 'daily_cap_reached' }))).status).toBe(
+      'daily_cap_reached',
+    );
+  });
+
+  it('L-2: Retry-After seconds are honoured, with a 5-minute minimum', async () => {
+    const h = (v: string) => () =>
+      withHeaders(429, JSON.stringify({ error: 'rate_limited' }), { 'retry-after': v });
+    expect((await retryOf(h('7200'))).retryAfter).toBe(7200);
+    expect((await retryOf(h('10'))).retryAfter).toBe(300);
+    expect((await retryOf(h('0'))).retryAfter).toBe(300);
+  });
+
+  it('L-2: a Retry-After HTTP date is honoured; junk falls back to the default', async () => {
+    const future = new Date(Date.now() + 2 * 3_600_000).toUTCString();
+    const date = (await retryOf(() => withHeaders(429, '{}', { 'retry-after': future })))
+      .retryAfter;
+    expect(date).toBeGreaterThanOrEqual(7190);
+    expect(date).toBeLessThanOrEqual(7200);
+    for (const junk of ['soon', '-5', '1e9', '12.5']) {
+      const r = await retryOf(() => withHeaders(429, '{}', { 'retry-after': junk }));
+      expect(r.retryAfter).toBe(3600);
+    }
+  });
+
+  it('L-2: no Retry-After keeps the default wait', async () => {
+    expect((await retryOf(() => json(429, { error: 'rate_limited' }))).retryAfter).toBe(3600);
+  });
+
+  it.each([400, 401, 403, 404, 405, 410, 422])(
+    'L-4: a refusing %i waits a day (paused, not claimed)',
+    async (status) => {
+      const { port: p } = port(() => new Response(SERVER_CANARY, { status }));
+      const answer = await p.request({ chainId: BASE_SEPOLIA, agent: AGENT });
+      expect(answer).toEqual({ status: 'rate_limited', retryAfter: 86_400 });
+      expect(JSON.stringify(answer)).not.toContain('CANARY');
+    },
+  );
+
+  it('L-4: a 404 is retried after the window; a real already_claimed stays permanent', async () => {
+    let status = 404;
+    let t = 1_000_000;
+    let calls = 0;
+    const { port: p } = port(() => {
+      calls += 1;
+      return status === 200
+        ? json(200, {})
+        : status === 429
+          ? json(429, { error: 'already_claimed' })
+          : new Response('', { status });
+    });
+    const claim = createFreeCreditsClaimer({
+      request: (chainId) => p.request({ chainId, agent: AGENT }),
+      isFreeCreditsChain,
+      marker: memoryFreeCreditsMarker(),
+      now: () => t,
+    });
+    expect(await claim(BASE_SEPOLIA)).toBe('paused');
+    expect(await claim(BASE_SEPOLIA)).toBe('paused'); // inside the window: nothing sent
+    expect(calls).toBe(1);
+    t += 86_400 + 1;
+    status = 200; // the route is back
+    expect(await claim(BASE_SEPOLIA)).toBe('added');
+    expect(calls).toBe(2);
+
+    const { port: q } = port(() => json(429, { error: 'already_claimed' }));
+    let n = 0;
+    const claim2 = createFreeCreditsClaimer({
+      request: (chainId) => {
+        n += 1;
+        return q.request({ chainId, agent: AGENT });
+      },
+      isFreeCreditsChain,
+      marker: memoryFreeCreditsMarker(),
+      now: () => t,
+    });
+    expect(await claim2(BASE_SEPOLIA)).toBe('none');
+    t += 10 * 86_400;
+    expect(await claim2(BASE_SEPOLIA)).toBe('none');
+    expect(n).toBe(1);
+  });
+
+  it.each([408, 500, 502, 503])('L-4: a transient %i stays unavailable', async (status) => {
+    const { port: p } = port(() => new Response('', { status }));
+    expect(await p.request({ chainId: BASE_SEPOLIA, agent: AGENT })).toEqual({
+      status: 'unavailable',
     });
   });
 });

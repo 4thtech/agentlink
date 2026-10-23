@@ -212,6 +212,9 @@ const invalid = (reason: ProofPackFailure): ProofPackInvalid =>
 /** A chain answer failed: not a property of the pack. */
 class Unavailable extends Error {}
 
+/** The chain answered a record that cannot be one (a zero signer, M1-4c-e). */
+class Malformed extends Error {}
+
 /** The latest second an RFC 3339 `YYYY-…Z` timestamp (and a JS Date) can hold: 9999-12-31T23:59:59Z. */
 const MAX_TIMESTAMP = 253_402_300_799n;
 
@@ -260,25 +263,35 @@ async function readRecordAt(
   recordId: Hex,
   blockTag: 'finalized' | 'latest',
 ): Promise<RecordState> {
+  let state: RecordState;
   try {
-    const state = await notaryReader(chain.client, chain.config).read.getRecord([recordId], {
+    state = (await notaryReader(chain.client, chain.config).read.getRecord([recordId], {
       blockTag,
-    });
-    return state as unknown as RecordState;
+    })) as unknown as RecordState;
   } catch (error) {
     // The deployed Notary reverts RecordNotFound() for an unknown ID: that revert, and only that
-    // one, is "no record at this block" (as clients/state.ts), read as the empty record so the
-    // pack fails `record_not_found` (07 §8) and never verifies. Any other failure is an outage.
+    // one, is "no record at this block", read as the empty record so the pack fails
+    // `record_not_found` (07 §8) and never verifies. The revert data must be exactly the 4-byte
+    // selector, as the submitter port reads it (M1-4d-g, #342): viem ignores bytes after a
+    // no-argument error, and those are not RecordNotFound(). Any other failure is an outage.
     if (
       error instanceof ChainError &&
       error.code === 'call_reverted' &&
-      error.revertName === 'RecordNotFound'
+      error.revertName === 'RecordNotFound' &&
+      error.revertBare
     ) {
       return ABSENT_RECORD;
     }
     // ChainErrors carry no URL; none of their detail leaves here either.
     throw new Unavailable();
   }
+  // The Notary never answers an unknown ID with a struct (it reverts, above). A returned struct
+  // with a zero signer is a malformed answer, never "absent" (M1-4c-e; as clients/state.ts
+  // `bad_answer`): the pack fails `malformed_record` at once, with no read at another block.
+  if (typeof state.signer !== 'string' || state.signer.toLowerCase() === ZERO_ADDRESS) {
+    throw new Malformed();
+  }
+  return state;
 }
 
 /** The record state of an unknown ID: no signer, no timestamp (`exists` is false). */
@@ -599,6 +612,7 @@ async function verifyParsed(
     });
   } catch (error) {
     if (error instanceof Unavailable) return invalid('chain_unavailable');
+    if (error instanceof Malformed) return invalid('malformed_record');
     throw error;
   }
 }
