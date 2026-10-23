@@ -26,6 +26,7 @@ import { cliPrefix } from '../runtime/cli-prefix.js';
 import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import { readAgentConfig } from '../runtime/index.js';
 import type { TerminalContext } from '../runtime/guards.js';
+import { HARNESSES } from '../harness/index.js';
 import { copy } from '../tools/strings/index.js';
 import { INIT_TEXT, createInitHandler, type InitDeps } from './init.js';
 
@@ -133,10 +134,10 @@ describe('detection', () => {
     const plan = await init([], { platform: 'darwin' });
     expect(plan.code).toBe(EXIT_OK);
     expect(plan.out).toContain(
-      "didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity",
+      "didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf",
     );
     expect((await init([], { platform: 'linux' })).out).toContain(
-      "didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity",
+      "didn't find Claude Code, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf",
     );
     expect(plan.created).toBe(0);
     const run = await init(['--confirm', codeOf(plan)]);
@@ -886,5 +887,73 @@ describe('init --harness and --config (M1-9t)', () => {
     const plan = await init(['--harness', 'opencode', '--config', join(outside, 'opencode.toml')]);
     expect(plan.code).not.toBe(EXIT_OK);
     expect(plan.out).not.toContain('--confirm');
+  });
+});
+
+describe('apps lists name every harness (M1-36g-b)', () => {
+  it('appsAll names every app in the harness table, appsLinux all but Claude Desktop', () => {
+    for (const def of HARNESSES) {
+      expect(INIT_TEXT.appsAll).toContain(def.appName);
+      if (def.id === 'claude-desktop') expect(INIT_TEXT.appsLinux).not.toContain(def.appName);
+      else expect(INIT_TEXT.appsLinux).toContain(def.appName);
+    }
+  });
+});
+
+describe('Windsurf: the code binds the path that is written (M1-36g-c)', () => {
+  const xdgEnv = (): Record<string, string> => ({ XDG_CONFIG_HOME: join(home, 'xdg') });
+  const XDG_FILE = ['xdg', 'devin', 'mcp_config.json'] as const;
+  const DEFAULT_FILE = ['.config', 'devin', 'mcp_config.json'] as const;
+
+  it('with XDG_CONFIG_HOME set, shows that path and writes exactly there on confirmation', async () => {
+    const terminal = { ...PIPE, env: xdgEnv() };
+    const plan = await init(['--harness', 'windsurf'], { platform: 'linux', terminal });
+    expect(plan.code).toBe(EXIT_OK);
+    expect(plan.out).toContain('~/xdg/devin/mcp_config.json');
+    expect(plan.out).not.toContain('~/.config/devin/mcp_config.json');
+    expect(await exists(...XDG_FILE)).toBe(false);
+    const run = await init(['--harness', 'windsurf', '--confirm', codeOf(plan)], {
+      platform: 'linux',
+      terminal,
+    });
+    expect(run.code).toBe(EXIT_OK);
+    expect(JSON.parse(await read(...XDG_FILE))).toMatchObject({
+      mcpServers: { agentlink: { command: 'npx' } },
+    });
+    expect(await exists(...DEFAULT_FILE)).toBe(false);
+  });
+
+  it('gives a different code with and without XDG_CONFIG_HOME', async () => {
+    const withXdg = await init(['--harness', 'windsurf'], {
+      platform: 'linux',
+      terminal: { ...PIPE, env: xdgEnv() },
+    });
+    const without = await init(['--harness', 'windsurf'], { platform: 'linux' });
+    expect(without.out).toContain('~/.config/devin/mcp_config.json');
+    expect(codeOf(withXdg)).not.toBe(codeOf(without));
+  });
+
+  it('a code shown with one environment does not confirm under another; nothing is written', async () => {
+    const plan = await init(['--harness', 'windsurf'], {
+      platform: 'linux',
+      terminal: { ...PIPE, env: xdgEnv() },
+    });
+    const moved = await init(['--harness', 'windsurf', '--confirm', codeOf(plan)], {
+      platform: 'linux',
+    });
+    expect(moved.code).toBe(EXIT_FAILED);
+    expect(moved.err).toContain(withPrefix(INIT_TEXT.codeMismatch));
+    expect(moved.created).toBe(0);
+    expect(await exists(...XDG_FILE)).toBe(false);
+    expect(await exists(...DEFAULT_FILE)).toBe(false);
+
+    const back = await init(['--harness', 'windsurf'], { platform: 'linux' });
+    const reverse = await init(['--harness', 'windsurf', '--confirm', codeOf(back)], {
+      platform: 'linux',
+      terminal: { ...PIPE, env: xdgEnv() },
+    });
+    expect(reverse.code).toBe(EXIT_FAILED);
+    expect(await exists(...XDG_FILE)).toBe(false);
+    expect(await exists(...DEFAULT_FILE)).toBe(false);
   });
 });
