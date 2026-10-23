@@ -27,6 +27,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-17 | [M1a dogfood: agents of several harnesses](dogfood-m1a.md) | Owner (Tali) and Denis, with their agents | Owner |
 | RB-18 | [Releasing v0.1.0: owner checklist](release-v0.1.0.md) | Owner (Tali) | Owner |
 | RB-19 | [Submitter and faucet deploy: owner setup](submitter-deploy.md) | Owner (Tali) | Owner |
+| RB-20 | [M1 gate: tester runbook](m1-gate-testing.md) | Coordinator (orchestrator or Tali) with 10 internal testers | Sonnet (coordinator) |
 
 ## Template
 
