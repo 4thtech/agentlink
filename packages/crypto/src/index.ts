@@ -247,11 +247,12 @@ export {
 // KeyStore.signCardPop (public values only). The signer is in the restricted keystore entry.
 export { cardPopSnapshot, verifyCardPop, verifyCardPossession } from './card-pop.js';
 // M1-1j: the OCC v2 proof types (05 §3.1, §4; 04 §5), the recipient commitment and the EIP-3009
-// typed data. The revoke struct waits for G-20 (M1-1i-b).
+// typed data with the check of a token domain read from chain (M3-4b-t-1).
 export {
   OCC_V2_DOMAIN_NAME,
   OCC_V2_DOMAIN_VERSION,
   RECEIPT_TYPES,
+  RECEIVE_WITH_AUTHORIZATION_TYPE_HASH,
   RECEIVE_WITH_AUTHORIZATION_TYPES,
   RECORD_TYPES,
   REGISTRATION_TYPES,
@@ -274,6 +275,8 @@ export {
   recordTypedData,
   registrationTypedData,
   revocationTypedData,
+  tokenDomainSeparator,
+  verifyTokenDomain,
   type OccReceipt,
   type OccRecord,
   type OccRegistration,
