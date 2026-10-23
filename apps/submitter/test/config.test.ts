@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import type { Hex } from '@4thtech-io/chain';
 import {
   DEFAULTS,
+  DEPOSIT_AUTH_DEFAULTS,
   FAUCET_DEFAULTS,
   pinnedFaucet,
   readConfig,
+  readDepositAuthConfig,
   readFaucetAddress,
   readFaucetConfig,
 } from '../src/config.js';
@@ -206,5 +208,46 @@ describe('the pinned faucet wallet', () => {
     expect(pinnedFaucet(env, 84532, null)).toBeNull();
     // A pin for another chain does not count.
     expect(pinnedFaucet({ SUBMITTER_FAUCET_ADDRESS_10200: PINNED }, 84532, right)).toBeNull();
+  });
+});
+
+describe('readDepositAuthConfig (M3-4b-t-3)', () => {
+  it('is off by default: unset or empty', () => {
+    expect(readDepositAuthConfig({})).toBeNull();
+    expect(readDepositAuthConfig({ SUBMITTER_DEPOSIT_AUTH_CHAINS: '' })).toBeNull();
+  });
+
+  it('serves Base Sepolia with the owner limits: 5 per agent and 20 per IP per hour', () => {
+    const config = readDepositAuthConfig({ SUBMITTER_DEPOSIT_AUTH_CHAINS: '84532' });
+    expect(config?.chains).toEqual([84532]);
+    expect(config?.agentRequestsPerHour).toBe(5);
+    expect(config?.ipRequestsPerHour).toBe(20);
+    expect(DEPOSIT_AUTH_DEFAULTS).toEqual({ agentRequestsPerHour: 5, ipRequestsPerHour: 20 });
+  });
+
+  it('turns off on a chain without the gasless capability, a mainnet or a malformed list', () => {
+    for (const chains of ['10200', '84532,10200', '8453', '1', '84532,84532', ' 84532', '0x14a34', 'x']) {
+      expect(readDepositAuthConfig({ SUBMITTER_DEPOSIT_AUTH_CHAINS: chains }), chains).toBeNull();
+    }
+  });
+
+  it('bounds the limit overrides and turns off on an invalid one', () => {
+    const base = { SUBMITTER_DEPOSIT_AUTH_CHAINS: '84532' };
+    expect(
+      readDepositAuthConfig({
+        ...base,
+        SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR: '2',
+        SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR: '50',
+      }),
+    ).toMatchObject({ agentRequestsPerHour: 2, ipRequestsPerHour: 50 });
+    for (const [name, value] of [
+      ['SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR', '0'],
+      ['SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR', '61'],
+      ['SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR', '0'],
+      ['SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR', '1001'],
+      ['SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR', 'many'],
+    ] as const) {
+      expect(readDepositAuthConfig({ ...base, [name]: value }), `${name}=${value}`).toBeNull();
+    }
   });
 });
