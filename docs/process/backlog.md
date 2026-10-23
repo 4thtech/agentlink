@@ -68,9 +68,9 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28))))))) |
+| M1 Local beta | 315 (M1a 87, M1b 228, hand-added on 2026-10-23: 10 cards from the afternoon review follow-ups (DOCS-FOLLOWUPS-1023-c); counts regenerate with #476; previously 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)))))))) |
 | M2 Console, desktop apps, self-host, design | 49 (recounted from the headings on 2026-10-23; previously stated 48 and, before that, 44; incl. M2-19-b from AUDIT-FABLE-M2-19-2; incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
-| M3 Mainnet beta | 24 (recounted from the headings on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
+| M3 Mainnet beta | 25 (hand-added M3-4b-t-T4-ab-reconcile on 2026-10-23; previously 24 (recounted from the headings on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50)) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -4528,6 +4528,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-2, I-5
 - **Scope:**
   - Wire the static invite page deploy to Cloudflare (D-28). No pattern exists yet in `.github/workflows/`; follow the submitter and drop pipelines (staging on merge, smoke test, production on green, health check and rollback, `DEPLOY_FREEZE`).
+  - Owner (IR on #492): settle the invite production hostname before production Cloudflare credentials are set; a DNS conflict would trigger the repo-wide freeze.
   - The page recomputes `nameHash` from the name it shows and compares it with the payload's; a mismatch shows the invite as damaged and no prompt.
 - **Acceptance:** tests first: a payload whose `nameHash` does not match the shown name yields no prompt; a matching one still yields the template plus canonical link; the deploy workflow passes the workflow checks and the smoke test runs against staging.
 
@@ -5660,6 +5661,109 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Filled logs go to the private audit store, never to this repository.
   - Card counts are recounted after #449 lands (this PR does not touch the count rows).
 
+#### DOCS-RUNBOOKS-1023-c · runbook step reference fix (new, follow-up of IR-2 on #479)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (docs/runbooks) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/runbooks/submitter-deploy.md`
+- **Depends on:** DOCS-RUNBOOKS-1023
+- **Scope:**
+  - Step 30 says step 14's name check lists `SUBMITTER_DEPOSIT_GAS_KEY_84532`; it does not. Reword the step to say what step 14 actually checks.
+- **Acceptance:**
+  - The wording in step 30 matches step 14; a read-through of both steps finds no other dangling reference.
+
+#### DOCS-06-TOPUP-b · 06 §2.4 with-link `nextStep` shape shows the disclosure sentence (new, follow-up of DOCS-06-TOPUP (#482))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation; proposed, owner confirms at merge) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-and-agent-interface.md` §2.4
+- **Depends on:** DOCS-06-TOPUP
+- **Scope:**
+  - The with-link `nextStep` shape in 06 §2.4 omits the `topUpDisclosure()` sentence that the code adds. Add it to the shape so spec and tool output agree.
+- **Acceptance:**
+  - The §2.4 example for the with-link case includes the `topUpDisclosure()` sentence, and a grep of 06 finds no other shape that omits it.
+
+#### PROC-ORCH-PLAYBOOK-b · orchestrator playbook lows (new, follow-up of IR-2 on #488)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process; `.github` untouched; the script is a process tool) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/runbooks/merge-and-release.md`, the orchestrator playbook, the `record-ir.py` helper
+- **Depends on:** PROC-ORCH-PLAYBOOK
+- **Scope:**
+  - `docs/runbooks/merge-and-release.md:34` still says `--auto --squash`; align it with the merge-queue wording the playbook uses.
+  - Playbook: change "where the owner asked for one" to "where §1.1/§8 require one".
+  - `record-ir.py` with a trailing `--owner-merge` and no value ends in a traceback; it should print a usage error and exit 2.
+- **Acceptance:**
+  - A test (or fixture run) of `record-ir.py --owner-merge` with no value exits 2 with a usage message and no traceback.
+  - A grep finds no `--auto --squash` in the runbooks, and the playbook wording reads as above.
+
+#### CHORE-CI-QUEUE-DEDUPE-b · comment and doc text about which job scans secrets on merge-queue runs (new, follow-up of IR-1 on #491)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** sensitive (`.github/**`; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/secret-scan-branches.yml`, `docs/process/ci-cd.md`
+- **Depends on:** CHORE-CI-QUEUE-DEDUPE (#491); fold into DOCS-RUNBOOKS-1023-b (in #483) where it fits
+- **Scope:**
+  - The comment in `secret-scan-branches.yml` and the #491 threat note say `security.yml` `merge_group` scans secrets. It does not (line 103 skips it); say which job does.
+  - `ci-cd.md:9` push-trigger text must also exclude `gh-readonly-queue/**`.
+- **Acceptance:**
+  - The comment and the doc line match the workflow files; the workflow checks pass; no trigger or step changes.
+
+#### M1-6b-d-b · abort-incomplete lifecycle: empty element, and status wording (new, follow-up of IR-1 on #485)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (storage) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/storage` (lifecycle read), `README.md` status text
+- **Depends on:** M1-6b-d
+- **Scope:**
+  - An empty `<AbortIncompleteMultipartUpload></AbortIncompleteMultipartUpload>` element reads as the rule being kept. It must read as dropped.
+  - README and status text say "gasless top-up"; the word "gas" is technical status text. Use "credits top-up without fees" (11 §5).
+- **Acceptance:**
+  - Tests first: a lifecycle document with the empty element is reported as the rule dropped; a document with a day count still reads as kept.
+  - README and status pages contain no "gas" in default-facing wording; the docs vocabulary check passes.
+
+#### M1-34-c-b · receipt retry: acknowledge no longer blocks on a lagging RPC (new, follow-up of IR-1 on #489)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter, `packages/core` receipt path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/submitter`, `packages/core`, the `agentlink_acknowledge` tool
+- **Depends on:** M1-34-c
+- **Scope:**
+  - The acknowledge tool waits about 3 s when the RPC lags. Return at once with the receipt pending and let the retry finish in the background, or document the wait in the tool summary.
+  - The window where a direct post and the sync post both send is idempotent, but the retry sleep widens it. Add a test that two posts in that window end in one stored receipt.
+- **Acceptance:**
+  - Tests first: acknowledge against a lagging RPC returns within the tool budget; a direct post plus a sync post yield exactly one receipt; no test weakened.
+
+#### M1-36b-2-b · add-agent with an existing signed policy, and first rules in the local UI (new, follow-up of IR-1 on #493)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/core`, `packages/node`, owner signing) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core`, `packages/node`, `apps/local-ui` (first-run owner setup)
+- **Depends on:** M1-36b-2
+- **Scope:**
+  - Add a test for add-agent when a signed policy already exists: core refuses with `stale_version` and node reports `failed`. Decide whether node should re-read the version and retry once, or report a plain message.
+  - The local-UI first-run owner setup still signs no first policy. Make it sign the same first rules (Send folder) as `init` does, in the same owner-code entry.
+- **Acceptance:**
+  - Tests first: add-agent over an existing policy ends in the decided outcome with a plain message; the local-UI first run leaves a signed first policy and the agent can send to the Send folder.
+
+#### M1-7f-3-b · files: expiry assertions and refresh-link lows (new, follow-up of IR-1 on #498)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core` files) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (files), test storage doubles
+- **Depends on:** M1-7f-3
+- **Scope:**
+  - `MemoryOwnStorage.presignGet` ignores its expiry. Add a deadline assertion in the double and a test that uses it.
+  - Refresh-link on a drop entry returns `NOT_REFRESHABLE` locally, without a call.
+  - `#take` checks that the original state is `ok` before it takes.
+  - The rest of M1-7f-3 stays open as listed in #498: receipt trigger, old-key backfill, expiry cursor, sent copies, D-53 re-hash, SentFile name and hash, and the drop expiry test against the Worker. Keep those on M1-7f-3.
+- **Acceptance:**
+  - Tests first: a presigned URL past its deadline is refused by the double; a drop entry refresh returns `NOT_REFRESHABLE` with no network call; `#take` on a non-ok entry does not take.
+
+#### M1-35b-b-c · approvals review: the local UI implements `onPrune` (new, follow-up of IR-2 on #500)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (policy and approval UI) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui`
+- **Depends on:** M1-35b-b, M1-11b-4
+- **Scope:**
+  - The components call `onPrune` when a card goes away. The local UI caller must implement it so a returning card shows nothing selected; otherwise the old pick reappears, visibly.
+- **Acceptance:**
+  - Test: select an option on a card, let the card go and come back; nothing is selected.
+
+#### M1-11r-d-b · activity read API lows (new, follow-up of IR-1 on #503)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`packages/core` read API) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (activity), M1-11r-d consumers
+- **Depends on:** M1-11r-d
+- **Scope:**
+  - Compute `unknownSenderCodesTx` once per page, not per row.
+  - Remove the dead `delivery ?? queued` fallback.
+  - The consumer in #417 must render file names as data (escaped text), never as markup.
+- **Acceptance:**
+  - Tests first: one page does one `unknownSenderCodesTx` computation (spy count); a file name with markup renders as text in the #417 view.
+
 ---
 
 ## 4. M2 — Owner console, desktop apps, self-host, design
@@ -6779,6 +6883,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Acceptance:**
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
   - A fixture PR touching only `docs-site/` is derived as S1 by `review-gate`.
+
+#### M3-4b-t-T4-ab-reconcile · gasless top-up: reconcile the core step and the CLI port (new, follow-up of IR-1 on #494 and #490)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core`, `apps/cli`) · **Phase:** M3
+- **Repo/path:** agentlink · `packages/core` (T4-a step), `apps/cli` (T4-b port)
+- **Depends on:** M3-4b-t-T4-a (#494), M3-4b-t-T4-b (#490); starts after both merge
+- **Scope:**
+  - Use the core `DepositAuthPort` type in the CLI instead of the local copy.
+  - A remote `gasless_unavailable` fails over to the next URL, then ends `unavailable`. A local pre-send refusal stays `refused` with `gasless_unavailable`.
+  - Lows: check the body length before reading it whole (`bodyOf`); a 200 with `failed` or `rate_limited` honours `Retry-After`.
+- **Acceptance:**
+  - Tests first: a first URL answering `gasless_unavailable` fails over to the second, and both failing ends `unavailable`; the local pre-send refusal is unchanged; an oversized body is refused before it is read; `Retry-After` on a 200 `rate_limited` is honoured.
 
 ---
 
