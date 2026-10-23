@@ -1,9 +1,16 @@
 // CHORE-CI-SPEED-2: the PR test selection. A wrong answer here skips tests on a pull request (the
 // merge queue still runs everything), so every rule has a case, and the real workspace is checked too.
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { loadWorkspace, selectAffected, turboFilters } from './select-affected.mjs';
+import {
+  HEAVY_JOBS,
+  jobOutputs,
+  loadWorkspace,
+  selectAffected,
+  turboFilters,
+} from './select-affected.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -218,5 +225,154 @@ describe('the real workspace', () => {
 
   it('the node package needs the Playwright browsers', () => {
     expect(ws.find((p) => p.name === '@4thtech-io/node').playwright).toBe(true);
+  });
+});
+
+// CHORE-CI-SPEED-3: the heavy jobs follow the affected packages on a pull request. A wrong answer
+// skips a job on the PR only; the merge queue runs every job and ci-gate requires them there.
+// Before the selector exports the map, every case below must fail on its own (not the whole file).
+const HEAVY = HEAVY_JOBS ?? { 'heavy-jobs-missing': ['@4thtech-io/heavy-jobs-missing'] };
+
+describe('heavy jobs: which ones a pull request runs', () => {
+  const ws = loadWorkspace(root);
+  const jobsFor = (files) => selectAffected({ files, workspace: ws }).jobs ?? {};
+  const running = (files) =>
+    Object.entries(jobsFor(files))
+      .filter(([, run]) => run)
+      .map(([job]) => job)
+      .sort();
+  const ALL = Object.keys(HEAVY).sort();
+
+  it('maps each heavy job of ci.yml to the packages it tests', () => {
+    expect(ALL).toEqual([
+      'bundle-check',
+      'e2e-deterministic',
+      'keychain',
+      'relays-docker',
+      'storage-minio',
+      'vectors',
+    ]);
+  });
+
+  it('names only packages that exist in the workspace (a renamed package must not silence a job)', () => {
+    const names = new Set(ws.map((p) => p.name));
+    for (const [job, pkgs] of Object.entries(HEAVY)) {
+      expect(pkgs.length, job).toBeGreaterThan(0);
+      for (const name of pkgs) expect(names.has(name), `${job}: ${name}`).toBe(true);
+    }
+  });
+
+  it.each([
+    ['an unreadable diff', null],
+    ['an empty diff', []],
+    ['a workflow change', ['.github/workflows/ci.yml']],
+    ['a tools change', ['tools/ci/select-affected.mjs']],
+    ['the lockfile', ['pnpm-lock.yaml']],
+    ['a root config file', ['turbo.json']],
+    ['an unknown path', ['scripts/new.sh']],
+    ['an unknown package directory', ['packages/new-thing/src/index.ts']],
+    ['a test vector', ['test-vectors/nip44/vectors.json']],
+    ['core', ['packages/core/src/index.ts']],
+    ['crypto', ['packages/crypto/src/index.ts']],
+    ['types', ['packages/types/src/index.ts']],
+  ])('fails open to every job: %s', (_label, files) => {
+    expect(running(files)).toEqual(ALL);
+  });
+
+  it('a docs-only change runs no heavy job', () => {
+    expect(running(['docs/process/ci-cd.md', 'changelog.d/x.md', 'README.md'])).toEqual([]);
+  });
+
+  it('a CLI-only change runs keychain, bundle-check and the e2e', () => {
+    expect(running(['apps/cli/src/server.ts'])).toEqual([
+      'bundle-check',
+      'e2e-deterministic',
+      'keychain',
+    ]);
+  });
+
+  it('a node change runs keychain, relays-docker, bundle-check and the e2e (node is under the CLI)', () => {
+    expect(running(['packages/node/src/keystore.ts'])).toEqual([
+      'bundle-check',
+      'e2e-deterministic',
+      'keychain',
+      'relays-docker',
+    ]);
+  });
+
+  it('a transport-nostr change runs relays-docker', () => {
+    expect(running(['packages/transport-nostr/src/index.ts'])).toContain('relays-docker');
+  });
+
+  it('a storage change runs storage-minio', () => {
+    expect(running(['packages/storage/src/s3.ts'])).toContain('storage-minio');
+  });
+
+  it('a chain change runs the vectors (the harness imports chain) and the e2e', () => {
+    const jobs = running(['packages/chain/src/index.ts']);
+    expect(jobs).toContain('vectors');
+    expect(jobs).toContain('e2e-deterministic');
+  });
+
+  it('an e2e change runs the e2e only', () => {
+    expect(running(['e2e/test/world.ts'])).toEqual(['e2e-deterministic']);
+  });
+
+  it('an invite page change runs the e2e (it builds the invite site)', () => {
+    expect(running(['apps/invite/site/index.html'])).toContain('e2e-deterministic');
+  });
+
+  it('a ui-only change runs no heavy job', () => {
+    expect(running(['packages/ui/src/button.ts'])).toEqual([]);
+  });
+});
+
+describe('jobOutputs', () => {
+  it('writes one run_<job> line per heavy job, true on a full run', () => {
+    const lines = jobOutputs({
+      scope: 'full',
+      reason: 'x',
+      jobs: selectAffected({ files: null, workspace: fake }).jobs,
+    });
+    expect(lines).toEqual(Object.keys(HEAVY).map((j) => `run_${j.replaceAll('-', '_')}=true`));
+  });
+
+  it('writes false for a job the change does not reach', () => {
+    const r = selectAffected({ files: ['packages/ui/src/x.ts'], workspace: fake });
+    expect(jobOutputs(r)).toContain('run_storage_minio=false');
+  });
+});
+
+describe('ci.yml wires the heavy-job selection', () => {
+  const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+  const job = (name) => {
+    const start = yml.indexOf(`\n  ${name}:\n`);
+    expect(start, name).toBeGreaterThan(-1);
+    const rest = yml.slice(start + 1);
+    const next = rest.slice(1).search(/\n  [a-z0-9-]+:\n/);
+    return next === -1 ? rest : rest.slice(0, next + 1);
+  };
+
+  it.each(Object.keys(HEAVY))('%s runs only when detect selects it', (name) => {
+    const key = `run_${name.replaceAll('-', '_')}`;
+    expect(job(name)).toMatch(
+      new RegExp(`\\n    if: .*needs\\.detect\\.outputs\\.${key} == 'true'`),
+    );
+  });
+
+  it.each(Object.keys(HEAVY))(
+    'detect defaults %s to true when the selector did not run (queue, push, crash)',
+    (name) => {
+      const key = `run_${name.replaceAll('-', '_')}`;
+      expect(job('detect')).toContain(`${key}: \${{ steps.affected.outputs.${key} || 'true' }}`);
+    },
+  );
+
+  it('ci-gate requires every heavy job and checks to succeed in the merge queue', () => {
+    const gate = job('ci-gate');
+    expect(gate).toContain('merge_group');
+    for (const name of ['checks', ...Object.keys(HEAVY)]) {
+      expect(gate, name).toMatch(new RegExp(`QUEUE_REQUIRED:.*\\b${name}\\b`));
+    }
   });
 });
