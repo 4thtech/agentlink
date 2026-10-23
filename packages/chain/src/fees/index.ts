@@ -54,3 +54,22 @@ export {
   type FaucetCredit,
 } from './faucet.js';
 export { tokenUnitsToUsd } from './usd.js';
+export {
+  GASLESS_CHAIN_IDS,
+  GASLESS_MAX_USD_CENTS,
+  GASLESS_MAX_WINDOW_SECONDS,
+  GASLESS_MIN_USD_CENTS,
+  GASLESS_WINDOW_SECONDS,
+  buildReceiveWithAuthorization,
+  gaslessToken,
+  gaslessValueBounds,
+  readAuthorizationUsed,
+  readClientEthCall,
+  readTokenDomain,
+  recoverAuthorizationSigner,
+  type BuildGaslessOptions,
+  type EthCall,
+  type GaslessSigner,
+  type GaslessToken,
+  type GaslessTopUpRequest,
+} from './gasless.js';
