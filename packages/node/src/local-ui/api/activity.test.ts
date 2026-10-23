@@ -79,7 +79,8 @@ describe('GET /api/ui/activity (M1-11c-a1)', () => {
     expect(route.presence).toBe(false);
     const match = createLocalUiRoutes().match('GET', '/api/ui/activity');
     expect(match).not.toBe('method');
-    expect(match === undefined || match === 'method' ? undefined : match.route.handler).toBe(
+    const matched = match === undefined || match === 'method' ? undefined : match.route;
+    expect(matched !== undefined && 'handler' in matched ? matched.handler : undefined).toBe(
       route.handler,
     );
     // No mutating route on this page.
