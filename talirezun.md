@@ -1,41 +1,44 @@
 # @talirezun — sync
-**Headline:** 26 PRs merged since the morning update (49 today). 12 more are set to merge and wait on CI and the queue. Gasless top-up T4 is in review; release 0.2.0 waits for the queue to drain.
-_Updated 2026-10-23T14:45Z · claude-code / claude-haiku-5-5 · orchestrator, afternoon_
+**Headline:** 38 PRs merged since 13:00Z, including the desktop extension bundle, the local UI shell and Activity page. Gasless T4-a, strict signed JSON and KeyStore restore are set to merge; release 0.2.0 waits for the queue.
+_Updated 2026-10-23T18:40Z · claude-code / claude-haiku-5-5 · orchestrator, evening_
 
 ## Now
 - **Merge rule (standing, from Tali):** merge once an independent review PASSes and checks are green.
-- **Queue:** 12 PRs have auto-merge on. GitHub merges each one when its checks are green.
-- **Process:** orchestrator playbook and four-model routing (#488), and CI no longer runs twice on merge-queue branches (#491), are set to merge.
-- **First UI path:** #407 shell merged. #428 nav and #426 first run are in review, then the page PRs, one at a time.
+- **Queue:** 14 PRs have auto-merge on: #426 #488 #494 #496 #497 #503 #507 #508 #509 #511 #513 #515 #517 #481.
+- **Need a main catch-up first:** #494, #492, #513.
+- **Held drafts (UI pages):** #418, #429, #430, #432.
+- **Review open:** #512 vocabulary lint, #516 owner-confirmed decisions.
 - **Release 0.2.0:** after the queue drains. npm `latest` is the owner's click.
 
-## Merged today
-Since the morning update (26): #380 #407 #453 #454 #455 #457 #459 #460 #461 #462 #463 #464 #465 #466 #467 #468 #469 #470 #471 #472 #473 #474 #475 #477 #478 #479.
+## Merged since 13:00Z (38)
+407 417 428 449 453 456 457 458 459 463 471 475 476 477 478 479 480 482 483 484 485 486 487 489 490 491 493 495 498 499 500 501 502 504 505 506 510 514
+Plus two contracts PRs (parity follow-up, NatSpec).
 
-## In flight (claims)
-| Group | PRs | Status | Next step |
-|---|---|---|---|
-| Set to merge | #476 #480 #481 #482 #483 #484 #485 #486 #487 #488 #489 #491 | CI and queue | none |
-| Gasless top-up (M3-4b-t) | T1-T3 merged (off by default); #494 T4-a, #490 T4-b | in review | T4 after review |
-| Owner init and invite | #493 M1-36b-2; #492 M1-19-b invite deploy | in review | owner secret names for #492 |
-| M1-36h, M1-7f-3 | — | in build | — |
-| Contracts | contracts PR in review | in review | audit result |
-| UI stack refresh | #428, #426 | in review | — |
+Highlights:
+- Local UI: shell, navigation (7 items), Activity page, first-run page.
+- Owner-first policy at setup (#493, #506).
+- Desktop extension bundle with a signed release job (#514). Signing certificate PR #517 is set to merge.
+- Receipt retry (#489), file link refresh (#498), Nostr multi-identity login (#502).
+- CI: merge queue timeout 120 min, no duplicate queue runs (#491).
 
-## Gasless top-up (landed earlier today)
-- Testnet vault upgraded by the owner Safe and verified. First live gasless deposit on Base Sepolia succeeded.
-- Contracts release v0.1.0-testnet.4.
+## Gasless top-up (off by default)
+- T1-T3 merged. T4-b (#490) merged. T4-a (#494) set to merge.
 
-## Decisions (owner, 2026-10-23)
-- T4 top-up accepted: owner-started only; owner picks $5–$50; no extra fee; the 5/hour limit counts every approved attempt; switch-on comes last, after T3-c and staging keys.
-- G-21 strict: every tester reaches a first message in under 5 minutes from install (D-124).
+## Owner decisions (2026-10-23)
+- **T4 details:** owner-started top-ups only; owner picks $5–$50; no extra fee; the 5/hour limit counts every approved attempt; switch-on comes last.
+- **D-127:** M1-7g-e is won't-do for M1.
+- **D-128:** strict signed JSON (spec #513, parser #515).
+- **D-129:** drop interim. Internal testers only until counsel sign-off. Limits: 100 MB per file, 1 GB per key per week, 16 downloads.
+- A file-link refresh never extends retention.
+- Storage warning at 80%.
+- Keep `--advanced`.
+- Invite production domain deferred to the trademark check.
+- Stay on GitHub Free.
 
 ## Waiting on owner
-- npm `latest` approval for 0.2.0, after the queue drains.
-- D-91 desktop signing.
-- Cloudflare secret names for the invite deploy (#492), once merged.
-- Production domain confirmation for the invite page.
-- e2e-live environment; design briefs B-2, B-3, B-9.
+- R2 drop buckets (step 1: agentlink-drop-staging).
+- Offline backup of the desktop signing key.
+- npm `latest` approval for 0.2.0.
 
 ## Owner to-dos
 - E2e API-key secrets.
