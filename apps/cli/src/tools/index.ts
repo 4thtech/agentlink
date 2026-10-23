@@ -10,7 +10,7 @@
 import type { McpToolName } from '@4thtech-io/types';
 import { acceptInviteHandler } from './accept-invite.js';
 import { acknowledgeHandler } from './acknowledge.js';
-import { waitForApprovalDecision } from './approval-wait.js';
+import { approvalWaitLeft, waitForApprovalDecision } from './approval-wait.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
 import { exportProofPackHandler } from './export-proof-pack.js';
@@ -69,7 +69,10 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 export interface CallToolOptions {
   /** The client's cancel for this request. */
   readonly signal?: AbortSignal;
-  /** How long a linked `pending_approval` may wait for the owner's decision; 0 or absent: no wait. */
+  /**
+   * How long a linked `pending_approval` may wait for the owner's decision; 0 or absent: no wait.
+   * M1-36i-e: the time the tool already spent in this call comes off it (one budget per call).
+   */
   readonly approvalWaitMs?: number;
   /** The approval read interval (tests). */
   readonly approvalWaitIntervalMs?: number;
@@ -101,6 +104,8 @@ export async function callTool(
         : fail('needs_setup', env.needsSetup.message, TOOL_TEXT.setupFollowNextStep);
     return finalizeResult(output, origins);
   }
+  // M1-36i-e: one time budget per call; the time the handler spends counts against the wait.
+  const started = Date.now();
   let output: HandlerOutput;
   try {
     output = await handler(args, env);
@@ -113,7 +118,7 @@ export async function callTool(
   const linked = await withApprovalLink(output, env);
   // M1-36j (D4): with the page open, wait briefly for the owner's decision (read-only).
   const waited = await waitForApprovalDecision(linked.output, env, {
-    waitMs: options.approvalWaitMs ?? 0,
+    waitMs: approvalWaitLeft(options.approvalWaitMs ?? 0, Date.now() - started),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.approvalWaitIntervalMs === undefined
       ? {}

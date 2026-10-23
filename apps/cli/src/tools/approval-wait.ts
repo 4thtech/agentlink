@@ -35,6 +35,19 @@ export interface ApprovalWaitOptions {
   readonly intervalMs?: number;
 }
 
+/**
+ * M1-36i-e: one time budget per tool call. The approval wait is what is left of the harness's
+ * budget after the time the call has already spent (a free test credits wait, M1-36i-c, can take
+ * about 20 s): never more than `waitMs`, never less than 0. At 0 the linked pending_approval comes
+ * back at once, so the call stays under the harness's tool-call timeout. A clock that went
+ * backwards or a value that is not a number counts as nothing spent (never a longer wait).
+ */
+export function approvalWaitLeft(waitMs: number, spentMs: number): number {
+  if (!(waitMs > 0) || !Number.isFinite(waitMs)) return 0;
+  const spent = Number.isFinite(spentMs) && spentMs > 0 ? spentMs : 0;
+  return Math.max(0, waitMs - spent);
+}
+
 type Decision = 'approved' | 'denied' | undefined;
 
 /** Resolves after `ms`, or at once when `signal` aborts. Never rejects. */
