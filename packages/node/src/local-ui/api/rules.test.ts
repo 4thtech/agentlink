@@ -193,7 +193,7 @@ const readRoute = (path: string): LocalUiReadRoute => {
 };
 const ownerRoute = (): LocalUiOwnerRoute => {
   const route = rulesRoutes.find((r) => r.method === 'POST' && r.path === '/api/ui/rules');
-  if (route === undefined || !route.presence) throw new Error('no owner route');
+  if (route === undefined || route.presence !== true) throw new Error('no owner route');
   return route;
 };
 
