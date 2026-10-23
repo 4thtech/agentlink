@@ -23,6 +23,12 @@ export interface MockRelayConfig {
   requireAuth?: boolean;
   /** Advertised in NIP-11 and enforced on EVENT frames. */
   maxMessageLength?: number;
+  /**
+   * M1-5e: with requireAuth, serves a kind 1059 wrap only if its `p` tag is a key that logged in on
+   * this connection, and closes a REQ none of whose `#p` keys did (relays that serve only the
+   * authenticated recipient). Several AUTH events on one connection each add a key.
+   */
+  servePerKey?: boolean;
   /** With requireAuth: refuses EVENT but never sends the AUTH challenge. */
   noChallenge?: boolean;
   /** Answers every EVENT with OK false. */
@@ -78,7 +84,8 @@ interface MockFilter {
 }
 
 export class MockSocket implements RelaySocket {
-  authed = false;
+  /** M1-5e: the keys that logged in (NIP-42) on this connection; each AUTH event adds its own. */
+  readonly authedKeys = new Set<string>();
   closed = false;
   /** Open subscriptions on this connection (M1-5c): sub id to filter. */
   readonly subs = new Map<string, MockFilter>();
@@ -102,6 +109,11 @@ export class MockSocket implements RelaySocket {
         this.push(JSON.stringify(['AUTH', this.challenge]));
       }
     });
+  }
+
+  /** True once any key logged in. */
+  get authed(): boolean {
+    return this.authedKeys.size > 0;
   }
 
   /** The relay sends `text` to the client. */
@@ -143,7 +155,7 @@ export class MockSocket implements RelaySocket {
         event.kind === NOSTR_KIND_AUTH &&
         tags.some((t) => t[0] === 'relay' && t[1] === this.target.url) &&
         tags.some((t) => t[0] === 'challenge' && t[1] === this.challenge);
-      this.authed = valid;
+      if (valid) this.authedKeys.add(event.pubkey);
       this.push(JSON.stringify(['OK', event.id, valid, valid ? '' : 'invalid: bad auth']));
       return;
     }
@@ -180,6 +192,10 @@ export class MockSocket implements RelaySocket {
 
   /** Whether `event` matches the filter of subscription `subId`. */
   matches(filter: MockFilter, event: NostrEvent): boolean {
+    if (this.config.servePerKey === true && this.config.requireAuth === true) {
+      const to = event.tags.find((t) => t[0] === 'p')?.[1];
+      if (to === undefined || !this.authedKeys.has(to)) return false;
+    }
     if (filter.ids !== undefined && !filter.ids.includes(event.id)) return false;
     if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
     if (filter['#p'] !== undefined) {
@@ -195,6 +211,14 @@ export class MockSocket implements RelaySocket {
 
   private handleReq(subId: string, filter: MockFilter, config: MockRelayConfig): void {
     if (config.requireAuth === true && !this.authed) {
+      this.push(JSON.stringify(['CLOSED', subId, 'auth-required: log in first']));
+      return;
+    }
+    if (
+      config.servePerKey === true &&
+      config.requireAuth === true &&
+      !(filter['#p'] ?? []).some((key) => this.authedKeys.has(key))
+    ) {
       this.push(JSON.stringify(['CLOSED', subId, 'auth-required: log in first']));
       return;
     }
