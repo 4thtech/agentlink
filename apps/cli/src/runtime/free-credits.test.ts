@@ -175,3 +175,77 @@ describe('fileFreeCreditsMarker (M1-36i)', () => {
     });
   });
 });
+
+describe('free credits claim lows (M1-36i-b)', () => {
+  const withHeaders = (status: number, body: string, headers: Record<string, string>) =>
+    new Response(body, { status, headers });
+  const retryOf = async (answer: () => Response) => {
+    const { port: p } = port(answer);
+    return (await p.request({ chainId: BASE_SEPOLIA, agent: AGENT })) as {
+      status: string;
+      retryAfter?: number;
+    };
+  };
+
+  it('L-3: a 429 body is read only up to a small cap, never in full', async () => {
+    let pulled = 0;
+    const chunk = new TextEncoder().encode('x'.repeat(1024));
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += chunk.length;
+        controller.enqueue(chunk);
+      },
+    });
+    const { port: p } = port(() => new Response(stream, { status: 429 }));
+    const answer = await p.request({ chainId: BASE_SEPOLIA, agent: AGENT });
+    expect(answer.status).toBe('rate_limited');
+    expect(pulled).toBeLessThanOrEqual(8 * 1024); // an endless body is cut off, not drained
+  });
+
+  it('L-3: a short in-cap body still maps its fixed code', async () => {
+    expect((await retryOf(() => json(429, { error: 'daily_cap_reached' }))).status).toBe(
+      'daily_cap_reached',
+    );
+  });
+
+  it('L-2: Retry-After seconds are honoured, with a 5-minute minimum', async () => {
+    const h = (v: string) => () =>
+      withHeaders(429, JSON.stringify({ error: 'rate_limited' }), { 'retry-after': v });
+    expect((await retryOf(h('7200'))).retryAfter).toBe(7200);
+    expect((await retryOf(h('10'))).retryAfter).toBe(300);
+    expect((await retryOf(h('0'))).retryAfter).toBe(300);
+  });
+
+  it('L-2: a Retry-After HTTP date is honoured; junk falls back to the default', async () => {
+    const future = new Date(Date.now() + 2 * 3_600_000).toUTCString();
+    const date = (await retryOf(() => withHeaders(429, '{}', { 'retry-after': future })))
+      .retryAfter;
+    expect(date).toBeGreaterThanOrEqual(7190);
+    expect(date).toBeLessThanOrEqual(7200);
+    for (const junk of ['soon', '-5', '1e9', '12.5']) {
+      const r = await retryOf(() => withHeaders(429, '{}', { 'retry-after': junk }));
+      expect(r.retryAfter).toBe(3600);
+    }
+  });
+
+  it('L-2: no Retry-After keeps the default wait', async () => {
+    expect((await retryOf(() => json(429, { error: 'rate_limited' }))).retryAfter).toBe(3600);
+  });
+
+  it.each([400, 401, 403, 404, 405, 410, 422])(
+    'L-4: a permanent %i stops the daily retry (a fixed non-paused answer)',
+    async (status) => {
+      const { port: p } = port(() => new Response(SERVER_CANARY, { status }));
+      const answer = await p.request({ chainId: BASE_SEPOLIA, agent: AGENT });
+      expect(answer.status).toBe('already_claimed');
+      expect(JSON.stringify(answer)).not.toContain('CANARY');
+    },
+  );
+
+  it.each([408, 500, 502, 503])('L-4: a transient %i stays unavailable', async (status) => {
+    const { port: p } = port(() => new Response('', { status }));
+    expect(await p.request({ chainId: BASE_SEPOLIA, agent: AGENT })).toEqual({
+      status: 'unavailable',
+    });
+  });
+});
