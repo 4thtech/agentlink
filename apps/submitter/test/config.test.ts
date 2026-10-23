@@ -29,6 +29,7 @@ describe('readConfig', () => {
     expect(config?.settings.maxItemGas).toBe(700_000n);
     expect(config?.settings.stuckAfterSeconds).toBe(180);
     expect(config?.settings.maxReplacements).toBe(3);
+    expect(config?.settings.maxHeldSeconds).toBe(86_400);
     expect(config?.limits.ipReadsPerHour).toBe(600);
     expect(config?.maxFeePerGasWei).toBeNull();
   });
@@ -47,6 +48,7 @@ describe('readConfig', () => {
       SUBMITTER_MAX_ITEM_GAS: '400000',
       SUBMITTER_STUCK_AFTER_SECONDS: '60',
       SUBMITTER_MAX_REPLACEMENTS: '2',
+      SUBMITTER_MAX_HELD_SECONDS: '3600',
       SUBMITTER_MAX_FEE_PER_GAS_WEI: '50000000000',
     });
     expect(config?.maxFeePerGasWei).toBe(50_000_000_000n);
@@ -60,6 +62,7 @@ describe('readConfig', () => {
       maxItemGas: 400_000n,
       stuckAfterSeconds: 60,
       maxReplacements: 2,
+      maxHeldSeconds: 3_600,
     });
     expect(config?.limits).toEqual({
       ipItemsPerHour: 12,
@@ -86,6 +89,8 @@ describe('readConfig', () => {
       { ...base, SUBMITTER_MAX_ITEM_GAS: '50000000' },
       { ...base, SUBMITTER_MAX_REPLACEMENTS: '11' },
       { ...base, SUBMITTER_STUCK_AFTER_SECONDS: '5' },
+      { ...base, SUBMITTER_MAX_HELD_SECONDS: '59' }, // M1-10a-c: bounded both ways
+      { ...base, SUBMITTER_MAX_HELD_SECONDS: '604801' },
       { ...base, SUBMITTER_MAX_FEE_PER_GAS_WEI: '0' },
       { ...base, SUBMITTER_MAX_FEE_PER_GAS_WEI: '1e9' },
     ];

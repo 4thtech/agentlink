@@ -3659,7 +3659,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first (local red run) for each item, with the in-memory chain (engine) and, for the nonce, the mock RPC.
 
 #### M1-10a-c · submitter: bound how long `held` items retry (new, IR-M1-10a-b review)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
+- **Status:** in review (`apps/submitter/src/engine.ts`, `apps/submitter/src/config.ts`) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
 - **Repo/path:** agentlink · apps/submitter/src/engine.ts
 - **Depends on:** M1-10a-b
 - **Spec:** 07 §7 (Implementation); 05 §3.3
