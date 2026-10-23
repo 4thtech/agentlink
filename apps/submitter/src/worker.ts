@@ -397,10 +397,14 @@ async function faucetClaim(
   return refuse(429, answer.error, { 'retry-after': String(answer.retryAfter) });
 }
 
-/** A deposit-authorization refusal: `{status: "failed", error}` with a fixed code. */
+/**
+ * A deposit-authorization refusal: `{status: "failed", error}` with a fixed code. Every refusal of
+ * the enabled route has this shape, `bad_request` and `too_large` included (M3-4b-t-T3-b); only
+ * 405 and the switched-off 501 keep the `{error}` form every route shares.
+ */
 const failed = (
   status: number,
-  error: DepositAuthErrorCode,
+  error: DepositAuthErrorCode | 'bad_request' | 'too_large',
   extra?: Record<string, string>,
 ): Response => json(status, { status: 'failed', error }, extra);
 
@@ -439,18 +443,18 @@ async function depositAuthorization(
     text = await readBody(request, MAX_DEPOSIT_AUTH_BODY_BYTES);
   } catch {
     count(c, 'bad_request');
-    return refuse(400, 'bad_request');
+    return failed(400, 'bad_request');
   }
   if (text === null) {
     count(c, 'bad_request');
-    return refuse(413, 'too_large');
+    return failed(413, 'too_large');
   }
   let parsed: DepositAuthorizationRequest;
   try {
     parsed = parseDepositAuthorizationRequest(parseJson(text));
   } catch {
     count(c, 'bad_request');
-    return refuse(400, 'bad_request');
+    return failed(400, 'bad_request');
   }
   const chain = getChainConfig(parsed.chainId);
   if (!depositConfig.chains.includes(parsed.chainId) || !chain) {
@@ -466,6 +470,14 @@ async function depositAuthorization(
     count(c, 'deposit_auth_refused');
     return failed(refusalStatus(early), early);
   }
+  // The route's global hourly cap (M3-4b-t-T3-b): counts every request that reaches the relay.
+  const now = Math.floor(Date.now() / 1000);
+  const all = c.env.SUBMITTER_LIMITS.get(c.env.SUBMITTER_LIMITS.idFromName('dg'));
+  const global = await all.take(1, depositConfig.requestsPerHour, 3600, now);
+  if (!global.ok) {
+    count(c, 'rate_limited');
+    return failed(429, 'rate_limited', { 'retry-after': String(global.retryAfter) });
+  }
   const stub = namespace.get(namespace.idFromName(`deposit:${String(parsed.chainId)}`));
   const answer = await stub.relay(parsed.chainId, parsed);
   if (answer.ok) {
@@ -477,6 +489,7 @@ async function depositAuthorization(
     count(c, 'deposit_auth_refused');
     return json(200, { status: 'failed', error: answer.error, txHash: answer.txHash });
   }
+  if (answer.stuck === true) count(c, 'deposit_relay_stuck');
   if (answer.error === 'unavailable') count(c, 'unavailable');
   else if (answer.error === 'rate_limited') count(c, 'rate_limited');
   else count(c, 'deposit_auth_refused');

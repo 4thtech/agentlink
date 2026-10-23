@@ -222,7 +222,12 @@ describe('readDepositAuthConfig (M3-4b-t-3)', () => {
     expect(config?.chains).toEqual([84532]);
     expect(config?.agentRequestsPerHour).toBe(5);
     expect(config?.ipRequestsPerHour).toBe(20);
-    expect(DEPOSIT_AUTH_DEFAULTS).toEqual({ agentRequestsPerHour: 5, ipRequestsPerHour: 20 });
+    expect(config?.requestsPerHour).toBe(200);
+    expect(DEPOSIT_AUTH_DEFAULTS).toEqual({
+      agentRequestsPerHour: 5,
+      ipRequestsPerHour: 20,
+      requestsPerHour: 200,
+    });
   });
 
   it('turns off on a chain without the gasless capability, a mainnet or a malformed list', () => {
@@ -247,14 +252,17 @@ describe('readDepositAuthConfig (M3-4b-t-3)', () => {
         ...base,
         SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR: '2',
         SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR: '50',
+        SUBMITTER_DEPOSIT_AUTH_REQUESTS_PER_HOUR: '1000',
       }),
-    ).toMatchObject({ agentRequestsPerHour: 2, ipRequestsPerHour: 50 });
+    ).toMatchObject({ agentRequestsPerHour: 2, ipRequestsPerHour: 50, requestsPerHour: 1000 });
     for (const [name, value] of [
       ['SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR', '0'],
       ['SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR', '61'],
       ['SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR', '0'],
       ['SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR', '1001'],
       ['SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR', 'many'],
+      ['SUBMITTER_DEPOSIT_AUTH_REQUESTS_PER_HOUR', '0'],
+      ['SUBMITTER_DEPOSIT_AUTH_REQUESTS_PER_HOUR', '10001'],
     ] as const) {
       expect(readDepositAuthConfig({ ...base, [name]: value }), `${name}=${value}`).toBeNull();
     }

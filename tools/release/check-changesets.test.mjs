@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { checkChangesets, isVersionPackagesPr } from './check-changesets.mjs';
 
 // OPS-CI-2 / D-43: a pull request that changes a published package fails unless
@@ -45,6 +45,18 @@ describe('checkChangesets on a fixture repository', () => {
   };
   const check = () =>
     checkChangesets({ cwd: dir, base: 'main', changesetBin, log: () => {}, pr: {} });
+
+  // CHORE-DEPLOY-RECONCILE-b: these tests run the real Changesets CLI. Without `pnpm install` in
+  // this checkout (a fresh worktree has no node_modules) `changeset status` cannot start, which
+  // made the three "green" tests fail with a bare `false` while the "red" one passed for the
+  // wrong reason. Fail every test here with the cause instead.
+  beforeAll(() => {
+    if (!existsSync(changesetBin)) {
+      throw new Error(
+        `@changesets/cli is not installed at ${changesetBin}; run \`pnpm install\` in this checkout first`,
+      );
+    }
+  });
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'ops-ci-2-changesets-'));
