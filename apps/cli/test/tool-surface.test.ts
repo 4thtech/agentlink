@@ -19,7 +19,7 @@ import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 import { SERVER_INSTRUCTIONS } from '../src/mcp/instructions.js';
 import { toMcpTool } from '../src/mcp/server.js';
-import { TOOLS } from '../src/tools/registry.js';
+import { ADVANCED_TOOLS, TOOLS } from '../src/tools/registry.js';
 
 const SNAPSHOT = new URL('./fixtures/tool-surface.json', import.meta.url);
 const SPEC = new URL('../../../docs/foundation/06-mcp-server.md', import.meta.url);
@@ -140,9 +140,11 @@ const FILE_TOOLS: ReadonlySet<string> = new Set(['agentlink_send', 'agentlink_fe
  * M1-26-b (D-40, 02 F-51, 11 §5.1): users never choose or see a chain outside Advanced.
  * - Output: a network (`chain`, `chainId`, `network`) or a fee-token name (`token`, except the hex
  *   address of `fee.token`, 06 §2.4) appears only inside an `advanced` member, at any depth.
- * - Input: only agentlink_notarize takes the Advanced `chain?` override, and never as required.
- * - Titles and descriptions name no network or fee token; "chain" appears only in the description
- *   of the one tool with the override (to say: leave it out).
+ * - Input: no tool on the default surface takes a network argument (M1-36h, D-39/D-40); only the
+ *   Advanced surface (`agentlink mcp --advanced`) adds the `chain?` override, on agentlink_notarize
+ *   alone and never as required.
+ * - Titles and descriptions name no network or fee token; "chain" appears only in the Advanced
+ *   description of the one tool with the override (to say: leave it out).
  */
 const NETWORK_NAMES = /\b(base|sepolia|gnosis|chiado|usdc|usdt|xdai|blockchain|on-chain)\b/i;
 const CHAIN_WORD = /\bchains?\b/i;
@@ -191,7 +193,9 @@ export function auditSurface(
   tools: readonly SurfaceTool[],
   table: readonly TableRow[],
   instructions: string,
+  advanced = false,
 ): string[] {
+  const override = (name: string): boolean => advanced && name === CHAIN_OVERRIDE_TOOL;
   const bad: string[] = [];
   const byName = new Map(table.map((row) => [row.name, row]));
   for (const tool of tools) {
@@ -256,7 +260,7 @@ export function auditSurface(
       bad.push(`${name}: output field "${field}" names a network outside advanced (D-40)`);
     }
     for (const arg of argNames(tool.inputSchema)) {
-      if (NETWORK_FIELD.test(arg) && !(name === CHAIN_OVERRIDE_TOOL && arg === 'chain')) {
+      if (NETWORK_FIELD.test(arg) && !(override(name) && arg === 'chain')) {
         bad.push(`${name}: argument "${arg}" asks for a network (D-40)`);
       }
     }
@@ -270,7 +274,7 @@ export function auditSurface(
     ] as const) {
       const word = NETWORK_NAMES.exec(text)?.[0];
       if (word !== undefined) bad.push(`${name}: ${where} names a network "${word}" (11 §5.1)`);
-      if (CHAIN_WORD.test(text) && !(where === 'description' && name === CHAIN_OVERRIDE_TOOL)) {
+      if (CHAIN_WORD.test(text) && !(where === 'description' && override(name))) {
         bad.push(`${name}: ${where} says "chain" (11 §5.1)`);
       }
     }
@@ -281,10 +285,17 @@ export function auditSurface(
       }
     }
   }
-  // The instructions tell the model what not to say; that one sentence names the words on purpose.
-  const prose = instructions.replace(/Never mention wallets, gas, keys or chains[^.]*\./, '');
+  // The instructions tell the model what not to say; that one clause names the words on purpose.
+  const prose = instructions.replace(/never mention wallets, gas, keys or chains[^.]*\./i, '');
   for (const [word, pattern] of BANNED_WORDS) {
     if (pattern.test(prose)) bad.push(`server instructions use "${word}" (11 §5)`);
+  }
+  // M1-36h (11 §5.1): no network, "on-chain" or "notarization" wording in the instructions either.
+  const network = NETWORK_NAMES.exec(prose)?.[0];
+  if (network !== undefined) bad.push(`server instructions name a network "${network}" (11 §5.1)`);
+  if (CHAIN_WORD.test(prose)) bad.push('server instructions say "chain" (11 §5.1)');
+  if (/\bnotari[sz]ation\b/i.test(prose)) {
+    bad.push('server instructions say "notarization" (11 §5.1: add proof)');
   }
   return bad;
 }
@@ -292,7 +303,74 @@ export function auditSurface(
 // ---- Tests -------------------------------------------------------------------------------------
 
 const surface = TOOLS.map(toMcpTool) as unknown as SurfaceTool[];
+const advancedSurface = ADVANCED_TOOLS.map(toMcpTool) as unknown as SurfaceTool[];
 const table = readTable();
+
+describe('the chain override is Advanced only (M1-36h; D-39, D-40; 11 §5.1)', () => {
+  const props = (tool: SurfaceTool | undefined): Record<string, unknown> =>
+    (tool?.inputSchema['properties'] ?? {}) as Record<string, unknown>;
+
+  it('the default surface has no chain argument and never says "chain"', () => {
+    for (const tool of surface) {
+      expect(argNames(tool.inputSchema), tool.name).not.toContain('chain');
+      expect(`${tool.title ?? ''} ${tool.description ?? ''}`, tool.name).not.toMatch(CHAIN_WORD);
+    }
+    const notarize = surface.find((t) => t.name === 'agentlink_notarize');
+    expect(Object.keys(props(notarize)).sort()).toEqual([
+      'approvalId',
+      'clientRequestId',
+      'envelopeId',
+      'requestReceipt',
+    ]);
+    expect(notarize?.inputSchema['additionalProperties']).toBe(false);
+  });
+
+  it('the Advanced surface differs only by the optional chain override on agentlink_notarize', () => {
+    expect(advancedSurface.map((t) => t.name)).toEqual(surface.map((t) => t.name));
+    for (const [i, tool] of advancedSurface.entries()) {
+      if (tool.name === 'agentlink_notarize') continue;
+      expect(tool, tool.name).toEqual(surface[i]);
+    }
+    const base = surface.find((t) => t.name === 'agentlink_notarize')!;
+    const adv = advancedSurface.find((t) => t.name === 'agentlink_notarize')!;
+    expect(props(adv)['chain']).toEqual({ type: 'string', pattern: '^[a-z0-9-]{1,32}$' });
+    expect(adv.inputSchema['required']).toEqual(['envelopeId']);
+    const { chain: _chain, ...rest } = props(adv);
+    expect(rest).toEqual(props(base));
+    expect(adv.description).toMatch(/leave chain out unless the user explicitly asks for one/);
+    expect(base.description).not.toMatch(/leave chain out/);
+    expect({ ...adv, inputSchema: undefined, description: undefined }).toEqual({
+      ...base,
+      inputSchema: undefined,
+      description: undefined,
+    });
+  });
+});
+
+describe('server instructions wording (M1-36h; 11 §5.1, I-5)', () => {
+  it('say "public proof" and "adding proof", never "on-chain" or "notarization"', () => {
+    expect(SERVER_INSTRUCTIONS).toMatch(/add a public proof when the user asks for it/);
+    expect(SERVER_INSTRUCTIONS).toMatch(/Adding proof costs a small fee/);
+    expect(SERVER_INSTRUCTIONS).not.toMatch(/on-chain|notari[sz]ation/i);
+  });
+
+  it('tell the model the network is picked automatically and never to ask the user to choose one', () => {
+    expect(SERVER_INSTRUCTIONS).toMatch(
+      /AgentLink picks the proof network automatically, so never ask the user to choose one/,
+    );
+  });
+
+  it('are fixed text: no placeholder, template or run-time value (I-5)', () => {
+    expect(SERVER_INSTRUCTIONS).not.toMatch(/[{}]|\$\{/);
+  });
+
+  it('auditSurface flags network wording in the instructions', () => {
+    const audit = (text: string) => auditSurface(surface, table, text).join('\n');
+    expect(audit(`${SERVER_INSTRUCTIONS} Pick a chain.`)).toMatch(/instructions say "chain"/);
+    expect(audit(`${SERVER_INSTRUCTIONS} Proof is on-chain.`)).toMatch(/name a network "on-chain"/);
+    expect(audit(`${SERVER_INSTRUCTIONS} Notarization costs.`)).toMatch(/say "notarization"/);
+  });
+});
 
 describe('tool-surface snapshot', () => {
   const current = surface.map(
@@ -399,6 +477,16 @@ describe('06 §2.0 table (D-53, D-55)', () => {
 describe('auditSurface on the real registry', () => {
   it('is clean: prefix, four annotations per the table, approvalId, no denied capability, vocabulary', () => {
     expect(auditSurface(surface, table, SERVER_INSTRUCTIONS)).toEqual([]);
+  });
+
+  it('the Advanced surface is clean under the Advanced rules (M1-36h)', () => {
+    expect(auditSurface(advancedSurface, table, SERVER_INSTRUCTIONS, true)).toEqual([]);
+  });
+
+  it('the Advanced surface fails the default rules: its chain override is Advanced only', () => {
+    const bad = auditSurface(advancedSurface, table, SERVER_INSTRUCTIONS).join('\n');
+    expect(bad).toMatch(/agentlink_notarize: argument "chain" asks for a network/);
+    expect(bad).toMatch(/agentlink_notarize: description says "chain"/);
   });
 
   it('agentlink_send has no offer, accept or reject type (D-55)', () => {
