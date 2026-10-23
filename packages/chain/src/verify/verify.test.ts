@@ -1110,6 +1110,34 @@ describe('verifyProofPack: finality (IR-M1-4d-1 M-3)', () => {
     expect(calls.filter((c) => c.fn === 'getRecord').map((c) => c.tag)).toEqual(['finalized']);
   });
 
+  // M1-4c-e: the Notary answers an unknown ID only with the RecordNotFound() revert. A returned
+  // struct with a zero signer is a malformed answer (as clients/state.ts `bad_answer`), not "absent".
+  it('a zero-signer struct is malformed_record, never record_not_found', async () => {
+    const f = await eoaFixture();
+    const { reader } = chainFor(base(), { emptyStruct: true });
+    expectFailure(await verify(f.pack, [reader]), 'malformed_record');
+    const zeroSigner = { ...f.state, signer: `0x${'0'.repeat(40)}` };
+    const withFields = chainFor(base(), { records: new Map([[f.recordId, zeroSigner]]) });
+    expectFailure(await verify(f.pack, [withFields.reader]), 'malformed_record');
+  });
+
+  it('a zero-signer struct at finalized does not fall through to latest', async () => {
+    const f = await eoaFixture();
+    const { reader, calls } = chainFor(base(), {
+      records: new Map([[f.recordId, f.state]]),
+      finalizedRecords: new Map(),
+      emptyStruct: true,
+    });
+    expectFailure(await verify(f.pack, [reader]), 'malformed_record');
+    expect(calls.filter((c) => c.fn === 'getRecord').map((c) => c.tag)).toEqual(['finalized']);
+  });
+
+  it('a true RecordNotFound revert stays record_not_found', async () => {
+    const f = await eoaFixture();
+    const { reader } = chainFor(base(), { missingRevert: RECORD_NOT_FOUND });
+    expectFailure(await verify(f.pack, [reader]), 'record_not_found');
+  });
+
   it('the verifier and the submitter port agree on the same getRecord reverts', async () => {
     const f = await eoaFixture();
     const otherError = encodeErrorResult({
