@@ -10,7 +10,6 @@
 // skipped locally (in CI a missing browser fails it). AGENTLINK_TEST_CHROMIUM names another
 // Chromium executable. The keychain is a file in a temp folder, never the OS keychain or ~/.agentlink.
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,24 +17,18 @@ import { AgentLinkClient, nostrTransport, type ApprovalChannel } from '@4thtech-
 import { decodeBase64url, encodeBase64url } from '@4thtech-io/crypto';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { openAgentStoreWith } from '../../packages/node/dist/agent-store.js';
+import { openAgentStoreWith } from './agent-store.js';
 import {
   startApprovalServerWith,
   type ApprovalServer,
   type ApprovalServerEvent,
-} from '../../packages/node/dist/approval-server.js';
-import {
-  createKeychainAgent,
-  openRecordedKeyStore,
-} from '../../packages/node/dist/keychain-keystore.js';
-import type { KeychainBackend } from '../../packages/node/dist/keychain.js';
-import {
-  KeychainOwnerKeyStore,
-  OWNER_PASSKEY_ACCOUNT,
-} from '../../packages/node/dist/owner-keystore.js';
-import { defaultOwnerFiles } from '../../packages/node/dist/owner-setup.js';
+} from './approval-server.js';
+import { createKeychainAgent, openRecordedKeyStore } from './keychain-keystore.js';
+import type { KeychainBackend } from './keychain.js';
+import { KeychainOwnerKeyStore, OWNER_PASSKEY_ACCOUNT } from './owner-keystore.js';
+import { defaultOwnerFiles } from './owner-setup.js';
 
-const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
+const DIST = fileURLToPath(new URL('../../../apps/local-ui/dist/', import.meta.url));
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 const root = mkdtempSync(join(tmpdir(), 'agentlink-m1-11b-1-'));
 
@@ -107,9 +100,7 @@ function appAssets(): Map<string, Uint8Array> | undefined {
  * evaluated through the DevTools protocol, so the page's CSP stays as served.
  */
 const AXE_SOURCE = readFileSync(
-  createRequire(fileURLToPath(new URL('../../packages/ui/package.json', import.meta.url))).resolve(
-    'axe-core/axe.min.js',
-  ),
+  fileURLToPath(new URL('../../ui/node_modules/axe-core/axe.min.js', import.meta.url)),
   'utf8',
 );
 
