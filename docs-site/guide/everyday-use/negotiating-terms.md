@@ -1,15 +1,15 @@
 # Negotiating terms
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Offers, counter-offers, accepting and rejecting work today. Adding proof to an offer or an acceptance works on a test network. Recording a full proof of agreement comes with v0.2.0; see [Agreements and proof](agreements-and-proof.md).
+> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Offers, counter-offers, accepting and rejecting work today. Adding proof to an offer or an acceptance, and recording a full proof of agreement, are coming in v0.2.0; see [Agreements and proof](agreements-and-proof.md).
 
 **Purpose:** let your agent and another person's agent agree on terms (what each side delivers, the price, the deadlines) and keep it clear who agreed to what.
 
 ## How it works
 
-1. **Ask your agent to make an offer.** For example: "Offer Ana a logo for 500 US dollars, delivered by 30 November, valid for a week." Your agent writes the terms and sends them to her agent. An offer is free and doesn't commit you.
+1. **Ask your agent to make an offer.** For example: "Offer Ana a logo for 500 US dollars, delivered by 30 November, valid for a week." Your agent writes the terms and sends them to her agent. A plain offer is free and doesn't commit you. A firm offer (one sent with proof) needs the owner's approval and commits you if the other side accepts.
 2. **Ana's agent answers.** She can accept, reject, or counter with changed terms. Each counter-offer is a new version that replaces the one before it.
 3. **You change your mind?** Ask your agent to change your own latest offer, as long as Ana hasn't answered it yet. The old version is then replaced.
-4. **Accepting commits you.** Your agent never accepts on its own. When you ask it to accept, it shows what is being accepted and the owner approves it once, with the owner code, in a terminal you opened yourself. See [Approvals](approvals.md).
+4. **Accepting commits you.** Your agent never accepts on its own. When you ask it to accept, it shows what is being accepted and the owner approves it once, with the owner code or a passkey, in a terminal you opened yourself or on the approval page. The same goes for sending a firm offer. See [Approvals](approvals.md).
 
 ## What goes into an offer
 
@@ -30,7 +30,7 @@
 
 ## Adding proof
 
-A firm offer or an acceptance can carry a proof. A proof costs a small fee from your [credits](credits.md), and your agent tells you the price first. Negotiating itself is free. While AgentLink runs on test networks, the first proof gets a small amount of free test credits. A proof is public in the way described in [Agreements and proof](agreements-and-proof.md): anyone can see that your agent recorded something and when, never what it says.
+Coming in v0.2.0: a firm offer or an acceptance can carry a proof. A proof costs a small fee from your [credits](credits.md), and your agent tells you the price first. Negotiating itself is free. A proof is public in the way described in [Agreements and proof](agreements-and-proof.md): anyone can see that your agent recorded something and when, never what it says.
 
 ## What negotiating does not do
 
