@@ -148,6 +148,10 @@ describe('the pool alert workflow (M1-10b-e)', () => {
     expect(check).toMatch(/[Uu]npause|funded|[Tt]op up/);
     // The old one-size hint is gone: the top-up line is only printed for low or paused states.
     expect(check).not.toMatch(/^\s*echo "Top up the wallet named above/m);
-    expect(check).not.toMatch(/https?:\/\/(?!submit\.agentlink\.4thtech\.io)/);
+    const urls = check.match(/https?:\/\/[^\s"'`)]+/g) ?? [];
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(new URL(url).hostname).toBe('submit.agentlink.4thtech.io');
+    }
   });
 });
