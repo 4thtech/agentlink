@@ -50,12 +50,18 @@ describe('install-playwright action', () => {
     expect(probe).toContain('GITHUB_OUTPUT');
     const deps = step('Install the Playwright system libraries (attempt 1)');
     expect(deps).toContain('playwright install-deps');
-    expect(deps).toContain('timeout 300');
+    expect(deps).toContain('timeout -k 10 300');
     expect(deps).toContain("steps.libs.outputs.missing == 'true'");
     const retry = step('Install the Playwright system libraries (attempt 2)');
     expect(retry).toContain("steps.libs.outputs.missing == 'true'");
     expect(retry).toContain("steps.deps1.outcome == 'failure'");
     expect(retry).toContain('apt-get update');
+    // the time limit runs as root (so it can stop root's apt) and hard-kills after a grace period
+    expect(deps).toMatch(/sudo -E env "PATH=\$PATH" timeout -k 10 300 /);
+    expect(retry).toMatch(/sudo -E env "PATH=\$PATH" timeout -k 10 300 /);
+    // mirror fallback on the retry only
+    expect(retry).toContain('archive.ubuntu.com');
+    expect(deps).not.toContain('archive.ubuntu.com');
   });
 
   it('no longer runs `install --with-deps`, and run: blocks hold no inline expressions', () => {

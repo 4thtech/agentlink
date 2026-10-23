@@ -100,8 +100,10 @@ runs:
         BROWSERS: ${{ steps.libs.outputs.failing }}
       run: |
         set -euo pipefail
+        # Run as root under the time limit: a user-level `timeout` could not stop root's apt, and a
+        # slow mirror then held the step until the job limit (seen in CI, 12 minutes).
         # shellcheck disable=SC2086
-        timeout 300 pnpm exec playwright install-deps $BROWSERS
+        sudo -E env "PATH=$PATH" timeout -k 10 300 node_modules/.bin/playwright install-deps $BROWSERS
 
     - name: Install the Playwright system libraries (attempt 2)
       if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true' && steps.deps1.outcome == 'failure'
@@ -111,6 +113,11 @@ runs:
       run: |
         set -euo pipefail
         echo "::warning::Playwright system libraries failed once (slow or unreachable mirror); retrying."
-        sudo apt-get update -o Acquire::Retries=3 || true
+        # Mirror fallback: the runner image points apt at azure.archive.ubuntu.com; try the main
+        # archive for this run (the runner is discarded afterwards).
+        if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+          sudo sed -i -E 's#^URIs: .*#URIs: http://archive.ubuntu.com/ubuntu/#' /etc/apt/sources.list.d/ubuntu.sources
+        fi
+        sudo timeout -k 10 120 apt-get update -o Acquire::Retries=3 || true
         # shellcheck disable=SC2086
-        timeout 300 pnpm exec playwright install-deps $BROWSERS
+        sudo -E env "PATH=$PATH" timeout -k 10 300 node_modules/.bin/playwright install-deps $BROWSERS
