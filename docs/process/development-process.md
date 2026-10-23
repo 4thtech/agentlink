@@ -18,9 +18,9 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 |---|---|---|---|
 | **Owner** | Tali Režun (`@talirezun`) | **Leads development.** The owner's orchestrated agents build. The owner decides (D-xx), performs the owner-only actions (§1.1) and releases every S2 and sensitive-path PR with a one-word "merge" in chat (D-51, D-52). MAY review any PR and MAY disable its auto-merge. | Delegate owner-only actions to an agent; be a ruleset bypass actor. |
 | **4thTech engineer** | Denis Jazbec (`@denisjazbec`), repo admin, author of OCC v1 | **Feedback reviewer.** Feedback reaches the build through the owner and is logged with a disposition; review comments on PRs are welcome (§14). Stays a code owner (notified on code-owned paths); his GitHub approval is optional (D-51). His review is recommended for contract releases; by agreement he witnesses mainnet contract deployment. May take over specific parts later, decided case by case by the owner and recorded on the sync board (`sync-protocol.md`). | Approve a change he authored; let an agent approve on his behalf. |
-| **Orchestrator** | Main Claude Code session of the owner, **Opus 5.5** | **Orchestrates, deploys workers and audits** (§3.5). It plans and decomposes tasks, assigns Tier and Security class, and writes worker briefs (§4). It verifies worker output with targeted checks and, for S1/S2, an independent auditor worker (§5). It pushes task branches and opens PRs under Tali's account (§1.3), and MAY enable auto-merge once §5 is complete on S0/S1 PRs; S2 and sensitive-path PRs merge only after Tali's "merge" (§1.2). It MAY set `DEPLOY_FREEZE`. It prepares releases (notes, changelog, deploy record, rollback plan). It **alone** writes Curator state and the owner's sync file (§13). | Implement bulk changes or read entire S1/S2 diffs itself (§3.5); merge with admin bypass; push to `main`; approve PRs, deployments or environments; clear `DEPLOY_FREEZE`; change rulesets, CODEOWNERS or environments; deploy from a workstation; write code it then reviews for the record. |
-| **Worker** | Subagent on Haiku 5.5, Sonnet 5.5 or Opus 5.5 (§3) | Executes exactly one brief inside its allowed paths; reports in ≤ 400 words in the required format (§4.3), with details in files. | Merge PRs or enable auto-merge; push anything except its own task branch, or open a PR before its independent review has passed (it may push the branch, and open a non-draft PR with the `IR-…` line after the review, only when the brief says so); touch `main`; deploy; clear `DEPLOY_FREEZE` (it MAY set it on a documented trigger, `release-and-deployment.md` §3.1, and reports that at once); write Curator; act outside its brief; expand its own scope. |
-| **Independent reviewer** | Fresh Opus 5.5 subagent with no implementation context (the independent auditor worker, §3.5), or a non-author human engineer | Reviews per `audit-rules.md` §4 using the area checklists. | Have seen the implementation transcript, worker reports or worker rationale. |
+| **Orchestrator** | Main Claude Code session of the owner, **Opus 5.5** | **Orchestrates, deploys workers and audits** (§3.5); it never implements and follows [`orchestrator-playbook.md`](orchestrator-playbook.md) every session (owner instruction 2026-10-23). It plans and decomposes tasks, assigns Tier and Security class, and writes worker briefs (§4). It verifies worker output with targeted checks and, for S1/S2, an independent auditor worker (§5). It pushes task branches and opens PRs under Tali's account (§1.3), and MAY enable auto-merge once §5 is complete on S0/S1 PRs; S2 and sensitive-path PRs merge only after Tali's "merge" (§1.2). It MAY set `DEPLOY_FREEZE`. It prepares releases (notes, changelog, deploy record, rollback plan). It **alone** writes Curator state and the owner's sync file (§13). | Implement bulk changes or read entire S1/S2 diffs itself (§3.5); merge with admin bypass; push to `main`; approve PRs, deployments or environments; clear `DEPLOY_FREEZE`; change rulesets, CODEOWNERS or environments; deploy from a workstation; write code it then reviews for the record. |
+| **Worker** | Subagent on Haiku 5.5, Sonnet 5.5, Opus 5.5 or Fable 5.1 (§3) | Executes exactly one brief inside its allowed paths; reports in ≤ 400 words in the required format (§4.3), with details in files. | Merge PRs or enable auto-merge; push anything except its own task branch, or open a PR before its independent review has passed (it may push the branch, and open a non-draft PR with the `IR-…` line after the review, only when the brief says so); touch `main`; deploy; clear `DEPLOY_FREEZE` (it MAY set it on a documented trigger, `release-and-deployment.md` §3.1, and reports that at once); write Curator; act outside its brief; expand its own scope. |
+| **Independent reviewer** | Fresh Opus 5.5 subagent (Fable 5.1 for security audits, §3.1) with no implementation context (the independent auditor worker, §3.5), or a non-author human engineer | Reviews per `audit-rules.md` §4 using the area checklists. | Have seen the implementation transcript, worker reports or worker rationale. |
 | **External auditor** | External firm (contracts) and independent reviewer (crypto, core) for M3-1 | Audit the S2 scope register at a pinned commit; verify fixes (`audit-rules.md` §8). | — |
 
 ### 1.1 Owner-only actions
@@ -29,7 +29,7 @@ Approving production deployments (GitHub Environments `npm-publish` and `product
 
 ### 1.2 Hard limits for every agent (orchestrator and workers)
 
-1. Agents **merge only through GitHub auto-merge behind the GitHub-enforced gates** (`gh pr merge --auto --squash`), and only after §5 is complete. They **never merge with admin bypass, never push to `main`, and never approve** PRs, deployments or environments. On the owner-approval changes of §1.1 and §8 they enable auto-merge only after the owner's explicit "merge" in chat for that specific PR (a go-ahead covering a piece of work never applies), recorded in the PR body. On S2 and sensitive paths (`audit-rules.md` §2.2) they enable auto-merge only after the owner's one-word "merge" in chat, recorded in the PR body (D-51, D-52); no GitHub approval is required.
+1. Agents **merge only through GitHub auto-merge behind the GitHub-enforced gates** (`gh pr merge --auto --match-head-commit <sha>`; the merge queue sets the merge method, never `--squash` or `--admin`; [`orchestrator-playbook.md`](orchestrator-playbook.md) §5), and only after §5 is complete. They **never merge with admin bypass, never push to `main`, and never approve** PRs, deployments or environments. On the owner-approval changes of §1.1 and §8 they enable auto-merge only after the owner's explicit "merge" in chat for that specific PR (a go-ahead covering a piece of work never applies), recorded in the PR body. On S2 and sensitive paths (`audit-rules.md` §2.2) they enable auto-merge only after the owner's one-word "merge" in chat, recorded in the PR body (D-51, D-52); no GitHub approval is required.
 2. **Production deploys happen only through CI (D-52)**: production Workers and sites automatically once the staging deploy and smoke tests are green, npm `latest` after the owner's approval click (`release-and-deployment.md` §3). Testnet and staging deploys also go **through CI only**. Agents MUST NOT run `wrangler deploy`, `wrangler secret put`, `forge script --broadcast`, `npm publish`, `npm dist-tag` or equivalent from a workstation, and never use the owner's Wrangler login.
 3. Agents MAY set `DEPLOY_FREEZE=true` (incident, failed health check, open Critical/High finding) and then disable auto-merge on open PRs. Only the owner clears it (`release-and-deployment.md` §3.1).
 4. All rules in `AGENTS.md` § Hard rules apply unchanged.
@@ -105,14 +105,17 @@ Any conflict between the layers, between two specs, or between a spec and an own
 |---|---|---|
 | **Haiku 5.5** | Read-only lookups and inventories; run a command and summarise its output; fully specified mechanical edits; boilerplate from an exact template | S1 or S2 work; any design choice; anything whose brief needs the word "decide" |
 | **Sonnet 5.5** | Implementation against a clear spec; tests; CI; UI; docs; non-security review; research synthesis; S1 implementation | S2 work; architecture or spec changes; independent security reviews; audits |
-| **Opus 5.5** | All S2 work; architecture and spec changes; task decomposition; independent reviews; audits; hard debugging | — |
+| **Opus 5.5** (effort medium) | All S2 work; architecture and spec changes; task decomposition; independent reviews and delta reviews; audits; hard debugging | — |
+| **Fable 5.1** | Security audits of keys, crypto, owner presence, money paths (credits, deposits, fees, gasless), contracts and supply chain | — |
+
+Owner instruction 2026-10-23: the four-model routing in detail, with the merge-queue procedures, is in [`orchestrator-playbook.md`](orchestrator-playbook.md) §3.
 
 ### 3.2 Routing procedure
 
 1. Determine the security class from `audit-rules.md` §2 (path defaults plus content rules; highest wins).
 2. S2 → **Opus**. S1 → **Sonnet** minimum. S0 → by complexity.
 3. Raise one tier if any of these hold: the spec is ambiguous or silent; the change crosses package or repo boundaries; a design choice is needed; the failure mode is subtle (concurrency, parsing, state machines, money).
-4. Independent reviews and audits are always **Opus**, regardless of the implementing tier.
+4. Independent reviews and audits are always **Opus**, regardless of the implementing tier; security audits of keys, crypto, owner presence, money paths, contracts and supply chain go to **Fable 5.1**.
 5. When in doubt, route up. Record the tier on the task card and in the brief.
 
 ### 3.3 Escalation
@@ -135,7 +138,7 @@ A worker MUST stop and report `STATUS: escalate` when it meets: unexpected compl
 
 ### 3.5 Context economy
 
-The orchestrator's job is to **orchestrate, deploy workers and audit**, not to implement. Its context window is the session's scarcest resource; preserving it lets one session carry as much work as possible.
+The orchestrator's job is to **orchestrate, deploy workers and audit**, not to implement. Its context window is the session's scarcest resource; preserving it lets one session carry as much work as possible. Its step-by-step procedure is [`orchestrator-playbook.md`](orchestrator-playbook.md) (owner instruction 2026-10-23).
 
 | Rule | Detail |
 |---|---|
@@ -144,7 +147,7 @@ The orchestrator's job is to **orchestrate, deploy workers and audit**, not to i
 | Targeted verification | The orchestrator verifies with targeted checks: re-run tests, CI status, `git diff --stat`, specific hunks (§5). |
 | Independent auditor | For S1/S2 it spawns an independent auditor worker (`audit-rules.md` §4) and does **not** read the entire diff itself. |
 | Files over context | Large outputs (test logs, diffs, reports) go to files and are read in slices (`grep`, `head`, line ranges). Specs are opened by section. |
-| Parallel and background | Independent workers run in parallel and in the background. |
+| Parallel and background | Independent workers run in parallel and in the background. Throughput rule (owner instruction 2026-10-23): keep 8–15 workers running whenever work exists, with queue babysitting alongside new building, and pull the next batch when fewer than about 6 run (playbook §2). |
 | Save at ~60% | At about 60% context use, the orchestrator saves the Curator handoff and its sync file, and suggests a fresh session to the owner. |
 | Never at the cost of safety | Context economy never skips a §5 step, an independent review or a gate. When a check is expensive, delegate it; do not drop it. |
 
@@ -179,7 +182,7 @@ Rules:
 ```text
 WORKER BRIEF
 Task ID:              <e.g. M1-5a>
-Tier / Security class: <Haiku|Sonnet|Opus 5.5> / <S0|S1|S2>
+Tier / Security class: <Haiku|Sonnet|Opus 5.5|Fable 5.1> / <S0|S1|S2>
 Mode:                 read-only | write
 Worktree:             <absolute path>  (REQUIRED for write mode when any other writer runs in parallel)
 Branch:               <task-id>-<slug>  (write mode only)
