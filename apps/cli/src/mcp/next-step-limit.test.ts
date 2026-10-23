@@ -22,6 +22,38 @@ import {
 import { SEND_TEXT } from '../tools/send.js';
 import { en } from '../tools/strings/en.js';
 import { approvalLinkNextStep } from './approval-ui.js';
+import * as tool_accept_action from '../tools/accept-action.js';
+import * as tool_accept_invite from '../tools/accept-invite.js';
+import * as tool_acknowledge from '../tools/acknowledge.js';
+import * as tool_approval_wait from '../tools/approval-wait.js';
+import * as tool_contacts from '../tools/contacts.js';
+import * as tool_context from '../tools/context.js';
+import * as tool_create_invite from '../tools/create-invite.js';
+import * as tool_export_proof_pack from '../tools/export-proof-pack.js';
+import * as tool_fetch_file from '../tools/fetch-file.js';
+import * as tool_files_common from '../tools/files-common.js';
+import * as tool_free_credits from '../tools/free-credits.js';
+import * as tool_get_approval from '../tools/get-approval.js';
+import * as tool_get_proof from '../tools/get-proof.js';
+import * as tool_inbox from '../tools/inbox.js';
+import * as tool_index from '../tools/index.js';
+import * as tool_input from '../tools/input.js';
+import * as tool_invite_common from '../tools/invite-common.js';
+import * as tool_list_contacts from '../tools/list-contacts.js';
+import * as tool_notarize from '../tools/notarize.js';
+import * as tool_proofs_common from '../tools/proofs-common.js';
+import * as tool_propose_terms from '../tools/propose-terms.js';
+import * as tool_registry from '../tools/registry.js';
+import * as tool_respond_to_terms from '../tools/respond-to-terms.js';
+import * as tool_result from '../tools/result.js';
+import * as tool_send from '../tools/send.js';
+import * as tool_status from '../tools/status.js';
+import * as tool_terms_common from '../tools/terms-common.js';
+import * as tool_text from '../tools/text.js';
+import * as tool_untrusted from '../tools/untrusted.js';
+import * as tool_verify_proof_pack from '../tools/verify-proof-pack.js';
+import * as approval_next_step from '../approval/next-step.js';
+import * as approval_ui from './approval-ui.js';
 
 const LIMIT = 500;
 const len = (text: string | undefined): number => [...(text ?? '')].length;
@@ -112,21 +144,52 @@ type Exports = Record<string, unknown>;
 const toolsDir = new URL('../tools/', import.meta.url);
 const sourceFiles = (dir: URL): string[] =>
   readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.includes('.test.'));
-const load = async (dir: string, files: string[]): Promise<Record<string, Exports>> => {
-  const out: Record<string, Exports> = {};
-  for (const f of files) {
-    // Discovery on purpose: a new tool module is picked up without editing this test.
-    // eslint-disable-next-line boundaries/no-bypass
-    const mod = (await import(`${dir}/${f.replace(/\.ts$/, '.js')}`)) as Exports;
-    out[`${dir}/${f}`] = mod;
-  }
-  return out;
+// Explicit list (no dynamic import: boundary rules forbid it). The guard below fails when a tool
+// file is added without being listed here, so a new tool cannot be silently skipped.
+const modules: Record<string, Exports> = {
+  '../tools/accept-action.ts': tool_accept_action,
+  '../tools/accept-invite.ts': tool_accept_invite,
+  '../tools/acknowledge.ts': tool_acknowledge,
+  '../tools/approval-wait.ts': tool_approval_wait,
+  '../tools/contacts.ts': tool_contacts,
+  '../tools/context.ts': tool_context,
+  '../tools/create-invite.ts': tool_create_invite,
+  '../tools/export-proof-pack.ts': tool_export_proof_pack,
+  '../tools/fetch-file.ts': tool_fetch_file,
+  '../tools/files-common.ts': tool_files_common,
+  '../tools/free-credits.ts': tool_free_credits,
+  '../tools/get-approval.ts': tool_get_approval,
+  '../tools/get-proof.ts': tool_get_proof,
+  '../tools/inbox.ts': tool_inbox,
+  '../tools/index.ts': tool_index,
+  '../tools/input.ts': tool_input,
+  '../tools/invite-common.ts': tool_invite_common,
+  '../tools/list-contacts.ts': tool_list_contacts,
+  '../tools/notarize.ts': tool_notarize,
+  '../tools/proofs-common.ts': tool_proofs_common,
+  '../tools/propose-terms.ts': tool_propose_terms,
+  '../tools/registry.ts': tool_registry,
+  '../tools/respond-to-terms.ts': tool_respond_to_terms,
+  '../tools/result.ts': tool_result,
+  '../tools/send.ts': tool_send,
+  '../tools/status.ts': tool_status,
+  '../tools/terms-common.ts': tool_terms_common,
+  '../tools/text.ts': tool_text,
+  '../tools/untrusted.ts': tool_untrusted,
+  '../tools/verify-proof-pack.ts': tool_verify_proof_pack,
+  '../approval/next-step.ts': approval_next_step,
+  './approval-ui.ts': approval_ui,
 };
-const modules = {
-  ...(await load('../tools', sourceFiles(toolsDir))),
-  ...(await load('../approval', ['next-step.ts'])),
-  ...(await load('.', ['approval-ui.ts'])),
-};
+
+describe('the explicit module list', () => {
+  it('covers every tool source file', () => {
+    const listed = Object.keys(modules)
+      .filter((k) => k.startsWith('../tools/'))
+      .map((k) => k.slice('../tools/'.length))
+      .sort();
+    expect(listed).toEqual([...sourceFiles(toolsDir)].sort());
+  });
+});
 
 /** Every exported `*_TEXT` object, plus the copy sheet `en`. */
 const sheets: Record<string, Record<string, unknown>> = { en };
