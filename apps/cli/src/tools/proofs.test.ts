@@ -555,11 +555,38 @@ describe('agentlink_notarize (06 §2.4)', () => {
 
   it('the chain override is Advanced only: a known key maps to its ID, an unknown one is refused', async () => {
     const { client, calls } = fake();
-    await call('agentlink_notarize', { envelopeId: ENVELOPE, chain: 'base-sepolia' }, client);
+    const advanced = { surface: 'advanced' } as const;
+    const ok = await callTool(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, chain: 'base-sepolia' },
+      context(client),
+      advanced,
+    );
+    expect(
+      matchesSchema(findTool('agentlink_notarize', 'advanced')!.outputSchema, ok.structured),
+    ).toBe(true);
     expect(calls.notarize[0]).toEqual({ envelopeId: ENVELOPE, chainId: 84532 });
-    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE, chain: 'mainnet' }, client);
+    const r = await callTool(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, chain: 'mainnet' },
+      context(client),
+      advanced,
+    );
     expect(r.structured).toMatchObject({ status: 'rejected', code: 'UNSUPPORTED_CHAIN' });
     expect(calls.notarize).toHaveLength(1);
+  });
+
+  it('M1-36h: on the default surface a chain argument is refused before anything runs', async () => {
+    const { client, calls } = fake();
+    for (const chain of ['base-sepolia', 'mainnet']) {
+      const r = await call('agentlink_notarize', { envelopeId: ENVELOPE, chain }, client);
+      expect(r.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
+      expect(JSON.stringify(r.structured)).not.toContain(chain);
+    }
+    expect(calls.notarize).toHaveLength(0);
+    // The same call without the hidden argument runs with automatic selection.
+    await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(calls.notarize[0]).toEqual({ envelopeId: ENVELOPE });
   });
 
   it('a chain package error becomes fixed text, never its own wording', async () => {

@@ -123,8 +123,70 @@ export interface ApprovalCardProps {
   onApprove?: () => void;
   onDeny?: () => void;
   onAskAgain?: () => void;
+  /**
+   * The "review together" variant (B-2, D-68). The card shows Approve, Deny and Later as a choice
+   * with nothing preselected, and no buttons of its own: the view's one summary button applies them.
+   * `alone` is for terms: no choice, "Decide this one on its own" and its own Approve.
+   */
+  review?: ApprovalReview;
   children?: ReactNode;
 }
+
+export type ReviewDecision = 'approve' | 'deny' | 'later';
+export type ReviewResult =
+  'approved' | 'denied' | 'later' | 'expired' | 'failed' | 'decided-elsewhere';
+
+export interface ApprovalReview {
+  decision?: ReviewDecision | undefined;
+  onDecide?: ((decision: ReviewDecision) => void) | undefined;
+  alone?: boolean | undefined;
+  /** Disables the controls while the owner confirms (presence). */
+  disabled?: boolean | undefined;
+  /** Shown in place of the choice once the review is done. */
+  result?: ReviewResult | undefined;
+}
+
+const CHOICES: ReadonlyArray<readonly [ReviewDecision, string]> = [
+  ['approve', 'Approve'],
+  ['deny', 'Deny'],
+  ['later', 'Later'],
+];
+
+/** Approve, Deny, Later: radios with a visible group name, none chosen until the owner does. */
+function ReviewChoice({
+  headline,
+  review,
+}: {
+  headline: string;
+  review: ApprovalReview;
+}): ReactElement {
+  const name = useId();
+  return (
+    <fieldset className="al-rv-choice" disabled={review.disabled === true}>
+      <legend className="al-sr-only">{`Your decision for ${headline}`}</legend>
+      {CHOICES.map(([value, label]) => (
+        <label key={value} className={cx('al-rv-opt', `is-${value}`)}>
+          <input
+            type="radio"
+            name={name}
+            value={value}
+            checked={review.decision === value}
+            onChange={() => review.onDecide?.(value)}
+          />
+          <span className="al-text-label">{label}</span>
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+const RESULT_STATE: Readonly<Record<Exclude<ReviewResult, 'later'>, ApprovalState>> = {
+  approved: 'approved',
+  denied: 'denied',
+  expired: 'expired',
+  failed: 'failed',
+  'decided-elsewhere': 'decided-elsewhere',
+};
 
 /**
  * The one-screen owner decision: consequences and cost first, then Approve with the named method.
@@ -147,20 +209,27 @@ export function ApprovalCard({
   budget,
   remember,
   onRememberChange,
-  state = 'pending',
+  state: stateProp = 'pending',
   method,
   onApprove,
   onDeny,
   onAskAgain,
+  review,
   children,
 }: ApprovalCardProps): ReactElement {
   const [icon, word] = TYPE[type] ?? TYPE.proof;
   const id = useId();
   const heading = useRef<HTMLHeadingElement>(null);
+  const result = review?.result;
+  const state: ApprovalState =
+    result === undefined || result === 'later' ? stateProp : RESULT_STATE[result];
   useEffect(() => {
-    if (state === 'pending') heading.current?.focus();
-  }, [state]);
+    // In a review the view owns focus: a card never pulls it away from the list.
+    if (state === 'pending' && review === undefined) heading.current?.focus();
+  }, [state, review]);
   const actionable = state === 'pending' || state === 'waiting';
+  const choosing = review !== undefined && !review.alone && actionable && result === undefined;
+  const lockAll = review?.disabled === true;
   const rememberOffer =
     remember !== undefined &&
     type === 'proof' &&
@@ -236,9 +305,13 @@ export function ApprovalCard({
           <div className="al-text-code al-muted">{details}</div>
         </details>
       )}
-      {actionable ? (
+      {review?.alone === true && actionable ? (
+        <p className="al-text-body-sm al-muted">Decide this one on its own</p>
+      ) : null}
+      {choosing ? <ReviewChoice headline={cleanText(headline, 200)} review={review} /> : null}
+      {actionable && !choosing && result === undefined ? (
         <div className="al-approval-actions">
-          <Button size="lg" onClick={onDeny} disabled={state === 'waiting'}>
+          <Button size="lg" onClick={onDeny} disabled={state === 'waiting' || lockAll}>
             Deny
           </Button>
           <Button
@@ -246,14 +319,21 @@ export function ApprovalCard({
             size="lg"
             icon="approval"
             onClick={onApprove}
-            disabled={state === 'waiting'}
+            disabled={state === 'waiting' || lockAll}
           >
             {`Approve with ${method ?? 'passkey'}`}
           </Button>
         </div>
       ) : null}
-      <StateBox state={state} method={method ?? 'your passkey'} onAskAgain={onAskAgain} />
-      <ApprovalFooter />
+      {result === 'later' ? (
+        <div className="al-astate al-tone-neutral" role="status" aria-live="polite">
+          <Icon name="clock" size={16} />
+          <span className="al-text-body">Left for later. It stays in your list.</span>
+        </div>
+      ) : (
+        <StateBox state={state} method={method ?? 'your passkey'} onAskAgain={onAskAgain} />
+      )}
+      {review === undefined ? <ApprovalFooter /> : null}
     </article>
   );
 }

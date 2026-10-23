@@ -74,6 +74,47 @@ export const fixtures: Record<string, () => ReactElement> = {
       disclosure: ['A proof is public.'],
       method: 'Touch ID',
     }),
+  'ReviewTogether/choosing': () =>
+    h(ui.ReviewTogether, {
+      agent: 'work-agent',
+      items: [
+        { id: 'a', type: 'proof', agent: 'work-agent', headline: 'Add proof to this file' },
+        { id: 'b', type: 'new-contact', agent: 'work-agent', headline: 'Add Marko' },
+        {
+          id: 't',
+          type: 'proof',
+          agent: 'work-agent',
+          headline: 'Accept terms',
+          decideAlone: true,
+        },
+        { id: 'x', type: 'proof', agent: 'work-agent', headline: 'Old one', status: 'expired' },
+      ],
+      decisions: { a: 'approve', b: 'deny' },
+      onDecide: () => undefined,
+      onConfirm: () => undefined,
+    }),
+  'ReviewTogether/done': () =>
+    h(ui.ReviewTogether, {
+      agent: 'work-agent',
+      items: [
+        { id: 'a', type: 'proof', agent: 'work-agent', headline: 'Add proof to this file' },
+        { id: 'b', type: 'proof', agent: 'work-agent', headline: 'Add proof to that file' },
+      ],
+      decisions: {},
+      phase: 'done',
+      results: { a: 'approved', b: 'later' },
+      onDecide: () => undefined,
+      onConfirm: () => undefined,
+    }),
+  'ReviewTogether/failed': () =>
+    h(ui.ReviewTogether, {
+      agent: 'work-agent',
+      items: [],
+      decisions: {},
+      phase: 'failed',
+      onDecide: () => undefined,
+      onConfirm: () => undefined,
+    }),
   'ApprovalCard/waiting': () =>
     h(ui.ApprovalCard, {
       type: 'new-contact',

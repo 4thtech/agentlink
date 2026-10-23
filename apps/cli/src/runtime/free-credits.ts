@@ -8,7 +8,8 @@
 //   addresses only, no redirects). No key, signature or other value leaves. A chain off the chain
 //   package's hard-coded testnet allowlist, or not a testnet in the shipped config, sends nothing.
 //   The answer maps by HTTP status and the service's fixed codes only: no server text, transaction
-//   hash or header is kept.
+//   hash or header text is kept (a 429's Retry-After is kept as a bounded number of seconds; its
+//   body is read up to 512 bytes; a refusing 4xx waits a day, never claimed).
 // - fileFreeCreditsMarker: the claim, remembered in the agent's folder (`free-credits.json`, 0600,
 //   written to a new file and renamed into place). It holds the agent ID and per chain `claimed` or
 //   a retry time: public values only. A file that cannot be parsed counts as claimed for every chain
@@ -28,9 +29,12 @@ export const FREE_CREDITS_PATH = '/v1/faucet';
 export const FREE_CREDITS_FILE = 'free-credits.json';
 /** How long one request may take. */
 export const FREE_CREDITS_TIMEOUT_MS = 15_000;
-/** The wait the service's 429 implies when it gives none we can read (the header is not kept). */
+/** The wait the service's 429 implies when it gives none we can read. */
 const DEFAULT_RETRY_AFTER = 3_600;
-/** A 429 body longer than this is not read. */
+/** A Retry-After is honoured, but never shorter than 5 minutes nor longer than a day. */
+const MIN_RETRY_AFTER = 300;
+const MAX_RETRY_AFTER = 86_400;
+/** A 429 body longer than this many bytes is not read further or parsed. */
 const MAX_ANSWER_CHARS = 512;
 
 const AGENT = /^0x[0-9a-fA-F]{40}$/;
@@ -66,11 +70,37 @@ export interface FreeCreditsPortOptions {
   readonly configs?: readonly chain.ChainConfig[];
 }
 
-/** The 429 code, read from a short JSON body; `rate_limited` for anything else. */
+/** Reads at most MAX_ANSWER_CHARS bytes of the body, then cancels the rest. Undefined if cut off. */
+async function readCapped(response: Response): Promise<string | undefined> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return '';
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_ANSWER_CHARS) return undefined; // too long: not parsed
+      chunks.push(value);
+    }
+  } finally {
+    await reader.cancel().catch(() => undefined);
+  }
+  const all = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.length;
+  }
+  return new TextDecoder().decode(all);
+}
+
+/** The 429 code, read from a short JSON body (bounded read); `rate_limited` for anything else. */
 async function limitCode(response: Response): Promise<FreeCreditsAnswer['status']> {
   try {
-    const text = await response.text();
-    if (text.length > MAX_ANSWER_CHARS) return 'rate_limited';
+    const text = await readCapped(response);
+    if (text === undefined) return 'rate_limited';
     const body = parseJson(text) as unknown;
     const error =
       typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
@@ -80,6 +110,29 @@ async function limitCode(response: Response): Promise<FreeCreditsAnswer['status'
   } catch {
     return 'rate_limited';
   }
+}
+
+/**
+ * The wait a 429 implies, in seconds: its Retry-After (whole seconds or an HTTP date), never under
+ * MIN_RETRY_AFTER and never over MAX_RETRY_AFTER; DEFAULT_RETRY_AFTER when absent or unreadable.
+ * Only the number is kept.
+ */
+function retryAfterOf(response: Response): number {
+  const raw = response.headers.get('retry-after')?.trim() ?? '';
+  let seconds: number | undefined;
+  if (/^[0-9]{1,9}$/.test(raw)) {
+    seconds = Number(raw);
+  } else if (raw !== '' && /[A-Za-z]/.test(raw)) {
+    const at = Date.parse(raw);
+    if (Number.isFinite(at)) seconds = Math.ceil((at - Date.now()) / 1000);
+  }
+  if (seconds === undefined) return DEFAULT_RETRY_AFTER;
+  return Math.min(Math.max(seconds, MIN_RETRY_AFTER), MAX_RETRY_AFTER);
+}
+
+/** A 4xx that asking again cannot fix (a bad request, no such route, refused): never retried. */
+function isPermanentClientError(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 425 && status !== 429;
 }
 
 export function nodeFreeCreditsPort(options: FreeCreditsPortOptions): FreeCreditsPort {
@@ -106,14 +159,21 @@ export function nodeFreeCreditsPort(options: FreeCreditsPortOptions): FreeCredit
           return Object.freeze({ status: 'sent' });
         }
         if (response.status === 429) {
+          const retryAfter = retryAfterOf(response);
           const status = await limitCode(response);
           return status === 'already_claimed' ||
             status === 'rate_limited' ||
             status === 'daily_cap_reached'
-            ? Object.freeze({ status, retryAfter: DEFAULT_RETRY_AFTER })
+            ? Object.freeze({ status, retryAfter })
             : UNAVAILABLE;
         }
         await response.body?.cancel().catch(() => undefined);
+        // A refusal (4xx other than 408/425/429) is not retried for a day: a paused answer with the
+        // longest wait, never `claimed`, so a WAF or deploy 404 does not disable claims for good.
+        // Fixed value, no server text.
+        if (isPermanentClientError(response.status)) {
+          return Object.freeze({ status: 'rate_limited', retryAfter: MAX_RETRY_AFTER });
+        }
         return UNAVAILABLE;
       }
       return UNAVAILABLE;

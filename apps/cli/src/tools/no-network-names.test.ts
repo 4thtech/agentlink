@@ -11,7 +11,7 @@ import { GET_PROOF_TEXT } from './get-proof.js';
 import { INBOX_TEXT } from './inbox.js';
 import { INVITE_TEXT } from './invite-common.js';
 import { PROOF_TEXT } from './proofs-common.js';
-import { TOOLS } from './registry.js';
+import { ADVANCED_TOOLS, TOOLS } from './registry.js';
 import { RESULT_TEXT } from './result.js';
 import { SEND_TEXT } from './send.js';
 import { en } from './strings/en.js';
@@ -54,8 +54,16 @@ describe('no network name or chain prompt in any tool text (M1-26-b)', () => {
     for (const [at, text] of all) expect(text, at).not.toMatch(NETWORK_NAMES);
   });
 
-  it('only agentlink_notarize takes a chain, optional and described as an override to leave out', () => {
+  it('M1-36h: no tool takes a chain by default; only the Advanced agentlink_notarize does, optional', () => {
     for (const tool of TOOLS) {
+      const props = Object.keys(
+        (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {},
+      );
+      expect(props, tool.name).not.toContain('chain');
+      expect(`${tool.title} ${tool.description}`, tool.name).not.toMatch(NETWORK_NAMES);
+      expect(`${tool.title} ${tool.description}`, tool.name).not.toMatch(/\bchains?\b/i);
+    }
+    for (const tool of ADVANCED_TOOLS) {
       const props = Object.keys(
         (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {},
       );
@@ -64,7 +72,7 @@ describe('no network name or chain prompt in any tool text (M1-26-b)', () => {
         expect(props).toContain('chain');
         expect(required).not.toContain('chain');
         expect(tool.description).toMatch(/picks where to record it automatically/);
-        expect(tool.description).toMatch(/leave chain out unless the user explicitly asks/);
+        expect(tool.description).toMatch(/Leave chain out unless the user explicitly asks/);
       } else {
         expect(props, tool.name).not.toContain('chain');
         expect(`${tool.title} ${tool.description}`, tool.name).not.toMatch(NETWORK_NAMES);
