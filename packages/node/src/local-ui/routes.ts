@@ -3,6 +3,8 @@
 // - Every route declares its method, its path under /api/ui/ and `presence`. Registration throws when
 //   a mutating method (POST, PUT, PATCH, DELETE) does not declare `presence: true`, or a GET does,
 //   so no route can reach an owner operation around the central presence gate (approval-server.ts).
+// - M1-11s-c: a `presence: 'setup'` route is only a POST under /api/ui/first-run/, has no handler
+//   and is registered at most once per step (begin, finish); the server's setup gate runs it.
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
@@ -20,6 +22,8 @@ import { storageRoutes } from './api/storage.js';
 import type { LocalUiRoute } from './route-types.js';
 
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
+/** M1-11s-c: setup routes live only under the first-run page's API. */
+const SETUP_PREFIX = '/api/ui/first-run/';
 
 const OWNER_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const FIXED = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -75,13 +79,26 @@ export class LocalUiRouteRegistry {
   /** Adds a route, or throws when it breaks a rule above (nothing is added then). */
   register(route: LocalUiRoute): void {
     if (typeof route !== 'object' || route === null) throw invalid('malformed');
-    const { method, presence, handler } = route as {
+    const { method, presence, handler, step } = route as unknown as {
       method: unknown;
       presence: unknown;
       handler: unknown;
+      step: unknown;
     };
-    if (typeof handler !== 'function') throw invalid('no handler');
-    if (method === 'GET') {
+    if (presence === 'setup') {
+      // M1-11s-c: owner setup is run by the server's setup gate, never by a page handler.
+      if (method !== 'POST') throw invalid('a setup route is a POST');
+      if (handler !== undefined) throw invalid('a setup route has no handler');
+      if (typeof route.path !== 'string' || !route.path.startsWith(SETUP_PREFIX)) {
+        throw invalid('a setup route is under /api/ui/first-run/');
+      }
+      if (step !== 'begin' && step !== 'finish') throw invalid('unknown setup step');
+      if (this.#entries.some((e) => e.route.presence === 'setup' && e.route.step === step)) {
+        throw invalid('this setup step is already registered');
+      }
+    } else if (typeof handler !== 'function') {
+      throw invalid('no handler');
+    } else if (method === 'GET') {
       if (presence !== false) throw invalid('a GET route never takes owner presence');
     } else if (typeof method === 'string' && OWNER_METHODS.has(method)) {
       // I-4: every change goes through the central presence gate.

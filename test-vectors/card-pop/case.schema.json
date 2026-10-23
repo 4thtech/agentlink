@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/card-pop/case.schema.json",
+  "title": "card-pop case",
+  "description": "The agent card's proof of possession (04 \u00a72.9, 07 \u00a78, D-102). `cardPopMessage`: the tag, sha256(JCS(card)) and taggedHash(tag, cardHash), bare hex. `signCardPop`: the BIP-340 cardPop (bare 128 hex) by the card's agentNostr secret key with a fixed auxRand, or a rejection. `verifyCardPop`, `verifyCardPossession` (cardAgentSig and cardPop, each optional to test its absence): accept or reject. `signerShape` (the proof pack `signer`) and `cardUpdateShape` (the `card-update` body): whether the strict schema accepts the presence and encodings.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card"
+          ],
+          "properties": {
+            "op": {
+              "const": "cardPopMessage"
+            },
+            "card": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tag",
+            "cardHash",
+            "message"
+          ],
+          "properties": {
+            "tag": {
+              "const": "agentlink/card-pop/v1"
+            },
+            "cardHash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "message": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card",
+            "secretKey",
+            "auxRand"
+          ],
+          "properties": {
+            "op": {
+              "const": "signCardPop"
+            },
+            "card": {
+              "type": "object"
+            },
+            "secretKey": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "auxRand": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cardPop"
+              ],
+              "properties": {
+                "cardPop": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{128}$"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card",
+            "cardPop"
+          ],
+          "properties": {
+            "op": {
+              "const": "verifyCardPop"
+            },
+            "card": {
+              "type": "object"
+            },
+            "cardPop": {}
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "card"
+          ],
+          "properties": {
+            "op": {
+              "const": "verifyCardPossession"
+            },
+            "card": {
+              "type": "object"
+            },
+            "cardAgentSig": {
+              "type": "string"
+            },
+            "cardPop": {
+              "type": "string"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "signer"
+          ],
+          "properties": {
+            "op": {
+              "const": "signerShape"
+            },
+            "signer": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "body"
+          ],
+          "properties": {
+            "op": {
+              "const": "cardUpdateShape"
+            },
+            "body": {
+              "type": "object"
+            }
+          }
+        },
+        "expected": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "accept"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcome"
+              ],
+              "properties": {
+                "outcome": {
+                  "const": "reject"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

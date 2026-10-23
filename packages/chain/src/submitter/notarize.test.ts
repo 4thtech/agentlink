@@ -9,7 +9,9 @@
 import { encodeHex0x, recordStructHash, type OccReceipt, type OccRecord } from '@4thtech-io/crypto';
 import {
   decodeFunctionData,
+  encodeErrorResult,
   encodeFunctionData,
+  encodeFunctionResult,
   erc20Abi,
   getAddress,
   keccak256,
@@ -22,6 +24,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ChainError,
   FEE_VAULT_CLIENT_ABI,
+  createChainState,
+  createReadClient,
   encodeFeeVaultCall,
   NOTARY_CLIENT_ABI,
   getChainConfig,
@@ -1411,6 +1415,118 @@ describe('deposits: allowance read first, USDT re-approve, minDeposit, re-select
         minDeposit: 5_000_000n,
       },
     );
+  });
+});
+
+// --- a zero-signer answer through the real chain-state port (M1-4c-d) ---------------------------
+
+const ADDRESS_CHECKED = Symbol.for('agentlink.address-checked-rpc-fetch');
+
+/**
+ * The real chain-state port's `getRecord` over an injected RPC that answers every `getRecord` call
+ * with `answer`: a struct with this signer, or the Notary's RecordNotFound revert. The Ledger plays
+ * everything else.
+ */
+function realGetRecord(answer: Hex | 'RecordNotFound'): ChainState['getRecord'] {
+  const fetchFn = vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body)) as { id: number; method: string };
+    if (body.method !== 'eth_call') throw new Error(`unexpected ${body.method}`);
+    const out =
+      answer === 'RecordNotFound'
+        ? {
+            error: {
+              code: 3,
+              message: 'execution reverted',
+              data: encodeErrorResult({ abi: NOTARY_CLIENT_ABI, errorName: 'RecordNotFound' }),
+            },
+          }
+        : {
+            result: encodeFunctionResult({
+              abi: NOTARY_CLIENT_ABI,
+              functionName: 'getRecord',
+              result: {
+                signer: answer,
+                timestamp: 0n,
+                kind: 0,
+                receiptFlags: 0,
+                envelopeHash: hash32('00'),
+                recipientCommitment: hash32('00'),
+                recordStructHash: hash32('00'),
+                receiptAt: [0n, 0n, 0n, 0n],
+              },
+            } as never),
+          };
+    return Promise.resolve(
+      new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, ...out }), {
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+  });
+  Object.defineProperty(fetchFn, ADDRESS_CHECKED, { value: true });
+  const client = createReadClient(config, { fetchFn, retryCount: 0 });
+  const state = createChainState({ config, client });
+  return (recordId, blockNumber) => state.getRecord(recordId, blockNumber);
+}
+
+describe('a zero-signer getRecord answer fails closed in every caller (M1-4c-d)', () => {
+  const pastDeadline = (ledger: Ledger) => {
+    const deadline = Number(ledger.now()) + 10;
+    ledger.head += 100n; // finalized is now well after the deadline
+    return deadline;
+  };
+
+  it('replacementAllowed: a zero-signer struct never allows a replacement (record or receipt)', async () => {
+    const ledger = new Ledger();
+    const deadline = pastDeadline(ledger);
+    ledger.getRecord = realGetRecord(ZERO_ADDRESS);
+    expect(await replacementAllowed(ledger, { recordId: hash32('aa'), deadline })).toBe(false);
+    for (const receiptType of [1, 2, 3, 4]) {
+      expect(
+        await replacementAllowed(ledger, { recordId: hash32('aa'), deadline, receiptType }),
+      ).toBe(false);
+    }
+  });
+
+  it('replacementAllowed: only a RecordNotFound revert reads as absent', async () => {
+    const ledger = new Ledger();
+    const deadline = pastDeadline(ledger);
+    ledger.getRecord = realGetRecord('RecordNotFound');
+    expect(await replacementAllowed(ledger, { recordId: hash32('aa'), deadline })).toBe(true);
+  });
+
+  it('readInclusion: a zero-signer struct is a retryable ChainError, never "absent"', async () => {
+    const ledger = funded(new Ledger());
+    const { built } = await signedRecord(ledger);
+    ledger.getRecord = realGetRecord(ZERO_ADDRESS);
+    const read = readInclusion(ledger, { recordId: built.recordId, record: built.record });
+    await expect(read).rejects.toBeInstanceOf(ChainError);
+    await expect(read).rejects.toMatchObject({ code: 'bad_answer' });
+    ledger.getRecord = realGetRecord('RecordNotFound');
+    expect(await readInclusion(ledger, { recordId: built.recordId, record: built.record })).toBe(
+      'absent',
+    );
+  });
+
+  it('notarize: a zero-signer struct before sending sends nothing and fails with a ChainError', async () => {
+    const ledger = funded(new Ledger());
+    const sub = fakeSubmitter(ledger, 'honest');
+    const { item } = await signedRecord(ledger);
+    ledger.getRecord = realGetRecord(ZERO_ADDRESS);
+    const out = submitterFor(ledger, [sub]).notarize(item);
+    await expect(out).rejects.toBeInstanceOf(ChainError);
+    await expect(out).rejects.toMatchObject({ code: 'bad_answer' });
+    expect(sub.sent).toHaveLength(0);
+  });
+
+  it('acknowledge: a zero-signer struct before sending sends nothing and fails with a ChainError', async () => {
+    const ledger = funded(new Ledger());
+    const sub = fakeSubmitter(ledger, 'honest');
+    const rc = await signedReceipt(ledger, hash32('aa'));
+    ledger.getRecord = realGetRecord(ZERO_ADDRESS);
+    const out = submitterFor(ledger, [sub]).acknowledge(rc);
+    await expect(out).rejects.toBeInstanceOf(ChainError);
+    await expect(out).rejects.toMatchObject({ code: 'bad_answer' });
+    expect(sub.sent).toHaveLength(0);
   });
 });
 

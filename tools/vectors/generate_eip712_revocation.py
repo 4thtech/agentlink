@@ -23,7 +23,16 @@ Types, with the field order of the spec:
 types (derived here, flagged in the PR): `agentEvm` is 0x + 40 lowercase hex; `nonce` is a decimal
 string matching ^(0|[1-9][0-9]*)$ up to 2^256 - 1; `keyEpoch` (as in the card JSON form, 04 §2.4)
 and `deadline` are JSON integers in [0, 2^53 - 1] within their uint type. Every non-canonical form
-is rejected, never normalised. All addresses, hashes and nonces are synthetic test values
+is rejected, never normalised. The domain is parsed as strictly as the message: exactly the four
+fields, name "OCC", version "2", chainId a JSON integer in [1, 2^53 - 1] and verifyingContract 0x +
+40 lowercase hex; any other domain is refused, never hashed (I-6; 05 §3.1). The cases include the
+AgentCard domain (04 §2.4), so a Revocation never hashes under the card's domain (M1-1j-b).
+
+`keyEpoch` spelled `-0` (M1-1j-b): the JSON token `-0` does not match `0|[1-9][0-9]*` (04 §2.4.1).
+The harness loads vector files as parsed JSON, which writes -0 back as 0, so this case carries the
+Revocation as raw JSON text (op `revocationJson`, as the `eip712` suite's `agentCardJson`). The
+suite parses that text with JSON.parse, which keeps -0 in every runtime, and hands the value to the
+code under test. The generator rejects it on the token. All addresses, hashes and nonces are synthetic test values
 (vectorlib.det); the chain IDs are Base Sepolia (84532) and Gnosis Chiado (10200). No signatures:
 the card scope is hashing only.
 
@@ -31,6 +40,7 @@ Usage: python3 -I tools/vectors/generate_eip712_revocation.py --check [FILE] | -
 """
 
 import copy
+import json
 import re
 import sys
 from pathlib import Path
@@ -76,6 +86,7 @@ UINT32_MAX = 2**32 - 1
 SAFE_MAX = 2**53 - 1
 ZERO32 = "0x" + "00" * 32
 ZERO_ADDRESS = "0x" + "00" * 20
+JSON_INTEGER = re.compile(r"0|[1-9][0-9]*")
 
 
 def addr(label):
@@ -125,7 +136,24 @@ def parse_message(primary, message):
     return message
 
 
+def parse_domain(the_domain):
+    """The OCC v2 chain domain: exactly {name, version, chainId, verifyingContract}, name "OCC",
+    version "2", chainId a JSON integer in [1, 2^53 - 1], verifyingContract 0x + 40 lowercase hex."""
+    if not isinstance(the_domain, dict) or set(the_domain) != {f["name"] for f in DOMAIN_FIELDS}:
+        raise ValueError("not exactly the four domain fields")
+    if the_domain["name"] != "OCC" or the_domain["version"] != "2":
+        raise ValueError("not the OCC v2 chain domain")
+    chain_id = the_domain["chainId"]
+    if isinstance(chain_id, bool) or not isinstance(chain_id, int) or not 1 <= chain_id <= SAFE_MAX:
+        raise ValueError("chainId is out of range")
+    contract = the_domain["verifyingContract"]
+    if not isinstance(contract, str) or not re.fullmatch(r"0x[0-9a-f]{40}", contract):
+        raise ValueError("verifyingContract is not canonical")
+    return the_domain
+
+
 def hashes(primary, the_domain, message):
+    parse_domain(the_domain)
     parse_message(primary, message)
     return {
         "typeHash": e.type_hash(TYPES, primary).hex(),
@@ -204,8 +232,7 @@ def build():
         ("key-epoch-negative", "keyEpoch = -1", variant(rev, keyEpoch=-1)),
         ("key-epoch-string", "keyEpoch as a decimal string", variant(rev, keyEpoch="0")),
         ("key-epoch-boolean", "keyEpoch as false", variant(rev, keyEpoch=False)),
-        ("key-epoch-fraction", "keyEpoch = 1.5", variant(rev, keyEpoch=1.5)),
-        ("nonce-number", "nonce as a JSON number", variant(rev, nonce=12345)),
+        ("key-epoch-fraction", "keyEpoch = 1.5", variant(rev, keyEpoch=1.5)),        ("nonce-number", "nonce as a JSON number", variant(rev, nonce=12345)),
         ("nonce-leading-zero", "nonce with a leading zero", variant(rev, nonce="0" + rev["nonce"])),
         ("nonce-sign", "nonce with a + sign", variant(rev, nonce="+" + rev["nonce"])),
         ("nonce-negative", "nonce \"-1\"", variant(rev, nonce="-1")),
@@ -227,6 +254,39 @@ def build():
         except ValueError:
             pass
         cases.append(v.case(f"revocation-reject-{case_id}", f"{JSON_FORM}: {why}; rejected, never normalised", {"op": "revocation", "domain": registry, "revocation": bad}, {"outcome": "reject"}))
+
+    domain_rejects = [
+        ("agent-card", "the chain-agnostic AgentCard domain {name: \"OCC AgentCard\", version: \"1\"} (04 §2.4)", dict(e.AGENT_CARD_DOMAIN)),
+        ("agent-card-chain", "the AgentCard name and version with a chainId and verifyingContract", {"name": "OCC AgentCard", "version": "1", "chainId": BASE_SEPOLIA, "verifyingContract": REGISTRY}),
+        ("version-1", "name \"OCC\", version \"1\" (OCC v1)", registry | {"version": "1"}),
+        ("version-number", "version as the JSON number 2", registry | {"version": 2}),
+        ("name-case", "name \"occ\"", registry | {"name": "occ"}),
+        ("salt", "a fifth domain field salt", registry | {"salt": ZERO32}),
+        ("no-contract", "verifyingContract missing", {"name": "OCC", "version": "2", "chainId": BASE_SEPOLIA}),
+        ("no-chain-id", "chainId missing", {"name": "OCC", "version": "2", "verifyingContract": REGISTRY}),
+        ("chain-id-zero", "chainId 0", registry | {"chainId": 0}),
+        ("chain-id-string", "chainId as a decimal string", registry | {"chainId": str(BASE_SEPOLIA)}),
+        ("contract-checksummed", "verifyingContract in EIP-55 mixed case", registry | {"verifyingContract": v.eip55(REGISTRY)}),
+        ("contract-no-prefix", "verifyingContract without 0x", registry | {"verifyingContract": REGISTRY[2:]}),
+    ]
+    parse_message("Revocation", revocation)
+    for case_id, why, bad in domain_rejects:
+        try:
+            parse_domain(bad)
+            v.fail(f"domain {case_id} parses")
+        except ValueError:
+            pass
+        cases.append(v.case(f"revocation-reject-domain-{case_id}", f"{SOURCES['Revocation']}; I-6: {why}; a canonical Revocation under it is refused, never hashed", {"op": "revocation", "domain": bad, "revocation": revocation}, {"outcome": "reject"}))
+
+    # Raw JSON text (module doc): the token -0 survives only as text.
+    canonical_text = json.dumps(revocation)
+    if json.loads(canonical_text) != revocation or canonical_text.count('"keyEpoch": 0,') != 1:
+        v.fail("the canonical Revocation text is not the expected one")
+    minus_zero = canonical_text.replace('"keyEpoch": 0,', '"keyEpoch": -0,')
+    token = re.search(r'"keyEpoch": (-?[0-9]+),', minus_zero).group(1)
+    if JSON_INTEGER.fullmatch(token):
+        v.fail("the keyEpoch -0 token is accepted")
+    cases.append(v.case("revocation-json-reject-key-epoch-minus-zero", f"{JSON_FORM}: keyEpoch spelled -0 (negative zero; the token is not 0|[1-9][0-9]*), as raw JSON text; rejected, never normalised", {"op": "revocationJson", "domain": registry, "json": minus_zero}, {"outcome": "reject"}))
     return cases
 
 
@@ -237,10 +297,12 @@ SCHEMA = v.case_schema(
     "domain separator, struct hash and digest (32-byte hex without 0x) of a Revocation in its JSON "
     "form under a domain {name, version, chainId, verifyingContract}, or a rejection of a "
     "non-canonical Revocation. `registration`: the same hashes of a Registration that shares its "
-    "owner nonce with a Revocation.",
+    "owner nonce with a Revocation. `revocationJson`: as `revocation`, with the Revocation as raw "
+    "JSON text (for tokens such as -0 that parsed JSON cannot carry).",
     {
         "revocation": ({"domain": v.OBJECT, "revocation": v.OBJECT}, [HASHES, v.REJECT]),
         "registration": ({"domain": v.OBJECT, "registration": v.OBJECT}, [HASHES]),
+        "revocationJson": ({"domain": v.OBJECT, "json": v.STRING}, [HASHES, v.REJECT]),
     },
 )
 
