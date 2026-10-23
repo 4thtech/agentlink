@@ -71,8 +71,9 @@ a local name, a port with a leading zero, percent-encoding), a provider outside 
 region and digest spellings, `kitId` padding and length, other `contents`, `expiresAt` = 0 and
 another signer. The credential item, the `own_storage` row and `storage-mark` are the core's rules.
 
-Received text (M1-1h-b, D-128; 04 §2.5.1), version 8: `verifyJson` vectors whose raw text writes a
-member name with an escape (at the top, in `body`, in `params`, an upper-case hex escape, and an
+Received text (M1-1h-b, D-128; 04 §2.5.1), version 8. The raw-text op is renamed `verifyText`
+(was `verifyJson`), as 04 §2.5.1 names it, and its case ids `verify-text-`. New `verifyText`
+vectors whose raw text writes a member name with an escape (at the top, in `body`, in `params`, an upper-case hex escape, and an
 escaped name that equals another name after unescaping) or repeats a member name at depth, each
 parsing to exactly the validly signed object, so only the text rule refuses it; and accepted texts
 with escapes inside string values and in JCS form.
@@ -742,7 +743,7 @@ def build():
     # token or duplicate check can refuse it (IR-M1-1h-2 F-D).
     good_signed = {"body": good, "sig": good_sig}
     text = json.dumps(good_signed, separators=(",", ":"))
-    cases.append(v.case("verify-json-revoke", f"{SPEC}: the SignedOwnerAction as JSON text verifies", {"op": "verifyJson", "json": text, "context": context}, {"outcome": "accept"}))
+    cases.append(v.case("verify-text-revoke", f"{SPEC}: the SignedOwnerAction as JSON text verifies", {"op": "verifyText", "json": text, "context": context}, {"outcome": "accept"}))
     for case_id, why, old, new in [
         ("issued-at-fraction", "issuedAt spelled 1760000000.0", '"issuedAt":1760000000', '"issuedAt":1760000000.0'),
         ("issued-at-exponent", "issuedAt spelled 1.76e9", '"issuedAt":1760000000', '"issuedAt":1.76e9'),
@@ -754,9 +755,9 @@ def build():
             v.fail(f"{case_id}: substitution")
         cases.append(
             v.case(
-                f"verify-json-reject-{case_id}",
+                f"verify-text-reject-{case_id}",
                 f"{SPEC}, 04 §2.4.1: {why}; the signature is valid over the parsed value, so only the token check refuses it",
-                {"op": "verifyJson", "json": text.replace(old, new, 1), "context": context},
+                {"op": "verifyText", "json": text.replace(old, new, 1), "context": context},
                 {"outcome": "reject"},
             )
         )
@@ -779,9 +780,9 @@ def build():
             v.fail(f"{case_id}: the received-text rule disagrees with the expected outcome")
         cases.append(
             v.case(
-                f"verify-json-{case_id}",
+                f"verify-text-{case_id}",
                 f"{SPEC} Received text (D-128): {why}",
-                {"op": "verifyJson", "json": candidate, "context": context},
+                {"op": "verifyText", "json": candidate, "context": context},
                 {"outcome": outcome},
             )
         )
@@ -925,7 +926,7 @@ SCHEMA = v.case_schema(
             [{"jcs": v.STRING, "bodyHash": v.hexn(32), "signatureInput": v.hexn(32), "sig": v.hexn(64)}],
         ),
         "verify": ({"signed": v.OBJECT, "context": CONTEXT}, [v.ACCEPT, v.REJECT]),
-        "verifyJson": ({"json": v.STRING, "context": CONTEXT}, [v.ACCEPT, v.REJECT]),
+        "verifyText": ({"json": v.STRING, "context": CONTEXT}, [v.ACCEPT, v.REJECT]),
     },
 )
 

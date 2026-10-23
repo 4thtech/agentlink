@@ -5,7 +5,7 @@
 // the CEK alone; `deriveFromCek` runs one 04 §3.3 derivation by its label through the test seam;
 // `sign` returns the hash, the tagged signature input and the signature; `verify` checks the
 // signature; `validate` parses the envelope strictly (structure and encodings) and then checks the
-// signature; `verifyJson` parses the received text (04 §3.1.1 step 3, §2.5.1 "Received text",
+// signature; `verifyText` parses the received text (04 §3.1.1 step 3, §2.5.1 "Received text",
 // M1-1h-b) with parseEnvelopeText and then checks the signature. Inputs go to the code under test unchecked, so its own refusals (CryptoInputError)
 // and a failed check are what `outcome: reject` measures; any other error is a bug and fails the
 // case.
@@ -35,7 +35,7 @@ type AeadEnvelopeInput =
   | { op: 'decryptPayload' | 'checkCommitment'; envelope: object; cek: string }
   | { op: 'deriveFromCek'; label: string; cek: string; envelopeId: string }
   | { op: 'sign'; envelope: object; secretKey: string; auxRand: string }
-  | { op: 'verifyJson'; json: string };
+  | { op: 'verifyText'; json: string };
 
 const ENVELOPE_OPS = new Set(['envelopeHash', 'aad', 'verify', 'validate']);
 
@@ -62,7 +62,7 @@ function parseInput(input: unknown): AeadEnvelopeInput {
   if (i?.op === 'sign' && obj('envelope') && str('secretKey', 'auxRand')) {
     return i as AeadEnvelopeInput;
   }
-  if (i?.op === 'verifyJson' && str('json')) {
+  if (i?.op === 'verifyText' && str('json')) {
     return i as AeadEnvelopeInput;
   }
   throw new TypeError('aead-envelope: input does not match any op of case.schema.json');
@@ -134,7 +134,7 @@ async function evaluateInput(input: AeadEnvelopeInput): Promise<readonly Compari
       return outcome(verifyEnvelope(input.envelope as Envelope));
     case 'validate':
       return outcome(verifyEnvelope(parseEnvelope(input.envelope)));
-    case 'verifyJson':
+    case 'verifyText':
       return outcome(verifyEnvelope(parseEnvelopeText(input.json)));
   }
 }

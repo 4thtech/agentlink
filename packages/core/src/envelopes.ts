@@ -40,7 +40,7 @@ import {
   envelopeHash,
   generateCek,
   parseEnvelope,
-  parseJson,
+  parseReceivedJson,
   parseEnvelopeText,
   randomBytes,
   verifyEnvelope,
@@ -1051,9 +1051,9 @@ export class EnvelopeService {
       try {
         payloadText = decodeUtf8(plaintext);
         // Received text (04 §2.5.1, D-128): an `approval`, `policy` or `revoke` payload carries a
-        // SignedOwnerAction and a pairing or card-update payload a card, so no member name may be
-        // written with an escape (duplicates are refused by parseJson itself).
-        const parsed = payloadSchema.safeParse(parseJson(payloadText, { plainMemberNames: true }));
+        // SignedOwnerAction and a pairing or card-update payload a card: no duplicate or escaped
+        // member name, and integer tokens only (every payload number is a protocol integer).
+        const parsed = payloadSchema.safeParse(parseReceivedJson(payloadText));
         if (!parsed.success) return { kind: 'drop', reason: 'payload_invalid' };
         payload = parsed.data;
       } catch {

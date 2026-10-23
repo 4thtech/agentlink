@@ -25,7 +25,7 @@ bytes, the old alg `A256GCM` and the whole earlier envelope form are refused; a 
 and confirmed with `cryptography`) opens only under the CEK its `kc` commits to; a signature by
 another key, over the untagged hash, or under the owner-action tag (04 §2.5.1) does not verify.
 
-Version 3 (M1-1h-b, D-128): `verifyJson` cases give the reference envelope as received JSON text
+Version 3 (M1-1h-b, D-128): `verifyText` cases give the reference envelope as received JSON text
 (04 §3.1.1 step 3, §2.5.1 "Received text"). Its JCS text and an escape inside a string value are
 accepted; a member name written with an escape (at the top, in `aead`, in a recipient, upper-case
 hex, an escaped duplicate), a duplicate member name at each depth and a non-integer `createdAt`
@@ -546,18 +546,18 @@ def build():
 
     def received(case_id, why, candidate, outcome):
         if case_id != "jcs-canonical" and candidate == text:
-            v.fail(f"verify-json-{case_id}: substitution")
+            v.fail(f"verify-text-{case_id}: substitution")
         # Equal values (1760000000.0 == 1760000000 in Python): the text differs only in its tokens.
         if json.loads(candidate) != env or not validate(env):
-            v.fail(f"verify-json-{case_id}: the text does not parse to the valid reference envelope")
+            v.fail(f"verify-text-{case_id}: the text does not parse to the valid reference envelope")
         try:
             v.parse_received_text(candidate)
             refused = False
         except ValueError:
             refused = True
         if refused != (outcome == "reject"):
-            v.fail(f"verify-json-{case_id}: the received-text rule disagrees with the expected outcome")
-        cases.append(v.case(f"verify-json-{case_id}", f"{SPEC_TEXT}: {why}", {"op": "verifyJson", "json": candidate}, {"outcome": outcome}))
+            v.fail(f"verify-text-{case_id}: the received-text rule disagrees with the expected outcome")
+        cases.append(v.case(f"verify-text-{case_id}", f"{SPEC_TEXT}: {why}", {"op": "verifyText", "json": candidate}, {"outcome": outcome}))
 
     received("jcs-canonical", "the JCS text of the reference envelope verifies", text, "accept")
     received("escaped-value", "an escape inside a string value (aead.alg) is unaffected", text.replace('"alg":"A256GCM-KC"', '"alg":"\\u0041256GCM-KC"', 1), "accept")
@@ -585,7 +585,7 @@ SCHEMA = v.case_schema(
     "base64url kc and base64url ct||tag (AES-256-GCM under encKey) for header, CEK, IV and plaintext. "
     "`decryptPayload`: plaintext or rejection (kc checked first). `checkCommitment`: whether aead.kc "
     "is the kc of the CEK. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or "
-    "reject. `validate`: structure, encodings and signature together (strict). `verifyJson`: the "
+    "reject. `validate`: structure, encodings and signature together (strict). `verifyText`: the "
     "envelope as received JSON text, parsed strictly (no duplicate or escaped member names, integer "
     "tokens only; 04 §3.1.1 step 3, §2.5.1), then `validate`.",
     {
@@ -604,7 +604,7 @@ SCHEMA = v.case_schema(
         ),
         "verify": ({"envelope": v.OBJECT}, [v.ACCEPT, v.REJECT]),
         "validate": ({"envelope": v.OBJECT}, [v.ACCEPT, v.REJECT]),
-        "verifyJson": ({"json": v.STRING}, [v.ACCEPT, v.REJECT]),
+        "verifyText": ({"json": v.STRING}, [v.ACCEPT, v.REJECT]),
     },
 )
 
