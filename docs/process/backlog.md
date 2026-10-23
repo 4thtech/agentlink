@@ -801,6 +801,36 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** PR #335 changed only `.github/scripts/worker-logging-settings.jq`, which both deploy workflows run in their logging read-back, and neither deploy started: their `on.push.paths` did not list it (nor `tools/release/wait-for-ci.mjs`). Add both to each filter and a test that fails when a workflow with a push `paths` filter runs a repo-local script (or local action) the filter does not cover.
 - **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
 
+#### CHORE-DEPLOY-RECONCILE-b · reconcile: bound pending approvals; alert when no deploy is found (new, IR-CHORE-DEPLOY-RECONCILE-1, #464)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · the reconcile workflow and `tools/release/**`
+- **Depends on:** CHORE-DEPLOY-RECONCILE
+- **Scope:**
+  - While production lags, allow at most one pending approval request per service (not per head).
+  - Raise an alert instead of a notice when no deploy is found in the last 30 runs.
+  - Card bullet 3: the `check-changesets.test.mjs` 3 of 15 local failures (environmental) get a note or a fix.
+- **Acceptance:**
+  - A test with several pending heads shows one request per service; the 30-run case alerts; no step weakened.
+
+#### DOCS-PASS-1023-b · status.yaml names init global install and the gasless route (new, 2026-10-23)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (`docs/process/**` by path; docs only)
+- **Repo/path:** agentlink · `docs/status.yaml`, then `node tools/docs-status/index.mjs`
+- **Depends on:** #422 and #452 merged (both are)
+- **Scope:**
+  - Mention #422 (init offers the global install and names agents after their app) and #452 (gasless top-up route, off by default) in `docs/status.yaml` at the next docs pass; regenerate the status files.
+- **Acceptance:**
+  - `node tools/docs-status/index.mjs --check` passes; nothing claims the gasless route is on.
+
+#### DOCS-G21-b · "median" vs "every tester": align the M2 gate and 02 with D-124 (new, IR-M1-GATE-a-2, #461)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · `docs/process/backlog.md` (M2-GATE acceptance), `docs/foundation/02-product-spec.md` (line 240)
+- **Depends on:** M1-GATE-a (#461)
+- **Spec:** 02 (success metrics); G-21
+- **Scope:**
+  - M2-GATE acceptance says "(median)" but its scope says "every tester"; 02 says "Median < 5 minutes". Align both with D-124 or state the M2 rule explicitly. The owner decides which.
+- **Acceptance:**
+  - One rule, worded the same in the M2-GATE card, 02 and the gate runbook; the owner confirmed it.
+
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
 - **Repo/path:** agentlink · `apps/submitter/src/index.ts`
@@ -2428,18 +2458,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
 
-#### M1-6b-c · storage: lifecycle read-back compares rule content, not only IDs (new, IR-M1-6b-b-1, #440)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/storage/src/lifecycle.ts`
-- **Depends on:** M1-6b-b
-- **Spec:** 07 §5.2
-- **Invariants:** I-2, I-3
-- **Scope:**
-  - The lifecycle read-back (around `lifecycle.ts` line 190) matches rules by ID only. If another writer changes a rule's content in the race window, our write overwrites it silently.
-  - Compare content (not only the ID) and detect or retry on a difference, as M1-6b-b L3 intends.
-- **Acceptance:**
-  - A test where a rule with the same ID but different content appears between read and write is detected, not overwritten; rules this code did not write stay untouched.
-
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** done (4thtech/agentlink#268, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
@@ -3868,19 +3886,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The docs list exactly the codes the workflow treats as the long window; a case shows an unrelated error does not match the rollback refusal.
 
-#### M1-27b-e · drop: staging round trip, `cpu_ms` and stale ci-cd row (new, follow-up to M1-27b-b; #444)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `.github/workflows/ci.yml` (actionlint), `.github/workflows/deploy-drop.yml`, `docs/process/ci-cd.md`
-- **Depends on:** M1-27b-b (workflow edits start after #436 and #438 land)
-- **Spec:** `release-and-deployment.md` §4.5, §8
-- **Invariants:** I-3, I-7
-- **Scope:**
-  - Make `actionlint` a required check once #436 and #438 have landed.
-  - Run a 100 MB round trip against the staging drop to confirm `cpu_ms: 5000` is enough (medium priority; do this before M1-27b-b is closed).
-  - Fix the stale deploy-drop row in `ci-cd.md` after #444.
-- **Acceptance:**
-  - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
-
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
@@ -4622,6 +4627,37 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - A schema test accepts each new field and rejects a malformed one; the existing proof tests pass unchanged.
 
+#### M1-33d-d · proofStatusShape and 06 ProofStatus agree on `chain` and `receiptRequested` (new, IR-M1-33d-c-1, #462)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/types` (`proofStatusShape`, `proofStatusResultSchema`), `apps/cli` (proof status result), `docs/foundation/06-mcp-tools-and-ux.md` (proposed, owner confirms at merge)
+- **Depends on:** M1-33d-c
+- **Spec:** 06 `ProofStatus`; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - `proofStatusShape` requires a top-level `chain`, but 06 says it is advanced-only and the CLI never emits it, so a real result would fail `proofStatusResultSchema`. Make `chain` optional (advanced only) or move it under `advanced`, and align 06 and the schema.
+  - Add `receiptRequested` to the 06 `ProofStatus` and the CLI schema, or note in 06 why it is not there.
+  - Rated medium in the review: fix before M1-33d ships.
+- **Acceptance:**
+  - A schema test parses the CLI's real proof status result (default and advanced); a result without `chain` passes; the default result still shows no chain; the existing proof tests pass unchanged.
+
+#### M1-36d-d · next-step-limit test renders multi-argument builders (new, IR-M1-36d-c-3, #458)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`next-step-limit.test.ts`)
+- **Depends on:** M1-36d-c
+- **Scope:**
+  - The test skips builders that take 2 or 3 arguments (`TERMS_TEXT.*`, `INBOX_TEXT.headerFrom`) without saying so. Render them with sample arguments, or fail loudly (or warn) when a builder is skipped.
+- **Acceptance:**
+  - A new multi-argument builder over the 500 code point limit fails the test; no builder is skipped silently; no test weakened.
+
+#### M1-36i-e · free-credits wait counts against the approval wait (new, IR-M1-36i-c-1, #466)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`src/mcp/approval-wait.ts` and the free-credits claim)
+- **Depends on:** M1-36i-c
+- **Scope:**
+  - Subtract the time spent waiting for the free test credits from `approvalWaitMs`, so a tool call stays under the harness timeouts (Codex is about 60 s).
+- **Acceptance:**
+  - A test with a slow credits claim shows the total tool call time stays within the configured bound; with no credits wait the behaviour is unchanged.
+
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
 #### M1-20 · Commitments policy: owner approval for binding accepts and receipts (D-31) (new)
@@ -5126,29 +5162,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Writer tests per target (diff shown, nothing written before confirm); an Opus reviewer audits the writer.
 
-#### M1-36g-b · init: Cursor and Windsurf in the apps lists (new, #441)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
-- **Depends on:** M1-36g
-- **Spec:** 06 §5; 08
-- **Invariants:** I-4
-- **Scope:**
-  - The `appsAll` and `appsLinux` strings in `init.ts` do not list Cursor and Windsurf after #422 and #431; add them.
-- **Acceptance:**
-  - A test pins the strings for each platform; no write behaviour changes.
-
-#### M1-36g-c · init: confirmation code binds the path actually used for Windsurf (new, IR-M1-36g-2, #441; owner #422/#431)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
-- **Depends on:** M1-36g
-- **Spec:** 06 §5; 08
-- **Invariants:** I-4
-- **Scope:**
-  - `init.ts` hashes `displayPath` without the environment, so the confirmation code binds the default Windsurf path and not the XDG one that is written when the environment selects it.
-  - Hash the resolved path (environment applied) so the code a user confirms names the file that is written.
-- **Acceptance:**
-  - A test with and without the XDG environment shows the code differs and matches the path written; nothing is written before the confirmation.
-
 #### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/mcp/instructions.ts`, `docs/foundation/06-mcp-server.md` §2 and §5, `apps/cli/src/tools/registry.ts`, `test/fixtures/tool-surface.json`
@@ -5195,17 +5208,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-3 (pre-existing): `accept_invite` loses the approval link for agent names above about 21 characters (511 code points); shorten the copy or raise the budget per 06.
 - **Acceptance:**
   - The restored assertion passes; a long agent name still carries the approval link.
-
-#### M1-36d-c · accept_invite: nextStep stays inside the 500-code-point limit (new, IR-M1-36d-b-2, #442)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/tools/invite-common.ts`, `apps/cli/src/tools/next-action.test.ts`
-- **Depends on:** M1-36d-b
-- **Spec:** 06 §2.5
-- **Invariants:** I-5
-- **Scope:**
-  - The pending `accept_invite` nextStep is 498 of 500 code points in the worst case, so any added wording crosses the limit. Shorten the copy, or add a guard test that fails with a clear message when the worst case exceeds the budget.
-- **Acceptance:**
-  - A worst-case test (longest allowed agent name) pins the length at or under the limit and keeps the approval link.
 
 #### M1-37a · app UX P0 copy and flow fixes (first run, approvals, invite landing) (new, UX audit, app, 2026-10-22, section 12 "orchestrator can just do")
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` is S1 by path) · **Phase:** M1b
@@ -5446,18 +5448,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests for the null-faucet reading and the same-block second claim.
 
-#### M1-10b-e-c · pool workflow header and top-up hint (new, IR-M1-10b-e-b-1, #439)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge") · **Phase:** M1b
-- **Repo/path:** agentlink · `.github/workflows/submitter-pool.yml`
-- **Depends on:** M1-10b-e-b
-- **Spec:** 07 §5
-- **Invariants:** I-4
-- **Scope:**
-  - The header of `submitter-pool.yml` names only "low or paused"; it should also name the other alert reasons.
-  - The "Top up the wallet" hint is misleading when the reason is "faucet off"; give each reason its own hint, in plain words that follow 11 §5 where the text reaches a user.
-- **Acceptance:**
-  - A test on the workflow text or the pool script shows each alert reason carries a matching header line and hint; actionlint clean; no gate weakened.
-
 #### M1-11b-6 · cli: `init` opens the first-run page and wires owner setup (new, IR-M1-11b-1-1; #426 follow-up)
 - **Status:** backlog (draft PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, the CLI server start (`localUi.ownerSetup` wiring) and their tests
@@ -5518,17 +5508,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - If the finish response is lost, the server re-shows the owner code once within the hold window (same bounds as the pending seed); never after it.
 - **Acceptance:**
   - Tests first: a PRF-on-get authenticator completes setup with two gestures; a lost finish response lets the owner code be shown again inside the window and not after; the pending seed still expires and is wiped; threat note and Fable audit.
-
-#### M1-11s-c-d · owner setup canary: more forms of the secret bytes (new, IR-M1-11s-c-b-1, #443)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/node/src/owner-setup-canary.test.ts`
-- **Depends on:** M1-11s-c-b
-- **Spec:** 04 §2.2
-- **Invariants:** I-1
-- **Scope:**
-  - The `forms()` helper at about line 78 of `owner-setup-canary.test.ts` should also produce the `JSON.stringify(Uint8Array)` form and the `util.inspect` forms, so the canary catches a secret logged in those shapes.
-- **Acceptance:**
-  - The canary test fails when a secret is emitted in either added form (shown with a deliberate leak in a scratch run); no test weakened.
 
 #### M1-11c-a2b · local UI Contacts: a protective route kind for the mismatch block (new, IR-M1-11c-a2-1, option A)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -5624,18 +5603,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `vault-impl-check.sh` emits `::error` when a label is missing; optionally scope the secret only to the deploy step.
 - **Acceptance:**
   - A run with a missing label fails with an error annotation; the secret is not available to other steps (if scoped).
-
-#### M1-3c-d · contracts repo: vector-parity job covers the eip3009 vectors (new, IR-M3-4b-t-T1-1, #448; cross-repo)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (contract CI) · **Phase:** M1b
-- **Repo/path:** `occ-v2-contracts` (private; cross-repo card: the work and its PR live there) · vector-parity job
-- **Depends on:** M1-3c; M3-4b-t
-- **Spec:** 07 §7
-- **Invariants:** I-6
-- **Scope:**
-  - Add the eip3009 vectors to the vector-parity job: the typehash equals the vector; the `auth-usdc-base-sepolia` digest is recomputed under the USDC domain separator; `ecrecover` of each `sign-*` vector returns its `from`.
-  - Pin the vectors commit the job uses.
-- **Acceptance:**
-  - The job fails when a vector, typehash or digest differs; the vectors commit is pinned; nothing weakened.
 
 #### M1-35c-c · vocabulary lint: more banned words; app pages use `lintVocabulary` (new, IR-M1-35c-b-1 low)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -6457,6 +6424,48 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - From IR-M1-3c-1 (info): a `TokenChecks` negative payee probe; client rule: always sign the `ReceiveWithAuthorization` typehash, never `TransferWithAuthorization`; the submitter simulates and rate-limits `deposit-authorization`; decide the interface file placement.
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
+#### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
+- **Depends on:** M3-4b-t
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-6
+- **Scope:**
+  - The builder accepts `windowSeconds` up to 3600, but the relay refuses a `validBefore` later than now plus 1020 s. Align them with one named constant (`GASLESS_MAX_WINDOW_SECONDS`) or document the gap.
+- **Acceptance:**
+  - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
+
+#### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
+- **Depends on:** M3-4b-t-0 (#453)
+- **Scope:**
+  - Update the comments that still say "until M1-3c" now that the ABI landed. No code change.
+- **Acceptance:**
+  - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
+
+#### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
+- **Depends on:** M3-4b-t-0 (#453)
+- **Scope:**
+  - Current tests mock the registry. Add a test against the real registry: `gaslessToken` refuses on 84532 and 10200 while `GASLESS_TOPUP_ENABLED=false`.
+  - Check the eip3009 composition in `registry.ts` also requires the flag (a note on the review, to be confirmed in the code).
+- **Acceptance:**
+  - The test fails if the flag check is removed; no test mocks the registry in it.
+
+#### M3-4b-t-T3-c · deposit relay: cap order and refund on a crash mid-send (new, IR-M3-4b-t-T3-b-1, #459)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/submitter/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/submitter` (deposit-authorization route)
+- **Depends on:** M3-4b-t-T3-b (#459)
+- **Spec:** 07 §7; 04 §7
+- **Invariants:** I-3
+- **Scope:**
+  - Count the global cap after `relay.check` (so a bad request cannot burn it, which raises the attacker's cost), or add a signature pre-verify before counting.
+  - Refund the quota when the process crashes mid-send.
+- **Acceptance:**
+  - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/submitter; agentlink-ops · monitoring
