@@ -87,7 +87,10 @@ describe('lifecycle: concurrent changes (L3)', () => {
     const racing = async (req: Request): Promise<Response> => {
       const response = await fake.fetch(req);
       if (req.method === 'PUT') {
-        fake.lifecycle = (fake.lifecycle ?? '').replace('<Prefix>logs/</Prefix>', '<Prefix>other/</Prefix>');
+        fake.lifecycle = (fake.lifecycle ?? '').replace(
+          '<Prefix>logs/</Prefix>',
+          '<Prefix>other/</Prefix>',
+        );
       }
       return response;
     };
@@ -104,7 +107,10 @@ describe('lifecycle: concurrent changes (L3)', () => {
     const racing = async (req: Request): Promise<Response> => {
       const response = await fake.fetch(req);
       if (req.method === 'PUT') {
-        fake.lifecycle = (fake.lifecycle ?? '').replace('<Prefix>agentlink/</Prefix>', '<Prefix>x/</Prefix>');
+        fake.lifecycle = (fake.lifecycle ?? '').replace(
+          '<Prefix>agentlink/</Prefix>',
+          '<Prefix>x/</Prefix>',
+        );
       }
       return response;
     };

@@ -2428,6 +2428,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
 
+#### M1-6b-c · storage: lifecycle read-back verifies full rule content (new, from IR-M1-6b-b-1 on #440)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage
+- **Depends on:** M1-6b-b
+- **Spec:** 07 §5.2; 04 §4
+- **Invariants:** I-2, I-3
+- **Scope:**
+  - The lifecycle `apply()` read-back matched rules by ID only; compare the normalised full content of this app's rule and of every other rule read before the write, and fail with `lifecycle_failed` on a mismatch.
+- **Acceptance:**
+  - A rule changed in place by another writer after the write, or a changed own rule with the same days, fails with `lifecycle_failed` (no URL or provider text in the error); a whitespace-only reformat still succeeds.
+
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** done (4thtech/agentlink#268, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage

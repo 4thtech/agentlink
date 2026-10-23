@@ -77,6 +77,11 @@ function ruleId(rule: string): string | null {
   return xmlText(rule, 'ID');
 }
 
+/** A rule with the whitespace between elements removed, so a reformatted rule compares equal. */
+function normaliseRule(rule: string): string {
+  return rule.replace(/>\s+</g, '><').trim();
+}
+
 function ownRuleXml(days: number): string {
   return (
     `<Rule><ID>${LIFECYCLE_RULE_ID}</ID><Filter><Prefix>${LIFECYCLE_PREFIX}</Prefix></Filter>` +
@@ -149,7 +154,7 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
       // S3 has no conditional write for the lifecycle configuration, so the read-modify-write cannot be
       // made atomic (M1-6b-b L3). It is made safe as far as the API allows: read twice and write only
       // when both reads agree (a change in between is retried from the start), then read the result
-      // back and check that no rule was lost. A change that lands between the second read and the
+      // back and check that every rule is still there with the same content. A change that lands between the second read and the
       // write is the one window left; the read-back reports it instead of hiding it.
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const current = await currentRules();
@@ -188,13 +193,13 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
           throw failed(response.status);
         }
         const after = (await currentRules()).rules;
-        const key = (rule: string): string => ruleId(rule) ?? rule;
-        const present = new Set(after.map(key));
+        // Full content, not just IDs (M1-6b-c): a rule another writer changed in place keeps its ID.
+        const present = new Set(after.map(normaliseRule));
         const ownAfter = after.find((rule) => ruleId(rule) === LIFECYCLE_RULE_ID);
         if (
           ownAfter === undefined ||
-          parseOwnRule(ownAfter).days !== days ||
-          !others.every((rule) => present.has(key(rule)))
+          normaliseRule(ownAfter) !== normaliseRule(ownRuleXml(days)) ||
+          !others.every((rule) => present.has(normaliseRule(rule)))
         ) {
           log?.warn('storage lifecycle changed after the update');
           throw failed();
