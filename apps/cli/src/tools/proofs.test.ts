@@ -18,8 +18,12 @@ import type {
 } from '@4thtech-io/core';
 import { PAY_PAGE } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
-import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
-import { describe, expect, it } from 'vitest';
+import {
+  proofStatusResultSchema,
+  type ContactDisplayName,
+  type RestrictedName,
+} from '@4thtech-io/types';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AccountView,
   PackCheck,
@@ -30,7 +34,7 @@ import type {
   ToolContext,
 } from './context.js';
 import { callTool } from './index.js';
-import { PROOF_TEXT } from './proofs-common.js';
+import { FREE_CREDITS_WAIT, PROOF_TEXT } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
 import { TOOLS, findTool } from './registry.js';
@@ -1180,7 +1184,7 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     // so nextStep carries the fixed no-link text (M1-26-e), with neither a link nor the agent ID.
     expect(r.structured.url).toBeUndefined();
     expect(r.structured.nextStep).toBe(
-      'Tell the user there are not enough credits to add proof, and that adding credits is not available yet in this version of AgentLink (messages and files stay free). Do not give a link.',
+      'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
     );
     expect(dump(r)).not.toMatch(/https?:\/\/|pay\.agentlink|#v=1/);
     expect(r.structured.summary).toContain('Nothing was sent.');
@@ -1762,7 +1766,27 @@ describe('no tool turns on automatic delivery receipts (I-4, 06 §3)', () => {
 
 // ---- M1-36i: free test credits, claimed once ------------------------------------------------------
 
+/**
+ * M1-36i-c: runs a tool call under fake timers, moving the clock until it settles. Returns the
+ * result and the fake time it took (the bounded wait after a free test credits claim).
+ */
+async function settle<T>(pending: Promise<T>): Promise<{ value: T; elapsedMs: number }> {
+  const start = Date.now();
+  let done = false;
+  const watched = pending.finally(() => {
+    done = true;
+  });
+  for (let i = 0; i < 2_000 && !done; i += 1) await vi.advanceTimersByTimeAsync(250);
+  return { value: await watched, elapsedMs: Date.now() - start };
+}
+
 describe('free test credits on the first needs_credits (M1-36i)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const needs = (chainId = 84532): NotarizeResult => ({
     status: 'needs_credits',
     topUp: {
@@ -1790,8 +1814,10 @@ describe('free test credits on the first needs_credits (M1-36i)', () => {
       marker: memoryFreeCreditsMarker(),
     });
     const { client, calls } = fake({ notarize: () => needs(), freeCredits: claim });
-    const first = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
-    expect(calls.log).toEqual(['notarize', 'freeCredits:84532']);
+    const first = (await settle(call('agentlink_notarize', { envelopeId: ENVELOPE }, client)))
+      .value;
+    // M1-36i-c: the credits showed up, so the proof was tried once more (still short here).
+    expect(calls.log).toEqual(['notarize', 'freeCredits:84532', 'account', 'notarize']);
     expect(first.structured.status).toBe('needs_credits');
     expect(first.structured.summary).toContain(ADDED);
     expect(first.structured.nextStep).toContain('agentlink_notarize');
@@ -1877,7 +1903,8 @@ describe('free test credits on the first needs_credits (M1-36i)', () => {
       notarize: () => needs(),
       freeCredits: () => Promise.resolve('added'),
     });
-    const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+    const r = (await settle(call('agentlink_send', { to: B, text: 'hi', notarize: true }, client)))
+      .value;
     expect(r.structured).toMatchObject({ status: 'needs_credits', envelopeId: ENVELOPE });
     expect(r.structured.summary).toContain(ADDED);
     expect(r.structured.nextStep).toContain('agentlink_notarize');
@@ -1893,5 +1920,573 @@ describe('free test credits on the first needs_credits (M1-36i)', () => {
     });
     const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
     expect(r.structured.summary).toContain(PAUSED);
+  });
+});
+
+// ---- the shared ProofStatus schema against real results (M1-33d-d, IR-M1-33d-c-1) --------------
+
+describe('real agentlink_notarize and agentlink_get_proof results against the shared ProofStatus schema (06 §2.4, M1-33d-d)', () => {
+  const FEE_CANONICAL = Object.freeze({ token: TOKEN, amount: '100000', usd: '0.1' });
+  /** The default view (06 §2.4 Advanced, D-40): the whole `advanced` member dropped. */
+  const defaultView = (structured: object): Record<string, unknown> => {
+    const copy = { ...structured } as Record<string, unknown>;
+    delete copy['advanced'];
+    return copy;
+  };
+  const issuesOf = (value: unknown) => proofStatusResultSchema.safeParse(value).error?.issues;
+
+  it('get_proof error result, advanced and default view, parses; neither has a top-level chain', async () => {
+    const { client } = fake({
+      get: () => ({
+        direction: 'sent',
+        status: 'failed',
+        recordId: RECORD,
+        chainId: 84532,
+        chain: 'base-sepolia',
+        fee: FEE_CANONICAL,
+        receipts: [],
+      }),
+    });
+    const r = await call('agentlink_get_proof', { recordId: RECORD }, client);
+    expect(r.structured).toMatchObject({ status: 'error', advanced: { chain: 'base-sepolia' } });
+    expect(r.structured).not.toHaveProperty('chain');
+    expect(issuesOf(r.structured)).toBeUndefined();
+    const plain = defaultView(r.structured);
+    expect(JSON.stringify(plain)).not.toContain('base-sepolia');
+    expect(issuesOf(plain)).toBeUndefined();
+  });
+
+  it('notarize pending_approval and error results parse', async () => {
+    const pending = fake({
+      notarize: () => ({ status: 'pending_approval', approvalId: APPROVAL }) as NotarizeResult,
+    });
+    const p = await call('agentlink_notarize', { envelopeId: ENVELOPE }, pending.client);
+    expect(p.structured.status).toBe('pending_approval');
+    expect(issuesOf(p.structured)).toBeUndefined();
+    const failed = fake({
+      notarize: () =>
+        ({ status: 'error', code: 'RECORD_FAILED', recordId: RECORD }) as NotarizeResult,
+    });
+    const e = await call('agentlink_notarize', { envelopeId: ENVELOPE }, failed.client);
+    expect(e.structured.status).toBe('error');
+    expect(issuesOf(e.structured)).toBeUndefined();
+  });
+
+  it('notarize ok and submitted results (no txHash, no fee split from the core) parse, advanced and default view', async () => {
+    for (const status of ['ok', 'submitted'] as const) {
+      const { client } = fake({
+        notarize: () => ({ ...recorded(), status, fee: FEE_CANONICAL }) as NotarizeResult,
+      });
+      const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+      expect(r.structured.status).toBe(status);
+      expect(issuesOf(r.structured), status).toBeUndefined();
+      expect(issuesOf(defaultView(r.structured)), status).toBeUndefined();
+    }
+  });
+
+  it('get_proof ok, submitted and needs_credits results parse', async () => {
+    for (const stored of ['announced', 'received', 'pending', 'needs_credits']) {
+      const { client } = fake({
+        get: () => ({
+          direction: stored === 'received' ? 'received' : 'sent',
+          status: stored,
+          recordId: RECORD,
+          chainId: 84532,
+          chain: 'base-sepolia',
+          fee: FEE_CANONICAL,
+          receipts: stored === 'pending' ? [] : [{ type: 'DELIVERED', at: '2026-10-19T10:05:00Z' }],
+        }),
+      });
+      const r = await call('agentlink_get_proof', { recordId: RECORD }, client);
+      expect(issuesOf(r.structured), stored).toBeUndefined();
+      expect(issuesOf(defaultView(r.structured)), stored).toBeUndefined();
+    }
+  });
+
+  it('notarize needs_credits results parse, with and without the top-up link', async () => {
+    for (const payPage of [LIVE_PAY, PAY_PAGE]) {
+      const { client } = fake({
+        notarize: () =>
+          ({
+            status: 'needs_credits',
+            topUp: { chainId: 84532, feeUsd: '0.1', usd: '0.1' },
+          }) as unknown as NotarizeResult,
+      });
+      const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client, { payPage });
+      expect(r.structured.status).toBe('needs_credits');
+      expect(r.structured['agentAddress']).toBe(A);
+      expect(issuesOf(r.structured), JSON.stringify(r.structured)).toBeUndefined();
+    }
+  });
+
+  it('notarize ok and submitted with a requested receipt carry receiptRequested and parse', async () => {
+    for (const status of ['ok', 'submitted'] as const) {
+      const { client } = fake({
+        notarize: () =>
+          ({
+            ...recorded(),
+            status,
+            fee: FEE_CANONICAL,
+            receiptRequested: true,
+          }) as NotarizeResult,
+      });
+      const r = await call(
+        'agentlink_notarize',
+        { envelopeId: ENVELOPE, requestReceipt: true },
+        client,
+      );
+      expect(r.structured, status).toMatchObject({
+        status,
+        advanced: { chain: 'base-sepolia' },
+        receiptRequested: true,
+      });
+      expect(r.structured, status).not.toHaveProperty('chain');
+      expect(issuesOf(r.structured), status).toBeUndefined();
+      expect(issuesOf(defaultView(r.structured)), status).toBeUndefined();
+    }
+  });
+});
+
+// ---- M1-36i-c: after free test credits, a bounded wait and one retry ------------------------------
+
+describe('free test credits: a bounded wait for them, then one retry (M1-36i-c)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const needs = (): NotarizeResult => ({
+    status: 'needs_credits',
+    topUp: {
+      chainId: 84532,
+      chain: 'base-sepolia',
+      token: 'USDC',
+      usd: '0.10',
+      feeUsd: '0.10',
+      agentAddress: A as `0x${string}`,
+    },
+  });
+  const PRICE = [
+    { action: 'notarize' as const, usd: '0.10', protocolUsd: '0.10', integratorUsd: '0' },
+  ];
+  const empty = (): AccountView => ({
+    credits: [{ chain: 'base-sepolia', token: 'USDC', amount: '0', usd: '0' }],
+    prices: PRICE,
+  });
+  const landed = (): AccountView => ({
+    credits: [{ chain: 'base-sepolia', token: 'USDC', amount: '1000000', usd: '1.00' }],
+    prices: PRICE,
+  });
+  const ADDED = 'Added free test credits so you can try proof.';
+  const JARGON = /faucet|\bgas\b|\btokens?\b|wallet|transaction|sepolia|chain|USDC/i;
+  /** First call needs credits; later calls answer with `then`. */
+  const sequence = (then: () => NotarizeResult) => {
+    let n = 0;
+    return () => {
+      n += 1;
+      return n === 1 ? needs() : then();
+    };
+  };
+  const counting = () => {
+    const claims: number[] = [];
+    return {
+      claims,
+      freeCredits: (chainId: number) => {
+        claims.push(chainId);
+        return Promise.resolve('added' as const);
+      },
+    };
+  };
+
+  it('the wait is a fixed constant, short enough for an AI app to wait for', () => {
+    expect(Object.isFrozen(FREE_CREDITS_WAIT)).toBe(true);
+    expect(FREE_CREDITS_WAIT.maxMs).toBeGreaterThan(0);
+    expect(FREE_CREDITS_WAIT.maxMs).toBeLessThanOrEqual(30_000);
+    expect(FREE_CREDITS_WAIT.intervalMs).toBeGreaterThan(0);
+    expect(FREE_CREDITS_WAIT.intervalMs).toBeLessThan(FREE_CREDITS_WAIT.maxMs);
+  });
+
+  it('claim, the credits arrive, exactly one retry records the proof', async () => {
+    let reads = 0;
+    const { claims, freeCredits } = counting();
+    const { client, calls } = fake({
+      notarize: sequence(recorded),
+      freeCredits,
+      account: () => {
+        reads += 1;
+        return reads < 2 ? empty() : landed();
+      },
+    });
+    const { value: r, elapsedMs } = await settle(
+      call('agentlink_notarize', { envelopeId: ENVELOPE }, client),
+    );
+    expect(claims).toEqual([84532]);
+    expect(calls.notarize).toHaveLength(2);
+    // The retry is the same request: nothing added, nothing widened.
+    expect(calls.notarize[1]).toEqual(calls.notarize[0]);
+    expect(reads).toBe(2);
+    expect(r.structured.status).toBe('ok');
+    expect(r.structured.summary).toContain(PROOF_TEXT.freeCreditsUsed);
+    expect(r.structured.summary).toContain('Proof recorded. $0.10 from credits.');
+    expect(r.structured.summary).not.toMatch(JARGON);
+    expect(r.structured).toMatchObject({ recordId: RECORD });
+    expect(elapsedMs).toBeLessThanOrEqual(FREE_CREDITS_WAIT.maxMs);
+  });
+
+  it('the retry still needs credits: no second retry, no second claim, the plain text', async () => {
+    const { claims, freeCredits } = counting();
+    const { client, calls } = fake({ notarize: needs, freeCredits, account: landed });
+    const { value: r } = await settle(call('agentlink_notarize', { envelopeId: ENVELOPE }, client));
+    expect(claims).toEqual([84532]);
+    expect(calls.notarize).toHaveLength(2);
+    expect(r.structured.status).toBe('needs_credits');
+    expect(r.structured.summary).toContain(ADDED);
+    expect(r.structured.nextStep).toContain('agentlink_notarize');
+    expect(r.structured.nextStep).toContain(ENVELOPE);
+    expect(r.structured).not.toHaveProperty('topUpUrl');
+    expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
+  });
+
+  it('the credits never arrive: the wait ends at the bound, no retry, the plain needs_credits text', async () => {
+    let reads = 0;
+    const { client, calls } = fake({
+      notarize: needs,
+      freeCredits: counting().freeCredits,
+      account: () => {
+        reads += 1;
+        return empty();
+      },
+    });
+    const { value: r, elapsedMs } = await settle(
+      call('agentlink_notarize', { envelopeId: ENVELOPE }, client),
+    );
+    expect(calls.notarize).toHaveLength(1);
+    expect(reads).toBeGreaterThan(0);
+    expect(reads).toBeLessThanOrEqual(
+      Math.ceil(FREE_CREDITS_WAIT.maxMs / FREE_CREDITS_WAIT.intervalMs),
+    );
+    expect(elapsedMs).toBeGreaterThanOrEqual(
+      FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs,
+    );
+    // The bound, plus at most one 250 ms step of `settle` itself.
+    expect(elapsedMs).toBeLessThanOrEqual(FREE_CREDITS_WAIT.maxMs + 250);
+    expect(r.structured.status).toBe('needs_credits');
+    expect(r.structured.summary).toContain(ADDED);
+    expect(r.structured.nextStep).toContain(ENVELOPE);
+    expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
+  });
+
+  it('credits below the price, no answer, or a read that throws count as not arrived', async () => {
+    const accounts: (() => AccountView | undefined)[] = [
+      () => ({
+        credits: [{ chain: 'base-sepolia', token: 'USDC', amount: '50000', usd: '0.05' }],
+        prices: PRICE,
+      }),
+      () => undefined,
+      () => {
+        throw new Error('https://rpc.example/CANARY-RPC');
+      },
+    ];
+    for (const account of accounts) {
+      const lines: string[] = [];
+      const { client, calls } = fake({
+        notarize: needs,
+        freeCredits: counting().freeCredits,
+        account,
+      });
+      const { value: r } = await settle(
+        call('agentlink_notarize', { envelopeId: ENVELOPE }, client, {
+          logger: createLogger({ level: 'debug', sink: (_at, line) => lines.push(line) }),
+        }),
+      );
+      expect(calls.notarize).toHaveLength(1);
+      expect(r.structured.status).toBe('needs_credits');
+      expect(dump(r)).not.toContain('CANARY');
+      expect(lines.join('\n')).not.toMatch(/CANARY|https?:\/\//);
+    }
+  });
+
+  it('paused or nothing claimed: no wait, no read, no retry', async () => {
+    for (const outcome of ['paused', 'none'] as const) {
+      const { client, calls } = fake({
+        notarize: needs,
+        freeCredits: () => Promise.resolve(outcome),
+      });
+      const { value: r, elapsedMs } = await settle(
+        call('agentlink_notarize', { envelopeId: ENVELOPE }, client),
+      );
+      expect(calls.log).not.toContain('account');
+      expect(calls.notarize).toHaveLength(1);
+      expect(elapsedMs).toBeLessThan(FREE_CREDITS_WAIT.intervalMs);
+      expect(r.structured.status).toBe('needs_credits');
+    }
+  });
+
+  it('a retry that fails is fixed text, and is never tried again', async () => {
+    const { client, calls } = fake({
+      notarize: sequence(() => {
+        throw Object.assign(new Error('https://rpc.example CANARY-RETRY'), {
+          name: 'ChainError',
+          code: 'rpc_timeout',
+        });
+      }),
+      freeCredits: counting().freeCredits,
+      account: landed,
+    });
+    const { value: r } = await settle(call('agentlink_notarize', { envelopeId: ENVELOPE }, client));
+    expect(calls.notarize).toHaveLength(2);
+    expect(r.structured).toMatchObject({ status: 'error', code: 'NETWORK' });
+    expect(dump(r)).not.toContain('CANARY');
+  });
+
+  it('send with notarize: the message is sent once, the proof retried once after the claim', async () => {
+    const { claims, freeCredits } = counting();
+    const { client, calls } = fake({
+      notarize: sequence(recorded),
+      freeCredits,
+      account: landed,
+    });
+    const { value: r } = await settle(
+      call('agentlink_send', { to: B, text: 'hi', notarize: true }, client),
+    );
+    expect(calls.sent).toHaveLength(1);
+    expect(claims).toEqual([84532]);
+    expect(calls.notarize).toHaveLength(2);
+    expect(r.structured).toMatchObject({ status: 'ok', envelopeId: ENVELOPE });
+    expect(r.structured.summary).toContain(PROOF_TEXT.freeCreditsUsed);
+    expect(r.structured.summary).toContain('Proof recorded.');
+    expect(r.structured).toMatchObject({ proof: { status: 'ok', recordId: RECORD } });
+  });
+
+  it('send with notarize: credits that never arrive leave one proof attempt and the plain text', async () => {
+    const { client, calls } = fake({
+      notarize: needs,
+      freeCredits: counting().freeCredits,
+      account: empty,
+    });
+    const { value: r } = await settle(
+      call('agentlink_send', { to: B, text: 'hi', notarize: true }, client),
+    );
+    expect(calls.sent).toHaveLength(1);
+    expect(calls.notarize).toHaveLength(1);
+    expect(r.structured).toMatchObject({ status: 'needs_credits', envelopeId: ENVELOPE });
+    expect(r.structured.summary).toContain(ADDED);
+  });
+});
+
+// ---- M1-36i-e: the free test credits wait counts against the approval wait -------------------------
+
+describe('one time budget per call: the free test credits wait shortens the approval wait (M1-36i-e)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const ORIGIN = 'http://localhost:47321';
+  /** Codex's approval wait (mcp/approval-wait.ts): its tool-call timeout is about 60 s. */
+  const CODEX_WAIT_MS = 30_000;
+  /** The approval read interval used here. */
+  const READ_MS = 1_000;
+  const pending = (): NotarizeResult => ({
+    status: 'pending_approval',
+    approvalId: APPROVAL,
+    actionDigest: 'd'.repeat(64),
+    summary: 'core text',
+    expiresAt: 1_760_700_000,
+  });
+  const needs = (): NotarizeResult => ({
+    status: 'needs_credits',
+    topUp: {
+      chainId: 84532,
+      chain: 'base-sepolia',
+      token: 'USDC',
+      usd: '0.10',
+      feeUsd: '0.10',
+      agentAddress: A as `0x${string}`,
+    },
+  });
+  const PRICE = [
+    { action: 'notarize' as const, usd: '0.10', protocolUsd: '0.10', integratorUsd: '0' },
+  ];
+  const view = (usd: string): AccountView => ({
+    credits: [{ chain: 'base-sepolia', token: 'USDC', amount: '0', usd }],
+    prices: PRICE,
+  });
+  /** The approval page is open (the link is in the result), and the owner has not decided yet. */
+  function waiting(client: ToolClient): { reads: () => number; ctx: ToolContext } {
+    let reads = 0;
+    (client as { approvalState: ToolClient['approvalState'] }).approvalState = () => {
+      reads += 1;
+      return Promise.resolve({
+        status: 'pending',
+        actionDigest: 'd'.repeat(64),
+        expiresAt: 1_760_700_000,
+      } as Awaited<ReturnType<ToolClient['approvalState']>>);
+    };
+    const ctx = context(client, {
+      approvalLink: (id: string) =>
+        Promise.resolve({
+          url: `${ORIGIN}/approve/${id}`,
+          origin: ORIGIN,
+          nextStep: `Never open or fetch this link yourself. Approve here: ${ORIGIN}/approve/${id}`,
+        }),
+    });
+    return { reads: () => reads, ctx };
+  }
+  /** Needs credits, the claim adds them, they arrive on the last read of the bounded wait. */
+  function slowCredits() {
+    let n = 0;
+    let accountReads = 0;
+    const lastRead = Math.floor(FREE_CREDITS_WAIT.maxMs / FREE_CREDITS_WAIT.intervalMs);
+    return fake({
+      notarize: () => {
+        n += 1;
+        return n === 1 ? needs() : pending();
+      },
+      freeCredits: () => Promise.resolve('added' as const),
+      account: () => {
+        accountReads += 1;
+        return accountReads < lastRead ? view('0') : view('1.00');
+      },
+    });
+  }
+  const options = (waitMs: number) => ({ approvalWaitMs: waitMs, approvalWaitIntervalMs: READ_MS });
+
+  it('a 20 s credits wait leaves only the rest of the approval wait: the call stays within it', async () => {
+    const { client, calls } = slowCredits();
+    const { reads, ctx } = waiting(client);
+    const { value: r, elapsedMs } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(CODEX_WAIT_MS)),
+    );
+    expect(calls.notarize).toHaveLength(2);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(r.structured.url).toBe(`${ORIGIN}/approve/${APPROVAL}`);
+    // The credits wait took its time, and the whole call still fits the approval budget.
+    expect(elapsedMs).toBeGreaterThanOrEqual(
+      FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs,
+    );
+    expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
+    // The approval was still waited for, just for the rest of the budget.
+    expect(reads()).toBeGreaterThan(0);
+    expect(reads()).toBeLessThanOrEqual(
+      (CODEX_WAIT_MS - (FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs)) / READ_MS,
+    );
+  });
+
+  it('a credits wait longer than the approval wait: the approval link comes back at once, no read', async () => {
+    const { client } = slowCredits();
+    const { reads, ctx } = waiting(client);
+    const { value: r, elapsedMs } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(10_000)),
+    );
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(r.structured.url).toBe(`${ORIGIN}/approve/${APPROVAL}`);
+    expect(reads()).toBe(0);
+    expect(elapsedMs).toBeLessThanOrEqual(FREE_CREDITS_WAIT.maxMs + 250);
+  });
+
+  it('no credits wait: the approval wait is the full budget, as before', async () => {
+    const { client, calls } = fake({ notarize: pending });
+    const { reads, ctx } = waiting(client);
+    const { value: r, elapsedMs } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(CODEX_WAIT_MS)),
+    );
+    expect(calls.notarize).toHaveLength(1);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(elapsedMs).toBeGreaterThanOrEqual(CODEX_WAIT_MS);
+    expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
+    expect(reads()).toBeGreaterThanOrEqual(CODEX_WAIT_MS / READ_MS - 1);
+  });
+
+  it('a wall clock that jumps back mid-call never gives the wait more time (monotonic budget)', async () => {
+    const { client } = slowCredits();
+    const { reads, ctx } = waiting(client);
+    const approvalState = client.approvalState;
+    let jumped = false;
+    // The wall clock jumps back a minute during the credits wait and again during the approval wait.
+    const account = client.proofs!.account;
+    (client.proofs as { account: typeof account }).account = (id) => {
+      vi.setSystemTime(Date.now() - 60_000);
+      return account(id);
+    };
+    (client as { approvalState: ToolClient['approvalState'] }).approvalState = (id) => {
+      if (!jumped) {
+        jumped = true;
+        vi.setSystemTime(Date.now() - 60_000);
+      }
+      return approvalState(id);
+    };
+    const started = performance.now();
+    const { value: r } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(CODEX_WAIT_MS)),
+    );
+    const elapsedMs = performance.now() - started;
+    expect(jumped).toBe(true);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(elapsedMs).toBeGreaterThanOrEqual(
+      FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs,
+    );
+    expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
+    expect(reads()).toBeLessThanOrEqual(
+      (CODEX_WAIT_MS - (FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs)) / READ_MS,
+    );
+  });
+});
+
+// ---- M1-36f: needs_credits says plainly what is missing and the one next step ----------------------
+
+describe('needs_credits says what is missing (M1-36f)', () => {
+  const route = (usd?: string, feeUsd?: string): NotarizeResult => ({
+    status: 'needs_credits',
+    topUp: {
+      chainId: 84532,
+      chain: 'base-sepolia',
+      token: 'USDC',
+      ...(usd === undefined ? {} : { usd }),
+      ...(feeUsd === undefined ? {} : { feeUsd }),
+      agentAddress: A as `0x${string}`,
+    } as never,
+  });
+  const JARGON =
+    /faucet|\bgas\b|\btokens?\b|wallet|transaction|sepolia|chain|USDC|deposit|network/i;
+
+  it('the price and the amount missing, in dollars; one next step with the link', async () => {
+    const { client } = fake({ notarize: () => route('1.00', '0.10') });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(r.structured.summary).toBe(
+      'Adding proof costs $0.10. This agent needs $1.00 more in credits.',
+    );
+    expect(r.structured.nextStep).toContain('Tell the user to add at least $1.00 here: ');
+    expect(r.structured.nextStep).toContain('Then call this tool again.');
+    expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
+  });
+
+  it('without the amount missing: the price only; without the price: plain words', async () => {
+    const priceOnly = fake({ notarize: () => route(undefined, '0.10') });
+    const a = await call('agentlink_notarize', { envelopeId: ENVELOPE }, priceOnly.client);
+    expect(a.structured.summary).toBe(
+      "Adding proof costs $0.10, and this agent doesn't have enough credits for it.",
+    );
+    const nothing = fake({ notarize: () => ({ status: 'needs_credits', recordId: RECORD }) });
+    const b = await call('agentlink_notarize', { envelopeId: ENVELOPE }, nothing.client);
+    expect(b.structured.summary).toBe("This agent doesn't have enough credits to add proof.");
+    for (const r of [a, b]) {
+      expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
+    }
+  });
+
+  it('while adding credits is not available: says so, and never a link', async () => {
+    const { client } = fake({ notarize: () => route('1.00', '0.10') });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client, {
+      payPage: PAY_PAGE,
+    });
+    expect(r.structured.nextStep).toBe(PROOF_TEXT.needsCreditsNoLink);
+    expect(r.structured.nextStep).toBe(
+      'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
+    );
+    expect(dump(r)).not.toMatch(/https?:\/\/|#v=1/);
+    expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
   });
 });
