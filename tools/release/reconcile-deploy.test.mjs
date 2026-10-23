@@ -96,10 +96,12 @@ const gateRoutes = (conclusion = 'success') => {
 };
 
 // Production runs DEPLOYED (run 100); main's head HEAD touched apps/submitter; no run for HEAD.
-const routes = ({ headRuns = [], files = ['apps/submitter/src/index.ts'], ...overrides } = {}) => ({
+const routes = ({ headRuns = [], otherRuns = [], files = ['apps/submitter/src/index.ts'], ...overrides } = {}) => ({
   [headPath]: () => ({ sha: HEAD }),
   [runsPath]: (q) =>
-    q.get('head_sha') === HEAD ? { workflow_runs: headRuns } : { workflow_runs: [wfRun(100)] },
+    q.get('head_sha') === HEAD
+      ? { workflow_runs: headRuns }
+      : { workflow_runs: [wfRun(100), ...otherRuns] },
   [jobsPath(100)]: () => ({ jobs: [{ name: 'build', conclusion: 'success' }, deployJob()] }),
   [comparePath]: () => ({ status: 'ahead', files: files.map((filename) => ({ filename })) }),
   [dispatchPath]: () => undefined,
@@ -266,11 +268,40 @@ describe('reconcile', () => {
     expect(dispatched(calls)).toEqual([]);
   });
 
-  it('does nothing when no production deploy is found', async () => {
+  it('does nothing when no production deploy is found, and raises a warning in the log and the summary', async () => {
     const r = routes({ [jobsPath(100)]: () => ({ jobs: [deployJob('skipped')] }) });
-    const { result, calls } = await go(r);
+    const { result, calls, lines, summary } = await go(r);
     expect(result).toMatchObject({ action: 'none', reason: 'unknown' });
     expect(dispatched(calls)).toEqual([]);
+    expect(lines.join('\n')).toMatch(/::warning::.*no production deploy/);
+    expect(lines.join('\n')).not.toMatch(/::notice::/);
+    expect(summary.join('\n')).toMatch(/no production deploy/);
+  });
+
+  it('allows one pending approval per service: a run waiting for an older head blocks a new dispatch', async () => {
+    const OLD = 'a'.repeat(40);
+    // Several heads have landed since; one run for an older head still waits for the owner.
+    const waiting = wfRun(150, { head_sha: OLD, status: 'waiting', conclusion: null });
+    const { result, calls, lines, summary } = await go(routes({ otherRuns: [waiting] }));
+    expect(result).toMatchObject({ action: 'none', reason: 'approval-pending', runId: 150 });
+    expect(dispatched(calls)).toEqual([]);
+    expect(lines.join('\n')).toMatch(/::warning::.*150/);
+    expect(summary.join('\n')).toMatch(/approve or cancel/i);
+  });
+
+  it('a waiting dispatch run on main also counts, and a completed or other-branch run does not', async () => {
+    const waiting = wfRun(151, {
+      head_sha: 'd'.repeat(40),
+      event: 'workflow_dispatch',
+      status: 'waiting',
+      conclusion: null,
+    });
+    expect((await go(routes({ otherRuns: [waiting] }))).result.reason).toBe('approval-pending');
+    const other = [
+      wfRun(152, { head_sha: 'a'.repeat(40), head_branch: 'feature', status: 'waiting' }),
+      wfRun(153, { head_sha: 'a'.repeat(40), status: 'in_progress' }),
+    ];
+    expect((await go(routes({ otherRuns: other }))).result.action).toBe('dispatched');
   });
 
   it('throws when the head of main cannot be read', async () => {
