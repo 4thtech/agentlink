@@ -6,7 +6,8 @@
 // Nothing here is a real key or signature.
 import { SELF, createExecutionContext, env as testEnv, runInDurableObject } from 'cloudflare:test';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getChainConfig, type Hex } from '@4thtech-io/chain';
+import { depositAuthorizationRequestBody, getChainConfig, type Hex } from '@4thtech-io/chain';
+import { encodeHex, encodeUtf8, sha256 } from '@4thtech-io/crypto';
 import type { SubmitterEnv } from '../src/worker.js';
 import { METRICS } from '../src/limits.js';
 import worker from './worker-entry.js';
@@ -290,7 +291,10 @@ describe('refusals before any send', () => {
     ];
     for (const body of bodies) {
       const res = await answer(await post(body));
-      expect(res, JSON.stringify(body)).toEqual({ status: 400, body: { error: 'bad_request' } });
+      expect(res, JSON.stringify(body)).toEqual({
+        status: 400,
+        body: { status: 'failed', error: 'bad_request' },
+      });
     }
     expect(relay.checks).toHaveLength(0);
   });
@@ -298,7 +302,7 @@ describe('refusals before any send', () => {
   it('refuses a body over the size limit', async () => {
     const res = await post(JSON.stringify({ ...request(), pad: 'x'.repeat(4096) }));
     expect(res.status).toBe(413);
-    expect(await res.json()).toEqual({ error: 'too_large' });
+    expect(await res.json()).toEqual({ status: 'failed', error: 'too_large' });
   });
 
   it('refuses a payee other than the chain vault before any chain read', async () => {
@@ -391,6 +395,87 @@ describe('rate limits', () => {
   });
 });
 
+describe('hardening (M3-4b-t-T3-b, IR-M3-4b-t-T3-1)', () => {
+  const relayStub = () =>
+    env.SUBMITTER_DEPOSIT_RELAY!.get(
+      env.SUBMITTER_DEPOSIT_RELAY!.idFromName(`deposit:${String(CHAIN_ID)}`),
+    );
+
+  it('refuses at once, sending nothing, while the relay wallet has too many transactions pending', async () => {
+    relay.pending = 20;
+    relay.latest = 16; // 4 pending: above the bound
+    const from = newAgent();
+    const res = await answer(await post(request({ from })));
+    expect(res).toEqual({ status: 503, body: { status: 'failed', error: 'unavailable' } });
+    expect(relay.sends).toHaveLength(0);
+    expect(relay.checks).toHaveLength(0);
+    relay.latest = 17; // 3 pending: within the bound
+    expect((await post(request({ from }))).status).toBe(200);
+    expect(relay.sends).toHaveLength(1);
+  });
+
+  it('does not use up the agent quota when the send fails', async () => {
+    const from = newAgent();
+    relay.failSend = true;
+    for (let i = 0; i < 5; i += 1) {
+      expect((await post(request({ from }))).status).toBe(503);
+    }
+    relay.failSend = false;
+    for (let i = 0; i < 5; i += 1) {
+      expect((await post(request({ from }))).status).toBe(200);
+    }
+    expect((await post(request({ from }))).status).toBe(429);
+    expect(relay.sends).toHaveLength(5);
+  });
+
+  it('records an authorization before sending it, so a crash mid-send never sends it twice', async () => {
+    const req = request();
+    const digest = encodeHex(
+      sha256(encodeUtf8(JSON.stringify(depositAuthorizationRequestBody(req as never)))),
+    );
+    // What a crash between the record and the send's answer leaves behind.
+    await runInDurableObject(relayStub(), async (_i, state) => {
+      await state.storage.put(`a:${req.auth.from}:${req.auth.nonce}`, { d: digest, at: NOW });
+    });
+    expect(await answer(await post(req))).toEqual({
+      status: 503,
+      body: { status: 'failed', error: 'unavailable' },
+    });
+    relay.used = true; // the first send landed
+    expect(await answer(await post(req))).toEqual({
+      status: 409,
+      body: { status: 'failed', error: 'already_used' },
+    });
+    expect(relay.sends).toHaveLength(0);
+    expect(relay.checks).toHaveLength(0);
+  });
+
+  it('caps the requests that reach the relay per hour across all IPs and agents', async () => {
+    const later = NOW + 7 * 86_400; // a fresh hourly window
+    vi.setSystemTime(new Date(later * 1000));
+    const capped = { ...env, SUBMITTER_DEPOSIT_AUTH_REQUESTS_PER_HOUR: '3' } as SubmitterEnv;
+    const send = (body: unknown) =>
+      worker.fetch(
+        new Request(`${HOST}/v1/deposit-authorization`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'cf-connecting-ip': newIp() },
+          body: typeof body === 'string' ? body : JSON.stringify(body),
+        }),
+        capped,
+        createExecutionContext(),
+      );
+    const fresh = () => request({ validBefore: String(later + 900) });
+    expect((await send('not json')).status).toBe(400); // a malformed body is not counted
+    for (let i = 0; i < 3; i += 1) expect((await send(fresh())).status).toBe(200);
+    const res = await send(fresh());
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ status: 'failed', error: 'rate_limited' });
+    expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect(relay.checks).toHaveLength(3);
+    expect(relay.sends).toHaveLength(3);
+  });
+});
+
 describe('logging canary (07 §7, I-7)', () => {
   it('stored nothing that ties an IP to an agent', async () => {
     const req = request();
@@ -417,7 +502,12 @@ describe('logging canary (07 §7, I-7)', () => {
       (await runInDurableObject(stub, (_i, state) =>
         state.storage.get<Record<string, unknown>>('m'),
       )) ?? {};
-    for (const name of ['request_deposit_auth', 'deposit_auth_submitted', 'deposit_auth_refused']) {
+    for (const name of [
+      'request_deposit_auth',
+      'deposit_auth_submitted',
+      'deposit_auth_refused',
+      'deposit_relay_stuck',
+    ]) {
       expect(METRICS as readonly string[]).toContain(name);
       expect(metrics[name]).toBeGreaterThan(0);
     }

@@ -140,7 +140,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M2-17 Privacy of on-chain proofs, M2 part (D-109) | contracts, chain, core, console | Per-relationship signing addresses with proof of possession and no per-address funding (M2-17a); a Registry whose events and calldata carry no guessable identifier (M2-17b, before M2-4a); optional delayed or batched receipts (M2-17c). Contract changes land before the M3 audit |
 | M2-18 Adding credits on the pay page (D-111) | apps/pay, docs | With the pay page (M2-2f): use crypto you already have (connect the user's own account, network detected, one confirmation) and send from an exchange (address, QR, minimum, wrong-network help) on testnets, plus free test credits; payment progress and records. Crypto first: nothing waits for a card path (D-111). Design brief `docs/design/topup-ux.md` |
 
-**Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met; no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
+**Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met by the D-125 rule (median < 5 min, at least 80% of testers < 5 min, no tester > 15 min for a cause on our side); no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
 
 ## M3 — Mainnet beta (≈ 4 weeks, includes audit)
 

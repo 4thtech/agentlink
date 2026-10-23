@@ -35,6 +35,10 @@ export class FakeRelay implements DepositRelayChain {
   sendDelayMs = 0;
   /** The gas wallet's pending nonce, as the chain reports it. */
   pending = 7;
+  /** The gas wallet's latest (mined) nonce; null: everything sent is mined (equal to `pending`). */
+  latest: number | null = null;
+  /** What `authorizationUsed` answers (the token's `authorizationState`). */
+  used = false;
   /** Receipt status per sent hash; `pending` when absent. */
   readonly statuses = new Map<string, 'pending' | 'success' | 'reverted'>();
   /** Every check and send, in order. */
@@ -58,7 +62,7 @@ export class FakeRelay implements DepositRelayChain {
   }
 
   authorizationUsed(): Promise<boolean> {
-    return Promise.resolve(false);
+    return Promise.resolve(this.used);
   }
 
   pendingNonce(): Promise<number> {
@@ -66,7 +70,7 @@ export class FakeRelay implements DepositRelayChain {
   }
 
   latestNonce(): Promise<number> {
-    return Promise.resolve(this.pending);
+    return Promise.resolve(this.latest ?? this.pending);
   }
 
   async send(request: DepositAuthorizationRequest, options: SendOptions): Promise<Hex> {
