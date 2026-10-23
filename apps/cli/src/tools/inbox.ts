@@ -43,7 +43,7 @@ import type { InboxPageQuery, PageFile, PageItem, ToolContext } from './context.
 import { fail, invalidArgument, ok, type HandlerOutput } from './result.js';
 import { copy, UNTRUSTED_FOOTER } from './strings/index.js';
 import { addressLabel } from './terms-common.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerResult } from './text.js';
 import {
   removeInvisible,
   sanitizeUntrustedText,
@@ -298,11 +298,7 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
 
   const { client, logger } = context;
   if ((await client.self()) === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
 
   let contactId: string | undefined;

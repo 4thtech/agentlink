@@ -575,7 +575,9 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
     w.answers.push('a');
     expect(await w.run(['approve'])).toBe(0);
     expect(w.asked).toHaveLength(1);
-    expect(w.out).toContain(`Decide this one on its own: \`agentlink approve ${scoped}\``);
+    expect(w.out).toContain(
+      `Decide this one on its own: \`npx -y @4thtech-io/agentlink approve ${scoped}\``,
+    );
     expect((w.codeEntries[0]?.reviewed ?? []).map((i) => i.approvalId)).toEqual([r.approvalId]);
     expect((await row(w, scoped))?.status).toBe('pending');
   });

@@ -159,6 +159,10 @@ export {
   type OwnStorageKeys,
   type OwnStorageProblem,
   type OwnStorageState,
+  type OwnStorageStatus,
+  type OwnStorageTest,
+  type OwnStorageTestCode,
+  type OwnStorageTestInput,
   type StorageMark,
 } from './own-storage.js';
 export {
@@ -361,6 +365,14 @@ export type {
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
 export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
+// M1-11r-c: the Storage page's drop meter (07 §5.4 Limits). Numbers only.
+export {
+  DROP_NEAR_FRACTION,
+  DROP_QUOTA_WINDOW_SECONDS,
+  DROP_WEEKLY_QUOTA_BYTES,
+  type DropUsage,
+  type DropUsageLevel,
+} from './files/usage.js';
 export {
   PROOF_AWAITING_PER_CONTACT,
   PROOF_LOG_CODES,

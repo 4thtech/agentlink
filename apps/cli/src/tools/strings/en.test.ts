@@ -42,6 +42,7 @@ const SAMPLES: Record<string, string | number> = {
   denied: 1,
   total: 4,
   receipt: 'opened',
+  prefix: 'npx -y @4thtech-io/agentlink',
 };
 
 function sampleParams(key: CopyKey): CopyParams {
