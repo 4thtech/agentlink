@@ -112,7 +112,10 @@ describe('createChainState', () => {
     // viem names a no-argument error from its selector and ignores any bytes after it, so a buggy
     // or malicious RPC could dress another answer up as RecordNotFound. Only the exact 4-byte
     // selector is the Notary's "absent"; anything else fails, so no replacement is decided on it.
-    const bare = encodeErrorResult({ abi: NOTARY_CLIENT_ABI, errorName: 'RecordNotFound' as never });
+    const bare = encodeErrorResult({
+      abi: NOTARY_CLIENT_ABI,
+      errorName: 'RecordNotFound' as never,
+    });
     const errorString = encodeErrorResult({
       abi: [{ type: 'error', name: 'Error', inputs: [{ name: 'message', type: 'string' }] }],
       errorName: 'Error',
