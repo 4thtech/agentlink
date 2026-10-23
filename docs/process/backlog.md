@@ -4521,7 +4521,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split:** the deploy work moved to M1-19-b (the page itself shipped in #348); the Deploy (D-25) bullet above is carried out there.
 
 #### M1-19-b · Invite page: deploy pipeline and `nameHash` check (new, #348)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · apps/invite, `.github/workflows/` (invite deploy)
 - **Depends on:** M1-19
 - **Spec:** 04 §3.6; 08 §4; D-28, D-53

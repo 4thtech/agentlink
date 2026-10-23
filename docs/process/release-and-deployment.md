@@ -295,7 +295,7 @@ This section and §4.6 are the **contract** for the Cloudflare deploy workflows.
 | Integrity | SRI on all scripts; CSP and security headers per 08 §2.3 and `audit-rules.md` WEB-1…WEB-6; self-hosted fonts. |
 | Origins | Separate origins (§1.1). |
 | Hashes | Published in the GitHub release; the console shows its build hash in Settings. |
-| Deploy | Workers static assets through the Cloudflare deploy workflow: staging automatically on merge (`workers.dev`); production automatically once staging smoke is green (Workers Custom Domains, D-52). |
+| Deploy | Workers static assets through the Cloudflare deploy workflow: staging automatically on merge (`workers.dev`); production automatically once staging smoke is green (Workers Custom Domains, D-52). The invite page deploys through `deploy-invite.yml` (M1-19-b): the built site is hashed once, and staging and production serve exactly those files; the smoke test and the production health check compare the served pages and script with the build byte for byte and check the headers of 08 §4. |
 | Verify | Served asset hashes equal the release manifest; headers checked; the fragment-never-sent test runs against staging, and the header and hash checks also against production. |
 | Rollback | Automatic in `deploy-production`: back to the previous version, hash-identical. Clients may cache; a service-worker update may be needed. |
 

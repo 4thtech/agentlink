@@ -266,61 +266,64 @@ describe('parseArgs', () => {
 });
 
 // The `catch-up` job of both deploy workflows.
-describe.each(['deploy-submitter.yml', 'deploy-drop.yml'])('%s catch-up job', (file) => {
-  const source = readFileSync(
-    resolve(import.meta.dirname, `../../.github/workflows/${file}`),
-    'utf8',
-  );
-  const jobOf = (name) => {
-    const start = source.indexOf(`\n  ${name}:\n`);
-    if (start < 0) return '';
-    const rest = source.slice(start + 1);
-    const next = rest.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
-    return next < 0 ? rest : rest.slice(0, next + 2);
-  };
-  const catchUpJob = jobOf('catch-up');
-
-  it('exists, with a timeout, and runs only after main moved on', () => {
-    expect(catchUpJob).not.toBe('');
-    expect(catchUpJob).toMatch(/timeout-minutes: \d+/);
-    expect(catchUpJob).toMatch(/needs: \[ci-green, deploy-production\]/);
-    const condition = catchUpJob.slice(
-      catchUpJob.indexOf('\n    if:'),
-      catchUpJob.indexOf('\n    runs-on:'),
+describe.each(['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml'])(
+  '%s catch-up job',
+  (file) => {
+    const source = readFileSync(
+      resolve(import.meta.dirname, `../../.github/workflows/${file}`),
+      'utf8',
     );
-    expect(condition).toMatch(/always\(\)/);
-    expect(condition).toMatch(/github\.repository == '4thtech\/agentlink'/);
-    expect(condition).toMatch(/github\.ref == 'refs\/heads\/main'/);
-    expect(condition).toMatch(/needs\.ci-green\.outputs\.result == 'superseded'/);
-    expect(condition).toMatch(/needs\.deploy-production\.outputs\.current == 'false'/);
-  });
+    const jobOf = (name) => {
+      const start = source.indexOf(`\n  ${name}:\n`);
+      if (start < 0) return '';
+      const rest = source.slice(start + 1);
+      const next = rest.slice(1).search(/\n {2}[a-z][a-z0-9-]*:\n/);
+      return next < 0 ? rest : rest.slice(0, next + 2);
+    };
+    const catchUpJob = jobOf('catch-up');
 
-  // CHORE-DEPLOY-CATCHUP: a ci-green failure (a flake on this commit) also hands off to main's head.
-  it("also runs when this commit's CI failed", () => {
-    const condition = catchUpJob.slice(
-      catchUpJob.indexOf('\n    if:'),
-      catchUpJob.indexOf('\n    runs-on:'),
-    );
-    expect(condition).toMatch(/needs\.ci-green\.result == 'failure'/);
-  });
+    it('exists, with a timeout, and runs only after main moved on', () => {
+      expect(catchUpJob).not.toBe('');
+      expect(catchUpJob).toMatch(/timeout-minutes: \d+/);
+      expect(catchUpJob).toMatch(/needs: \[ci-green, deploy-production\]/);
+      const condition = catchUpJob.slice(
+        catchUpJob.indexOf('\n    if:'),
+        catchUpJob.indexOf('\n    runs-on:'),
+      );
+      expect(condition).toMatch(/always\(\)/);
+      expect(condition).toMatch(/github\.repository == '4thtech\/agentlink'/);
+      expect(condition).toMatch(/github\.ref == 'refs\/heads\/main'/);
+      expect(condition).toMatch(/needs\.ci-green\.outputs\.result == 'superseded'/);
+      expect(condition).toMatch(/needs\.deploy-production\.outputs\.current == 'false'/);
+    });
 
-  it('dispatches this same workflow with only actions: write and contents: read, no environment or secrets', () => {
-    expect(catchUpJob).toMatch(/permissions:\n {6}actions: write\b[^\n]*\n {6}contents: read\n/);
-    expect(catchUpJob).not.toMatch(/environment:|secrets\.|id-token/);
-    expect(catchUpJob).toContain(`node tools/release/catch-up-deploy.mjs --workflow ${file}`);
-    expect(catchUpJob).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
-  });
+    // CHORE-DEPLOY-CATCHUP: a ci-green failure (a flake on this commit) also hands off to main's head.
+    it("also runs when this commit's CI failed", () => {
+      const condition = catchUpJob.slice(
+        catchUpJob.indexOf('\n    if:'),
+        catchUpJob.indexOf('\n    runs-on:'),
+      );
+      expect(condition).toMatch(/needs\.ci-green\.result == 'failure'/);
+    });
 
-  it('is the only job that may write actions', () => {
-    const writers = [...source.matchAll(/\n {2}([a-z][a-z0-9-]*):\n/g)]
-      .map((m) => m[1])
-      .filter((name) => /actions: write/.test(jobOf(name)));
-    expect(writers).toEqual(['catch-up']);
-  });
+    it('dispatches this same workflow with only actions: write and contents: read, no environment or secrets', () => {
+      expect(catchUpJob).toMatch(/permissions:\n {6}actions: write\b[^\n]*\n {6}contents: read\n/);
+      expect(catchUpJob).not.toMatch(/environment:|secrets\.|id-token/);
+      expect(catchUpJob).toContain(`node tools/release/catch-up-deploy.mjs --workflow ${file}`);
+      expect(catchUpJob).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
+    });
 
-  it('deploy-production publishes whether this commit was still the head of main', () => {
-    expect(jobOf('deploy-production')).toMatch(
-      /outputs:\n(?: {6}.*\n)* {6}current: \$\{\{ steps\.head\.outputs\.current \}\}\n/,
-    );
-  });
-});
+    it('is the only job that may write actions', () => {
+      const writers = [...source.matchAll(/\n {2}([a-z][a-z0-9-]*):\n/g)]
+        .map((m) => m[1])
+        .filter((name) => /actions: write/.test(jobOf(name)));
+      expect(writers).toEqual(['catch-up']);
+    });
+
+    it('deploy-production publishes whether this commit was still the head of main', () => {
+      expect(jobOf('deploy-production')).toMatch(
+        /outputs:\n(?: {6}.*\n)* {6}current: \$\{\{ steps\.head\.outputs\.current \}\}\n/,
+      );
+    });
+  },
+);
