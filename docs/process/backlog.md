@@ -4263,7 +4263,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures render inert in every component; no `style=` attribute in rendered output; owner confirms visual match.
 
 #### M1-35b-b · ui: components, brief B-2 (new, D-118)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
 - **Depends on:** M1-35b, M1-35c-b; design brief B-2 (`docs/design/adjustments.md`)
 - **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
