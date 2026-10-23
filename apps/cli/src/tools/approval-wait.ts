@@ -35,6 +35,19 @@ export interface ApprovalWaitOptions {
   readonly intervalMs?: number;
 }
 
+/**
+ * M1-36i-e: one time budget per tool call. The approval wait is what is left of the harness's
+ * budget after the time the call has already spent (a free test credits wait, M1-36i-c, can take
+ * about 20 s): never more than `waitMs`, never less than 0. At 0 the linked pending_approval comes
+ * back at once, so the call stays under the harness's tool-call timeout. A clock that went
+ * backwards or a value that is not a number counts as nothing spent (never a longer wait).
+ */
+export function approvalWaitLeft(waitMs: number, spentMs: number): number {
+  if (!(waitMs > 0) || !Number.isFinite(waitMs)) return 0;
+  const spent = Number.isFinite(spentMs) && spentMs > 0 ? spentMs : 0;
+  return Math.max(0, waitMs - spent);
+}
+
 type Decision = 'approved' | 'denied' | undefined;
 
 /** Resolves after `ms`, or at once when `signal` aborts. Never rejects. */
@@ -104,14 +117,15 @@ export async function waitForApprovalDecision(
     return output;
   }
   const interval = Math.max(1, options.intervalMs ?? APPROVAL_WAIT_INTERVAL_MS);
-  const deadline = Date.now() + options.waitMs;
+  // Monotonic (M1-36i-e): a wall clock change never moves the deadline.
+  const deadline = performance.now() + options.waitMs;
   // A function, so each check reads the signal now (it can abort during any await).
   const cancelled = (): boolean => signal?.aborted === true;
   for (;;) {
-    const left = deadline - Date.now();
+    const left = deadline - performance.now();
     if (left <= 0) return output;
     await pause(Math.min(interval, left), signal);
-    if (cancelled() || Date.now() > deadline) return output;
+    if (cancelled() || performance.now() > deadline) return output;
     const decision = await readDecision(context, approvalId);
     if (cancelled()) return output;
     if (decision === 'other') return output;
