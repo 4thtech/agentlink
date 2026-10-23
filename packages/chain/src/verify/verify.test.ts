@@ -37,6 +37,7 @@ import { loadOccV2Contracts, type OccV2Contracts } from '../occ-v2.js';
 import { composeChainConfig } from '../clients/registry.js';
 import { NOTARY_CLIENT_ABI, createReadClient, getChainConfig } from '../clients/index.js';
 import { ChainInputError, computeRecordId } from '../ids/index.js';
+import { createSubmitterChain } from '../submitter/index.js';
 import * as packageRoot from '../index.js';
 import {
   MAX_PROOF_PACK_BYTES,
@@ -330,7 +331,7 @@ interface RecordState {
 }
 
 interface FakeChain {
-  /** getRecord answers by record ID; a missing ID returns the empty struct, as the contract does. */
+  /** getRecord answers by record ID; a missing ID reverts RecordNotFound(), as the Notary does. */
   records?: Map<string, RecordState>;
   /** getRecord at the `finalized` tag; default: the same as `records`. */
   finalizedRecords?: Map<string, RecordState>;
@@ -350,13 +351,21 @@ interface FakeChain {
   txDown?: boolean;
   down?: boolean;
   /**
-   * getRecord reverts with this raw data for an ID it does not hold (at that tag), as the deployed
-   * Notary does with RecordNotFound(); default: it answers the empty struct.
+   * getRecord reverts with this raw data for an ID it does not hold (at that tag); default: the bare
+   * RecordNotFound() selector, as the deployed Notary does.
    */
   missingRevert?: string;
+  /** getRecord answers the empty struct (a zero signer) for an ID it does not hold, not a revert. */
+  emptyStruct?: boolean;
 }
 
 type RpcCall = { method: string; to?: string; fn?: string; tag?: string };
+
+/** The deployed Notary's revert for an unknown record ID: the bare RecordNotFound() selector. */
+const RECORD_NOT_FOUND_DATA = encodeErrorResult({
+  abi: NOTARY_CLIENT_ABI,
+  errorName: 'RecordNotFound',
+} as never);
 
 const EMPTY_STATE: RecordState = {
   signer: `0x${'0'.repeat(40)}`,
@@ -409,12 +418,16 @@ function chainFetch(config: ChainConfig, chain: FakeChain) {
       const source =
         tag === 'finalized' ? (chain.finalizedRecords ?? chain.records) : chain.records;
       const held = source?.get(recordId);
-      if (held === undefined && chain.missingRevert !== undefined) {
+      if (held === undefined && chain.emptyStruct !== true) {
         return new Response(
           JSON.stringify({
             jsonrpc: '2.0',
             id: body.id,
-            error: { code: 3, message: 'execution reverted', data: chain.missingRevert },
+            error: {
+              code: 3,
+              message: 'execution reverted',
+              data: chain.missingRevert ?? RECORD_NOT_FOUND_DATA,
+            },
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
@@ -1073,6 +1086,57 @@ describe('verifyProofPack: finality (IR-M1-4d-1 M-3)', () => {
     for (const data of ['0x', '0xdeadbeef']) {
       const { reader } = chainFor(base(), { missingRevert: data });
       expectFailure(await verify(f.pack, [reader]), 'chain_unavailable');
+    }
+  });
+
+  // M1-4d-g: only the bare 4-byte selector is RecordNotFound(), as the submitter port reads it
+  // (#342). viem decodes a no-argument error and ignores bytes after it; those are not the Notary's.
+  it('RecordNotFound with trailing bytes is chain_unavailable, never record_not_found', async () => {
+    const f = await eoaFixture();
+    for (const tail of ['00', '00'.repeat(32), 'deadbeef']) {
+      const { reader } = chainFor(base(), { missingRevert: `${RECORD_NOT_FOUND}${tail}` });
+      expectFailure(await verify(f.pack, [reader]), 'chain_unavailable');
+    }
+  });
+
+  it('RecordNotFound with trailing bytes at finalized does not fall through to latest', async () => {
+    const f = await eoaFixture();
+    const { reader, calls } = chainFor(base(), {
+      records: new Map([[f.recordId, f.state]]),
+      finalizedRecords: new Map(),
+      missingRevert: `${RECORD_NOT_FOUND}00`,
+    });
+    expectFailure(await verify(f.pack, [reader]), 'chain_unavailable');
+    expect(calls.filter((c) => c.fn === 'getRecord').map((c) => c.tag)).toEqual(['finalized']);
+  });
+
+  it('the verifier and the submitter port agree on the same getRecord reverts', async () => {
+    const f = await eoaFixture();
+    const otherError = encodeErrorResult({
+      abi: [{ type: 'error', name: 'Error', inputs: [{ name: 'm', type: 'string' }] }],
+      errorName: 'Error',
+      args: ['RecordNotFound'],
+    });
+    const fixtures: { data: string; absent: boolean }[] = [
+      { data: RECORD_NOT_FOUND, absent: true },
+      { data: `${RECORD_NOT_FOUND}00`, absent: false },
+      { data: `${RECORD_NOT_FOUND}${'00'.repeat(32)}`, absent: false },
+      { data: '0x', absent: false },
+      { data: '0xdeadbeef', absent: false },
+      { data: otherError, absent: false },
+    ];
+    for (const { data, absent } of fixtures) {
+      const { reader, fetchFn } = chainFor(base(), { missingRevert: data });
+      const verdict = await verify(f.pack, [reader]);
+      expectFailure(verdict, absent ? 'record_not_found' : 'chain_unavailable');
+      const port = createSubmitterChain(base(), {
+        fetchFn: fetchFn as never,
+        gasKey: `0x${'11'.repeat(32)}`,
+        rpcUrls: [SECRET_RPC_URL],
+      });
+      const read = port.recordReceipts(f.recordId as never);
+      if (absent) await expect(read).resolves.toEqual({ charged: false, set: [] });
+      else await expect(read).rejects.toMatchObject({ code: 'rpc_error' });
     }
   });
 });
