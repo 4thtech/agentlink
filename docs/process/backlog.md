@@ -3767,7 +3767,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-27a-2 (PR #218, open), 2026-10-17): tighten per-network limits; account downloads after delivery; document URL normalisation in 07 §5.4; set `cpu_ms` in the deploy config; add a header-whitespace test.
 
 #### M1-27b-b · drop: deploy pipeline follow-ups (new, follow-up from #255)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (rollback on cancel and timeout, `cpu_ms`, lifecycle check before the deploy; `actionlint` and the 100 MB staging round trip stay open) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `.github/workflows/deploy-drop.yml`, `docs/process/release-and-deployment.md`
 - **Depends on:** M1-27b
 - **Spec:** `release-and-deployment.md` §4.5, §8; 07 §5.4
