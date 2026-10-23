@@ -137,15 +137,16 @@ for (const [file, exports] of Object.entries(modules)) {
     }
   }
 }
-const WANTED = /nextstep|hint|tail/i;
+/** Every string in a sheet, recursing into nested objects. */
+function strings(value: unknown, path: string): (readonly [string, string])[] {
+  if (typeof value === 'string') return [[path, value]];
+  if (typeof value !== 'object' || value === null) return [];
+  return Object.entries(value).flatMap(([key, inner]) => strings(inner, `${path}.${key}`));
+}
 const filler = (key: string): string => (/approvalId/i.test(key) ? APPROVAL : ENVELOPE);
 
 describe('every fixed nextStep and hint text stays within 500 code points', () => {
-  const entries = Object.entries(sheets).flatMap(([sheet, texts]) =>
-    Object.entries(texts)
-      .filter(([key, value]) => WANTED.test(key) && typeof value === 'string')
-      .map(([key, value]) => [`${sheet}.${key}`, value as string] as const),
-  );
+  const entries = Object.entries(sheets).flatMap(([sheet, texts]) => strings(texts, sheet));
 
   it('discovers all the text sheets', () => {
     const names = Object.keys(sheets).map((s) => s.split('#')[1]);
