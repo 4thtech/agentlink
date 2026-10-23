@@ -272,21 +272,29 @@ function namesOwner(
   );
 }
 
+/** M1-11s-c: what signFirstCardWith found in core afterwards. */
+export type FirstCardOutcome =
+  | { readonly kind: 'signed'; readonly card: AgentCard }
+  /** No verified card naming this owner is stored: the caller rolls the new owner back. */
+  | { readonly kind: 'not_signed' }
+  /** Core could not be read back: whether a card names this owner is unknown (keep the owner). */
+  | { readonly kind: 'unknown' };
+
 /**
- * M1-8h: signs and stores the first card with the owner just stored, unlocked once with `secret`
- * (a copy; `secret` itself is wiped by the caller). Whatever happens, the result is read back from
- * core: a verified card for this agent naming this owner is success; anything else removes the new
- * owner item, only if it is still `blob` (the item this run stored, IR-M1-8h-1 L2), and is
- * `owner_card_failed` (fixed text; the cause is not echoed, I-5).
+ * M1-8h, shared with the first-run page's owner setup (M1-11s-c): signs and stores the first card
+ * with the owner just stored, unlocked once with `secret` (a copy; `secret` itself is wiped by the
+ * caller), through a FirstCardSession that signs exactly one card for this agent and owner. Whatever
+ * happens, the outcome is read back from core: a verified card for this agent naming this owner is
+ * `signed`; anything else is `not_signed`, or `unknown` when core could not be read. Nothing is
+ * rolled back here; the error text is never shown (I-5).
  */
-async function issueFirstCard(
+export async function signFirstCardWith(
   keychain: KeychainBackend,
   owner: OwnerPublicKeys,
   secret: Uint8Array,
   first: FirstAgentCard,
-  blob: Uint8Array,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
-): Promise<AgentCard> {
+): Promise<FirstCardOutcome> {
   try {
     const store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
     try {
@@ -316,11 +324,30 @@ async function issueFirstCard(
   try {
     stored = await first.identity.get();
   } catch {
-    // Unknown whether a card naming this owner was stored: keep the owner key (removing it could
-    // leave a card whose owner key is gone).
-    throw new NodeKeyStoreError('owner_card_failed', COPY.cardUnknown);
+    return { kind: 'unknown' };
   }
-  if (namesOwner(stored, first.agent, owner)) return stored.card;
+  if (namesOwner(stored, first.agent, owner)) return { kind: 'signed', card: stored.card };
+  return { kind: 'not_signed' };
+}
+
+/**
+ * M1-8h: signs and stores the first card (signFirstCardWith). A verified card for this agent naming
+ * this owner is success; anything else removes the new owner item, only if it is still `blob` (the
+ * item this run stored, IR-M1-8h-1 L2), and is `owner_card_failed` (fixed text). When core could not
+ * be read back, the owner key is kept (removing it could leave a card whose owner key is gone).
+ */
+async function issueFirstCard(
+  keychain: KeychainBackend,
+  owner: OwnerPublicKeys,
+  secret: Uint8Array,
+  first: FirstAgentCard,
+  blob: Uint8Array,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<AgentCard> {
+  const outcome = await signFirstCardWith(keychain, owner, secret, first, timeoutMs);
+  if (outcome.kind === 'signed') return outcome.card;
+  if (outcome.kind === 'unknown')
+    throw new NodeKeyStoreError('owner_card_failed', COPY.cardUnknown);
   // IR-M1-8h-1 L2: remove only the item this run stored; another run's item is never deleted.
   const removal = await removeOwnerItemIfOurs(keychain, blob, timeoutMs);
   if (removal === 'failed') throw new NodeKeyStoreError('keychain_failed', COPY.keychainFailed);

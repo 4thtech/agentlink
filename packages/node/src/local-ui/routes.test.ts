@@ -148,7 +148,10 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       'backup',
       'advanced',
     ];
-    const stubs = registry.routes().filter((r) => !built.has(r.path));
+    // M1-11s-c: the first-run page's two owner setup routes are covered in owner-setup-route.test.ts.
+    const stubs = registry
+      .routes()
+      .filter((r) => r.presence !== 'setup' && !built.has(r.path));
     expect(stubs.map((r) => r.path).sort()).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
     for (const route of stubs as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');

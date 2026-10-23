@@ -26,7 +26,9 @@
 //   proof service (CommitmentRecorder) quotes the fee before the owner is asked, so the fee and any
 //   proof trigger sit on the same single request (`needs_credits` first, nothing sent), and signs
 //   the Record after the envelope, claiming the Record part in the transaction that stores it and
-//   reserves its fee. `counter` and `reject` with `notarize` stay refused (NOTARIZE_UNAVAILABLE).
+//   reserves its fee. `counter` with `notarize` is a firm offer too (M1-9d-5): the same scope
+//   `offer`, answering the contact's newest offer. `reject` with `notarize` stays refused
+//   (NOTARIZE_UNAVAILABLE).
 // - With a `clientRequestId`, propose() and respond() are idempotent as sendMessage is (06 §1 rule
 //   6, 07 §3.3; M1-32-b): a repeat returns the original result and sends nothing; another request
 //   under the same key is IDEMPOTENCY_KEY_REUSED. Every effect transaction (the envelope, the
@@ -131,8 +133,8 @@ export type TermsCode =
   | 'APPROVAL_VOID'
   | 'POLICY_DENIED'
   /**
-   * `notarize` where no Record can be made: no proof platform on this machine, or a `counter` or
-   * `reject` with `notarize` (not built; M1-9d-3). Nothing is sent.
+   * `notarize` where no Record can be made: no proof platform on this machine, or a `reject`
+   * with `notarize` (not specified; M1-9d-3, M1-9d-5). Nothing is sent.
    */
   | 'NOTARIZE_UNAVAILABLE'
   /** The proof network could not be asked for a fee (07 §6.3). Nothing is sent or requested. */
@@ -510,6 +512,21 @@ function quoteRefusal(
   }
 }
 
+/** A firm offer's outcome reported as the `counter` answer that sent it (M1-9d-5; 06 §2.2a). */
+function counterOutcome(r: ProposeOutcome): RespondOutcome {
+  if (r.status !== 'ok') return r;
+  return {
+    status: 'ok',
+    decision: 'counter',
+    thread: r.thread,
+    termsId: r.termsId,
+    version: r.version,
+    termsHash: r.termsHash,
+    envelopeId: r.envelopeId,
+    ...(r.proof === undefined ? {} : { proof: r.proof }),
+  };
+}
+
 /** The approval's triggers (sorted, unique): the commitment rule and any proof rule that asked. */
 function triggersOf(commitmentAsked: boolean, proofTriggers: readonly string[]): string[] {
   const all = new Set<string>(proofTriggers);
@@ -769,7 +786,7 @@ export class TermsService {
       input,
       args,
       (run) => (notarize ? this.#proposeFirm(input, run) : this.#proposeRun(input, note.note, run)),
-      (run) => (notarize ? this.#resumeFirm(input, run) : this.#resumeOffer(run)),
+      (run) => (notarize ? this.#resumeFirm(input.approvalId, run) : this.#resumeOffer(run)),
     );
   }
 
@@ -935,10 +952,12 @@ export class TermsService {
     if (!keyFieldsValid(input as unknown as Record<string, unknown>)) {
       return rejected('INVALID_ARGUMENT');
     }
-    // A recorded accept (M1-9d-3); a recorded counter or reject is not built (nothing sent).
-    if (notarize && (decision !== 'accept' || this.#deps.recorder === undefined)) {
+    // A recorded accept (M1-9d-3) and a recorded counter, a firm offer (M1-9d-5); a recorded
+    // reject is not specified (nothing sent).
+    if (notarize && (decision === 'reject' || this.#deps.recorder === undefined)) {
       return rejected('NOTARIZE_UNAVAILABLE');
     }
+    const firmCounter = notarize && decision === 'counter';
     // `args` as for `action.args` (04 §3.4.1): defaults applied, without approvalId and
     // clientRequestId (the approvalId is part of the key instead).
     const args = {
@@ -953,13 +972,17 @@ export class TermsService {
       input,
       args,
       async (run) => {
+        if (firmCounter) return this.#counterFirm(input, run);
         for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
           const result = await this.#respondOnce(input, decision, note.note, run);
           if (result !== 'stale') return result;
         }
         return rejected('TERMS_SUPERSEDED');
       },
-      (run) => this.#resumeResponse(input, decision, run),
+      async (run) =>
+        firmCounter
+          ? counterOutcome(await this.#resumeFirm(input.approvalId, run))
+          : this.#resumeResponse(input, decision, run),
     );
   }
 
@@ -1595,7 +1618,7 @@ export class TermsService {
     if (self.agentId !== selfId || stored.scope.agentId !== selfId)
       return rejected('APPROVAL_VOID');
     const { scope } = stored;
-    // A firm offer runs only through propose (#runOfferScope).
+    // A firm offer (propose, or a recorded counter) runs only through #runOfferScope.
     if (scope.decision === 'offer' || stored.tool !== RESPOND_TO_TERMS_TOOL) {
       return rejected('APPROVAL_VOID');
     }
@@ -1938,26 +1961,43 @@ export class TermsService {
     snapshot: TermsSnapshot,
     self: string,
     terms: Terms,
+    answering?: string,
   ): { readonly replyTo: string | null } | undefined {
     const n = this.#negotiationOf(snapshot, terms.termsId);
-    if (terms.version === 1) {
-      return n === undefined ? { replyTo: null } : undefined;
-    }
-    if (n === undefined) return undefined;
-    const own = newestOffer(n);
-    const answered =
-      own !== undefined &&
-      n.records.some(
-        (r) => r.direction === 'in' && r.type !== 'offer' && r.replyTo === own.envelopeId,
-      );
-    if (
-      own === undefined ||
-      own.direction !== 'out' ||
-      own.type !== 'offer' ||
-      isLocked(n, own.terms.version) ||
-      answered
-    ) {
-      return undefined;
+    if (answering !== undefined) {
+      // A recorded counter (M1-9d-5): the contact's offer it answers is still the newest version
+      // and not locked by an accept (as #respondOnce checks an unrecorded counter).
+      const theirs = n === undefined ? undefined : newestOffer(n);
+      if (
+        n === undefined ||
+        theirs === undefined ||
+        theirs.envelopeId !== answering ||
+        theirs.direction !== 'in' ||
+        theirs.type !== 'offer' ||
+        isLocked(n, theirs.terms.version)
+      ) {
+        return undefined;
+      }
+    } else {
+      if (terms.version === 1) {
+        return n === undefined ? { replyTo: null } : undefined;
+      }
+      if (n === undefined) return undefined;
+      const own = newestOffer(n);
+      const answered =
+        own !== undefined &&
+        n.records.some(
+          (r) => r.direction === 'in' && r.type !== 'offer' && r.replyTo === own.envelopeId,
+        );
+      if (
+        own === undefined ||
+        own.direction !== 'out' ||
+        own.type !== 'offer' ||
+        isLocked(n, own.terms.version) ||
+        answered
+      ) {
+        return undefined;
+      }
     }
     const link = nextTermsLink(n.state, self);
     if (link.version !== terms.version || link.previousTermsHash !== terms.previousTermsHash) {
@@ -2034,39 +2074,7 @@ export class TermsService {
           ? rejected('TERMS_SUPERSEDED')
           : rejected('USE_RESPOND_TO_TERMS');
       }
-      // The fee first: no credits means nothing is sent and the owner is not asked (D-111).
-      const quote = await this.#deps.recorder!.quoteCommitment({ counterparty: to });
-      if (quote.status !== 'ok') return quoteRefusal(quote);
-      const termsHash = termsHashOf(terms);
-      const scope = commitmentScopeSchema.safeParse({
-        v: 1,
-        kind: 'agentlink/commitment',
-        agentId: self.agentId,
-        decision: 'offer',
-        counterparty: { agentId: contact.id, ownerKey: contact.card.ownerNostr.slice(2) },
-        thread,
-        termsId: terms.termsId,
-        version: terms.version,
-        termsHash,
-        answers: null,
-        notarize: true,
-        maxFeeUsd: quote.fee.usd,
-        createdAt: now,
-        expiresAt: Math.min(terms.validUntil, now + COMMITMENT_SCOPE_SECONDS),
-      });
-      if (!scope.success) return rejected('TERMS_EXPIRED');
-      const facts: CommitmentFacts = {
-        kind: 'terms',
-        self: self.agentId,
-        scope: scope.data,
-        terms,
-        supersededByOwnNewer: false,
-      };
-      const evaluation = evaluateCommitment(await this.#policy(), facts);
-      if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
-      if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
-      const commitmentAsked = evaluation.decision === 'approval';
-      const action = {
+      const r = await this.#firmRequest({
         tool: PROPOSE_TERMS_TOOL,
         args: {
           to,
@@ -2074,58 +2082,221 @@ export class TermsService {
           ...(input.revises === undefined ? {} : { revises: input.revises }),
           notarize: true,
         },
-        context: {
-          triggers: triggersOf(commitmentAsked, quote.triggers),
-          scope: scope.data,
-          terms,
-          fee: quote.fee,
-        },
-      };
-      // One live scope per firm offer: this agent, the negotiation key and the version (04 §3.4.2).
-      const scopeKey = `offer:${to}:${terms.termsId}:${String(terms.version)}`;
-      const parts = partRows(['offer_envelope', 'offer_record']);
-      const who = renderContactName(contact.display);
-      const summary = `Send version ${String(terms.version)} of your terms to ${who} as a firm offer with proof`;
-      if (commitmentAsked || quote.triggers.length > 0) {
-        const pending = await this.#deps.approvals.request(
-          { action, summary, commitment: { scopeKey, parts } },
-          run === undefined ? {} : { run },
-        );
-        const card = this.#offerCard(
-          contact,
-          scope.data,
-          terms,
-          snapshot,
-          commitmentAsked ? evaluation.autoAccept : null,
-          quote.fee,
-        );
-        return { ...pending, card };
-      }
-      if (evaluation.decision !== 'allow') return rejected('APPROVAL_VOID');
-      const approvalId = await this.#insertGrant(
-        action,
-        scope.data,
-        scopeKey,
-        parts,
-        evaluation.grant.policyHash,
-        summary,
+        selfId: self.agentId,
+        contact,
+        thread,
+        terms,
+        snapshot,
+        now,
         run,
-      );
-      const r = await this.#runOfferScope(approvalId, run, self.agentId);
-      if (r.status !== 'rejected' || r.code !== 'TERMS_SUPERSEDED') return r;
+      });
+      if (r !== 'retry') return r;
     }
     return rejected('TERMS_SUPERSEDED');
+  }
+
+  /**
+   * `agentlink_respond_to_terms` `counter` with `notarize` (M1-9d-5; 06 §2.2a): a firm offer as
+   * through propose, answering the contact's newest offer (path (a) only). The terms are built
+   * from the store now and bound to one scope `offer` (04 §3.4.2) with the Record's fee; nothing
+   * is sent until the owner approves (or a `commitments.accept: allow` grant runs it at once). The
+   * call with the `approvalId` and the same arguments runs it from the STORED terms; other
+   * arguments get a new request.
+   */
+  async #counterFirm(
+    input: RespondToTermsInput,
+    run: IdempotencyRun | undefined,
+  ): Promise<RespondOutcome> {
+    const self = await this.#self();
+    if (input.approvalId !== undefined) {
+      const stored = await this.#stored(input.approvalId);
+      if (stored === undefined || stored.scope.agentId !== self.agentId) {
+        return rejected('APPROVAL_VOID');
+      }
+      const a = stored.args;
+      if (
+        stored.tool === RESPOND_TO_TERMS_TOOL &&
+        a.decision === 'counter' &&
+        a.notarize === true &&
+        a.envelopeId === input.envelopeId &&
+        canonicalize(a.terms as never) === canonicalize(input.terms as never)
+      ) {
+        return counterOutcome(await this.#runOfferScope(input.approvalId, run, self.agentId));
+      }
+    }
+    for (let attempt = 0; attempt < CHAIN_ATTEMPTS; attempt += 1) {
+      await this.#deps.identity.assertCanSend();
+      const row = await this.#ctx.store.transaction((tx) =>
+        tx.get('envelopes', { envelope_id: input.envelopeId }),
+      );
+      if (
+        row === undefined ||
+        row.direction !== 'in' ||
+        row.state !== 'ok' ||
+        row.contact_id === null
+      ) {
+        return rejected('INVALID_ARGUMENT');
+      }
+      const contactId = row.contact_id;
+      const contact = await this.#activeContact(contactId);
+      const snapshot = await loadTermsSnapshot(this.#ctx, self.agentId, contactId);
+      const entry = snapshot.byEnvelope.get(input.envelopeId);
+      if (entry === undefined) return rejected('INVALID_ARGUMENT');
+      const rec = entry.record;
+      if (!rec.terms.parties.includes(self.agentId)) return rejected('NOT_A_PARTY');
+      // Path (a) only: their offer. A counter on their accept (path (b)) is not allowed.
+      if (rec.type !== 'offer' || rec.direction !== 'in') return rejected('INVALID_ARGUMENT');
+      const n = snapshot.negotiations.get(entry.key);
+      if (
+        n === undefined ||
+        newestOffer(n)?.envelopeId !== rec.envelopeId ||
+        isLocked(n, rec.terms.version)
+      ) {
+        return rejected('TERMS_SUPERSEDED');
+      }
+      const now = nowOf(this.#ctx);
+      const link = nextTermsLink(n.state, self.agentId);
+      const built = termsFromInput(input.terms, {
+        termsId: rec.terms.termsId,
+        version: link.version,
+        previousTermsHash: link.previousTermsHash,
+        self: self.agentId,
+        counterparty: contactId,
+        now,
+      });
+      if (!built.success) return rejected('INVALID_ARGUMENT');
+      const terms = built.data;
+      if (this.#offerSlot(snapshot, self.agentId, terms, rec.envelopeId) === undefined) {
+        return rejected('TERMS_SUPERSEDED');
+      }
+      const r = await this.#firmRequest({
+        tool: RESPOND_TO_TERMS_TOOL,
+        args: {
+          envelopeId: input.envelopeId,
+          decision: 'counter',
+          terms: input.terms,
+          notarize: true,
+        },
+        selfId: self.agentId,
+        contact,
+        thread: rec.thread,
+        terms,
+        snapshot,
+        now,
+        run,
+      });
+      if (r !== 'retry') return counterOutcome(r);
+    }
+    return rejected('TERMS_SUPERSEDED');
+  }
+
+  /**
+   * One firm offer's single request (04 §3.4.2 scope `offer`), for propose and for a recorded
+   * counter: the fee first (no credits: nothing sent, the owner not asked; D-111), the scope from
+   * stored data, the commitment rule, then one pending request with the card, or a policy grant
+   * run at once. `retry` when that grant run found the slot taken meanwhile.
+   */
+  async #firmRequest(p: {
+    readonly tool: typeof PROPOSE_TERMS_TOOL | typeof RESPOND_TO_TERMS_TOOL;
+    readonly args: Record<string, unknown>;
+    readonly selfId: string;
+    readonly contact: ContactView;
+    readonly thread: string;
+    readonly terms: Terms;
+    readonly snapshot: TermsSnapshot;
+    readonly now: number;
+    readonly run: IdempotencyRun | undefined;
+  }): Promise<ProposeOutcome | 'retry'> {
+    const { contact, terms, run } = p;
+    const to = contact.id;
+    const quote = await this.#deps.recorder!.quoteCommitment({ counterparty: to });
+    if (quote.status !== 'ok') return quoteRefusal(quote);
+    const termsHash = termsHashOf(terms);
+    const scope = commitmentScopeSchema.safeParse({
+      v: 1,
+      kind: 'agentlink/commitment',
+      agentId: p.selfId,
+      decision: 'offer',
+      counterparty: { agentId: contact.id, ownerKey: contact.card.ownerNostr.slice(2) },
+      thread: p.thread,
+      termsId: terms.termsId,
+      version: terms.version,
+      termsHash,
+      answers: null,
+      notarize: true,
+      maxFeeUsd: quote.fee.usd,
+      createdAt: p.now,
+      expiresAt: Math.min(terms.validUntil, p.now + COMMITMENT_SCOPE_SECONDS),
+    });
+    if (!scope.success) return rejected('TERMS_EXPIRED');
+    const facts: CommitmentFacts = {
+      kind: 'terms',
+      self: p.selfId,
+      scope: scope.data,
+      terms,
+      supersededByOwnNewer: false,
+    };
+    const evaluation = evaluateCommitment(await this.#policy(), facts);
+    if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
+    if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
+    const commitmentAsked = evaluation.decision === 'approval';
+    const action = {
+      tool: p.tool,
+      args: p.args,
+      context: {
+        triggers: triggersOf(commitmentAsked, quote.triggers),
+        scope: scope.data,
+        terms,
+        fee: quote.fee,
+      },
+    };
+    // One live scope per firm offer: this agent, the negotiation key and the version (04 §3.4.2).
+    const scopeKey = `offer:${to}:${terms.termsId}:${String(terms.version)}`;
+    const parts = partRows(['offer_envelope', 'offer_record']);
+    const who = renderContactName(contact.display);
+    const summary = `Send version ${String(terms.version)} of your terms to ${who} as a firm offer with proof`;
+    if (commitmentAsked || quote.triggers.length > 0) {
+      const pending = await this.#deps.approvals.request(
+        { action, summary, commitment: { scopeKey, parts } },
+        run === undefined ? {} : { run },
+      );
+      const card = this.#offerCard(
+        contact,
+        scope.data,
+        terms,
+        p.snapshot,
+        commitmentAsked ? evaluation.autoAccept : null,
+        quote.fee,
+      );
+      return { ...pending, card };
+    }
+    if (evaluation.decision !== 'allow') return rejected('APPROVAL_VOID');
+    const approvalId = await this.#insertGrant(
+      action,
+      scope.data,
+      scopeKey,
+      parts,
+      evaluation.grant.policyHash,
+      summary,
+      run,
+    );
+    const r = await this.#runOfferScope(approvalId, run, p.selfId);
+    if (r.status !== 'rejected' || r.code !== 'TERMS_SUPERSEDED') return r;
+    return 'retry';
   }
 
   /**
    * A takeover of a firm-offer call with stored effects (07 §3.3 "Resume"): through its scope,
    * whose parts run at most once; never a second offer.
    */
-  async #resumeFirm(input: ProposeTermsInput, run: IdempotencyRun): Promise<ProposeOutcome> {
+  async #resumeFirm(
+    callApprovalId: string | undefined,
+    run: IdempotencyRun,
+  ): Promise<ProposeOutcome> {
     const self = (await this.#self()).agentId;
     const approvalId =
       [...run.effects].reverse().find((e) => APPROVAL_EFFECT.test(e) && !isEnvelopeId(e)) ??
-      input.approvalId;
+      callApprovalId;
     if (approvalId === undefined) return this.#resumeOffer(run);
     const r = await this.#runOfferScope(approvalId, run, self);
     if (r.status === 'rejected' && r.code === 'APPROVAL_USED' && r.envelopeId !== undefined) {
@@ -2153,7 +2324,20 @@ export class TermsService {
     selfId: string,
   ): Promise<ProposeOutcome | 'stale'> {
     const stored = await this.#stored(approvalId);
-    if (stored === undefined || stored.tool !== PROPOSE_TERMS_TOOL) {
+    if (stored === undefined) return rejected('APPROVAL_VOID');
+    // A firm offer is propose with `notarize`, or a `counter` with `notarize` (M1-9d-5), whose
+    // owner-signed args name the contact's offer it answers.
+    let answering: string | undefined;
+    if (stored.tool === RESPOND_TO_TERMS_TOOL) {
+      if (
+        stored.args.decision !== 'counter' ||
+        stored.args.notarize !== true ||
+        typeof stored.args.envelopeId !== 'string'
+      ) {
+        return rejected('APPROVAL_VOID');
+      }
+      answering = stored.args.envelopeId;
+    } else if (stored.tool !== PROPOSE_TERMS_TOOL) {
       return rejected('APPROVAL_VOID');
     }
     const self = await this.#self();
@@ -2241,7 +2425,7 @@ export class TermsService {
     if (envelopeUnrun) {
       const snapshot = await loadTermsSnapshot(this.#ctx, selfId, scope.counterparty.agentId);
       // Void rule 1 (04 §3.4.2): before the offer is sent, its slot must still be the same.
-      const slot = this.#offerSlot(snapshot, selfId, terms);
+      const slot = this.#offerSlot(snapshot, selfId, terms, answering);
       if (slot === undefined) {
         await this.#voidParts(approvalId, 'superseded');
         return rejected('TERMS_SUPERSEDED');

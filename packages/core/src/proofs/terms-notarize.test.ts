@@ -627,24 +627,16 @@ describe('credits, policy and approvals for terms with notarize (06 §2.4, §3; 
     expect(chain.calls.notarize).toBe(0);
   });
 
-  it('counter and reject with notarize stay refused (NOTARIZE_UNAVAILABLE), nothing sent', async () => {
+  it('reject with notarize stays refused (NOTARIZE_UNAVAILABLE), nothing sent', async () => {
     const { a, b } = await twoAgents();
     const offered = await a.client.proposeTerms({ to: b.id, terms: terms() });
     await deliver(a, b);
     const offerId = field<string>(offered, 'envelopeId');
     expect(
-      await b.client.respondToTerms({
-        envelopeId: offerId,
-        decision: 'counter',
-        terms: terms('90.00'),
-        notarize: true,
-      }),
-    ).toEqual({ status: 'rejected', code: 'NOTARIZE_UNAVAILABLE' });
-    expect(
       await b.client.respondToTerms({ envelopeId: offerId, decision: 'reject', notarize: true }),
     ).toEqual({ status: 'rejected', code: 'NOTARIZE_UNAVAILABLE' });
-    expect(await outOfType(b, 'offer')).toHaveLength(0);
     expect(await outOfType(b, 'reject')).toHaveLength(0);
+    expect(await approvals(b)).toHaveLength(0);
   });
 
   it('no log line carries the terms text (I-5, I-7)', async () => {
@@ -660,5 +652,270 @@ describe('credits, policy and approvals for terms with notarize (06 §2.4, §3; 
     await deliver(a, b);
     expect(a.lines.join('\n')).not.toContain('CANARY');
     expect(b.lines.join('\n')).not.toContain('CANARY');
+  });
+});
+
+// M1-9d-5 (02 J4, J8; 04 §3.4.2 scope `offer`; 06 §2.2a `counter` with `notarize`): a recorded
+// counter-offer is a firm offer, as through `proposeTerms`, under exactly one owner approval.
+describe('J4: a recorded counter-offer (counter with notarize) is a firm offer under one approval', () => {
+  /** Alice offers version 1 without proof; Bob holds it. */
+  async function offered() {
+    const { a, b } = await twoAgents();
+    const v1 = await a.client.proposeTerms({ to: b.id, terms: terms('150.00') });
+    expect(v1.status).toBe('ok');
+    await deliver(a, b);
+    return { a, b, offerId: field<string>(v1, 'envelopeId') };
+  }
+
+  it('records Bob’s counter (OFFER) under his one approval; Alice’s one accept adds ACCEPTED; his pack verifies', async () => {
+    const { a, b, offerId } = await offered();
+    const args = {
+      envelopeId: offerId,
+      decision: 'counter' as const,
+      terms: terms('140.00'),
+      notarize: true,
+    };
+
+    // 1. One request with the fee on it; nothing is sent or recorded yet.
+    const pending = await b.client.respondToTerms(args);
+    expect(pending.status).toBe('pending_approval');
+    noTermsText(pending);
+    const card = field<Loose>(pending, 'card');
+    expect(card).toMatchObject({ decision: 'offer', version: 2, autoAccept: 'firm_offer' });
+    expect(field<string[]>(card, 'parts')).toEqual(['offer_envelope', 'offer_record']);
+    expect(field<Loose>(card, 'fee')).toMatchObject({ usd: expect.any(String) as unknown });
+    // The changes are from Alice's version 1, computed locally.
+    expect(field<unknown[]>(card, 'changes')).toEqual(
+      expect.arrayContaining([expect.objectContaining({ field: 'price' })]),
+    );
+    expect(await outOfType(b, 'offer')).toHaveLength(0);
+    expect(chain.calls.notarize).toBe(0);
+    const approvalId = field<string>(pending, 'approvalId');
+    const action = await storedAction(b, approvalId);
+    expect(action).toMatchObject({
+      tool: 'agentlink_respond_to_terms',
+      args: { envelopeId: offerId, decision: 'counter', notarize: true },
+      context: {
+        triggers: ['commitments.accept'],
+        scope: { decision: 'offer', answers: null, notarize: true, version: 2 },
+      },
+    });
+
+    // 2. Approved: the same call with the approvalId sends version 2 and records it, once.
+    await approve(b, approvalId);
+    const sent = await b.client.respondToTerms({ ...args, approvalId });
+    expect(sent).toMatchObject({ status: 'ok', decision: 'counter', version: 2 });
+    const counterId = field<string>(sent, 'envelopeId');
+    const proof = field<Loose>(sent, 'proof');
+    expect(proof).toMatchObject({ status: 'ok', recordId: expect.any(String) as unknown });
+    const recordId = field<string>(proof, 'recordId');
+    expect(onChain(recordId)!.record).toMatchObject({ kind: RECORD_KIND.OFFER, signer: b.id });
+    expect(chain.calls.notarize).toBe(1);
+    expect(await ledger(b)).toEqual([
+      expect.objectContaining({ record_id: recordId, approval_id: approvalId }),
+    ]);
+    expect(await outOfType(b, 'offer')).toHaveLength(1);
+
+    // A repeat with the same approvalId sends, signs and charges nothing more.
+    const repeat = await b.client.respondToTerms({ ...args, approvalId });
+    expect(repeat).toMatchObject({ status: 'rejected', code: 'APPROVAL_USED' });
+    expect(await outOfType(b, 'offer')).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(1);
+
+    // 3. Alice receives version 2 with its proof; her one approval covers accept and ACCEPTED.
+    await deliver(b, a);
+    const asked = await a.client.respondToTerms({ envelopeId: counterId, decision: 'accept' });
+    expect(asked.status).toBe('pending_approval');
+    const acceptApproval = field<string>(asked, 'approvalId');
+    await approve(a, acceptApproval);
+    const accepted = await a.client.respondToTerms({
+      envelopeId: counterId,
+      decision: 'accept',
+      approvalId: acceptApproval,
+    });
+    expect(accepted).toMatchObject({ status: 'ok', decision: 'accept', version: 2 });
+    expect(onChain(recordId)!.receiptAt[2]).not.toBe(0n);
+    expect(chain.calls.notarize).toBe(1);
+
+    // One approval per owner (04 §3.4.2 "Each J8 shape asks each owner once").
+    expect(await approvals(a)).toHaveLength(1);
+    expect(await approvals(b)).toHaveLength(1);
+
+    // 4. Bob's pack carries his owner's signed approval of the firm counter.
+    const mine = await b.client.exportProofPack({ envelopeId: counterId });
+    expect(mine.status).toBe('ok');
+    expect(await verify(field<Loose>(mine, 'pack'))).toMatchObject({
+      valid: true,
+      kind: RECORD_KIND.OFFER,
+      signer: b.id,
+      ownerApproval: { status: 'signed', approver: 'signer', decision: 'offer' },
+    });
+    expect(a.lines.join('\n')).not.toContain('CANARY');
+    expect(b.lines.join('\n')).not.toContain('CANARY');
+  });
+
+  it('no credits: needs_credits before the owner is asked; nothing is sent or requested', async () => {
+    const a = await openAgent(45, ownerA, 'alice');
+    const b = await openAgent(46, ownerB, 'bob');
+    await pairWith(clock, a, b);
+    await pairWith(clock, b, a);
+    const v1 = await a.client.proposeTerms({ to: b.id, terms: terms() });
+    await deliver(a, b);
+    const r = await b.client.respondToTerms({
+      envelopeId: field<string>(v1, 'envelopeId'),
+      decision: 'counter',
+      terms: terms('90.00'),
+      notarize: true,
+    });
+    expect(r.status).toBe('needs_credits');
+    expect(await outOfType(b, 'offer')).toHaveLength(0);
+    expect(await approvals(b)).toHaveLength(0);
+  });
+
+  it('an approval covers its own counter only: other terms get a new request, and a plain counter supersedes it', async () => {
+    const { b, offerId } = await offered();
+    const first = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'counter',
+      terms: terms('140.00'),
+      notarize: true,
+    });
+    const approvalId = field<string>(first, 'approvalId');
+    await approve(b, approvalId);
+    const other = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'counter',
+      terms: terms('999.00'),
+      notarize: true,
+      approvalId,
+    });
+    expect(other.status).toBe('pending_approval');
+    expect(field<string>(other, 'approvalId')).not.toBe(approvalId);
+    expect(await outOfType(b, 'offer')).toHaveLength(0);
+    // An unrecorded counter is another call: the firm approval never runs it.
+    const plain = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'counter',
+      terms: terms('140.00'),
+    });
+    expect(plain).toMatchObject({ status: 'ok', decision: 'counter' });
+    expect(field<unknown>(plain, 'proof')).toBeUndefined();
+    // That counter took version 2: the approved firm counter is now superseded, nothing recorded.
+    const late = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'counter',
+      terms: terms('140.00'),
+      notarize: true,
+      approvalId,
+    });
+    expect(late).toMatchObject({ status: 'rejected' });
+    expect(await outOfType(b, 'offer')).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(0);
+  });
+
+  it('a newer version from the contact before it is sent voids it (TERMS_SUPERSEDED)', async () => {
+    const { a, b, offerId } = await offered();
+    const firm = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'counter',
+      terms: terms('140.00'),
+      notarize: true,
+    });
+    const approvalId = field<string>(firm, 'approvalId');
+    await approve(b, approvalId);
+    // Meanwhile Alice revises her own unanswered offer: her version 2 reaches Bob first.
+    expect(
+      (await a.client.proposeTerms({ to: b.id, terms: terms('145.00'), revises: offerId })).status,
+    ).toBe('ok');
+    await deliver(a, b);
+    const late = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'counter',
+      terms: terms('140.00'),
+      notarize: true,
+      approvalId,
+    });
+    expect(late).toEqual({ status: 'rejected', code: 'TERMS_SUPERSEDED' });
+    expect(await outOfType(b, 'offer')).toHaveLength(0);
+    expect(chain.calls.notarize).toBe(0);
+  });
+
+  it('commitments.accept deny: nothing sent or requested; allow: runs at once as a policy grant', async () => {
+    const { b, offerId } = await offered();
+    await setPolicy(b, (p) => {
+      p.commitments.accept = 'deny';
+    });
+    const args = {
+      envelopeId: offerId,
+      decision: 'counter' as const,
+      terms: terms('140.00'),
+      notarize: true,
+    };
+    expect(await b.client.respondToTerms(args)).toEqual({
+      status: 'rejected',
+      code: 'POLICY_DENIED',
+    });
+    expect(await approvals(b)).toHaveLength(0);
+    await setPolicy(b, (p) => {
+      p.commitments.accept = 'allow';
+    });
+    const sent = await b.client.respondToTerms(args);
+    expect(sent).toMatchObject({ status: 'ok', decision: 'counter', proof: { status: 'ok' } });
+    expect(chain.calls.notarize).toBe(1);
+    const rows = await approvals(b);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ source: 'policy_grant' });
+  });
+
+  it('refused with a note, and on their accept (path b); nothing sent or requested', async () => {
+    const { a, b, offerId } = await offered();
+    expect(
+      await b.client.respondToTerms({
+        envelopeId: offerId,
+        decision: 'counter',
+        terms: terms('140.00'),
+        notarize: true,
+        note: 'x',
+      }),
+    ).toEqual({ status: 'rejected', code: 'INVALID_ARGUMENT' });
+    // Path (b): Bob accepts Alice's offer, then Alice holds his accept.
+    const asked = await b.client.respondToTerms({ envelopeId: offerId, decision: 'accept' });
+    const acceptApproval = field<string>(asked, 'approvalId');
+    await approve(b, acceptApproval);
+    const accepted = await b.client.respondToTerms({
+      envelopeId: offerId,
+      decision: 'accept',
+      approvalId: acceptApproval,
+    });
+    await deliver(b, a);
+    expect(
+      await a.client.respondToTerms({
+        envelopeId: field<string>(accepted, 'envelopeId'),
+        decision: 'counter',
+        terms: terms('140.00'),
+        notarize: true,
+      }),
+    ).toEqual({ status: 'rejected', code: 'INVALID_ARGUMENT' });
+    expect(await approvals(a)).toHaveLength(0);
+    expect(await outOfType(a, 'offer')).toHaveLength(1);
+  });
+
+  it('a repeat under the same clientRequestId returns the first result and records nothing more', async () => {
+    const { b, offerId } = await offered();
+    await setPolicy(b, (p) => {
+      p.commitments.accept = 'allow';
+    });
+    const args = {
+      envelopeId: offerId,
+      decision: 'counter' as const,
+      terms: terms('140.00'),
+      notarize: true,
+      clientRequestId: 'firm-counter-1',
+    };
+    const first = await b.client.respondToTerms(args);
+    expect(first).toMatchObject({ status: 'ok', decision: 'counter' });
+    expect(await b.client.respondToTerms(args)).toEqual(first);
+    expect(await outOfType(b, 'offer')).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(1);
   });
 });

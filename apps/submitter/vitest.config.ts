@@ -42,6 +42,7 @@ export default defineConfig({
             'test/engine.test.ts',
             'test/config.test.ts',
             'test/faucet-claim.test.ts',
+            'test/pool.test.ts',
             'test/smoke-config.test.ts',
           ],
           // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default.
@@ -71,6 +72,7 @@ export default defineConfig({
                 SUBMITTER_QUEUE: 'SubmitterQueue',
                 SUBMITTER_LIMITS: 'SubmitterLimits',
                 SUBMITTER_FAUCET: 'SubmitterFaucet',
+                SUBMITTER_DEPOSIT_RELAY: 'SubmitterDepositRelay',
               },
               bindings: {
                 SUBMITTER_CHAINS: '84532',
@@ -84,6 +86,9 @@ export default defineConfig({
                 SUBMITTER_FAUCET_IP_CLAIMS_PER_DAY: '2',
                 SUBMITTER_FAUCET_DAILY_CAP: '10',
                 SUBMITTER_FAUCET_IP_REQUESTS_PER_HOUR: '20',
+                // M3-4b-t-3: gasless top-ups on (off by default in every deployed environment).
+                SUBMITTER_DEPOSIT_AUTH_CHAINS: '84532',
+                SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR: '12',
               },
             },
           }),
@@ -93,6 +98,7 @@ export default defineConfig({
           include: [
             'test/submitter.test.ts',
             'test/faucet.test.ts',
+            'test/deposit-auth.test.ts',
             'test/smoke.test.ts',
             'test/entry.test.ts',
           ],
