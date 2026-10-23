@@ -46,7 +46,7 @@ import {
   ok,
   type HandlerOutput,
 } from './result.js';
-import { notarizeOutput, proofThrown } from './proofs-common.js';
+import { claimFreeCredits, notarizeOutput, proofThrown } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 
@@ -333,8 +333,12 @@ async function withProofOf(
       ...(typeof approvalId === 'string' ? { approvalId } : {}),
       ...(requestReceipt ? { requestReceipt: true } : {}),
     });
+    // M1-36i: the first proof that needs credits claims free test credits once (testnets only).
+    const freeCredits = await claimFreeCredits(result, context);
     proofOut = notarizeOutput(result, context, agentId, {
       contactName,
+      freeCredits,
+      envelopeId,
       approvalSummary: SEND_TEXT.proofApproval,
       approvalNextStepTail: (requestReceipt
         ? SEND_TEXT.proofApprovalTailReceipt
