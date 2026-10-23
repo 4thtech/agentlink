@@ -90,7 +90,7 @@ describe('--help (06 §8)', () => {
       'agentlink deny <approvalId> [--agent <name>]',
       'agentlink cancel <approvalId> [--agent <name>]',
       'agentlink doctor',
-      'agentlink mcp',
+      'agentlink mcp [--advanced]',
     ]) {
       expect(help).toContain(usage);
     }
@@ -269,5 +269,13 @@ describe('an MCP-side process cannot approve (04 §2.5, I-4)', () => {
     expect(await dispatch(['contacts'], io(MCP_PIPE).value)).toBe(EXIT_OK);
     expect(await dispatch(['mcp'], io(MCP_PIPE).value)).toBe(EXIT_OK);
     expect(r.calls).toHaveLength(2);
+  });
+
+  it('M1-36h: `mcp --advanced` is parsed as a flag (the Advanced tool surface)', async () => {
+    const r = recorder();
+    const dispatch = createDispatcher({ mcp: r.handler });
+    expect(await dispatch(['mcp', '--advanced'], io(MCP_PIPE).value)).toBe(EXIT_OK);
+    expect(await dispatch(['mcp'], io(MCP_PIPE).value)).toBe(EXIT_OK);
+    expect(r.calls.map((c) => c.parsed.values['advanced'])).toEqual([true, undefined]);
   });
 });

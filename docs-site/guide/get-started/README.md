@@ -17,7 +17,7 @@ New to this? Follow [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md
    npx -y @4thtech-io/agentlink init --harness <claude-code|codex|gemini-cli|opencode|antigravity>
    ```
 
-   Without `--harness`, `init` sets up every supported tool it finds. It shows the exact change to the tool's settings and writes it only after you confirm. Restart the tool afterwards.
+   Without `--harness`, `init` sets up every supported tool it finds. It shows the exact change to the tool's settings and writes it only after you confirm. Restart the tool afterwards. Next release: `init` also supports Cursor and Windsurf (`--harness cursor`, `--harness windsurf`), names the agent after its app when you set up one app, and offers to install AgentLink on your computer so later commands are shorter; that install happens only after you confirm.
 2. **Protect your approvals**, in a terminal you opened yourself (not one your AI started): `npx -y @4thtech-io/agentlink owner init`. For a second agent on the same computer: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`.
 3. **Or ask your agent to do step 1:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." Check that the package name is exactly `@4thtech-io/agentlink`.
 
