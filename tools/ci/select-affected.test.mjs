@@ -322,8 +322,16 @@ describe('heavy jobs: which ones a pull request runs', () => {
     expect(running(['apps/invite/site/index.html'])).toContain('e2e-deterministic');
   });
 
-  it('a ui-only change runs no heavy job', () => {
-    expect(running(['packages/ui/src/button.ts'])).toEqual([]);
+  it('a change to an app no heavy job tests (console, verify) runs none', () => {
+    expect(running(['apps/console/src/x.ts', 'apps/verify/src/x.ts'])).toEqual([]);
+  });
+
+  it('a ui change runs the jobs of the CLI, which serves the approval pages', () => {
+    expect(running(['packages/ui/src/x.ts'])).toEqual([
+      'bundle-check',
+      'e2e-deterministic',
+      'keychain',
+    ]);
   });
 });
 
@@ -349,7 +357,7 @@ describe('ci.yml wires the heavy-job selection', () => {
     const start = yml.indexOf(`\n  ${name}:\n`);
     expect(start, name).toBeGreaterThan(-1);
     const rest = yml.slice(start + 1);
-    const next = rest.slice(1).search(/\n  [a-z0-9-]+:\n/);
+    const next = rest.slice(1).search(/\n {2}[a-z0-9-]+:\n/);
     return next === -1 ? rest : rest.slice(0, next + 1);
   };
 
