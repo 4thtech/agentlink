@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { FLAKY_JOBS, baseJobName, decide, parseRunId, summaryLine } from './auto-retry.mjs';
+import { FLAKY_JOBS, decide, flakyEntry, parseRunId, summaryLine } from './auto-retry.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const wf = readFileSync(join(root, '.github/workflows/ci-auto-retry.yml'), 'utf8');
@@ -23,7 +23,7 @@ const base = {
   headBranch: 'CHORE-X',
   jobs: [
     { name: 'detect', conclusion: 'success' },
-    { name: 'checks', conclusion: 'failure' },
+    { name: 'checks', conclusion: 'failure', failedSteps: ['Unit tests'] },
     { name: 'ci-gate', conclusion: 'failure' },
   ],
 };
@@ -56,8 +56,8 @@ describe('decide', () => {
       expect(decide({ ...base, conclusion }).rerun).toBe(false);
   });
 
-  it('only handles pull_request, merge_group and push on main', () => {
-    expect(decide({ ...base, event: 'merge_group' }).rerun).toBe(true);
+  it('only handles pull_request and push on main (never the merge queue)', () => {
+    expect(decide({ ...base, event: 'merge_group' }).rerun).toBe(false);
     expect(decide({ ...base, event: 'push', headBranch: 'main' }).rerun).toBe(true);
     expect(decide({ ...base, event: 'push', headBranch: 'CHORE-X' }).rerun).toBe(false);
     for (const event of ['schedule', 'workflow_dispatch', 'pull_request_target', 'workflow_run'])
@@ -93,6 +93,49 @@ describe('decide', () => {
     expect(d.rerun).toBe(false);
   });
 
+  it('checks: a unit-tests or MCP-surface step failure means rerun', () => {
+    for (const step of ['Unit tests', 'MCP tool surface and conformance']) {
+      const jobs = [{ name: 'checks', conclusion: 'failure', failedSteps: [step] }];
+      expect(decide({ ...base, jobs }).rerun).toBe(true);
+    }
+  });
+
+  it('checks: a lint, typecheck or build step failure means no rerun', () => {
+    for (const step of ['Lint', 'Typecheck', 'Build']) {
+      const jobs = [{ name: 'checks', conclusion: 'failure', failedSteps: [step] }];
+      const d = decide({ ...base, jobs });
+      expect(d.rerun).toBe(false);
+      expect(d.reason).toMatch(/not on the flaky list/);
+    }
+    const mixed = [{ name: 'checks', conclusion: 'failure', failedSteps: ['Unit tests', 'Lint'] }];
+    expect(decide({ ...base, jobs: mixed }).rerun).toBe(false);
+  });
+
+  it('a mixed job with no failed step listed (cancelled, timed out, missing) does not qualify', () => {
+    for (const job of [
+      { name: 'checks', conclusion: 'cancelled', failedSteps: [] },
+      { name: 'checks', conclusion: 'timed_out' },
+      { name: 'vectors', conclusion: 'failure', failedSteps: [] },
+    ])
+      expect(decide({ ...base, jobs: [job] }).rerun).toBe(false);
+  });
+
+  it('vectors and bundle-check qualify only by their flaky-prone steps', () => {
+    const v = (step) => [{ name: 'vectors', conclusion: 'failure', failedSteps: [step] }];
+    expect(decide({ ...base, jobs: v('Check test vectors across runtimes') }).rerun).toBe(true);
+    expect(decide({ ...base, jobs: v('Install Playwright browsers') }).rerun).toBe(true);
+    expect(
+      decide({ ...base, jobs: v('Check committed vectors against their independent generators') })
+        .rerun,
+    ).toBe(false);
+    const b = (step) => [{ name: 'bundle-check', conclusion: 'failure', failedSteps: [step] }];
+    expect(decide({ ...base, jobs: b('Set up Node.js and pnpm') }).rerun).toBe(true);
+    expect(
+      decide({ ...base, jobs: b('Check the published bundle and the neutral src/tools/ bundle') })
+        .rerun,
+    ).toBe(false);
+  });
+
   it('accepts matrix legs, reusable-workflow jobs and timed-out or fail-fast-cancelled legs', () => {
     const jobs = [
       { name: 'node-os (macos-15)', conclusion: 'failure' },
@@ -104,6 +147,11 @@ describe('decide', () => {
     const d = decide({ ...base, jobs });
     expect(d.rerun).toBe(true);
     expect(d.jobs).toHaveLength(4);
+    const push = [
+      { name: 'relays-docker', conclusion: 'failure' },
+      { name: 'ci-gate (push)', conclusion: 'failure' },
+    ];
+    expect(decide({ ...base, jobs: push }).jobs).toEqual(['relays-docker']);
   });
 
   it('uses the per-workflow allowlist (Security: codeql and dependency-review only)', () => {
@@ -119,12 +167,11 @@ describe('decide', () => {
   });
 
   it('keeps the CI allowlist to the flaky-prone jobs and away from the deterministic ones', () => {
-    expect([...FLAKY_JOBS.CI].sort()).toEqual(
+    expect(Object.keys(FLAKY_JOBS.CI).sort()).toEqual(
       [
         'bundle-check',
         'checks',
-        'e2e',
-        'e2e-deterministic',
+        'e2e-deterministic / e2e-deterministic',
         'keychain',
         'node-os',
         'relays-docker',
@@ -132,23 +179,30 @@ describe('decide', () => {
         'vectors',
       ].sort(),
     );
-    for (const j of [
-      'pr-hygiene',
-      'review-gate',
-      'changesets',
-      'context-budget',
-      'detect',
-      'ci-gate',
-    ])
-      expect(FLAKY_JOBS.CI.has(j)).toBe(false);
+    expect(FLAKY_JOBS.CI.checks.steps).toEqual(['Unit tests', 'MCP tool surface and conformance']);
+    for (const j of ['pr-hygiene', 'review-gate', 'changesets', 'context-budget', 'detect', 'e2e'])
+      expect(flakyEntry('CI', j)).toBeNull();
+  });
+
+  it('names the steps exactly as ci.yml does', () => {
+    for (const [job, entry] of Object.entries(FLAKY_JOBS.CI))
+      for (const step of entry.steps ?? [])
+        expect(ci, `${job}: ${step}`).toContain(`- name: ${step}\n`);
   });
 });
 
 describe('helpers', () => {
-  it('baseJobName strips matrix suffixes and reusable-workflow paths', () => {
-    expect(baseJobName('node-os (macos-15)')).toBe('node-os');
-    expect(baseJobName('e2e-deterministic / e2e-deterministic')).toBe('e2e-deterministic');
-    expect(baseJobName('checks')).toBe('checks');
+  it('flakyEntry matches exact names, matrix legs only for matrix jobs, and the e2e call form', () => {
+    expect(flakyEntry('CI', 'node-os (macos-26)')).not.toBeNull();
+    expect(flakyEntry('CI', 'keychain (ubuntu-24.04)')).not.toBeNull();
+    expect(flakyEntry('CI', 'e2e-deterministic / e2e-deterministic')).not.toBeNull();
+    expect(flakyEntry('CI', 'e2e-deterministic')).toBeNull();
+    expect(flakyEntry('CI', 'e2e-deterministic / e2e-llm')).toBeNull();
+    expect(flakyEntry('CI', 'checks (x)')).toBeNull();
+    expect(flakyEntry('CI', 'relays-docker (x)')).toBeNull();
+    expect(flakyEntry('CI', 'node-os')).toBeNull();
+    expect(flakyEntry('CI', 'constructor')).toBeNull();
+    expect(flakyEntry('Security', 'codeql (actions)')).not.toBeNull();
   });
 
   it('parseRunId accepts only a plain positive integer', () => {
@@ -188,6 +242,8 @@ describe('ci-auto-retry.yml', () => {
     expect(wf).toContain(
       'github.event.workflow_run.head_repository.full_name == github.repository',
     );
+    expect(wf).not.toContain('merge_group');
+    expect(wf).toContain('select(.conclusion == "failure") | .name');
   });
 
   it('one concurrency group per run id, never cancelling', () => {

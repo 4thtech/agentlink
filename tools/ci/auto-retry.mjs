@@ -1,39 +1,66 @@
 // CHORE-CI-AUTORETRY: decides whether `.github/workflows/ci-auto-retry.yml` reruns the failed jobs of
 // a completed CI or Security run, once. Rules (docs/process/ci-cd.md "Automatic rerun of flaky jobs"):
 // - only a run that ended `failure` on its first attempt (attempt 2 or later never: no loops);
-// - only pull_request, merge_group, and push on `main`; only runs from this repository (no forks);
-// - every failed job (the aggregating gate aside) must be on the workflow's flaky list, because
-//   rerunning a deterministic job (changesets, context-budget, ...) cannot turn it green.
+// - only pull_request and push on `main` (a failed merge-queue run already ejected the PR); only runs from this repository (no forks);
+// - every failed job (the aggregating gate aside) must be on the workflow's flaky list, and for a
+//   mixed job every failed step must be flaky-prone, because rerunning a deterministic job or step
+//   (lint, typecheck, changesets, context-budget, ...) cannot turn it green.
 // No dependencies; the workflow runs it with the runner's Node from a checkout of the default branch.
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+// Per workflow: the exact job name as the API reports it, and either `steps` (a mixed job: rerun only
+// when every failed step is one of these flaky-prone steps; lint, typecheck, build and static checks
+// never qualify) or no `steps` (a purely flaky-prone job: any failure qualifies). `matrix: true`
+// accepts only "<name> (<leg>)". Names follow ci.yml, e2e.yml and security.yml.
 export const FLAKY_JOBS = {
-  CI: new Set([
-    'checks',
-    'vectors',
-    'e2e',
-    'e2e-deterministic',
-    'keychain',
-    'storage-minio',
-    'relays-docker',
-    'node-os',
-    'bundle-check',
-  ]),
-  Security: new Set(['codeql', 'dependency-review']),
+  CI: {
+    checks: { steps: ['Unit tests', 'MCP tool surface and conformance'] },
+    vectors: {
+      steps: [
+        'Install Playwright browsers',
+        "Install the vector generators' pinned Python packages",
+        'Check test vectors across runtimes',
+      ],
+    },
+    'bundle-check': { steps: ['Set up Node.js and pnpm'] },
+    keychain: { matrix: true },
+    'node-os': { matrix: true },
+    'relays-docker': {},
+    'storage-minio': {},
+    // the reusable e2e.yml called by the ci.yml job of the same name
+    'e2e-deterministic / e2e-deterministic': {},
+  },
+  Security: {
+    codeql: { matrix: true },
+    'dependency-review': {},
+  },
 };
 
 // Aggregating gates fail whenever an upstream job fails; `--failed` reruns them as dependents.
-const GATES = new Set(['ci-gate', 'security-gate']);
+const GATES = new Set(['ci-gate', 'ci-gate (push)', 'security-gate']);
 const FAILED = new Set(['failure', 'timed_out', 'cancelled']);
-const EVENTS = new Set(['pull_request', 'merge_group', 'push']);
+const EVENTS = new Set(['pull_request', 'push']);
 
-// "node-os (macos-15)" -> "node-os"; "e2e-deterministic / e2e-deterministic" -> "e2e-deterministic".
-export function baseJobName(name) {
-  return String(name)
-    .split(' / ')[0]
-    .replace(/ \(.*\)$/, '')
-    .trim();
+// The allowlist entry for an exact job name, or for "<name> (<leg>)" of a matrix job; else null.
+export function flakyEntry(workflow, name) {
+  const table = Object.hasOwn(FLAKY_JOBS, workflow) ? FLAKY_JOBS[workflow] : null;
+  if (!table) return null;
+  const n = String(name);
+  if (Object.hasOwn(table, n)) return table[n].matrix ? null : table[n];
+  const m = /^([a-z0-9-]+) \([^()]+\)$/.exec(n);
+  if (m && Object.hasOwn(table, m[1]) && table[m[1]].matrix) return table[m[1]];
+  return null;
+}
+
+// A failed job qualifies when it is on the list and, for a mixed job, it failed in at least one
+// step and every failed step is flaky-prone (a cancelled or timed-out mixed job does not qualify).
+export function jobQualifies(workflow, job) {
+  const entry = flakyEntry(workflow, job.name);
+  if (!entry) return false;
+  if (!entry.steps) return true;
+  const steps = Array.isArray(job.failedSteps) ? job.failedSteps.map(String) : [];
+  return steps.length > 0 && steps.every((s) => entry.steps.includes(s));
 }
 
 export function parseRunId(value) {
@@ -45,8 +72,7 @@ export function parseRunId(value) {
 
 export function decide({ workflow, event, conclusion, attempt, repo, headRepo, headBranch, jobs }) {
   const no = (reason) => ({ rerun: false, reason, jobs: [] });
-  const flaky = Object.hasOwn(FLAKY_JOBS, workflow) ? FLAKY_JOBS[workflow] : null;
-  if (!flaky) return no('not a workflow this retries');
+  if (!Object.hasOwn(FLAKY_JOBS, workflow)) return no('not a workflow this retries');
   if (attempt !== '1') return no('not the first attempt');
   if (conclusion !== 'failure') return no(`run ended ${conclusion || 'unknown'}, not failure`);
   if (!EVENTS.has(event)) return no(`event ${event || 'unknown'} is not retried`);
@@ -55,14 +81,21 @@ export function decide({ workflow, event, conclusion, attempt, repo, headRepo, h
 
   const failed = (jobs ?? [])
     .filter((j) => FAILED.has(j.conclusion))
-    .map((j) => String(j.name))
-    .filter((n) => !GATES.has(baseJobName(n)));
+    .filter((j) => !GATES.has(String(j.name)));
   if (failed.length === 0) return no('no failed job besides the gate');
-  const deterministic = failed.filter((n) => !flaky.has(baseJobName(n)));
+  const deterministic = failed.filter((j) => !jobQualifies(workflow, j)).map((j) => String(j.name));
   if (deterministic.length > 0) {
-    return { rerun: false, reason: 'a failed job is not on the flaky list', jobs: deterministic };
+    return {
+      rerun: false,
+      reason: 'a failed job or step is not on the flaky list',
+      jobs: deterministic,
+    };
   }
-  return { rerun: true, reason: 'first attempt failed only in flaky-prone jobs', jobs: failed };
+  return {
+    rerun: true,
+    reason: 'first attempt failed only in flaky-prone jobs or steps',
+    jobs: failed.map((j) => String(j.name)),
+  };
 }
 
 // One plain line for the job summary; job names come from the run's workflow file, so they are

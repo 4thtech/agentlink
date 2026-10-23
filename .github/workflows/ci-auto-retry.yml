@@ -7,7 +7,8 @@
 # default branch head for this event), runs it with the runner's Node (no install), and calls the
 # GitHub API with the numeric run id from the event payload, passed through `env:` and validated.
 # Only runs from this repository are retried (no forks), only attempt 1 (no loops), never a
-# cancelled run. Rules: tools/ci/auto-retry.mjs and docs/process/ci-cd.md.
+# cancelled run, never a merge-queue run (a failed queue run has already ejected the pull request).
+# Mixed jobs (for example `checks`: lint, typecheck, build, unit tests) qualify only by failed step. Rules: tools/ci/auto-retry.mjs and docs/process/ci-cd.md.
 name: CI auto-retry
 
 on:
@@ -29,7 +30,6 @@ jobs:
       github.event.workflow_run.run_attempt == 1 &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       (github.event.workflow_run.event == 'pull_request' ||
-       github.event.workflow_run.event == 'merge_group' ||
        (github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -46,7 +46,7 @@ jobs:
             tools/ci/auto-retry.mjs
           sparse-checkout-cone-mode: false
 
-      - name: List the jobs of the failed attempt
+      - name: List the jobs and failed steps of the failed attempt
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -59,7 +59,7 @@ jobs:
             exit 1
           fi
           gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/attempts/1/jobs?per_page=100" \
-            --jq '.jobs[] | {name, conclusion} | tojson' > "$RUNNER_TEMP/auto-retry-jobs.jsonl"
+            --jq '.jobs[] | {name, conclusion, failedSteps: [(.steps // [])[] | select(.conclusion == "failure") | .name]} | tojson' > "$RUNNER_TEMP/auto-retry-jobs.jsonl"
 
       - name: Decide
         id: decide
