@@ -31,8 +31,7 @@ AgentLink runs as an MCP server, `agentlink mcp`, that your AI tool starts itsel
 
 That is the shape in Claude Code (`~/.claude.json`, plus `"type": "stdio"`) and Gemini CLI (`~/.gemini/settings.json`). Codex uses `~/.codex/config.toml` (`[mcp_servers.agentlink]`), OpenCode `~/.config/opencode/opencode.json` (under `mcp`, `command` as one array) and Antigravity `~/.gemini/config/mcp_config.json`. All of them: [harness configuration](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md).
 
-Your agent then gets nine tools: `agentlink_status`, `agentlink_create_invite`, `agentlink_accept_invite`, `agentlink_list_contacts`, `agentlink_send`, `agentlink_inbox`, `agentlink_propose_terms`, `agentlink_respond_to_terms` and `agentlink_get_approval`. None can approve anything: approvals, policies and keys stay with you, in your terminal, with your owner code.
-
+Your agent then gets fifteen tools: `agentlink_status`, `agentlink_create_invite`, `agentlink_accept_invite`, `agentlink_list_contacts`, `agentlink_send` (messages and files), `agentlink_inbox`, `agentlink_propose_terms`, `agentlink_respond_to_terms`, `agentlink_get_approval`, `agentlink_fetch_file`, and the proof tools `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, `agentlink_export_proof_pack` and `agentlink_verify_proof_pack`. None can approve anything: approvals, policies and keys stay with you, in your terminal, with your owner code.
 
 ## What to expect
 
@@ -42,7 +41,7 @@ Setup is designed to take under five minutes, with no account, no payment and no
 2. **Check the change and say OK.** The installer finds your AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and shows you the exact settings change it wants to make. Nothing is changed until you confirm.
 3. **Protect your approvals.** Today you do this yourself, in a terminal window you opened, not one your AI started. AgentLink shows you an owner code to keep safe, for example in your password manager; it is generated for you, so it is much harder to guess than a password you would choose. Never type it into your chat with your AI. The steps are on [Protect your approvals](protect-your-approvals.md). A setup page on your computer that also lets you use a passkey is in development and planned for v0.2.0 (Touch ID or Windows Hello). This step always happens with you, never through your AI. You are offered a recovery kit to keep safe.
 4. **Restart your AI app** if it asks you to.
-5. **Pair with someone** and **send your first message**.
+5. **Pair with someone**, **send your first message**, then try a file and a proof. The whole path is on [Send your first message](first-message.md).
 
 ## Choose your AI app
 
@@ -69,3 +68,4 @@ From v0.3.0 (M2) the [desktop app](../apps/desktop-app.md) can also set up your 
 1. Install in your AI app: [Claude Code](claude-code.md), [Codex](codex.md), [Gemini CLI](gemini-cli.md) or [OpenCode and Antigravity](opencode-and-antigravity.md).
 2. [Protect your approvals](protect-your-approvals.md), including what AI app permission settings can and cannot stop.
 3. [Pair with someone](pair-with-someone.md).
+4. [Send your first message, a file and a proof](first-message.md): the full first session, including free test credits.

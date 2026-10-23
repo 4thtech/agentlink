@@ -1064,8 +1064,9 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     );
     expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'claimed' });
     b.spy.mode = 'ack';
-    // Past the first backoff step and its jitter (30 s, at most 25 % more; 07 §4.2, M1-5b-c) and
-    // before give_up_at: with the worst-case back-dating that is only S = 300 s away (CHORE-DEFLAKE-2).
+    // Past the first backoff step and its jitter (transport-nostr outbox.ts: 30 s base plus
+    // floor(30 × 0.25 × r) ≤ 7 s, so at most 37 s; 07 §4.2, M1-5b-c) and before give_up_at: with
+    // the worst-case back-dating that is only S = 300 s away (CHORE-DEFLAKE-2, CHORE-DEFLAKE-2-b).
     clock.t += 40;
     const published = b.spy.published.length;
     // The repeat republishes the stored envelope and reports the approval as used: the first call
