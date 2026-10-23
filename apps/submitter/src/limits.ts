@@ -1,10 +1,14 @@
 // Rate counters and aggregate metrics of the submitter (07 §7; 04 §7 gas griefing; M1-10a). One
-// class, three kinds of instance, each named by the Worker:
+// class, several kinds of instance, each named by the Worker:
 //   `i:<HMAC of the IP bucket>`        items per IP (IPv6 /64) per hour, every item counted (FA-3);
+//                                      `r:`, `f:` and `g:<HMAC>` count reads, faucet and top-up
+//                                      requests per IP the same way;
 //   `s:<chainId>:<signer address>`     new items per signer per hour (items already on-chain are not
 //                                      counted: anyone can replay a signer's public items);
+//   `d:<chainId>:<agent address>`      gasless top-ups sent per agent per hour (M3-4b-t-3; only
+//                                      authorizations that passed the relay checks count);
 //   `metrics`                          the aggregate counters, a fixed set of names.
-// No raw IP, signature or record is stored, and an IP is never stored next to a signer. Counter
+// No raw IP, signature or record is stored, and an IP is never stored next to a signer or agent. Counter
 // instances delete their own storage after their window (alarm).
 import { DurableObject } from 'cloudflare:workers';
 
@@ -17,6 +21,9 @@ export const METRICS = [
   'request_faucet',
   'faucet_credited',
   'faucet_paused',
+  'request_deposit_auth',
+  'deposit_auth_submitted',
+  'deposit_auth_refused',
   'item_submitted',
   'item_held',
   'item_skipped',

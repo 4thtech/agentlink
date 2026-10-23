@@ -9,6 +9,9 @@
 #   SUBMITTER_GAS_KEY_<chainId>    the chain's gas key, 0x + 64 lowercase hex (hot key, low balance)
 #   SUBMITTER_FAUCET_KEY_<chainId> the chain's faucet key, 0x + 64 lowercase hex, never the gas key
 #   SUBMITTER_RPC_URLS_<chainId>   optional: comma-separated RPC URLs (may carry a provider key)
+#   SUBMITTER_DEPOSIT_GAS_KEY_<chainId> optional: the gasless top-up relay's own gas key, used only
+#                                  once SUBMITTER_DEPOSIT_AUTH_CHAINS (a var, unset here: off)
+#                                  names the chain (M3-4b-t-3; docs/runbooks/submitter-deploy.md)
 # The deploy workflow skips cleanly until the required ones exist (names only; it never reads a
 # value). No account ID here either: CI passes CLOUDFLARE_ACCOUNT_ID from the GitHub Environment.
 #
@@ -69,9 +72,19 @@ class_name = "SubmitterLimits"
 name = "SUBMITTER_FAUCET"
 class_name = "SubmitterFaucet"
 
+[[durable_objects.bindings]]
+name = "SUBMITTER_DEPOSIT_RELAY"
+class_name = "SubmitterDepositRelay"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SubmitterQueue", "SubmitterLimits", "SubmitterFaucet"]
+
+# M3-4b-t-3: the gasless top-up relay. Additive; inert while SUBMITTER_DEPOSIT_AUTH_CHAINS is unset.
+# Forward fix if it must go: a later migration with deleted_classes = ["SubmitterDepositRelay"].
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["SubmitterDepositRelay"]
 
 # ---------------------------------------------------------------------------------------------------
 # Staging: workers.dev only, deployed on every merge to main; CI and smoke tests only (D-88).
@@ -110,6 +123,10 @@ class_name = "SubmitterLimits"
 name = "SUBMITTER_FAUCET"
 class_name = "SubmitterFaucet"
 
+[[env.staging.durable_objects.bindings]]
+name = "SUBMITTER_DEPOSIT_RELAY"
+class_name = "SubmitterDepositRelay"
+
 # ---------------------------------------------------------------------------------------------------
 # Production: the Custom Domain only (release-and-deployment.md §1.1), no workers.dev or preview
 # URLs. The testnet beta (D-88). Deployed automatically once the staging smoke is green (D-52).
@@ -147,3 +164,7 @@ class_name = "SubmitterLimits"
 [[env.production.durable_objects.bindings]]
 name = "SUBMITTER_FAUCET"
 class_name = "SubmitterFaucet"
+
+[[env.production.durable_objects.bindings]]
+name = "SUBMITTER_DEPOSIT_RELAY"
+class_name = "SubmitterDepositRelay"
