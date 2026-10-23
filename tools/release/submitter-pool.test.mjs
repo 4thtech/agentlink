@@ -45,9 +45,26 @@ const LINE =
 describe('the pool alert program (M1-10b-e)', () => {
   it('is quiet when every chain is available with gas and faucet ok', () => {
     expect(run({ ok: true, chains: [chain()] })).toBe('pool: ok');
-    // A chain without a faucet (faucet null) is fine.
+    expect(run({ ok: true, chains: [chain(), chain({ chainId: 10200 })] })).toBe('pool: ok');
+  });
+
+  it('alerts on `faucet: null`: the faucet is off for that chain (M1-10b-e-b)', () => {
+    // The submitter answers `faucet: null` when the chain is not in its faucet settings, and for
+    // every chain when those settings are missing or invalid (apps/submitter/src/config.ts
+    // `readFaucetConfig`). The production submitter serves testnets only, where the faucet is
+    // expected (D-120 (3)), so null is a finding and never a quiet `pool: ok`.
+    expect(run({ ok: true, chains: [chain({ faucet: null })] })).toBe(
+      'alert chain 84532: faucet off',
+    );
     expect(run({ ok: true, chains: [chain(), chain({ chainId: 10200, faucet: null })] })).toBe(
-      'pool: ok',
+      'alert chain 10200: faucet off',
+    );
+    expect(
+      run({ ok: true, chains: [chain({ faucet: null }), chain({ chainId: 10200, faucet: null })] }),
+    ).toBe('alert chain 84532: faucet off\nalert chain 10200: faucet off');
+    // A missing `faucet` key stays an older or malformed answer: unknown, not off.
+    expect(run({ ok: true, chains: [chain({ faucet: undefined })] })).toBe(
+      'alert chain 84532: faucet unknown',
     );
   });
 
