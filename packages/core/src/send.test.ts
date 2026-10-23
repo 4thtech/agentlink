@@ -44,7 +44,7 @@ let clock: FakeClock;
 /** A relay spy: records every publish; acks all relays, none, or never answers. */
 class RelaySpy {
   readonly published: { event: NostrEvent; relays: string[] }[] = [];
-  mode: 'ack' | 'none' | 'hang' = 'ack';
+  mode: 'ack' | 'none' | 'hang' | 'too_large' = 'ack';
   readonly factory: TransportFactory = (deps) => ({
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
@@ -56,7 +56,12 @@ class RelaySpy {
         results: relays.map((relay) => ({
           relay,
           ok: this.mode === 'ack',
-          reason: this.mode === 'ack' ? ('ok' as const) : ('rejected' as const),
+          reason:
+            this.mode === 'ack'
+              ? ('ok' as const)
+              : this.mode === 'too_large'
+                ? ('too_large' as const)
+                : ('rejected' as const),
         })),
         acked,
         sent: acked.length >= 2,
@@ -476,12 +481,40 @@ describe('sendMessage: store before publish (07 §3.2 "Transaction", "On failure
 
     a.spy.mode = 'ack';
     expect((await a.client.outbox.processDue()).sent).toBe(0); // backing off: nothing due yet
-    clock.t += 30;
+    clock.t += 40; // past the first backoff step and its jitter (at most 25 %, M1-5b-c)
     const summary = await a.client.outbox.processDue();
     expect(summary.sent).toBe(4);
     expect([...a.spy.ids.slice(4)].sort()).toEqual(firstIds);
     stored = await rows(a.store);
     expect(stored.out[0]?.delivery).toBe('sent');
+  });
+});
+
+describe('outbox: notices for rows that cannot reach 2 relays (07 §4.2, §4.3; M1-5b-c)', () => {
+  it('passes the transport notices through to the caller with a fixed reason', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'too_large';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    clock.t += 40; // past the first backoff step and its jitter (at most 25 %)
+    const summary = await a.client.outbox.processDue();
+    expect(summary.retrying).toBe(4);
+    const wrapIds = (await rows(a.store)).outbox.map((r) => r.wrap_id).sort();
+    expect(summary.notices.map((n) => n.wrapId).sort()).toEqual(wrapIds);
+    expect(summary.notices.every((n) => n.reason === 'no_relay_large_enough')).toBe(true);
+  });
+
+  it('reports no notice for a transient relay failure', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    clock.t += 40; // past the first backoff step and its jitter (at most 25 %)
+    const summary = await a.client.outbox.processDue();
+    expect(summary.retrying).toBe(4);
+    expect(summary.notices).toEqual([]);
   });
 });
 
@@ -492,7 +525,7 @@ describe('outbox: one publisher per pending row (07 §3.2; M1-9 plan finding 4)'
     await pair(a, b);
     a.spy.mode = 'none';
     await a.client.sendMessage({ to: b.id, text: 'hello' });
-    clock.t += 30;
+    clock.t += 40; // past the first backoff step and its jitter (at most 25 %, M1-5b-c)
 
     const spy1 = new RelaySpy();
     spy1.mode = 'hang'; // this process stalls (or dies) mid-publish
@@ -559,7 +592,7 @@ describe('outbox: staged pairing messages (04 §3.6; M1-7c)', () => {
       clock: clock.now,
       transport: spy.factory,
     });
-    clock.t += 30;
+    clock.t += 40; // past the first backoff step and its jitter (at most 25 %, M1-5b-c)
     expect((await restarted.outbox.processDue()).sent).toBe(4);
     expect([...spy.ids].sort()).toEqual(ids);
     clock.t += 3_600;
@@ -789,7 +822,7 @@ describe('logs (I-7)', () => {
     lines.length = 0;
     a.spy.mode = 'none';
     const result = await a.client.sendMessage({ to: b.id, text: 'secret words here' });
-    clock.t += 30;
+    clock.t += 40; // past the first backoff step and its jitter (at most 25 %, M1-5b-c)
     a.spy.mode = 'ack';
     await a.client.outbox.processDue();
     if (result.status !== 'ok') throw new Error('expected ok');

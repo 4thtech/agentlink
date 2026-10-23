@@ -114,8 +114,9 @@ export function createFakeWorld(): World {
     storedBytes: () => [...drop.objects.values()].flatMap((o) => (o.bytes ? [o.bytes] : [])),
     verifier: () => verifier,
     topUp: (agentId) => {
-      // The faucet's gift: $1 of testnet credits (apps/submitter faucet, M1-10b).
-      notary.fund(agentId, 10n * FEE_UNITS);
+      // The faucet's gift: 50 cents of testnet credits, five $0.10 fees (apps/submitter faucet,
+      // M1-10b; `FAUCET_DEFAULTS.usdCents`).
+      notary.fund(agentId, 5n * FEE_UNITS);
       return Promise.resolve(true);
     },
     deps(relays) {

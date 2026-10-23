@@ -4,6 +4,12 @@
 // - No key reaches this package (I-1, 04 §2.2). A `DirectSigner` signs one EIP-1559 transaction
 //   that this module built; the bytes it returns are parsed and must be exactly that transaction,
 //   from exactly the signer's address, or nothing is broadcast (`signer_mismatch`).
+// - M1-4c-b: the one production DirectSigner is keyStoreDirectSigner, over the agent KeyStore's
+//   `signTransaction`, which applies its own fixed rules before any key is read (testnets only, the
+//   AgentLink contracts only, the direct-mode calls only). A KeyStore refusal is `signing_refused`.
+//   createDirectMode wires it for a chain of the KeyStore's allowlist and nothing else, so mainnet
+//   direct mode stays off. Other DirectSigners are test doubles. No MCP tool reaches any of this
+//   (I-4): the runtime builds direct mode, never a tool argument.
 // - Every call is one of the direct-mode functions (state.ts) and is simulated from the signer
 //   before it is signed: a revert is returned by name and nothing is signed.
 // - A missing native balance for the worst-case gas cost is `no_gas`, decided before signing.
@@ -11,6 +17,12 @@
 // - Broadcasting goes through the platform's address-checked fetch to the same RPC URLs as reads
 //   (user first, then shipped), sending only `eth_sendRawTransaction`. URLs are secrets: no error
 //   names one.
+import {
+  CryptoInputError,
+  DIRECT_TX_ALLOWLIST,
+  type DirectTransaction as KeyStoreTransaction,
+  type KeyStore,
+} from '@4thtech-io/crypto';
 import { encodeFunctionData, keccak256, parseTransaction, recoverTransactionAddress } from 'viem';
 import { ChainConfigError, type ChainConfig } from '../config/index.js';
 import type { Hex } from '../ids/index.js';
@@ -20,17 +32,10 @@ import { ChainError } from './errors.js';
 import { DEFAULT_RPC_TIMEOUT_MS, MAX_USER_RPC_URLS } from './read-client.js';
 import { checkDirectCall, directAbi, type ChainState, type ContractTx } from './state.js';
 
-/** The transaction a DirectSigner is asked to sign. */
-export interface DirectTransaction {
-  readonly type: 'eip1559';
-  readonly chainId: number;
-  readonly nonce: number;
-  readonly gas: bigint;
-  readonly maxFeePerGas: bigint;
-  readonly maxPriorityFeePerGas: bigint;
+/** The transaction a DirectSigner is asked to sign: the KeyStore's own type, with `0x` hex. */
+export interface DirectTransaction extends KeyStoreTransaction {
   readonly to: Hex;
   readonly data: Hex;
-  readonly value: bigint;
 }
 
 /**
@@ -41,6 +46,64 @@ export interface DirectSigner {
   readonly address: Hex;
   /** The serialized, signed transaction (`0x02…`). */
   signTransaction(tx: DirectTransaction): Promise<Hex>;
+}
+
+/** The KeyStore methods direct mode uses: the agent's address and the transaction signer. */
+export type DirectKeys = Pick<KeyStore, 'getPublicBundle' | 'signTransaction'>;
+
+const EVM_ADDRESS = /^0x[0-9a-f]{40}$/;
+
+/**
+ * The production DirectSigner (M1-4c-b): the agent KeyStore signs, with the EVM key it never hands
+ * out. A KeyStore refusal (CryptoInputError `transaction_refused`) becomes ChainError
+ * `signing_refused`, fixed text; nothing is broadcast.
+ */
+export async function keyStoreDirectSigner(keys: DirectKeys): Promise<DirectSigner> {
+  const { agentId } = await keys.getPublicBundle();
+  const address = typeof agentId === 'string' ? agentId.toLowerCase() : '';
+  if (!EVM_ADDRESS.test(address)) throw new ChainError('invalid_call');
+  return Object.freeze({
+    address: address as Hex,
+    async signTransaction(tx: DirectTransaction): Promise<Hex> {
+      try {
+        return (await keys.signTransaction(tx)) as Hex;
+      } catch (error) {
+        if (error instanceof CryptoInputError && error.code === 'transaction_refused') {
+          throw new ChainError('signing_refused');
+        }
+        throw error;
+      }
+    },
+  });
+}
+
+/**
+ * Direct mode for one chain over the agent KeyStore (M1-4c-b; D-123 top-up): keyStoreDirectSigner
+ * and a broadcaster to the chain's RPCs. Only a testnet whose contracts are the KeyStore's
+ * allowlist for that chain ID (DIRECT_TX_ALLOWLIST): anything else, a mainnet included, is
+ * ChainConfigError `direct_mode_unavailable`, before the KeyStore is asked.
+ */
+export async function createDirectMode(
+  config: ChainConfig,
+  keys: DirectKeys,
+  options: BroadcasterOptions,
+): Promise<DirectMode> {
+  const allowed = Object.hasOwn(DIRECT_TX_ALLOWLIST, config.chainId)
+    ? DIRECT_TX_ALLOWLIST[config.chainId]
+    : undefined;
+  if (
+    config.testnet !== true ||
+    allowed === undefined ||
+    allowed.notary !== String(config.contracts.notary).toLowerCase() ||
+    allowed.vault !== String(config.contracts.vault).toLowerCase()
+  ) {
+    throw new ChainConfigError(
+      'direct_mode_unavailable',
+      'direct mode: only on a supported test network',
+    );
+  }
+  const broadcast = createBroadcaster(config, options);
+  return Object.freeze({ signer: await keyStoreDirectSigner(keys), broadcast });
 }
 
 /** Sends signed bytes to the chain. */

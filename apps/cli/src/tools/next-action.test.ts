@@ -33,6 +33,12 @@ describe('pending_approval points at agentlink_get_approval (F5a)', () => {
     expect(out.result.nextStep).toContain('agentlink_get_approval');
   });
 
+  it('keeps the context nextStep as its prefix, so the link can replace it (L-1)', () => {
+    const ctx = context();
+    const out = pendingApproval(ctx, APPROVAL, 'This needs your approval.');
+    expect(out.result.nextStep?.startsWith(ctx.approvalNextStep(APPROVAL))).toBe(true);
+  });
+
   it('the copy sheet nextStep names it too', () => {
     expect(en['chat.status.pending_approval.nextStep']).toContain('agentlink_get_approval');
   });
@@ -46,6 +52,16 @@ describe('the folder-not-allowed results name the exact step (F12)', () => {
       expect(out.result.nextStep, reason).toMatch(/terminal/);
     }
     expect(FILE_TEXT.noFolderNextStep).not.toMatch(/AgentLink rules/);
+  });
+});
+
+describe('the file path hints are exact (L-2)', () => {
+  it('say <path> and the --agent hint for allow-folder', () => {
+    for (const text of [FILE_TEXT.noFolderNextStep, FILE_TEXT.outsideFolderNextStep]) {
+      expect(text).toContain('agentlink policy allow-folder <path>');
+      expect(text).toContain('--agent <name>');
+      expect(text).not.toContain('<folder>');
+    }
   });
 });
 

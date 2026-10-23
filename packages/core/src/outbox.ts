@@ -57,6 +57,7 @@ import {
   type GiftWrap,
   type OutboxAttempt,
   type OutboxGiveUpReason,
+  type OutboxNotice,
   type OutboxPersistence,
   type OutboxRow,
   type OutboxSummary,
@@ -463,8 +464,11 @@ export class OutboxService {
     let notDelivered = 0;
     let failed = 0;
     let nextAttemptAt: number | undefined;
+    // Rows that cannot reach 2 usable relays, with the transport's fixed reason (07 §4.2, §4.3).
+    const notices: OutboxNotice[] = [];
     for (let i = 0; i < MAX_BATCHES; i += 1) {
       const s = await worker.processDue();
+      notices.push(...s.notices);
       sent += s.sent;
       retrying += s.retrying;
       notDelivered += s.notDelivered;
@@ -478,7 +482,7 @@ export class OutboxService {
     if (sent + retrying + notDelivered + failed > 0) {
       this.#ctx.log.info('outbox pass', { sent, retrying, notDelivered, failed });
     }
-    return { sent, retrying, notDelivered, failed, nextAttemptAt };
+    return { sent, retrying, notDelivered, failed, nextAttemptAt, notices };
   }
 
   /**

@@ -30,6 +30,7 @@ import type {
   ToolContext,
 } from './context.js';
 import { callTool } from './index.js';
+import { PROOF_TEXT } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
 import { TOOLS, findTool } from './registry.js';
@@ -1253,6 +1254,54 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     });
   });
 
+  it('a counter recorded with notarize (M1-9d-5): ok with `proof`, said as a firm offer, the fee in $', async () => {
+    const { client, calls } = fake({
+      respond: () => ({
+        status: 'ok',
+        decision: 'counter',
+        thread: THREAD,
+        ...TERMS_OK,
+        version: 2,
+        envelopeId: ENVELOPE,
+        proof: recorded(),
+      }),
+    });
+    const r = await call(
+      'agentlink_respond_to_terms',
+      {
+        envelopeId: ENVELOPE,
+        decision: 'counter',
+        terms: firm,
+        notarize: true,
+        approvalId: APPROVAL,
+      },
+      client,
+    );
+    expect(calls.responded[0]).toMatchObject({ decision: 'counter', notarize: true });
+    expect(r.structured).toMatchObject({
+      status: 'ok',
+      decision: 'counter',
+      version: 2,
+      envelopeId: ENVELOPE,
+      proof: { status: 'ok', recordId: RECORD, fee: FEE, receipts: [] },
+    });
+    expect(r.structured.summary).toContain('firm offer');
+    expect(r.structured.summary).toContain('$0.10');
+    expect(r.structured.summary).not.toMatch(/base|sepolia|chain|on-chain|transaction|gas/i);
+    expectOurTextClean(r);
+  });
+
+  it('the unavailable text names a counter as a place proof works (M1-9d-5)', async () => {
+    const { client } = fake();
+    const r = await call(
+      'agentlink_respond_to_terms',
+      { envelopeId: ENVELOPE, decision: 'reject', notarize: true },
+      client,
+    );
+    expect(r.structured).toMatchObject({ code: 'NOTARIZE_UNAVAILABLE' });
+    expect(r.structured.nextStep).toContain('counter');
+  });
+
   it('a proof refusal of the core (CHAIN_UNAVAILABLE, CARD_EXPIRED) is fixed proof text', async () => {
     for (const code of ['CHAIN_UNAVAILABLE', 'CARD_EXPIRED'] as const) {
       const { client } = fake({ propose: () => ({ status: 'rejected', code }) });
@@ -1507,6 +1556,55 @@ describe('requestReceipt on agentlink_notarize and agentlink_send (06 §2.4, 11 
       client,
     );
     expect(r.structured.summary).not.toContain(RECEIPT_LINE_GENERIC);
+  });
+
+  it('M1-33d-b: a request the core did not add is said in the result field and the summary', async () => {
+    const { client } = fake({
+      notarize: () => ({ ...recorded(), receiptRequestNotAdded: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: true },
+      client,
+    );
+    expect(r.structured).toMatchObject({ status: 'ok', receiptRequestNotAdded: true });
+    expect(r.structured).not.toHaveProperty('receiptRequested');
+    expect(r.structured.summary).toContain(PROOF_TEXT.receiptRequestNotAdded);
+    expect(r.structured.summary).not.toContain(RECEIPT_LINE_GENERIC);
+    expectOurTextClean(r);
+  });
+
+  it('M1-33d-b: a kept request or no request never carries the not-added line', async () => {
+    const { client } = fake({
+      notarize: () => ({ ...recorded(), receiptRequested: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_notarize',
+      { envelopeId: ENVELOPE, requestReceipt: true },
+      client,
+    );
+    expect(r.structured).not.toHaveProperty('receiptRequestNotAdded');
+    expect(r.structured.summary).not.toContain(PROOF_TEXT.receiptRequestNotAdded);
+    const plain = await call('agentlink_notarize', { envelopeId: ENVELOPE }, fake().client);
+    expect(plain.structured).not.toHaveProperty('receiptRequestNotAdded');
+    expect(plain.structured.summary).not.toContain(PROOF_TEXT.receiptRequestNotAdded);
+  });
+
+  it('M1-33d-b: send with a request the core did not add says so in proof and summary', async () => {
+    const { client } = fake({
+      notarize: () => ({ ...recorded(), receiptRequestNotAdded: true }) as NotarizeResult,
+    });
+    const r = await call(
+      'agentlink_send',
+      { to: B, text: 'hi', notarize: true, requestReceipt: true },
+      client,
+    );
+    expect(r.structured).toMatchObject({
+      status: 'ok',
+      proof: { status: 'ok', receiptRequestNotAdded: true },
+    });
+    expect(r.structured.summary).toContain(PROOF_TEXT.receiptRequestNotAdded);
+    expectOurTextClean(r);
   });
 
   it('a non-boolean requestReceipt is refused by the schema; nothing runs', async () => {

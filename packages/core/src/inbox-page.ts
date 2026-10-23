@@ -13,7 +13,8 @@
 // of `sizeOf` above `maxBytes` (at least one item), listed oldest first.
 //
 // Read marks and atomicity. A Store transaction is synchronous (store.ts) and payloads are sealed,
-// so a page is built in three steps: (A) one transaction selects the candidate rows; (B) their
+// so a page is built in three steps: (A) one transaction selects the candidate rows (and reads the
+// receipt-request flag of all of them at once, M1-33d-b; no transaction per item); (B) their
 // payloads are opened outside it; (C) one transaction checks that every row on the page is unchanged
 // (same hash, state, contact, and the read mark seen in A) and sets `read_at` on the unread inbound
 // ones. If any check fails, C writes nothing and the read starts again from A, so the page that is
@@ -34,7 +35,7 @@ import type { ContactBook, ContactView } from './contacts.js';
 import { nowOf, open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { InboxSender } from './inbox.js';
-import { receiptRequestedTx } from './proofs/receipt-request.js';
+import { receiptRequestedSetTx } from './proofs/receipt-request.js';
 import { unknownSenderCodesTx } from './sender-codes.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx, Where } from './store/store.js';
@@ -328,6 +329,8 @@ type Selection =
       readonly requests: number;
       /** Sender codes of the unknown senders, collisions judged store-wide (04 §2.9). */
       readonly codes: ReadonlyMap<string, string>;
+      /** The inbound candidates whose sender asked for a delivery receipt not signed yet (M1-33d). */
+      readonly requested: ReadonlySet<string>;
     }
   | { readonly status: 'before_not_found' };
 
@@ -395,7 +398,12 @@ function selectTx(tx: StoreTx, q: InboxPageQuery): Selection {
   }
   const candidates = [...found.values()].sort((x, y) => byPosition(y, x)).slice(0, q.limit);
   const requests = tx.count('envelopes', { direction: 'in', contact_id: null, state: 'request' });
-  return { status: 'ok', candidates, requests, codes: unknownSenderCodesTx(tx) };
+  // M1-33d-b: the receipt-request flag of every inbound candidate in this one read.
+  const requested = receiptRequestedSetTx(
+    tx,
+    candidates.filter((c) => c.category === 'in').map((c) => c.row.envelope_id),
+  );
+  return { status: 'ok', candidates, requests, codes: unknownSenderCodesTx(tx), requested };
 }
 
 /** The item fields every direction shares, from an opened payload. */
@@ -502,7 +510,7 @@ export async function readInboxPage(deps: InboxPageDeps, q: InboxPageQuery): Pro
     let bytes = 0;
     let unreadable = 0;
     for (const candidate of selection.candidates) {
-      const item = await buildItem(ctx, candidate, dropOrigins, sender, selection.codes);
+      const item = await buildItem(ctx, candidate, dropOrigins, sender, selection);
       if (item === undefined) {
         unreadable += 1;
         continue;
@@ -537,7 +545,10 @@ async function buildItem(
   candidate: Candidate,
   drop: ReadonlySet<string>,
   sender: (contactId: string) => Promise<InboxSender | undefined>,
-  codes: ReadonlyMap<string, string>,
+  selection: {
+    readonly codes: ReadonlyMap<string, string>;
+    readonly requested: ReadonlySet<string>;
+  },
 ): Promise<InboxPageItem | undefined> {
   const { row, category } = candidate;
   if (row.payload_json === null) return undefined;
@@ -552,7 +563,7 @@ async function buildItem(
   }
   const base = baseOf(row, payload, drop);
   if (category === 'request') {
-    const code = codes.get(row.from_key);
+    const code = selection.codes.get(row.from_key);
     if (code === undefined) return undefined;
     return { ...base, direction: 'in', from: null, senderCode: code, read: row.read_at !== null };
   }
@@ -563,7 +574,7 @@ async function buildItem(
     if (row.delivery === null) return undefined;
     return { ...base, direction: 'out', to: who, delivery: row.delivery };
   }
-  const requested = await ctx.store.transaction((tx) => receiptRequestedTx(tx, row.envelope_id));
+  const requested = selection.requested.has(row.envelope_id);
   return {
     ...base,
     direction: 'in',

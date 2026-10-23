@@ -51,6 +51,8 @@ export const DEFAULTS = Object.freeze({
   stuckAfterSeconds: 180,
   /** M-2: replacements before a transaction counts as dropped and its items are queued again. */
   maxReplacements: 3,
+  /** M1-10a-c: a held item stops retrying a day after intake. */
+  maxHeldSeconds: 86_400,
   /** D-62: 1 h. */
   soloAfterRevertSeconds: 3_600,
   codeSignerMode: 'solo' as const,
@@ -121,6 +123,13 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
   );
   const stuck = intVar(env, 'SUBMITTER_STUCK_AFTER_SECONDS', DEFAULTS.stuckAfterSeconds, 30, 3_600);
   const replacements = intVar(env, 'SUBMITTER_MAX_REPLACEMENTS', DEFAULTS.maxReplacements, 0, 10);
+  const maxHeld = intVar(
+    env,
+    'SUBMITTER_MAX_HELD_SECONDS',
+    DEFAULTS.maxHeldSeconds,
+    300,
+    7 * 86_400,
+  );
   const reads = intVar(env, 'SUBMITTER_IP_READS_PER_HOUR', DEFAULTS.ipReadsPerHour, 1, 100_000);
   const feeRaw = env.SUBMITTER_MAX_FEE_PER_GAS_WEI;
   let maxFeePerGasWei: bigint | null = null;
@@ -145,6 +154,7 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
     maxItemGas === null ||
     stuck === null ||
     replacements === null ||
+    maxHeld === null ||
     reads === null ||
     ipItems === null ||
     signerItems === null
@@ -162,6 +172,7 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
       maxItemGas: BigInt(maxItemGas),
       stuckAfterSeconds: stuck,
       maxReplacements: replacements,
+      maxHeldSeconds: maxHeld,
     }),
     limits: Object.freeze({
       ipItemsPerHour: ipItems,
@@ -175,8 +186,8 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
 
 /**
  * The testnet credits faucet (05 §9; SUB-7; M1-10b). Off unless SUBMITTER_FAUCET_CHAINS names
- * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia until
- * Chiado's smoke test has passed, M1-3j-b) and a testnet in the shipped config. Anything invalid turns the faucet off
+ * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia and
+ * Gnosis Chiado, M1-3j-c) and a testnet in the shipped config. Anything invalid turns the faucet off
  * (null) and leaves the rest of the submitter running.
  *
  * Vars: SUBMITTER_FAUCET_CHAINS, SUBMITTER_FAUCET_ADDRESS_<chainId> (below) and the bounded

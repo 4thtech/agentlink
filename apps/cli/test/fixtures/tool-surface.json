@@ -780,6 +780,9 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1086,6 +1089,9 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1386,6 +1392,9 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -2041,6 +2050,9 @@
             "additionalProperties": false
           }
         },
+        "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
         "agentAddress": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{40}$"
@@ -2264,6 +2276,9 @@
             "required": ["type", "at"],
             "additionalProperties": false
           }
+        },
+        "receiptRequestNotAdded": {
+          "type": "boolean"
         },
         "agentAddress": {
           "type": "string",

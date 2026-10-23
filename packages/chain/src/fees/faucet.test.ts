@@ -207,17 +207,19 @@ function decodeSent(raw: Hex) {
 }
 
 describe('the faucet chain allowlist (SUB-7)', () => {
-  it('is hard-coded to Base Sepolia until Chiado is deployed (M1-3j)', () => {
-    expect(FAUCET_CHAIN_IDS).toEqual([84532]);
+  it('is hard-coded to Base Sepolia and Gnosis Chiado (M1-3j-c)', () => {
+    expect(FAUCET_CHAIN_IDS).toEqual([84532, 10200]);
     expect(Object.isFrozen(FAUCET_CHAIN_IDS)).toBe(true);
     expect(isFaucetChain(84532)).toBe(true);
+    expect(isFaucetChain(10200)).toBe(true);
   });
 
-  it('refuses every mainnet chain ID and Chiado (not deployed yet)', () => {
-    for (const id of [1, 8453, 100, 42161, 10, 137, 10200, 11155111, 0, -1, 84532.5]) {
+  it('refuses every mainnet chain ID (Gnosis 100 included) and every other testnet', () => {
+    for (const id of [1, 8453, 100, 42161, 10, 137, 11155111, 0, -1, 84532.5, 10200.5]) {
       expect(isFaucetChain(id)).toBe(false);
     }
     expect(isFaucetChain('84532')).toBe(false);
+    expect(isFaucetChain('10200')).toBe(false);
   });
 
   it('createFaucetChain refuses a config off the allowlist, even one that claims to be a testnet', () => {
@@ -515,6 +517,64 @@ describe('createFaucetChain().credit robustness (M1-10b-c)', () => {
       state: 'not_sent',
       reason: 'unavailable',
     });
+    expect(chain.attempted).toEqual([]);
+  });
+});
+
+// M1-3j-c: Gnosis Chiado's fee token is the native xDAI (D-46). The faucet credits it with one
+// `depositFor` that carries the amount as its value: no ERC-20 read, no approve.
+describe('createFaucetChain().credit on Gnosis Chiado: native xDAI (M1-3j-c, D-46)', () => {
+  const chiado = getChainConfig(10200) as ChainConfig;
+  const ONE_XDAI = 10n ** 18n;
+  // The mock's vault simulation checks an allowance; a native deposit needs none, so it is high.
+  const nativeChain = (overrides: Partial<MockChain> = {}) =>
+    newChain({ chainId: 10200, allowance: 2n ** 255n, gasBalance: 5n * ONE_XDAI, ...overrides });
+
+  it('the shipped Chiado config offers the native coin only', () => {
+    expect(chiado.feeTokens.map((t) => [t.symbol, t.address, t.decimals])).toEqual([
+      ['NATIVE', null, 18],
+    ]);
+    expect(chiado.contracts.vault.toLowerCase()).toBe(VAULT);
+  });
+
+  it('one depositFor carrying the value, at the pending nonce; no token read and no approve', async () => {
+    const chain = nativeChain();
+    const port = faucet(chain, chiado);
+    expect(port.chainId).toBe(10200);
+    expect(port.faucetAddress).toBe(FAUCET);
+    const result = await port.credit(AGENT, 100);
+    expect(result.state).toBe('sent');
+    expect(chain.methods).not.toContain('eth_call');
+    expect(chain.sent).toHaveLength(1);
+    const tx = parseTransaction(chain.sent[0]?.raw as ViemHex);
+    expect(tx.chainId).toBe(10200);
+    expect(tx.nonce).toBe(7);
+    expect(String(tx.to).toLowerCase()).toBe(VAULT);
+    // 100 US cents of a USD stablecoin with 18 decimals: one xDAI.
+    expect(tx.value).toBe(ONE_XDAI);
+    const d = decodeFunctionData({ abi: FEE_VAULT_CLIENT_ABI, data: tx.data as ViemHex });
+    expect(d.functionName).toBe('depositFor');
+    const args = d.args as readonly unknown[];
+    expect(String(args[0]).toLowerCase()).toBe(AGENT);
+    expect(String(args[1]).toLowerCase()).toBe(`0x${'0'.repeat(40)}`);
+    expect(args[2]).toBe(ONE_XDAI);
+    if (result.state === 'sent') expect(result.txHash).toBe(chain.sent[0]?.hash);
+  });
+
+  it('sends nothing when the faucet holds less xDAI than the amount: faucet_empty', async () => {
+    const chain = nativeChain({ gasBalance: ONE_XDAI / 2n });
+    expect(await faucet(chain, chiado).credit(AGENT, 100)).toEqual({
+      state: 'not_sent',
+      reason: 'faucet_empty',
+    });
+    expect(chain.attempted).toEqual([]);
+  });
+
+  it('sends nothing when the xDAI covers the amount but not the amount plus gas', async () => {
+    // Exactly the amount: the deposit's gas cannot be paid on top of the value it carries.
+    const chain = nativeChain({ gasBalance: ONE_XDAI });
+    const result = await faucet(chain, chiado).credit(AGENT, 100);
+    expect(result.state).toBe('not_sent');
     expect(chain.attempted).toEqual([]);
   });
 });

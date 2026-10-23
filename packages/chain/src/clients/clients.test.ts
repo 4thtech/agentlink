@@ -130,11 +130,12 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
         .filter((c) => isFaucetChain(c.chainId))
         .map((c) => c.chainId),
     );
-    // Shipped today: the faucet serves Base Sepolia only, so Chiado is not routed to yet.
-    expect(FAUCET_CHAIN_IDS).toEqual([84532]);
-    expect(autoSelectableChains().map((c) => c.chainId)).toEqual([84532]);
+    // Shipped (M1-3j-c): the faucet serves Base Sepolia and Gnosis Chiado, so both are routed to.
+    expect(FAUCET_CHAIN_IDS).toEqual([84532, 10200]);
+    expect(autoSelectableChains().map((c) => c.chainId)).toEqual([84532, 10200]);
+    // With no funding information the first registry entry stays the plain default.
     expect(selectChain().chainId).toBe(84532);
-    expect(getChainConfig(10200)).toBeDefined(); // data and an explicit override stay available
+    expect(getChainConfig(10200)).toBeDefined();
   });
 
   it('advertises no EIP-3009 deposit while the vault refuses it (M1-3c; FA M-1)', () => {

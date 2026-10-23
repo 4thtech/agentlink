@@ -24,7 +24,7 @@ name: PR hygiene
 # Pull requests into the markdown-only coordination branch `sync` are ignored (that branch is pushed to directly).
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
   merge_group:
 
