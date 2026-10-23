@@ -35,6 +35,11 @@ import { copy } from './strings/index.js';
 import type { FinishedResult } from './result.js';
 import { TOOLS, findTool } from './registry.js';
 import { matchesSchema } from './input.js';
+import {
+  createFreeCreditsClaimer,
+  memoryFreeCreditsMarker,
+  type FreeCreditsOutcome,
+} from './free-credits.js';
 
 const A = `0x${'a'.repeat(40)}`;
 const B = `0x${'b'.repeat(40)}`;
@@ -131,6 +136,8 @@ interface FakeOptions {
   contacts?: readonly ContactView[];
   respond?: () => unknown;
   propose?: () => unknown;
+  /** M1-36i: the free test credits claim, when the runtime offers it. */
+  freeCredits?: (chainId: number) => Promise<FreeCreditsOutcome>;
 }
 
 function fake(options: FakeOptions = {}): { client: ToolClient; calls: Calls } {
@@ -236,6 +243,14 @@ function fake(options: FakeOptions = {}): { client: ToolClient; calls: Calls } {
       );
     },
     chainIdOf: (key) => (key === 'base-sepolia' ? 84532 : undefined),
+    ...(options.freeCredits === undefined
+      ? {}
+      : {
+          freeCredits: (chainId: number) => {
+            calls.log.push(`freeCredits:${String(chainId)}`);
+            return options.freeCredits!(chainId);
+          },
+        }),
   };
   const client: ToolClient = {
     self: () =>
@@ -1742,5 +1757,141 @@ describe('no tool turns on automatic delivery receipts (I-4, 06 §3)', () => {
         expect(names.has(banned), `${tool.name}.${banned}`).toBe(false);
       }
     }
+  });
+});
+
+// ---- M1-36i: free test credits, claimed once ------------------------------------------------------
+
+describe('free test credits on the first needs_credits (M1-36i)', () => {
+  const needs = (chainId = 84532): NotarizeResult => ({
+    status: 'needs_credits',
+    topUp: {
+      chainId,
+      chain: chainId === 84532 ? 'base-sepolia' : 'base',
+      token: 'USDC',
+      usd: '1.00',
+      feeUsd: '0.10',
+      agentAddress: A as `0x${string}`,
+    },
+  });
+  const ADDED = 'Added free test credits so you can try proof.';
+  const PAUSED = 'Free test credits are paused right now. Try again later.';
+  /** 11 §5: never these words in a result about free test credits. */
+  const JARGON = /faucet|\bgas\b|\btokens?\b|wallet|transaction|sepolia|chain|USDC/i;
+
+  it('notarize: the first needs_credits claims free test credits once and says so in one sentence', async () => {
+    const requested: number[] = [];
+    const claim = createFreeCreditsClaimer({
+      request: (chainId) => {
+        requested.push(chainId);
+        return Promise.resolve({ status: 'sent' });
+      },
+      isFreeCreditsChain: (chainId) => chainId === 84532,
+      marker: memoryFreeCreditsMarker(),
+    });
+    const { client, calls } = fake({ notarize: () => needs(), freeCredits: claim });
+    const first = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(calls.log).toEqual(['notarize', 'freeCredits:84532']);
+    expect(first.structured.status).toBe('needs_credits');
+    expect(first.structured.summary).toContain(ADDED);
+    expect(first.structured.nextStep).toContain('agentlink_notarize');
+    expect(first.structured.nextStep).toContain(ENVELOPE);
+    // No top-up link to share: the credits are already on their way.
+    expect(first.structured).not.toHaveProperty('topUpUrl');
+    expect(`${first.structured.summary} ${first.structured.nextStep}`).not.toMatch(JARGON);
+
+    // Once only: the next needs_credits is the plain one; nothing is requested again.
+    const second = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(requested).toEqual([84532]);
+    expect(second.structured.summary).not.toContain(ADDED);
+    expect(second.structured['topUpUrl']).toBe(linkFor('5'));
+  });
+
+  it('notarize: paused says so plainly; never an error text from the service', async () => {
+    const { client } = fake({
+      notarize: () => needs(),
+      freeCredits: () => Promise.resolve('paused'),
+    });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(r.structured.status).toBe('needs_credits');
+    expect(r.structured.summary).toContain(PAUSED);
+    expect(r.structured.summary).not.toContain(ADDED);
+    expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
+  });
+
+  it('notarize: none (claimed before, refused, mainnet) is the unchanged needs_credits result', async () => {
+    const { client } = fake({
+      notarize: () => needs(),
+      freeCredits: () => Promise.resolve('none'),
+    });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(r.structured.summary).not.toContain(ADDED);
+    expect(r.structured.summary).not.toContain(PAUSED);
+    expect(r.structured['topUpUrl']).toBe(linkFor('5'));
+  });
+
+  it('notarize: a claim that throws is the unchanged needs_credits result, never an error', async () => {
+    const { client } = fake({
+      notarize: () => needs(),
+      freeCredits: () => Promise.reject(new Error('SERVER-CANARY boom')),
+    });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(r.structured.status).toBe('needs_credits');
+    expect(dump(r)).not.toContain('CANARY');
+  });
+
+  it('a mainnet route is never claimed, even when the runtime offers a claim', async () => {
+    const requested: number[] = [];
+    const claim = createFreeCreditsClaimer({
+      request: (chainId) => {
+        requested.push(chainId);
+        return Promise.resolve({ status: 'sent' });
+      },
+      isFreeCreditsChain: (chainId) => chainId === 84532,
+      marker: memoryFreeCreditsMarker(),
+    });
+    const { client } = fake({ notarize: () => needs(8453), freeCredits: claim });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(requested).toEqual([]);
+    expect(r.structured.summary).not.toContain(ADDED);
+  });
+
+  it('no claim without a route, and none for any other status', async () => {
+    let claims = 0;
+    const freeCredits = () => {
+      claims += 1;
+      return Promise.resolve('added' as const);
+    };
+    const noRoute = fake({
+      notarize: () => ({ status: 'needs_credits', recordId: RECORD }),
+      freeCredits,
+    });
+    await call('agentlink_notarize', { envelopeId: ENVELOPE }, noRoute.client);
+    const okResult = fake({ freeCredits });
+    await call('agentlink_notarize', { envelopeId: ENVELOPE }, okResult.client);
+    expect(claims).toBe(0);
+  });
+
+  it('send with notarize: the sentence follows the sent message; the next step finishes via agentlink_notarize', async () => {
+    const { client } = fake({
+      notarize: () => needs(),
+      freeCredits: () => Promise.resolve('added'),
+    });
+    const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+    expect(r.structured).toMatchObject({ status: 'needs_credits', envelopeId: ENVELOPE });
+    expect(r.structured.summary).toContain(ADDED);
+    expect(r.structured.nextStep).toContain('agentlink_notarize');
+    expect(r.structured.nextStep).toContain(ENVELOPE);
+    expect(r.structured).not.toHaveProperty('topUpUrl');
+    expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
+  });
+
+  it('send with notarize: paused', async () => {
+    const { client } = fake({
+      notarize: () => needs(),
+      freeCredits: () => Promise.resolve('paused'),
+    });
+    const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
+    expect(r.structured.summary).toContain(PAUSED);
   });
 });

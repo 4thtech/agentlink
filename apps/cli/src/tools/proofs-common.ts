@@ -20,6 +20,7 @@ import {
   type ProofView,
 } from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
+import type { FreeCreditsOutcome } from './free-credits.js';
 import {
   fail,
   internalError,
@@ -112,6 +113,14 @@ export const PROOF_TEXT = Object.freeze({
     'Call the tool again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
+  // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that
+  // needed credits. 11 §5: never the service's own name, nor "gas" or "token".
+  freeCreditsAdded: 'Added free test credits so you can try proof. Nothing was recorded yet.',
+  freeCreditsAddedNextStep:
+    'In about a minute, call agentlink_notarize with envelopeId {envelopeId} to add the proof.',
+  freeCreditsPaused: 'Free test credits are paused right now. Try again later.',
+  freeCreditsPausedNextStep:
+    'Tell the user free test credits are paused right now, so the proof has to wait. Try again later.',
 });
 
 const fill = (template: string, slots: Readonly<Record<string, string>>): string =>
@@ -158,6 +167,58 @@ export function needsCredits(
     agentAddress: agentId,
     ...(url === undefined ? {} : { topUpUrl: url }),
   });
+}
+
+/**
+ * M1-36i: free test credits on the first `needs_credits` with a route (tools/free-credits.ts). The
+ * runtime's claim checks the testnet allowlist and remembers the claim; anything it throws is
+ * `none`, so the result is the plain `needs_credits` one. Only the route's chain ID is passed.
+ */
+export async function claimFreeCredits(
+  result: NotarizeResult,
+  context: ToolContext,
+): Promise<FreeCreditsOutcome> {
+  const claim = context.client.proofs?.freeCredits;
+  if (claim === undefined || result.status !== 'needs_credits') return 'none';
+  const chainId = result.topUp?.chainId;
+  if (typeof chainId !== 'number' || !Number.isSafeInteger(chainId)) return 'none';
+  try {
+    const outcome = await claim(chainId);
+    return outcome === 'added' || outcome === 'paused' ? outcome : 'none';
+  } catch {
+    context.logger.info('free test credits not added', { code: 'claim_failed' });
+    return 'none';
+  }
+}
+
+/** The `needs_credits` result after a free test credits claim (M1-36i): fixed text only. */
+function withFreeCredits(
+  output: HandlerOutput,
+  outcome: FreeCreditsOutcome | undefined,
+  envelopeId: string | undefined,
+): HandlerOutput {
+  if (outcome === 'added' && envelopeId !== undefined && ENVELOPE_ID.test(envelopeId)) {
+    // The credits are on their way: no top-up link to share, one next action.
+    const rest: Record<string, unknown> = { ...output.result };
+    delete rest['topUpUrl'];
+    return {
+      result: {
+        ...(rest as typeof output.result),
+        summary: PROOF_TEXT.freeCreditsAdded,
+        nextStep: fill(PROOF_TEXT.freeCreditsAddedNextStep, { envelopeId }),
+      },
+    };
+  }
+  if (outcome === 'paused') {
+    return {
+      result: {
+        ...output.result,
+        summary: `${String(output.result.summary)} ${PROOF_TEXT.freeCreditsPaused}`,
+        nextStep: PROOF_TEXT.freeCreditsPausedNextStep,
+      },
+    };
+  }
+  return output;
 }
 
 /**
@@ -278,6 +339,10 @@ export function notarizeOutput(
     readonly approvalNextStepTail?: string;
     /** The recipient under the name rule (06 §2.1), when the caller knows it (send). */
     readonly contactName?: string;
+    /** M1-36i: the free test credits claim this attempt made (claimFreeCredits). */
+    readonly freeCredits?: FreeCreditsOutcome;
+    /** The proof's envelope, for the next step after free test credits were added. */
+    readonly envelopeId?: string;
   } = {},
 ): HandlerOutput {
   const fields = options.fields ?? {};
@@ -317,15 +382,19 @@ export function notarizeOutput(
         { ...fields, ...proofFields(result), ...notAddedField },
       );
     case 'needs_credits':
-      return needsCredits(
-        agentId,
-        result.topUp,
-        {
-          ...fields,
-          ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
-          receipts: [],
-        },
-        context.payPage,
+      return withFreeCredits(
+        needsCredits(
+          agentId,
+          result.topUp,
+          {
+            ...fields,
+            ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
+            receipts: [],
+          },
+          context.payPage,
+        ),
+        options.freeCredits,
+        options.envelopeId,
       );
     case 'error':
       return fail('error', PROOF_TEXT.failed, PROOF_TEXT.failedNextStep, result.code, {
