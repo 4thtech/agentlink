@@ -2147,6 +2147,132 @@ describe('free test credits: a bounded wait for them, then one retry (M1-36i-c)'
   });
 });
 
+// ---- M1-36i-e: the free test credits wait counts against the approval wait -------------------------
+
+describe('one time budget per call: the free test credits wait shortens the approval wait (M1-36i-e)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const ORIGIN = 'http://localhost:47321';
+  /** Codex's approval wait (mcp/approval-wait.ts): its tool-call timeout is about 60 s. */
+  const CODEX_WAIT_MS = 30_000;
+  /** The approval read interval used here. */
+  const READ_MS = 1_000;
+  const pending = (): NotarizeResult => ({
+    status: 'pending_approval',
+    approvalId: APPROVAL,
+    actionDigest: 'd'.repeat(64),
+    summary: 'core text',
+    expiresAt: 1_760_700_000,
+  });
+  const needs = (): NotarizeResult => ({
+    status: 'needs_credits',
+    topUp: {
+      chainId: 84532,
+      chain: 'base-sepolia',
+      token: 'USDC',
+      usd: '0.10',
+      feeUsd: '0.10',
+      agentAddress: A as `0x${string}`,
+    },
+  });
+  const PRICE = [
+    { action: 'notarize' as const, usd: '0.10', protocolUsd: '0.10', integratorUsd: '0' },
+  ];
+  const view = (usd: string): AccountView => ({
+    credits: [{ chain: 'base-sepolia', token: 'USDC', amount: '0', usd }],
+    prices: PRICE,
+  });
+  /** The approval page is open (the link is in the result), and the owner has not decided yet. */
+  function waiting(client: ToolClient): { reads: () => number; ctx: ToolContext } {
+    let reads = 0;
+    (client as { approvalState: ToolClient['approvalState'] }).approvalState = () => {
+      reads += 1;
+      return Promise.resolve({
+        status: 'pending',
+        actionDigest: 'd'.repeat(64),
+        expiresAt: 1_760_700_000,
+      } as Awaited<ReturnType<ToolClient['approvalState']>>);
+    };
+    const ctx = context(client, {
+      approvalLink: (id: string) =>
+        Promise.resolve({
+          url: `${ORIGIN}/approve/${id}`,
+          origin: ORIGIN,
+          nextStep: `Never open or fetch this link yourself. Approve here: ${ORIGIN}/approve/${id}`,
+        }),
+    });
+    return { reads: () => reads, ctx };
+  }
+  /** Needs credits, the claim adds them, they arrive on the last read of the bounded wait. */
+  function slowCredits() {
+    let n = 0;
+    let accountReads = 0;
+    const lastRead = Math.floor(FREE_CREDITS_WAIT.maxMs / FREE_CREDITS_WAIT.intervalMs);
+    return fake({
+      notarize: () => {
+        n += 1;
+        return n === 1 ? needs() : pending();
+      },
+      freeCredits: () => Promise.resolve('added' as const),
+      account: () => {
+        accountReads += 1;
+        return accountReads < lastRead ? view('0') : view('1.00');
+      },
+    });
+  }
+  const options = (waitMs: number) => ({ approvalWaitMs: waitMs, approvalWaitIntervalMs: READ_MS });
+
+  it('a 20 s credits wait leaves only the rest of the approval wait: the call stays within it', async () => {
+    const { client, calls } = slowCredits();
+    const { reads, ctx } = waiting(client);
+    const { value: r, elapsedMs } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(CODEX_WAIT_MS)),
+    );
+    expect(calls.notarize).toHaveLength(2);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(r.structured.url).toBe(`${ORIGIN}/approve/${APPROVAL}`);
+    // The credits wait took its time, and the whole call still fits the approval budget.
+    expect(elapsedMs).toBeGreaterThanOrEqual(
+      FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs,
+    );
+    expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
+    // The approval was still waited for, just for the rest of the budget.
+    expect(reads()).toBeGreaterThan(0);
+    expect(reads()).toBeLessThanOrEqual(
+      (CODEX_WAIT_MS - (FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs)) / READ_MS,
+    );
+  });
+
+  it('a credits wait longer than the approval wait: the approval link comes back at once, no read', async () => {
+    const { client } = slowCredits();
+    const { reads, ctx } = waiting(client);
+    const { value: r, elapsedMs } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(10_000)),
+    );
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(r.structured.url).toBe(`${ORIGIN}/approve/${APPROVAL}`);
+    expect(reads()).toBe(0);
+    expect(elapsedMs).toBeLessThanOrEqual(FREE_CREDITS_WAIT.maxMs + 250);
+  });
+
+  it('no credits wait: the approval wait is the full budget, as before', async () => {
+    const { client, calls } = fake({ notarize: pending });
+    const { reads, ctx } = waiting(client);
+    const { value: r, elapsedMs } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(CODEX_WAIT_MS)),
+    );
+    expect(calls.notarize).toHaveLength(1);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(elapsedMs).toBeGreaterThanOrEqual(CODEX_WAIT_MS);
+    expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
+    expect(reads()).toBeGreaterThanOrEqual(CODEX_WAIT_MS / READ_MS - 1);
+  });
+});
+
 // ---- M1-36f: needs_credits says plainly what is missing and the one next step ----------------------
 
 describe('needs_credits says what is missing (M1-36f)', () => {
