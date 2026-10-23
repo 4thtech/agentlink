@@ -51,26 +51,23 @@ runs:
           timeout 300 pnpm exec playwright install $BROWSERS
         }
 
-    # Linux only: ask the dynamic linker whether every browser executable finds its libraries. The
-    # GitHub image has most of them, so apt is normally skipped. A browser we cannot find counts as
-    # missing (fail towards installing).
+    # Linux only: launch each browser once through Playwright's own API (probe.mjs). Playwright
+    # validates its host requirements (system libraries, bundled library paths) at launch, so the
+    # answer is exactly the one the tests would get. Any failure or error counts as missing (fail
+    # towards installing).
     - name: Check the browsers' system libraries
       id: libs
       shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        PROBE: ${{ github.action_path }}/probe.mjs
       run: |
         set -uo pipefail
         missing=false
         if [ "$RUNNER_OS" = "Linux" ]; then
-          mapfile -t bins < <(find "$HOME/.cache/ms-playwright" -type f \( -name chrome -o -name headless_shell -o -name firefox -o -name MiniBrowser -o -name WebKitWebProcess \) 2>/dev/null)
-          if [ "${#bins[@]}" -eq 0 ]; then
+          if ! timeout 240 node "$PROBE"; then
             missing=true
           fi
-          for b in "${bins[@]}"; do
-            if ldd "$b" 2>&1 | grep -q 'not found'; then
-              echo "missing libraries for ${b##*/}"
-              missing=true
-            fi
-          done
         fi
         echo "missing=$missing" >> "$GITHUB_OUTPUT"
 

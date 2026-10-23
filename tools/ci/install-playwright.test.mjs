@@ -1,4 +1,5 @@
 // CHORE-CI-PLAYWRIGHT-2: policy tests for the Playwright install action and its callers.
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,7 +45,8 @@ describe('install-playwright action', () => {
 
   it('touches apt only when a system library is missing, bounded and retried', () => {
     const probe = step("Check the browsers' system libraries");
-    expect(probe).toContain('ldd');
+    expect(probe).toContain('probe.mjs');
+    expect(probe).not.toContain('ldd');
     expect(probe).toContain('GITHUB_OUTPUT');
     const deps = step('Install the Playwright system libraries (attempt 1)');
     expect(deps).toContain('playwright install-deps');
@@ -58,15 +60,43 @@ describe('install-playwright action', () => {
 
   it('no longer runs `install --with-deps`, and run: blocks hold no inline expressions', () => {
     expect(action).not.toMatch(/playwright install --with-deps/);
-    const runBlocks = action.split(/\n {6}run: /).slice(1).map((b) => b.split(/\n {4}- name: /)[0]);
+    const runBlocks = action
+      .split(/\n {6}run: /)
+      .slice(1)
+      .map((b) => b.split(/\n {4}- name: /)[0]);
     for (const b of runBlocks) expect(b).not.toContain('${{');
+  });
+});
+
+describe("probe.mjs (Playwright's own host validation)", () => {
+  const probe = join(root, '.github/actions/install-playwright/probe.mjs');
+  const run = (browsers) =>
+    spawnSync(process.execPath, [probe], {
+      cwd: root,
+      env: { ...process.env, BROWSERS: browsers },
+      encoding: 'utf8',
+    });
+
+  it('launches through the playwright API, not ldd, and passes with nothing to check', () => {
+    expect(readFileSync(probe, 'utf8')).toMatch(/\.launch\(/);
+    const r = run('');
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('ok');
+  });
+
+  it('fails towards installing the libraries on an unknown browser', () => {
+    const r = run('nosuchbrowser');
+    expect(r.status).toBe(1);
+    expect(r.stdout).toContain('unknown browser');
   });
 });
 
 describe('ci.yml callers', () => {
   it('names the browsers each job installs explicitly', () => {
     const uses = [
-      ...ci.matchAll(/uses: \.\/\.github\/actions\/install-playwright\n(\s+with:\n\s+browsers: [a-z ]+)?/g),
+      ...ci.matchAll(
+        /uses: \.\/\.github\/actions\/install-playwright\n(\s+with:\n\s+browsers: [a-z ]+)?/g,
+      ),
     ];
     expect(uses.length).toBe(2);
     for (const m of uses) expect(m[1]).toMatch(/browsers: chromium firefox webkit/);
