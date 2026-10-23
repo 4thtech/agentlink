@@ -5,6 +5,7 @@ import { NOSTR_KIND_AUTH, encodeUtf8, verifyNostrEvent, type NostrEvent } from '
 import { finalizeEvent, generateSecretKey, getPublicKey } from 'nostr-tools/pure';
 import type {
   HostResolver,
+  Nip11FetchOptions,
   Nip11Fetcher,
   RelayConnector,
   RelaySocket,
@@ -30,6 +31,8 @@ export interface MockRelayConfig {
   okMessage?: string;
   /** Overrides the NIP-11 body; `null` makes the fetch fail. */
   nip11Body?: string | null;
+  /** The NIP-11 fetch never answers (a hanging HTTP server). */
+  nip11Hang?: boolean;
   /** M1-5c: accepts a REQ but never sends anything back (a slow relay that never reaches EOSE). */
   silentReq?: boolean;
   /** M1-5c: serves the stored events but never sends EOSE. */
@@ -249,6 +252,8 @@ export class MockNetwork implements RelayConnector, HostResolver, Nip11Fetcher {
   readonly resolves: string[] = [];
   readonly opens: RelayTarget[] = [];
   readonly nip11Fetches: RelayTarget[] = [];
+  /** The options each NIP-11 fetch was given, in order. */
+  readonly nip11Options: (Nip11FetchOptions | undefined)[] = [];
   readonly sockets: MockSocket[] = [];
   readonly received: { relay: string; frame: string }[] = [];
   readonly stored: { relay: string; event: NostrEvent }[] = [];
@@ -319,9 +324,11 @@ export class MockNetwork implements RelayConnector, HostResolver, Nip11Fetcher {
     return Promise.resolve(this.dns.get(host) ?? [PUBLIC_ADDRESS]);
   }
 
-  fetch(target: RelayTarget): Promise<string> {
+  fetch(target: RelayTarget, options?: Nip11FetchOptions): Promise<string> {
     this.nip11Fetches.push(target);
+    this.nip11Options.push(options);
     const config = this.relays.get(target.url) ?? {};
+    if (config.nip11Hang === true) return new Promise<string>(() => undefined);
     if (config.nip11Body === null) return Promise.reject(new Error('nip11 unavailable'));
     if (config.nip11Body !== undefined) return Promise.resolve(config.nip11Body);
     const doc =

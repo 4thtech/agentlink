@@ -3,8 +3,11 @@
 # tools/release/submitter-pool.test.mjs.
 #
 # Output: exactly the line `pool: ok` when the answer lists at least one chain and every chain is
-# available, its gas wallet is `ok`, and its faucet is `ok` or null (the chain has no faucet).
-# Otherwise one `alert ...` line per finding. A line holds only a chain ID (a number) and fixed
+# available, its gas wallet is `ok`, and its faucet is `ok`. Otherwise one `alert ...` line per
+# finding. `faucet: null` is a finding (`faucet off`, M1-10b-e-b): the submitter answers null for a
+# chain missing from its faucet settings, and for every chain when those settings are missing or
+# invalid, and the production submitter serves testnets only, where the faucet is expected
+# (D-120 (3)). A chain served without a faucet (a mainnet, later) needs an explicit exception here. A line holds only a chain ID (a number) and fixed
 # words of this file: never a balance, an address or any other string from the answer. An answer of
 # another shape (an older submitter without the pool states, or anything malformed) is an alert,
 # so the check fails closed.
@@ -12,7 +15,9 @@
 def chainid: if (.chainId | type) == "number" then (.chainId | tostring) else "?" end;
 def gasword: if .gas == "ok" or .gas == "low" then .gas else "unknown" end;
 def faucetword:
-  if .faucet == "ok" or .faucet == "low" or .faucet == "paused" then .faucet else "unknown" end;
+  if .faucet == "ok" or .faucet == "low" or .faucet == "paused" then .faucet
+  elif has("faucet") and .faucet == null then "off"
+  else "unknown" end;
 
 if (type != "object") or ((.chains | type) != "array") then
   "alert: malformed answer"
@@ -26,8 +31,7 @@ else
       else
         (if .available == true then empty else "alert chain \(chainid): not available" end),
         (if .gas == "ok" then empty else "alert chain \(chainid): gas \(gasword)" end),
-        (if .faucet == "ok" or (has("faucet") and .faucet == null) then empty
-         else "alert chain \(chainid): faucet \(faucetword)" end)
+        (if .faucet == "ok" then empty else "alert chain \(chainid): faucet \(faucetword)" end)
       end
   ]
   | if length == 0 then "pool: ok" else .[] end

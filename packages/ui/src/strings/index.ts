@@ -4,6 +4,7 @@ import { formatMessage, type MessageValues } from './format.js';
 
 export { en, type StringKey } from './en.js';
 export { formatMessage, type MessageValues } from './format.js';
+export { NEVER_SAY, isExemptKey, lintVocabulary, type LintOptions } from './lint.js';
 export { pendingStrings, type PendingString } from './pending.js';
 
 /** Look a string up by key and fill its placeholders. */

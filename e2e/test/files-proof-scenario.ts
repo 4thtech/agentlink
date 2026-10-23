@@ -23,10 +23,9 @@
 //   8. Zero access (I-1, I-2, I-7): relays, drop, logs and artifacts hold no plaintext, key or URL.
 //
 // Everything printed or stored goes to files under the artifact directory, which the canary scan reads.
-import { createHash, randomBytes as nodeRandomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
 import { probeOsKeychain } from '@4thtech-io/node';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -278,7 +277,7 @@ export function defineFilesProofScenario(options: ScenarioOptions): void {
       await mkdir(join(alice.home, 'Work'), { recursive: true });
       sent = Buffer.concat([
         Buffer.from(marker),
-        nodeRandomBytes(FILE_BYTES - Buffer.byteLength(marker)),
+        randomBytes(FILE_BYTES - Buffer.byteLength(marker)),
       ]);
       filePath = join(alice.home, 'Work', fileName);
       await writeFile(filePath, sent, { mode: 0o600 });
@@ -378,9 +377,7 @@ export function defineFilesProofScenario(options: ScenarioOptions): void {
         const savedTo = String(fetched.structured['savedTo']);
         expect(savedTo.startsWith(bob.home)).toBe(true);
         const saved = await readFile(savedTo);
-        expect(createHash('sha256').update(saved).digest('hex')).toBe(
-          createHash('sha256').update(sent).digest('hex'),
-        );
+        expect(encodeHex(sha256(saved))).toBe(encodeHex(sha256(sent)));
       });
 
       // Zero access (I-1, I-2): the drop held ciphertext only, and saw neither the name nor the marker.
