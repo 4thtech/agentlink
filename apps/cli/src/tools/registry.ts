@@ -125,6 +125,8 @@ const proofStatusFields = {
   receipts: arr(obj({ type: receiptType, at: timestamp }, ['type', 'at'])),
   /** M1-33d-b: `requestReceipt` on a message that already had proof; no request was added. */
   receiptRequestNotAdded: bool(),
+  /** M1-33d-d: this proof asks the recipient for a delivery receipt (D-109). */
+  receiptRequested: bool(),
 };
 /** `proof?: ProofStatus` inside a send or terms result (06 §2.2, §2.2a). */
 const proofStatus = obj(

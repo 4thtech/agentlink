@@ -361,7 +361,11 @@ export function notarizeOutput(
       ? withDisclosure(text, disclosure)
       : text;
   };
-  const notAddedField = notAdded ? { receiptRequestNotAdded: true } : {};
+  // M1-33d-d (06 §2.4): the core's `receiptRequested` (this proof asks for a delivery receipt) is
+  // a result field too, so the agent can see it without parsing the summary.
+  const requestField =
+    notAdded || !recorded || result.receiptRequested !== true ? {} : { receiptRequested: true };
+  const notAddedField = notAdded ? { receiptRequestNotAdded: true } : requestField;
   switch (result.status) {
     case 'ok': {
       const fee = dollars(result.fee.usd);

@@ -301,10 +301,12 @@ export const proofStatusReceiptSchema = z.strictObject({
   at: utcTimestampSchema,
 });
 
-/** The ProofStatus fields, for a tool result that is a ProofStatus (06 §2.4, `toolResult`). */
+/**
+ * The ProofStatus fields, for a tool result that is a ProofStatus (06 §2.4, `toolResult`). The
+ * proof network is `advanced.chain` only, never a top-level field (06 §2.4 Advanced; M1-33d-d).
+ */
 export const proofStatusShape = {
   status: z.enum(PROOF_STATUSES),
-  chain: chainKeySchema,
   recordId: bytes32Hex.exactOptional(),
   txHash: bytes32Hex.exactOptional(),
   fee: proofFeeSchema.exactOptional(),

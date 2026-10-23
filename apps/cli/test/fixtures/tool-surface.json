@@ -783,6 +783,9 @@
             },
             "receiptRequestNotAdded": {
               "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1092,6 +1095,9 @@
             },
             "receiptRequestNotAdded": {
               "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1394,6 +1400,9 @@
               }
             },
             "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
               "type": "boolean"
             }
           },
@@ -2053,6 +2062,9 @@
         "receiptRequestNotAdded": {
           "type": "boolean"
         },
+        "receiptRequested": {
+          "type": "boolean"
+        },
         "agentAddress": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{40}$"
@@ -2278,6 +2290,9 @@
           }
         },
         "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
+        "receiptRequested": {
           "type": "boolean"
         },
         "agentAddress": {
