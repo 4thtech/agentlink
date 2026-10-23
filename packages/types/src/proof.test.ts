@@ -324,7 +324,6 @@ const quotedFee = () => ({ token: FEE_TOKEN, amount: '100000', usd: '0.1' });
 describe('ProofStatus fee fields (06 §2.4, 07 §8 as merged in #30)', () => {
   const unconfirmed = (status: string, fee: unknown) => ({
     status,
-    chain: 'base',
     ...(status === 'submitted' ? { recordId: B32, txHash: hex0x(32, '7e') } : {}),
     fee,
     receipts: [],
@@ -339,9 +338,9 @@ describe('ProofStatus fee fields (06 §2.4, 07 §8 as merged in #30)', () => {
     },
   );
 
-  it('ok: the charged fee carries its split, both parts together', () => {
+  it('ok: the split is optional (the core may not know it yet, M1-33d-d); both parts together', () => {
     expectRoundTrip(proofStatusSchema, proofStatus());
-    expectReject(proofStatusSchema, { ...proofStatus(), fee: quotedFee() });
+    expectRoundTrip(proofStatusSchema, { ...proofStatus(), fee: quotedFee() });
     expectReject(proofStatusSchema, edit(proofStatus(), ['fee', 'protocolUsd'], DELETE));
     expectReject(proofStatusSchema, edit(proofStatus(), ['fee', 'integratorUsd'], DELETE));
   });
@@ -368,7 +367,7 @@ describe('ProofStatus (06 §2.4)', () => {
     expectRoundTrip(proofStatusSchema, proofStatus());
     // Before confirmation the fee is the signed maxFee, with no protocol/integrator split (06 §2.4).
     const noRecord = {
-      ...without(proofStatus(), 'recordId', 'txHash', 'explorerUrl', 'verifyUrl'),
+      ...without(proofStatus(), 'recordId', 'txHash'),
       fee: quotedFee(),
     };
     expectRoundTrip(proofStatusSchema, { ...noRecord, status: 'pending_approval', receipts: [] });
@@ -380,13 +379,34 @@ describe('ProofStatus (06 §2.4)', () => {
       txHash: hex0x(32, '7e'),
       receipts: [],
     });
-    expectRoundTrip(proofStatusSchema, { status: 'error', chain: 'base', receipts: [] });
+    // M1-33d-d: no chain at all (the CLI's default result names none, 06 §2.4 Advanced).
+    expectRoundTrip(proofStatusSchema, { status: 'error', receipts: [] });
+  });
+
+  it('needs_credits carries agentAddress and an optional topUpUrl (06 §2.1, M1-33d-d)', () => {
+    const credits = { status: 'needs_credits', receipts: [], agentAddress: AGENT_EVM };
+    expectRoundTrip(proofStatusSchema, credits);
+    expectRoundTrip(proofStatusSchema, {
+      ...credits,
+      topUpUrl: `https://pay.agentlink.4thtech.io/#v=1&a=${AGENT_EVM}&usd=5`,
+    });
+    expectReject(proofStatusSchema, {
+      ...credits,
+      agentAddress: AGENT_EVM.toUpperCase().replace('0X', '0x'),
+    });
+    expectReject(proofStatusSchema, { ...credits, topUpUrl: 'http://pay.example/' });
+  });
+
+  it('chain is never a top-level field: only advanced.chain (06 §2.4 Advanced, M1-33d-d)', () => {
+    expectReject(proofStatusSchema, { ...proofStatus(), chain: 'base' });
+    expectReject(proofStatusSchema, { status: 'error', chain: 'base', receipts: [] });
+    expectRoundTrip(proofStatusSchema, without(proofStatus(), 'advanced'));
   });
 
   it.each([
     ['a status ProofStatus does not have', ['status'], 'rejected'],
-    ['chain with uppercase', ['chain'], 'Base'],
-    ['chain as chainId', ['chain'], 8453],
+    ['advanced chain with uppercase', ['advanced', 'chain'], 'Base'],
+    ['advanced chain as chainId', ['advanced', 'chain'], 8453],
     ['recordId bare hex', ['recordId'], B32.slice(2)],
     ['txHash uppercase', ['txHash'], hex0x(32, '7E')],
     ['fee usd as a number', ['fee', 'usd'], 0.1],
@@ -397,13 +417,13 @@ describe('ProofStatus (06 §2.4)', () => {
     ['receipts missing', ['receipts'], DELETE],
     ['receipt with an unknown key', ['receipts', 0, 'signer'], CONTACT_A],
     ['receipt at not UTC', ['receipts', 0, 'at'], '2026-10-14T12:00:00+00:00'],
-    ['explorerUrl over http', ['explorerUrl'], 'http://basescan.org/tx/1'],
-    ['explorerUrl javascript:', ['explorerUrl'], 'javascript:alert(1)'],
-    ['verifyUrl with user info', ['verifyUrl'], 'https://user:pw@verify.example/r/1'],
-    ['verifyUrl with a space', ['verifyUrl'], 'https://verify.example/r/ 1'],
+    // M1-33d-d: no explorer or verify link (the core returns none; 06 §2.4 proposed).
+    ['explorerUrl', ['explorerUrl'], 'https://basescan.org/tx/1'],
+    ['verifyUrl', ['verifyUrl'], 'https://verify.agentlink.example/r/1'],
     ['unknown key', ['signer'], AGENT_EVM],
     ['ok without a recordId', ['recordId'], DELETE],
-    ['ok without a txHash', ['txHash'], DELETE],
+    ['agentAddress on ok (needs_credits only)', ['agentAddress'], AGENT_EVM],
+    ['topUpUrl on ok (needs_credits only)', ['topUpUrl'], 'https://pay.agentlink.4thtech.io/#v=1'],
   ] as [string, Path, unknown][])('rejects %s', (_l, path, value) => {
     expectReject(proofStatusSchema, edit(proofStatus(), path, value));
   });
@@ -426,8 +446,9 @@ describe('ProofStatus (06 §2.4)', () => {
     expectReject(proofStatusSchema, fee('0.4', '0.1', '0.2'));
   });
 
-  it('a submitted proof has a txHash; receipts need a record; receipts are unique', () => {
-    expectReject(proofStatusSchema, {
+  it('txHash is optional (06 §2.4, M1-33d-d); receipts need a record; receipts are unique', () => {
+    expectRoundTrip(proofStatusSchema, without(proofStatus(), 'txHash'));
+    expectRoundTrip(proofStatusSchema, {
       ...without(proofStatus(), 'txHash'),
       status: 'submitted',
       fee: quotedFee(),
@@ -534,5 +555,39 @@ describe('04 §2.4.1 encodings vectors (M1-1h) agree with the M1-2b path schemas
       const r = { ...record(), [field]: c.value };
       expect(recordSchema.safeParse(r).success).toBe(c.accept);
     }
+  });
+});
+
+describe('ProofStatus receipt and advanced fields (06 §2.4, D-109, M1-33d-c)', () => {
+  const withField = (key: string, value: unknown) => ({ ...proofStatus(), [key]: value });
+
+  it('accepts receiptRequested: true, receiptRequestNotAdded: true and advanced: {chain}', () => {
+    expectRoundTrip(proofStatusSchema, withField('receiptRequested', true));
+    expectRoundTrip(proofStatusSchema, withField('receiptRequestNotAdded', true));
+    expectRoundTrip(proofStatusSchema, withField('advanced', { chain: 'base' }));
+  });
+
+  it('accepts all three together, and none of them (existing shape unchanged)', () => {
+    expectRoundTrip(proofStatusSchema, {
+      ...proofStatus(),
+      receiptRequested: true,
+      receiptRequestNotAdded: true,
+      advanced: { chain: 'base' },
+    });
+    expectRoundTrip(proofStatusSchema, proofStatus());
+  });
+
+  it.each([
+    ['receiptRequested false', 'receiptRequested', false],
+    ['receiptRequested "true"', 'receiptRequested', 'true'],
+    ['receiptRequestNotAdded false', 'receiptRequestNotAdded', false],
+    ['receiptRequestNotAdded 1', 'receiptRequestNotAdded', 1],
+    ['advanced as a string', 'advanced', 'base'],
+    ['advanced without chain', 'advanced', {}],
+    ['advanced chain uppercase', 'advanced', { chain: 'Base' }],
+    ['advanced chain as chainId', 'advanced', { chain: 8453 }],
+    ['advanced with an unknown key', 'advanced', { chain: 'base', token: '0x' }],
+  ])('rejects %s', (_name, key, value) => {
+    expectReject(proofStatusSchema, withField(key, value));
   });
 });
