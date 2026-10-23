@@ -33,7 +33,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
   push:
-    branches-ignore: [sync]
+    # The merge queue's own branches (`gh-readonly-queue/**`) are already run as `merge_group`
+    # (CHORE-CI-QUEUE-DEDUPE); a second `push` run of the same commit only saturates the runner pool.
+    branches-ignore: [sync, "gh-readonly-queue/**"]
   merge_group:
 
 permissions: {}

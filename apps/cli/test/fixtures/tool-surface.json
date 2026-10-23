@@ -1946,17 +1946,13 @@
   {
     "name": "agentlink_notarize",
     "title": "AgentLink: add proof to a sent message",
-    "description": "Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically; leave chain out unless the user explicitly asks for one. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "envelopeId": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]{22}$"
-        },
-        "chain": {
-          "type": "string",
-          "pattern": "^[a-z0-9-]{1,32}$"
         },
         "requestReceipt": {
           "type": "boolean"

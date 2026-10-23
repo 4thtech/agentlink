@@ -19,6 +19,7 @@ import * as chain from '@4thtech-io/chain';
 import { hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '../tools/strings/index.js';
 import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } from './shared.js';
@@ -165,12 +166,13 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         emit(
           copy('cli.doctor.noOwnerCard', {
             agent: isAgentName(agent.name) ? agent.name : '<name>',
+            prefix: cliPrefix(),
           }),
           true,
         );
         await agent.close();
         if (!(await otherAgentHasCard(deps, agent.name))) {
-          emit(copy('cli.doctor.noOwnerCardNoOthers'));
+          emit(copy('cli.doctor.noOwnerCardNoOthers', { prefix: cliPrefix() }));
         }
         return EXIT_FAILED;
       }
@@ -195,7 +197,7 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         const caught = await client.catchUp({ budgetMs: 3_000 });
         emit(caught.partial ? TEXT.doctorPartial : copy('cli.doctor.networkOk'));
       } catch {
-        emit(copy('cli.doctor.networkDown'), true);
+        emit(copy('cli.doctor.networkDown', { prefix: cliPrefix() }), true);
       }
 
       try {

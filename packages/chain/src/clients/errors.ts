@@ -67,16 +67,25 @@ export class ChainError extends Error {
   readonly code: ChainErrorCode;
   /** The contract error's ABI name for `call_reverted`, when known (from the bound ABI). */
   readonly revertName: string | undefined;
+  /**
+   * True only when the revert data was exactly a 4-byte selector, with nothing after it: the whole
+   * encoding of a no-argument error. viem names a no-argument error and ignores trailing bytes, so
+   * a reader that decides on such an error (`RecordNotFound()`) checks this too (M1-4d-g). Carries
+   * no revert bytes (I-7).
+   */
+  readonly revertBare: boolean;
 
-  constructor(code: ChainErrorCode, revertName?: string) {
+  constructor(code: ChainErrorCode, revertName?: string, revertBare = false) {
     super(MESSAGES[code]);
     this.name = 'ChainError';
     this.code = code;
     this.revertName = revertName;
+    this.revertBare = revertBare;
   }
 }
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const BARE_SELECTOR = /^0x[0-9a-fA-F]{8}$/;
 
 /** Maps any error to a URL-free ChainError. */
 export function toChainError(error: unknown): ChainError {
@@ -85,9 +94,11 @@ export function toChainError(error: unknown): ChainError {
   const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
   if (reverted instanceof ContractFunctionRevertedError) {
     const name = reverted.data?.errorName;
+    const raw = reverted.raw;
     return new ChainError(
       'call_reverted',
       typeof name === 'string' && IDENTIFIER.test(name) ? name : undefined,
+      typeof raw === 'string' && BARE_SELECTOR.test(raw),
     );
   }
   const has = (cls: new (...args: never[]) => Error): boolean =>
