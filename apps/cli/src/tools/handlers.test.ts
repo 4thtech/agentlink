@@ -342,16 +342,17 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured).toEqual({
       status: 'needs_setup',
       summary:
-        'This agent has no card from your owner yet: run `agentlink owner add-agent --agent default` in your own terminal.',
+        "This agent isn't set up with your owner yet. In a terminal you opened yourself, run `npx -y @4thtech-io/agentlink owner add-agent --agent default`. Your AI can't do this for you.",
       nextStep: TOOL_TEXT.noOwnerCardNextStep,
     });
-    expect(JSON.stringify(result.structured)).not.toContain('agentlink init');
+    expect(JSON.stringify(result.structured)).not.toMatch(/\bcard\b/);
   });
 
   it('shows a placeholder, never an unchecked name, in the no-card text (M1-9u)', () => {
-    expect(noOwnerCard('Bad name; rm').summary).toContain('--agent <name>`');
-    expect(noOwnerCard('Bad name; rm').summary).not.toContain('Bad name');
-    expect(noOwnerCard('writer').summary).toContain('--agent writer`');
+    const has = { ownerExists: true };
+    expect(noOwnerCard('Bad name; rm', has).summary).toContain('--agent <name>`');
+    expect(noOwnerCard('Bad name; rm', has).summary).not.toContain('Bad name');
+    expect(noOwnerCard('writer', has).summary).toContain('--agent writer`');
   });
 
   it('falls back to the stored counts when the catch-up fails, and logs no error text', async () => {
