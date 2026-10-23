@@ -49,11 +49,14 @@ export {
 } from './state.js';
 export {
   createBroadcaster,
+  createDirectMode,
+  keyStoreDirectSigner,
   pollChain,
   sendDirect,
   waitForTx,
   type Broadcast,
   type BroadcasterOptions,
+  type DirectKeys,
   type DirectMode,
   type DirectSend,
   type DirectSendOptions,

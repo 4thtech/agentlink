@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@4thtech-io/ui": "workspace:*",
+    "qrcode-generator": "2.0.4",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

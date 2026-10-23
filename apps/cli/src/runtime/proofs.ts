@@ -244,7 +244,12 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
       submitters: urls.length === 0 ? [] : [chain.createSubmitterClient({ urls, fetchFn })],
       selector,
     });
-    return Object.freeze({ config, client, state, submitter });
+    // M1-11c-a4c: the agent's own direct mode over its KeyStore, for Add credits and Withdraw
+    // credits in the local UI. Testnets only (createDirectMode refuses anything else, and so does
+    // the KeyStore); core asks for it only after an owner-signed credits op passed its checks.
+    const directMode = (keys: chain.DirectKeys): Promise<chain.DirectMode> =>
+      chain.createDirectMode(config, keys, { fetchFn });
+    return Object.freeze({ config, client, state, submitter, directMode });
   });
   const readers = chains.map(({ config, client }) => ({ config, client }));
   // M1-26-b (02 F-51, 07 §6.3 step 4, §8): a pack carries its chain, so verification needs no

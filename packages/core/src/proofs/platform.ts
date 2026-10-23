@@ -11,6 +11,9 @@ import type {
   ChainConfig,
   ChainSelector,
   ChainState,
+  DirectKeys,
+  DirectMode,
+  PollOptions,
   ProofSubmitter,
   ReadClient,
 } from '@4thtech-io/chain';
@@ -25,6 +28,12 @@ export interface ProofChain {
   readonly state: ChainState;
   /** Submitters with failover and, when configured, direct mode (`createProofSubmitter`). */
   readonly submitter: ProofSubmitter;
+  /**
+   * M1-11c-a4c: the agent's own direct mode on this chain over its KeyStore (the runtime passes
+   * `(keys) => createDirectMode(config, keys, {fetchFn})`, testnets only). Asked only after an
+   * owner-signed `credits.deposit` or `credits.withdraw` passed its checks; absent: no top-up here.
+   */
+  readonly directMode?: (keys: DirectKeys) => Promise<DirectMode>;
 }
 
 /** The chain package functions the proof flow calls: pass `@4thtech-io/chain` itself. */
@@ -44,6 +53,12 @@ export type ProofKit = Pick<
   // The local UI's credits read and the free test credits allowlist (M1-11r-a).
   | 'readCreditsAcrossChains'
   | 'isFaucetChain'
+  // Add credits on Chiado and withdraw credits, in direct mode (M1-11c-a4c).
+  | 'offeredTokens'
+  | 'tokenUnitsToUsd'
+  | 'buildDeposit'
+  | 'sendDeposit'
+  | 'sendWithdraw'
 >;
 
 /**
@@ -77,4 +92,9 @@ export interface ProofsPlatform {
   readonly selector?: Pick<ChainSelector, 'select' | 'clear'>;
   /** Free test credits (testnets only; M1-11r-a). Without it, `requestFaucet` is unavailable. */
   readonly faucet?: FreeCreditsPort;
+  /**
+   * How a top-up or withdrawal waits for inclusion (M1-11c-a4c). Default: every 2 s for 20 s, then
+   * `pending`, so it answers within one local UI request.
+   */
+  readonly directPoll?: PollOptions;
 }

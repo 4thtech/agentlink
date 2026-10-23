@@ -164,6 +164,8 @@ describe('constants (04, 05, 06)', () => {
         'contact.check',
         'contact.remove',
         'contact.rename',
+        'credits.deposit',
+        'credits.withdraw',
         'policy.set',
       ].sort(),
     );
@@ -235,6 +237,8 @@ describe('constants (04, 05, 06)', () => {
       'contact.check': 86_400,
       'contact.rename': 600,
       'contact.remove': 600,
+      'credits.deposit': 600,
+      'credits.withdraw': 600,
       'agent.revoke': null,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);

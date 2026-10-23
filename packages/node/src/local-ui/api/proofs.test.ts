@@ -2,7 +2,8 @@
 //
 // - Two read routes, `GET /api/ui/proofs` (the proof list, paged) and `GET /api/ui/proofs/credits`
 //   (proofs left and the balance), both `presence: false` and both through the read-only client
-//   view. There is no mutating route: no free test credits (owner decision D2), no Add credits (X-6).
+//   view. No free test credits route (owner decision D2). Add credits and Withdraw credits came with
+//   M1-11c-a4c and are tested in proofs-top-up.test.ts.
 // - What leaves is only what the default view shows (UX north star, PR-1): a proof row is its
 //   direction, a fixed display state and its time; credits are proofs left, a dollar balance and
 //   two flags. No record, envelope or agent ID, chain, token or address, and never an error's text.
@@ -30,7 +31,11 @@ function fakeClient(
   return {
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
-    proofs: { list, creditsBalance: credits },
+    proofs: {
+      list,
+      creditsBalance: credits,
+      topUp: () => Promise.resolve({ status: 'unavailable' }),
+    },
   };
 }
 
@@ -107,8 +112,12 @@ function expectNoLeak(body: unknown): void {
 }
 
 describe('routes (M1-11c-a4)', () => {
-  it('declares two read routes and nothing that changes anything', () => {
-    expect(proofsRoutes.map((r) => [r.method, r.path, r.presence])).toEqual([
+  it('declares the two list and credits read routes (M1-11c-a4c adds top-up and withdraw)', () => {
+    expect(
+      proofsRoutes
+        .filter((r) => r.path === '/api/ui/proofs' || r.path === '/api/ui/proofs/credits')
+        .map((r) => [r.method, r.path, r.presence]),
+    ).toEqual([
       ['GET', '/api/ui/proofs', false],
       ['GET', '/api/ui/proofs/credits', false],
     ]);
@@ -408,7 +417,8 @@ describe('the read-only client view (context.ts)', () => {
     };
     const view = readOnlyClient(full as never);
     expect(Object.keys(view).sort()).toEqual(['agentId', 'getProof', 'proofs']);
-    expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list']);
+    // M1-11c-a4c adds the top-up read (proofs-top-up.test.ts); still nothing that moves funds.
+    expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list', 'topUp']);
     expect(view.proofs).not.toBe(full.proofs);
     expect(Object.isFrozen(view.proofs)).toBe(true);
     await view.proofs.list({ limit: 3 });

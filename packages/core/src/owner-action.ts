@@ -290,10 +290,13 @@ export function verifyOwnerAction(
     case 'policy.set':
     case 'contact.rename':
     case 'contact.remove':
+    case 'credits.deposit':
+    case 'credits.withdraw':
     case 'agent.revoke':
-      // Their rules need the store (cancel: an approved row; policy.set: the version above, already
-      // checked; contact.rename and contact.remove: a stored contact, M1-9za; agent.revoke: none)
-      // and are applied by the store side.
+      // Their rules need the store or the chain (cancel: an approved row; policy.set: the version
+      // above, already checked; contact.rename and contact.remove: a stored contact, M1-9za;
+      // credits.deposit and credits.withdraw: the top-up chain, the amount and the recipient,
+      // M1-11c-a4c, proofs/credits-move.ts; agent.revoke: none) and are applied by those sides.
       break;
   }
   return { ok: true, signed, actionHash: ownerActionHash(input) };

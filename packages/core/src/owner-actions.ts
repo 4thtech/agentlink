@@ -289,9 +289,12 @@ export class OwnerActions {
       case 'contact.rename':
       case 'contact.remove':
         return this.#applyContactChange(value, base);
+      case 'credits.deposit':
+      case 'credits.withdraw':
       case 'agent.revoke': {
-        // Verified for the report, applied elsewhere: revocation delivery is M1-7h. Nothing is
-        // written here.
+        // Verified for the report, applied elsewhere: revocation delivery is M1-7h; the credits ops
+        // only through ProofService.addReceivedFunds and withdrawCredits (M1-11c-a4c), which check
+        // the chain before anything is sent. Nothing is written here, so the nonce stays unused.
         const verdict = verifyOwnerAction(value, base);
         if (!verdict.ok && verdict.stage === 'object') return this.#report(fromVerdict(verdict));
         return this.#report(refused(op, 'unsupported_op'));
@@ -388,6 +391,56 @@ export class OwnerActions {
       return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * M1-11c-a4c: the object checks of a `credits.deposit` or `credits.withdraw` (04 §2.5.1, in its
+   * order: encoding and strict schema, agent, owner, signature, freshness, lifetime, nonce) against
+   * the own card, for exactly the op `op`. Writes nothing: `consumeCredits` records the nonce once
+   * the chain checks passed and before anything is sent. Refusals are fixed codes, logged as such.
+   */
+  async verifyCredits(
+    input: unknown,
+    op: 'credits.deposit' | 'credits.withdraw',
+  ): Promise<
+    | { readonly ok: true; readonly signed: SignedOwnerAction; readonly actionHash: string }
+    | { readonly ok: false; readonly reason: OwnerActionRefusal }
+  > {
+    let value: unknown;
+    try {
+      value = parseOwnerActionText(canonicalize(input));
+    } catch {
+      return { ok: false, reason: this.#report(refused(null, 'malformed')).reason };
+    }
+    const shape = signedOwnerActionSchema.safeParse(value);
+    if (!shape.success || shape.data.body.op !== op) {
+      return { ok: false, reason: this.#report(refused(null, 'malformed')).reason };
+    }
+    const self = await this.#self();
+    if ('refusal' in self)
+      return { ok: false, reason: this.#report(refused(op, self.refusal)).reason };
+    const usedBefore = await this.#nonceUsed(shape.data.body.nonce);
+    const verdict = verifyOwnerAction(value, {
+      ...self,
+      now: nowOf(this.#ctx),
+      nonceUsed: () => usedBefore,
+    });
+    if (!verdict.ok) return { ok: false, reason: this.#report(fromVerdict(verdict)).reason };
+    return { ok: true, signed: verdict.signed, actionHash: verdict.actionHash };
+  }
+
+  /**
+   * M1-11c-a4c: records a verified credits op's nonce (the audit row: op, action hash, applied time)
+   * in one store transaction, so the object applies at most once. False when the nonce was recorded
+   * in the meantime (nothing is written then).
+   */
+  async consumeCredits(signed: SignedOwnerAction, actionHash: string): Promise<boolean> {
+    const now = nowOf(this.#ctx);
+    return this.#ctx.store.transaction((tx) => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) return false;
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      return true;
+    });
   }
 
   async #nonceUsed(nonce: string): Promise<boolean> {

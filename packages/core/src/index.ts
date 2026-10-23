@@ -323,6 +323,16 @@ export type {
 } from './proofs/reads.js';
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
 export { PROOF_PRICE_USD_MICROS } from './proofs/price.js';
+export {
+  TOP_UP_CHAIN_IDS,
+  TOP_UP_GAS_RESERVE_WEI,
+  TOP_UP_MIN_WEI,
+  type CreditsMoveRefusal,
+  type CreditsMoveResult,
+  type TopUpAmount,
+  type TopUpChain,
+  type TopUpView,
+} from './proofs/credits-move.js';
 export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
 export {

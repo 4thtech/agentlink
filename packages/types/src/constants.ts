@@ -162,7 +162,8 @@ export type ApprovalToolName = (typeof APPROVAL_TOOL_NAMES)[number];
 
 /**
  * Ops defined in 04 §2.5.1 (`approval.cancel` from D-55, `approval.decideBatch` from D-68,
- * `contact.rename` and `contact.remove` from M1-9za). Other ops land with the tasks that build them.
+ * `contact.rename` and `contact.remove` from M1-9za, `credits.deposit` and `credits.withdraw` from
+ * M1-11c-a4c). Other ops land with the tasks that build them.
  */
 export const OWNER_ACTION_OPS = freeze([
   'approval.decide',
@@ -172,6 +173,10 @@ export const OWNER_ACTION_OPS = freeze([
   'contact.check',
   'contact.rename',
   'contact.remove',
+  // M1-11c-a4c (D-122, D-123; proposed, owner confirms at merge): the owner turns funds the agent's
+  // account received into its credits, or withdraws credits, from the local UI with owner presence.
+  'credits.deposit',
+  'credits.withdraw',
   'agent.revoke',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
@@ -213,6 +218,9 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   // M1-9za: applied on the agent's own machine within seconds; the default for later ops.
   'contact.rename': 600,
   'contact.remove': 600,
+  // M1-11c-a4c: confirmed on one screen and sent at once, like a contact change.
+  'credits.deposit': 600,
+  'credits.withdraw': 600,
   'agent.revoke': null,
 } as const);
 
