@@ -20,6 +20,7 @@ import { describe, expect, it } from 'vitest';
 import type { TermsTools, ToolClient, ToolContext } from './context.js';
 import { callTool } from './index.js';
 import type { FinishedResult } from './result.js';
+import { TERMS_FREE_CREDITS_TEXT } from './propose-terms.js';
 import { TERMS_TEXT } from './terms-common.js';
 
 const A = `0x${'a'.repeat(40)}`;
@@ -645,6 +646,8 @@ describe('fixed text of the terms tools (11 §5.1; I-5)', () => {
     TERMS_TEXT.askConfirm(2, name),
     TERMS_TEXT.askLate(2, 3, name),
     TERMS_TEXT.askFirmOffer(name),
+    // M1-36i-d: the terms tools' free test credits text.
+    ...Object.values(TERMS_FREE_CREDITS_TEXT),
   ];
 
   it('passes the vocabulary lint (the same list as the M1-9c handlers)', () => {
