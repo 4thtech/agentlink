@@ -22,6 +22,7 @@ import {
 } from './proofs-common.js';
 import { receiptDisclosure, withDisclosure } from './strings/privacy.js';
 import { fail, internalError, ok, pendingApproval, type HandlerOutput } from './result.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 export const ACK_TEXT = Object.freeze({
   recorded: 'Receipt recorded: {receipt}.',
@@ -48,8 +49,7 @@ export const ACK_TEXT = Object.freeze({
   approvalInvalidNextStep:
     'Call again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
   unavailable: "Receipts aren't available on this machine, so nothing was signed.",
-  unavailableNextStep:
-    'Tell the user receipts need AgentLink set up with proof support. They can run `agentlink doctor`.',
+  unavailableNextStep: `Tell the user receipts need AgentLink set up with proof support. They can run \`${NPX_COMMAND} doctor\`.`,
 });
 
 const RECEIPT_WORD: Readonly<Record<string, string>> = Object.freeze({

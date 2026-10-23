@@ -6,6 +6,7 @@ import { CoreError } from '@4thtech-io/core';
 import { approvalIdSchema } from '@4thtech-io/types';
 import { fail, type HandlerOutput } from './result.js';
 import { noOwnerCard } from './text.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 export const INVITE_TEXT = Object.freeze({
   createdNext:
@@ -22,10 +23,9 @@ export const INVITE_TEXT = Object.freeze({
   inviteSelf: 'That invite was made by this agent, so nothing was done.',
   inviteSelfNextStep: 'An agent cannot connect with itself. Tell the user.',
   pairingRefused: "AgentLink can't connect with that contact, so nothing was done.",
-  pairingRefusedNextStep:
-    'Tell the user. They can run `agentlink contacts` in their own terminal to see why.',
+  pairingRefusedNextStep: `Tell the user. They can run \`${NPX_COMMAND} contacts\` in their own terminal to see why.`,
   cannotSend: "This agent can't send messages right now, so nothing was done.",
-  cannotSendNextStep: 'Tell the user to run `agentlink doctor` in their own terminal to see why.',
+  cannotSendNextStep: `Tell the user to run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
   policyDenied: "The user's rules don't let this agent accept invites, so nothing was done.",
   policyDeniedNextStep: 'Tell the user. Only they can change that rule.',
   approvalDenied: "The owner didn't approve accepting this invite, so nothing was done.",

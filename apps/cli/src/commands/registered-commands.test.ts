@@ -93,6 +93,17 @@ describe('the instructions in --help (M1-36c)', () => {
     }
   });
 
+  it('the source scan reads the prefix forms too (M1-36e)', () => {
+    const found = (text: string): string[] =>
+      [...text.matchAll(COMMAND_IN_SOURCE)].map((m) => (m[1] ?? '').replace(/\\$/, ''));
+    expect(found('run \\`${commandPrefix()} policy show\\` now')).toEqual(['policy show']);
+    expect(found('run `{prefix} doctor`')).toEqual(['doctor']);
+    expect(found('`${NPX_COMMAND} ui`').map((c) => problemWith(`agentlink ${c}`))).toEqual([
+      'unknown command "ui"',
+    ]);
+    expect(found('`${name} · owner`')).toEqual([]);
+  });
+
   it('the checker itself rejects a dead end', () => {
     expect(problemWith('agentlink ui')).toContain('unknown command');
     expect(problemWith('agentlink contacts --verify <id>')).toContain('--verify');
@@ -102,6 +113,13 @@ describe('the instructions in --help (M1-36c)', () => {
   });
 });
 
+/**
+ * A backticked command in the source: the bare name, or (M1-36a-b, M1-36e) one of the prefix forms
+ * that replace it, so the commands keep being checked after the bare name is gone.
+ */
+const COMMAND_IN_SOURCE =
+  /`(?:agentlink|\{prefix\}|\$\{(?:commandPrefix\(\)|prefix\(\)|cliPrefix\(\)|NPX_COMMAND)\}) ([^`]*)`/g;
+
 describe('the fixed text in the source (M1-36c)', () => {
   // M1-36e: every file is checked; the M1-36 UX-B and UX-D exceptions are gone.
   it('every backticked `agentlink ...` names something registered', () => {
@@ -109,9 +127,13 @@ describe('the fixed text in the source (M1-36c)', () => {
     for (const file of sourceFiles(SRC)) {
       const rel = relative(SRC, file);
       const text = readFileSync(file, 'utf8');
-      for (const m of text.matchAll(/`(agentlink [^`]*)`/g)) {
-        const problem = problemWith(m[1] ?? '');
-        if (problem !== undefined) bad.push(`${rel}: \`${m[1]}\` (${problem})`);
+      for (const m of text.matchAll(COMMAND_IN_SOURCE)) {
+        // A trailing `\` is the escape of the closing backtick; a `{slot}` glued to a word is its
+        // own (placeholder) token.
+        const rest = (m[1] ?? '').replace(/\\$/, '').replace(/\{(\w+)\}/g, ' {$1}');
+        const command = `agentlink ${rest}`;
+        const problem = problemWith(command);
+        if (problem !== undefined) bad.push(`${rel}: \`${command}\` (${problem})`);
       }
     }
     expect(bad).toEqual([]);

@@ -19,6 +19,8 @@ import {
   VERIFY_NOTICE_TEXT,
 } from './commands/verify.js';
 import { DISPATCH_TEXT, helpText } from './dispatch.js';
+import { HARNESS_MESSAGES } from './harness/errors.js';
+import { RUNTIME_MESSAGES } from './runtime/errors.js';
 import { NO_AGENT_MESSAGE } from './runtime/open-agent.js';
 import { ACK_TEXT } from './tools/acknowledge.js';
 import { EXPORT_TEXT } from './tools/export-proof-pack.js';
@@ -87,6 +89,8 @@ const TABLES: Readonly<Record<string, unknown>> = {
     .filter((line) => !/^\s*agentlink /.test(line))
     .join('\n'),
   NO_AGENT_MESSAGE,
+  RUNTIME_MESSAGES,
+  HARNESS_MESSAGES,
   ACK_TEXT,
   EXPORT_TEXT,
   FETCH_FILE_TEXT,

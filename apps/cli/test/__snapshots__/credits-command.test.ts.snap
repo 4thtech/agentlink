@@ -5,7 +5,7 @@ exports[`credits (06 §8) > shows the agent ID, credits in dollars over every ne
 Credits: $1.75
 Adding proof costs $0.10. Messages and files are free.
 These are free test credits for the beta. They aren't real money.
-To see how much to add, run \`agentlink credits --topup\`."
+To see how much to add, run \`npx -y @4thtech-io/agentlink credits --topup\`."
 `;
 
 exports[`credits --topup (07 §6.3, M1-26) > not enough credits: the amount to add on the cheapest route, then our deposit page only 1`] = `

@@ -2,8 +2,8 @@
 // is not on the user's PATH, so no "run this" text in these files may start with it. Commands are
 // built from the runtime's `cliPrefix()` (M1-36a) or the fixed npx form; comments may still name the
 // commands by their short name.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CREDITS_TEXT } from './credits.js';
@@ -47,7 +47,27 @@ const valuesOf = (o: object): string[] =>
     typeof v === 'string' ? [v] : typeof v === 'function' ? [String(v(['work']))] : [],
   );
 
+/** M1-36e: every non-test source file of the CLI, so a new text cannot bring the bare name back. */
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return sourceFiles(path);
+    return path.endsWith('.ts') && !path.endsWith('.test.ts') ? [relative(SRC, path)] : [];
+  });
+}
+
 describe('no bare `agentlink` command prefix (M1-36a-b)', () => {
+  it('no source file has one in its text (M1-36e)', () => {
+    const files = sourceFiles(SRC);
+    expect(files.length).toBeGreaterThan(100);
+    const bad = files.flatMap((rel) =>
+      codeLines(rel)
+        .filter(({ text }) => BARE.test(text))
+        .map(({ line, text }) => `${rel}:${String(line)}: ${text.trim()}`),
+    );
+    expect(bad).toEqual([]);
+  });
+
   it.each(FILES)('%s has none in its text', (rel) => {
     const bad = codeLines(rel)
       .filter(({ text }) => BARE.test(text))

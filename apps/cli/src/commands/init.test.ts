@@ -34,7 +34,7 @@ const POSIX = process.platform !== 'win32';
 const AGENT_ID = `0x${'ab'.repeat(20)}`;
 const NOW = 1_800_000_000;
 const NO_KEYCHAIN_COPY =
-  "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `agentlink init --keystore file` yourself, in your own terminal.";
+  "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `npx -y @4thtech-io/agentlink init --keystore file` yourself, in your own terminal.";
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const PIPE: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };

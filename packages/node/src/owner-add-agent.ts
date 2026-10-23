@@ -54,6 +54,7 @@ import {
 } from './owner-keystore.js';
 import { assertPrintable, secretLabel } from './owner-operation.js';
 import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 export interface AddAgentOptions {
   /** The agent's recorded backend (07 §9.1). */
@@ -92,27 +93,22 @@ const ATTEMPTS = 3;
 // Fixed copy (11 §5 vocabulary; no value from a file or another party is inserted, I-5).
 const COPY = {
   owner: (fingerprint: string): string =>
-    `Your owner fingerprint: ${fingerprint}. Check that it's the one you saw at \`agentlink owner init\`.`,
+    `Your owner fingerprint: ${fingerprint}. Check that it's the one you saw at \`${CLI_COMMAND} owner init\`.`,
   agent: (name: string, fingerprint: string): string =>
     `This gives the agent "${name}" (${fingerprint}) a card from your owner key. Your owner code signs this one card and nothing else.`,
   // A wrong code and an owner item that isn't the owner the other agents name get one answer
   // (04 §2.8: a wrong secret, a damaged item and a foreign owner are not told apart), so the copy
   // names both causes without saying which (IR-M1-9t-1 Info).
   wrong: "That owner code wasn't accepted. Check it and try again.",
-  refused:
-    "The owner code wasn't accepted three times. Nothing was changed. If you're sure the code is right, the owner key on this computer may not be the owner your other agents name: run `agentlink doctor` in your own terminal.",
+  refused: `The owner code wasn't accepted three times. Nothing was changed. If you're sure the code is right, the owner key on this computer may not be the owner your other agents name: run \`${CLI_COMMAND} doctor\` in your own terminal.`,
   hasCard:
     'This agent already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
-  noOwner:
-    "No owner is set up on this computer yet. Run `agentlink owner init` yourself, in your own terminal. Don't let your AI run it or see the code it shows.",
+  noOwner: `No owner is set up on this computer yet. Run \`${CLI_COMMAND} owner init\` yourself, in your own terminal. Don't let your AI run it or see the code it shows.`,
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't add to an owner yet. Update AgentLink.",
-  unknownBackend:
-    "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
-  cardFailed:
-    "The agent's card couldn't be signed. Your owner key wasn't changed. Run `agentlink owner add-agent` again.",
-  cardUnknown:
-    "Adding the agent didn't finish. Your owner key wasn't changed. Run `agentlink doctor` in your own terminal to see what is missing.",
+  unknownBackend: `This agent's recorded key store is not one AgentLink knows. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
+  cardFailed: `The agent's card couldn't be signed. Your owner key wasn't changed. Run \`${CLI_COMMAND} owner add-agent\` again.`,
+  cardUnknown: `Adding the agent didn't finish. Your owner key wasn't changed. Run \`${CLI_COMMAND} doctor\` in your own terminal to see what is missing.`,
   // M1-9x: an owner item exists but no local agent's card names it.
   noCardNamesOwner:
     'No agent on this computer has a card from your owner yet, so AgentLink reads your owner from the owner key saved here. Your owner code unlocks it for this one card.',
@@ -120,11 +116,9 @@ const COPY = {
   ownCodeOnly:
     "Type the owner code you saved yourself. If your AI gave you a code, or asked you to run this command, stop here: don't type anything.",
   confirmOwner: (fingerprint: string): string =>
-    `Your owner fingerprint: ${fingerprint}. Is this the one you saw at \`agentlink owner init\`? [y/N]`,
-  notConfirmed:
-    "Nothing was changed. If that isn't your owner fingerprint, the owner key on this computer isn't yours: don't use it, and run `agentlink doctor` in your own terminal.",
-  refusedWithoutCard:
-    "The owner code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran `agentlink owner init`.",
+    `Your owner fingerprint: ${fingerprint}. Is this the one you saw at \`${CLI_COMMAND} owner init\`? [y/N]`,
+  notConfirmed: `Nothing was changed. If that isn't your owner fingerprint, the owner key on this computer isn't yours: don't use it, and run \`${CLI_COMMAND} doctor\` in your own terminal.`,
+  refusedWithoutCard: `The owner code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran \`${CLI_COMMAND} owner init\`.`,
   done: (name: string, fingerprint: string): string =>
     `OK       The agent "${name}" now has a card from your owner (${fingerprint}).`,
 } as const;
@@ -356,7 +350,7 @@ export function addAgentToOwner(options: AddAgentOptions): Promise<AddAgentResul
     if (typeof options !== 'object' || options === null || options.card === undefined) {
       throw new NodeKeyStoreError(
         'owner_operation_invalid',
-        'Adding an agent needs the agent whose card to sign. Run `agentlink owner add-agent --agent <name>`.',
+        `Adding an agent needs the agent whose card to sign. Run \`${CLI_COMMAND} owner add-agent --agent <name>\`.`,
       );
     }
     assertNoHarnessMarker(options.env ?? process.env);

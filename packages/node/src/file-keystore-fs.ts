@@ -18,6 +18,7 @@ import {
 import { dirname, join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 const { O_RDONLY, O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW, O_DIRECTORY } = constants;
 
@@ -45,7 +46,7 @@ export interface KeystoreFsOptions {
 export const keystoreUnsafe = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_file_unsafe',
-    "The agent's key file or its folder is not protected. It must be a regular file you own, not a link, with no access for other users (folder mode 0700, file mode 0600), on a disk that keeps file permissions. Fix it, then try again; `agentlink doctor` shows what is wrong.",
+    `The agent's key file or its folder is not protected. It must be a regular file you own, not a link, with no access for other users (folder mode 0700, file mode 0600), on a disk that keeps file permissions. Fix it, then try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 const passphraseFileUnsafe = (): NodeKeyStoreError =>
@@ -57,7 +58,7 @@ const passphraseFileUnsafe = (): NodeKeyStoreError =>
 export const keystoreFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_failed',
-    "The agent's key file could not be read or written. Check the disk and try again; `agentlink doctor` shows what is wrong.",
+    `The agent's key file could not be read or written. Check the disk and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 const errno = (error: unknown): unknown => (error as { code?: unknown }).code;

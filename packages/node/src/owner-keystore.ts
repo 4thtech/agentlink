@@ -76,6 +76,7 @@ import {
   guarded,
 } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 /** The keychain account of the owner's wrapped seed (04 §2.2, D-67 (2)(d)). */
 export const OWNER_ACCOUNT = 'owner';
@@ -96,13 +97,13 @@ export const MIN_OWNER_PASSPHRASE_CODE_POINTS = 12;
 export const ownerMissing = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_missing',
-    "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
+    `One step left, and you must do it yourself: run \`${CLI_COMMAND} owner init\` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.`,
   );
 
 const ownerMismatch = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_mismatch',
-    "The owner set up on this computer isn't the owner this agent names, or its saved copy is damaged. `agentlink doctor` shows the owner fingerprint.",
+    `The owner set up on this computer isn't the owner this agent names, or its saved copy is damaged. \`${CLI_COMMAND} doctor\` shows the owner fingerprint.`,
   );
 
 const presenceRejected = (): KeyStoreError =>
@@ -306,7 +307,7 @@ export async function storeOwnerSeed(
     // Whatever is there now is not the item this run wrote (another run's, or none): never deleted.
     throw new NodeKeyStoreError(
       'keychain_failed',
-      'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+      `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
     );
   }
   return blob;
@@ -412,7 +413,7 @@ export async function openOwnerItem(
 const changeFailedUnchanged = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
-    "The system keychain refused the request, so your owner code wasn't changed. Your current owner code still works. Unlock the keychain and run `agentlink owner change-code` again.",
+    `The system keychain refused the request, so your owner code wasn't changed. Your current owner code still works. Unlock the keychain and run \`${CLI_COMMAND} owner change-code\` again.`,
   );
 
 /**
@@ -483,7 +484,7 @@ export async function replaceOwnerWrap(
     if (!unchanged) {
       throw new NodeKeyStoreError(
         'owner_mismatch',
-        'The owner key on this computer changed while you were changing its code, so nothing was changed. Run `agentlink doctor` in your own terminal.',
+        `The owner key on this computer changed while you were changing its code, so nothing was changed. Run \`${CLI_COMMAND} doctor\` in your own terminal.`,
       );
     }
   } catch (error) {
@@ -513,7 +514,7 @@ export async function replaceOwnerWrap(
   // Neither the old nor the new wrap: keep the staging item, which holds the seed under the new code.
   throw new NodeKeyStoreError(
     'keychain_failed',
-    "The system keychain didn't confirm the change. Keep both your current and your new owner code, and run `agentlink owner change-code` again in your own terminal: it finishes or cleans up this change.",
+    `The system keychain didn't confirm the change. Keep both your current and your new owner code, and run \`${CLI_COMMAND} owner change-code\` again in your own terminal: it finishes or cleans up this change.`,
   );
 }
 
@@ -566,7 +567,7 @@ export async function promoteStagedOwnerWrap(
   if (!unchanged) {
     throw new NodeKeyStoreError(
       'owner_mismatch',
-      'The owner key on this computer changed while you were finishing the owner code change, so nothing was changed. Run `agentlink owner change-code` again in your own terminal.',
+      `The owner key on this computer changed while you were finishing the owner code change, so nothing was changed. Run \`${CLI_COMMAND} owner change-code\` again in your own terminal.`,
     );
   }
   try {
@@ -580,7 +581,7 @@ export async function promoteStagedOwnerWrap(
   if (!replaced) {
     throw new NodeKeyStoreError(
       'keychain_failed',
-      "The system keychain refused the request, so the owner code change isn't finished yet. Keep both your current and your new owner code, unlock the keychain and run `agentlink owner change-code` again.",
+      `The system keychain refused the request, so the owner code change isn't finished yet. Keep both your current and your new owner code, unlock the keychain and run \`${CLI_COMMAND} owner change-code\` again.`,
     );
   }
   await removeStagedOwnerItem(keychain, staged, timeoutMs);
