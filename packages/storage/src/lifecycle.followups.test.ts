@@ -80,4 +80,48 @@ describe('lifecycle: concurrent changes (L3)', () => {
       .catch((e: unknown) => e);
     expect(codeOf(error)).toBe('lifecycle_failed');
   });
+
+  it('fails when another writer changes the content of a kept rule that keeps its ID (M1-6b-c)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const racing = async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') {
+        fake.lifecycle = (fake.lifecycle ?? '').replace('<Prefix>logs/</Prefix>', '<Prefix>other/</Prefix>');
+      }
+      return response;
+    };
+    const error = await setup({ fetch: racing }, fake)
+      .apply()
+      .catch((e: unknown) => e);
+    expect(codeOf(error)).toBe('lifecycle_failed');
+    expect((error as Error).message).not.toContain(ENDPOINT);
+  });
+
+  it('fails when our own rule changes in content but keeps its days (M1-6b-c)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const racing = async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') {
+        fake.lifecycle = (fake.lifecycle ?? '').replace('<Prefix>agentlink/</Prefix>', '<Prefix>x/</Prefix>');
+      }
+      return response;
+    };
+    const error = await setup({ fetch: racing }, fake)
+      .apply()
+      .catch((e: unknown) => e);
+    expect(codeOf(error)).toBe('lifecycle_failed');
+  });
+
+  it('still succeeds when the provider only reformats whitespace between elements (M1-6b-c)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const racing = async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') fake.lifecycle = (fake.lifecycle ?? '').replace(/></g, '>\n  <');
+      return response;
+    };
+    await setup({ fetch: racing }, fake).apply();
+  });
 });
