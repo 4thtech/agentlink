@@ -173,7 +173,7 @@ export class AgentLinkClient {
   readonly proofs: ProofService;
   /** The allowed folders as the rules name them and as resolved (M1-11r-a, the local UI). Read-only. */
   readonly files: FilesView;
-  /** The non-message activity feed (M1-11r-a, the local UI): approvals, proofs, blocks, rules. */
+  /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
   readonly #sync: SyncService;
@@ -246,7 +246,7 @@ export class AgentLinkClient {
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
-    this.activity = new ActivityService(ctx);
+    this.activity = new ActivityService(ctx, this.contacts);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,

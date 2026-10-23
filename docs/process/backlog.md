@@ -5382,7 +5382,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Playwright flow for both controls; withdraw requires presence (enforced centrally); the QR and copy pass `lintVocabulary` outside Advanced; no secret or URL is logged; threat note, tests-first evidence and a Fable audit (S2).
 
 #### M1-11r-d · core: activity entries carry contact name, cost, file and message events (new, M1-11c-a1 build)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` ActivityService and its tests
 - **Depends on:** M1-11r-a
 - **Spec:** 08 §1; 11 §6.2; D-118

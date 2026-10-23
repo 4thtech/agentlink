@@ -359,7 +359,15 @@ export type {
   ProofListItem,
 } from './proofs/reads.js';
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
-export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
+export {
+  ActivityService,
+  type ActivityContact,
+  type ActivityCost,
+  type ActivityEntry,
+  type ActivityFile,
+  type ApprovalDecision,
+  type ActivityMessageStatus,
+} from './activity.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
 export {
   PROOF_AWAITING_PER_CONTACT,
