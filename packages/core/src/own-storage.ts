@@ -25,7 +25,7 @@ import {
 } from '@4thtech-io/crypto';
 import { StorageError, type StorageAdapter } from '@4thtech-io/storage';
 import { storageIdSchema, type StorageProvider } from '@4thtech-io/types';
-import { open, type CoreContext } from './context.js';
+import { nowOf, open, type CoreContext } from './context.js';
 import type { IdentityService } from './identity.js';
 import { verifyStoredOwnerAction } from './owner-action.js';
 import type { Row } from './store/schema.js';
@@ -120,6 +120,83 @@ export type OwnStorageState =
 const broken = (problem: OwnStorageProblem): OwnStorageState => ({ state: 'broken', problem });
 
 /**
+ * The outcome of a test upload, download and delete (07 §5.2 guided setup), as a fixed code only:
+ * free text could carry an endpoint, a bucket or a credential (I-7).
+ */
+export type OwnStorageTestCode =
+  | 'ok'
+  | 'upload_failed'
+  | 'download_failed'
+  | 'delete_failed'
+  | 'credentials_refused'
+  | 'unreachable'
+  | 'failed';
+
+const TEST_CODES: ReadonlySet<string> = new Set<OwnStorageTestCode>([
+  'ok',
+  'upload_failed',
+  'download_failed',
+  'delete_failed',
+  'credentials_refused',
+  'unreachable',
+  'failed',
+]);
+
+/** A test result as the caller reports it: `ok` true exactly when `code` is `ok`. */
+export interface OwnStorageTestInput {
+  readonly ok: boolean;
+  readonly code: OwnStorageTestCode;
+}
+
+/** The last test result, with the unix time the core recorded it. */
+export interface OwnStorageTest extends OwnStorageTestInput {
+  readonly at: number;
+}
+
+/**
+ * Own storage for the Storage page (M1-11r-c; 08 §1): whether it is configured and working, the
+ * provider for display, the fixed problem code when broken, and the last test result of this
+ * process. Never the endpoint, bucket, region, id, credential or credentialDigest (I-7, 04 §4).
+ */
+export type OwnStorageStatus =
+  | {
+      readonly state: 'none';
+      readonly configured: false;
+      readonly working: false;
+      readonly lastTest: null;
+    }
+  | {
+      readonly state: 'ready';
+      readonly configured: true;
+      readonly working: true;
+      readonly provider: StorageProvider;
+      readonly lastTest: OwnStorageTest | null;
+    }
+  | {
+      readonly state: 'broken';
+      readonly configured: true;
+      readonly working: false;
+      readonly problem: OwnStorageProblem;
+      readonly lastTest: OwnStorageTest | null;
+    };
+
+function checkTestInput(input: unknown): OwnStorageTestInput {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new TypeError('own storage test: not an object');
+  }
+  const keys = Object.keys(input).sort();
+  if (keys.length !== 2 || keys[0] !== 'code' || keys[1] !== 'ok') {
+    throw new TypeError('own storage test: exactly ok and code');
+  }
+  const { ok, code } = input as { ok: unknown; code: unknown };
+  if (typeof ok !== 'boolean' || typeof code !== 'string' || !TEST_CODES.has(code)) {
+    throw new TypeError('own storage test: ok must be a boolean and code a known code');
+  }
+  if (ok !== (code === 'ok')) throw new TypeError('own storage test: ok and code disagree');
+  return { ok, code: code as OwnStorageTestCode };
+}
+
+/**
  * Compares two credentialDigests in constant time over their decoded bytes (never `===` on the
  * hex; AUDIT-FABLE-M1-9i-b2-1). A value that is not 64 lowercase hex matches nothing.
  */
@@ -157,6 +234,11 @@ export class OwnStorage {
   readonly #ctx: CoreContext;
   readonly #identity: IdentityService;
   readonly #keys: OwnStorageKeys | undefined;
+  /**
+   * The last test result in this process, bound to the storage it tested: the `ready` id, or null
+   * for a `broken` storage. Memory only; a restart shows "not tested yet".
+   */
+  #lastTest: { readonly boundTo: string | null; readonly test: OwnStorageTest } | undefined;
 
   constructor(ctx: CoreContext, identity: IdentityService, keys: OwnStorageKeys | undefined) {
     this.#ctx = ctx;
@@ -215,6 +297,56 @@ export class OwnStorage {
     }
     const { id, provider, endpoint, bucket, region } = body.params;
     return { state: 'ready', id, provider, endpoint, bucket, region };
+  }
+
+  /**
+   * The Storage page's read (M1-11r-c): load() reduced to display values. A test result is shown
+   * only for the storage it was recorded against (a new connection, or a change between ready and
+   * broken, hides it); with nothing configured there is none.
+   */
+  async status(): Promise<OwnStorageStatus> {
+    const state = await this.load();
+    if (state.state === 'none') {
+      return Object.freeze({ state: 'none', configured: false, working: false, lastTest: null });
+    }
+    const boundTo = state.state === 'ready' ? state.id : null;
+    const last = this.#lastTest;
+    const lastTest = last !== undefined && last.boundTo === boundTo ? last.test : null;
+    if (state.state === 'ready') {
+      return Object.freeze({
+        state: 'ready',
+        configured: true,
+        working: true,
+        provider: state.provider,
+        lastTest,
+      });
+    }
+    return Object.freeze({
+      state: 'broken',
+      configured: true,
+      working: false,
+      problem: state.problem,
+      lastTest,
+    });
+  }
+
+  /**
+   * Records the result of a test the runtime ran against the current own storage (a fixed code,
+   * never free text). With nothing configured it is not kept. Malformed input throws and keeps the
+   * previous result.
+   */
+  async recordTest(result: OwnStorageTestInput): Promise<void> {
+    const checked = checkTestInput(result);
+    const at = nowOf(this.#ctx);
+    const state = await this.load();
+    if (state.state === 'none') {
+      this.#lastTest = undefined;
+      return;
+    }
+    this.#lastTest = {
+      boundTo: state.state === 'ready' ? state.id : null,
+      test: Object.freeze({ ...checked, at }),
+    };
   }
 }
 

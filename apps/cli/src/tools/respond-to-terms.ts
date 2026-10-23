@@ -27,7 +27,6 @@ import type { RespondToTermsInput } from '@4thtech-io/core';
 import { displayRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import {
-  fail,
   internalError,
   invalidArgument,
   notAvailable,
@@ -50,7 +49,7 @@ import {
 } from './terms-common.js';
 import { termsNeedsCreditsAfterClaim } from './propose-terms.js';
 import { proofDisclosure, withDisclosure } from './strings/privacy.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerResult } from './text.js';
 
 interface RespondInput {
   envelopeId: string;
@@ -80,11 +79,7 @@ export async function respondToTermsHandler(
   if (tools === undefined) return notAvailable();
   const self = await client.self();
   if (self === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
 
   const request: RespondToTermsInput = {
