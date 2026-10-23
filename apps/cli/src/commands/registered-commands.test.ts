@@ -61,12 +61,6 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/**
- * Files another card owns and is fixing (M1-36 UX-B and UX-D). Their dead ends are tolerated here
- * only until those cards land; remove each entry then. Every other file must be clean.
- */
-const FIXED_BY_OTHER_CARDS = ['tools/strings/en.ts', 'tools/invite-common.ts'];
-
 describe('the subcommand list matches the handlers (M1-36c)', () => {
   const handlerFile: Readonly<Record<string, string>> = {
     owner: 'owner/owner-init.ts',
@@ -109,11 +103,11 @@ describe('the instructions in --help (M1-36c)', () => {
 });
 
 describe('the fixed text in the source (M1-36c)', () => {
+  // M1-36e: every file is checked; the M1-36 UX-B and UX-D exceptions are gone.
   it('every backticked `agentlink ...` names something registered', () => {
     const bad: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const rel = relative(SRC, file);
-      if (FIXED_BY_OTHER_CARDS.includes(rel)) continue;
       const text = readFileSync(file, 'utf8');
       for (const m of text.matchAll(/`(agentlink [^`]*)`/g)) {
         const problem = problemWith(m[1] ?? '');

@@ -6,19 +6,29 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CREDITS_TEXT } from './credits.js';
+import { DOCTOR_PROOF_TEXT, DOCTOR_TEXT } from './doctor.js';
 import { HOOK_TEXT, INIT_TEXT } from './init.js';
+import { CONTACTS_MANAGE_TEXT } from './owner/contacts-manage.js';
+import { POLICY_TEXT } from './owner/policy.js';
 import { OWNER_TEXT } from './owner/strings.js';
+import { TEXT } from './shared.js';
 import { NO_AGENT_MESSAGE } from '../runtime/open-agent.js';
 import { en } from '../tools/strings/en.js';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** The files of this card (M1-36a-b). */
+/** The files of this card (M1-36a-b) and of M1-36e (the rest #506's review found). */
 const FILES = [
   'commands/init.ts',
   'commands/owner/strings.ts',
   'tools/strings/en.ts',
   'runtime/open-agent.ts',
+  'commands/doctor.ts',
+  'commands/owner/policy.ts',
+  'commands/shared.ts',
+  'commands/credits.ts',
+  'commands/owner/contacts-manage.ts',
 ];
 
 /** A command line that starts with the bare name: in backticks, after "run", or in <code>. */
@@ -50,6 +60,12 @@ describe('no bare `agentlink` command prefix (M1-36a-b)', () => {
       ...valuesOf(INIT_TEXT),
       ...valuesOf(HOOK_TEXT),
       ...valuesOf(OWNER_TEXT),
+      ...valuesOf(DOCTOR_TEXT),
+      ...valuesOf(DOCTOR_PROOF_TEXT),
+      ...valuesOf(POLICY_TEXT),
+      ...valuesOf(TEXT),
+      ...valuesOf(CREDITS_TEXT),
+      ...valuesOf(CONTACTS_MANAGE_TEXT),
       ...Object.values(en),
       NO_AGENT_MESSAGE,
     ];
