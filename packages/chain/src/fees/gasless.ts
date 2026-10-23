@@ -57,8 +57,11 @@ export const GASLESS_MIN_USD_CENTS = 500;
 export const GASLESS_MAX_USD_CENTS = 5_000;
 /** How long a signed authorization stays valid by default, in seconds (15 minutes). */
 export const GASLESS_WINDOW_SECONDS = 900;
-/** The longest window the builder signs, in seconds. */
-export const GASLESS_MAX_WINDOW_SECONDS = 3_600;
+/**
+ * The longest window the builder signs, in seconds. The relay refuses a `validBefore` later than
+ * now + this + DEPOSIT_AUTH_CLOCK_SKEW_SECONDS, so the two cannot disagree (M3-4b-t-T2-b).
+ */
+export const GASLESS_MAX_WINDOW_SECONDS = GASLESS_WINDOW_SECONDS;
 const GASLESS_MIN_WINDOW_SECONDS = 60;
 
 const MAX_UINT256 = 2n ** 256n - 1n;
@@ -299,7 +302,7 @@ export interface BuildGaslessOptions {
   readonly ethCall: EthCall;
   /** The current time in seconds (tests); default the system clock. */
   readonly nowSeconds?: () => number;
-  /** Seconds until `validBefore`: 60 to 3 600, default GASLESS_WINDOW_SECONDS. */
+  /** Seconds until `validBefore`: 60 to GASLESS_MAX_WINDOW_SECONDS (900), default GASLESS_WINDOW_SECONDS. */
   readonly windowSeconds?: number;
 }
 
@@ -329,7 +332,7 @@ export async function buildReceiveWithAuthorization(
     window < GASLESS_MIN_WINDOW_SECONDS ||
     window > GASLESS_MAX_WINDOW_SECONDS
   ) {
-    throw new ChainInputError('invalid_option', 'windowSeconds: an integer from 60 to 3600');
+    throw new ChainInputError('invalid_option', 'windowSeconds: an integer from 60 to 900');
   }
   const deployment = gaslessToken(state.config, request.token);
   const bounds = gaslessValueBounds(deployment.decimals);
