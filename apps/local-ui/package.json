@@ -1,0 +1,32 @@
+{
+  "name": "@4thtech-io/local-ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The local web app (React, browser only): settings, first run and approvals, served by the approval server.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4thtech/agentlink.git",
+    "directory": "apps/local-ui"
+  },
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@4thtech-io/ui": "workspace:*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "jsdom": "29.1.1"
+  }
+}
