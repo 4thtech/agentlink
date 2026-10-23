@@ -612,11 +612,15 @@ describe('head-of-main check', () => {
   const SHA = 'a'.repeat(40);
   const run = (head, commit = SHA) => {
     const fakes = fakeTools({ head });
-    return runWithFakes(script, fakes, {
+    const summary = join(fakes.dir, 'step-summary');
+    writeFileSync(summary, '');
+    const result = runWithFakes(script, fakes, {
       REPOSITORY: '4thtech/agentlink',
       COMMIT: commit,
       GITHUB_OUTPUT: fakes.output,
+      GITHUB_STEP_SUMMARY: summary,
     });
+    return { ...result, summary: readFileSync(summary, 'utf8') };
   };
 
   it('appears once, before the production deploy only', () => {
@@ -638,6 +642,18 @@ describe('head-of-main check', () => {
   it('fails when the head of main cannot be read', () => {
     expect(run('').ok).toBe(false);
     expect(run('not-a-sha').ok).toBe(false);
+  });
+
+  // CHORE-DEPLOY-CATCHUP: a superseded production job must not end silently green.
+  it('warns and writes a run summary line when main moved on, nothing when current', () => {
+    const NEWER = 'b'.repeat(40);
+    const moved = run(NEWER);
+    expect(moved.output).toMatch(/::warning::/);
+    expect(moved.summary).toMatch(/Superseded/);
+    expect(moved.summary).toContain(NEWER);
+    expect(moved.summary).toMatch(/did not change production/);
+    expect(moved.summary).toMatch(/catch-up/);
+    expect(run(SHA).summary).toBe('');
   });
 });
 
