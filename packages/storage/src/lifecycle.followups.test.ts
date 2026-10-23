@@ -1,6 +1,7 @@
 // M1-6b-b L3: the lifecycle read-modify-write is not atomic on S3 (no conditional write), so the helper
 // re-reads before writing, retries on a change, and checks the result by reading it back (07 §5.2).
 import { describe, expect, it } from 'vitest';
+import { captureOutput } from '@4thtech-io/log/testing';
 import {
   LIFECYCLE_RULE_ID,
   StorageError,
@@ -185,5 +186,46 @@ describe('lifecycle: concurrent changes (L3)', () => {
   it('rejects a kept rule whose value changed (M1-6b-c)', async () => {
     const result = await runWith((d) => d.replace('<Days>7</Days>', '<Days>8</Days>'));
     expect(codeOf(result)).toBe('lifecycle_failed');
+  });
+});
+
+describe('lifecycle: provider drops the abort-incomplete element (M1-6b-d)', () => {
+  const dropAbort = (fake: FakeMultipartS3) => async (req: Request): Promise<Response> => {
+    const response = await fake.fetch(req);
+    if (req.method === 'PUT') {
+      fake.lifecycle = (fake.lifecycle ?? '').replace(
+        /<AbortIncompleteMultipartUpload>[\s\S]*?<\/AbortIncompleteMultipartUpload>/,
+        '',
+      );
+    }
+    return response;
+  };
+
+  it('succeeds but reports a plain-words warning when the element was dropped', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const result = await setup({ fetch: dropAbort(fake) }, fake).apply();
+    expect(result.abortIncomplete).toBe('dropped');
+    expect(result.warning).toMatch(/unfinished uploads/i);
+    expect(result.warning).not.toMatch(/https?:|wallet|gas|multipart/i);
+  });
+
+  it('reports no warning when the provider keeps the element', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    const result = await setup({}, fake).apply();
+    expect(result.abortIncomplete).toBe('kept');
+    expect(result.warning).toBeNull();
+  });
+
+  it('logs the warning without a URL, bucket name or credential', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    const lines = await captureOutput(async ({ logger }) => {
+      await setup({ fetch: dropAbort(fake), logger }, fake).apply();
+    });
+    const all = lines.map((l) => l.line).join('\n');
+    expect(all).toContain('abort');
+    for (const needle of ['AKIDLIFECYCLEL3', 'l3-secret', ENDPOINT, BUCKET, 'X-Amz-']) {
+      expect(all).not.toContain(needle);
+    }
   });
 });
