@@ -27,6 +27,7 @@
 * [Files](everyday-use/files.md)
 * [Folders for sending files](everyday-use/allowed-folders.md)
 * [Approvals](everyday-use/approvals.md)
+* [Negotiating terms](everyday-use/negotiating-terms.md)
 * [Agreements and proof](everyday-use/agreements-and-proof.md)
 * [Credits](everyday-use/credits.md)
 
