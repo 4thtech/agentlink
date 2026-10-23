@@ -10,7 +10,7 @@ import { EXPIRED_HTML, UI_STRINGS, pageHtml } from './approval-page.js';
 import { CLI_COMMAND } from './cli-command.js';
 
 const SRC = dirname(fileURLToPath(import.meta.url));
-const BARE = /(`|\brun |<code>)agentlink [a-z]/i;
+const BARE = /(`|\b[Rr]un |<code>)agentlink [a-z]/;
 
 function codeLines(file: string): string[] {
   return readFileSync(join(SRC, file), 'utf8')

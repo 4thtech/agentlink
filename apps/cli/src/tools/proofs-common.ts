@@ -41,7 +41,7 @@ import {
   type HandlerOutput,
 } from './result.js';
 import { proofDisclosure, topUpDisclosure, withDisclosure } from './strings/privacy.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerCard, noOwnerResult } from './text.js';
 
 const USD = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$/;
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
@@ -402,8 +402,7 @@ export async function needsIdentity(
 ): Promise<{ readonly agentId: string } | HandlerOutput> {
   const self = await context.client.self();
   if (self === undefined) {
-    const text = noOwnerCard(context.agentName);
-    return fail('needs_setup', text.summary, text.nextStep);
+    return noOwnerResult(context);
   }
   return { agentId: self.agentId };
 }

@@ -22,7 +22,7 @@ const FILES = [
 ];
 
 /** A command line that starts with the bare name: in backticks, after "run", or in <code>. */
-const BARE = /(`|\brun |\brun: |<code>)agentlink [a-z]/i;
+const BARE = /(`|\b[Rr]un |\b[Rr]un: |<code>)agentlink [a-z]/;
 
 /** The source lines that are not comments. */
 function codeLines(rel: string): { line: number; text: string }[] {

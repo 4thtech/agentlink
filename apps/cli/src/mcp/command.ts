@@ -19,6 +19,7 @@
 //   close the server stops after the loop and before the agent closes (its source reads the store).
 // - M1-11s-b, the local UI app (D-118): the same server serves the app embedded in this build
 //   (local-ui-assets.ts) at /settings and /first-run, with the agent's core client for its API.
+import { dirname } from 'node:path';
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -35,6 +36,8 @@ import {
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
+import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
 import { approvalWaitMsFor } from './approval-wait.js';
@@ -86,6 +89,11 @@ export function agentToolContext(
     ...(approvalUi === undefined
       ? {}
       : { approvalLink: (approvalId: string) => approvalUi.link(approvalId) }),
+    // M1-36a-b: the no-owner text names the command that works here, and `owner init` on a
+    // machine known to have no owner (folder names and file presence only; never a key).
+    cliPrefix: cliPrefix(),
+    ownerExists: async () =>
+      (await ownerKnownAbsent(dirname(agent.paths.root), agent.name)) ? false : undefined,
   });
 }
 
