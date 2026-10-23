@@ -193,8 +193,8 @@ function read(routes: ReturnType<typeof createFilesRoutes>, path: string): Local
 }
 
 function write(routes: ReturnType<typeof createFilesRoutes>): LocalUiOwnerRoute {
-  const found = routes.find((r) => r.presence);
-  if (found === undefined || !found.presence) throw new Error('no owner route');
+  const found = routes.find((r) => r.presence === true);
+  if (found === undefined || found.presence !== true) throw new Error('no owner route');
   return found;
 }
 
