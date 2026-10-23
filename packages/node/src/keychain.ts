@@ -2,7 +2,7 @@
 // through @napi-rs/keyring (03 §6). Items are generic credentials under service `agentlink`; values
 // are bytes and never become JS strings. Also the keychain probe and backend selection at `init`
 // (04 §2.8 "Selection", 07 §9.1).
-import { equalBytes, encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { CryptoInputError, equalBytes, encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
 
 /** The keychain service of every AgentLink item (04 §2.2). */
@@ -17,11 +17,22 @@ export const KEYCHAIN_SERVICE = 'agentlink';
 export const KEYCHAIN_LINUX_STORE = 'secret-service';
 
 /**
- * The agent's keychain items (04 §2.8: the names are the `ALKS` entry names): the seed, the store key
- * the policy-version mark (M1-8g, 04 §2.5.1) and the receipts-kept marker (M1-33a, 06 §3). Storage credentials (`s3:<id>`, 07 §5.2) join when
- * the storage card needs them.
+ * The agent's keychain items (04 §2.8: the names are the `ALKS` entry names): the seed, the store key,
+ * the policy-version mark (M1-8g, 04 §2.5.1), the receipts-kept marker (M1-33a, 06 §3), the
+ * own-storage mark `storage-mark` and the storage credentials `s3:<id>` (M1-9i-c, 04 §2.2, D-115).
  */
-export type KeychainItem = 'seed' | 'store-key' | 'policy-version' | 'receipts-kept';
+export type KeychainItem =
+  'seed' | 'store-key' | 'policy-version' | 'receipts-kept' | 'storage-mark' | `s3:${string}`;
+
+/** `s3:` + the `storage.set` id: 8 CSPRNG bytes as 16 lowercase hex (04 §2.2). */
+const S3_ITEM = /^s3:[0-9a-f]{16}$/;
+const FIXED_ITEMS: readonly string[] = [
+  'seed',
+  'store-key',
+  'policy-version',
+  'receipts-kept',
+  'storage-mark',
+];
 
 /** A narrow view of the OS keychain under one service. Values are bytes; callers wipe what they get. */
 export interface KeychainBackend {
@@ -51,6 +62,10 @@ export function assertAgentId(agentId: unknown): asserts agentId is string {
  */
 export function keychainAccount(agentId: string, item: KeychainItem): string {
   assertAgentId(agentId);
+  // M1-9i-c: an `s3:<id>` with any other id (or any unknown item) never becomes an account.
+  if (typeof item !== 'string' || (!FIXED_ITEMS.includes(item) && !S3_ITEM.test(item))) {
+    throw new CryptoInputError('invalid_argument', 'keychain: not an agent item name');
+  }
   return item === 'seed' ? agentId : `${agentId}:${item}`;
 }
 

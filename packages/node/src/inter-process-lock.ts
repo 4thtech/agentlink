@@ -7,7 +7,14 @@
 // exits or crashes, so a dead holder never leaves a stale lock, and SQLite also keeps two connections
 // in one process apart. Nothing is ever written to the lock file. The wait is asynchronous (a short
 // poll with backoff), so a waiting process keeps serving its event loop.
+//
+// M1-9i-c: a nested acquire of a lock the same async flow already holds (for example an export
+// `snapshots` callback that takes the agent's lock, 04 §2.3.3) would wait on itself until the
+// timeout; it is refused at once with `store_busy` instead. Other flows in the same process still
+// wait for the holder as before.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { closeSync, openSync } from 'node:fs';
+import { resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { NodeStoreError } from './store-errors.js';
 
@@ -18,6 +25,9 @@ export interface InterProcessLockOptions {
   /** How long to wait for the lock. Default INTER_PROCESS_LOCK_TIMEOUT_MS. */
   readonly timeoutMs?: number;
 }
+
+/** The lock paths the current async flow holds. */
+const held = new AsyncLocalStorage<ReadonlySet<string>>();
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,6 +41,9 @@ export async function withInterProcessLock<T>(
   options: InterProcessLockOptions = {},
 ): Promise<T> {
   const timeoutMs = options.timeoutMs ?? INTER_PROCESS_LOCK_TIMEOUT_MS;
+  const key = resolve(lockPath);
+  const outer = held.getStore();
+  if (outer?.has(key) === true) throw new NodeStoreError('store_busy');
   let db: Database.Database;
   try {
     try {
@@ -58,7 +71,7 @@ export async function withInterProcessLock<T>(
       }
     }
     try {
-      return await fn();
+      return await held.run(new Set([...(outer ?? []), key]), fn);
     } finally {
       if (db.inTransaction) db.prepare('ROLLBACK').run();
     }

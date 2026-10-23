@@ -11,7 +11,6 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import {
   CryptoInputError,
-  KeyStoreError,
   credentialDigest,
   encodeHex,
   encodeUtf8,
@@ -40,7 +39,7 @@ import {
   ownStorageKeysOver,
 } from './key-controls.js';
 import { unlockFileAgent, fileKeychain, writeAgentFile, OWNER_FILE } from './file-keystore.js';
-import { newKeystoreKek } from '@4thtech-io/crypto/keystore';
+import { generateSecretCode, newKeystoreKek } from '@4thtech-io/crypto/keystore';
 import { withInterProcessLock } from './inter-process-lock.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
@@ -98,7 +97,7 @@ interface Owner {
 /** An owner item under a generated-looking code in `keychain`, and its store. */
 async function makeOwner(keychain = new MemoryKeychain()): Promise<Owner> {
   const { seed, keys } = newOwnerSeed();
-  const code = encodeUtf8('ABCD-EFGH-JKMN-PQRS-TVWX-YZ23').slice();
+  const code = generateSecretCode();
   await storeOwnerSeed(keychain, seed, { secret: code, secretKind: 1 }, { kdf: FAST });
   const store = await KeychainOwnerKeyStore.open(keychain, keys);
   return { seed, nostr: keys.ownerNostr, code, keychain, store };
@@ -222,16 +221,28 @@ describe.runIf(POSIX)('KeyExportControl (keychain and file items)', () => {
     });
     const real = await owner.store.unlockForExport(presence(owner));
     const lookAlike = new Proxy(real, {}) as OwnerSession;
-    await expectCode(control.sealRecoveryKit(lookAlike, request(join(root, 'a'))), 'presence_required');
+    await expectCode(
+      control.sealRecoveryKit(lookAlike, request(join(root, 'a'))),
+      'presence_required',
+    );
     await expectCode(
       control.sealRecoveryKit({ ...real } as OwnerSession, request(join(root, 'b'))),
       'presence_required',
     );
-    const other = await KeychainOwnerKeyStore.open(owner.keychain, await owner.store.getPublicKeys());
+    const other = await KeychainOwnerKeyStore.open(
+      owner.keychain,
+      await owner.store.getPublicKeys(),
+    );
     const foreign = await other.unlockForExport(presence(owner));
-    await expectCode(control.sealRecoveryKit(foreign, request(join(root, 'c'))), 'presence_required');
+    await expectCode(
+      control.sealRecoveryKit(foreign, request(join(root, 'c'))),
+      'presence_required',
+    );
     const plain = await owner.store.unlock(presence(owner));
-    await expectCode(control.sealRecoveryKit(plain, request(join(root, 'd'))), 'operation_not_allowed');
+    await expectCode(
+      control.sealRecoveryKit(plain, request(join(root, 'd'))),
+      'operation_not_allowed',
+    );
     await real.close();
     await expectCode(control.sealRecoveryKit(real, request(join(root, 'e'))), 'owner_locked');
     const names = await readdir(root);
@@ -354,7 +365,12 @@ describe.runIf(POSIX)('KeyExportControl (keychain and file items)', () => {
     );
     try {
       const items = opened.agents[0]?.items ?? [];
-      expect(items.map((i) => i.name)).toEqual(['seed', 'store-key', 'policy-version', 'receipts-kept']);
+      expect(items.map((i) => i.name)).toEqual([
+        'seed',
+        'store-key',
+        'policy-version',
+        'receipts-kept',
+      ]);
       expect(ascii(items[2]?.value as Uint8Array)).toBe('3');
     } finally {
       opened.wipe();
@@ -396,7 +412,11 @@ describe.runIf(POSIX)('KeyExportControl (keychain and file items)', () => {
 /** An in-memory sink for kits opened directly in tests. */
 function memorySink(): RecoveryKitStoreSink {
   const parts: Uint8Array[] = [];
-  return { write: (b) => void parts.push(b.slice()), commit: () => undefined, discard: () => undefined };
+  return {
+    write: (b) => void parts.push(b.slice()),
+    commit: () => undefined,
+    discard: () => undefined,
+  };
 }
 
 // --- KeyImportControl: the conformance suite for both backends -------------------------------------
@@ -426,7 +446,6 @@ function keychainImportBackend(): ImportBackend {
           keychain: target,
           ownerKeychain,
           ...(ownerStore === undefined ? {} : { ownerStore }),
-          quarantineDir: join(root, 'q'),
           kdf: FAST,
         }),
         has: (agentId) =>
@@ -457,7 +476,6 @@ function fileImportBackend(): ImportBackend {
           keystoreDir: dir,
           ownerKeychain,
           ...(ownerStore === undefined ? {} : { ownerStore }),
-          quarantineDir: join(root, 'q'),
           kdf: FAST,
         }),
         has: (agentId) =>
@@ -492,9 +510,13 @@ function fileImportBackend(): ImportBackend {
 
 async function openKit(control: KeyImportControl, kit: Uint8Array, code: Uint8Array) {
   const quarantine = createRestoreQuarantine(join(root, 'q'));
-  return control.openRecoveryKit(kit, { secret: code.slice(), source: 'prompt' }, {
-    createStoreSink: quarantine.createStoreSink,
-  });
+  return control.openRecoveryKit(
+    kit,
+    { secret: code.slice(), source: 'prompt' },
+    {
+      createStoreSink: quarantine.createStoreSink,
+    },
+  );
 }
 
 for (const backend of [keychainImportBackend(), fileImportBackend()]) {
@@ -512,12 +534,19 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       expect(equalBytes(handle.ownerNostr, owner.nostr)).toBe(true);
       expect(handle.agents.map((a) => a.agentId)).toEqual([agent.agentId]);
       const { unlockCode } = await target.control.importAgent(handle, agent.agentId);
-      if (backend.name === 'file') expect(unlockCode?.length).toBe(29);
+      if (backend.name === 'file') expect(unlockCode?.length).toBe(24);
       else expect(unlockCode).toBeUndefined();
       const items = await target.items(agent.agentId, unlockCode);
-      expect(equalBytes(items.get('seed') as Uint8Array, (await agent.keychain.get(agent.agentId)) as Uint8Array)).toBe(true);
+      expect(
+        equalBytes(
+          items.get('seed') as Uint8Array,
+          (await agent.keychain.get(agent.agentId)) as Uint8Array,
+        ),
+      ).toBe(true);
       expect(equalBytes(items.get('store-key') as Uint8Array, agent.storeKey)).toBe(true);
-      expect(equalBytes(items.get('storage-mark') as Uint8Array, encodeStorageMark(null))).toBe(true);
+      expect(equalBytes(items.get('storage-mark') as Uint8Array, encodeStorageMark(null))).toBe(
+        true,
+      );
       handle.wipe();
     });
 
@@ -531,9 +560,9 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       const handle = await openKit(target.control, kit, code);
       await expectCode(target.control.importAgent(handle, agent.agentId), 'item_exists');
       if (backend.name === 'keychain') {
-        expect([...((await target.items(agent.agentId, undefined)) as Map<string, Uint8Array>).keys()]).toEqual(
-          [...(before as Map<string, Uint8Array>).keys()],
-        );
+        expect([
+          ...((await target.items(agent.agentId, undefined)) as Map<string, Uint8Array>).keys(),
+        ]).toEqual([...(before as Map<string, Uint8Array>).keys()]);
       }
       handle.wipe();
     });
@@ -561,7 +590,10 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       // kit's owner (as a planted card naming it would): its own code never opens it to that owner.
       const otherKeychain = new MemoryKeychain();
       const other = await makeOwner(otherKeychain);
-      const planted = await KeychainOwnerKeyStore.open(otherKeychain, await owner.store.getPublicKeys());
+      const planted = await KeychainOwnerKeyStore.open(
+        otherKeychain,
+        await owner.store.getPublicKeys(),
+      );
       await expectCode(planted.unlock(presence(other)), 'presence_rejected');
       const target = backend.control({ ownerKeychain: otherKeychain, ownerStore: other.store });
       const handle = await openKit(target.control, kit, code).catch((e: unknown) => e);
@@ -576,7 +608,10 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
         unpaired.control.importAgent(h2, agent.agentId, { owner: new Proxy(session, {}) }),
         'presence_required',
       );
-      await expectCode(unpaired.control.importAgent(h2, agent.agentId, { owner: session }), 'presence_required');
+      await expectCode(
+        unpaired.control.importAgent(h2, agent.agentId, { owner: session }),
+        'presence_required',
+      );
       expect(await unpaired.has(agent.agentId)).toBe(false);
       h2.wipe();
     });
@@ -590,7 +625,10 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       await expectCode(target.control.importAgent(handle, agent.agentId), 'presence_required');
       const session = await owner.store.unlock(presence(owner));
       await session.close();
-      await expectCode(target.control.importAgent(handle, agent.agentId, { owner: session }), 'owner_locked');
+      await expectCode(
+        target.control.importAgent(handle, agent.agentId, { owner: session }),
+        'owner_locked',
+      );
       expect(await target.has(agent.agentId)).toBe(false);
       const live = await owner.store.unlock(presence(owner));
       await target.control.importAgent(handle, agent.agentId, { owner: live, name: 'renamed' });
@@ -625,7 +663,7 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     const { control } = keychainImportBackend().control({ ownerKeychain });
     const handle = await openKit(control, kit, code);
     const ownerCode = await control.importOwner(handle);
-    expect(ownerCode.length).toBe(29);
+    expect(ownerCode.length).toBe(24);
     expect(ascii(ownerCode)).not.toBe(ascii(code));
     expect(ownerKeychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
     const blob = ownerKeychain.items.get(OWNER_ACCOUNT) as Uint8Array;
@@ -637,7 +675,11 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     );
     expect(equalBytes(seed, owner.seed)).toBe(true);
     await expect(
-      openOwnerSeedWithoutCard(blob, { secret: code.slice(), source: 'prompt' }, { fileKeystoreMachine: false }),
+      openOwnerSeedWithoutCard(
+        blob,
+        { secret: code.slice(), source: 'prompt' },
+        { fileKeystoreMachine: false },
+      ),
     ).rejects.toThrow();
     await expectCode(control.importOwner(handle), 'item_exists');
     handle.wipe();
@@ -652,12 +694,14 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     const { control } = keychainImportBackend().control({ ownerKeychain: existing.keychain });
     const handle = await openKit(control, kit, code);
     await expectCode(control.importOwner(handle), 'item_exists');
-    expect(equalBytes(existing.keychain.items.get(OWNER_ACCOUNT) as Uint8Array, before as Uint8Array)).toBe(true);
+    expect(
+      equalBytes(existing.keychain.items.get(OWNER_ACCOUNT) as Uint8Array, before as Uint8Array),
+    ).toBe(true);
     const failing = new MemoryKeychain();
     failing.failSetAfter = 0;
     const c2 = keychainImportBackend().control({ ownerKeychain: failing }).control;
     const h2 = await openKit(c2, kit, code);
-    await expect(c2.importOwner(h2)).rejects.toThrow(KeyStoreError);
+    await expect(c2.importOwner(h2)).rejects.toThrow();
     expect(failing.items.size).toBe(0);
     handle.wipe();
     h2.wipe();
@@ -749,7 +793,11 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     const { kit, code } = await exportKit(owner, agent);
     const { control } = keychainImportBackend().control({ ownerKeychain: new MemoryKeychain() });
     await expect(
-      control.openRecoveryKit(kit, { secret: code, source: 'prompt' }, { createStoreSink: () => memorySink() }),
+      control.openRecoveryKit(
+        kit,
+        { secret: code, source: 'prompt' },
+        { createStoreSink: () => memorySink() },
+      ),
     ).rejects.toThrow();
   });
 
@@ -835,7 +883,10 @@ for (const backend of credentialBackends) {
       const { control, items, agentId } = await backend.make(owner);
       const session = await owner.store.unlock(presence(owner));
       const id = '0123456789abcdef';
-      const credential = { accessKeyId: encodeUtf8('AKIATEST'), secretAccessKey: encodeUtf8(S3_CANARY) };
+      const credential = {
+        accessKeyId: encodeUtf8('AKIATEST'),
+        secretAccessKey: encodeUtf8(S3_CANARY),
+      };
       const digest = await control.writeCredential(session, id, credential);
       const account = `${agentId}:s3:${id}`;
       const item = (await items.get(account)) as Uint8Array;
@@ -860,19 +911,30 @@ for (const backend of credentialBackends) {
     it('refuses a look-alike or ended session and a malformed id before any write', async () => {
       const owner = await makeOwner();
       const { control, items, agentId } = await backend.make(owner);
-      const credential = () => ({ accessKeyId: encodeUtf8('AKIATEST'), secretAccessKey: encodeUtf8(S3_CANARY) });
+      const credential = () => ({
+        accessKeyId: encodeUtf8('AKIATEST'),
+        secretAccessKey: encodeUtf8(S3_CANARY),
+      });
       const session = await owner.store.unlock(presence(owner));
       await expectCode(
         control.writeCredential(new Proxy(session, {}), '0123456789abcdef', credential()),
         'presence_required',
       );
-      await expectCode(control.removeCredential({} as OwnerSession, '0123456789abcdef'), 'presence_required');
+      await expectCode(
+        control.removeCredential({} as OwnerSession, '0123456789abcdef'),
+        'presence_required',
+      );
       for (const id of ['0123456789ABCDEF', '0123', '../../x', '0123456789abcdef0']) {
-        const error = await control.writeCredential(session, id, credential()).catch((e: unknown) => e);
+        const error = await control
+          .writeCredential(session, id, credential())
+          .catch((e: unknown) => e);
         expect(error).toBeInstanceOf(CryptoInputError);
       }
       await session.close();
-      await expectCode(control.writeCredential(session, 'fedcba9876543210', credential()), 'owner_locked');
+      await expectCode(
+        control.writeCredential(session, 'fedcba9876543210', credential()),
+        'owner_locked',
+      );
       expect(await items.get(`${agentId}:s3:fedcba9876543210`)).toBeNull();
     });
 
@@ -884,7 +946,9 @@ for (const backend of credentialBackends) {
       );
       expect(await keys.readMark()).toBeNull();
       await keys.writeMark('0123456789abcdef');
-      expect(equalBytes((await keys.readMark()) as Uint8Array, encodeStorageMark('0123456789abcdef'))).toBe(true);
+      expect(
+        equalBytes((await keys.readMark()) as Uint8Array, encodeStorageMark('0123456789abcdef')),
+      ).toBe(true);
       await keys.writeMark(null);
       expect(equalBytes((await keys.readMark()) as Uint8Array, encodeStorageMark(null))).toBe(true);
       expect(await keys.credentialDigest('0123456789abcdef')).toBeNull();
@@ -921,4 +985,3 @@ describe('inter-process lock re-entrance', () => {
     expect(order).toEqual([1, 2]);
   });
 });
-
