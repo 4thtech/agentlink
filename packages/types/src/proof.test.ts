@@ -536,3 +536,37 @@ describe('04 §2.4.1 encodings vectors (M1-1h) agree with the M1-2b path schemas
     }
   });
 });
+
+describe('ProofStatus receipt and advanced fields (06 §2.4, D-109, M1-33d-c)', () => {
+  const withField = (key: string, value: unknown) => ({ ...proofStatus(), [key]: value });
+
+  it('accepts receiptRequested: true, receiptRequestNotAdded: true and advanced: {chain}', () => {
+    expectRoundTrip(proofStatusSchema, withField('receiptRequested', true));
+    expectRoundTrip(proofStatusSchema, withField('receiptRequestNotAdded', true));
+    expectRoundTrip(proofStatusSchema, withField('advanced', { chain: 'base' }));
+  });
+
+  it('accepts all three together, and none of them (existing shape unchanged)', () => {
+    expectRoundTrip(proofStatusSchema, {
+      ...proofStatus(),
+      receiptRequested: true,
+      receiptRequestNotAdded: true,
+      advanced: { chain: 'base' },
+    });
+    expectRoundTrip(proofStatusSchema, proofStatus());
+  });
+
+  it.each([
+    ['receiptRequested false', 'receiptRequested', false],
+    ['receiptRequested "true"', 'receiptRequested', 'true'],
+    ['receiptRequestNotAdded false', 'receiptRequestNotAdded', false],
+    ['receiptRequestNotAdded 1', 'receiptRequestNotAdded', 1],
+    ['advanced as a string', 'advanced', 'base'],
+    ['advanced without chain', 'advanced', {}],
+    ['advanced chain uppercase', 'advanced', { chain: 'Base' }],
+    ['advanced chain as chainId', 'advanced', { chain: 8453 }],
+    ['advanced with an unknown key', 'advanced', { chain: 'base', token: '0x' }],
+  ])('rejects %s', (_name, key, value) => {
+    expectReject(proofStatusSchema, withField(key, value));
+  });
+});
