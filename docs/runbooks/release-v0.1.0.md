@@ -65,7 +65,7 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
    5. Repo → Settings → Environments → `deploy-freeze` → Environment secrets → Add secret `DEPLOY_FREEZE_TOKEN` → paste. Not a repository or org secret.
    6. Round trip: Actions → "Deploy freeze" → Run workflow → `main`. It must be green and set `DEPLOY_FREEZE` to `true`. **Then clear it:** Settings → Secrets and variables → Actions → Variables → `DEPLOY_FREEZE` → `false` (or `gh variable set DEPLOY_FREEZE --body false --repo 4thtech/agentlink`). Do not release while it is `true`.
 8. Settings → Actions → General: "Allow GitHub Actions to create and approve pull requests" must be ON (or a GitHub App token is wired; `ci-cd.md` §3 records which). #124 already exists, so this is already working if it was opened by the bot.
-9. Merge queue (recommended, not required for v0.1.0): Settings → Rules → Rulesets → `main protection` → turn on **Require merge queue**, merge method **Squash**. Our workflows (`ci.yml`, `review-gate.yml`, `e2e.yml`) already run on `merge_group`. It also removes the stale-base problem of the weekly dependency PRs (`ci-cd.md` §6).
+9. Merge queue (recommended, not required for v0.1.0; **done since: the queue is on** in `main protection`, squash, see [RB-09](merge-and-release.md) step 4): Settings → Rules → Rulesets → `main protection` → turn on **Require merge queue**, merge method **Squash**. Our workflows (`ci.yml`, `review-gate.yml`, `e2e.yml`) already run on `merge_group`. It also removes the stale-base problem of the weekly dependency PRs (`ci-cd.md` §6).
 
 ### Part C: release day
 

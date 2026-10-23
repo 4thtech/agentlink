@@ -71,6 +71,15 @@ jobs:
       test_scope: ${{ steps.affected.outputs.test_scope || 'full' }}
       turbo_filters: ${{ steps.affected.outputs.turbo_filters }}
       affected_playwright: ${{ steps.affected.outputs.needs_playwright || 'true' }}
+      # CHORE-CI-SPEED-3: which heavy jobs a pull request runs (tools/ci/select-affected.mjs,
+      # HEAVY_JOBS). A missing value (merge queue, push, a .github/ or tools/ change, an unreadable
+      # diff, a selector crash) is `true`: run the job.
+      run_vectors: ${{ steps.affected.outputs.run_vectors || 'true' }}
+      run_keychain: ${{ steps.affected.outputs.run_keychain || 'true' }}
+      run_relays_docker: ${{ steps.affected.outputs.run_relays_docker || 'true' }}
+      run_storage_minio: ${{ steps.affected.outputs.run_storage_minio || 'true' }}
+      run_bundle_check: ${{ steps.affected.outputs.run_bundle_check || 'true' }}
+      run_e2e_deterministic: ${{ steps.affected.outputs.run_e2e_deterministic || 'true' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -182,7 +191,8 @@ jobs:
 
       # CHORE-CI-SPEED-2: a pull request lints, typechecks, builds and tests only the packages it
       # touches, their dependents, and the packages whose tests read a changed doc
-      # (tools/ci/select-affected.mjs, rules in docs/process/ci-cd.md "What runs where"). The merge
+      # (tools/ci/select-affected.mjs, rules in docs/process/ci-cd.md "What runs where").
+      # CHORE-CI-SPEED-3: the same step decides which heavy jobs run (run_<job>). The merge
       # queue and every push run the full suite and never reach the selector. A change under
       # `.github/` or `tools/` (the selector itself) runs everything before the selector is read.
       - name: Select the affected packages (pull requests only)
@@ -239,6 +249,8 @@ jobs:
         if: needs.detect.outputs.needs_playwright == 'true' && needs.detect.outputs.affected_playwright == 'true'
         timeout-minutes: 12
         uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium firefox webkit
 
       # Task ordering and caching are turbo's job; the root scripts call `turbo run ...`.
       # CHORE-CI-SPEED-2: TEST_SCOPE is `full` everywhere except a pull request whose selection
@@ -307,7 +319,8 @@ jobs:
     name: vectors
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true'
+    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true' && needs.detect.outputs.run_vectors == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -329,6 +342,8 @@ jobs:
         if: needs.detect.outputs.needs_playwright == 'true'
         timeout-minutes: 12
         uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium firefox webkit
 
       # Python for the independent vector generators, fixed at the version requirements.txt was
       # compiled for (every pinned package has a cp312 wheel), whatever the runner image ships.
@@ -409,7 +424,8 @@ jobs:
     name: keychain (${{ matrix.os }})
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_keychain == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -626,7 +642,8 @@ jobs:
     name: relays-docker
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_relays_docker == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -678,7 +695,8 @@ jobs:
     name: storage-minio
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_storage_minio == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -788,7 +806,8 @@ jobs:
     name: bundle-check
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
-    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.run_bundle_check == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -989,7 +1008,8 @@ jobs:
   e2e-deterministic:
     name: e2e-deterministic
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.e2e_relevant == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main')
+    # CHORE-CI-SPEED-3: on a pull request only when the change reaches the packages it tests.
+    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.e2e_relevant == 'true' && (github.event_name != 'push' || github.ref == 'refs/heads/main') && needs.detect.outputs.run_e2e_deterministic == 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/e2e.yml
@@ -1009,9 +1029,25 @@ jobs:
         shell: bash
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
+          EVENT_NAME: ${{ github.event_name }}
+          CODE_CHANGED: ${{ needs.detect.outputs.code_changed }}
+          NEEDS: ${{ toJSON(needs) }}
+          # CHORE-CI-SPEED-3: in the merge queue these must have run and passed (a skip fails),
+          # whatever a pull request run selected. A docs-only group may skip all but `checks`.
+          QUEUE_REQUIRED: checks vectors keychain path-guard relays-docker storage-minio bundle-check e2e-deterministic
         run: |
           set -euo pipefail
           echo "Upstream job results: $RESULTS"
+          if [ "$EVENT_NAME" = merge_group ]; then
+            for job in detect $QUEUE_REQUIRED; do
+              if [ "$job" != detect ] && [ "$job" != checks ] && [ "$CODE_CHANGED" != true ]; then continue; fi
+              result="$(jq -r --arg j "$job" '.[$j].result // "missing"' <<< "$NEEDS")"
+              if [ "$result" != success ]; then
+                echo "::error::In the merge queue the job '$job' must succeed; it ended as '$result'."
+                exit 1
+              fi
+            done
+          fi
           # CHORE-CI-SPEED-1: on a draft pull request every upstream job is skipped, which passes here;
           # the suite runs when the draft is marked ready for review.
           for result in $RESULTS; do

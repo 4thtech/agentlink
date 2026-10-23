@@ -354,7 +354,8 @@ export function pinnedFaucet(
  * route answers 501 `not_available`, as before. Anything invalid turns it off (null) and leaves
  * the rest of the submitter running.
  *
- * Vars: SUBMITTER_DEPOSIT_AUTH_CHAINS and the bounded overrides below.
+ * Vars: SUBMITTER_DEPOSIT_AUTH_CHAINS and the bounded overrides below (per agent, per IP and the
+ * route's global hourly cap).
  * Worker secrets (set by the owner with `wrangler secret put`, never in a file):
  *   SUBMITTER_DEPOSIT_GAS_KEY_<chainId>  the relay's own gas key, 0x + 64 hex, never the chain's
  *                                        submitter gas key or faucet key (index.ts): its wallet
@@ -368,12 +369,18 @@ export interface DepositAuthConfig {
   readonly agentRequestsPerHour: number;
   /** Requests per IP (IPv6 /64) per hour, whatever their outcome. */
   readonly ipRequestsPerHour: number;
+  /**
+   * Requests per hour across every IP, agent and chain that reach the relay (well-formed, for the
+   * vault, in their window): a backstop on the relay's RPC and gas use (M3-4b-t-T3-b).
+   */
+  readonly requestsPerHour: number;
 }
 
 export const DEPOSIT_AUTH_DEFAULTS = Object.freeze({
   /** Owner decision 2026-10-23: 5 per agent per hour. */
   agentRequestsPerHour: 5,
   ipRequestsPerHour: 20,
+  requestsPerHour: 200,
 });
 
 /** Reads and checks the gasless top-up settings; null when the route is off or anything is invalid. */
@@ -404,10 +411,18 @@ export function readDepositAuthConfig(env: Record<string, unknown>): DepositAuth
     1,
     1_000,
   );
-  if (agent === null || ip === null) return null;
+  const all = intVar(
+    env,
+    'SUBMITTER_DEPOSIT_AUTH_REQUESTS_PER_HOUR',
+    DEPOSIT_AUTH_DEFAULTS.requestsPerHour,
+    1,
+    10_000,
+  );
+  if (agent === null || ip === null || all === null) return null;
   return Object.freeze({
     chains: Object.freeze(chains),
     agentRequestsPerHour: agent,
     ipRequestsPerHour: ip,
+    requestsPerHour: all,
   });
 }
