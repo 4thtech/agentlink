@@ -66,8 +66,9 @@ Coverage the gate needs: every tester completes A to G once, as sender or recipi
 2. **Stop (T1).** The moment the tester's own agent says the first note was sent to a paired contact, run `date -u +%FT%TZ` again and stop the stopwatch.
 3. **Cross-check from local facts.** The tester pastes the two `date` lines, the stopwatch time, the creation time of their agent folder (`ls -ldT ~/.agentlink/agents/<name>` on macOS, `stat -c %w ~/.agentlink/agents/<name>` on Linux) and, from the counterpart, the time the note showed in their inbox. If the stopwatch and the `date` lines differ by more than 30 seconds, the log says so and the `date` lines win.
 4. **What counts.** Pairing (invite and accept) is inside the clock, because "first message" needs a contact. Time waiting for the other tester is written down as "waiting on counterpart" and subtracted. Time lost to a defect is not subtracted; it goes in the notes.
-5. **Pass rule.** The median of the per-tester minutes is under 5:00 and no more than 2 of 10 testers exceed 8:00. The coordinator computes it from the logs; the audit session recomputes it.
-6. **Never collected.** No file, folder or agent name, message text, link, code or IP address. Only minutes and seconds, the combination and the version.
+5. **Pass rule (proposed, owner confirms at merge).** The median of the per-tester minutes is under 5:00 and no more than 2 of 10 testers exceed 8:00. The coordinator computes it from the logs; the audit session recomputes it.
+6. **Owner must accept explicitly.** Using the median, and subtracting "waiting on counterpart" time, are reinterpretations of "install → first message under 5 minutes" (02 §5 J1, 10 Gate M1). The strict alternative: every tester under 5:00, with counterpart waiting excluded. Until the owner chooses, record both results.
+7. **Never collected.** No file, folder or agent name, message text, link, code or IP address. Only minutes and seconds, the combination and the version.
 
 A later card may add an opt-in command that prints the same local timestamps; nothing here depends on it.
 
@@ -103,7 +104,7 @@ Start each round with a clean state (a new agent name; `init` not run before on 
 1. Tester 1 to their agent: "Agree a review of one page by Friday for a lunch with <counterpart>'s agent." The agent opens terms with `agentlink_propose_terms`.
 2. The counterpart counters once, tester 1 revises, the counterpart accepts. The accept pauses for the accepting owner (`agentlink approve …`, own terminal, owner code).
 3. The closing step is recorded with proof (needs the credits from D). The other side signs the receipt after one owner approval.
-4. Both sides export the proof of agreement. Only the side that recorded can export until D-107 lands (card M1-7g-b); if the recipient's export is missing, record "not available".
+4. Both sides export the proof of agreement (D-107; the recipient's export is on `main`, M1-7g-b). A missing or failing export on either side is a FAIL: record "no" and open an issue. Proof on a single test network (Base Sepolia only) is enough for the gate (D-63).
 5. A tester who was not in the exchange runs `agentlink verify <pack>` as in E. Expected: the terms match the record, the accept and the receipt.
 6. Check: no money moved, no wallet or chain appeared, and the agreement in the agents' words matches what was agreed.
 
@@ -111,10 +112,12 @@ Start each round with a clean state (a new agent name; `init` not run before on 
 
 ### 6. Testing log (template)
 
-One filled copy per tester, kept in the private audit store (`audit-rules.md` §4.5). It holds no names, emails, owner codes, links, message text, file names or hashes. Copies in this public repository stay empty.
+One filled copy per tester, kept in the private audit store (`audit-rules.md` §4.5). **Never paste into it:** keys, a seed or the owner code; plaintext message or file content; approval links; drop, upload or download links; names, emails, file names or hashes. Copies in this public repository stay empty.
 
 ```text
 M1 gate testing log
+NEVER WRITE HERE: keys, seed or owner code; message or file content; approval links;
+drop, upload or download links; names, emails, file names or hashes. Words only.
 Tester ID: T__        Date (UTC): ____-__-__
 Build: agentlink --version = ______   commit/release = ______
 OS: ______   Harness: ______ (version ____)   Counterpart harness: ______   Combo: C_
@@ -139,7 +142,7 @@ Anything that confused you:
 Anything you would not do again:
 ```
 
-The coordinator keeps one summary table for the audit: testers × journeys × combinations, with counts of yes, partly, no and not available, the median and the over-8-minute count from step 4, and the issue links. The gate's testing acceptance: J1, J2, J4 and J5 are yes for every tester, J3 is yes for every tester with faucet credits, J8 with proof is yes for at least one pair per combination, the median is under 5:00, and no default-flow tick is left without a closed issue.
+The coordinator keeps one summary table for the audit: testers × journeys × combinations, with counts of yes, partly, no and not available, the median and the over-8-minute count from step 4, and the issue links. The gate's testing acceptance: J1, J2, J4 and J5 are yes for every tester, J3 is yes for every tester with faucet credits, J8 with proof is yes for at least one pair per combination, the timing rule of step 4 holds (median under 5:00 and at most 2 of 10 over 8:00, or the strict alternative if the owner chooses it), and no default-flow tick is left without a closed issue.
 
 ### 7. How to report an issue
 
