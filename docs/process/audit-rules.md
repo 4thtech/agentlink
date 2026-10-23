@@ -212,7 +212,7 @@ When an approved PR's head moves **only** by a mechanical merge of `origin/main`
 2. The PR's own diff against `main` is byte-identical to the previously approved head's diff.
 3. Required CI is green on the new head.
 
-It records `IR-<TASK-ID>-<n>: PASS (mechanical) at <full sha>`; `review-gate` (c) accepts the `(mechanical)` marker unchanged. Any non-empty remerge-diff, any change to the PR's own diff, or any S2 conflict resolution still needs a full independent review (Opus; Fable for keys, crypto, money or contracts, §4.1).
+It records the result as follows (*Orchestrator wording:*) `IR-<TASK-ID>-<n>: PASS (mechanical) at <full sha>`; `review-gate` (c) accepts the `(mechanical)` marker unchanged. Any non-empty remerge-diff, any change to the PR's own diff, or any S2 conflict resolution still needs a full independent review (Opus; Fable for keys, crypto, money or contracts, §4.1).
 
 ## 5. Area checklists
 
