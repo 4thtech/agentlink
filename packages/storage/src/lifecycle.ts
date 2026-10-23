@@ -77,6 +77,114 @@ function ruleId(rule: string): string | null {
   return xmlText(rule, 'ID');
 }
 
+interface RuleNode {
+  readonly name: string;
+  readonly children: RuleNode[];
+  text: string;
+}
+
+function decodeXml(text: string): string {
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
+/** Parses one `<Rule>` into a small tree; null when the markup is not well formed. */
+function parseRule(rule: string): RuleNode | null {
+  const root: RuleNode = { name: '#root', children: [], text: '' };
+  const stack: RuleNode[] = [root];
+  const token = /<(\/?)([A-Za-z][A-Za-z0-9]*)[^<>]*?(\/?)>|([^<]+)/g;
+  for (let m = token.exec(rule); m !== null; m = token.exec(rule)) {
+    const top = stack[stack.length - 1] as RuleNode;
+    if (m[4] !== undefined) {
+      top.text += m[4];
+    } else if (m[1] === '/') {
+      if (stack.length < 2 || top.name !== m[2]) return null;
+      stack.pop();
+    } else {
+      const node: RuleNode = { name: m[2] as string, children: [], text: '' };
+      top.children.push(node);
+      if (m[3] !== '/') stack.push(node);
+    }
+  }
+  return stack.length === 1 && root.children.length === 1 ? (root.children[0] as RuleNode) : null;
+}
+
+/**
+ * A canonical string for a node: children sorted, empty elements dropped, `And` unwrapped, so element
+ * order, empty placeholders and an equivalent re-serialisation by the provider compare equal while any
+ * element with a value still counts.
+ */
+function canon(node: RuleNode): string {
+  const flat: RuleNode[] = [];
+  for (const child of node.children) {
+    if (child.name === 'And') flat.push(...child.children);
+    else flat.push(child);
+  }
+  const parts = flat
+    .filter(
+      (child) => !(child.name === 'ExpiredObjectDeleteMarker' && child.text.trim() === 'false'),
+    )
+    .map(canon)
+    .filter((part) => part !== '')
+    .sort();
+  const text = decodeXml(node.text.trim());
+  if (parts.length === 0 && text === '') return '';
+  return `${node.name}(${text}|${parts.join(',')})`;
+}
+
+/** The rule as the provider holds it, without the multipart-abort element (checked separately). */
+function ruleSignature(rule: string, keepAbort: boolean): string | null {
+  const tree = parseRule(rule);
+  if (tree === null) return null;
+  // A prefix directly on the rule (older form) is the same as one inside the filter.
+  const legacy = tree.children.filter((child) => child.name === 'Prefix');
+  if (legacy.length > 0) {
+    const filter = tree.children.find((child) => child.name === 'Filter');
+    const target = filter ?? { name: 'Filter', children: [], text: '' };
+    if (filter === undefined) tree.children.push(target);
+    target.children.push(...legacy);
+    tree.children.splice(
+      0,
+      tree.children.length,
+      ...tree.children.filter((c) => !legacy.includes(c)),
+    );
+  }
+  if (!keepAbort) {
+    const rest = tree.children.filter((child) => child.name !== 'AbortIncompleteMultipartUpload');
+    tree.children.splice(0, tree.children.length, ...rest);
+  }
+  return canon(tree);
+}
+
+/**
+ * Whether two rules mean the same thing (M1-6b-c): compared as parsed content, not as text, because
+ * MinIO, R2 and S3 each re-serialise a stored rule differently (element order, empty placeholders).
+ */
+function sameRule(a: string, b: string): boolean {
+  const left = ruleSignature(a, true);
+  return left !== null && left === ruleSignature(b, true);
+}
+
+/**
+ * Whether `after` is our own rule for `days`. A provider may drop the multipart-abort element (MinIO
+ * accepts it and keeps its own stale-upload expiry), so it may be absent but never different.
+ */
+function ownRuleHolds(after: string, days: number): boolean {
+  const expected = ownRuleXml(days);
+  const left = ruleSignature(after, false);
+  if (left === null || left !== ruleSignature(expected, false)) return false;
+  const initiation = xmlText(after, 'DaysAfterInitiation');
+  return (
+    initiation === null ||
+    initiation.trim() === '' ||
+    initiation.trim() === String(LIFECYCLE_ABORT_INCOMPLETE_DAYS)
+  );
+}
+
 function ownRuleXml(days: number): string {
   return (
     `<Rule><ID>${LIFECYCLE_RULE_ID}</ID><Filter><Prefix>${LIFECYCLE_PREFIX}</Prefix></Filter>` +
@@ -149,7 +257,7 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
       // S3 has no conditional write for the lifecycle configuration, so the read-modify-write cannot be
       // made atomic (M1-6b-b L3). It is made safe as far as the API allows: read twice and write only
       // when both reads agree (a change in between is retried from the start), then read the result
-      // back and check that no rule was lost. A change that lands between the second read and the
+      // back and check that every rule is still there with the same content. A change that lands between the second read and the
       // write is the one window left; the read-back reports it instead of hiding it.
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
         const current = await currentRules();
@@ -188,13 +296,12 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
           throw failed(response.status);
         }
         const after = (await currentRules()).rules;
-        const key = (rule: string): string => ruleId(rule) ?? rule;
-        const present = new Set(after.map(key));
+        // Full content, not just IDs (M1-6b-c): a rule another writer changed in place keeps its ID.
         const ownAfter = after.find((rule) => ruleId(rule) === LIFECYCLE_RULE_ID);
         if (
           ownAfter === undefined ||
-          parseOwnRule(ownAfter).days !== days ||
-          !others.every((rule) => present.has(key(rule)))
+          !ownRuleHolds(ownAfter, days) ||
+          !others.every((rule) => after.some((candidate) => sameRule(candidate, rule)))
         ) {
           log?.warn('storage lifecycle changed after the update');
           throw failed();
