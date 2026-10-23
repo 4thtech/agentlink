@@ -220,7 +220,8 @@ describe('reconcile', () => {
       if (conclusion === null) {
         // CI still running on the head.
         for (const k of Object.keys(gates)) {
-          if (k.endsWith('/jobs')) gates[k] = () => ({ jobs: [{ name: 'ci-gate', status: 'in_progress' }] });
+          if (k.endsWith('/jobs'))
+            gates[k] = () => ({ jobs: [{ name: 'ci-gate', status: 'in_progress' }] });
         }
       }
       const { result, calls } = await go({ ...routes(), ...gates });
@@ -273,7 +274,9 @@ describe('reconcile', () => {
   });
 
   it('throws when the head of main cannot be read', async () => {
-    await expect(go(routes({ [headPath]: () => ({ sha: 'nope' }) }))).rejects.toThrow(/head of main/);
+    await expect(go(routes({ [headPath]: () => ({ sha: 'nope' }) }))).rejects.toThrow(
+      /head of main/,
+    );
   });
 });
 
@@ -283,10 +286,13 @@ describe('run (command line)', () => {
     GITHUB_REPOSITORY: REPO,
     GITHUB_SHA: HEAD,
   };
-  const readWorkflow = (name) => `name: x\non:\n  push:\n    branches: [main]\n    paths:\n      - "apps/submitter/**"\n      - ".github/workflows/${name}"\n`;
+  const readWorkflow = (name) =>
+    `name: x\non:\n  push:\n    branches: [main]\n    paths:\n      - "apps/submitter/**"\n      - ".github/workflows/${name}"\n`;
 
   it('parses one or more --workflow arguments and refuses anything else', () => {
-    expect(parseArgs(['--workflow', 'deploy-submitter.yml', '--workflow', 'deploy-drop.yml'])).toEqual({
+    expect(
+      parseArgs(['--workflow', 'deploy-submitter.yml', '--workflow', 'deploy-drop.yml']),
+    ).toEqual({
       workflows: ['deploy-submitter.yml', 'deploy-drop.yml'],
     });
     for (const argv of [[], ['--workflow'], ['--workflow', '../x.yml'], ['--other', 'a.yml']]) {
@@ -312,7 +318,13 @@ describe('run (command line)', () => {
   it('dispatches at most once per workflow per run and never prints the token', async () => {
     const { api, calls } = fakeApi(routes());
     const lines = [];
-    const code = await run({ argv: ['--workflow', WORKFLOW], env, api, log: (l) => lines.push(l), readWorkflow });
+    const code = await run({
+      argv: ['--workflow', WORKFLOW],
+      env,
+      api,
+      log: (l) => lines.push(l),
+      readWorkflow,
+    });
     expect(code).toBe(0);
     expect(dispatched(calls)).toHaveLength(1);
     expect(lines.join('\n')).not.toContain(env.GH_TOKEN);
@@ -322,12 +334,20 @@ describe('run (command line)', () => {
     const { api } = fakeApi(routes());
     const log = () => {};
     expect(
-      await run({ argv: ['--workflow', WORKFLOW], env, api, log, readWorkflow: () => 'on:\n  workflow_dispatch:\n' }),
+      await run({
+        argv: ['--workflow', WORKFLOW],
+        env,
+        api,
+        log,
+        readWorkflow: () => 'on:\n  workflow_dispatch:\n',
+      }),
     ).toBe(1);
     const failing = async () => {
       throw new Error('HTTP 500 for /x');
     };
-    expect(await run({ argv: ['--workflow', WORKFLOW], env, api: failing, log, readWorkflow })).toBe(1);
+    expect(
+      await run({ argv: ['--workflow', WORKFLOW], env, api: failing, log, readWorkflow }),
+    ).toBe(1);
   });
 });
 
@@ -335,19 +355,25 @@ describe('deploy-reconcile.yml', () => {
   const wf = read('deploy-reconcile.yml');
 
   it('runs on a schedule and by hand only', () => {
-    expect(wf).toMatch(/\non:\n {2}schedule:\n {4}- cron: "[0-9]+ \* \* \* \*"\n {2}workflow_dispatch:\n\n/);
+    expect(wf).toMatch(
+      /\non:\n {2}schedule:\n {4}- cron: "[0-9]+ \* \* \* \*"\n {2}workflow_dispatch:\n\n/,
+    );
     expect(wf).not.toMatch(/\n {2}(push|pull_request|pull_request_target|workflow_run):/);
   });
 
   it('holds no permissions at the top, one concurrency group without cancellation', () => {
     expect(wf).toMatch(/\npermissions: \{\}\n/);
-    expect(wf).toMatch(/\nconcurrency:\n {2}group: deploy-reconcile\n {2}cancel-in-progress: false\n/);
+    expect(wf).toMatch(
+      /\nconcurrency:\n {2}group: deploy-reconcile\n {2}cancel-in-progress: false\n/,
+    );
   });
 
   it('has a single job, the only one with actions: write, skipped while DEPLOY_FREEZE is set', () => {
     const jobs = [...wf.slice(wf.indexOf('\njobs:\n')).matchAll(/\n {2}([a-z][a-z0-9-]*):\n/g)];
     expect(jobs.map((m) => m[1])).toEqual(['reconcile']);
-    expect(wf).toMatch(/\n {4}permissions:\n {6}actions: write\b.*\n {6}contents: read\n {4}steps:/);
+    expect(wf).toMatch(
+      /\n {4}permissions:\n {6}actions: write\b.*\n {6}contents: read\n {4}steps:/,
+    );
     expect(wf).toContain("github.repository == '4thtech/agentlink'");
     expect(wf).toContain("github.ref == 'refs/heads/main'");
     expect(wf).toContain("vars.DEPLOY_FREEZE != 'true'");
@@ -364,7 +390,9 @@ describe('deploy-reconcile.yml', () => {
   });
 
   it('reconciles both deploy workflows in one call', () => {
-    const scripts = runScripts(wf).map((s) => s.script).join('\n');
+    const scripts = runScripts(wf)
+      .map((s) => s.script)
+      .join('\n');
     expect(scripts).toMatch(
       /node tools\/release\/reconcile-deploy\.mjs[\s\\]+--workflow deploy-submitter\.yml[\s\\]+--workflow deploy-drop\.yml/,
     );
