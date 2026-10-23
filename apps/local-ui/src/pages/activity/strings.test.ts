@@ -49,7 +49,7 @@ describe('Activity copy (11 §5.1)', () => {
   it('uses none of the never-say words', () => {
     for (const [key, value] of Object.entries(ACTIVITY_STRINGS)) {
       for (const word of NEVER) {
-        const re = new RegExp(`\\b${word.replace(/[-]/g, '\\-')}\\b`, 'i');
+        const re = new RegExp(`\\b${word.replace(/[\\-]/g, '\\$&')}\\b`, 'i');
         expect(re.test(value), `${key}: "${value}" says "${word}"`).toBe(false);
       }
     }
