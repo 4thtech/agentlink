@@ -3,4 +3,4 @@
 '@4thtech-io/agentlink': patch
 ---
 
-ProofStatus names the proof network only under `advanced.chain`: the shared `proofStatusShape` no longer has a top-level `chain`, so real `agentlink_notarize` and `agentlink_get_proof` results match it. A proof that asks for a delivery receipt now says so in a `receiptRequested: true` result field, which the tool output schema lists (M1-33d-d, 06 §2.4).
+The shared ProofStatus shape now matches real `agentlink_notarize` and `agentlink_get_proof` results and 06 §2.4 (M1-33d-d): the proof network only under `advanced.chain` (no top-level `chain`); `txHash` and the fee split optional on every status; `agentAddress` and `topUpUrl` allowed on `needs_credits` only; `explorerUrl` and `verifyUrl` removed. A proof that asks for a delivery receipt now says so in a `receiptRequested: true` result field, which the tool output schema lists.

@@ -34,7 +34,7 @@ export const utcTimestampSchema = z
 
 // --- URLs ----------------------------------------------------------------------------------------
 
-/** An https link we generate (block explorer, verify page): no user info, no whitespace. */
+/** An https link we generate (the top-up link): no user info, no whitespace. */
 export const httpsUrlSchema = z
   .string()
   .max(MAX_URL_LENGTH)
@@ -262,8 +262,8 @@ export const PROOF_STATUSES = freeze([
  * (`0x` address; the zero address only for a native USD stablecoin, xDAI on Gnosis, which the core
  * checks against its chain list). `amount` is base units, a uint256 decimal: the signed `maxFee`
  * until the record is confirmed, then the fee charged. `usd` is its USD amount. `protocolUsd` and
- * `integratorUsd` split the charged fee, so they come together, only once it is known (status
- * `ok`, see checkProofStatus), and then `usd` is exactly their sum (12 §4.3, §5).
+ * `integratorUsd` split the charged fee, so they come together, only on `ok` and only once it is
+ * known (optional, see checkProofStatus), and then `usd` is exactly their sum (12 §4.3, §5).
  */
 export const proofFeeSchema = z
   .strictObject({
@@ -314,8 +314,10 @@ export const proofStatusShape = {
     .array(proofStatusReceiptSchema)
     .max(RECEIPT_TYPE_NAMES.length)
     .refine(receiptTypesValid, RECEIPTS_MESSAGE),
-  explorerUrl: httpsUrlSchema.exactOptional(),
-  verifyUrl: httpsUrlSchema.exactOptional(),
+  /** `needs_credits` only (06 §2.1, M1-33d-d): the agent address that credits are added to. */
+  agentAddress: evmAddress.exactOptional(),
+  /** `needs_credits` only (06 §2.1, D-113, M1-33d-d): our top-up link, absent until it is live. */
+  topUpUrl: httpsUrlSchema.exactOptional(),
   /** The proof network, Advanced only (06 §2.4, M1-26-b; D-40). */
   advanced: z.strictObject({ chain: chainKeySchema }).exactOptional(),
   /** Present (true) only when this proof asks the recipient for a delivery receipt (D-109). */
@@ -328,28 +330,35 @@ export const proofStatusShape = {
 };
 
 /**
- * ProofStatus rules (no clock): a confirmed proof (`ok`) has its `recordId` and `txHash`; a
- * `submitted` one has its `txHash`; receipts exist only on a record.
+ * ProofStatus rules (no clock): a confirmed proof (`ok`) has its `recordId`; receipts exist only on
+ * a record; the fee split only on `ok`; `agentAddress` and `topUpUrl` only on `needs_credits`.
+ * `txHash` and the split stay optional, as 06 §2.4 has them: the core does not return them yet
+ * (M1-33d-d).
  */
 export function checkProofStatus(
-  s: { status?: unknown; recordId?: unknown; txHash?: unknown; receipts?: unknown; fee?: unknown },
+  s: {
+    status?: unknown;
+    recordId?: unknown;
+    receipts?: unknown;
+    fee?: unknown;
+    agentAddress?: unknown;
+    topUpUrl?: unknown;
+  },
   ctx: z.core.$RefinementCtx,
 ): void {
   const issue = (message: string, path: string[]) =>
     ctx.addIssue({ code: 'custom', message, path });
-  // The split belongs to the charged fee: present exactly on a confirmed (`ok`) record's fee.
+  // The split belongs to the charged fee: never before a confirmed (`ok`) record.
   if (s.fee !== null && typeof s.fee === 'object') {
     const hasSplit = (s.fee as { protocolUsd?: unknown }).protocolUsd !== undefined;
-    if (s.status === 'ok' && !hasSplit) {
-      issue('a confirmed fee carries protocolUsd and integratorUsd', ['fee', 'protocolUsd']);
-    }
     if (s.status !== 'ok' && hasSplit) {
       issue('before confirmation the fee is maxFee, with no split', ['fee', 'protocolUsd']);
     }
   }
   if (s.status === 'ok' && s.recordId === undefined) issue('ok needs recordId', ['recordId']);
-  if ((s.status === 'ok' || s.status === 'submitted') && s.txHash === undefined) {
-    issue(`${s.status} needs txHash`, ['txHash']);
+  if (s.status !== 'needs_credits') {
+    if (s.agentAddress !== undefined) issue('agentAddress only on needs_credits', ['agentAddress']);
+    if (s.topUpUrl !== undefined) issue('topUpUrl only on needs_credits', ['topUpUrl']);
   }
   if (Array.isArray(s.receipts) && s.receipts.length > 0 && s.recordId === undefined) {
     issue('receipts need a recordId', ['receipts']);
