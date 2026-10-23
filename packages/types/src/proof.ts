@@ -314,6 +314,15 @@ export const proofStatusShape = {
     .refine(receiptTypesValid, RECEIPTS_MESSAGE),
   explorerUrl: httpsUrlSchema.exactOptional(),
   verifyUrl: httpsUrlSchema.exactOptional(),
+  /** The proof network, Advanced only (06 §2.4, M1-26-b; D-40). */
+  advanced: z.strictObject({ chain: chainKeySchema }).exactOptional(),
+  /** Present (true) only when this proof asks the recipient for a delivery receipt (D-109). */
+  receiptRequested: z.literal(true).exactOptional(),
+  /**
+   * Present (true) only when `requestReceipt` was set on an envelope that already had a proof
+   * without one: no request was added (M1-33d-b).
+   */
+  receiptRequestNotAdded: z.literal(true).exactOptional(),
 };
 
 /**

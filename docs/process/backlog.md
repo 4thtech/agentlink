@@ -4587,7 +4587,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The concurrency test signs exactly one DELIVERED; the already-notarized case is reported in the result field and the summary line; the inbox page test shows one transaction per page; no test weakened.
 
 #### M1-33d-c · proofStatusShape follows 06 ProofStatus (new, from IR-M1-33d-b-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/types` (`proofStatusShape` and its schema test)
 - **Depends on:** M1-33d-b
 - **Spec:** 06 `ProofStatus`; D-109
