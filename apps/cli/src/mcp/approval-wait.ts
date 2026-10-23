@@ -16,6 +16,8 @@
 // | anything else           | Claude Desktop, Cursor, Windsurf, OpenCode, Antigravity, others: timeout unknown or about 60 s with no setting | 0 |
 //
 // Configurable per harness: change the table (or pass another lookup to createMcpServer).
+// M1-36i-e: the value is the whole call's budget for waiting: time the tool already spent (a free
+// test credits wait) comes off it (tools/approval-wait.ts `approvalWaitLeft`), never added to it.
 
 /** The longest wait for any harness (D4). */
 export const APPROVAL_WAIT_MAX_MS = 45_000;

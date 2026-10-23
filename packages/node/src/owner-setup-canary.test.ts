@@ -85,6 +85,13 @@ function forms(bytes: Uint8Array): string[] {
     Buffer.from(bytes).toString('base64'),
     encodeBase64url(bytes),
     Array.from(bytes).join(','),
+    // M1-11s-c-e: a typed array that reaches an event or a log line unconverted.
+    // JSON.stringify(Uint8Array) writes an index object: {"0":65,"1":71,…}.
+    JSON.stringify(bytes),
+    JSON.stringify(bytes.subarray(0, 8)).slice(0, -1),
+    // util.inspect (console.log, %o) writes `65, 71, …` with spaces, wrapped every few numbers.
+    Array.from(bytes).join(', '),
+    Array.from(bytes.subarray(0, 8)).join(', '),
     // A prefix catches a truncated or wrapped value.
     hex.slice(0, 16),
     new TextDecoder().decode(bytes.subarray(0, 12)),
