@@ -1,0 +1,84 @@
+/* Contacts layout (d1 Local-contacts): the list beside the selected contact; on a narrow window the
+   detail wraps below the list (no breakpoint needed). Design tokens only; the contact rows, chips
+   and the safety-code block use the ui components' own classes (.al-contact, .al-chip, .al-sc). */
+.ct-count {
+  margin: 0;
+}
+.ct-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-6);
+  align-items: flex-start;
+  margin-top: var(--al-space-6);
+}
+.ct-list {
+  flex: 1 1 calc(var(--al-layout-max-content) / 2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  overflow: hidden;
+}
+.ct-list > li:last-child .ct-row {
+  border-bottom: 0;
+}
+.ct-row {
+  width: 100%;
+  border: 0;
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.ct-row:hover,
+.ct-row[aria-current='true'] {
+  background: var(--al-color-bg-sunken);
+}
+.ct-detail {
+  flex: 1 1 calc(var(--al-layout-max-content) / 2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.ct-detail p {
+  margin: 0;
+}
+.ct-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+.ct-detail-head h2 {
+  margin: 0;
+}
+.ct-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+  align-items: center;
+}
+.ct-rename,
+.ct-confirm,
+.ct-presence,
+.ct-presence-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.ct-presence {
+  padding: var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-sunken);
+}
+.ct-error {
+  color: var(--al-color-status-danger-fg);
+}

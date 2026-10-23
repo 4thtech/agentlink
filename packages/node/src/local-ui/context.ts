@@ -7,7 +7,13 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
-import type { AgentLinkClient, OwnerActionOutcome } from '@4thtech-io/core';
+import type {
+  AgentLinkClient,
+  ContactView,
+  OwnerActionOutcome,
+  OwnerSafetyCode,
+  PreparedOwnerAction,
+} from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
@@ -57,6 +63,19 @@ export interface LocalUiReadClient {
   getProof(
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
+  /**
+   * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
+   * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
+   * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
+   * gate's one-use `sign`, applied by core, changes anything. No direct block, remove or apply.
+   */
+  readonly contacts: {
+    list(): Promise<readonly ContactView[]>;
+    safetyCode(contactId: string): Promise<OwnerSafetyCode>;
+    prepareCheck(contactId: string): Promise<PreparedOwnerAction>;
+    prepareRename(contactId: string, alias: string): Promise<PreparedOwnerAction>;
+    prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
+  };
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -64,6 +83,14 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    contacts: Object.freeze({
+      list: () => client.contacts.list(),
+      safetyCode: (contactId: string) => client.pairing.ownerSafetyCode(contactId),
+      prepareCheck: (contactId: string) => client.ownerActions.prepareContactCheck(contactId),
+      prepareRename: (contactId: string, alias: string) =>
+        client.ownerActions.prepareContactRename(contactId, alias),
+      prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
+    }),
   });
 }
 
