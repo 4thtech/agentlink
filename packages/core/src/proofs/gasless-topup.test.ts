@@ -290,6 +290,16 @@ async function harness(
   return h;
 }
 
+declare global {
+  interface ImportMeta {
+    /** Vite's static glob import (resolved at transform time). */
+    glob(
+      patterns: string[],
+      options: { query: '?raw'; import: 'default'; eager: true },
+    ): Record<string, string>;
+  }
+}
+
 const ADDRESS = /0x[0-9a-fA-F]{40}/;
 const HEX32 = /0x[0-9a-fA-F]{64}/;
 const URL_LIKE = /https?:\/\//;
@@ -323,7 +333,10 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
     const result = await runGaslessTopUp(h.deps, { approval: await h.approve(20n * DOLLAR) });
     expect(result).toEqual({ status: 'done' });
     expect(h.posted).toHaveLength(1);
-    const recovered = recoverAuthorizationSigner(DOMAIN, (h.posted[0] as DepositAuthorizationRequest).auth);
+    const recovered = recoverAuthorizationSigner(
+      DOMAIN,
+      (h.posted[0] as DepositAuthorizationRequest).auth,
+    );
     expect(recovered).toBe(h.agentId.toLowerCase());
     expect(recovered).not.toBe(ownerEvmId.toLowerCase());
     expect(h.sign712).toHaveBeenCalledTimes(1);
@@ -406,7 +419,10 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
         ...chainKit,
         gaslessToken: () => DEPLOYMENT,
         buildReceiveWithAuthorization: ((state, signer, request, options) =>
-          inner(state, signer, request, { ...options, windowSeconds: 3_600 })) as ProofKit['buildReceiveWithAuthorization'],
+          inner(state, signer, request, {
+            ...options,
+            windowSeconds: 3_600,
+          })) as ProofKit['buildReceiveWithAuthorization'],
       } as ProofKit,
     });
     const result = await runGaslessTopUp(h.deps, { approval: await h.approve(20n * DOLLAR) });
@@ -508,25 +524,18 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
       ),
     ).toBe(false);
     // Only the owner-signed credits.deposit path (T4-c, credits-move.ts) may import the step.
-    const { readdirSync, readFileSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const root = decodeURIComponent(new URL('..', import.meta.url).pathname);
-    const importers: string[] = [];
-    const walk = (dir: string): void => {
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const path = join(dir, entry.name);
-        if (entry.isDirectory()) walk(path);
-        else if (
-          entry.name.endsWith('.ts') &&
-          !entry.name.endsWith('.test.ts') &&
-          entry.name !== 'gasless-topup.ts' &&
-          readFileSync(path, 'utf8').includes('gasless-topup')
-        ) {
-          importers.push(path.slice(root.length));
-        }
-      }
-    };
-    walk(root);
+    // Vite reads every core source as text (no Node built-ins in this package's tests).
+    const sources = import.meta.glob(['../**/*.ts', '!../**/*.test.ts'], {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    });
+    expect(Object.keys(sources).length).toBeGreaterThan(20);
+    const importers = Object.entries(sources)
+      .filter(
+        ([path, text]) => !path.endsWith('/gasless-topup.ts') && text.includes('gasless-topup'),
+      )
+      .map(([path]) => path.replace(/^\.\.\//, ''));
     for (const file of importers) expect(file).toBe('proofs/credits-move.ts');
   });
 
@@ -631,10 +640,12 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
   it('refuses when the platform or the deposit-auth port is missing (no network call)', async () => {
     const h = await harness();
     const approval = await h.approve(20n * DOLLAR);
-    expect(
-      await runGaslessTopUp({ ...h.deps, platform: undefined }, { approval }),
-    ).toEqual({ status: 'refused', reason: 'not_available' });
-    const { depositAuth: _drop, ...noPort } = h.deps.platform as ProofsPlatform;
+    expect(await runGaslessTopUp({ ...h.deps, platform: undefined }, { approval })).toEqual({
+      status: 'refused',
+      reason: 'not_available',
+    });
+    const { kit, chains } = h.deps.platform as ProofsPlatform;
+    const noPort: ProofsPlatform = { kit, chains };
     expect(await runGaslessTopUp({ ...h.deps, platform: noPort }, { approval })).toEqual({
       status: 'refused',
       reason: 'not_available',
