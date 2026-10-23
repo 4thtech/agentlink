@@ -204,10 +204,15 @@ describe('a valid authorization', () => {
   it('sends concurrent identical requests once', async () => {
     relay.sendDelayMs = 20;
     const req = request();
-    const all = await Promise.all([post(req), post(req), post(req)].map(async (r) => answer(await r)));
+    const all = await Promise.all(
+      [post(req), post(req), post(req)].map(async (r) => answer(await r)),
+    );
     expect(relay.sends).toHaveLength(1);
     for (const a of all) {
-      expect(a).toEqual({ status: 200, body: { status: 'submitted', txHash: relay.sends[0]?.hash } });
+      expect(a).toEqual({
+        status: 200,
+        body: { status: 'submitted', txHash: relay.sends[0]?.hash },
+      });
     }
   });
 
@@ -215,14 +220,19 @@ describe('a valid authorization', () => {
     relay.sendDelayMs = 10;
     const all = await Promise.all([post(request()), post(request()), post(request())]);
     for (const res of all) expect(res.status).toBe(200);
-    expect(relay.sends.map((s) => s.nonce).sort()).toEqual([7, 8, 9]);
+    // One relay instance serves the whole file and remembers its next nonce: consecutive, distinct.
+    const nonces = relay.sends.map((s) => s.nonce).sort((a, b) => a - b);
+    const first = nonces[0] ?? -1;
+    expect(first).toBeGreaterThanOrEqual(7);
+    expect(nonces).toEqual([first, first + 1, first + 2]);
   });
 
   it('keeps its own next nonce while the chain lags behind its sends', async () => {
     expect((await post(request())).status).toBe(200);
-    relay.pending = 7; // an RPC node that has not seen the first transaction yet
+    const first = relay.sends[0]?.nonce ?? -1;
+    relay.pending = first; // an RPC node that has not seen the first transaction yet
     expect((await post(request())).status).toBe(200);
-    expect(relay.sends.map((s) => s.nonce)).toEqual([7, 8]);
+    expect(relay.sends.map((s) => s.nonce)).toEqual([first, first + 1]);
   });
 
   it('refuses a different authorization under a used (from, nonce), never sending it', async () => {
@@ -241,7 +251,11 @@ describe('a valid authorization', () => {
     relay.statuses.set(first.body.txHash as string, 'reverted');
     const { status, body } = await answer(await post(req));
     expect(status).toBe(200);
-    expect(body).toEqual({ status: 'failed', error: 'simulation_failed', txHash: first.body.txHash });
+    expect(body).toEqual({
+      status: 'failed',
+      error: 'simulation_failed',
+      txHash: first.body.txHash,
+    });
     expect(relay.sends).toHaveLength(1);
   });
 
@@ -288,7 +302,9 @@ describe('refusals before any send', () => {
   });
 
   it('refuses a payee other than the chain vault before any chain read', async () => {
-    const { status, body } = await answer(await post(request({ to: `0x${'0b'.repeat(20)}` as Hex })));
+    const { status, body } = await answer(
+      await post(request({ to: `0x${'0b'.repeat(20)}` as Hex })),
+    );
     expect(status).toBe(400);
     expect(body).toEqual({ status: 'failed', error: 'not_vault' });
     expect(relay.checks).toHaveLength(0);
@@ -355,7 +371,9 @@ describe('rate limits', () => {
   it('counts only authorizations that pass the checks, so a forged `from` cannot block an agent', async () => {
     const from = newAgent();
     relay.checkAnswer = (r) =>
-      r.auth.r.endsWith('ff') ? { ok: false, error: 'invalid_signature' } : { ok: true, gasLimit: 90_000n };
+      r.auth.r.endsWith('ff')
+        ? { ok: false, error: 'invalid_signature' }
+        : { ok: true, gasLimit: 90_000n };
     for (let i = 0; i < 6; i += 1) {
       const forged = request({ from, r: `0x${String(i).padStart(62, '3')}ff` as Hex });
       expect((await post(forged)).status).toBe(400);
@@ -399,11 +417,7 @@ describe('logging canary (07 §7, I-7)', () => {
       (await runInDurableObject(stub, (_i, state) =>
         state.storage.get<Record<string, unknown>>('m'),
       )) ?? {};
-    for (const name of [
-      'request_deposit_auth',
-      'deposit_auth_submitted',
-      'deposit_auth_refused',
-    ]) {
+    for (const name of ['request_deposit_auth', 'deposit_auth_submitted', 'deposit_auth_refused']) {
       expect(METRICS as readonly string[]).toContain(name);
       expect(metrics[name]).toBeGreaterThan(0);
     }

@@ -22,12 +22,11 @@ export class FakeRelay implements DepositRelayChain {
   readonly vault: Hex;
   readonly gasAddress: Hex = `0x${'ab'.repeat(20)}` as Hex;
   /** What the next check answers; a function sees the request. */
-  checkAnswer:
-    | DepositRelayCheck
-    | ((request: DepositAuthorizationRequest) => DepositRelayCheck) = Object.freeze({
-    ok: true,
-    gasLimit: 90_000n,
-  });
+  checkAnswer: DepositRelayCheck | ((request: DepositAuthorizationRequest) => DepositRelayCheck) =
+    Object.freeze({
+      ok: true,
+      gasLimit: 90_000n,
+    });
   /** The check throws (an RPC outage). */
   failCheck = false;
   /** The send throws (an RPC outage while broadcasting). */

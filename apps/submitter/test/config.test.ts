@@ -226,7 +226,16 @@ describe('readDepositAuthConfig (M3-4b-t-3)', () => {
   });
 
   it('turns off on a chain without the gasless capability, a mainnet or a malformed list', () => {
-    for (const chains of ['10200', '84532,10200', '8453', '1', '84532,84532', ' 84532', '0x14a34', 'x']) {
+    for (const chains of [
+      '10200',
+      '84532,10200',
+      '8453',
+      '1',
+      '84532,84532',
+      ' 84532',
+      '0x14a34',
+      'x',
+    ]) {
       expect(readDepositAuthConfig({ SUBMITTER_DEPOSIT_AUTH_CHAINS: chains }), chains).toBeNull();
     }
   });
