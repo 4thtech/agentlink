@@ -5074,7 +5074,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A grep test finds no bare prefix in the listed files; `status` on a fresh machine names the owner step.
 
 #### M1-36d-b · tool copy lows from IR-M1-36d-1 (new, IR-M1-36d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/next-action.test.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/tools/invite-common.ts`
 - **Depends on:** M1-36d
 - **Spec:** 06 §2.5
