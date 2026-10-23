@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 316 (M1a 91, M1b 225) |
+| M1 Local beta | 324 (M1a 91, M1b 233) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 34 |
 <!-- backlog-counts:end -->
