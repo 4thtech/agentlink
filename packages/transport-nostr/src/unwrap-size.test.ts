@@ -17,6 +17,11 @@ vi.mock('@4thtech-io/crypto', async (importOriginal) => {
       parseJsonSpy.calls.push(text);
       return original.parseJson(text, options);
     },
+    // The envelope text goes through the received-text parse (04 §2.5.1, D-128, M1-1h-b).
+    parseEnvelopeText: (text: string) => {
+      parseJsonSpy.calls.push(text);
+      return original.parseEnvelopeText(text);
+    },
   };
 });
 

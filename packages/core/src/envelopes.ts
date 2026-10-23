@@ -41,6 +41,7 @@ import {
   generateCek,
   parseEnvelope,
   parseJson,
+  parseEnvelopeText,
   randomBytes,
   verifyEnvelope,
   wipe,
@@ -1000,7 +1001,7 @@ export class EnvelopeService {
   async #open(item: Item, own: OwnKeys, book: Book): Promise<Opened | Final> {
     let envelope: Envelope;
     try {
-      envelope = parseEnvelope(parseJson(item.envelopeJson));
+      envelope = parseEnvelopeText(item.envelopeJson);
     } catch {
       return { kind: 'drop', reason: 'unreadable' };
     }
@@ -1049,7 +1050,10 @@ export class EnvelopeService {
       let payload: Payload;
       try {
         payloadText = decodeUtf8(plaintext);
-        const parsed = payloadSchema.safeParse(parseJson(payloadText));
+        // Received text (04 §2.5.1, D-128): an `approval`, `policy` or `revoke` payload carries a
+        // SignedOwnerAction and a pairing or card-update payload a card, so no member name may be
+        // written with an escape (duplicates are refused by parseJson itself).
+        const parsed = payloadSchema.safeParse(parseJson(payloadText, { plainMemberNames: true }));
         if (!parsed.success) return { kind: 'drop', reason: 'payload_invalid' };
         payload = parsed.data;
       } catch {
@@ -1642,7 +1646,7 @@ export class EnvelopeService {
     const now = nowOf(ctx);
     let envelope = parsed;
     if (envelope === undefined && final.kind === 'refuse') {
-      envelope = parseEnvelope(parseJson(item.envelopeJson));
+      envelope = parseEnvelopeText(item.envelopeJson);
     }
     const result = await ctx.store.transaction((tx) => {
       if (!claim(tx, item)) return undefined;
