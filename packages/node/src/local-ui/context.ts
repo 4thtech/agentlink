@@ -7,7 +7,13 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
-import type { AgentLinkClient, OwnerActionOutcome } from '@4thtech-io/core';
+import type {
+  AgentLinkClient,
+  OwnerActionOutcome,
+  PolicyEditOptions,
+  PreparedPolicyEdit,
+  ResolvedFolders,
+} from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
@@ -57,6 +63,16 @@ export interface LocalUiReadClient {
   getProof(
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
+  /**
+   * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
+   * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
+   * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
+   * `recordReceiptsKept`, nothing else of `ownerActions`.
+   */
+  readonly files: {
+    resolvedFolders(): Promise<ResolvedFolders>;
+    preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
+  };
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -64,6 +80,11 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    files: Object.freeze({
+      resolvedFolders: () => client.files.resolvedFolders(),
+      preparePolicyEdit: (patch: unknown, options?: PolicyEditOptions) =>
+        client.ownerActions.preparePolicyEdit(patch, options),
+    }),
   });
 }
 
