@@ -229,12 +229,15 @@ Prices come from `agentlink_status` (`prices`, §2.1); every paid result and eve
 type ProofStatus = {
   status: "ok" | "pending_approval" | "needs_credits" | "submitted" | "error";
   advanced?: { chain: string }; recordId?: `0x${string}`; txHash?: `0x${string}`;
-  fee?: { token: `0x${string}`; amount: string; usd: string; protocolUsd: string; integratorUsd: string };
+  fee?: { token: `0x${string}`; amount: string; usd: string; protocolUsd?: string; integratorUsd?: string };  // M1-33d-d (proposed, owner confirms at merge): the split is optional, only on ok and only once known
   receipts: { type: "DELIVERED" | "OPENED" | "ACCEPTED" | "REJECTED"; at: string }[];
-  explorerUrl?: string; verifyUrl?: string;
+  agentAddress?: `0x${string}`; topUpUrl?: string;  // M1-33d-d (proposed, owner confirms at merge): needs_credits only, as in §2.1; topUpUrl absent while the pay page is not live
+  receiptRequested?: true;                // M1-33d-d (proposed, owner confirms at merge): this proof asks the recipient for a delivery receipt (D-109); only on ok and submitted, never with receiptRequestNotAdded
   receiptRequestNotAdded?: true;          // M1-33d-b (proposed, owner confirms at merge): requestReceipt on an envelope that already had a proof without one; no request was added, and the summary says so
 };
 ```
+
+**Optional fields (M1-33d-d; proposed, owner confirms at merge).** `txHash` and the fee split are optional on every status, `ok` and `submitted` included, because the core does not return them yet; a client never requires them. `explorerUrl` and `verifyUrl` are not ProofStatus fields: no component produces them, and a later card adds a verify link if one is wanted.
 
 **What a proof makes public (D-109).** Every result that adds proof or signs a receipt (`agentlink_notarize`, the `proof` of `agentlink_send` and the terms tools, `agentlink_acknowledge`), and every approval card for one, carries the disclosure of 11 §5.6 in its summary the first time per session and in every approval: anyone can see that the agent recorded something, when, and what kind; once a receipt is posted, who it went to; never the content. `agentlink_export_proof_pack` lists in its `summary` what the pack contains beyond the record (the agent profile, message details, the recipient with `includeRecipient`, the content with `includeContentKey`; 07 §8). These are fixed strings with no inbound content (I-5).
 

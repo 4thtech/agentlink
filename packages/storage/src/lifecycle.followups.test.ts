@@ -80,4 +80,110 @@ describe('lifecycle: concurrent changes (L3)', () => {
       .catch((e: unknown) => e);
     expect(codeOf(error)).toBe('lifecycle_failed');
   });
+
+  it('fails when another writer changes the content of a kept rule that keeps its ID (M1-6b-c)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const racing = async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') {
+        fake.lifecycle = (fake.lifecycle ?? '').replace(
+          '<Prefix>logs/</Prefix>',
+          '<Prefix>other/</Prefix>',
+        );
+      }
+      return response;
+    };
+    const error = await setup({ fetch: racing }, fake)
+      .apply()
+      .catch((e: unknown) => e);
+    expect(codeOf(error)).toBe('lifecycle_failed');
+    expect((error as Error).message).not.toContain(ENDPOINT);
+  });
+
+  it('fails when our own rule changes in content but keeps its days (M1-6b-c)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const racing = async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') {
+        fake.lifecycle = (fake.lifecycle ?? '').replace(
+          '<Prefix>agentlink/</Prefix>',
+          '<Prefix>x/</Prefix>',
+        );
+      }
+      return response;
+    };
+    const error = await setup({ fetch: racing }, fake)
+      .apply()
+      .catch((e: unknown) => e);
+    expect(codeOf(error)).toBe('lifecycle_failed');
+  });
+
+  it('still succeeds when the provider only reformats whitespace between elements (M1-6b-c)', async () => {
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc(OTHER_RULE);
+    const racing = async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') fake.lifecycle = (fake.lifecycle ?? '').replace(/></g, '>\n  <');
+      return response;
+    };
+    await setup({ fetch: racing }, fake).apply();
+  });
+
+  let fakeRef: FakeMultipartS3;
+  const runWith = async (rewrite: (doc: string) => string): Promise<unknown> => {
+    fakeRef = fakeMultipartS3(BUCKET);
+    fakeRef.lifecycle = doc(OTHER_RULE);
+    const fetchRewrite = async (req: Request): Promise<Response> => {
+      const response = await fakeRef.fetch(req);
+      if (req.method === 'PUT') fakeRef.lifecycle = rewrite(fakeRef.lifecycle ?? '');
+      return response;
+    };
+    return setup({ fetch: fetchRewrite }, fakeRef)
+      .apply()
+      .then(() => 'ok')
+      .catch((e: unknown) => e);
+  };
+  const own30 = `<Rule><ID>${LIFECYCLE_RULE_ID}</ID><Filter><Prefix>agentlink/</Prefix></Filter><Status>Enabled</Status><Expiration><Days>30</Days></Expiration><AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation></AbortIncompleteMultipartUpload></Rule>`;
+
+  it('accepts a MinIO-style rewrite: abort element dropped, order changed, empty placeholders (M1-6b-c)', async () => {
+    const minio = `<Rule><Expiration><Days>30</Days><ExpiredObjectDeleteMarker>false</ExpiredObjectDeleteMarker></Expiration><ID>${LIFECYCLE_RULE_ID}</ID><Filter><Prefix>agentlink/</Prefix></Filter><NoncurrentVersionExpiration></NoncurrentVersionExpiration><Status>Enabled</Status></Rule>`;
+    expect(await runWith((d) => d.replace(own30, minio))).toBe('ok');
+  });
+
+  it('accepts an R2/S3-style rewrite: And-wrapped filter, legacy prefix and empty elements (M1-6b-c)', async () => {
+    const wrapped = own30.replace(
+      '<Filter><Prefix>agentlink/</Prefix></Filter>',
+      '<Filter><And><Prefix>agentlink/</Prefix></And></Filter>',
+    );
+    expect(await runWith((d) => d.replace(own30, wrapped))).toBe('ok');
+    const legacy = own30.replace(
+      '<Filter><Prefix>agentlink/</Prefix></Filter>',
+      '<Prefix>agentlink/</Prefix><Filter/>',
+    );
+    expect(await runWith((d) => d.replace(own30, legacy))).toBe('ok');
+  });
+
+  it('rejects changed content: status, days, a tag, a transition, a different abort (M1-6b-c)', async () => {
+    const edits: Array<[string, string]> = [
+      ['<Status>Enabled</Status>', '<Status>Disabled</Status>'],
+      ['<Days>30</Days>', '<Days>3</Days>'],
+      ['</Filter>', '<Tag><Key>a</Key><Value>b</Value></Tag></Filter>'],
+      [
+        '</Rule>',
+        '<Transition><Days>5</Days><StorageClass>GLACIER</StorageClass></Transition></Rule>',
+      ],
+      ['<DaysAfterInitiation>1<', '<DaysAfterInitiation>9<'],
+    ];
+    for (const [from, to] of edits) {
+      const result = await runWith((d) => d.replace(from, to));
+      expect(codeOf(result)).toBe('lifecycle_failed');
+    }
+  });
+
+  it('rejects a kept rule whose value changed (M1-6b-c)', async () => {
+    const result = await runWith((d) => d.replace('<Days>7</Days>', '<Days>8</Days>'));
+    expect(codeOf(result)).toBe('lifecycle_failed');
+  });
 });

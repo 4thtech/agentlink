@@ -17,6 +17,8 @@ Your AI sends and reads messages through AgentLink. Some actions need your appro
 
 You can approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `agentlink approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Each time you type it, it covers one approval, or one list you review together when you run `agentlink approve` with no ID (agreements are still decided one by one).
 
+What can wait for you in a first session: a new contact, accepting terms, and, depending on your rules, a file you ask your agent to send or a proof it adds (a proof costs a small fee from credits). Free test credits for your first proof need no approval; they are added once for you, on test networks only.
+
 If the command says it looks like a terminal your AI controls, that is on purpose. Open a new terminal window yourself and run it there.
 
 ## More than one AI app on this computer

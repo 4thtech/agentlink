@@ -32,6 +32,8 @@ import {
   getDeployment,
   occErrorsAbi,
   occFeeVaultAbi,
+  occFeeVaultClientAbi,
+  occFeeVaultRelayAbi,
   occManagedAbi,
   occNotaryAbi,
   openZeppelinInheritedAbi,
@@ -79,6 +81,7 @@ const PINNED_SURFACE: Record<string, readonly (readonly [string, string, string]
     ['error', 'AppInactive()', '0x89693c82'],
     ['error', 'BelowMinDeposit()', '0x96ec8e54'],
     ['error', 'ConflictingReceipt()', '0x949896d9'],
+    ['error', 'DepositMismatch()', '0xe45a15b0'],
     ['error', 'EnforcedPause()', '0xd93c0665'],
     ['error', 'ExpectedPause()', '0x8dfc202b'],
     ['error', 'Expired()', '0x203d82d8'],
@@ -237,6 +240,7 @@ const PINNED_SURFACE: Record<string, readonly (readonly [string, string, string]
     ['error', 'AppInactive()', '0x89693c82'],
     ['error', 'BelowMinDeposit()', '0x96ec8e54'],
     ['error', 'ConflictingReceipt()', '0x949896d9'],
+    ['error', 'DepositMismatch()', '0xe45a15b0'],
     ['error', 'EnforcedPause()', '0xd93c0665'],
     ['error', 'ExpectedPause()', '0x8dfc202b'],
     ['error', 'Expired()', '0x203d82d8'],
@@ -344,6 +348,7 @@ const PINNED_SURFACE: Record<string, readonly (readonly [string, string, string]
     ['error', 'AppInactive()', '0x89693c82'],
     ['error', 'BelowMinDeposit()', '0x96ec8e54'],
     ['error', 'ConflictingReceipt()', '0x949896d9'],
+    ['error', 'DepositMismatch()', '0xe45a15b0'],
     ['error', 'EnforcedPause()', '0xd93c0665'],
     ['error', 'ExpectedPause()', '0x8dfc202b'],
     ['error', 'Expired()', '0x203d82d8'],
@@ -417,8 +422,8 @@ describe('OCC v2 contract surface', () => {
       manifestSha256: OCC_V2_RELEASE.manifestSha256,
     });
     expect(OCC_V2_ABI_PIN).toEqual({
-      tag: 'v0.1.0-testnet.3',
-      manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
+      tag: 'v0.1.0-testnet.4',
+      manifestSha256: '4d2bfc98e71da1ed3b60fed574c0333ee945a17e701e32bfab10d6cab5bb436e',
     });
   });
 
@@ -504,7 +509,8 @@ describe('OCC v2 contract surface', () => {
         native,
         symbol,
       })),
-      depositWithAuthorization: false,
+      // v0.1.0-testnet.4 (M3-4b-t-0): the Base Sepolia vault accepts the gasless top-up.
+      depositWithAuthorization: true,
       testnet: true,
     });
     for (const value of [
@@ -518,19 +524,41 @@ describe('OCC v2 contract surface', () => {
     expect(Object.isFrozen(loaded)).toBe(true);
   });
 
+  it('carries the gasless top-up capability for Base Sepolia only (M3-4b-t-0)', () => {
+    expect(loadOccV2Contracts(84532)?.depositWithAuthorization).toBe(true);
+    expect(loadOccV2Contracts(84532)?.feeTokens.map((t) => [t.symbol, t.eip3009])).toEqual([
+      ['USDC', true],
+    ]);
+    expect(loadOccV2Contracts(10200)?.depositWithAuthorization).toBe(false);
+    expect(loadOccV2Contracts(10200)?.feeTokens.every((t) => !t.eip3009)).toBe(true);
+  });
+
+  it('binds the relay ABI to exactly depositWithAuthorization, the 05 §2.5 selector', () => {
+    const fns = surface(occFeeVaultRelayAbi as readonly Item[]).filter(([t]) => t === 'function');
+    expect(fns).toEqual([
+      [
+        'function',
+        'depositWithAuthorization(address,address,uint256,uint256,uint256,bytes32,uint8,bytes32,bytes32)',
+        '0x8a94d4fc',
+      ],
+    ]);
+    const clientFns = surface(occFeeVaultClientAbi as readonly Item[]).map(([, sig]) => sig);
+    expect(clientFns.some((sig) => sig.startsWith('depositWithAuthorization('))).toBe(false);
+  });
+
   it('loads nothing for a chain without a deployment', () => {
     for (const id of [1, 8453, 100, 31337]) expect(loadOccV2Contracts(id)).toBeUndefined();
   });
 });
 
-/** manifest.json `files` of v0.1.0-testnet.3 (its own SHA-256 is pinned as OCC_V2_ABI_PIN). */
+/** manifest.json `files` of v0.1.0-testnet.4 (its own SHA-256 is pinned as OCC_V2_ABI_PIN). */
 const MANIFEST_FILES = {
-  'abi/IOCCErrors.json': 'e072b05a6601e4cee38d6eaf514cce3805e14bafe7f50b68718a67e373b2caa0',
-  'abi/IOCCFeeVault.json': '28134918472b6fa86c141435bf99429193ed4f0ec54d7dfdf5a211aff720d82f',
+  'abi/IOCCErrors.json': '2b060bf31583d879211f86ee84d5cc1bd299555a63fe69ae5d3000a51532801f',
+  'abi/IOCCFeeVault.json': 'ff1ac3ab40177d81f6b7b29d779b40bbb115d5111e1615dc84936d45271f69c9',
   'abi/IOCCManaged.json': 'caa6f1a2f84ca525d7bcc9f760963c93e9db10ed19bad952699962508f00c199',
-  'abi/IOCCNotary.json': 'f8f6adc5fb822aa7933b21ff7432e7b09cbb1521c2cdc29efbd064211e3be521',
+  'abi/IOCCNotary.json': '7aeb628e7f73bbed6f2ea06c563923e4049bdd0e2b4c6461649f86fc74804fc9',
   'abi/OpenZeppelinInherited.json':
     '22a6c5b849406ce930a66118c7d33ebf3db43f8090eaa82cb28b63e7e7b3fb3b',
   'addresses/10200.json': '57915ade5f3538d0c4c21a494794ddebffe816a376ef2439e43d4d4dbb406d7a',
-  'addresses/84532.json': 'e7a090c22b21e94419c56200ac05b655471be6b3b6f958bf4ddbda4ae2e96732',
+  'addresses/84532.json': 'e1cfb528daa5c53570e31cfba6510ec695e9c4d501246ab9ca5f6e0f5e879177',
 };
