@@ -81,13 +81,22 @@ async function claim(body: unknown, ip: string): Promise<Response> {
 }
 
 describe('POST /v1/faucet: chains (SUB-7)', () => {
-  it('rejects every mainnet chain ID, and Chiado until it is deployed, before any send', async () => {
+  it('rejects every mainnet chain ID before any send', async () => {
     const ip = newIp();
-    for (const chainId of [1, 8453, 100, 42161, 10, 137, 10200]) {
+    for (const chainId of [1, 8453, 100, 42161, 10, 137]) {
       const res = await claim({ chainId, agent: newAgent() }, ip);
       expect(res.status, String(chainId)).toBe(400);
       expect(await res.json()).toEqual({ error: 'unsupported_chain' });
     }
+    expect(faucet.calls).toHaveLength(0);
+  });
+
+  it('an allowlisted testnet this environment does not serve is unavailable, before any send (M1-3j-c)', async () => {
+    // Chiado is on the allowlist since M1-3j-c, but this test environment's SUBMITTER_FAUCET_CHAINS
+    // names Base Sepolia only (vitest.config.ts): the claim is refused as unavailable.
+    const res = await claim({ chainId: 10200, agent: newAgent() }, newIp());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'unavailable' });
     expect(faucet.calls).toHaveLength(0);
   });
 });
