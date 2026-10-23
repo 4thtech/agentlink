@@ -379,6 +379,17 @@ function quotedValueEnd(text: string, start: number, slashes: number, meter: Met
 }
 
 /**
+ * An apostrophe inside a word of running text ("don't", "it's"): a word character on both sides,
+ * the one before it itself preceded by a word character. Everywhere else (`b'..'`, `='`, `('`,
+ * after a space or a bracket) it opens a string, so a bracket inside the string cannot end the value.
+ */
+function isContraction(text: string, at: number): boolean {
+  return (
+    at >= 2 && /\w/.test(text[at - 1]!) && /\w/.test(text[at - 2]!) && /\w/.test(text[at + 1] ?? '')
+  );
+}
+
+/**
  * An object or array: everything up to the matching bracket, skipping the strings inside it.
  * `level` is the backslash count of the quotes of the JSON it sits in (see isRealQuote). A value
  * that never closes is redacted to the end of the string (fails closed).
@@ -387,9 +398,6 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
   let depth = 0;
   let inString = '';
   let run = 0;
-  // The last character outside strings that is not white space. An apostrophe opens a string only
-  // after `{`, `[`, `,` or `:` (a Python-style repr), not inside running text ("don't").
-  let previous = '';
   let at = start;
   for (; at < text.length; at += 1) {
     meter.work += 1;
@@ -398,7 +406,7 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
       run += 1;
       continue;
     }
-    if (char === '"' || (char === "'" && (inString === "'" || '{[,:'.includes(previous)))) {
+    if (char === '"' || (char === "'" && (inString === "'" || !isContraction(text, at)))) {
       if (isRealQuote(run, level)) {
         if (inString === '') inString = char;
         else if (char === inString) inString = '';
@@ -412,7 +420,6 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
         if (depth <= 0) return { end: at + 1, open: '', close: '' };
       }
     }
-    if (inString === '' && char.trim() !== '') previous = char;
     run = 0;
   }
   return { end: at, open: '', close: '' };
@@ -457,12 +464,17 @@ function scanPairs(text: string, meter: Meter): string {
       kind = classifyKey(name);
       kinds.set(name, kind);
     }
-    if (kind === 'none' || kind === 'url') continue;
+    if (kind === 'none') continue;
     const start = match.index + match[0].length;
     const level = /^\\*/.exec(match[2]!)![0].length;
     const { end, open, close } = scanValue(text, start, level, meter);
     if (end === start) continue;
     const bare = text.slice(start + open.length, end - close.length);
+    if (kind === 'url') {
+      // A URL value is reduced by stripUrls; anything else under a URL-named key is replaced.
+      const whole = WHOLE_URL.exec(bare);
+      if (whole !== null && isUrlSeparator(whole[1]!, whole[2]!)) continue;
+    }
     if (kind === 'code' && (isAllowedCode(bare) || isAllowedCode(Number(bare)))) continue;
     out += `${text.slice(copied, start)}${open}${REDACTED}${close}`;
     copied = end;

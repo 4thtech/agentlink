@@ -83,3 +83,49 @@ describe('optional: upload joins the capability words', () => {
     });
   });
 });
+
+// Fix round 1 (IR-M0-8c-1): the apostrophe rule must never redact less than before.
+describe('R2-L2 fail closed: an apostrophe opens a string everywhere but inside a word', () => {
+  const leaks: [string, string][] = [
+    ['bytes repr', `secret=[b'${BS}x8a]${SECRET}${BS}x01'] after`],
+    ['raw prefix', `secret=[r'a]${SECRET}'] after`],
+    ['unicode prefix', `secret=[u'a]${SECRET}'] after`],
+    ['dataclass repr', `secret=[Foo(x='a]${SECRET}')] after`],
+    ['key=value in object', `secret={a='x]${SECRET}', b='z'} after`],
+    ['after a word and space', `secret=[foo 'bar]${SECRET}'] after`],
+    ['adjacent strings', `secret=['a' 'b]${SECRET}'] after`],
+    ['after empty object', `secret=[{}'a]${SECRET}'] after`],
+    ['after empty array', `secret=[[]'a]${SECRET}'] after`],
+    ['after colon', `secret={k:'a]${SECRET}'} after`],
+    ['after comma', `secret=['x','a]${SECRET}'] after`],
+  ];
+  it.each(leaks)('%s never leaks', (_name, text) => {
+    expect(redactString(text)).not.toContain(SECRET);
+  });
+
+  it('never leaks on a corpus of apostrophe positions', () => {
+    const shapes = ["'", " '", "('", "='", "b'", "]'", "}'", ",'", ":'"];
+    for (const first of shapes) {
+      for (const second of shapes) {
+        const text = `secret=[${first}a]${SECRET}${second}x] after`;
+        expect(redactString(text), JSON.stringify(text)).not.toContain(SECRET);
+      }
+    }
+  });
+});
+
+describe('URL-named keys with a value that is not an absolute URL are redacted in text', () => {
+  it('rpcUrl=host/v2/KEY in free text', () => {
+    expect(redactString(`rpcUrl=rpc.example.org/v2/${SECRET} next`)).not.toContain(SECRET);
+  });
+
+  it('{"rpcUrl":"host/v2/KEY"} in JSON text', () => {
+    expect(redactString(`{"rpcUrl":"rpc.example.org/v2/${SECRET}"}`)).not.toContain(SECRET);
+  });
+
+  it('an absolute URL under a URL-named key keeps its origin', () => {
+    expect(redactString(`relayUrl=https://relay.example.org/v2/${SECRET} next`)).toBe(
+      'relayUrl=https://relay.example.org next',
+    );
+  });
+});
