@@ -121,7 +121,10 @@ describe('@4thtech-io/occ-v2-abi', () => {
     for (const type of ['event', 'error']) {
       expect(namesOf(occFeeVaultRelayAbi, type)).toEqual(
         [
-          ...new Set([...namesOf(occFeeVaultAbi, type), ...namesOf(openZeppelinInheritedAbi, type)]),
+          ...new Set([
+            ...namesOf(occFeeVaultAbi, type),
+            ...namesOf(openZeppelinInheritedAbi, type),
+          ]),
         ].sort(),
       );
     }
