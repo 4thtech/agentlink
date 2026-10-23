@@ -101,7 +101,8 @@ describe('openAgentStoreWith', () => {
     const file = await openAgentStoreWith('file', agentId, path, { keychain }).catch(
       (e: unknown) => e,
     );
-    expect((file as NodeKeyStoreError).code).toBe('backend_unavailable');
+    // M1-8f: a file agent without its unlocked file is locked; it never falls back to the keychain.
+    expect((file as NodeKeyStoreError).code).toBe('keystore_locked');
     expect(await readdir(dir)).toEqual([]);
   });
 
