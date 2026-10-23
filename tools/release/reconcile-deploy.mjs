@@ -199,7 +199,9 @@ export async function reconcile({
   // older head would skip on approval (its head check), but the owner may still want to approve or
   // cancel it, so a new dispatch would only stack another request. Surface it instead.
   const waitingQuery = new URLSearchParams({ branch: 'main', status: 'waiting', per_page: '50' });
-  const waitingBody = await api(`/repos/${repo}/actions/workflows/${workflow}/runs?${waitingQuery}`);
+  const waitingBody = await api(
+    `/repos/${repo}/actions/workflows/${workflow}/runs?${waitingQuery}`,
+  );
   const pending = (waitingBody?.workflow_runs ?? []).find(
     (r) => isDeployRun(r, workflow) && r.status === 'waiting',
   );

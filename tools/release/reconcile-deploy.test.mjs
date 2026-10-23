@@ -96,7 +96,12 @@ const gateRoutes = (conclusion = 'success') => {
 };
 
 // Production runs DEPLOYED (run 100); main's head HEAD touched apps/submitter; no run for HEAD.
-const routes = ({ headRuns = [], otherRuns = [], files = ['apps/submitter/src/index.ts'], ...overrides } = {}) => ({
+const routes = ({
+  headRuns = [],
+  otherRuns = [],
+  files = ['apps/submitter/src/index.ts'],
+  ...overrides
+} = {}) => ({
   [headPath]: () => ({ sha: HEAD }),
   [runsPath]: (q) =>
     q.get('head_sha') === HEAD
