@@ -24,9 +24,12 @@
 // owner key, takes no presence and has no path that decides, widens or creates an approval or a
 // policy without one. Refusals are returned to the surface that delivered the object (the CLI or
 // the local UI shows them; the console path is M1-7e/M1-7h) and logged as fixed codes (I-5, I-7).
-import { canonicalize, parseJson } from '@4thtech-io/crypto';
+import { canonicalize, decodeHex0x, encodeHex, parseJson } from '@4thtech-io/crypto';
 import {
   approvalIdSchema,
+  contactRenameParamsSchema,
+  evmAddress,
+  policyPatchSchema,
   policySchema,
   signedOwnerActionSchema,
   type OwnerActionOp,
@@ -51,6 +54,19 @@ import {
   type OwnerActionRefusal,
   type OwnerActionVerdict,
 } from './owner-action.js';
+import {
+  PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+  buildOwnerActionBody,
+  mergePolicyPatch,
+  newOwnerActionNonce,
+  policyEditWarnings,
+  type OwnerActionBodyInput,
+  type PolicyEditOptions,
+  type PreparableOp,
+  type PreparedOwnerAction,
+  type PreparedPolicyEdit,
+  type PrepareRefusal,
+} from './owner-prepare.js';
 import {
   POLICY_DEFAULTS_EFFECTIVE,
   type EffectivePolicy,
@@ -872,6 +888,181 @@ export class OwnerActions {
       return { status: 'fail_closed', problem, nextVersion, stored: verified };
     }
     return { status: 'fail_closed', problem, nextVersion };
+  }
+
+  // --- Prepare helpers for owner surfaces (M1-11r-b, D-118) ---------------------------------------
+  //
+  // Each builds the unsigned body the local UI server shows, signs after the owner's presence
+  // (M1-11s-b) and passes to apply(). They sign nothing, write nothing and grant nothing (I-4); the
+  // op's rule is checked here only so the owner is not asked to sign what apply() would refuse, and
+  // apply() checks it again. Refusals are fixed codes (I-5, I-7). No MCP tool calls them.
+
+  /** The agent and its card's owner key as `owner` spells it, or why nothing can be prepared. */
+  async #signer(): Promise<
+    { readonly agent: string; readonly owner: string } | { readonly refusal: PrepareRefusal }
+  > {
+    const self = await this.#self();
+    if ('refusal' in self) return { refusal: self.refusal };
+    return { agent: self.agent, owner: encodeHex(decodeHex0x(self.ownerNostr, { length: 32 })) };
+  }
+
+  #build<O extends PreparableOp>(
+    signer: { readonly agent: string; readonly owner: string },
+    op: O,
+    params: OwnerActionBodyInput<O>['params'],
+  ): Extract<PreparedOwnerAction, { status: 'prepared' }> {
+    const issuedAt = nowOf(this.#ctx);
+    const { body, jcs } = buildOwnerActionBody<O>({
+      ...signer,
+      op,
+      params,
+      nonce: newOwnerActionNonce(),
+      issuedAt,
+      expiresAt: issuedAt + PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+    });
+    return { status: 'prepared', op, body, jcs };
+  }
+
+  /**
+   * The unsigned `policy.set` for an edit on the Rules or Files page (04 §2.5.1; 06 §3): the complete
+   * document, built from the verified policy in force (or the 06 §3 defaults while none was ever
+   * applied) with `patch` merged over it, at version max(KeyStore mark, stored row) + 1.
+   *
+   * Refused, building nothing, when: the patch is not a strict PolicyPatch or the merged document is
+   * not a valid policy (`patch_invalid`: every 06 §3 bound holds, `allowKeyDisclosure` is never
+   * `allow`, lists stay sorted and unique, nothing is normalised); the policy fails closed or its
+   * mark is unreadable (`policy_not_valid`: no value is ever taken from an invalid policy, and the
+   * way back is `policy recover`, D-100); `options.baseVersion` is not the version in force
+   * (`stale_version`). Delivery receipts on from an older default (D-109) are signed `false` unless
+   * `options.keepDeliveryReceipts` is `true` (a patch value is never the answer). Every loosening is
+   * returned as a stable warning code the server makes the owner acknowledge. Two bodies prepared from one
+   * base sign one version: apply() takes the first and refuses the second (`version_not_newer`).
+   */
+  async preparePolicyEdit(
+    patch: unknown,
+    options: PolicyEditOptions = {},
+  ): Promise<PreparedPolicyEdit> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'policy.set', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    const parsedPatch = policyPatchSchema.safeParse(patch);
+    if (!parsedPatch.success) return refuse('patch_invalid');
+
+    const inspected = await this.#inspectPolicy();
+    const { effective } = inspected;
+    if (
+      effective.mode === 'fail_closed' ||
+      inspected.mark === undefined ||
+      inspected.rowVersion === undefined
+    ) {
+      return refuse('policy_not_valid');
+    }
+    const baseVersion = effective.mode === 'signed' ? effective.version : 0;
+    if (options.baseVersion !== undefined && options.baseVersion !== baseVersion) {
+      return refuse('stale_version');
+    }
+    const version = Math.max(inspected.mark, inspected.rowVersion) + 1;
+    if (!Number.isSafeInteger(version)) return refuse('policy_not_valid');
+
+    const base = policySchema.parse(effective.policy);
+    const merged = mergePolicyPatch(base, parsedPatch.data);
+    const askKeepDeliveryReceipts =
+      effective.mode === 'signed' &&
+      (await this.receiptsOnFromOlderDefault({ policy: base, version: baseVersion }));
+    let keepDeliveryReceipts = false;
+    if (askKeepDeliveryReceipts) {
+      // D-109: only the owner's explicit answer keeps them. A patch value (a form re-submitting the
+      // receipts section as shown) is never that answer (IR-M1-11r-b-1 L1).
+      keepDeliveryReceipts = options.keepDeliveryReceipts === true;
+      merged.receipts.autoDelivered = keepDeliveryReceipts;
+    }
+    const policy = policySchema.safeParse(merged);
+    if (!policy.success) return refuse('patch_invalid');
+
+    const built = this.#build(signer, 'policy.set', { version, policy: policy.data });
+    return {
+      ...built,
+      version,
+      baseVersion,
+      askKeepDeliveryReceipts,
+      keepDeliveryReceipts,
+      warnings: policyEditWarnings(base, policy.data),
+    };
+  }
+
+  /**
+   * The unsigned `contact.check` for "They match" (04 §2.5.1, §3.6.1): `pairingDigest` is recomputed
+   * now from the stored signed `handshake` and `handshake-ack`, as apply() recomputes it.
+   */
+  async prepareContactCheck(contactId: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'contact.check', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const found = await this.#contacts.currentPairingDigest(contactId);
+    if (found.status === 'unknown') return refuse('contact_unknown');
+    if (found.status === 'unavailable') return refuse('pairing_unavailable');
+    return this.#build(signer, 'contact.check', {
+      contact: contactId,
+      pairingDigest: found.pairingDigest,
+    });
+  }
+
+  /**
+   * The unsigned `contact.rename` (04 §2.5.1; 06 §2.1 rule 1): the alias must already be its own
+   * restricted form and must not be another active contact's shown name (NFKC, case folded); the
+   * contact must be stored and not removed. The same rules apply() checks.
+   */
+  async prepareContactRename(contactId: string, alias: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'contact.rename', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('contacts', { contact_id: contactId }),
+    );
+    if (row === undefined || row.status === 'removed') return refuse('contact_unknown');
+    if (
+      !contactRenameParamsSchema.safeParse({ contact: contactId, alias }).success ||
+      !isRestrictedAlias(alias)
+    ) {
+      return refuse('alias_invalid');
+    }
+    const wanted = foldName(alias);
+    const others = (await this.#contacts.list()).filter(
+      (c) => c.id !== contactId && c.status === 'active',
+    );
+    if (others.some((c) => foldName(c.display.name) === wanted)) return refuse('alias_taken');
+    return this.#build(signer, 'contact.rename', { contact: contactId, alias });
+  }
+
+  /**
+   * The unsigned `contact.remove` (04 §2.5.1; 07 §3): refused for an unknown or removed contact and
+   * for a revoked one (removing never changes `revoked`), as apply() refuses them.
+   */
+  async prepareContactRemove(contactId: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'contact.remove', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const state = await this.#ctx.store.transaction((tx) => {
+      const row = tx.get('contacts', { contact_id: contactId });
+      if (row === undefined || row.status === 'removed') return 'unknown' as const;
+      if (
+        row.status === 'revoked' ||
+        tx.get('revoked_agents', { agent_evm: contactId }) !== undefined
+      ) {
+        return 'revoked' as const;
+      }
+      return 'ok' as const;
+    });
+    if (state === 'unknown') return refuse('contact_unknown');
+    if (state === 'revoked') return refuse('contact_revoked');
+    return this.#build(signer, 'contact.remove', { contact: contactId });
   }
 
   /**
