@@ -21,8 +21,12 @@
 # weekly from this (reviewed) definition as a backstop. See docs/process/ci-cd.md.
 name: Security
 
+# CHORE-CI-SPEED-1: `dependency-review` and `codeql` skip on a draft pull request and run when it is
+# marked ready for review (`ready_for_review`) and in the merge queue. The secret scan and zizmor
+# stay on for drafts: they are cheap and catch the mistakes that must never be pushed.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
   push:
     branches: [main]
@@ -42,7 +46,7 @@ concurrency:
 jobs:
   dependency-review:
     name: dependency-review
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -139,7 +143,7 @@ jobs:
 
   codeql:
     name: codeql (${{ matrix.language }})
-    if: github.event_name != 'merge_group'
+    if: github.event_name != 'merge_group' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

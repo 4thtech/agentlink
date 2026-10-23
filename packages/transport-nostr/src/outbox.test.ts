@@ -110,6 +110,7 @@ function setup(net = new MockNetwork()) {
       persistence: outbox,
       pool: new RelayPool({ connector: net, addressCheck: { resolver: net }, nip11: net, logger }),
       logger,
+      random: () => 0, // no jitter: the exact backoff steps are pinned here; jitter is in outbox-hardening.test.ts
     });
   return { net, outbox, lines, worker };
 }
