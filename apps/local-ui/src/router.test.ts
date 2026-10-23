@@ -44,7 +44,9 @@ describe('routes', () => {
     expect(ROUTES.map((r) => r.path).sort()).toEqual(EXPECTED.map(([p]) => p).sort());
   });
 
-  it.each(EXPECTED)('%s renders its stub inside the layout', (path, title) => {
+  // M1-11b-1: /first-run is a real page now (pages/first-run/first-run.test.ts).
+  const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');
+  it.each(STUBS)('%s renders its stub inside the layout', (path, title) => {
     mountAt(path);
     expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
     expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
