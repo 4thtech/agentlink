@@ -7,7 +7,7 @@
 //   KeychainOwnerKeyStore issued with unlockForExport (checked by identity). For each agent, the
 //   items are read and the `snapshots` callback runs under ONE hold of the agent's inter-process lock
 //   (06 §6), so the marks and the store are one consistent cut; a callback that takes that lock
-//   itself is refused at once (inter-process-lock.ts). Never an `s3:*` item (D-115 D).
+//   itself with the LockHold it is given is refused at once (inter-process-lock.ts). Never an `s3:*` item (D-115 D).
 // - KeyImportControl opens and checks a kit (the crypto checks, then the store snapshot checks on
 //   the quarantined store, restore-quarantine.ts) and writes one agent's items at once, never over
 //   an existing item or `.alks` (D-115 C), with `storage-mark` as `{"v":1,"active":null}`. On a
@@ -63,7 +63,7 @@ import { STORAGE_MARK_ITEM, encodeStorageMark, type OwnStorageKeys } from '@4tht
 import { NodeKeyStoreError } from './errors.js';
 import { OWNER_FILE, defaultKeystoreDir, importAgentFile } from './file-keystore.js';
 import { readKeystoreFile, type KeystoreFsOptions } from './file-keystore-fs.js';
-import { withInterProcessLock } from './inter-process-lock.js';
+import { withInterProcessLock, type LockHold } from './inter-process-lock.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import {
   assertAgentId,
@@ -190,7 +190,8 @@ function exportSnapshot(request: unknown): {
   readonly createdAt: unknown;
   readonly contents: unknown;
   readonly agents: readonly ExportAgent[];
-  readonly snapshots: (agentId: string) => Promise<RecoveryKitStoreSource>;
+  /** Runs under the agent's lock; any lock it takes passes `hold` as `within` (inter-process-lock.ts). */
+  readonly snapshots: (agentId: string, hold: LockHold) => Promise<RecoveryKitStoreSource>;
   readonly path: string;
 } {
   if (typeof request !== 'object' || request === null)
@@ -223,7 +224,7 @@ function exportSnapshot(request: unknown): {
     createdAt,
     contents,
     agents: Object.freeze(list),
-    snapshots: snapshots as (agentId: string) => Promise<RecoveryKitStoreSource>,
+    snapshots: snapshots as (agentId: string, hold: LockHold) => Promise<RecoveryKitStoreSource>,
     path,
   };
 }
@@ -282,7 +283,7 @@ export function createKeyExportControl(options: KeyExportControlOptions): KeyExp
           // One lock hold: the marks, the other items and the snapshot are one cut (04 §2.3.3).
           const read = await withInterProcessLock(
             `${storePathOf(agent.agentId)}.lock`,
-            async () => {
+            async (hold) => {
               const kitItems: RecoveryKitItem[] = [];
               for (const name of KIT_ITEMS) {
                 const value = await readItem(items, agent.agentId, name, timeoutMs);
@@ -298,7 +299,7 @@ export function createKeyExportControl(options: KeyExportControlOptions): KeyExp
                 held.push(value);
                 kitItems.push({ name, value });
               }
-              const store = await req.snapshots(agent.agentId);
+              const store = await req.snapshots(agent.agentId, hold);
               return { kitItems, store };
             },
           );

@@ -5,7 +5,7 @@
 // The same control conformance suite runs against the keychain backend (an in-memory keychain
 // double) and the file backend (a temporary `ALKS` directory), so both behave the same. Every Argon2id
 // runs at the 04 §2.8 floor (19 MiB, t = 2) to keep the suite fast.
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -307,8 +307,10 @@ describe.runIf(POSIX)('KeyExportControl (keychain and file items)', () => {
         createdAt: 1,
         contents: 'full',
         agents: [{ agentId: agent.agentId, name: 'helper' }],
-        snapshots: () =>
-          withInterProcessLock(`${agent.storePath}.lock`, () => source(agent.snapshot)),
+        snapshots: (_agentId, hold) =>
+          withInterProcessLock(`${agent.storePath}.lock`, () => source(agent.snapshot), {
+            within: hold,
+          }),
         path,
       }),
       'store_busy',
@@ -813,8 +815,13 @@ describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
     expect(await readFile(dest, 'utf8')).toBe('keep');
     const dest2 = join(root, 'restored2.sqlite');
     await installRestoredStore(handle, agent.agentId, dest2);
-    expect((await stat(dest2)).mode & 0o777).toBe(0o600);
-    expect(equalBytes(new Uint8Array(await readFile(dest2)), agent.snapshot)).toBe(true);
+    const installed = await open(dest2, 'r');
+    try {
+      expect((await installed.stat()).mode & 0o777).toBe(0o600);
+      expect(equalBytes(new Uint8Array(await installed.readFile()), agent.snapshot)).toBe(true);
+    } finally {
+      await installed.close();
+    }
     handle.wipe();
     expect(await readdir(join(root, 'q'))).toEqual([]);
   });
@@ -969,7 +976,7 @@ describe('inter-process lock re-entrance', () => {
     const path = join(root, 'x.lock');
     const started = Date.now();
     await expectCode(
-      withInterProcessLock(path, () => withInterProcessLock(path, () => 1)),
+      withInterProcessLock(path, (hold) => withInterProcessLock(path, () => 1, { within: hold })),
       'store_busy',
     );
     expect(Date.now() - started).toBeLessThan(2_000);
