@@ -890,6 +890,9 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               ],
               "type": "object",
             },
+            "receiptRequestNotAdded": {
+              "type": "boolean",
+            },
             "receipts": {
               "items": {
                 "additionalProperties": false,
@@ -1241,6 +1244,9 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               ],
               "type": "object",
             },
+            "receiptRequestNotAdded": {
+              "type": "boolean",
+            },
             "receipts": {
               "items": {
                 "additionalProperties": false,
@@ -1569,6 +1575,9 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                 "usd",
               ],
               "type": "object",
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean",
             },
             "receipts": {
               "items": {
@@ -2379,6 +2388,9 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "minLength": 1,
           "type": "string",
         },
+        "receiptRequestNotAdded": {
+          "type": "boolean",
+        },
         "receipts": {
           "items": {
             "additionalProperties": false,
@@ -2635,6 +2647,9 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "maxLength": 500,
           "minLength": 1,
           "type": "string",
+        },
+        "receiptRequestNotAdded": {
+          "type": "boolean",
         },
         "receipts": {
           "items": {

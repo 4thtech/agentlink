@@ -24,6 +24,13 @@ export {
   type SendDepositOptions,
 } from './deposit.js';
 export {
+  buildWithdraw,
+  sendWithdraw,
+  type SendWithdrawOptions,
+  type WithdrawRequest,
+  type WithdrawStep,
+} from './withdraw.js';
+export {
   MAX_LOG_BLOCK_SPAN,
   filterCreditEvents,
   readCreditHistory,

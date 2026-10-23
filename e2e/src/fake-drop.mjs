@@ -10,8 +10,8 @@
 // path (never the query, which carries the signed-URL token) and the body as bytes, and `objects`
 // holds the stored ciphertext. Nothing here logs or prints.
 import { Buffer } from 'node:buffer';
-import { createHash, randomBytes } from 'node:crypto';
 import { URL } from 'node:url';
+import { encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
 import { TextDecoder } from 'node:util';
 
 const { Response } = globalThis;
@@ -76,7 +76,7 @@ export function createFakeDrop(options = {}) {
       const object = objects.get(commit[1]);
       if (object?.bytes === undefined) return json(404, { error: 'not_found' });
       const reported = JSON.parse(new TextDecoder().decode(body)).ciphertextSha256;
-      if (createHash('sha256').update(object.bytes).digest('hex') !== reported) {
+      if (encodeHex(sha256(object.bytes)) !== reported) {
         return json(422, { error: 'hash_mismatch' });
       }
       object.committed = true;

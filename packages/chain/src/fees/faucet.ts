@@ -41,7 +41,7 @@ import type { DepositStep } from './deposit.js';
 import { offeredToken, offeredTokens } from './tokens.js';
 
 /** The chains a faucet may serve: testnets only (SUB-7). Chiado (10200) joins with M1-3j-b (after its smoke test), together with its faucet configuration. */
-export const FAUCET_CHAIN_IDS: readonly number[] = Object.freeze([84532]);
+export const FAUCET_CHAIN_IDS: readonly number[] = Object.freeze([84532, 10200]);
 
 /**
  * The highest gas limit the faucet signs for any one transaction (simulated gas plus the margin).

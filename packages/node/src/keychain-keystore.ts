@@ -12,6 +12,7 @@ import {
   cardPopSnapshot,
   decodeHex,
   decodeHex0x,
+  directTransactionSnapshot,
   dropRequestEpoch,
   dropRequestSnapshot,
   encodeHex,
@@ -21,6 +22,7 @@ import {
   randomBytes,
   wipe,
   type AgentCard,
+  type DirectTransaction,
   type DropAuthRequest,
   type EpochOptions,
   type KeyLabel,
@@ -41,6 +43,7 @@ import {
   nip44DecryptWithKey,
   nip44EncryptWithKey,
   signCardPop,
+  signDirectTransaction,
   signDropRequest,
   signEnvelopeHash,
   signTypedData,
@@ -336,6 +339,18 @@ export class KeychainKeyStore implements KeyStore {
     );
   }
 
+  async signTransaction(tx: DirectTransaction): Promise<string> {
+    // M1-4c-b (07 §6.2): checked against the direct-mode rules before the keychain is read, with
+    // this agent's own address (the agent ID, 04 §2.9) as the only withdraw recipient. The EVM key
+    // exists only at epoch 0 (04 §2.1).
+    const snapshot = directTransactionSnapshot(tx, this.#agentId);
+    return this.#withSeed((seed) =>
+      withSecret(seed, KEY_LABELS.evm, 0, (secretKey) =>
+        signDirectTransaction(secretKey, snapshot, this.#agentId),
+      ),
+    );
+  }
+
   async signCardPop(card: AgentCard): Promise<string> {
     // 04 §2.9 (D-102): only the own card at the current epoch. A card of another agent or epoch, or
     // one that does not parse, is refused before the keychain is read; the message keys are checked
@@ -478,6 +493,7 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
       store.unwrapCek(wrapped, envelopeId, options),
     sign712: (typedData: TypedData) => store.sign712(typedData),
     signCardPop: (card: AgentCard) => store.signCardPop(card),
+    signTransaction: (tx: DirectTransaction) => store.signTransaction(tx),
     signDropRequest: (request: DropAuthRequest, createdAt: number, options?: EpochOptions) =>
       store.signDropRequest(request, createdAt, options),
     close: () => store.close(),

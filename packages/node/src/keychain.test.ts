@@ -597,6 +597,8 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
       'signDropRequest',
       'signEnvelopeHash',
       'signNostr',
+      // M1-4c-b: direct-mode transactions, under the KeyStore's own fixed rules.
+      'signTransaction',
       'unwrapCek',
     ]);
     expect(Object.isFrozen(store)).toBe(true);

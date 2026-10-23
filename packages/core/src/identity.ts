@@ -30,9 +30,14 @@
 import {
   agentCardNameHash,
   agentCardRelaysHash,
+  agentFingerprint,
   canonicalize,
+  decodeHex,
+  decodeHex0x,
   encodeBase64url,
+  encodeHex,
   encodeHex0x,
+  formatFingerprint,
   KeyStoreError,
   randomBytes,
   verifyCardAgentSig,
@@ -50,6 +55,7 @@ import {
   checkName,
   checkRelays,
   ownCardText,
+  ownerFingerprintHex,
   ownerKeyFields,
   parseCard,
   parseOwnCardText,
@@ -83,6 +89,21 @@ export interface IdentityView {
   readonly revoked: boolean;
   readonly createdAt: number;
   readonly updatedAt: number;
+}
+
+/** A fingerprint in its display forms (04 §2.9): `short` (default views) and `long` (64 hex). */
+export interface FingerprintForms {
+  readonly short: string;
+  readonly long: string;
+}
+
+/**
+ * The agent's own fingerprints for the local UI (M1-11r-a): hashes of public keys only. They tell
+ * agents and owners apart and authenticate nothing (04 §2.9).
+ */
+export interface OwnFingerprints {
+  readonly agent: FingerprintForms;
+  readonly owner: FingerprintForms;
 }
 
 /**
@@ -207,6 +228,43 @@ export class IdentityService {
   async get(): Promise<IdentityView | undefined> {
     const got = await readIdentity(this.#ctx);
     return got === undefined ? undefined : this.#view(got.row, got.revoked);
+  }
+
+  /**
+   * The own agent and owner fingerprints (M1-11r-a, the local UI's Advanced page), from the stored
+   * card, which is re-verified. Public values only. Undefined before init.
+   */
+  async fingerprints(): Promise<OwnFingerprints | undefined> {
+    const view = await this.get();
+    if (view === undefined) return undefined;
+    const agent = agentFingerprint(decodeHex0x(view.agentId, { length: 20 }));
+    const owner = ownerFingerprintHex(view.card);
+    return Object.freeze({
+      agent: Object.freeze({ short: formatFingerprint(agent, 'short'), long: encodeHex(agent) }),
+      owner: Object.freeze({
+        short: formatFingerprint(decodeHex(owner, { length: 32 }), 'short'),
+        long: owner,
+      }),
+    });
+  }
+
+  /**
+   * The agent ID (its public address): the account its credits are kept for, shown as a QR code to
+   * add credits (M1-11r-a). Undefined before init.
+   */
+  async agentAddress(): Promise<string | undefined> {
+    return (await readIdentity(this.#ctx))?.row.agent_id;
+  }
+
+  /**
+   * The agent's own relays as stored with its card (07 §4.3; M1-11r-a, Advanced). Public: every
+   * invite carries them. Empty before init.
+   */
+  async relays(): Promise<readonly string[]> {
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined) return Object.freeze([]);
+    const text = await open(this.#ctx, 'identity', 'relays', [got.row.agent_id], got.row.relays);
+    return Object.freeze([...checkStoredRelays(text)]);
   }
 
   /** The current card with its signatures, name and relays (for invites and handshakes, M1-7c). */

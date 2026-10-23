@@ -45,9 +45,12 @@ enabled = false
 DROP_CORS_ORIGINS = ""
 
 [limits]
-# The commit hashes up to 100 MiB of stored ciphertext, about 0.4 s of CPU (IR-M1-27a-1 L-3).
-# Needs the Workers paid plan.
-cpu_ms = 30000
+# The commit hashes up to 100 MiB of stored ciphertext (IR-M1-27a-1 L-3). Measured for M1-27b-b:
+# 0.42 s of CPU for 100 MiB through createSha256 (V8, any chunk size from 16 KiB to 1 MiB). 5 s is
+# that need plus a wide margin for slower edge hardware and a cold isolate, and tighter than the
+# paid plan's 30 s default. Needs the Workers paid plan. The same value in every environment
+# (tools/release/deploy-drop.test.mjs checks it against release-and-deployment.md §4.5.1).
+cpu_ms = 5000
 
 [[r2_buckets]]
 binding = "DROP_BUCKET"
@@ -85,7 +88,7 @@ enabled = false
 DROP_CORS_ORIGINS = ""
 
 [env.staging.limits]
-cpu_ms = 30000
+cpu_ms = 5000
 
 [[env.staging.r2_buckets]]
 binding = "DROP_BUCKET"
@@ -119,7 +122,7 @@ enabled = false
 DROP_CORS_ORIGINS = "https://console.agentlink.4thtech.io"
 
 [env.production.limits]
-cpu_ms = 30000
+cpu_ms = 5000
 
 [[env.production.r2_buckets]]
 binding = "DROP_BUCKET"
