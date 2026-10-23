@@ -20,9 +20,13 @@
 //      without a hand-kept list. Those packages are added without their dependents.
 //   6. `@4thtech-io/tools` is always selected: docs-status, the knowledge links and size, the
 //      retired-vocabulary scan and the manifest checks are its `check` and `test`.
+//   7. CHORE-CI-SPEED-3: each heavy job (HEAVY_JOBS) runs when the selected set holds one of the
+//      packages it tests. The selected set already holds every dependent, so a change below a
+//      tested package reaches its job. A full run (rules 1 and 2) runs every job.
 //
 // Usage: node tools/ci/select-affected.mjs <changed-files.txt>
-// Writes test_scope, turbo_filters and needs_playwright to $GITHUB_OUTPUT when it is set.
+// Writes test_scope, turbo_filters, needs_playwright and one run_<job> per heavy job to
+// $GITHUB_OUTPUT when it is set. ci.yml reads a missing run_<job> as `true`.
 import { appendFileSync, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -43,13 +47,46 @@ const DOCS = /^(docs\/|docs-site\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+
 
 const NAME = /^@4thtech-io\/[a-z0-9][a-z0-9-]*$/;
 
+// CHORE-CI-SPEED-3: the heavy jobs of ci.yml and the workspace packages whose code each one runs
+// (rule 7). `checks` follows the package list itself; `path-guard` and `node-os` run in the merge
+// queue and on `main` only. A job is listed with every package its steps build or import outside
+// the declared dependencies (the vectors harness imports chain; the e2e builds the invite site).
+export const HEAVY_JOBS = Object.freeze({
+  vectors: ['@4thtech-io/test-vectors', '@4thtech-io/chain'],
+  keychain: ['@4thtech-io/node', '@4thtech-io/agentlink'],
+  'relays-docker': ['@4thtech-io/node', '@4thtech-io/transport-nostr'],
+  'storage-minio': ['@4thtech-io/storage'],
+  'bundle-check': ['@4thtech-io/agentlink'],
+  'e2e-deterministic': ['@4thtech-io/e2e', '@4thtech-io/chain', '@4thtech-io/invite'],
+});
+
+const allJobs = (run) => Object.fromEntries(Object.keys(HEAVY_JOBS).map((j) => [j, run]));
+
 /**
  * @param {{ files: string[] | null, workspace: Array<{ name: string, dir: string, deps: string[],
  *   refs: string[], playwright: boolean }> }} input
- * @returns {{ scope: 'full', reason: string } |
- *   { scope: 'filtered', packages: string[], playwright: boolean }}
+ * @returns {{ scope: 'full', reason: string, jobs: Record<string, boolean> } |
+ *   { scope: 'filtered', packages: string[], playwright: boolean, jobs: Record<string, boolean> }}
  */
 export function selectAffected({ files, workspace }) {
+  const result = selectPackages({ files, workspace });
+  if (result.scope === 'full') return { ...result, jobs: allJobs(true) };
+  const selected = new Set(result.packages);
+  const jobs = Object.fromEntries(
+    Object.entries(HEAVY_JOBS).map(([job, pkgs]) => [job, pkgs.some((p) => selected.has(p))]),
+  );
+  return { ...result, jobs };
+}
+
+/** The run_<job> lines for $GITHUB_OUTPUT, in HEAVY_JOBS order. */
+export function jobOutputs(result) {
+  return Object.keys(HEAVY_JOBS).map(
+    (job) =>
+      `run_${job.replaceAll('-', '_')}=${result.scope === 'full' || result.jobs[job] === true}`,
+  );
+}
+
+function selectPackages({ files, workspace }) {
   if (files == null) return { scope: 'full', reason: 'the diff could not be read' };
   const list = files.map((f) => f.trim()).filter(Boolean);
   if (list.length === 0) return { scope: 'full', reason: 'the diff is empty' };
@@ -216,11 +253,14 @@ function main(argv) {
   };
   if (result.scope === 'full') console.log(`Full suite: ${result.reason}`);
   else console.log(`Affected packages (${result.packages.length}): ${result.packages.join(' ')}`);
+  const jobs = jobOutputs(result);
+  console.log(`Heavy jobs: ${jobs.join(' ')}`);
   if (process.env.GITHUB_OUTPUT) {
     appendFileSync(
       process.env.GITHUB_OUTPUT,
       Object.entries(out)
         .map(([k, v]) => `${k}=${v}\n`)
+        .concat(jobs.map((line) => `${line}\n`))
         .join(''),
     );
   }

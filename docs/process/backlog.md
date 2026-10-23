@@ -812,7 +812,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
 
 #### CHORE-DEPLOY-RECONCILE-b · reconcile: bound pending approvals; alert when no deploy is found (new, IR-CHORE-DEPLOY-RECONCILE-1, #464)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · the reconcile workflow and `tools/release/**`
 - **Depends on:** CHORE-DEPLOY-RECONCILE
 - **Scope:**
@@ -3814,6 +3814,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The runbook rollback note says that the old daily cleanup deletes new-format claim records, so a rollback of the faucet must account for that.
 - **Acceptance:** tests first (local red run): with a stuck approve (pending nonce above latest) a new claim is refused at once and sends nothing; a simulated gas figure above the cap is rejected or clamped to the cap, per the chosen rule; the runbook rollback note is present and the docs checks pass.
 
+#### M1-10b-d · faucet: wait for its own pending depositFor before refusing `busy` (new, IR-M1-10b-c-1 L1)
+- **Status:** in review (`packages/chain/src/fees/faucet.ts`) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain (faucet wallet)
+- **Depends on:** M1-10b-c
+- **Spec:** 05 §9 (faucet); `release-and-deployment.md` §4.5
+- **Invariants:** I-3
+- **Scope:**
+  - Every USDC claim needs a fresh `approve`, so a claim within about one block of the previous one found the faucet's own unmined `depositFor` (`pending` nonce above `latest`) and got `busy`. Before refusing, poll `latest` until it reaches the `pending` nonce read, within the existing `receiptTimeoutMs` deadline; refuse `busy` only if it has not.
+  - The nonce poll and the approve's receipt wait share one `receiptTimeoutMs` budget per claim, so no claim waits longer in total than before.
+  - Unchanged: claims serialised on `SubmitterFaucet`'s tail; `pending` read before `latest`; `busy` maps to `not_sent`, refunded once; the gas cap; the HTTP answers. No nonce check on the `depositFor`-only path.
+- **Acceptance:** tests first (local red run): two claims within one block both succeed when the first `depositFor` mines within the poll window; a truly stuck approve still gets `busy` after the deadline and sends nothing; the poll and the receipt wait together stay within `receiptTimeoutMs`.
+
 #### M1-10c · submitter and faucet deploy pipeline (new sub-task)
 - **Status:** in review (`.github/workflows/deploy-submitter.yml`, `apps/submitter/wrangler.toml`; owner setup RB-19 `docs/runbooks/submitter-deploy.md`; deploy waits for the owner's Worker secrets and funding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · .github/workflows/deploy-submitter.yml, apps/submitter/wrangler config
@@ -6291,13 +6303,13 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Internal milestone audit (parts A–F of `audit-rules.md` §7) plus the M2 additions: web checklist on console, verify, invite and pay; cloud agent; Registry.
-  - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" for every tester measured per G-21.
+  - External testing: 20–50 early adopters on testnets; UX metric "install → first message" measured per G-21 and judged by the D-125 rule (self-reported, no analytics).
 - **Acceptance:**
   - Zero open Critical/High findings; per-invariant verdicts.
   - **G-1 re-decided (D-67)** before external testers start: the owner records a new decision on the same-user residual (G-1, G-42), taking into account what the desktop apps deliver; until then no external tester relies on owner presence on an `npx` install.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
-  - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message stays under 5 minutes (median).
-  - Adopter count and each measured time recorded; issues filed as cards; owner sign-off.
+  - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message meets the D-125 rule: median < 5 minutes, at least 80% of testers < 5 minutes, no tester > 15 minutes for a cause on our side (counterpart wait excluded; an over-15 caused by us is a bug fixed before the gate passes).
+  - Adopter count, the measured median and the share under 5 minutes recorded; issues filed as cards; owner sign-off.
 
 ---
 

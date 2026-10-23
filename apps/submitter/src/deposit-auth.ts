@@ -19,7 +19,16 @@
 //   @4thtech-io/chain `DepositRelayChain.check` (gasless token, $5 to $50, window, signature of an
 //   EOA `from`, unused nonce, vault minDeposit, simulation and gas cap), then the per-agent limit
 //   (only an authorization that passed the checks counts, so nobody can use up an agent's quota
-//   with a forged `from`), then one send at the relay wallet's next nonce.
+//   with a forged `from`; a send that fails gives it back), then one send at the relay wallet's
+//   next nonce. Before the relay checks, the Worker takes the route's global hourly cap, and the
+//   relay refuses `unavailable`, sending nothing, while more than MAX_PENDING_RELAY_TXS of its
+//   own transactions are pending (a stuck transaction; the faucet's M1-10b-c guard).
+// - Record, then send (M3-4b-t-T3-b): the entry is stored before the send (a Durable Object holds
+//   the outgoing request until the write is durable), so a crash mid-send leaves an entry without
+//   a hash and a repeat is never sent again: it answers `already_used` once the authorization is
+//   used on chain, `unavailable` before. A send that throws removes the entry; if it had reached
+//   a node after all, a later resend reverts on chain (the token marks the EIP-3009 nonce used),
+//   so it can cost the relay gas, never move funds twice.
 // - Idempotent on (chainId, from, nonce): the stored entry keeps a SHA-256 of the whole request,
 //   so an identical repeat returns the same transaction and anything else under that nonce is
 //   `already_used`; neither is sent again.
@@ -55,6 +64,12 @@ export const RETENTION_SECONDS = 86_400;
  */
 export const NONCE_MEMORY_SECONDS = 120;
 
+/**
+ * The relay wallet's transactions that may be pending (its `pending` nonce above its `latest`)
+ * before it sends nothing more: above it, one is stuck and every later send would wait behind it.
+ */
+export const MAX_PENDING_RELAY_TXS = 3;
+
 export interface DepositRelayDeps {
   /** The relay of a gasless chain, or null when its gas key or relay ABI is not configured. */
   relayFor(env: unknown, chainId: number): DepositRelayChain | null;
@@ -67,6 +82,8 @@ export type RelayAnswer =
       readonly error: DepositAuthErrorCode;
       readonly txHash?: Hex;
       readonly retryAfter?: number;
+      /** The relay wallet has too many transactions pending (MAX_PENDING_RELAY_TXS). */
+      readonly stuck?: true;
     };
 
 /** The relay's RPC surface, as the Worker calls it. */
@@ -101,10 +118,13 @@ function digestOf(request: DepositAuthorizationRequest): string {
   return encodeHex(sha256(encodeUtf8(JSON.stringify(depositAuthorizationRequestBody(request)))));
 }
 
-/** A sent authorization: request digest, transaction hash, unix seconds when sent. */
+/**
+ * An authorization recorded for sending: request digest, unix seconds when recorded and, once the
+ * send answered, its transaction hash (none: a crash mid-send).
+ */
 interface Sent {
   readonly d: string;
-  readonly h: Hex;
+  readonly h?: Hex;
   readonly at: number;
 }
 
@@ -113,6 +133,7 @@ type NextNonce = [number, number];
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 const UNAVAILABLE: RelayAnswer = Object.freeze({ ok: false, error: 'unavailable' });
+const STUCK: RelayAnswer = Object.freeze({ ok: false, error: 'unavailable', stuck: true });
 const refuse = (error: DepositAuthErrorCode): RelayAnswer => Object.freeze({ ok: false, error });
 
 export interface DepositRelayEnv {
@@ -165,6 +186,16 @@ export function createDepositRelayClass(deps: DepositRelayDeps): SubmitterDeposi
       const sent = await storage.get<Sent>(key);
       if (sent !== undefined) {
         if (sent.d !== digest) return refuse('already_used');
+        if (sent.h === undefined) {
+          // Recorded, but the send never answered (a crash): never send it again.
+          let used = false;
+          try {
+            used = await relay.authorizationUsed(request);
+          } catch {
+            // Unknown for now.
+          }
+          return used ? refuse('already_used') : UNAVAILABLE;
+        }
         let state: 'pending' | 'success' | 'reverted' = 'pending';
         try {
           state = await relay.txStatus(sent.h);
@@ -179,6 +210,9 @@ export function createDepositRelayClass(deps: DepositRelayDeps): SubmitterDeposi
       const now = nowSeconds();
       const early = precheckDepositAuthorization(request, relay.vault, now);
       if (early !== null) return refuse(early);
+      // A stuck transaction: refuse at once and send nothing (a chain failure throws: unavailable).
+      const [pending, latest] = await Promise.all([relay.pendingNonce(), relay.latestNonce()]);
+      if (pending - latest > MAX_PENDING_RELAY_TXS) return STUCK;
       const checked = await relay.check(request, now); // a chain failure throws: unavailable
       if (!checked.ok) return refuse(checked.error);
 
@@ -189,7 +223,6 @@ export function createDepositRelayClass(deps: DepositRelayDeps): SubmitterDeposi
         return Object.freeze({ ok: false, error: 'rate_limited', retryAfter: taken.retryAfter });
       }
 
-      const pending = await relay.pendingNonce();
       const remembered = await storage.get<NextNonce>('n');
       const nonce =
         remembered !== undefined &&
@@ -197,21 +230,24 @@ export function createDepositRelayClass(deps: DepositRelayDeps): SubmitterDeposi
         remembered[0] > pending
           ? remembered[0]
           : pending;
+      await storage.put(key, { d: digest, at: now } satisfies Sent);
+      if ((await storage.getAlarm()) === null) {
+        await storage.setAlarm((now + RETENTION_SECONDS + 60) * 1000);
+      }
       let txHash: Hex;
       try {
         txHash = await relay.send(request, { gasLimit: checked.gasLimit, nonce });
       } catch {
-        // The nonce may or may not be used: read it from the chain next time.
-        await storage.delete('n');
+        // The nonce may or may not be used: read it from the chain next time. The send did not
+        // happen as far as we know: forget the entry and give the agent's count back.
+        await storage.delete([key, 'n']);
+        await limiter.give(1, 3600, now);
         return UNAVAILABLE;
       }
       await storage.put({
         [key]: { d: digest, h: txHash, at: now } satisfies Sent,
         n: [nonce + 1, now] satisfies NextNonce,
       });
-      if ((await storage.getAlarm()) === null) {
-        await storage.setAlarm((now + RETENTION_SECONDS + 60) * 1000);
-      }
       return Object.freeze({ ok: true, txHash });
     }
 

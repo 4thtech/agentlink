@@ -43,6 +43,8 @@ export { NATIVE_TOKEN_ADDRESS, offeredTokens, type OfferedToken } from './tokens
 export {
   FAUCET_CHAIN_IDS,
   FAUCET_MAX_GAS,
+  FAUCET_MIN_APPROVE_BUDGET_SHARE,
+  FAUCET_STUCK_NONCE_COOLDOWN_MS,
   FAUCET_MAX_USD_CENTS,
   buildDepositFor,
   createFaucetChain,

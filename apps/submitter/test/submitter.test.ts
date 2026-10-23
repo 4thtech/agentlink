@@ -441,7 +441,7 @@ describe('other routes', () => {
     // The Miniflare settings enable Base Sepolia; the default (flag unset) is 501, tested there.
     const res = await post('/v1/deposit-authorization', { chainId: CHAIN_ID }, newIp());
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: 'bad_request' });
+    expect(await res.json()).toEqual({ status: 'failed', error: 'bad_request' });
   });
 
   it('answers 404 and 405 with fixed codes', async () => {
