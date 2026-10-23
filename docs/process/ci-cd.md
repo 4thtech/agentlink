@@ -31,6 +31,21 @@ Add exactly these four to the `main` ruleset: **`ci-gate`**, **`security-gate`**
 
 `ci-gate` and `security-gate` are aggregator jobs that always run. They fail if any upstream job failed or was cancelled; a skipped job counts as success. That is what keeps the repository green while it is docs-only, and why individual jobs (which come and go) are never listed as required. `pr-hygiene` is skipped on merge-queue runs, which GitHub treats as a pass. `review-gate` checks only `DEPLOY_FREEZE` on merge-queue runs.
 
+### What runs where (CHORE-CI-SPEED-2)
+
+`ci.yml` spends the runner queue by event. Only `ci-gate` is required, and it counts a skipped job as a pass; no required check is ever itself skipped, so each one reports on every non-draft pull request and on `merge_group`.
+
+| Event | `checks` (lint, typecheck, build, unit tests) | Other jobs | Required checks |
+|---|---|---|---|
+| Pull request, not draft | **Affected packages only**: the packages the change touches, their dependents (transitively), and the packages whose tests read a changed doc, chosen by `tools/ci/select-affected.mjs` in `detect` (step `affected`) and run as one turbo `--filter` per package; `@4thtech-io/tools` is always included | as before (docs-only skips, Ubuntu legs only) | all four report |
+| Pull request that touches `.github/`, `tools/`, root config, the lockfile, `test-vectors/` or `packages/types`, `crypto`, `core` | Full suite (these are global triggers; `.github/` and `tools/` are checked before the selector is read, so a broken selector cannot narrow its own change) | as before | all four report |
+| Pull request, selector fails or the diff cannot be read | Full suite, with a warning | as before | all four report |
+| `merge_group` (the queue) | **Full suite**, always; the selector is never run | full matrix including macOS and Windows | all four report |
+| `push` (any branch, `main`) | Full suite, the selector is never run | as in "Where the heavy jobs run" | `ci-gate (push)` is not required |
+| Draft pull request | Skipped (CHORE-CI-SPEED-1: `detect` and `context-budget` carry the draft condition, so every heavy job skips with them; `ready_for_review` starts the full suite) | skipped with `detect`; the secret scan, zizmor, `pr-hygiene` and `review-gate` still run | the gates report (skipped upstream counts as a pass) |
+
+A wrong or too-narrow selection can only delay a failure to the queue, never let it reach `main`: the queue repeats the full suite on the merged result. `dependency-review` and `codeql` are not repeated in the queue (they are skipped there); a pull request runs them on its own commits, and a draft runs them when marked ready for review (`ready_for_review`, CHORE-CI-SPEED-1). Selection rules are in the header of `tools/ci/select-affected.mjs`; its tests are `tools/ci/select-affected.test.mjs`.
+
 ### Where the heavy jobs run (CHORE-CI-MATRIX-QUEUE-ONLY)
 
 The runner queue on GitHub Free is the scarce resource, so `ci.yml` spends it where it protects `main`. Only the four aggregators above are required, and `ci-gate` counts a skipped job as a pass, so no job needs a placeholder; a skipped job simply reports "skipped".
