@@ -11,7 +11,9 @@
 //   3. compares that commit with the head; when no file between them matches the workflow's own
 //      `on.push.paths`, production is current for this service;
 //   4. otherwise requires the head's own CI gates green (ci.yml ci-gate, security.yml security-gate);
-//   5. skips while a push or dispatch run of the workflow for the head is in flight (queued,
+//   5. skips while a run of the workflow for ANY head waits for the production approval (at most
+//      one pending approval per service; the summary asks the owner to approve or cancel it), and
+//      skips while a push or dispatch run of the workflow for the head is in flight (queued,
 //      running, or waiting for the production approval), and stops with a warning after
 //      MAX_ATTEMPTS finished runs for the head;
 //   6. dispatches the workflow on main, at most once per workflow per call.
@@ -161,7 +163,10 @@ export async function reconcile({
   const deployed = await deployedCommit({ api, repo, workflow });
   if (!deployed) {
     log(
-      `::notice::${workflow}: no production deploy among the last ${MAX_RUNS} finished runs; nothing to reconcile.`,
+      `::warning::${workflow}: no production deploy among the last ${MAX_RUNS} finished runs; the reconcile cannot tell whether production lags. Check the deploy runs by hand.`,
+    );
+    summary(
+      `**${workflow} unknown:** no production deploy among the last ${MAX_RUNS} finished runs, so the reconcile cannot tell whether production lags. Needs a look.`,
     );
     return none('unknown');
   }
@@ -188,6 +193,25 @@ export async function reconcile({
   if (!touched) {
     log(`${workflow}: no change to its paths since ${deployed}; production is current.`);
     return none('current', { deployed });
+  }
+
+  // At most one pending production approval per service, whatever the head: a run waiting for an
+  // older head would skip on approval (its head check), but the owner may still want to approve or
+  // cancel it, so a new dispatch would only stack another request. Surface it instead.
+  const waitingQuery = new URLSearchParams({ branch: 'main', status: 'waiting', per_page: '50' });
+  const waitingBody = await api(`/repos/${repo}/actions/workflows/${workflow}/runs?${waitingQuery}`);
+  const pending = (waitingBody?.workflow_runs ?? []).find(
+    (r) => isDeployRun(r, workflow) && r.status === 'waiting',
+  );
+  if (pending) {
+    const runId = Number.isSafeInteger(pending.id) ? pending.id : String(pending.id);
+    log(
+      `::warning::${workflow}: production runs ${deployed}, behind main's head ${head}, and run ${runId} (${pending.event}, for ${pending.head_sha}) waits for the production approval; not dispatching another. Approve or cancel it.`,
+    );
+    summary(
+      `**${workflow} waiting:** production runs \`${deployed}\`; run ${runId} for \`${pending.head_sha}\` waits for the production approval. The owner should approve or cancel it; no new run is dispatched while it waits.`,
+    );
+    return none('approval-pending', { deployed, runId });
   }
 
   const ci = await checkOnce({ api, repo, sha: head, require: REQUIRED_GATES });
