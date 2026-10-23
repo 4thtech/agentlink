@@ -16,7 +16,9 @@ import {
   AgentLinkClient,
   POLICY_DEFAULTS_EFFECTIVE,
   type ApprovalChannel,
+  type EffectivePolicy,
   type OwnerActionOutcome,
+  type PolicyDocument,
   type PreparedPolicyEdit,
 } from '@4thtech-io/core';
 import {
@@ -30,6 +32,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { createKeychainAgent, openRecordedKeyStore } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
+import { CLI_COMMAND } from './cli-command.js';
 import { addAgentWith } from './owner-add-agent.js';
 import type { FirstAgentCard, FirstPolicyActions } from './owner-first-card.js';
 import { initOwnerWith } from './owner-init.js';
@@ -188,7 +191,7 @@ async function exists(path: string): Promise<boolean> {
 }
 
 async function ownerInitFor(
-  agent: Agent,
+  _agent: Agent,
   card: FirstAgentCard,
 ): Promise<{ owner: OwnerPublicKeys; code: string; run: ReturnType<typeof ownerAtInit> }> {
   const run = ownerAtInit();
@@ -227,14 +230,28 @@ function spyActions(
   return { actions, applied, prepared };
 }
 
+/** A JSON object whose fields a test may change (a copy, never the prepared body). */
+type MutableJson = { [key: string]: unknown };
+
 function alterPolicy(
   prepared: PreparedPolicyEdit,
-  change: (body: JsonObject) => void,
+  change: (body: MutableJson) => void,
 ): PreparedPolicyEdit {
   if (prepared.status !== 'prepared') return prepared;
-  const body = JSON.parse(JSON.stringify(prepared.body)) as JsonObject;
+  // A mutable deep copy: the prepared body itself is never changed.
+  const body = JSON.parse(JSON.stringify(prepared.body)) as MutableJson;
   change(body);
-  return { ...prepared, body: body as unknown as typeof prepared.body, jcs: canonicalize(body) };
+  return {
+    ...prepared,
+    body: body as unknown as typeof prepared.body,
+    jcs: canonicalize(body as JsonObject),
+  };
+}
+
+/** The applied rules; fails the test unless they are signed rules. */
+function signedPolicy(effective: EffectivePolicy): PolicyDocument {
+  if (effective.mode !== 'signed') throw new Error(`expected signed rules, got ${effective.mode}`);
+  return effective.policy;
 }
 
 describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2.5; D-121 D6)', () => {
@@ -268,7 +285,7 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
     const code = run.written.findIndex((t) => t.startsWith('Your owner code: '));
     expect(review).toBeGreaterThanOrEqual(0);
     expect(review).toBeLessThan(code);
-    expect(run.written.join('\n')).toContain('agentlink policy remove-folder');
+    expect(run.written.join('\n')).toContain(`${CLI_COMMAND} policy remove-folder`);
     // No wallet words in the copy (11 §5).
     expect(run.written.join('\n')).not.toMatch(/wallet|gas|seed phrase|transaction/i);
   });
@@ -314,7 +331,8 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
     await mkdir(join(home, 'AgentLink', 'Send'), { recursive: true });
     await ownerInitFor(alice, withPolicy(alice, 'alice'));
     const effective = await alice.client.ownerActions.loadPolicy();
-    expect(canonicalize(effective.policy)).toBe(defaultsWith([await sendFolder()]));
+    expect(effective.mode).toBe('signed');
+    expect(canonicalize(signedPolicy(effective))).toBe(defaultsWith([await sendFolder()]));
   });
 
   it.skipIf(process.platform === 'win32')(
@@ -422,7 +440,7 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
     expect((await alice.client.ownerActions.loadPolicy()).mode).toBe('defaults');
     expect(await exists(join(home, 'AgentLink'))).toBe(false);
     expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
-    expect(run.written.join('\n')).toContain('agentlink policy allow-folder');
+    expect(run.written.join('\n')).toContain(`${CLI_COMMAND} policy allow-folder`);
   });
 
   it('rules applied but not confirmed point the owner to policy recover', async () => {
@@ -444,47 +462,47 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
       { kdf: KDF },
     );
     expect(result.sendFolder).toEqual({ status: 'not_confirmed', folder: await sendFolder() });
-    expect(run.written.join('\n')).toContain('agentlink policy recover');
+    expect(run.written.join('\n')).toContain(`${CLI_COMMAND} policy recover`);
   });
 
   it.each([
     [
       'a looser commitment rule',
-      (body: JsonObject) => {
-        const policy = (body['params'] as JsonObject)['policy'] as JsonObject;
-        (policy['commitments'] as JsonObject)['accept'] = 'allow';
+      (body: MutableJson) => {
+        const policy = (body['params'] as MutableJson)['policy'] as MutableJson;
+        (policy['commitments'] as MutableJson)['accept'] = 'allow';
       },
     ],
     [
       'a higher daily proof budget',
-      (body: JsonObject) => {
-        const policy = (body['params'] as JsonObject)['policy'] as JsonObject;
-        (policy['proofs'] as JsonObject)['dailyBudgetUSD'] = '500';
+      (body: MutableJson) => {
+        const policy = (body['params'] as MutableJson)['policy'] as MutableJson;
+        (policy['proofs'] as MutableJson)['dailyBudgetUSD'] = '500';
       },
     ],
     [
       'a second folder',
-      (body: JsonObject) => {
-        const policy = (body['params'] as JsonObject)['policy'] as JsonObject;
-        const files = policy['files'] as JsonObject;
+      (body: MutableJson) => {
+        const policy = (body['params'] as MutableJson)['policy'] as MutableJson;
+        const files = policy['files'] as MutableJson;
         files['allowedFolders'] = ['/', ...(files['allowedFolders'] as string[])].sort();
       },
     ],
     [
       'another agent',
-      (body: JsonObject) => {
+      (body: MutableJson) => {
         body['agent'] = '0x' + '11'.repeat(20);
       },
     ],
     [
       'another owner',
-      (body: JsonObject) => {
+      (body: MutableJson) => {
         body['owner'] = '22'.repeat(32);
       },
     ],
     [
       'another op',
-      (body: JsonObject) => {
+      (body: MutableJson) => {
         body['op'] = 'contact.remove';
       },
     ],
@@ -531,7 +549,7 @@ describe('owner add-agent signs the first rules with the card (M1-36b-2; 04 §2.
     expect(result.sendFolder).toEqual({ status: 'allowed', folder: await sendFolder() });
     const effective = await bob.client.ownerActions.loadPolicy();
     expect(effective.mode).toBe('signed');
-    expect(canonicalize(effective.policy)).toBe(defaultsWith([await sendFolder()]));
+    expect(canonicalize(signedPolicy(effective))).toBe(defaultsWith([await sendFolder()]));
     // Alice's rules are her own (the action binds to Bob by `agent`).
     expect((await alice.client.ownerActions.loadPolicy()).mode).toBe('defaults');
     // Shown before the prompt.
@@ -549,7 +567,8 @@ describe('owner add-agent signs the first rules with the card (M1-36b-2; 04 §2.
       card: withPolicy(bob, 'bob'),
     });
     const effective = await bob.client.ownerActions.loadPolicy();
-    expect(canonicalize(effective.policy)).toBe(defaultsWith([await sendFolder()]));
+    expect(effective.mode).toBe('signed');
+    expect(canonicalize(signedPolicy(effective))).toBe(defaultsWith([await sendFolder()]));
   });
 
   it('M1-9x path (no local card names the owner): one entry, card and rules', async () => {

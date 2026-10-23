@@ -35,6 +35,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
+import { CLI_COMMAND } from './cli-command.js';
 import { assertAllowedOwnerAction } from './owner-allowlist.js';
 import type { FirstAgentCard, FirstPolicy } from './owner-first-card.js';
 
@@ -66,16 +67,12 @@ export type SendFolderPlan =
 // Fixed copy (11 §5: "your rules", "your AI"; the path is local data shown only when printable).
 const COPY = {
   review: (folder: string): string =>
-    `Your owner code also sets your first rule: your AI can send files you put in ${folder} (empty for now). Nothing else on this computer can be sent. To remove it later, run \`agentlink policy remove-folder ${folder}\`.`,
-  notEmpty:
-    'The folder AgentLink/Send in your home folder already holds files, so it is not allowed for sending. To send files later, run `agentlink policy allow-folder <path>` yourself.',
-  unavailable:
-    "AgentLink couldn't set up the folder AgentLink/Send in your home folder, so no folder is allowed for sending. To send files later, run `agentlink policy allow-folder <path>` yourself.",
+    `Your owner code also sets your first rule: your AI can send files you put in ${folder} (empty for now). Nothing else on this computer can be sent. To remove it later, run \`${CLI_COMMAND} policy remove-folder ${folder}\`.`,
+  notEmpty: `The folder AgentLink/Send in your home folder already holds files, so it is not allowed for sending. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
+  unavailable: `AgentLink couldn't set up the folder AgentLink/Send in your home folder, so no folder is allowed for sending. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
   allowed: (folder: string): string => `OK       Your AI can send files you put in ${folder}.`,
-  failed:
-    "Problem  Your first rule couldn't be set, so no folder is allowed for sending. Everything else is set up. To send files later, run `agentlink policy allow-folder <path>` yourself.",
-  notConfirmed:
-    "Problem  Your first rule was saved, but AgentLink couldn't confirm it, so it uses its strictest settings until your rules are set again. Run `agentlink policy recover` in your own terminal.",
+  failed: `Problem  Your first rule couldn't be set, so no folder is allowed for sending. Everything else is set up. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
+  notConfirmed: `Problem  Your first rule was saved, but AgentLink couldn't confirm it, so it uses its strictest settings until your rules are set again. Run \`${CLI_COMMAND} policy recover\` in your own terminal.`,
 } as const;
 
 // eslint-disable-next-line no-control-regex -- terminal control characters make a path unusable here
