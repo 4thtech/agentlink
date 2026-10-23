@@ -202,7 +202,7 @@ describe('verify-debs.sh (cached packages checked against the signed index)', ()
   const verify = join(root, '.github/actions/install-playwright/verify-debs.sh');
   const good = 'a'.repeat(64);
 
-  // Stubs: dpkg-deb reads "<file>.fields", sha256sum prints the file's first line as its hash,
+  // Stubs: dpkg-deb reads "<src>/<name>.fields", sha256sum prints the file's first line as its hash,
   // apt-cache prints the SHA256 that index.txt lists for "<pkg>=<ver>".
   function setup(files, index) {
     const dir = mkdtempSync(join(tmpdir(), 'chore-ci-playwright-3-'));
@@ -214,7 +214,11 @@ describe('verify-debs.sh (cached packages checked against the signed index)', ()
       writeFileSync(join(bin, name), `#!/usr/bin/env bash\n${body}\n`);
       chmodSync(join(bin, name), 0o755);
     };
-    stub('dpkg-deb', 'f="$2"; field="$3"; grep "^$field=" "$f.fields" | cut -d= -f2-');
+    // verify-debs.sh reads the copy ("<name>.agentlink-partial" in dest); the fields sit in src.
+    stub(
+      'dpkg-deb',
+      `b="$(basename "\${2%.agentlink-partial}")"; grep "^$3=" "${src}/$b.fields" | cut -d= -f2-`,
+    );
     stub(
       'sha256sum',
       'for f in "$@"; do [ "$f" = -- ] && continue; printf "%s  %s\\n" "$(head -n1 "$f")" "$f"; done',
