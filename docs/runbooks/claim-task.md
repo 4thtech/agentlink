@@ -31,7 +31,7 @@ The orchestrator (Opus), or a human builder for their own task. Workers never wr
    git -C ../agentlink-<TASK-ID> push -u origin <TASK-ID>-<slug>
    ```
 4. Add your row to `board.md` → Active tasks (`<TASK-ID> | @<login> | in-progress | <branch> | <UTC time>`), then commit and push the `sync` worktree as in [RB-01](session-start-end.md) step 10.
-5. **Open no PR yet.** The PR is opened only after the independent review passes ([RB-04](independent-review.md)), not (draft) at claim time: failed runs on PRs e-mail the owner, and a PR whose review is pending only makes `review-gate` red (lesson [LL-13](../lessons/LL-13-open-prs-after-review.md)). When it opens, the title must start with the task ID or an allowed prefix (lesson [LL-02](../lessons/LL-02-pr-title-prefix.md)); add ` / #<n>` to your board row.
+5. **Open no PR yet.** The PR is opened only after the independent review passes ([RB-04](independent-review.md)), not (draft) at claim time: a draft PR skips the full suite, but `pr-hygiene` and `review-gate` still run on it and failed runs on PRs e-mail the owner, and a PR whose review is pending only makes `review-gate` red (lesson [LL-13](../lessons/LL-13-open-prs-after-review.md)). When it opens, the title must start with the task ID or an allowed prefix (lesson [LL-02](../lessons/LL-02-pr-title-prefix.md)); add ` / #<n>` to your board row.
 
 ## Verify
 - `git ls-remote --heads origin <branch>` lists the pushed branch, and `gh run list --branch <branch>` shows a CI run on the push.
