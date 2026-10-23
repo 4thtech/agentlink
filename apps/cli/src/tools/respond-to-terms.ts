@@ -12,6 +12,8 @@
 //    built from the core's card data: the contact under the 06 §2.1 rule, the version, nothing else.
 // 4. `accept` with `notarize` (M1-9d-3): the same one approval also covers the accept's proof when
 //    the offer has none; `needs_credits` first (nothing sent); the result carries `proof`.
+// 4b. `needs_credits` (M1-36i-d): the first one with a testnet route claims free test credits once
+//    (propose-terms.ts `termsNeedsCreditsAfterClaim`); the next step is the same call again.
 // 5. `counter` with `notarize` (M1-9d-5): a firm offer, as `agentlink_propose_terms` with
 //    `notarize`: one approval covers the new version and its proof; the result carries `proof`.
 //
@@ -43,10 +45,10 @@ import {
   termsApprovalState,
   termsCoreError,
   termsInProgress,
-  termsNeedsCredits,
   termsRefusal,
   termsWithProof,
 } from './terms-common.js';
+import { termsNeedsCreditsAfterClaim } from './propose-terms.js';
 import { proofDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
 
@@ -110,7 +112,12 @@ export async function respondToTermsHandler(
       return termsInProgress();
     case 'needs_credits':
       logger.info('respond to terms needs credits', { answers: 0 });
-      return termsNeedsCredits(self.agentId, result.topUp, context.payPage);
+      return termsNeedsCreditsAfterClaim(
+        result,
+        context,
+        self.agentId,
+        'agentlink_respond_to_terms',
+      );
     case 'approval_state':
       return termsApprovalState(context, 'agentlink_respond_to_terms', result);
     case 'pending_approval':

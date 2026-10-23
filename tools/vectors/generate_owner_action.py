@@ -58,6 +58,19 @@ unknown params key; remove carrying an `alias`; another signer. The store rules 
 the alias being its own restricted form and unique, a revoked contact refused) are the core's, not
 these vectors'.
 
+`storage.set`, `storage.remove` and `backup.export` (M1-9i-a, D-115; 04 §2.5.1), version 7: params
+exactly `{id, provider, endpoint, bucket, region, credentialDigest}`, `{id}` and `{kitId,
+contents}`; `id` 8 bytes as 16 lowercase hex; `provider` one of r2, s3, b2, hetzner, scaleway,
+wasabi, minio, other; `endpoint` exactly `https://host[:port]` under the 04 §4 grammar with no
+trailing slash; `bucket` the S3 bucket rule; `region` 1 to 32 of [a-z0-9-]; `credentialDigest` 64
+lowercase hex; `kitId` 16 bytes base64url; `contents` full or identity; L(op) = 600 s. Sign and
+verify vectors for each op; rejections, each validly signed unless stated: a lifetime of 601 s
+per op, expiry, unknown, extra or missing params keys (a credential among them), `id` spellings and
+lengths, endpoints not in canonical form (trailing slash, http, upper case, a path, an IP literal,
+a local name, a port with a leading zero, percent-encoding), a provider outside the list, bucket,
+region and digest spellings, `kitId` padding and length, other `contents`, `expiresAt` = 0 and
+another signer. The credential item, the `own_storage` row and `storage-mark` are the core's rules.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -75,7 +88,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 6
+VERSION = 7
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -627,6 +640,95 @@ def build():
         ("reject-contact-remove-alias", "contact.remove carrying an `alias` (strict params)", signed_body(op_body("contact.remove", {"contact": other_agent, "alias": "Ana"}))),
         ("reject-contact-rename-other-signer", "signed by another key than `owner`", {"body": rename, "sig": sign(rename, other, aux)}),
     ]:
+        reject(case_id, why, signed)
+
+    # storage.set, storage.remove and backup.export (M1-9i-a, D-115; 04 §2.5.1): applied on the
+    # agent's own machine, L(op) = 600 s, no envelope carrier. The credential item, the
+    # `own_storage` row and `storage-mark` are the core's rules (not vectors).
+    storage_id = v.hx(v.det("owner-action/storage-id", 8))
+    cred_digest = v.hx(v.det("owner-action/credential-digest", 32))
+    kit_id = v.b64u(v.det("owner-action/kit-id", 16))
+
+    def storage_params(**over):
+        p = {
+            "id": storage_id,
+            "provider": "r2",
+            "endpoint": "https://acct.r2.cloudflarestorage.com",
+            "bucket": "agent-files",
+            "region": "auto",
+            "credentialDigest": cred_digest,
+        }
+        p.update(over)
+        return p
+
+    storage_set = op_body("storage.set", storage_params())
+    storage_set_port = op_body("storage.set", storage_params(provider="minio", endpoint="https://minio.example.com:9000", bucket="a.b-c", region="eu-central-1"))
+    storage_remove = op_body("storage.remove", {"id": storage_id})
+    export_full = op_body("backup.export", {"kitId": kit_id, "contents": "full"})
+    export_identity = op_body("backup.export", {"kitId": kit_id, "contents": "identity"})
+    for case_id, why, b in [
+        ("sign-storage-set", "storage.set, R2 (M1-9i-a)", storage_set),
+        ("sign-storage-set-port", "storage.set, an endpoint with a port (M1-9i-a)", storage_set_port),
+        ("sign-storage-remove", "storage.remove (M1-9i-a)", storage_remove),
+        ("sign-backup-export-full", "backup.export, contents full (M1-9i-a)", export_full),
+        ("sign-backup-export-identity", "backup.export, contents identity (M1-9i-a)", export_identity),
+    ]:
+        cases.append(
+            v.case(
+                case_id,
+                f"{SPEC} SignedOwnerAction, {why}",
+                {"op": "sign", "body": b, "secretKey": v.hx(owner), "auxRand": v.hx(aux)},
+                {
+                    "jcs": jcs_lenient(b).decode("utf-8"),
+                    "bodyHash": v.hx(body_hash(b)),
+                    "signatureInput": v.hx(v.tagged_hash(TAG, body_hash(b))),
+                    "sig": sign(b, owner, aux),
+                },
+            )
+        )
+    for case_id, why, signed, ctx in [
+        ("verify-storage-set", "storage.set verifies (M1-9i-a)", signed_body(storage_set), context),
+        ("verify-storage-set-port", "storage.set with a port verifies (M1-9i-a)", signed_body(storage_set_port), context),
+        ("verify-storage-remove", "storage.remove verifies (M1-9i-a)", signed_body(storage_remove), context),
+        ("verify-backup-export", "backup.export verifies (M1-9i-a)", signed_body(export_full), context),
+        ("verify-storage-set-at-expiry", "storage.set verified at now = expiresAt (expiry has no skew)", signed_body(storage_set), {**context, "now": storage_set["expiresAt"]}),
+    ]:
+        cases.append(v.case(case_id, f"{SPEC}: {why}", {"op": "verify", "signed": signed, "context": ctx}, {"outcome": "accept"}))
+    storage_rejects = [
+        ("reject-storage-set-lifetime", "expiresAt - issuedAt = 601 s (L(storage.set) = 600 s)", signed_body(op_body("storage.set", storage_params(), expires_at=ISSUED_AT + 601))),
+        ("reject-storage-remove-lifetime", "expiresAt - issuedAt = 601 s (L(storage.remove) = 600 s)", signed_body(op_body("storage.remove", {"id": storage_id}, expires_at=ISSUED_AT + 601))),
+        ("reject-backup-export-lifetime", "expiresAt - issuedAt = 601 s (L(backup.export) = 600 s)", signed_body(op_body("backup.export", {"kitId": kit_id, "contents": "full"}, expires_at=ISSUED_AT + 601))),
+        ("reject-storage-set-expired", "now > expiresAt", signed_body(op_body("storage.set", storage_params(), expires_at=ISSUED_AT + 59))),
+        ("reject-storage-set-unknown-param", "unknown key in storage.set params", signed_body(op_body("storage.set", {**storage_params(), "note": "x"}))),
+        ("reject-storage-set-secret-param", "a credential in storage.set params (never a param, I-7)", signed_body(op_body("storage.set", {**storage_params(), "secretAccessKey": "s"}))),
+        ("reject-storage-set-missing-region", "storage.set params without `region`", signed_body(op_body("storage.set", {k: x for k, x in storage_params().items() if k != "region"}))),
+        ("reject-storage-remove-unknown-param", "unknown key in storage.remove params", signed_body(op_body("storage.remove", {"id": storage_id, "provider": "r2"}))),
+        ("reject-backup-export-unknown-param", "unknown key in backup.export params", signed_body(op_body("backup.export", {"kitId": kit_id, "contents": "full", "agent": agent}))),
+        ("reject-storage-set-id-uppercase", "`id` in upper-case hex", signed_body(op_body("storage.set", storage_params(id=storage_id.upper())))),
+        ("reject-storage-set-id-short", "`id` of 15 hex digits (8 bytes are 16)", signed_body(op_body("storage.set", storage_params(id=storage_id[:-1])))),
+        ("reject-storage-set-id-long", "`id` of 9 bytes", signed_body(op_body("storage.set", storage_params(id=storage_id + "00")))),
+        ("reject-storage-remove-id-0x", "`id` with a 0x prefix", signed_body(op_body("storage.remove", {"id": "0x" + storage_id}))),
+        ("reject-storage-set-endpoint-trailing-slash", "endpoint with a trailing slash (not the validateEndpoint output)", signed_body(op_body("storage.set", storage_params(endpoint="https://acct.r2.cloudflarestorage.com/")))),
+        ("reject-storage-set-endpoint-http", "endpoint over http", signed_body(op_body("storage.set", storage_params(endpoint="http://acct.r2.cloudflarestorage.com")))),
+        ("reject-storage-set-endpoint-uppercase", "endpoint host in upper case", signed_body(op_body("storage.set", storage_params(endpoint="https://ACCT.r2.cloudflarestorage.com")))),
+        ("reject-storage-set-endpoint-path", "endpoint with a path", signed_body(op_body("storage.set", storage_params(endpoint="https://acct.r2.cloudflarestorage.com/agent-files")))),
+        ("reject-storage-set-endpoint-ip", "endpoint an IP literal", signed_body(op_body("storage.set", storage_params(endpoint="https://10.0.0.1:9000")))),
+        ("reject-storage-set-endpoint-localhost", "endpoint a local name", signed_body(op_body("storage.set", storage_params(endpoint="https://minio.localhost")))),
+        ("reject-storage-set-endpoint-port-leading-zero", "endpoint port with a leading zero", signed_body(op_body("storage.set", storage_params(endpoint="https://minio.example.com:09000")))),
+        ("reject-storage-set-endpoint-percent", "endpoint with percent-encoding", signed_body(op_body("storage.set", storage_params(endpoint="https://acct.r2.cloudflarestorag%65.com")))),
+        ("reject-storage-set-provider", "a provider outside the list", signed_body(op_body("storage.set", storage_params(provider="gcs")))),
+        ("reject-storage-set-bucket-uppercase", "bucket in upper case", signed_body(op_body("storage.set", storage_params(bucket="Agent-Files")))),
+        ("reject-storage-set-bucket-short", "bucket of 2 characters", signed_body(op_body("storage.set", storage_params(bucket="ab")))),
+        ("reject-storage-set-region-uppercase", "region in upper case", signed_body(op_body("storage.set", storage_params(region="EU")))),
+        ("reject-storage-set-digest-uppercase", "credentialDigest in upper-case hex", signed_body(op_body("storage.set", storage_params(credentialDigest=cred_digest.upper())))),
+        ("reject-backup-export-kit-id-padded", "kitId base64url with padding", signed_body(op_body("backup.export", {"kitId": kit_id + "==", "contents": "full"}))),
+        ("reject-backup-export-kit-id-short", "kitId of 15 bytes", signed_body(op_body("backup.export", {"kitId": v.b64u(v.det("owner-action/kit-id", 16)[:15]), "contents": "full"}))),
+        ("reject-backup-export-contents", "contents outside full and identity", signed_body(op_body("backup.export", {"kitId": kit_id, "contents": "all"}))),
+        ("reject-storage-set-expires-zero", "expiresAt = 0 (allowed only for agent.revoke)", signed_body(op_body("storage.set", storage_params(), expires_at=0))),
+        ("reject-storage-set-other-signer", "signed by another key than `owner`", {"body": storage_set, "sig": sign(storage_set, other, aux)}),
+        ("reject-backup-export-other-signer", "signed by another key than `owner`", {"body": export_full, "sig": sign(export_full, other, aux)}),
+    ]
+    for case_id, why, signed in storage_rejects:
         reject(case_id, why, signed)
 
     # Raw JSON text (04 §2.4.1: integer tokens must match 0|[1-9][0-9]*, checked on the token; I-JSON

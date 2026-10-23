@@ -10,8 +10,12 @@ import {
   type Store,
   type StoreTx,
 } from '@4thtech-io/core';
-import { NodeKeyStoreError } from './errors.js';
-import { KeychainKeyStore, type KeychainKeyStoreOptions } from './keychain-keystore.js';
+import type { UnlockedFileAgent } from './file-keystore.js';
+import {
+  KeychainKeyStore,
+  recordedBackend,
+  type KeychainKeyStoreOptions,
+} from './keychain-keystore.js';
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';
 import { keychainPolicyMark } from './policy-mark.js';
 import { keychainReceiptsKept } from './receipts-kept.js';
@@ -44,6 +48,8 @@ export interface AgentStore {
 export interface AgentStoreOptions {
   /** Limit for each keychain call in milliseconds (KeychainKeyStoreOptions). */
   readonly timeoutMs?: number;
+  /** For the backend `file` (M1-8f): the handle unlockFileKeyStoreAgent returned for this agent. */
+  readonly fileAgent?: UnlockedFileAgent;
 }
 
 /**
@@ -66,20 +72,16 @@ export async function openAgentStoreWith(
   backend: KeyStoreBackendKind,
   agentId: string,
   path: string,
-  backends: { readonly keychain: KeychainBackend },
+  backends: { readonly keychain: KeychainBackend; readonly file?: UnlockedFileAgent },
   options: AgentStoreOptions = {},
 ): Promise<AgentStore> {
-  if (backend !== 'keychain') {
-    throw new NodeKeyStoreError(
-      'backend_unavailable',
-      backend === 'file'
-        ? "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't open yet. Update AgentLink."
-        : "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
-    );
-  }
+  // M1-8f: the file backend's items are the `ALKS` entries of the unlocked file, behind the same
+  // item interface, so the store key, the policy-version mark and the receipts-kept marker below
+  // are the keychain code unchanged (04 §2.8).
+  const items = recordedBackend(backend, agentId, backends);
   const keyOptions: KeychainKeyStoreOptions =
     options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs };
-  const keys = await KeychainKeyStore.open(backends.keychain, agentId, keyOptions);
+  const keys = await KeychainKeyStore.open(items, agentId, keyOptions);
   let cipher: AgentStoreCipher;
   try {
     cipher = await keys.withStoreKey((storeKey) => createAgentStoreCipher(storeKey));
@@ -95,7 +97,7 @@ export async function openAgentStoreWith(
   }
   let closed = false;
   const mark = keychainPolicyMark(
-    backends.keychain,
+    items,
     agentId,
     (fn) => store.withInterProcessLock(fn),
     keyOptions,
@@ -107,7 +109,7 @@ export async function openAgentStoreWith(
     raise: (version: number): Promise<number> => (closed ? storeClosed() : mark.raise(version)),
   });
   const kept = keychainReceiptsKept(
-    backends.keychain,
+    items,
     agentId,
     (fn) => store.withInterProcessLock(fn),
     keyOptions,
@@ -139,5 +141,14 @@ export function openAgentStore(
   path: string,
   options: AgentStoreOptions = {},
 ): Promise<AgentStore> {
-  return openAgentStoreWith(backend, agentId, path, { keychain: osKeychain() }, options);
+  const { fileAgent, ...rest } = options;
+  return openAgentStoreWith(
+    backend,
+    agentId,
+    path,
+    fileAgent === undefined
+      ? { keychain: osKeychain() }
+      : { keychain: osKeychain(), file: fileAgent },
+    rest,
+  );
 }

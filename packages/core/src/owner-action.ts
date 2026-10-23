@@ -61,13 +61,17 @@ export type OwnerActionRefusal =
   | 'alias_invalid'
   | 'alias_taken'
   | 'pairing_unavailable'
+  | 'credential_missing'
+  | 'credential_mismatch'
+  | 'storage_not_active'
   | 'unsupported_op'
   // store side (owner-actions.ts)
   | 'not_approved'
   | 'store_changed'
   | 'identity_missing'
   | 'identity_revoked'
-  | 'policy_mark_unavailable';
+  | 'policy_mark_unavailable'
+  | 'storage_keys_unavailable';
 
 /** Why one batch item does not match its pending request (04 §2.5.2). */
 export type ItemRefusal =
@@ -290,10 +294,14 @@ export function verifyOwnerAction(
     case 'policy.set':
     case 'contact.rename':
     case 'contact.remove':
+    case 'storage.set':
+    case 'storage.remove':
+    case 'backup.export':
     case 'agent.revoke':
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already
-      // checked; contact.rename and contact.remove: a stored contact, M1-9za; agent.revoke: none)
-      // and are applied by the store side.
+      // checked; contact.rename and contact.remove: a stored contact, M1-9za; storage.set: the
+      // KeyStore item `s3:<id>` and its digest, storage.remove: the active row, backup.export: none,
+      // M1-9i-a; agent.revoke: none) and are applied by the store side.
       break;
   }
   return { ok: true, signed, actionHash: ownerActionHash(input) };

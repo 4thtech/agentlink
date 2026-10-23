@@ -801,6 +801,36 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** PR #335 changed only `.github/scripts/worker-logging-settings.jq`, which both deploy workflows run in their logging read-back, and neither deploy started: their `on.push.paths` did not list it (nor `tools/release/wait-for-ci.mjs`). Add both to each filter and a test that fails when a workflow with a push `paths` filter runs a repo-local script (or local action) the filter does not cover.
 - **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
 
+#### CHORE-DEPLOY-RECONCILE-b · reconcile: bound pending approvals; alert when no deploy is found (new, IR-CHORE-DEPLOY-RECONCILE-1, #464)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · the reconcile workflow and `tools/release/**`
+- **Depends on:** CHORE-DEPLOY-RECONCILE
+- **Scope:**
+  - While production lags, allow at most one pending approval request per service (not per head).
+  - Raise an alert instead of a notice when no deploy is found in the last 30 runs.
+  - Card bullet 3: the `check-changesets.test.mjs` 3 of 15 local failures (environmental) get a note or a fix.
+- **Acceptance:**
+  - A test with several pending heads shows one request per service; the 30-run case alerts; no step weakened.
+
+#### DOCS-PASS-1023-b · status.yaml names init global install and the gasless route (new, 2026-10-23)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (`docs/process/**` by path; docs only)
+- **Repo/path:** agentlink · `docs/status.yaml`, then `node tools/docs-status/index.mjs`
+- **Depends on:** #422 and #452 merged (both are)
+- **Scope:**
+  - Mention #422 (init offers the global install and names agents after their app) and #452 (gasless top-up route, off by default) in `docs/status.yaml` at the next docs pass; regenerate the status files.
+- **Acceptance:**
+  - `node tools/docs-status/index.mjs --check` passes; nothing claims the gasless route is on.
+
+#### DOCS-G21-b · "median" vs "every tester": align the M2 gate and 02 with D-124 (new, IR-M1-GATE-a-2, #461)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · `docs/process/backlog.md` (M2-GATE acceptance), `docs/foundation/02-product-spec.md` (line 240)
+- **Depends on:** M1-GATE-a (#461)
+- **Spec:** 02 (success metrics); G-21
+- **Scope:**
+  - M2-GATE acceptance says "(median)" but its scope says "every tester"; 02 says "Median < 5 minutes". Align both with D-124 or state the M2 rule explicitly. The owner decides which.
+- **Acceptance:**
+  - One rule, worded the same in the M2-GATE card, 02 and the gate runbook; the owner confirmed it.
+
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
 - **Repo/path:** agentlink · `apps/submitter/src/index.ts`
@@ -3102,28 +3132,82 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-31-1 L-1, 2026-10-17): add "on `http://localhost:<port>`" to this card's acceptance (the approval page origin is localhost, D-79).
 - Review note (IR-M1-1k-1 (PR #223), 2026-10-17): wiping the PRF output after use is the caller's duty (JSDoc in `@4thtech-io/crypto`); do it in the node and console callers and test it.
 
-#### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
+#### M1-8f · node: passphrase-locked file KeyStore backend for headless machines (new, D-54)
+- **Status:** in review (4thtech/agentlink#392; the backend slice; CLI, MCP unlock, CI and `KeyEpochControl` split into M1-8f-b … M1-8f-e) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card and M1-8f-b; proposed, owner confirms at merge)
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-1f (`ALKS`/`ALKO` seal/open), M1-1g, M1-8a (keychain probe, recorded backend), M1-8c (owner passphrase path); M1-8b for the shared inter-process lock; M1-8g (the policy-version mark item of the file KeyStore)
-- **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
+- **Spec:** 04 §2.8 (format, KDF, unlock, file handling, threat delta, required tests); 07 §9.1, §9.2; D-54
 - **Invariants:** I-1, I-4, I-7, I-10
 - **Scope:**
   - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check and exact 04 §2.9 form (`0x` + 40 lowercase hex); expected-agent-ID check before the KDF and seed-derived check (the seed's EVM address) after decryption. All crypto through `@4thtech-io/crypto`; this package only handles files, locking and unlock sources.
-  - Selection per 07 §9.1: opt-in only, only when the keychain probe fails (with timeout and fix message), only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; backend recorded per agent and never switched.
-  - Unlock sources per 07 §9.2: passphrase file (`O_NOFOLLOW`, `fstat` checks), environment variable (allowed with the 04 §2.8 conditions; both variables removed from `process.env`; never written by `init`), interactive prompt for CLI commands; no CLI argument takes a passphrase. Async unlock after MCP `initialize`. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
-  - Secrets: generated unlock code by default (pinned base32 encoding, `secretKind` in the header); chosen passphrase ≥ 12 characters. Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko`, generated 120-bit owner code required. Agent ≠ owner enforced in both directions across all agents, with the owner wrap's normalisation.
-  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; `keystore passphrase` asks for the current passphrase at the prompt; `doctor` reporting and warnings (07 §9.4).
-  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit) and record whether `@noble/hashes` clears its Argon2id buffers.
-  - Full threat note (04 §2.8 threat delta, including the faked-terminal case) and quickstart input for M1-12b.
+  - Selection per 07 §9.1 in the create entry point: opt-in only, only when the keychain probe fails, only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; the recorded backend `file` opens only from its unlocked file, never from the keychain.
+  - Unlock sources per 07 §9.2: passphrase file (`realpath`, `O_NOFOLLOW`, `fstat` checks), environment variable (both variables removed from `process.env`), a prompt callback for CLI commands; no CLI argument takes a passphrase. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
+  - Secrets: generated unlock code by default (`secretKind` in the header); chosen passphrase ≥ 12 characters. Agent ≠ owner on the agent side (a candidate that unlocks `owner.alko` is refused), with the owner wrap's normalisation, and a helper for the owner side (does a candidate open any agent file).
+  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; the passphrase change asks for the current secret at the prompt only.
+  - Measure Argon2id unlock time and record whether `@noble/hashes` clears its Argon2id buffers.
+  - Threat note (04 §2.8 threat delta, including the faked-terminal case) in the PR.
 - **Acceptance:**
-  - Every test listed in 04 §2.8 "Required tests", written first: canary (I-7), wrong passphrase, tamper detection, agent binding, parser, normalisation, permissions, write protocol, selection, owner key, environment, unlock timing, `ALKS` v1 vectors (M1-1h).
-  - CI: an Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
-  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
-  - `KeyEpochControl` as in M1-8a (IR-M1-1g-d-1 M-1, L-5). The advance writes the epoch with the 04 §2.8 write protocol, so it is atomic and durable. Every open `KeyStore` instance over the same file sees it at once. The control accepts only sessions the paired `OwnerKeyStore` minted.
-  - Unlock time on the reference container is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
+  - Tests first, the 04 §2.8 "Required tests" this package owns: canary (I-7), wrong passphrase, tamper detection, agent binding, permissions, write protocol, selection, environment, agent ≠ owner (agent side); parser, normalisation and `ALKS` v1 vectors stay with M1-1f/M1-1h.
+  - The KeyStore conformance suite passes against the file backend.
+  - Unlock time is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
   - (M1-8g) The policy-version mark is the `ALKS` entry `policy-version`, written with the 04 §2.8 write protocol; M1-8g's mark contract test (`policy-mark.fixture.ts`) passes against the file backend, and `openAgentStore` hands the file backend's mark to the client.
+
+#### M1-8f-b · cli: `init --keystore file`, `keystore passphrase`, `doctor` and `owner init` with `owner.alko` on file-KeyStore machines (new, split from M1-8f)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · apps/cli, packages/node (owner store over `owner.alko`)
+- **Depends on:** M1-8f, M1-8c, M1-8h, M1-9a, M1-9t, M1-9z
+- **Spec:** 04 §2.8 (Selection, Passphrase strength, The owner key on a headless machine, Changing the passphrase, Logging and display); 07 §9.1–§9.4; 06 §7; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - `agentlink init --keystore file` (and the `init` question) on M1-8f's `createFileKeyStoreAgent`: interactive terminal only, harness-marker guard, generated unlock code shown once with its last group re-typed (`confirmCode`) and the screen cleared; the optional code file (`O_CREAT | O_EXCL | O_NOFOLLOW`, 0600, never under `~/.agentlink`); `init` and the harness config writers write only `AGENTLINK_KEYSTORE_PASSPHRASE_FILE`, never the value; the one-time trade-off copy at opt-in (07 §9.4); probe timeout with the fix message.
+  - `agentlink keystore passphrase` on `changeFileKeyStorePassphrase`, current secret at the prompt, with its copy.
+  - `doctor` reporting and warnings (07 §9.4): value variable set, passphrase file readable by others, `AGENTLINK_OWNER_*` set and ignored, owner key present on a file-KeyStore machine; owner fingerprint and creation time.
+  - Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko` (`ALKO` v1, the `.alks` file-handling rules), generated 120-bit owner code required, display-only; agent ≠ owner on the owner side across all agents; `owner add-agent` and `owner change-code` on `owner.alko`.
+  - The redacting logger treats both environment variable names as secret-bearing; the CI secret-pattern test knows the code pattern.
+  - Quickstart input for M1-12b.
+- **Acceptance:**
+  - The 04 §2.8 "Owner key" required tests, written first: no non-interactive source unlocks `OwnerKeyStore` (`AGENTLINK_OWNER_*`, a file, an argument, piped stdin); on file-KeyStore machines a chosen owner passphrase is refused and `init --keystore file` creates no owner key; `owner init` refuses when the owner key exists or the card names an owner, never overwrites, and points to `owner add-agent` (D-78); `owner init` writes the owner code to no file and offers no code file; fingerprint and lost-code consequence before the code, and `doctor` shows the fingerprint and creation time; agent ≠ owner in both directions across several agents, with matching normalisation.
+  - Canary (I-7) over CLI output and `doctor`; no CLI command accepts the agent passphrase as an argument; `init` never writes the value variable into a harness config.
+  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
   - (IR-M1-8c-1 F-10, F-11) The TTY prompt tests run unconditionally in CI (a pseudo-terminal, not skipped when no TTY is present), and the owner and passphrase prompts refuse C0 control characters in the typed input.
+
+#### M1-8f-c · cli: async file KeyStore unlock in the MCP server (new, split from M1-8f)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · apps/cli (MCP server start-up, open-agent runtime)
+- **Depends on:** M1-8f, M1-8f-b (recorded backend `file` from `init`)
+- **Spec:** 04 §2.8 (Unlocking the agent key; KDF target); 07 §9.2; 06 §2.5
+- **Invariants:** I-1, I-7
+- **Scope:**
+  - For an agent recorded with the backend `file`, the MCP server calls `unlockFileKeyStoreAgent` after answering MCP `initialize` (no prompt), then opens the KeyStore and the store with `fileAgent`. Until it finishes, tools return `needs_setup` (`keystore_locked`, "unlocking"); with no source or a failed unlock, `needs_setup` (`keystore_locked`) naming the fix without revealing anything about the file.
+  - A later `keystore_locked` (a passphrase change elsewhere) keeps tools at `needs_setup` until restart.
+- **Acceptance:**
+  - Unlock timing: the async unlock answers MCP `initialize` before the KDF finishes, and tools return `keystore_locked` until it does.
+  - Environment: both variables are removed from `process.env` at start-up and child processes started later do not inherit them; canary (I-7) over tool results.
+
+#### M1-8f-d · CI: Ubuntu job without D-Bus or Secret Service for the file KeyStore (new, split from M1-8f)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · .github/workflows/ci.yml
+- **Depends on:** M1-8f-b, M1-8f-c
+- **Spec:** 04 §2.8 (Required tests: Vectors and the CI job); docs/process/ci-cd.md
+- **Invariants:** I-1
+- **Scope:**
+  - An Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
+  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit, x86); M1-8f measured on arm64 only.
+- **Acceptance:**
+  - The job is green and required. Unlock time on the reference container is recorded; up to 5 s is accepted, above that it goes to the owner (04 §2.8).
+
+#### M1-8f-e · node: `KeyEpochControl` for the keychain and file KeyStores (new, split from M1-8f; IR-M1-1g-d-1 M-1, L-5)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/node
+- **Depends on:** M1-1g-d, M1-8a, M1-8f
+- **Spec:** 04 §2.6, §2.8 (Writes), §3.1.1 (Epoch advance); 07 §9
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - `KeyEpochControl` as in M1-8a for both Node backends (packages/node has none yet): a separate object, built only by owner flows and unreachable from the `KeyStore` instance.
+- **Acceptance:**
+  - `advanceEpoch` accepts only sessions the paired `OwnerKeyStore` minted, checked by identity; a look-alike gets `presence_required`.
+  - The compare-and-set is atomic and durable across processes, and every open `KeyStore` instance over the same keychain entry or file sees an advance at once; on the file backend the advance writes the epoch with the 04 §2.8 write protocol.
+  - Tests: a fake session, a cast of the agent `KeyStore`, two processes advancing concurrently, and a kill during the advance.
 
 #### M1-8g · node: policy-version mark in the keychain and file KeyStores (new, IR-M1-7d-1 F-2)
 - **Status:** ready (planning 2026-10-15: dependencies M1-7d #79, M1-8a #54 and M1-8b #60 merged) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3306,7 +3390,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** docs checks pass; no implementation; the build cards below cite the new sections.
 
 #### M1-9i-a · types and core: storage and backup owner ops (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (4thtech/agentlink#414) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types/src/{constants,owner-action}.ts; packages/core/src/{owner-action,owner-actions,own-storage}.ts, the store migration and `Store` contract for `own_storage`, packages/core/src/files/outgoing.ts; owner-action vectors for the new ops
 - **Depends on:** M1-9i-s, M1-9i-b2 (`credentialDigest`)
 - **Spec:** 04 §2.5.1 (new rows); 07 §3.4 (`own_storage`), §5.6
@@ -3530,7 +3614,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** core tests, two real cores against the in-memory Notary: both J8 shapes end with an `ACCEPTED` receipt on-chain and an exported pack that verifies with the owner's signed approval; one owner approval per side; zero credits gives `needs_credits` with nothing sent or asked; a changed argument gets a new approval; a repeat with the same `approvalId` signs and charges nothing more; summaries carry no terms text (I-5); RED commit. The e2e `it.fails` J8 tests of M1-13c flip to plain tests once both land.
 
 #### M1-9d-4 · Terms tools: the top-up link for `needs_credits` (new, from IR-M1-9d-3-1)
-- **Status:** todo · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/registry.ts`, `terms-common.ts`), `test/fixtures/tool-surface.json`
 - **Depends on:** M1-9d-3
 - **Spec:** 06 §2.2a, §2.4 (`needs_credits`: `url` set to the top-up link), §2.1 (`topUpUrl`, `agentAddress`); D-111, D-113
@@ -3719,6 +3803,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Cap the simulated gas for `depositFor` (for example at most 300k), so a bad simulation result cannot spend the faucet key on a runaway limit.
   - The runbook rollback note says that the old daily cleanup deletes new-format claim records, so a rollback of the faucet must account for that.
 - **Acceptance:** tests first (local red run): with a stuck approve (pending nonce above latest) a new claim is refused at once and sends nothing; a simulated gas figure above the cap is rejected or clamped to the cap, per the chosen rule; the runbook rollback note is present and the docs checks pass.
+
+#### M1-10b-d · faucet: wait for its own pending depositFor before refusing `busy` (new, IR-M1-10b-c-1 L1)
+- **Status:** in review (`packages/chain/src/fees/faucet.ts`) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain (faucet wallet)
+- **Depends on:** M1-10b-c
+- **Spec:** 05 §9 (faucet); `release-and-deployment.md` §4.5
+- **Invariants:** I-3
+- **Scope:**
+  - Every USDC claim needs a fresh `approve`, so a claim within about one block of the previous one found the faucet's own unmined `depositFor` (`pending` nonce above `latest`) and got `busy`. Before refusing, poll `latest` until it reaches the `pending` nonce read, within the existing `receiptTimeoutMs` deadline; refuse `busy` only if it has not.
+  - The nonce poll and the approve's receipt wait share one `receiptTimeoutMs` budget per claim, so no claim waits longer in total than before.
+  - Unchanged: claims serialised on `SubmitterFaucet`'s tail; `pending` read before `latest`; `busy` maps to `not_sent`, refunded once; the gas cap; the HTTP answers. No nonce check on the `depositFor`-only path.
+- **Acceptance:** tests first (local red run): two claims within one block both succeed when the first `depositFor` mines within the poll window; a truly stuck approve still gets `busy` after the deadline and sends nothing; the poll and the receipt wait together stay within `receiptTimeoutMs`.
 
 #### M1-10c · submitter and faucet deploy pipeline (new sub-task)
 - **Status:** in review (`.github/workflows/deploy-submitter.yml`, `apps/submitter/wrangler.toml`; owner setup RB-19 `docs/runbooks/submitter-deploy.md`; deploy waits for the owner's Worker secrets and funding) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -4533,7 +4629,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The concurrency test signs exactly one DELIVERED; the already-notarized case is reported in the result field and the summary line; the inbox page test shows one transaction per page; no test weakened.
 
 #### M1-33d-c · proofStatusShape follows 06 ProofStatus (new, from IR-M1-33d-b-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/types` (`proofStatusShape` and its schema test)
 - **Depends on:** M1-33d-b
 - **Spec:** 06 `ProofStatus`; D-109
@@ -4542,6 +4638,37 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Align `proofStatusShape` with 06 `ProofStatus`: add `receiptRequested`, `receiptRequestNotAdded` and `advanced`.
 - **Acceptance:**
   - A schema test accepts each new field and rejects a malformed one; the existing proof tests pass unchanged.
+
+#### M1-33d-d · proofStatusShape and 06 ProofStatus agree on `chain` and `receiptRequested` (new, IR-M1-33d-c-1, #462)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/types` (`proofStatusShape`, `proofStatusResultSchema`), `apps/cli` (proof status result), `docs/foundation/06-mcp-tools-and-ux.md` (proposed, owner confirms at merge)
+- **Depends on:** M1-33d-c
+- **Spec:** 06 `ProofStatus`; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - `proofStatusShape` requires a top-level `chain`, but 06 says it is advanced-only and the CLI never emits it, so a real result would fail `proofStatusResultSchema`. Make `chain` optional (advanced only) or move it under `advanced`, and align 06 and the schema.
+  - Add `receiptRequested` to the 06 `ProofStatus` and the CLI schema, or note in 06 why it is not there.
+  - Rated medium in the review: fix before M1-33d ships.
+- **Acceptance:**
+  - A schema test parses the CLI's real proof status result (default and advanced); a result without `chain` passes; the default result still shows no chain; the existing proof tests pass unchanged.
+
+#### M1-36d-d · next-step-limit test renders multi-argument builders (new, IR-M1-36d-c-3, #458)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`next-step-limit.test.ts`)
+- **Depends on:** M1-36d-c
+- **Scope:**
+  - The test skips builders that take 2 or 3 arguments (`TERMS_TEXT.*`, `INBOX_TEXT.headerFrom`) without saying so. Render them with sample arguments, or fail loudly (or warn) when a builder is skipped.
+- **Acceptance:**
+  - A new multi-argument builder over the 500 code point limit fails the test; no builder is skipped silently; no test weakened.
+
+#### M1-36i-e · free-credits wait counts against the approval wait (new, IR-M1-36i-c-1, #466)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`src/mcp/approval-wait.ts` and the free-credits claim)
+- **Depends on:** M1-36i-c
+- **Scope:**
+  - Subtract the time spent waiting for the free test credits from `approvalWaitMs`, so a tool call stays under the harness timeouts (Codex is about 60 s).
+- **Acceptance:**
+  - A test with a slow credits claim shows the total tool call time stays within the configured bound; with no credits wait the behaviour is unchanged.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
@@ -5026,7 +5153,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A test fails on any banned term in default output; the two `FIXED_BY_OTHER_CARDS` entries are gone.
 
 #### M1-36f · agent UX: credits honesty (UX-F) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (folded into M1-36i-c) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/proofs-common.ts`, `apps/cli/src/commands/credits.ts` (rebase on #344)
 - **Depends on:** #344
 - **Spec:** 06 §2.5; 11 §5
@@ -5300,7 +5427,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A test per item; no secret or URL is logged.
 
 #### M1-36i-c · free credits: bounded in-call wait and one proof retry after a claim (new, D-120 (3))
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/notarize.ts`, `send.ts`, `proofs-common.ts`, `apps/cli/src/runtime/proofs.ts` and tests
 - **Depends on:** M1-36i
 - **Spec:** 06 §2.5; 07 §5
@@ -5311,7 +5438,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests: claim then one retry; no second retry; timeout returns the plain `needs_credits` text; threat note and tests-first evidence (S2).
 
 #### M1-36i-d · terms tools claim free test credits on needs_credits (new, D-120 (3))
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/propose-terms.ts`, `apps/cli/src/tools/respond-to-terms.ts` and their tests only (not `notarize.ts`, `send.ts` or `proofs-common.ts`, which M1-36i-c owns)
 - **Depends on:** M1-36i, M1-36i-c
 - **Spec:** 06 §2.5
@@ -5513,10 +5640,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Audit report with a verdict per invariant and zero open Critical/High findings.
   - Testing log: testers × journeys × harness combinations, with issues filed as cards; J8 completed with on-chain proof of agreement (D-32).
-  - UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows; install → first message stays under 5 minutes (median, per G-21).
+  - UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows; install → first message stays under 5 minutes for every tester (per G-21, D-124).
   - Files (D-48): in J1 a file over 12 KB is sent with zero storage setup through the encrypted drop; the audit covers the 04 §7 drop rows.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - Owner sign-off recorded.
+
+#### M1-GATE-a · Tester runbook, testing log and the install → first message timing method for the M1 gate (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus independent review, because it proposes a gap resolution) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/runbooks
+- **Depends on:** none to write; the testers run it once the M1b cards its journeys need have merged
+- **Spec:** 10 Gate M1; 02 §5 (J1–J5, J8); 08 §2.3; G-21; `audit-rules.md` §4.5, §7; D-39, D-40, D-48
+- **Invariants:** I-1, I-5 (testers never share keys, codes or content; hostile-message check)
+- **Scope:**
+  - `docs/runbooks/m1-gate-testing.md` (RB-20): recruitment checklist for 10 testers on ≥ 3 harness combinations, per-journey script for J1, J2, J3, J4, J5 and J8 on testnets, a testing-log template with no names or secrets, how to report issues.
+  - The G-21 resolution (D-124, owner-confirmed 2026-10-23), used by the runbook.
+- **Acceptance:**
+  - The runbook follows the runbook template, covers J1, J2, J3, J4, J5 and J8 across the harness combinations, and every command it names exists on `main`.
+  - Timing needs no network telemetry (08 §2.3).
+  - Filled logs go to the private audit store, never to this repository.
+  - Card counts are recounted after #449 lands (this PR does not touch the count rows).
 
 ---
 
@@ -6151,13 +6293,13 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Internal milestone audit (parts A–F of `audit-rules.md` §7) plus the M2 additions: web checklist on console, verify, invite and pay; cloud agent; Registry.
-  - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" (median) measured per G-21.
+  - External testing: 20–50 early adopters on testnets; UX metric "install → first message" measured per G-21 and judged by the D-125 rule (self-reported, no analytics).
 - **Acceptance:**
   - Zero open Critical/High findings; per-invariant verdicts.
   - **G-1 re-decided (D-67)** before external testers start: the owner records a new decision on the same-user residual (G-1, G-42), taking into account what the desktop apps deliver; until then no external tester relies on owner presence on an `npx` install.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
-  - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message stays under 5 minutes (median).
-  - Adopter count and the measured median recorded; issues filed as cards; owner sign-off.
+  - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message meets the D-125 rule: median < 5 minutes, at least 80% of testers < 5 minutes, no tester > 15 minutes for a cause on our side (counterpart wait excluded; an over-15 caused by us is a bug fixed before the gate passes).
+  - Adopter count, the measured median and the share under 5 minutes recorded; issues filed as cards; owner sign-off.
 
 ---
 
@@ -6309,6 +6451,48 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - From IR-M1-3c-1 (info): a `TokenChecks` negative payee probe; client rule: always sign the `ReceiveWithAuthorization` typehash, never `TransferWithAuthorization`; the submitter simulates and rate-limits `deposit-authorization`; decide the interface file placement.
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
+#### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
+- **Depends on:** M3-4b-t
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-6
+- **Scope:**
+  - The builder accepts `windowSeconds` up to 3600, but the relay refuses a `validBefore` later than now plus 1020 s. Align them with one named constant (`GASLESS_MAX_WINDOW_SECONDS`) or document the gap.
+- **Acceptance:**
+  - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
+
+#### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
+- **Depends on:** M3-4b-t-0 (#453)
+- **Scope:**
+  - Update the comments that still say "until M1-3c" now that the ABI landed. No code change.
+- **Acceptance:**
+  - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
+
+#### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
+- **Depends on:** M3-4b-t-0 (#453)
+- **Scope:**
+  - Current tests mock the registry. Add a test against the real registry: `gaslessToken` refuses on 84532 and 10200 while `GASLESS_TOPUP_ENABLED=false`.
+  - Check the eip3009 composition in `registry.ts` also requires the flag (a note on the review, to be confirmed in the code).
+- **Acceptance:**
+  - The test fails if the flag check is removed; no test mocks the registry in it.
+
+#### M3-4b-t-T3-c · deposit relay: cap order and refund on a crash mid-send (new, IR-M3-4b-t-T3-b-1, #459)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/submitter/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/submitter` (deposit-authorization route)
+- **Depends on:** M3-4b-t-T3-b (#459)
+- **Spec:** 07 §7; 04 §7
+- **Invariants:** I-3
+- **Scope:**
+  - Count the global cap after `relay.check` (so a bad request cannot burn it, which raises the attacker's cost), or add a signature pre-verify before counting.
+  - Refund the quota when the process crashes mid-send.
+- **Acceptance:**
+  - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/submitter; agentlink-ops · monitoring
@@ -6783,7 +6967,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
 20. **G-20 (M) Revocation typed data.** **RESOLVED (D-81, Tali, in chat, 17 Oct 2026):** 05 §4 `Revocation` struct, owner-signed (EIP-712, OCC v2 chain domain, ERC-1271 accepted); random single-use nonces per owner shared with `Registration` (`usedNonces[ownerEvm][nonce]`); reverts on expiry, reuse or a `keyEpoch` other than the stored one; revoke works while paused. *Was:* 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i-b (vectors), M2-4a.
-21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
+21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. **RESOLVED (D-124, Tali, in chat, 2026-10-23, strict):** every tester's install → first message time is under 5:00, time waiting for the counterpart excluded. Timing is self-timed with a stopwatch plus two local `date -u` lines, cross-checked against the agent folder's creation time and the counterpart's inbox time, logged by tester ID in the private audit store (RB-20 step 4). No analytics, no network telemetry. M2-GATE reuses the method. *Was:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
 23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** RESOLVED by 4thtech/agentlink#51 (D-65; accepted by Tali, 2026-10-14, at merge, with every value below), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. After IR-G-24-1 (also accepted at that merge): invite, `handshake` and `handshake-ack` lists must match `relaysHash` and `nameHash` (04 §3.6); `handshake-ack` carries `relays` (amends D-58; M1-2d); lists carried with a card hold 2–16 relays; a relay change is refused while an overlap runs; the owner `card-update` is also sent at `init`, re-published every 24 h during an overlap and every 7 days otherwise, and also published to the release default set; no agent-directory event kind now (a directory, if wanted, goes into the G-36 owner-backup blob); the 15-minute sync turn is a target. New cards M1-2d and M1-7j. The two D-58 amendments (owner-channel `card-update`, `handshake-ack` `relays`) are recorded as D-65 (accepted) in the decision log (00-README). After round 2: a 9-day look-back on a surface's first sync of a relay with no cursor, and a per-agent Advanced opt-out from announcing on the default relays, with its privacy cost stated. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.
