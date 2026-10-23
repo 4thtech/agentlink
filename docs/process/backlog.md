@@ -2125,7 +2125,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first: a zero-signer struct is not absent; `replacementAllowed` refuses on it (record and receipt); `readInclusion`, `notarize` and `acknowledge` fail with a ChainError and send nothing; `RecordNotFound` still means absent.
 
 #### M1-4c-e · chain: verify.ts treats a zero signer as not found, aligned with `bad_answer` (new, IR-M1-4c-d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
+- **Status:** in review (M1-4d-g PR) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`verify.ts`)
 - **Depends on:** M1-4c-d
 - **Scope:** `verify.ts` treats a zero-signer record as not found. The verdict is failed and therefore safe, but a zero signer is a malformed answer: align it with `bad_answer`, as the chain-state `getRecord` does after M1-4c-d. Source: IR-M1-4c-d-1.
@@ -2153,7 +2153,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): an update without the signatures from an older peer is still accepted and a forged one is dropped; a signer for an earlier epoch signs only for retained epochs, never a future one; a lost compare-and-set is reported, not ignored.
 
 #### M1-4d-g · chain: verifier reads `RecordNotFound` only as the bare selector (new, IR-CHORE-CHAIN-SUBMITTER-1)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`src/verify`, `src/clients/errors.ts`)
 - **Depends on:** M1-4d
 - **Spec:** 05 (record lookup); 07 §8
