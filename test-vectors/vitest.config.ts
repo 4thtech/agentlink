@@ -69,6 +69,8 @@ export default defineConfig({
             'harness/schema.test.ts',
             'harness/compare.test.ts',
             'harness/policy-form.test.ts',
+            // M1-11r-b: the owner-operation prepare builder against the signing vectors.
+            'harness/prepare-form.test.ts',
             BATCH_FORM,
             CONTACT_CHECK_FORM,
           ],
