@@ -16,6 +16,7 @@ declare module 'cloudflare:test' {
         storage: {
           get<T>(key: string): Promise<T | undefined>;
           list<T = unknown>(): Promise<Map<string, T>>;
+          put(key: string, value: unknown): Promise<void>;
         };
       },
     ) => R | Promise<R>,
