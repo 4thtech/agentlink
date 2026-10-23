@@ -9,10 +9,11 @@
 # Requires the owner to NOT enable CodeQL "default setup" in the repository
 # settings (it would conflict with the `codeql` job below).
 #
-# On merge_group runs `dependency-review` and `codeql` are skipped, so `security-gate` still reports
-# (a skipped job counts as a pass). They are not covered by the queue: they run on the pull request's
-# own commits, and a draft that skipped them runs them when it is marked ready for review (the
-# `ready_for_review` trigger, CHORE-CI-SPEED-1). The secret scan and zizmor run in the queue too.
+# On merge_group runs every job except the gate is skipped (`dependency-review`, `codeql`,
+# `secret-scan`, `zizmor`), so `security-gate` still reports (a skipped job counts as a pass). The
+# queue does not repeat them: they run on the pull request's own commits, and a draft that skipped
+# `dependency-review` and `codeql` runs them when it is marked ready for review (the
+# `ready_for_review` trigger, CHORE-CI-SPEED-1).
 #
 # The orphan coordination branch `sync` (markdown only, pushed directly, no pull
 # requests) is NOT triggered from here: a push-triggered workflow always runs from the
@@ -22,7 +23,7 @@
 name: Security
 
 # CHORE-CI-SPEED-1: `dependency-review` and `codeql` skip on a draft pull request and run when it is
-# marked ready for review (`ready_for_review`) and in the merge queue. The secret scan and zizmor
+# marked ready for review (`ready_for_review`); neither runs in the merge queue. The secret scan and zizmor
 # stay on for drafts: they are cheap and catch the mistakes that must never be pushed.
 on:
   pull_request:

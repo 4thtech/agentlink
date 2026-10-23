@@ -42,7 +42,7 @@ Add exactly these four to the `main` ruleset: **`ci-gate`**, **`security-gate`**
 | Pull request, selector fails or the diff cannot be read | Full suite, with a warning | as before | all four report |
 | `merge_group` (the queue) | **Full suite**, always; the selector is never run | full matrix including macOS and Windows | all four report |
 | `push` (any branch, `main`) | Full suite, the selector is never run | as in "Where the heavy jobs run" | `ci-gate (push)` is not required |
-| Draft pull request | Skipped when CHORE-CI-SPEED-1 lands (it adds the draft condition and the `ready_for_review` trigger; this change does not touch either) | skipped with `detect`; the secret scan, zizmor, `pr-hygiene` and `review-gate` still run | the gates report (skipped upstream counts as a pass) |
+| Draft pull request | Skipped (CHORE-CI-SPEED-1: `detect` and `context-budget` carry the draft condition, so every heavy job skips with them; `ready_for_review` starts the full suite) | skipped with `detect`; the secret scan, zizmor, `pr-hygiene` and `review-gate` still run | the gates report (skipped upstream counts as a pass) |
 
 A wrong or too-narrow selection can only delay a failure to the queue, never let it reach `main`: the queue repeats the full suite on the merged result. `dependency-review` and `codeql` are not repeated in the queue (they are skipped there); a pull request runs them on its own commits, and a draft runs them when marked ready for review (`ready_for_review`, CHORE-CI-SPEED-1). Selection rules are in the header of `tools/ci/select-affected.mjs`; its tests are `tools/ci/select-affected.test.mjs`.
 
