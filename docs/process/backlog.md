@@ -4995,7 +4995,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Search results and the go/no-go recorded privately; the name confirmed or changed in the decision log before M2-10 is decided.
 
 #### M1-25 · Agent-assisted install: install prompts per harness (D-39) (new)
-- **Status:** in progress (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; the negotiation, glossary and FAQ pages remain) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; negotiation page, glossary and FAQ updates in this PR; `SKILL.md` already complete) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, skills/agentlink/SKILL.md, apps/cli (`init`)
 - **Depends on:** M1-9a, M1-12a, M1-12b, M1-16
 - **Spec:** D-39, D-53; 06 §7, §7.1 (install prompts, install-and-accept prompt); 02 F-01, F-09, J1, J7; 04 §2.5; 11 §5
