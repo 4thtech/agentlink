@@ -437,10 +437,11 @@ describe('read limits (IR-M1-10a-1 L-2)', () => {
 });
 
 describe('other routes', () => {
-  it('keeps /v1/deposit-authorization present but disabled', async () => {
+  it('serves /v1/deposit-authorization once enabled (M3-4b-t-3; test/deposit-auth.test.ts)', async () => {
+    // The Miniflare settings enable Base Sepolia; the default (flag unset) is 501, tested there.
     const res = await post('/v1/deposit-authorization', { chainId: CHAIN_ID }, newIp());
-    expect(res.status).toBe(501);
-    expect(await res.json()).toEqual({ error: 'not_available' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'bad_request' });
   });
 
   it('answers 404 and 405 with fixed codes', async () => {

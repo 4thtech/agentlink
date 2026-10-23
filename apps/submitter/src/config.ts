@@ -11,6 +11,7 @@
 import { decodeBase64url } from '@4thtech-io/crypto';
 import {
   FAUCET_MAX_USD_CENTS,
+  GASLESS_CHAIN_IDS,
   getChainConfig,
   isFaucetChain,
   type FaucetChain,
@@ -344,4 +345,69 @@ export function pinnedFaucet(
   if (faucet === null || typeof env !== 'object' || env === null) return null;
   const pinned = readFaucetAddress(env as Record<string, unknown>, chainId);
   return pinned !== null && faucet.faucetAddress.toLowerCase() === pinned ? faucet : null;
+}
+
+/**
+ * Gasless top-ups (07 §7 `POST /v1/deposit-authorization`; 05 §2.5; 12 §4.1; M3-4b-t-3). Off unless
+ * SUBMITTER_DEPOSIT_AUTH_CHAINS names chains, each a gasless testnet of @4thtech-io/chain
+ * (`GASLESS_CHAIN_IDS`: Base Sepolia only) and a testnet in the shipped config. While it is off the
+ * route answers 501 `not_available`, as before. Anything invalid turns it off (null) and leaves
+ * the rest of the submitter running.
+ *
+ * Vars: SUBMITTER_DEPOSIT_AUTH_CHAINS and the bounded overrides below.
+ * Worker secrets (set by the owner with `wrangler secret put`, never in a file):
+ *   SUBMITTER_DEPOSIT_GAS_KEY_<chainId>  the relay's own gas key, 0x + 64 hex, never the chain's
+ *                                        submitter gas key or faucet key (index.ts): its wallet
+ *                                        pays the network cost of top-ups only, so griefing it
+ *                                        cannot drain the wallet that relays proofs
+ * The relay uses the submitter's RPC URLs, fee ceiling and per-IP bucket key.
+ */
+export interface DepositAuthConfig {
+  readonly chains: readonly number[];
+  /** Top-ups sent per agent (`auth.from`) per chain per hour; only checked authorizations count. */
+  readonly agentRequestsPerHour: number;
+  /** Requests per IP (IPv6 /64) per hour, whatever their outcome. */
+  readonly ipRequestsPerHour: number;
+}
+
+export const DEPOSIT_AUTH_DEFAULTS = Object.freeze({
+  /** Owner decision 2026-10-23: 5 per agent per hour. */
+  agentRequestsPerHour: 5,
+  ipRequestsPerHour: 20,
+});
+
+/** Reads and checks the gasless top-up settings; null when the route is off or anything is invalid. */
+export function readDepositAuthConfig(env: Record<string, unknown>): DepositAuthConfig | null {
+  const chainsRaw = env.SUBMITTER_DEPOSIT_AUTH_CHAINS;
+  if (typeof chainsRaw !== 'string' || chainsRaw === '') return null;
+  const chains: number[] = [];
+  for (const part of chainsRaw.split(',')) {
+    if (!INTEGER.test(part)) return null;
+    const chainId = Number(part);
+    if (!GASLESS_CHAIN_IDS.includes(chainId) || getChainConfig(chainId)?.testnet !== true) {
+      return null;
+    }
+    if (chains.includes(chainId)) return null;
+    chains.push(chainId);
+  }
+  const agent = intVar(
+    env,
+    'SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR',
+    DEPOSIT_AUTH_DEFAULTS.agentRequestsPerHour,
+    1,
+    60,
+  );
+  const ip = intVar(
+    env,
+    'SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR',
+    DEPOSIT_AUTH_DEFAULTS.ipRequestsPerHour,
+    1,
+    1_000,
+  );
+  if (agent === null || ip === null) return null;
+  return Object.freeze({
+    chains: Object.freeze(chains),
+    agentRequestsPerHour: agent,
+    ipRequestsPerHour: ip,
+  });
 }
