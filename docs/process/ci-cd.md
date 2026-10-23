@@ -91,7 +91,7 @@ Owner-approved 2026-10-22 after a day of CI starvation and merge-queue ejections
 Fix commands (also printed by the job). Merge, never rebase:
 
 - Conflict: `git fetch origin && git merge origin/main`, resolve, commit, push.
-- Generated status files (`README.md`, `docs-site/technical/project/status-and-roadmap.md`, `knowledge/agentlink-overview.md`) are never merged by hand: `git checkout origin/main -- README.md docs-site/technical/project/status-and-roadmap.md knowledge/agentlink-overview.md && node tools/docs-status/index.mjs`. A conflict in the source `docs/status.yaml` is resolved by hand first.
+- Generated status files (`README.md`, `docs-site/technical/project/status-and-roadmap.md`, `knowledge/agentlink-overview.md`) are never merged by hand: `git checkout origin/main -- README.md docs-site/technical/project/status-and-roadmap.md knowledge/agentlink-overview.md && node tools/docs-status/index.mjs`. A conflict in the source `docs/status.yaml` is resolved by hand first. The card counts block in `docs/process/backlog.md` is generated too: after a merge, rerun `node tools/docs-status/index.mjs` instead of editing the counts.
 - Lockfile: `git checkout origin/main -- pnpm-lock.yaml && pnpm install --ignore-scripts --ignore-pnpmfile`, then commit `pnpm-lock.yaml`.
 
 Locally, before pushing a long-lived branch: `git fetch origin && git merge origin/main && node tools/docs-status/index.mjs --check && pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`.
