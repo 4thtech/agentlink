@@ -562,8 +562,9 @@ describe('agentlink_notarize (06 §2.4)', () => {
       context(client),
       advanced,
     );
-    expect(matchesSchema(findTool('agentlink_notarize', 'advanced')!.outputSchema, ok.structured))
-      .toBe(true);
+    expect(
+      matchesSchema(findTool('agentlink_notarize', 'advanced')!.outputSchema, ok.structured),
+    ).toBe(true);
     expect(calls.notarize[0]).toEqual({ envelopeId: ENVELOPE, chainId: 84532 });
     const r = await callTool(
       'agentlink_notarize',

@@ -778,7 +778,7 @@ There is no chain choice in the default UX (02 F-51).
    3. otherwise `needs_credits`, with a top-up suggestion (agent address, amount in $) on the **cheapest supported chain**.
 
    "Funded" means credits covering the quote, or a stablecoin balance that can become credits through the gasless top-up (F-46, once available).
-3. **Override.** The tools' `chain?` input (06 §2.4) and the Advanced settings can force a chain; nothing else in the UX names one.
+3. **Override.** The tools' `chain?` input (06 §2.4; served only on the Advanced tool surface, `agentlink mcp --advanced`, M1-36h, proposed, owner confirms at merge) and the Advanced settings can force a chain; nothing else in the UX names one.
 4. **Record.** The chosen chain is stored with the proof and written into the proof pack (`chainId`, §8), so verification needs no setup.
 
 Querying every chain reveals the (pseudonymous, already public) agent address to those RPC providers; users who mind can set their own RPCs.

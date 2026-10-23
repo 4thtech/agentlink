@@ -335,10 +335,11 @@ describe('the chain override is Advanced only (M1-36h; D-39, D-40; 11 §5.1)', (
     const adv = advancedSurface.find((t) => t.name === 'agentlink_notarize')!;
     expect(props(adv)['chain']).toEqual({ type: 'string', pattern: '^[a-z0-9-]{1,32}$' });
     expect(adv.inputSchema['required']).toEqual(['envelopeId']);
-    const { chain: _chain, ...rest } = props(adv);
+    const rest = { ...props(adv) };
+    delete rest['chain'];
     expect(rest).toEqual(props(base));
-    expect(adv.description).toMatch(/leave chain out unless the user explicitly asks for one/);
-    expect(base.description).not.toMatch(/leave chain out/);
+    expect(adv.description).toMatch(/leave chain out unless the user explicitly asks for one/i);
+    expect(base.description).not.toMatch(/leave chain out/i);
     expect({ ...adv, inputSchema: undefined, description: undefined }).toEqual({
       ...base,
       inputSchema: undefined,
