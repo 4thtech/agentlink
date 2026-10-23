@@ -5080,7 +5080,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A test fails on any banned term in default output; the two `FIXED_BY_OTHER_CARDS` entries are gone.
 
 #### M1-36f · agent UX: credits honesty (UX-F) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (folded into M1-36i-c) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/proofs-common.ts`, `apps/cli/src/commands/credits.ts` (rebase on #344)
 - **Depends on:** #344
 - **Spec:** 06 §2.5; 11 §5
@@ -5354,7 +5354,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A test per item; no secret or URL is logged.
 
 #### M1-36i-c · free credits: bounded in-call wait and one proof retry after a claim (new, D-120 (3))
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/notarize.ts`, `send.ts`, `proofs-common.ts`, `apps/cli/src/runtime/proofs.ts` and tests
 - **Depends on:** M1-36i
 - **Spec:** 06 §2.5; 07 §5

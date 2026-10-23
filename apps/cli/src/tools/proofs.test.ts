@@ -1180,7 +1180,7 @@ describe('notarize on the terms tools (06 §2.2a, D-55; M1-9d-3)', () => {
     // so nextStep carries the fixed no-link text (M1-26-e), with neither a link nor the agent ID.
     expect(r.structured.url).toBeUndefined();
     expect(r.structured.nextStep).toBe(
-      "Tell the user this agent needs credits to add proof, and adding credits isn't available yet in this version of AgentLink. Messages and files stay free. Do not give a link.",
+      'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
     );
     expect(dump(r)).not.toMatch(/https?:\/\/|pay\.agentlink|#v=1/);
     expect(r.structured.summary).toContain('Nothing was sent.');
@@ -2196,7 +2196,7 @@ describe('needs_credits says what is missing (M1-36f)', () => {
     });
     expect(r.structured.nextStep).toBe(PROOF_TEXT.needsCreditsNoLink);
     expect(r.structured.nextStep).toBe(
-      "Tell the user this agent needs credits to add proof, and adding credits isn't available yet in this version of AgentLink. Messages and files stay free. Do not give a link.",
+      'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
     );
     expect(dump(r)).not.toMatch(/https?:\/\/|#v=1/);
     expect(`${r.structured.summary} ${r.structured.nextStep}`).not.toMatch(JARGON);
