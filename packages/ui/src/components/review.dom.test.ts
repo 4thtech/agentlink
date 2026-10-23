@@ -200,6 +200,88 @@ describe('ReviewTogether', () => {
   });
 });
 
+describe('the confirmed batch', () => {
+  const parsed = (text: string): { approve: number; deny: number } => ({
+    approve: Number(/Approve (\d+)/.exec(text)?.[1] ?? 0),
+    deny: Number(/deny (\d+)|Deny (\d+)/.exec(text)?.slice(1).find(Boolean) ?? 0),
+  });
+  it('hands over exactly the counted entries, equal to the summary counts', () => {
+    const onConfirm = vi.fn();
+    const items = [item('a'), item('b'), item('c'), item('d')];
+    mount(
+      view({ items, onConfirm, decisions: { a: 'approve', b: 'deny', c: 'later', d: 'approve' } }),
+    );
+    const button = q('[data-review-confirm]');
+    click(button);
+    const batch = onConfirm.mock.calls[0]![0] as ui.ReviewBatchEntry[];
+    expect(batch).toEqual([
+      { id: 'a', decision: 'approve' },
+      { id: 'b', decision: 'deny' },
+      { id: 'd', decision: 'approve' },
+    ]);
+    expect({
+      approve: batch.filter((e) => e.decision === 'approve').length,
+      deny: batch.filter((e) => e.decision === 'deny').length,
+    }).toEqual(parsed(button.textContent ?? ''));
+  });
+  it('drops a stale pick that a sooner request pushed past the 20, and asks to clear it', () => {
+    const onConfirm = vi.fn();
+    const onPrune = vi.fn();
+    const make = (n: number): ui.ReviewItem[] =>
+      Array.from({ length: n }, (_, i) => item(`i${i}`, { expiresAt: 100 + i }));
+    const decisions = { i19: 'approve' as const };
+    mount(view({ items: make(20), decisions, onConfirm, onPrune }));
+    expect(q('[data-review-confirm]').textContent).toContain('Approve 1');
+    // A sooner request arrives: i19 becomes the 21st.
+    mount(
+      view({
+        items: [item('new', { expiresAt: 1 }), ...make(20)],
+        decisions,
+        onConfirm,
+        onPrune,
+      }),
+    );
+    expect(q<HTMLButtonElement>('[data-review-confirm]').disabled).toBe(true);
+    expect(host.textContent).not.toContain('This covers exactly');
+    expect(onPrune).toHaveBeenCalledWith(['i19']);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+  it('never includes expired, decided-elsewhere, terms or Later, and prunes the first three', () => {
+    const onConfirm = vi.fn();
+    const onPrune = vi.fn();
+    const items = [
+      item('ok'),
+      item('ex', { status: 'expired' }),
+      item('de', { status: 'decided-elsewhere' }),
+      item('t', { decideAlone: true }),
+      item('l'),
+    ];
+    mount(
+      view({
+        items,
+        onConfirm,
+        onPrune,
+        decisions: { ok: 'approve', ex: 'approve', de: 'deny', t: 'approve', l: 'later' },
+      }),
+    );
+    click(q('[data-review-confirm]'));
+    expect(onConfirm).toHaveBeenCalledWith([{ id: 'ok', decision: 'approve' }]);
+    expect(onPrune).toHaveBeenCalledWith(['ex', 'de', 't']);
+  });
+  it('counts only cards still waiting in the heading', () => {
+    mount(
+      view({
+        items: [
+          item('a'),
+          item('b', { status: 'expired' }),
+          item('c', { status: 'decided-elsewhere' }),
+        ],
+      }),
+    );
+    expect(q('h1').textContent).toBe('Waiting for you (1)');
+  });
+});
+
 describe('review safety (I-5, 08 §4)', () => {
   it('renders hostile text inert and writes no style attribute', () => {
     const out = renderToStaticMarkup(

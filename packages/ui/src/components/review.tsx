@@ -43,6 +43,12 @@ export function decisionSummary({ approve, deny }: DecisionCounts): string | und
   return undefined;
 }
 
+/** One counted decision. `onConfirm` receives exactly the entries the summary text counted. */
+export interface ReviewBatchEntry {
+  id: string;
+  decision: 'approve' | 'deny';
+}
+
 export interface ReviewTogetherProps {
   /** The agent whose approvals these are. */
   agent: string;
@@ -51,7 +57,13 @@ export interface ReviewTogetherProps {
   decisions: Readonly<Record<string, ReviewDecision | undefined>>;
   onDecide: (id: string, decision: ReviewDecision) => void;
   /** The summary button: the caller then starts the browser's own passkey prompt (or owner code). */
-  onConfirm: () => void;
+  onConfirm: (batch: readonly ReviewBatchEntry[]) => void;
+  /**
+   * Called when decisions exist for cards that are no longer in the counted set (pushed past the
+   * 20, expired, decided elsewhere, or terms). The caller deletes them, so a card that comes back
+   * shows nothing chosen. They are never in the `onConfirm` batch either way.
+   */
+  onPrune?: (ids: readonly string[]) => void;
   /** Reviewing, waiting for the owner's confirmation, it failed (nothing applied), or done. */
   phase?: 'reviewing' | 'waiting' | 'failed' | 'done';
   /** The presence method: "passkey", "owner code" or "owner passphrase". */
@@ -77,6 +89,7 @@ export function ReviewTogether({
   decisions,
   onDecide,
   onConfirm,
+  onPrune,
   phase = 'reviewing',
   method = 'passkey',
   results,
@@ -95,14 +108,25 @@ export function ReviewTogether({
     .map((e) => e.item);
   const shown = sorted.slice(0, REVIEW_LIMIT);
   const hidden = sorted.length - shown.length;
-  const counts: DecisionCounts = { approve: 0, deny: 0 };
+  const batch: ReviewBatchEntry[] = [];
   for (const item of shown) {
     if (!inList(item)) continue;
     const d = decisions[item.id];
-    if (d === 'approve') counts.approve += 1;
-    else if (d === 'deny') counts.deny += 1;
+    if (d === 'approve' || d === 'deny') batch.push({ id: item.id, decision: d });
   }
-  const included = counts.approve + counts.deny;
+  const counts: DecisionCounts = {
+    approve: batch.filter((e) => e.decision === 'approve').length,
+    deny: batch.filter((e) => e.decision === 'deny').length,
+  };
+  const included = batch.length;
+  const counted = new Set(shown.filter(inList).map((i) => i.id));
+  const stale = Object.keys(decisions)
+    .filter((id) => decisions[id] !== undefined && !counted.has(id))
+    .join('\u0000');
+  useEffect(() => {
+    if (stale !== '') onPrune?.(stale.split('\u0000'));
+  }, [stale, onPrune]);
+  const waitingCount = items.filter((i) => (i.status ?? 'pending') === 'pending').length;
   const summary = decisionSummary(counts);
   const done = phase === 'done';
   const locked = phase === 'waiting';
@@ -110,7 +134,7 @@ export function ReviewTogether({
     <section className="al-rv" aria-labelledby="al-rv-h">
       <header className="al-rv-head">
         <h1 id="al-rv-h" ref={heading} className="al-text-title-1" tabIndex={-1}>
-          {items.length === 0 ? 'Waiting for you' : `Waiting for you (${items.length})`}
+          {waitingCount === 0 ? 'Waiting for you' : `Waiting for you (${waitingCount})`}
         </h1>
         <p className="al-text-body-sm al-muted">{cleanText(agent, 80)}</p>
       </header>
@@ -172,7 +196,7 @@ export function ReviewTogether({
             icon="approval"
             data-review-confirm=""
             disabled={summary === undefined || locked}
-            onClick={onConfirm}
+            onClick={() => onConfirm(batch)}
           >
             {summary ?? 'Choose Approve or Deny'}
           </Button>
