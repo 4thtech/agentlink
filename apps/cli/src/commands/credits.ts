@@ -12,6 +12,8 @@
 //   <agent address>&usd=<suggested amount>`, host from the shipped config), the agent ID as a
 //   terminal QR code, and the browser opened on the link when stdout is a terminal. No other URL
 //   is ever printed, and no key. The link is shown to the user only; it is never logged.
+// - M1-36f: plain words only (11 §5): no "network" or "public record" in the output; a read that
+//   did not answer says what to do next (try again in a few minutes).
 import * as chain from '@4thtech-io/chain';
 import { nodeRpcFetch } from '@4thtech-io/node';
 import {
@@ -49,12 +51,12 @@ export interface CreditsDeps extends CommandDeps {
 export const CREDITS_TEXT = Object.freeze({
   agentId: 'Agent ID: {agentId}',
   credits: 'Credits: {usd}',
-  creditsUnknown: "Credits: can't be checked right now (the public record didn't answer).",
+  creditsUnknown: "Credits: can't be checked right now. Try again in a few minutes.",
   price: 'Adding proof costs {fee}. Messages and files are free.',
-  testCredits: 'These are test credits: AgentLink runs on test networks during the beta.',
+  testCredits: "These are free test credits for the beta. They aren't real money.",
   enough: 'You have enough credits to add proof ({fee} each).',
   needs: 'Add at least {usd} in credits to add proof ({fee} each).',
-  unavailable: "Can't check right now what to add: the public record didn't answer.",
+  unavailable: "Can't check right now how much to add. Try again in a few minutes.",
   topUpHow: 'To add credits, open this link:',
   topUpNoLink: "Can't make the link to add credits right now.",
   topUpNotLive: 'Adding credits is not available yet in this version of AgentLink.',

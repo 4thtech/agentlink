@@ -6,7 +6,11 @@ import type { ApprovalState, CommitmentCard, RespondToTermsResult } from '@4thte
 import { createLogger } from '@4thtech-io/log';
 import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
-import { APPROVAL_WAIT_INTERVAL_MS, waitForApprovalDecision } from './approval-wait.js';
+import {
+  APPROVAL_WAIT_INTERVAL_MS,
+  approvalWaitLeft,
+  waitForApprovalDecision,
+} from './approval-wait.js';
 import type { TermsTools } from './context.js';
 import { callTool, type ToolClient, type ToolContext } from './index.js';
 import { pendingApproval } from './result.js';
@@ -272,6 +276,20 @@ describe('waiting for an open approval inside the call (M1-36j, D4)', () => {
     expect(approved.structured.summary).not.toContain('CANARY');
     const denied = await respond(context(fakeClient(['denied']).client), FAST);
     expect(JSON.stringify(denied.structured)).not.toContain('CANARY');
+  });
+
+  it('approvalWaitLeft: what is left of the budget, never more, never below 0 (M1-36i-e)', () => {
+    expect(approvalWaitLeft(30_000, 0)).toBe(30_000);
+    expect(approvalWaitLeft(30_000, 20_000)).toBe(10_000);
+    expect(approvalWaitLeft(30_000, 30_000)).toBe(0);
+    expect(approvalWaitLeft(30_000, 45_000)).toBe(0);
+    // A clock that went backwards or no number: nothing spent, never a longer wait.
+    expect(approvalWaitLeft(30_000, -5_000)).toBe(30_000);
+    expect(approvalWaitLeft(30_000, Number.NaN)).toBe(30_000);
+    // No budget stays no budget.
+    for (const none of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(approvalWaitLeft(none, 0)).toBe(0);
+    }
   });
 
   it('waitForApprovalDecision leaves anything but a linked pending_approval alone', async () => {

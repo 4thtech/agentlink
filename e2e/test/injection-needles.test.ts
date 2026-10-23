@@ -32,7 +32,8 @@ describe('prompt-injection needles', () => {
       }
     }
     expect(PREFIXES).toBe(4096);
-    expect(NEEDLES.length).toBeGreaterThan(0);
+    // CHORE-DEFLAKE-3-b: a corpus that shrinks (a needle source dropped or emptied) fails here.
+    expect(NEEDLES.length).toBeGreaterThanOrEqual(48);
     expect(checked).toBe(PAIRS);
     expect(matches).toEqual([]);
   });

@@ -383,6 +383,13 @@ export type HarnessPlan =
       readonly text: string;
       /** The exact diff, as display lines. */
       readonly diff: readonly string[];
+      /** The file as shown to the user (`~/…` or the `--config` display): the diff names it too. */
+      readonly path: string;
+      /** The absolute file that `applyHarness` writes, resolved once here (environment applied). */
+      readonly file: string;
+      /** Where `applyHarness` writes: the folder and the parts below it, checked again at write. */
+      readonly base: string;
+      readonly parts: readonly string[];
     }
   /** AgentLink is already configured there, as it would write it. */
   | { readonly status: 'present'; readonly def: HarnessDef }
@@ -447,22 +454,27 @@ export async function planHarness(def: HarnessDef, context: HarnessContext): Pro
   }
   try {
     const envParts = context.config === undefined ? await envConfigParts(def, context) : undefined;
-    const before = await readConfigFile(...(await where(def, context)), context);
+    // M1-36g-c: resolved once, so the path shown, the path a confirmation code binds and the path
+    // written are the same (the environment is applied here, not again at write).
+    const [base, parts] = await where(def, context);
+    const before = await readConfigFile(base, parts, context);
     const edit = def.edit(before.text, mcpArgs(context.agent));
     if (edit.status === 'present') return { status: 'present', def };
     if (edit.status === 'conflict') return { status: 'conflict', def };
+    const path =
+      context.config === undefined && envParts !== undefined
+        ? `~/${envParts.join('/')}`
+        : displayPath(def, context.config, context.platform);
     return {
       status: 'change',
       def,
       before,
       text: edit.text,
-      diff: unifiedDiff(
-        before.text ?? '',
-        edit.text,
-        context.config === undefined && envParts !== undefined
-          ? `~/${envParts.join('/')}`
-          : displayPath(def, context.config, context.platform),
-      ),
+      diff: unifiedDiff(before.text ?? '', edit.text, path),
+      path,
+      file: join(base, ...parts),
+      base,
+      parts,
     };
   } catch (error) {
     if (error instanceof HarnessError) return { status: 'blocked', def, reason: error.code };
@@ -475,6 +487,6 @@ export async function applyHarness(
   plan: Extract<HarnessPlan, { status: 'change' }>,
   context: HarnessContext,
 ): Promise<{ backup: string | undefined }> {
-  const [base, parts] = await where(plan.def, context);
-  return writeConfigFile(base, parts, plan.before, plan.text, context);
+  // The location planned (and bound by the confirmation code), never re-resolved from the environment.
+  return writeConfigFile(plan.base, plan.parts, plan.before, plan.text, context);
 }
