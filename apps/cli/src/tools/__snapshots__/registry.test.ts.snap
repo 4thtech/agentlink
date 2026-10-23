@@ -1140,6 +1140,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "agentAddress": {
+          "pattern": "^0x[0-9a-f]{40}$",
+          "type": "string",
+        },
         "approvalId": {
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
@@ -1328,6 +1332,11 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "pattern": "^[A-Za-z0-9_-]{22}$",
           "type": "string",
         },
+        "topUpUrl": {
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/",
+          "type": "string",
+        },
         "url": {
           "maxLength": 2048,
           "type": "string",
@@ -1504,6 +1513,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "agentAddress": {
+          "pattern": "^0x[0-9a-f]{40}$",
+          "type": "string",
+        },
         "approvalId": {
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
@@ -1658,6 +1671,11 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         },
         "thread": {
           "pattern": "^[A-Za-z0-9_-]{22}$",
+          "type": "string",
+        },
+        "topUpUrl": {
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/",
           "type": "string",
         },
         "url": {

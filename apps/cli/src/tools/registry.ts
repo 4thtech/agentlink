@@ -518,7 +518,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
       },
       ['to', 'terms'],
     ),
-    outputSchema: output({ envelopeId, ...termsOutput, proof: proofStatus, candidates }, true),
+    // M1-9d-4: `needs_credits` carries the top-up link as agentlink_send does (06 §2.1).
+    outputSchema: output(
+      { envelopeId, ...termsOutput, proof: proofStatus, ...creditFields, candidates },
+      true,
+    ),
     annotations: WRITE(true),
     approval: true,
   },
@@ -545,6 +549,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         envelopeId,
         ...termsOutput,
         proof: proofStatus,
+        ...creditFields,
       },
       true,
     ),

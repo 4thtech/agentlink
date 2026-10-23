@@ -1097,6 +1097,15 @@
           "required": ["status", "receipts"],
           "additionalProperties": false
         },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
+        },
         "candidates": {
           "type": "array",
           "items": {
@@ -1399,6 +1408,15 @@
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         }
       },
       "required": ["status", "summary"],

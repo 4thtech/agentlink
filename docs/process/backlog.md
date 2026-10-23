@@ -3614,7 +3614,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** core tests, two real cores against the in-memory Notary: both J8 shapes end with an `ACCEPTED` receipt on-chain and an exported pack that verifies with the owner's signed approval; one owner approval per side; zero credits gives `needs_credits` with nothing sent or asked; a changed argument gets a new approval; a repeat with the same `approvalId` signs and charges nothing more; summaries carry no terms text (I-5); RED commit. The e2e `it.fails` J8 tests of M1-13c flip to plain tests once both land.
 
 #### M1-9d-4 · Terms tools: the top-up link for `needs_credits` (new, from IR-M1-9d-3-1)
-- **Status:** todo · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/registry.ts`, `terms-common.ts`), `test/fixtures/tool-surface.json`
 - **Depends on:** M1-9d-3
 - **Spec:** 06 §2.2a, §2.4 (`needs_credits`: `url` set to the top-up link), §2.1 (`topUpUrl`, `agentAddress`); D-111, D-113
