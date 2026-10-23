@@ -15,6 +15,7 @@
 import type { NotarizeInput } from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
 import {
+  claimFreeCredits,
   invalidArgument,
   isOutput,
   needsIdentity,
@@ -59,5 +60,7 @@ export async function notarizeHandler(
     return proofThrown(error);
   }
   context.logger.info('notarize', { status: result.status });
-  return notarizeOutput(result, context, self.agentId);
+  // M1-36i: the first proof that needs credits claims free test credits once (testnets only).
+  const freeCredits = await claimFreeCredits(result, context);
+  return notarizeOutput(result, context, self.agentId, { freeCredits, envelopeId });
 }

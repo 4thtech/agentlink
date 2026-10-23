@@ -51,6 +51,8 @@ export const MAX_RELAYS_PER_WRAP = 32;
 export const MIN_ACKS = 2;
 /** The NIP-11 document is read only up to this size. */
 export const NIP11_MAX_BYTES = 65_536;
+/** 07 §4.2 (M1-5b-c): the NIP-11 wait has its own bound, inside the 10 s connect budget. */
+export const NIP11_TIMEOUT_MS = 3_000;
 const NIP11_TTL_MS = 60 * 60 * 1000;
 const NIP11_FAILURE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
@@ -70,7 +72,9 @@ export type RelayFailure =
   | 'rejected'
   | 'ok_timeout'
   | 'auth_failed'
-  | 'closed';
+  | 'closed'
+  /** The pool itself was closed (not a bad URL, not a dropped connection). */
+  | 'pool_closed';
 
 /** The outcome for one relay. */
 export interface RelayPublishResult {
@@ -201,6 +205,13 @@ function readMaxMessageLength(doc: unknown): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
+/** `wss://host[:port]` of a relay URL: what health output and the activity feed may show. */
+function relayOrigin(url: string): string {
+  const m = RELAY_PARTS.exec(url);
+  if (m === null) return 'wss://invalid';
+  return m[2] === undefined ? `wss://${m[1] as string}` : `wss://${m[1] as string}:${m[2]}`;
+}
+
 /** Splits a validated relay URL into host and port without a URL parser (04 §4). */
 function relayParts(url: string): { host: string; port: number } | undefined {
   const m = RELAY_PARTS.exec(url);
@@ -257,7 +268,7 @@ export class RelayPool {
   /** Per-relay health for every relay seen so far. */
   relayHealth(): readonly RelayHealth[] {
     return [...this.health.entries()].map(([relay, h]) => ({
-      relay,
+      relay: relayOrigin(relay), // origin only: no path or query (07 §4.3, the logger's URL rule)
       connected: this.conns.get(relay)?.state === 'open',
       successes: h.successes,
       failures: h.failures,
@@ -299,9 +310,8 @@ export class RelayPool {
    * bound, 10 s connect budget. Returns the link, or the fixed reason it is not available.
    */
   async connect(relay: string): Promise<RelayLink | RelayFailure> {
-    if (this.closed || !isAllowedRelayUrl(relay) || relayParts(relay) === undefined) {
-      return this.closed ? 'closed' : 'invalid_url';
-    }
+    if (this.closed) return 'pool_closed';
+    if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'invalid_url';
     const conn = this.acquire(relay);
     if (typeof conn === 'string') return conn;
     conn.inflight += 1;
@@ -370,9 +380,8 @@ export class RelayPool {
     frameBytes: number,
     relay: string,
   ): Promise<'ok' | RelayFailure> {
-    if (this.closed || !isAllowedRelayUrl(relay) || relayParts(relay) === undefined) {
-      return 'invalid_url';
-    }
+    if (this.closed) return 'pool_closed';
+    if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'invalid_url';
     if (this.tooLarge(relay, frameBytes)) return 'too_large';
     const conn = this.acquire(relay);
     if (typeof conn === 'string') return conn;
@@ -587,7 +596,7 @@ export class RelayPool {
     }
     let limit: number | undefined;
     try {
-      const body = await fetcher.fetch(target);
+      const body = await this.boundedFetch(fetcher, target);
       if (typeof body === 'string' && utf8Length(body, NIP11_MAX_BYTES) <= NIP11_MAX_BYTES) {
         const value = readMaxMessageLength(parseJson(body));
         if (value !== undefined) limit = value;
@@ -598,6 +607,26 @@ export class RelayPool {
     if (this.limits.size >= MAX_CACHE_ENTRIES)
       this.limits.delete(this.limits.keys().next().value as string);
     this.limits.set(target.url, { limit, at: this.now() });
+  }
+
+  /**
+   * The NIP-11 fetch, bounded in time: after NIP11_TIMEOUT_MS the wait ends with no document, so a
+   * hanging HTTP server cannot make a working relay miss the publish's connect budget. A late answer
+   * is ignored. The size bound is passed on and checked again on the result.
+   */
+  private boundedFetch(fetcher: Nip11Fetcher, target: RelayTarget): Promise<string | undefined> {
+    return new Promise((resolve) => {
+      const timer = this.timers.setTimeout(() => resolve(undefined), NIP11_TIMEOUT_MS);
+      const done = (body: string | undefined): void => {
+        this.timers.clearTimeout(timer);
+        resolve(body);
+      };
+      try {
+        fetcher.fetch(target, { maxBytes: NIP11_MAX_BYTES }).then(done, () => done(undefined));
+      } catch {
+        done(undefined);
+      }
+    });
   }
 
   private touch(conn: Connection): void {

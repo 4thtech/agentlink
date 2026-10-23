@@ -42,6 +42,7 @@ export default defineConfig({
             'test/engine.test.ts',
             'test/config.test.ts',
             'test/faucet-claim.test.ts',
+            'test/pool.test.ts',
             'test/smoke-config.test.ts',
           ],
           // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default.

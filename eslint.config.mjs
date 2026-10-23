@@ -8,11 +8,11 @@ import {
   ENTRY_TEST_DIRS,
   LIBRARIES,
   NODE_MSG,
-  NODE_ZONES,
   RESTRICTED_ENTRY_POINTS,
   WORKSPACE_NAMES,
   ZONES,
   allowedWorkspaceNames,
+  nodeBuiltinsAllowed,
   entryTestNames,
   layerMessage,
   libraryAllowed,
@@ -34,7 +34,7 @@ const SOURCE = '{ts,tsx,mts,cts}';
 // types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
 function restrictionsFor(zone, { test = false, testDir = null } = {}) {
-  const nodeAllowed = NODE_ZONES.includes(zone);
+  const nodeAllowed = nodeBuiltinsAllowed(zone);
   const paths = nodeAllowed
     ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
     : BUILTINS.map((name) => ({ name, message: NODE_MSG }));
@@ -176,6 +176,19 @@ export default tseslint.config(
     // eval, new Function and string timers build code the import checks cannot see.
     rules: {
       ...restrictionsFor(null),
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      'no-implied-eval': 'error',
+    },
+  },
+  // e2e/ (M1-1g-c): never built, may use the test seam, but its suites touch real crypto paths.
+  // Same libraries, /keystore, Node crypto, crypto.subtle, deep-import and scope rules as any zone;
+  // Node built-ins allowed except crypto; every workspace package importable by name.
+  {
+    files: [`e2e/**/*.${SOURCE}`],
+    plugins: { boundaries },
+    rules: {
+      ...restrictionsFor('e2e'),
       'no-eval': 'error',
       'no-new-func': 'error',
       'no-implied-eval': 'error',
