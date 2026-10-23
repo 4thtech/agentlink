@@ -135,7 +135,7 @@ export const HOOK_TEXT = Object.freeze({
   intro:
     'This adds a start-of-session note to Claude Code: a line or two saying who has written to you. It runs the AgentLink program installed on this computer. It never reads message text and changes nothing.',
   noInstall:
-    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run `agentlink init --hook` again. Nothing was changed.',
+    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run the same command again. Nothing was changed.',
   notFound: "Problem  AgentLink didn't find Claude Code on this computer. Nothing was changed.",
   present: 'OK       The AgentLink start-of-session note is already set up in Claude Code',
   conflict:
