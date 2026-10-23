@@ -1804,7 +1804,7 @@ describe('free test credits on the first needs_credits (M1-36i)', () => {
     const second = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
     expect(requested).toEqual([84532]);
     expect(second.structured.summary).not.toContain(ADDED);
-    expect(second.structured['topUpUrl']).toBe(`${PAY_ORIGIN}/`);
+    expect(second.structured['topUpUrl']).toBe(linkFor('5'));
   });
 
   it('notarize: paused says so plainly; never an error text from the service', async () => {
@@ -1827,7 +1827,7 @@ describe('free test credits on the first needs_credits (M1-36i)', () => {
     const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
     expect(r.structured.summary).not.toContain(ADDED);
     expect(r.structured.summary).not.toContain(PAUSED);
-    expect(r.structured['topUpUrl']).toBe(`${PAY_ORIGIN}/`);
+    expect(r.structured['topUpUrl']).toBe(linkFor('5'));
   });
 
   it('notarize: a claim that throws is the unchanged needs_credits result, never an error', async () => {
