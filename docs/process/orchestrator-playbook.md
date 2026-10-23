@@ -69,7 +69,9 @@ When in doubt, **route up**. A failure is never a reason to route down (`develop
 
 ## 5. Merge-queue procedures
 
-Agents arm merges only behind the GitHub-enforced gates and only after `development-process.md` §5 is complete; S2 and sensitive-path PRs additionally need the owner's "merge" in chat, recorded in the PR body (`AGENTS.md` § Merging and releases); `record-ir.py` (§6) records the owner's standing order of 2026-10-22 as that line.
+Agents arm merges only behind the GitHub-enforced gates and only after `development-process.md` §5 is complete; S2 and sensitive-path PRs additionally need the owner's "merge" in chat, recorded in the PR body (`AGENTS.md` § Merging and releases).
+
+**Owner standing order.** The owner may give, in chat, a standing order to merge PRs once their review passed and CI is green. It is the owner's, given in chat, **revocable at any time**, and **re-confirmed by the owner each session**; the orchestrator never infers or extends it. It never covers npm `latest`, deployment or environment approvals, mainnet, Safe operations, production secrets or `DEPLOY_FREEZE`, and it never replaces a per-PR "merge" where the owner asked for one (`development-process.md` §1.1, §8). Only while the order stands does the orchestrator pass `--owner-merge "<the owner's wording>"` to `record-ir.py` (§6); otherwise it records the owner's per-PR "merge" in the body when given, or waits.
 
 ### 5.1 Arming
 
@@ -128,10 +130,10 @@ IR-<ID>-<n>: PASS at <full sha> (<model>, fresh context; <summary>)
 IR-<ID>-<n>: PASS (mechanical) at <full sha> (Haiku 5.5, D-126 verifier; <summary>)
 ```
 
-- Record with `tools/orchestrator/record-ir.py <pr> "<line>"`. It replaces `Pending (orchestrator).` or appends below earlier lines, adds the standing-order line once, and refuses a non-PASS line, a body without the section, or a section that would contain "verdict … fail" text. `--dry-run` prints the new body without editing; `--body-file <path>` reads the body from a file (offline use, tests).
+- Record with `tools/orchestrator/record-ir.py <pr> "<line>"`. It replaces `Pending (orchestrator).` or appends below earlier lines, adds the owner's merge line once only when `--owner-merge` is passed (§5; default: none), and refuses a non-PASS line, a body without the section, or a section that would contain "verdict … fail" text. `--dry-run` prints the new body without editing; `--body-file <path>` reads the body from a file (offline use, tests).
 - Never write "verdict … fail" text in the section; `review-gate` reads it. A failed round is fixed and reviewed again; only the PASS line is recorded.
 - **Reviewers** get the spec sections and the diff only, start in a fresh context, and work read-only (a scratch worktree or git reads). They never see the builder's report, rationale or transcript (`audit-rules.md` §4). Their first output line is exactly the IR line, or the same line with `FAIL`.
-- **Max 2–3 review rounds** (more only while a High or Critical finding is open). Lows become cards.
+- **Max 2 review rounds unless a High finding remains**; lows become cards.
 - S2: check the `RED (expected):` commit exists before merge, and put that requirement in the builder and reviewer briefs.
 
 ## 7. Worker brief template
