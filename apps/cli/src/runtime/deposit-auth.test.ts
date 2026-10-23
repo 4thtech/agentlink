@@ -260,7 +260,7 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
 
   it('503 (stuck or not configured) fails over; the next submitter can take it', async () => {
     const { port: p, sent } = port((url) =>
-      url.startsWith(URL_A)
+      new URL(url).hostname === new URL(URL_A).hostname
         ? json(503, { status: 'failed', error: 'unavailable' })
         : json(200, { status: 'submitted', txHash: TX_HASH }),
     );
@@ -355,7 +355,9 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
       new Response('not found', { status: 404 }),
     ]) {
       const { port: p, sent } = port((url) =>
-        url.startsWith(URL_A) ? first : json(200, { status: 'submitted', txHash: TX_HASH }),
+        new URL(url).hostname === new URL(URL_A).hostname
+          ? first
+          : json(200, { status: 'submitted', txHash: TX_HASH }),
       );
       expect(await p.submit(request())).toEqual({ status: 'submitted' });
       expect(sent).toHaveLength(2);
