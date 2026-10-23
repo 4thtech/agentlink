@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 316 (M1a 91, M1b 225) |
+| M1 Local beta | 324 (M1a 91, M1b 233) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 34 |
 <!-- backlog-counts:end -->
@@ -803,6 +803,30 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Depends on:** CHORE-CI-SUPERSEDED, CHORE-WIN-RELAY-IO
 - **Scope:** (1) GitHub keeps one pending run per concurrency group, so a newer push to `main` cancels an older commit's queued CI run (`cancel-in-progress: false` protects only runs in progress); CHORE-CI-SUPERSEDED handles the effect. Give push runs on `main` a per-commit group (for example including `github.sha`) in `ci.yml` and `security.yml` so no main commit loses its CI; weigh the runner load. (2) `safe-fetch.test.ts` and `rpc-fetch.test.ts` spawn `openssl` in `beforeAll` like `relay-io.test.ts`, under Vitest's 10 s default hook timeout, which the Windows `node-os` runner exceeded once for relay-io. Give them the same measured 60 s hook timeout, or set a package-wide `hookTimeout` in `packages/node/vitest.config.ts` (and name `hookTimeout` in the M0-10e policy, `repo-reference.md`).
 - **Acceptance:** a test on the workflow text shows main push runs use a per-commit group while branch and PR runs still cancel; the hook timeouts land with their measurement; no gate or test weakened; actionlint clean.
+
+#### CHORE-CI-PLAYWRIGHT-2 · "Install Playwright browsers" apt timeouts fail ci-gate (new, 2026-10-22)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`
+- **Depends on:** CHORE-CI-MATRIX-QUEUE-ONLY; start after #438 has merged (same file)
+- **Scope:** The "Install Playwright browsers" step (apt dependencies) timed out and failed `ci-gate` on five PRs between 17:24Z and 17:49Z on 2026-10-22. Cache the browsers and the apt dependencies, and retry the install once, so a slow mirror no longer fails a PR. Medium priority.
+- **Acceptance:** a measured before and after of the step time is recorded in the PR; a cold cache still passes; no gate or test weakened; actionlint clean.
+
+#### CHORE-DEFLAKE-2-b · terms-flow test comment mentions jitter that does not exist (new, IR-CHORE-DEFLAKE-2-1, #446)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 by path (`packages/core`; comment-only, the owner may lower it)
+- **Repo/path:** agentlink · `packages/core/src/terms-flow.test.ts`
+- **Depends on:** CHORE-DEFLAKE-2 (done, #446)
+- **Scope:** The "+40 s" comment in `terms-flow.test.ts` refers to jitter (M1-5b-c) that is not in `src`. Correct the comment to what the code does; no behaviour change.
+- **Acceptance:** the comment matches the code; the test is unchanged otherwise.
+
+#### CHORE-DEPLOY-RECONCILE · Deploys cannot be lost when main moves or a head's CI flakes (new, IR-CHORE-DEPLOY-CATCHUP-1, #447)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/deploy-submitter.yml`, `.github/workflows/deploy-drop.yml`, `tools/release/**`, `tools/release/check-changesets.test.mjs`
+- **Depends on:** CHORE-CI-SUPERSEDED; the catch-up itself (CHORE-DEPLOY-CATCHUP) is addressed by #447 (open) and is not carded again
+- **Scope:** What #447 leaves open:
+  - A scheduled reconcile that deploys the newest green head when a head's CI flaked and the later merges did not touch the deploy paths, so production never updated.
+  - `deploy-production` ends green without deploying when main moved during the run (run 39905205426); with a busy queue production may never update. Make the skip visible (not green) and make the catch-up deploy the newest green head.
+  - `check-changesets.test.mjs` fails 3 of 15 locally on main (environmental): find the cause and make it pass.
+- **Acceptance:** RED tests first; a flaked head followed by non-deploy-path merges still deploys within the schedule interval; a skipped production deploy is visible in the run result; nothing deploys without its own green CI, smoke, the production environment, `DEPLOY_FREEZE` and the head check; actionlint clean; no gate or test weakened.
 
 #### CHORE-DEPLOY-PATH-TRIGGERS · Deploy workflows start when a script they run changes (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
@@ -2527,6 +2551,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
 
+#### M1-6b-c · storage: lifecycle read-back compares rule content, not only IDs (new, IR-M1-6b-b-1, #440)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/storage/src/lifecycle.ts`
+- **Depends on:** M1-6b-b
+- **Spec:** 07 §5.2
+- **Invariants:** I-2, I-3
+- **Scope:**
+  - The lifecycle read-back (around `lifecycle.ts` line 190) matches rules by ID only. If another writer changes a rule's content in the race window, our write overwrites it silently.
+  - Compare content (not only the ID) and detect or retry on a difference, as M1-6b-b L3 intends.
+- **Acceptance:**
+  - A test where a rule with the same ID but different content appears between read and write is detected, not overwritten; rules this code did not write stay untouched.
+
 #### M1-6b-d · storage: warn when a provider drops the abort-incomplete-multipart lifecycle element on read-back (new, follow-up of M1-6b-c, #457)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage (lifecycle read-back)
@@ -3978,6 +4014,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The docs list exactly the codes the workflow treats as the long window; a case shows an unrelated error does not match the rollback refusal.
 
+#### M1-27b-e · drop: staging round trip, `cpu_ms` and stale ci-cd row (new, follow-up to M1-27b-b; #444)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/ci.yml` (actionlint), `.github/workflows/deploy-drop.yml`, `docs/process/ci-cd.md`
+- **Depends on:** M1-27b-b (workflow edits start after #436 and #438 land)
+- **Spec:** `release-and-deployment.md` §4.5, §8
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Make `actionlint` a required check once #436 and #438 have landed.
+  - Run a 100 MB round trip against the staging drop to confirm `cpu_ms: 5000` is enough (medium priority; do this before M1-27b-b is closed).
+  - Fix the stale deploy-drop row in `ci-cd.md` after #444.
+- **Acceptance:**
+  - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
+
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
 - **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
@@ -5254,6 +5303,29 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Writer tests per target (diff shown, nothing written before confirm); an Opus reviewer audits the writer.
 
+#### M1-36g-b · init: Cursor and Windsurf in the apps lists (new, #441)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
+- **Depends on:** M1-36g
+- **Spec:** 06 §5; 08
+- **Invariants:** I-4
+- **Scope:**
+  - The `appsAll` and `appsLinux` strings in `init.ts` do not list Cursor and Windsurf after #422 and #431; add them.
+- **Acceptance:**
+  - A test pins the strings for each platform; no write behaviour changes.
+
+#### M1-36g-c · init: confirmation code binds the path actually used for Windsurf (new, IR-M1-36g-2, #441; owner #422/#431)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
+- **Depends on:** M1-36g
+- **Spec:** 06 §5; 08
+- **Invariants:** I-4
+- **Scope:**
+  - `init.ts` hashes `displayPath` without the environment, so the confirmation code binds the default Windsurf path and not the XDG one that is written when the environment selects it.
+  - Hash the resolved path (environment applied) so the code a user confirms names the file that is written.
+- **Acceptance:**
+  - A test with and without the XDG environment shows the code differs and matches the path written; nothing is written before the confirmation.
+
 #### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/mcp/instructions.ts`, `docs/foundation/06-mcp-server.md` §2 and §5, `apps/cli/src/tools/registry.ts`, `test/fixtures/tool-surface.json`
@@ -5300,6 +5372,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-3 (pre-existing): `accept_invite` loses the approval link for agent names above about 21 characters (511 code points); shorten the copy or raise the budget per 06.
 - **Acceptance:**
   - The restored assertion passes; a long agent name still carries the approval link.
+
+#### M1-36d-c · accept_invite: nextStep stays inside the 500-code-point limit (new, IR-M1-36d-b-2, #442)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/invite-common.ts`, `apps/cli/src/tools/next-action.test.ts`
+- **Depends on:** M1-36d-b
+- **Spec:** 06 §2.5
+- **Invariants:** I-5
+- **Scope:**
+  - The pending `accept_invite` nextStep is 498 of 500 code points in the worst case, so any added wording crosses the limit. Shorten the copy, or add a guard test that fails with a clear message when the worst case exceeds the budget.
+- **Acceptance:**
+  - A worst-case test (longest allowed agent name) pins the length at or under the limit and keeps the approval link.
 
 #### M1-37a · app UX P0 copy and flow fixes (first run, approvals, invite landing) (new, UX audit, app, 2026-10-22, section 12 "orchestrator can just do")
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` is S1 by path) · **Phase:** M1b
@@ -5540,6 +5623,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests for the null-faucet reading and the same-block second claim.
 
+#### M1-10b-e-c · pool workflow header and top-up hint (new, IR-M1-10b-e-b-1, #439)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/submitter-pool.yml`
+- **Depends on:** M1-10b-e-b
+- **Spec:** 07 §5
+- **Invariants:** I-4
+- **Scope:**
+  - The header of `submitter-pool.yml` names only "low or paused"; it should also name the other alert reasons.
+  - The "Top up the wallet" hint is misleading when the reason is "faucet off"; give each reason its own hint, in plain words that follow 11 §5 where the text reaches a user.
+- **Acceptance:**
+  - A test on the workflow text or the pool script shows each alert reason carries a matching header line and hint; actionlint clean; no gate weakened.
+
 #### M1-10b-e-c-b · submitter-pool test: URL extraction catches more forms (new, follow-up of M1-10b-e-c, PR #456)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
 - **Repo/path:** agentlink · the submitter-pool test
@@ -5609,6 +5704,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - If the finish response is lost, the server re-shows the owner code once within the hold window (same bounds as the pending seed); never after it.
 - **Acceptance:**
   - Tests first: a PRF-on-get authenticator completes setup with two gestures; a lost finish response lets the owner code be shown again inside the window and not after; the pending seed still expires and is wiped; threat note and Fable audit.
+
+#### M1-11s-c-e · owner setup canary: more forms of the secret bytes (new, IR-M1-11s-c-b-1, #443)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/owner-setup-canary.test.ts`
+- **Depends on:** M1-11s-c-b
+- **Spec:** 04 §2.2
+- **Invariants:** I-1
+- **Scope:**
+  - The `forms()` helper at about line 78 of `owner-setup-canary.test.ts` should also produce the `JSON.stringify(Uint8Array)` form and the `util.inspect` forms, so the canary catches a secret logged in those shapes.
+- **Acceptance:**
+  - The canary test fails when a secret is emitted in either added form (shown with a deliberate leak in a scratch run); no test weakened.
 
 #### M1-11c-a2b · local UI Contacts: a protective route kind for the mismatch block (new, IR-M1-11c-a2-1, option A)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -5704,6 +5810,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `vault-impl-check.sh` emits `::error` when a label is missing; optionally scope the secret only to the deploy step.
 - **Acceptance:**
   - A run with a missing label fails with an error annotation; the secret is not available to other steps (if scoped).
+
+#### M1-3c-d · contracts repo: vector-parity job covers the eip3009 vectors (new, IR-M3-4b-t-T1-1, #448; cross-repo)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (contract CI) · **Phase:** M1b
+- **Repo/path:** `occ-v2-contracts` (private; cross-repo card: the work and its PR live there) · vector-parity job
+- **Depends on:** M1-3c; M3-4b-t
+- **Spec:** 07 §7
+- **Invariants:** I-6
+- **Scope:**
+  - Add the eip3009 vectors to the vector-parity job: the typehash equals the vector; the `auth-usdc-base-sepolia` digest is recomputed under the USDC domain separator; `ecrecover` of each `sign-*` vector returns its `from`.
+  - Pin the vectors commit the job uses.
+- **Acceptance:**
+  - The job fails when a vector, typehash or digest differs; the vectors commit is pinned; nothing weakened.
 
 #### M1-35c-c · vocabulary lint: more banned words; app pages use `lintVocabulary` (new, IR-M1-35c-b-1 low)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
