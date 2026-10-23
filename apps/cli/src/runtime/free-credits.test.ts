@@ -16,6 +16,7 @@ import {
   isFreeCreditsChain,
   nodeFreeCreditsPort,
 } from './free-credits.js';
+import { createFreeCreditsClaimer, memoryFreeCreditsMarker } from '../tools/free-credits.js';
 
 const AGENT = `0x${'ab'.repeat(20)}`;
 const OTHER = `0x${'cd'.repeat(20)}`;
@@ -233,14 +234,57 @@ describe('free credits claim lows (M1-36i-b)', () => {
   });
 
   it.each([400, 401, 403, 404, 405, 410, 422])(
-    'L-4: a permanent %i stops the daily retry (a fixed non-paused answer)',
+    'L-4: a refusing %i waits a day (paused, not claimed)',
     async (status) => {
       const { port: p } = port(() => new Response(SERVER_CANARY, { status }));
       const answer = await p.request({ chainId: BASE_SEPOLIA, agent: AGENT });
-      expect(answer.status).toBe('already_claimed');
+      expect(answer).toEqual({ status: 'rate_limited', retryAfter: 86_400 });
       expect(JSON.stringify(answer)).not.toContain('CANARY');
     },
   );
+
+  it('L-4: a 404 is retried after the window; a real already_claimed stays permanent', async () => {
+    let status = 404;
+    let t = 1_000_000;
+    let calls = 0;
+    const { port: p } = port(() => {
+      calls += 1;
+      return status === 200
+        ? json(200, {})
+        : status === 429
+          ? json(429, { error: 'already_claimed' })
+          : new Response('', { status });
+    });
+    const claim = createFreeCreditsClaimer({
+      request: (chainId) => p.request({ chainId, agent: AGENT }),
+      isFreeCreditsChain,
+      marker: memoryFreeCreditsMarker(),
+      now: () => t,
+    });
+    expect(await claim(BASE_SEPOLIA)).toBe('paused');
+    expect(await claim(BASE_SEPOLIA)).toBe('paused'); // inside the window: nothing sent
+    expect(calls).toBe(1);
+    t += 86_400 + 1;
+    status = 200; // the route is back
+    expect(await claim(BASE_SEPOLIA)).toBe('added');
+    expect(calls).toBe(2);
+
+    const { port: q } = port(() => json(429, { error: 'already_claimed' }));
+    let n = 0;
+    const claim2 = createFreeCreditsClaimer({
+      request: (chainId) => {
+        n += 1;
+        return q.request({ chainId, agent: AGENT });
+      },
+      isFreeCreditsChain,
+      marker: memoryFreeCreditsMarker(),
+      now: () => t,
+    });
+    expect(await claim2(BASE_SEPOLIA)).toBe('none');
+    t += 10 * 86_400;
+    expect(await claim2(BASE_SEPOLIA)).toBe('none');
+    expect(n).toBe(1);
+  });
 
   it.each([408, 500, 502, 503])('L-4: a transient %i stays unavailable', async (status) => {
     const { port: p } = port(() => new Response('', { status }));

@@ -9,7 +9,7 @@
 //   package's hard-coded testnet allowlist, or not a testnet in the shipped config, sends nothing.
 //   The answer maps by HTTP status and the service's fixed codes only: no server text, transaction
 //   hash or header text is kept (a 429's Retry-After is kept as a bounded number of seconds; its
-//   body is read up to 512 bytes; a permanent 4xx stops the retry).
+//   body is read up to 512 bytes; a refusing 4xx waits a day, never claimed).
 // - fileFreeCreditsMarker: the claim, remembered in the agent's folder (`free-credits.json`, 0600,
 //   written to a new file and renamed into place). It holds the agent ID and per chain `claimed` or
 //   a retry time: public values only. A file that cannot be parsed counts as claimed for every chain
@@ -168,10 +168,11 @@ export function nodeFreeCreditsPort(options: FreeCreditsPortOptions): FreeCredit
             : UNAVAILABLE;
         }
         await response.body?.cancel().catch(() => undefined);
-        // A permanent 4xx will not change by asking again: answer as "claimed" so the marker
-        // stops the daily retry (the claimer stores it and says nothing). Fixed value, no text.
+        // A refusal (4xx other than 408/425/429) is not retried for a day: a paused answer with the
+        // longest wait, never `claimed`, so a WAF or deploy 404 does not disable claims for good.
+        // Fixed value, no server text.
         if (isPermanentClientError(response.status)) {
-          return Object.freeze({ status: 'already_claimed', retryAfter: MAX_RETRY_AFTER });
+          return Object.freeze({ status: 'rate_limited', retryAfter: MAX_RETRY_AFTER });
         }
         return UNAVAILABLE;
       }
