@@ -2770,7 +2770,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7f-3 · core: files refresh-link, MinIO round trip and the rest of M1-7f-2 (split from M1-7f-2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (refresh-link request and answer, the refreshed link in the receiver row, the 5 MB MinIO round trip in CI's `storage-minio` job; the receiver's receipt trigger, the legacy-key backfill, the expiry cursor, sent copies, D-53 re-hash, `SentFile` name and hash and the drop expiry test against the Worker stay open on this card) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, client), packages/types if the `refresh-link` answer needs a body schema
 - **Depends on:** M1-7f-2
 - **Spec:** 04 §4 (delivery, retention and crypto-shredding); 07 §3, §5.4; 06 §2.3; D-18, D-48, D-53, D-98

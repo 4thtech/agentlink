@@ -333,7 +333,7 @@ export async function deliver(from: FileAgent, to: FileAgent): Promise<void> {
   // checked on-chain and DELIVERED is signed per policy. A no-op without a proofs platform.
   await to.client.proofs.processInbound(reports);
   // M1-7f-3: refresh-link requests and answers, as syncInbox runs them after processing.
-  await to.client.fileLinks?.processInbound(reports);
+  await to.client.fileLinks.processInbound(reports);
 }
 
 /** Deterministic bytes of a given length with a recognisable marker at the start. */
