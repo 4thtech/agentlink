@@ -101,7 +101,7 @@ describe('nodeFreeCreditsPort (M1-36i)', () => {
 
   it.each([
     ['503 (the pool is empty or the service is off)', () => json(503, { error: 'unavailable' })],
-    ['400', () => json(400, { error: SERVER_CANARY })],
+    ['500 json', () => json(500, { error: SERVER_CANARY })],
     ['500 with server text', () => new Response(SERVER_CANARY, { status: 500 })],
     ['200 is still sent, whatever its body', () => new Response(SERVER_CANARY, { status: 200 })],
     ['a 302', () => new Response(null, { status: 302, headers: { location: URL_BASE } })],
