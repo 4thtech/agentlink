@@ -124,6 +124,21 @@ export {
   type PolicyVersionMark,
   type ReceiptsKeptMark,
 } from './owner-actions.js';
+// M1-9i-a (D-115; 04 §2.2, §2.5.1; 07 §3.4, §5.6): own storage as the owner signed it.
+export {
+  OwnStorage,
+  STORAGE_MARK_ITEM,
+  brokenOwnStorageAdapter,
+  credentialDigestsEqual,
+  decodeStorageMark,
+  encodeStorageMark,
+  isBrokenOwnStorageAdapter,
+  storageCredentialItem,
+  type OwnStorageKeys,
+  type OwnStorageProblem,
+  type OwnStorageState,
+  type StorageMark,
+} from './own-storage.js';
 export {
   BUDGET_WINDOW_SECONDS,
   FAIL_CLOSED_CONTACTS,
