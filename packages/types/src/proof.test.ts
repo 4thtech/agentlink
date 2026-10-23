@@ -324,7 +324,6 @@ const quotedFee = () => ({ token: FEE_TOKEN, amount: '100000', usd: '0.1' });
 describe('ProofStatus fee fields (06 §2.4, 07 §8 as merged in #30)', () => {
   const unconfirmed = (status: string, fee: unknown) => ({
     status,
-    chain: 'base',
     ...(status === 'submitted' ? { recordId: B32, txHash: hex0x(32, '7e') } : {}),
     fee,
     receipts: [],
@@ -380,13 +379,20 @@ describe('ProofStatus (06 §2.4)', () => {
       txHash: hex0x(32, '7e'),
       receipts: [],
     });
-    expectRoundTrip(proofStatusSchema, { status: 'error', chain: 'base', receipts: [] });
+    // M1-33d-d: no chain at all (the CLI's default result names none, 06 §2.4 Advanced).
+    expectRoundTrip(proofStatusSchema, { status: 'error', receipts: [] });
+  });
+
+  it('chain is never a top-level field: only advanced.chain (06 §2.4 Advanced, M1-33d-d)', () => {
+    expectReject(proofStatusSchema, { ...proofStatus(), chain: 'base' });
+    expectReject(proofStatusSchema, { status: 'error', chain: 'base', receipts: [] });
+    expectRoundTrip(proofStatusSchema, without(proofStatus(), 'advanced'));
   });
 
   it.each([
     ['a status ProofStatus does not have', ['status'], 'rejected'],
-    ['chain with uppercase', ['chain'], 'Base'],
-    ['chain as chainId', ['chain'], 8453],
+    ['advanced chain with uppercase', ['advanced', 'chain'], 'Base'],
+    ['advanced chain as chainId', ['advanced', 'chain'], 8453],
     ['recordId bare hex', ['recordId'], B32.slice(2)],
     ['txHash uppercase', ['txHash'], hex0x(32, '7E')],
     ['fee usd as a number', ['fee', 'usd'], 0.1],

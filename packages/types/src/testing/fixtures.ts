@@ -420,7 +420,7 @@ export const minimalProofPack = () => ({
 /** ProofStatus (06 §2.4) for a confirmed record. */
 export const proofStatus = () => ({
   status: 'ok',
-  chain: 'base',
+  advanced: { chain: 'base' },
   recordId: B32,
   txHash: hex0x(32, '7e'),
   fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1', protocolUsd: '0.1', integratorUsd: '0' },

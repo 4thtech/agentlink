@@ -18,7 +18,11 @@ import type {
 } from '@4thtech-io/core';
 import { PAY_PAGE } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
-import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
+import {
+  proofStatusResultSchema,
+  type ContactDisplayName,
+  type RestrictedName,
+} from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import type {
   AccountView,
@@ -1893,5 +1897,89 @@ describe('free test credits on the first needs_credits (M1-36i)', () => {
     });
     const r = await call('agentlink_send', { to: B, text: 'hi', notarize: true }, client);
     expect(r.structured.summary).toContain(PAUSED);
+  });
+});
+
+// ---- the shared ProofStatus schema against real results (M1-33d-d, IR-M1-33d-c-1) --------------
+
+describe('real agentlink_notarize and agentlink_get_proof results against the shared ProofStatus schema (06 §2.4, M1-33d-d)', () => {
+  const FEE_CANONICAL = Object.freeze({ token: TOKEN, amount: '100000', usd: '0.1' });
+  /** The default view (06 §2.4 Advanced, D-40): the whole `advanced` member dropped. */
+  const defaultView = (structured: object): Record<string, unknown> => {
+    const copy = { ...structured } as Record<string, unknown>;
+    delete copy['advanced'];
+    return copy;
+  };
+  const issuesOf = (value: unknown) => proofStatusResultSchema.safeParse(value).error?.issues;
+
+  it('get_proof error result, advanced and default view, parses; neither has a top-level chain', async () => {
+    const { client } = fake({
+      get: () => ({
+        direction: 'sent',
+        status: 'failed',
+        recordId: RECORD,
+        chainId: 84532,
+        chain: 'base-sepolia',
+        fee: FEE_CANONICAL,
+        receipts: [],
+      }),
+    });
+    const r = await call('agentlink_get_proof', { recordId: RECORD }, client);
+    expect(r.structured).toMatchObject({ status: 'error', advanced: { chain: 'base-sepolia' } });
+    expect(r.structured).not.toHaveProperty('chain');
+    expect(issuesOf(r.structured)).toBeUndefined();
+    const plain = defaultView(r.structured);
+    expect(JSON.stringify(plain)).not.toContain('base-sepolia');
+    expect(issuesOf(plain)).toBeUndefined();
+  });
+
+  it('notarize pending_approval and error results parse', async () => {
+    const pending = fake({
+      notarize: () => ({ status: 'pending_approval', approvalId: APPROVAL }) as NotarizeResult,
+    });
+    const p = await call('agentlink_notarize', { envelopeId: ENVELOPE }, pending.client);
+    expect(p.structured.status).toBe('pending_approval');
+    expect(issuesOf(p.structured)).toBeUndefined();
+    const failed = fake({
+      notarize: () =>
+        ({ status: 'error', code: 'RECORD_FAILED', recordId: RECORD }) as NotarizeResult,
+    });
+    const e = await call('agentlink_notarize', { envelopeId: ENVELOPE }, failed.client);
+    expect(e.structured.status).toBe('error');
+    expect(issuesOf(e.structured)).toBeUndefined();
+  });
+
+  it('notarize ok and submitted with a requested receipt carry receiptRequested; the schema agrees on chain and receiptRequested', async () => {
+    // Known gap outside this card (flagged in the PR): the core returns no `txHash` and no fee
+    // split, which the shared rules ask of ok and submitted. Only those issues may remain here:
+    // nothing about chain, advanced, receiptRequested or an unknown key.
+    const allowed = new Set(['txHash', 'fee.protocolUsd']);
+    for (const status of ['ok', 'submitted'] as const) {
+      const { client } = fake({
+        notarize: () =>
+          ({
+            ...recorded(),
+            status,
+            fee: FEE_CANONICAL,
+            receiptRequested: true,
+          }) as NotarizeResult,
+      });
+      const r = await call(
+        'agentlink_notarize',
+        { envelopeId: ENVELOPE, requestReceipt: true },
+        client,
+      );
+      expect(r.structured, status).toMatchObject({
+        status,
+        advanced: { chain: 'base-sepolia' },
+        receiptRequested: true,
+      });
+      expect(r.structured, status).not.toHaveProperty('chain');
+      for (const value of [r.structured, defaultView(r.structured)]) {
+        const issues = issuesOf(value) ?? [];
+        const unexpected = issues.filter((i) => !allowed.has(i.path.join('.')));
+        expect(unexpected, `${status}: ${JSON.stringify(issues)}`).toEqual([]);
+      }
+    }
   });
 });
