@@ -8,7 +8,7 @@ import { BASE_SEPOLIA, GNOSIS_CHIADO } from '../config/index.js';
 import type { ChainConfig, ChainNetwork } from '../config/index.js';
 import { FAUCET_CHAIN_IDS, isFaucetChain } from '../fees/faucet.js';
 import { loadOccV2Contracts, type OccV2Contracts } from '../occ-v2.js';
-import { composeChainConfig } from './registry.js';
+import { GASLESS_TOPUP_ENABLED, composeChainConfig } from './registry.js';
 import {
   ChainError,
   FEE_VAULT_CLIENT_ABI,
@@ -138,10 +138,19 @@ describe('chain registry: network entry + pinned OCC v2 contracts', () => {
     expect(getChainConfig(10200)).toBeDefined();
   });
 
-  it('advertises no EIP-3009 deposit while the vault refuses it (M1-3c; FA M-1)', () => {
-    const c = getChainConfig(84532) as ChainConfig;
-    expect(loadOccV2Contracts(84532)?.depositWithAuthorization).toBe(false);
-    expect(c.feeTokens.every((t) => t.eip3009 !== true)).toBe(true);
+  it('keeps the gasless top-up off behind the kill switch, though Base Sepolia accepts it (M3-4b-t-0)', () => {
+    // v0.1.0-testnet.4: the Base Sepolia vault accepts depositWithAuthorization, Chiado does not.
+    expect(loadOccV2Contracts(84532)?.depositWithAuthorization).toBe(true);
+    expect(loadOccV2Contracts(10200)?.depositWithAuthorization).toBe(false);
+    expect(BASE_SEPOLIA.feeTokens.map((t) => [t.symbol, t.eip3009])).toEqual([['USDC', true]]);
+    // Off until M3-4b-t-4 ships the path that executes a top-up: detect, pick, checkGaslessTopUp and
+    // the builder all read the composed flag, so it must stay false on every chain.
+    expect(GASLESS_TOPUP_ENABLED).toBe(false);
+    for (const c of chainRegistry()) {
+      expect(c.feeTokens.every((t) => t.eip3009 !== true)).toBe(true);
+    }
+    const composed = composeChainConfig(BASE_SEPOLIA, loadOccV2Contracts(84532) as OccV2Contracts);
+    expect(composed.feeTokens.map((t) => [t.symbol, t.eip3009])).toEqual([['USDC', false]]);
   });
 
   it('knows no chain without a deployment, and no mainnet', () => {
@@ -748,7 +757,7 @@ describe('calls: the client cannot encode admin, upgrade, module or pending func
   it('refuses every non-client vault function, depositWithAuthorization included', () => {
     // @ts-expect-error charge is module-only
     expect(() => encodeFeeVaultCall({ functionName: 'charge' })).toThrow();
-    // @ts-expect-error depositWithAuthorization waits for M1-3c
+    // @ts-expect-error depositWithAuthorization is relay-only (D-89)
     expect(() => encodeFeeVaultCall({ functionName: 'depositWithAuthorization' })).toThrow();
     for (const functionName of NON_CLIENT_VAULT) {
       expect(() =>

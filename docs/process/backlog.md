@@ -826,7 +826,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
 
 #### CHORE-DEPLOY-RECONCILE-b · reconcile: bound pending approvals; alert when no deploy is found (new, IR-CHORE-DEPLOY-RECONCILE-1, #464)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · the reconcile workflow and `tools/release/**`
 - **Depends on:** CHORE-DEPLOY-RECONCILE
 - **Scope:**
