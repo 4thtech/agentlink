@@ -4079,7 +4079,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests-first: the version bump, rejection of a stale version, and byte-exact bodies against vectors where a vector exists; an unsigned body is never accepted by the core without an owner signature. Threat note and tests-first evidence (S2).
 
 #### M1-11r-c · core dropUsage and own-storage status (new, D-118)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (new module and `src/index.ts` export)
 - **Depends on:** M1-9i-a (shares own-storage), M1-11r-b (both write `packages/core/src/index.ts`)
 - **Spec:** 06 §8; 07; 08 §1; D-48, D-115, D-118
