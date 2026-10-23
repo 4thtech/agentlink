@@ -6205,13 +6205,13 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Internal milestone audit (parts A–F of `audit-rules.md` §7) plus the M2 additions: web checklist on console, verify, invite and pay; cloud agent; Registry.
-  - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" (median) measured per G-21.
+  - External testing: 20–50 early adopters on testnets; UX metric "install → first message" measured per G-21 and judged by the D-125 rule (self-reported, no analytics).
 - **Acceptance:**
   - Zero open Critical/High findings; per-invariant verdicts.
   - **G-1 re-decided (D-67)** before external testers start: the owner records a new decision on the same-user residual (G-1, G-42), taking into account what the desktop apps deliver; until then no external tester relies on owner presence on an `npx` install.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
-  - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message stays under 5 minutes (median).
-  - Adopter count and the measured median recorded; issues filed as cards; owner sign-off.
+  - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message meets the D-125 rule: median < 5 minutes, at least 80% of testers < 5 minutes, no tester > 15 minutes for a cause on our side (counterpart wait excluded; an over-15 caused by us is a bug fixed before the gate passes).
+  - Adopter count, the measured median and the share under 5 minutes recorded; issues filed as cards; owner sign-off.
 
 ---
 
