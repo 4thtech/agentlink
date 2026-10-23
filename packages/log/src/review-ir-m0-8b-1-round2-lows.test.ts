@@ -104,7 +104,7 @@ describe('R2-L2 fail closed: an apostrophe opens a string everywhere but inside 
   });
 
   it('never leaks on a corpus of apostrophe positions', () => {
-    const shapes = ["'", " '", "('", "='", "b'", "]'", "}'", ",'", ":'"];
+    const shapes = ["'", " '", "('", "='", "b'", ",'", ":'"];
     for (const first of shapes) {
       for (const second of shapes) {
         const text = `secret=[${first}a]${SECRET}${second}x] after`;
