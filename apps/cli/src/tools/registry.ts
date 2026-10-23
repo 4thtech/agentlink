@@ -123,6 +123,8 @@ const proofStatusFields = {
     ['token', 'amount', 'usd'],
   ),
   receipts: arr(obj({ type: receiptType, at: timestamp }, ['type', 'at'])),
+  /** M1-33d-b: `requestReceipt` on a message that already had proof; no request was added. */
+  receiptRequestNotAdded: bool(),
 };
 /** `proof?: ProofStatus` inside a send or terms result (06 §2.2, §2.2a). */
 const proofStatus = obj(

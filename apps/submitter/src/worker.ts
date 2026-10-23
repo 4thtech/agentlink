@@ -5,9 +5,12 @@
 //   POST /v1/notarize                 {chainId, records: [{record, signature}]}
 //   POST /v1/receipt                  {chainId, receipts: [{receipt, signature}]}
 //   GET  /v1/status/:txHash           a sent transaction and the current status of its items
-//   GET  /v1/health                   per chain: available, gas balance (wei), queue depth
+//   GET  /v1/health                   per chain: available, gas balance (wei), queue depth, and
+//                                     the pool states gas: ok|low and faucet: ok|low|paused
+//                                     (pool.ts; M1-10b-e)
 //   POST /v1/deposit-authorization    present, disabled until M3-4b (501)
-//   POST /v1/faucet                   {chainId, agent}: testnet credits (faucet.ts; M1-10b)
+//   POST /v1/faucet                   {chainId, agent}: testnet credits (faucet.ts; M1-10b);
+//                                     503 `paused` while the faucet cannot cover one grant
 //
 // Logging (07 §7, I-7): this Worker writes nothing to the console and logs no request, IP, signer,
 // signature or record. It keeps only the aggregate counters of limits.ts (METRICS). Errors are fixed
@@ -17,12 +20,22 @@ import {
   isTxHash,
   parseSubmitRequest,
   type ChainInputError,
+  type FaucetBalances,
+  type FaucetChain,
+  type FaucetPoolState,
   type Hex,
   type SubmitKind,
   type SubmitterChain,
 } from '@4thtech-io/chain';
 import { encodeHex, encodeUtf8, hmacSha256, parseJson } from '@4thtech-io/crypto';
-import { pinnedFaucet, readConfig, readFaucetConfig, type SubmitterConfig } from './config.js';
+import {
+  pinnedFaucet,
+  poolThresholds,
+  readConfig,
+  readFaucetConfig,
+  type SubmitterConfig,
+} from './config.js';
+import { faucetPoolState, gasPoolState } from './pool.js';
 import {
   MAX_FAUCET_BODY_BYTES,
   createFaucetClass,
@@ -62,7 +75,11 @@ export interface SubmitterEnv {
   readonly [name: string]: unknown;
 }
 
-export type WorkerDeps = QueueDeps & FaucetDeps;
+export type WorkerDeps = QueueDeps &
+  FaucetDeps & {
+    /** How long one isolate reuses a balance read for `/v1/health`; default BALANCE_CACHE_MS. */
+    readonly balanceCacheMs?: number;
+  };
 
 /**
  * Largest request body (IR-M1-10a-1 L-4): 20 items, each with a signature of the full 2 048 bytes
@@ -70,19 +87,43 @@ export type WorkerDeps = QueueDeps & FaucetDeps;
  */
 export const MAX_BODY_BYTES = 128 * 1024;
 
-/** How long one isolate reuses a chain's gas balance for `/v1/health` (an RPC read each). */
+/** A paused faucet's `retry-after`: the owner tops it up within hours, not seconds. */
+const PAUSED_RETRY_AFTER_SECONDS = 3_600;
+
+/**
+ * How long one isolate reuses a chain's gas balance and faucet balances for `/v1/health` (an RPC
+ * read each).
+ */
 const BALANCE_CACHE_MS = 10_000;
 const balances = new Map<number, { readonly at: number; readonly wei: string | null }>();
+const faucetBalances = new Map<
+  number,
+  { readonly at: number; readonly value: FaucetBalances | null }
+>();
 
-async function gasBalanceOf(port: SubmitterChain): Promise<string | null> {
+async function gasBalanceOf(port: SubmitterChain, cacheMs: number): Promise<string | null> {
   const cached = balances.get(port.chainId);
-  if (cached && Date.now() - cached.at < BALANCE_CACHE_MS) return cached.wei;
+  if (cached && Date.now() - cached.at < cacheMs) return cached.wei;
   const wei = await port.gasBalance().then(
     (value) => value.toString(10),
     () => null,
   );
   balances.set(port.chainId, { at: Date.now(), wei });
   return wei;
+}
+
+async function faucetBalancesOf(
+  faucet: FaucetChain,
+  cacheMs: number,
+): Promise<FaucetBalances | null> {
+  const cached = faucetBalances.get(faucet.chainId);
+  if (cached && Date.now() - cached.at < cacheMs) return cached.value;
+  const value = await faucet.balances().then(
+    (b) => b,
+    () => null,
+  );
+  faucetBalances.set(faucet.chainId, { at: Date.now(), value });
+  return value;
 }
 
 const HEADERS: Readonly<Record<string, string>> = {
@@ -244,12 +285,30 @@ async function health(c: Ctx, config: SubmitterConfig | null, request: Request):
   if (!config) return json(200, { ok: false, chains: [] });
   const limited = await takeIp(c, config, request, 'r', 1, config.limits.ipReadsPerHour);
   if (limited) return limited;
+  const cacheMs = c.deps.balanceCacheMs ?? BALANCE_CACHE_MS;
+  const faucetConfig = readFaucetConfig(c.env);
   const chains = await Promise.all(
     config.chains.map(async (chainId) => {
       const port: SubmitterChain | null = c.deps.portFor(c.env, chainId);
-      const gasBalance = port ? await gasBalanceOf(port) : null;
+      const gasBalance = port ? await gasBalanceOf(port, cacheMs) : null;
       const queueDepth = await queueOf(c.env, chainId).depth();
-      return { chainId, available: port !== null && gasBalance !== null, gasBalance, queueDepth };
+      const thresholds = poolThresholds(chainId);
+      // M1-10b-e: states only, never the faucet's balances or address. A chain the faucet does not
+      // serve has `faucet: null`; one it serves whose wallet is missing or unreadable is paused.
+      let faucet: FaucetPoolState | null = null;
+      if (faucetConfig?.chains.includes(chainId) === true) {
+        const wallet = pinnedFaucet(c.env, chainId, c.deps.faucetFor(c.env, chainId));
+        const walletBalances = wallet ? await faucetBalancesOf(wallet, cacheMs) : null;
+        faucet = faucetPoolState(walletBalances, faucetConfig.usdCents, thresholds);
+      }
+      return {
+        chainId,
+        available: port !== null && gasBalance !== null,
+        gasBalance,
+        queueDepth,
+        gas: gasPoolState(gasBalance, thresholds),
+        faucet,
+      };
     }),
   );
   return json(200, { ok: chains.every((x) => x.available), chains });
@@ -303,6 +362,11 @@ async function faucetClaim(
   if (answer.error === 'unavailable') {
     count(c, 'unavailable');
     return refuse(503, 'unavailable');
+  }
+  if (answer.error === 'paused') {
+    // M1-10b-e: a stable code clients map to plain words; the owner tops the wallet up.
+    count(c, 'faucet_paused');
+    return refuse(503, 'paused', { 'retry-after': String(PAUSED_RETRY_AFTER_SECONDS) });
   }
   count(c, 'rate_limited');
   return refuse(429, answer.error, { 'retry-after': String(answer.retryAfter) });

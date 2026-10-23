@@ -11,6 +11,8 @@ export type {
 } from './approval-channel.js';
 export {
   IdentityService,
+  type FingerprintForms,
+  type OwnFingerprints,
   type IdentityView,
   type InitIdentityInput,
   type RotateIdentityInput,
@@ -65,6 +67,14 @@ export {
   type PendingContact,
 } from './pairing.js';
 export {
+  TOP_UP_MAX_USD,
+  TOP_UP_MIN_USD,
+  TOP_UP_PRESETS_USD,
+  buildTopUpLink,
+  suggestTopUpUsd,
+  type TopUpLinkInput,
+} from './top-up-link.js';
+export {
   INVITE_INFLATE_SLICE_BYTES,
   INVITE_LINK_PREFIX,
   INVITE_MAX_JSON_BYTES,
@@ -114,6 +124,21 @@ export {
   type PolicyVersionMark,
   type ReceiptsKeptMark,
 } from './owner-actions.js';
+// M1-9i-a (D-115; 04 §2.2, §2.5.1; 07 §3.4, §5.6): own storage as the owner signed it.
+export {
+  OwnStorage,
+  STORAGE_MARK_ITEM,
+  brokenOwnStorageAdapter,
+  credentialDigestsEqual,
+  decodeStorageMark,
+  encodeStorageMark,
+  isBrokenOwnStorageAdapter,
+  storageCredentialItem,
+  type OwnStorageKeys,
+  type OwnStorageProblem,
+  type OwnStorageState,
+  type StorageMark,
+} from './own-storage.js';
 export {
   BUDGET_WINDOW_SECONDS,
   FAIL_CLOSED_CONTACTS,
@@ -297,7 +322,23 @@ export {
 } from './terms-flow.js';
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
-export type { ProofChain, ProofKit, ProofsPlatform } from './proofs/platform.js';
+export type {
+  FreeCreditsAnswer,
+  FreeCreditsPort,
+  ProofChain,
+  ProofKit,
+  ProofsPlatform,
+} from './proofs/platform.js';
+// The local UI reads (M1-11r-a): proof list, credits, free test credits, activity feed, folders.
+export type {
+  ChainCredits,
+  CreditsView,
+  FreeCreditsResult,
+  ProofListItem,
+} from './proofs/reads.js';
+export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
+export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
+export type { FilesView, ResolvedFolders } from './files/view.js';
 export {
   PROOF_AWAITING_PER_CONTACT,
   PROOF_LOG_CODES,

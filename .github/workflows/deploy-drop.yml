@@ -19,17 +19,21 @@
 #   build              builds the Worker bundle ONCE (wrangler deploy --dry-run, no credentials) and
 #                      uploads it with its SHA-256; both environments deploy exactly these bytes.
 #   deploy-staging     environment `staging`. Skips cleanly (green, with a notice) while the
-#                      Cloudflare credentials or the Worker secret DROP_URL_KEY are missing. Deploys
-#                      to workers.dev, then reads back the bucket lifecycle rule and the logging
-#                      settings.
+#                      Cloudflare credentials or the Worker secret DROP_URL_KEY are missing. Checks
+#                      the bucket lifecycle rule BEFORE deploying (a missing rule fails the job with
+#                      nothing deployed, M1-27b-b), deploys to workers.dev, then reads back the
+#                      logging settings.
 #   smoke-staging      no credentials: health, signed upload / GET / DELETE round trip, expired GET
 #                      refused (apps/drop/test/smoke-remote.test.ts against the staging origin).
 #   deploy-production  environment `production`, only after a green staging smoke, and only while this
-#                      commit is still main's head (runs can finish out of order). Records the live
-#                      version (rollback target), deploys to the Custom Domain, health-checks over
-#                      HTTP (no repository code runs against production), reads back the lifecycle
-#                      rule and the logging settings, and on any failure rolls back automatically
-#                      with `wrangler rollback`. Writes the deploy record draft to the run summary.
+#                      commit is still main's head (runs can finish out of order). Checks the bucket
+#                      lifecycle rule before deploying, records the live version (rollback target),
+#                      deploys to the Custom Domain, health-checks over HTTP (no repository code runs
+#                      against production), reads back the logging settings, and on any failure,
+#                      cancellation or step timeout after the deploy started rolls back
+#                      automatically with `wrangler rollback`. Every step has its own timeout and
+#                      the job timeout is above their sum, so a slow step fails as a step and the
+#                      rollback still runs (M1-27b-b). Writes the deploy record draft to the run summary.
 #                      The health check waits up to 15 minutes while there is no TLS or connection
 #                      yet (curl exit 6, 7, 28 or 35: a new Custom Domain's certificate); an unhealthy
 #                      HTTP answer or any other curl error fails after 10 attempts. A rollback Cloudflare refuses across a binding or storage change
@@ -39,8 +43,10 @@
 #   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
 #                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
 #   catch-up           only when this run did not deploy its commit because main moved on (CI
-#                      superseded, or deploy-production found a newer head): dispatches this workflow
-#                      on main unless a run already exists for main's head, whose commits may not
+#                      superseded, or deploy-production found a newer head) or its CI failed (a
+#                      flake): dispatches this workflow on main unless a run for main's head is in
+#                      flight or succeeded (a failed one does not count), and writes to the run
+#                      summary which run deploys instead. The newer commits may not
 #                      touch the paths above (tools/release/catch-up-deploy.mjs). The dispatched run
 #                      passes every gate again for the head commit: its own green CI, staging and
 #                      the smoke test, the production environment, DEPLOY_FREEZE, the head check.
@@ -317,6 +323,38 @@ jobs:
           echo "ready=true" >> "$GITHUB_OUTPUT"
           # SECRET-CHECK-END
 
+      # M1-27b-b: before the deploy, so a bucket without its rule never gets a new version. A
+      # failure here fails the job with nothing deployed.
+      - name: Check the bucket lifecycle rule before deploying (7 days)
+        id: lifecycle
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          BUCKET: agentlink-drop-staging
+          LIFECYCLE_JSON: ${{ runner.temp }}/lifecycle.json
+        run: |
+          set -euo pipefail
+          curl -sS --proto '=https' --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -o "$LIFECYCLE_JSON" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/lifecycle"
+          # READBACK-LIFECYCLE-BEGIN
+          if ! jq -e '
+            .success == true
+            and ([.result.rules[]? | select(
+              .enabled == true
+              and ((.conditions.prefix // "") == "")
+              and (.deleteObjectsTransition.condition.type == "Age")
+              and ((.deleteObjectsTransition.condition.maxAge // 0) > 0)
+              and ((.deleteObjectsTransition.condition.maxAge // 0) <= 604800)
+            )] | length > 0)
+          ' "$LIFECYCLE_JSON" > /dev/null; then
+            echo "::error::The bucket has no enabled rule deleting every object within 7 days (604800 s). Not deployed; owner: restore the rule (release-and-deployment.md §4.5.1)."
+            exit 1
+          fi
+          echo "Lifecycle rule checked before deploying: every object is deleted within 7 days."
+          # READBACK-LIFECYCLE-END
+
       - name: Record the live version (rollback rehearsal target)
         id: previous
         if: steps.ready.outputs.ready == 'true'
@@ -338,7 +376,7 @@ jobs:
 
       - name: Deploy to staging (workers.dev)
         id: deploy
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.lifecycle.outcome == 'success'
         shell: bash
         working-directory: apps/drop
         env:
@@ -362,7 +400,7 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch the live Worker settings and the bucket lifecycle rule
+      - name: Fetch the live Worker settings
         if: steps.ready.outputs.ready == 'true'
         shell: bash
         env:
@@ -374,8 +412,6 @@ jobs:
           auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
           curl -sS --proto '=https' --max-time 30 -H "$auth" \
             -o "$RUNNER_TEMP/settings.json" "$api/workers/scripts/agentlink-drop-staging/script-settings"
-          curl -sS --proto '=https' --max-time 30 -H "$auth" \
-            -o "$RUNNER_TEMP/lifecycle.json" "$api/r2/buckets/agentlink-drop-staging/lifecycle"
 
       - name: Read back the logging settings (all off, 04 §4)
         if: steps.ready.outputs.ready == 'true'
@@ -402,30 +438,6 @@ jobs:
           fi
           echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
           # READBACK-SETTINGS-END
-
-      - name: Read back the bucket lifecycle rule (7 days)
-        if: steps.ready.outputs.ready == 'true'
-        shell: bash
-        env:
-          LIFECYCLE_JSON: ${{ runner.temp }}/lifecycle.json
-        run: |
-          set -euo pipefail
-          # READBACK-LIFECYCLE-BEGIN
-          if ! jq -e '
-            .success == true
-            and ([.result.rules[]? | select(
-              .enabled == true
-              and ((.conditions.prefix // "") == "")
-              and (.deleteObjectsTransition.condition.type == "Age")
-              and ((.deleteObjectsTransition.condition.maxAge // 0) > 0)
-              and ((.deleteObjectsTransition.condition.maxAge // 0) <= 604800)
-            )] | length > 0)
-          ' "$LIFECYCLE_JSON" > /dev/null; then
-            echo "::error::The bucket has no enabled rule deleting every object within 7 days (604800 s)."
-            exit 1
-          fi
-          echo "Lifecycle rule read back: every object is deleted within 7 days."
-          # READBACK-LIFECYCLE-END
 
   smoke-staging:
     name: smoke-staging
@@ -464,8 +476,11 @@ jobs:
     needs: [build, deploy-staging, smoke-staging]
     if: needs.deploy-staging.outputs.deployed == 'true' && needs.smoke-staging.result == 'success' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
+    # M1-27b-b: every step has its own timeout-minutes and this job timeout stays above their sum
+    # (89; tested). A slow step therefore ends as a failed step and the rollback step still runs
+    # with its own budget; the job-level timeout, which would cancel the job, is never reached first.
     # The health check alone may wait 20 minutes for a new Custom Domain's certificate (M1-27b-c).
-    timeout-minutes: 45
+    timeout-minutes: 95
     environment: production
     concurrency:
       group: deploy-drop-production
@@ -473,17 +488,21 @@ jobs:
     permissions:
       contents: read
     outputs:
-      deployed: ${{ steps.deploy.outputs.deployed }}
+      # M1-27b-b: from the deploy step's outcome, not an output it writes: a step cancelled or timed
+      # out mid-way may never have written one, but its wrangler request may still have landed.
+      deployed: ${{ contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome) && 'true' || 'false' }}
       rollback: ${{ steps.rollback.outputs.result }}
       current: ${{ steps.head.outputs.current }}
     steps:
       - name: Check out repository
+        timeout-minutes: 5
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       # Re-checked here: the environment may have waited for an approval click.
       - name: Stop if DEPLOY_FREEZE is set
+        timeout-minutes: 2
         shell: bash
         env:
           DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
@@ -496,6 +515,7 @@ jobs:
 
       - name: Check that this commit is still the head of main
         id: head
+        timeout-minutes: 2
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -511,7 +531,9 @@ jobs:
             exit 1
           fi
           if [ "$head" != "$COMMIT" ]; then
-            echo "::notice::main has moved on from $COMMIT to $head; the newer run or the catch-up job handles production. Skipped."
+            # CHORE-DEPLOY-CATCHUP: not silently green; the catch-up job names the run that deploys.
+            echo "::warning::main has moved on from $COMMIT to $head; this run did not change production. The catch-up job hands it to a run for $head."
+            echo "**Superseded by \`$head\`:** this run did not change production (main moved on from \`$COMMIT\`); see the catch-up job for the run that deploys it." >> "$GITHUB_STEP_SUMMARY"
             echo "current=false" >> "$GITHUB_OUTPUT"
           else
             echo "current=true" >> "$GITHUB_OUTPUT"
@@ -519,17 +541,20 @@ jobs:
           # HEAD-CHECK-END
 
       - name: Set up Node.js and pnpm
+        timeout-minutes: 15
         uses: ./.github/actions/setup-node-pnpm
         with:
           cache: "false"
 
       - name: Download the bundle
+        timeout-minutes: 5
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: drop-bundle
           path: ${{ runner.temp }}/drop-bundle
 
       - name: Verify the bundle is the one staging ran
+        timeout-minutes: 2
         shell: bash
         env:
           EXPECTED: ${{ needs.build.outputs.sha256 }}
@@ -541,6 +566,7 @@ jobs:
       - name: Check credentials and the Worker secret
         id: ready
         if: steps.head.outputs.current == 'true'
+        timeout-minutes: 3
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -593,9 +619,43 @@ jobs:
           echo "ready=true" >> "$GITHUB_OUTPUT"
           # SECRET-CHECK-END
 
+      # M1-27b-b: before the deploy, so a bucket without its rule never gets a new version. A
+      # failure here fails the job with nothing deployed (no rollback, no freeze).
+      - name: Check the bucket lifecycle rule before deploying (7 days)
+        id: lifecycle
+        if: steps.ready.outputs.ready == 'true'
+        timeout-minutes: 3
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          BUCKET: agentlink-drop-prod
+          LIFECYCLE_JSON: ${{ runner.temp }}/lifecycle.json
+        run: |
+          set -euo pipefail
+          curl -sS --proto '=https' --max-time 30 -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -o "$LIFECYCLE_JSON" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/r2/buckets/$BUCKET/lifecycle"
+          # READBACK-LIFECYCLE-BEGIN
+          if ! jq -e '
+            .success == true
+            and ([.result.rules[]? | select(
+              .enabled == true
+              and ((.conditions.prefix // "") == "")
+              and (.deleteObjectsTransition.condition.type == "Age")
+              and ((.deleteObjectsTransition.condition.maxAge // 0) > 0)
+              and ((.deleteObjectsTransition.condition.maxAge // 0) <= 604800)
+            )] | length > 0)
+          ' "$LIFECYCLE_JSON" > /dev/null; then
+            echo "::error::The bucket has no enabled rule deleting every object within 7 days (604800 s). Not deployed; owner: restore the rule (release-and-deployment.md §4.5.1)."
+            exit 1
+          fi
+          echo "Lifecycle rule checked before deploying: every object is deleted within 7 days."
+          # READBACK-LIFECYCLE-END
+
       - name: Record the live version (rollback target)
         id: previous
         if: steps.ready.outputs.ready == 'true'
+        timeout-minutes: 5
         shell: bash
         working-directory: apps/drop
         env:
@@ -615,9 +675,13 @@ jobs:
           echo "Rollback target: ${version:-none}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+      # Once this step has started it counts as deployed (its outcome is success, failure or
+      # cancelled): a deploy that fails, is cancelled or times out half-way may still have gone live,
+      # so the rollback and the freeze run (M1-27b-b).
       - name: Deploy to production (Custom Domain)
         id: deploy
-        if: steps.ready.outputs.ready == 'true'
+        if: steps.lifecycle.outcome == 'success'
+        timeout-minutes: 10
         shell: bash
         working-directory: apps/drop
         env:
@@ -626,8 +690,6 @@ jobs:
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/wrangler-production.ndjson"
-          # Set first: a deploy that fails half-way still counts as deployed (rollback, freeze).
-          echo "deployed=true" >> "$GITHUB_OUTPUT"
           WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy "$RUNNER_TEMP/drop-bundle/index.js" --no-bundle --env production --config wrangler.toml
           version="$(jq -r 'select(.type == "deploy") | .version_id // empty' "$report" | head -n 1)"
           if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
@@ -692,8 +754,9 @@ jobs:
           done
           # HEALTH-CHECK-END
 
-      - name: Fetch the live Worker settings and the bucket lifecycle rule
+      - name: Fetch the live Worker settings
         if: steps.ready.outputs.ready == 'true'
+        timeout-minutes: 3
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -704,12 +767,11 @@ jobs:
           auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
           curl -sS --proto '=https' --max-time 30 -H "$auth" \
             -o "$RUNNER_TEMP/settings.json" "$api/workers/scripts/agentlink-drop/script-settings"
-          curl -sS --proto '=https' --max-time 30 -H "$auth" \
-            -o "$RUNNER_TEMP/lifecycle.json" "$api/r2/buckets/agentlink-drop-prod/lifecycle"
 
       - name: Read back the logging settings (all off, 04 §4)
         id: settings
         if: steps.ready.outputs.ready == 'true'
+        timeout-minutes: 2
         shell: bash
         env:
           SETTINGS_JSON: ${{ runner.temp }}/settings.json
@@ -734,32 +796,11 @@ jobs:
           echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
           # READBACK-SETTINGS-END
 
-      - name: Read back the bucket lifecycle rule (7 days)
-        id: lifecycle
-        if: steps.ready.outputs.ready == 'true'
-        shell: bash
-        env:
-          LIFECYCLE_JSON: ${{ runner.temp }}/lifecycle.json
-        run: |
-          set -euo pipefail
-          # READBACK-LIFECYCLE-BEGIN
-          if ! jq -e '
-            .success == true
-            and ([.result.rules[]? | select(
-              .enabled == true
-              and ((.conditions.prefix // "") == "")
-              and (.deleteObjectsTransition.condition.type == "Age")
-              and ((.deleteObjectsTransition.condition.maxAge // 0) > 0)
-              and ((.deleteObjectsTransition.condition.maxAge // 0) <= 604800)
-            )] | length > 0)
-          ' "$LIFECYCLE_JSON" > /dev/null; then
-            echo "::error::The bucket has no enabled rule deleting every object within 7 days (604800 s)."
-            exit 1
-          fi
-          echo "Lifecycle rule read back: every object is deleted within 7 days."
-          # READBACK-LIFECYCLE-END
-
-      # Any failure after the deploy started rolls back. Durable Object migrations are forward-only
+      # Any failure, cancellation or step timeout after the deploy started rolls back (M1-27b-b: a
+      # cancelled run still runs this step, and every earlier step ends by its own timeout before the
+      # job's). A second, forced cancellation stops this step too; the freeze job still runs, and the
+      # owner rolls back by hand (release-and-deployment.md §8).
+      # Durable Object migrations are forward-only
       # (§4.5): Cloudflare refuses a version that depends on a binding or storage this deploy changed
       # (seen on the first production deploy, M1-27b-c). The step then reports that the new version
       # stays live, the freeze stops everything and the owner decides the forward fix.
@@ -767,13 +808,15 @@ jobs:
       # so the version this run deployed is live and must be rolled back even if main moved on.
       - name: Roll back to the recorded version
         id: rollback
-        if: (failure() || cancelled()) && steps.deploy.outputs.deployed == 'true'
+        if: (failure() || cancelled()) && contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome)
+        timeout-minutes: 10
         shell: bash
         working-directory: apps/drop
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           PREVIOUS: ${{ steps.previous.outputs.version }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set -euo pipefail
@@ -781,6 +824,37 @@ jobs:
           if [ -z "${PREVIOUS:-}" ]; then
             echo "::error::No recorded rollback target. DEPLOY_FREEZE is set by the freeze job; the owner decides the fix."
             echo "result=no-target" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          live_version() {
+            pnpm exec wrangler deployments status --env production --config wrangler.toml --json \
+              | awk 'f || /^\{/ { f = 1; print }' \
+              | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' || true
+          }
+          healthy() {
+            for _ in 1 2 3 4 5 6; do
+              health="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
+              if [ "$health" = "200" ]; then return 0; fi
+              sleep 10
+            done
+            return 1
+          }
+          # M1-27b-b: a deploy step that was cancelled or timed out had its wrangler killed, but a
+          # request it had already sent can still land. Wait for it before reading the live version.
+          if [ "${DEPLOY_OUTCOME:-}" != "success" ]; then
+            echo "The deploy step ended ${DEPLOY_OUTCOME:-unknown}; waiting 30 s for an interrupted deploy request to settle."
+            sleep 30
+          fi
+          # Nothing to roll back when the recorded version is still the live one (the deploy never
+          # went live). An unreadable status rolls back anyway.
+          if [ "$(live_version)" = "$PREVIOUS" ]; then
+            if healthy; then
+              echo "::warning::Not rolled back: the recorded version $PREVIOUS is still live (this deploy never went live) and /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
+              echo "result=previous-live" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "::error::The recorded version $PREVIOUS is still live, but /v1/health does not answer 200."
+            echo "result=previous-live-unhealthy" >> "$GITHUB_OUTPUT"
             exit 1
           fi
           if rolled="$(pnpm exec wrangler rollback "$PREVIOUS" --env production --config wrangler.toml --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes 2>&1)"; then
@@ -805,30 +879,25 @@ jobs:
             echo "result=rollback-failed" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          live="$(pnpm exec wrangler deployments status --env production --config wrangler.toml --json \
-            | awk 'f || /^\{/ { f = 1; print }' \
-            | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' || true)"
+          live="$(live_version)"
           if [ "$live" != "$PREVIOUS" ]; then
             echo "::error::After the rollback the live version is ${live:-unknown}, not $PREVIOUS."
             echo "result=rollback-not-live" >> "$GITHUB_OUTPUT"
             exit 1
           fi
-          for _ in 1 2 3 4 5 6; do
-            health="$(curl -sS --proto '=https' --max-time 15 -o /dev/null -w '%{http_code}' "$DROP_PRODUCTION_ORIGIN/v1/health" || true)"
-            if [ "$health" = "200" ]; then
-              echo "::warning::Rolled back: $PREVIOUS is live and /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
-              echo "result=rolled-back" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            sleep 10
-          done
+          if healthy; then
+            echo "::warning::Rolled back: $PREVIOUS is live and /v1/health answers 200. DEPLOY_FREEZE is set by the freeze job."
+            echo "result=rolled-back" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           echo "::error::Rolled back: $PREVIOUS is live, but /v1/health does not answer 200."
           echo "result=rolled-back-unhealthy" >> "$GITHUB_OUTPUT"
           exit 1
           # ROLLBACK-END
 
       - name: Write the deploy record draft
-        if: always() && steps.deploy.outputs.deployed == 'true'
+        if: always() && contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome)
+        timeout-minutes: 2
         shell: bash
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -862,7 +931,7 @@ jobs:
             echo "| Rollback target | \`${PREVIOUS:-none}\` |"
             echo "| Health check | ${HEALTH_RESULT:-skipped} |"
             echo "| Logging read-back | ${SETTINGS_RESULT:-skipped} |"
-            echo "| Lifecycle read-back | ${LIFECYCLE_RESULT:-skipped} |"
+            echo "| Lifecycle check (before the deploy) | ${LIFECYCLE_RESULT:-skipped} |"
             echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -874,7 +943,8 @@ jobs:
     needs: [ci-green, deploy-production]
     if: >-
       always() && github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' &&
-      (needs.ci-green.outputs.result == 'superseded' || needs.deploy-production.outputs.current == 'false')
+      (needs.ci-green.outputs.result == 'superseded' || needs.ci-green.result == 'failure' ||
+      needs.deploy-production.outputs.current == 'false')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -48,6 +48,8 @@ export type CoreErrorCode =
   // Inbox page read (06 §2.2; M1-7h-c)
   | 'inbox_query_invalid'
   | 'inbox_busy'
+  // Paged reads for the local UI (M1-11r-a): a limit outside 1 to 100 or a malformed cursor
+  | 'page_query_invalid'
   // Policy (06 §3; M1-7d)
   | 'policy_context_invalid'
   // Approvals and idempotency (04 §3.4.1, 06 §2.5, 07 §3.3; M1-7e)

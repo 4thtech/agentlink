@@ -35,6 +35,7 @@ const settings = (over: Partial<EngineSettings> = {}): EngineSettings => ({
   maxItemGas: 700_000n,
   stuckAfterSeconds: 180,
   maxReplacements: 3,
+  maxHeldSeconds: 86_400,
   ...over,
 });
 
@@ -445,6 +446,94 @@ describe('a paused Notary (05 §3.3)', () => {
     expect(txStatus(t.state, 84532, t.chain.sent[1]?.hash as `0x${string}`)?.items[0]?.status).toBe(
       'recorded',
     );
+  });
+});
+
+describe('M1-10a-c: how long a held item keeps retrying (intake deadline)', () => {
+  it('fails an item held past the cap with unavailable, sends nothing and empties the queue', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    t.chain.paused = true;
+    const item = fakeRecordItem(A); // its own deadline is far ahead
+    const [held] = await t.submit([item]);
+    expect(held).toMatchObject({ status: 'held' });
+    expect(await t.poll(NOW + 600)).toBe(true); // at the cap: still retrying
+    expect(await t.poll(NOW + 601)).toBe(false);
+    expect(queueDepth(t.state)).toBe(0);
+    expect(t.chain.sent).toHaveLength(0);
+    expect(t.state.items.get(item.id)).toMatchObject({ status: 'failed', error: 'unavailable' });
+  });
+
+  it('keeps retrying an item held within the cap and sends it once the Notary answers', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    t.chain.paused = true;
+    const item = fakeRecordItem(A);
+    await t.submit([item]);
+    expect(await t.poll(NOW + 300)).toBe(true);
+    expect(await t.poll(NOW + 599)).toBe(true);
+    expect(t.chain.sent).toHaveLength(0);
+    t.chain.paused = false;
+    await t.poll(NOW + 600);
+    expect(t.chain.sent.map((tx) => tx.ids)).toEqual([[item.id]]);
+    t.chain.includeAll();
+    await t.poll(NOW + 610);
+    expect(t.state.items.get(item.id)?.status).toBe('recorded');
+  });
+
+  it('counts the cap from intake: asking again while held does not extend it', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    t.chain.paused = true;
+    const item = fakeRecordItem(A);
+    await t.submit([item]);
+    const [again] = await t.submit([item], NOW + 590);
+    expect(again).toMatchObject({ status: 'held' });
+    await t.poll(NOW + 601);
+    expect(t.state.items.get(item.id)).toMatchObject({ status: 'failed', error: 'unavailable' });
+  });
+
+  it('counts the cap from intake for an item held again after its transaction reverted on a pause', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    const item = fakeRecordItem(A);
+    await t.submit([item]);
+    t.chain.paused = true;
+    t.chain.includeAll();
+    await t.poll(NOW + 500); // the revert holds it, 500 s after intake
+    expect(t.state.items.get(item.id)?.status).toBe('held');
+    await t.poll(NOW + 601);
+    expect(t.state.items.get(item.id)).toMatchObject({ status: 'failed', error: 'unavailable' });
+    expect(t.chain.sent).toHaveLength(1);
+  });
+
+  it('applies the cap to an item held because the chain cannot be read', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    t.chain.paused = true;
+    const item = fakeRecordItem(A);
+    await t.submit([item]);
+    t.chain.paused = false;
+    t.chain.readFails = true;
+    expect(await t.poll(NOW + 100)).toBe(true);
+    expect(await t.poll(NOW + 601)).toBe(false);
+    expect(t.state.items.get(item.id)).toMatchObject({ status: 'failed', error: 'unavailable' });
+  });
+
+  it('still fails with Expired when the item’s own deadline comes before the cap', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    t.chain.paused = true;
+    const item = fakeRecordItem(A, NOW + 50);
+    await t.submit([item]);
+    await t.poll(NOW + 51);
+    expect(t.state.items.get(item.id)).toMatchObject({ status: 'failed', error: 'Expired' });
+  });
+
+  it('caps an item stored by the earlier version (no intake time) from its last update', async () => {
+    const t = setup({ maxHeldSeconds: 600 });
+    t.chain.paused = true;
+    const item = fakeRecordItem(A);
+    await t.submit([item]);
+    const stored = t.state.items.get(item.id) as unknown as Record<string, unknown>;
+    delete stored.intakeAt; // as persisted before M1-10a-c
+    expect(await t.poll(NOW + 600)).toBe(true);
+    await t.poll(NOW + 601);
+    expect(t.state.items.get(item.id)).toMatchObject({ status: 'failed', error: 'unavailable' });
   });
 });
 

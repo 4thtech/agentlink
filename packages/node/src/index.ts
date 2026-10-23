@@ -18,11 +18,24 @@ export {
   type ProbeOptions,
 } from './keychain.js';
 export {
+  createFileKeyStoreAgent,
   createOsKeychainAgent,
   openAgentKeyStore,
   probeOsKeychain,
   type KeychainKeyStoreOptions,
+  type OpenAgentKeyStoreOptions,
 } from './keychain-keystore.js';
+// M1-8f (04 §2.8, D-54): the passphrase-locked file KeyStore for headless machines. Only the unlock
+// and passphrase-change entry points and an opaque handle: no kek, file reader, directory or KDF seam.
+export {
+  PASSPHRASE_ENV,
+  PASSPHRASE_FILE_ENV,
+  changeFileKeyStorePassphrase,
+  unlockFileKeyStoreAgent,
+  type FileKeyStoreSetupOptions,
+  type FileKeyStoreWarning,
+  type UnlockedFileAgent,
+} from './file-keystore.js';
 // M1-8c: owner steps at a TTY prompt (04 §2.2, §2.5, D-67). Only the prompting entry points are
 // exported: no OwnerKeyStore, session, owner item or presence argument is reachable from here.
 export {
@@ -77,6 +90,9 @@ export {
   type ApprovalServerSource,
   type PendingApprovalView,
 } from './approval-server.js';
+// M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
+// agent's core client. The route registry and the presence gate stay inside the package.
+export type { LocalUiAssets, LocalUiContext, LocalUiOptions } from './local-ui/context.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';

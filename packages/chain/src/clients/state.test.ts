@@ -14,6 +14,7 @@ import {
   ChainError,
   FEE_VAULT_CLIENT_ABI,
   NOTARY_CLIENT_ABI,
+  checkDirectCall,
   createBroadcaster,
   createChainState,
   createReadClient,
@@ -71,15 +72,12 @@ const recordState = (signer: Hex) =>
   } as never);
 
 describe('createChainState', () => {
-  it('getRecord: null for an empty slot, the stored state otherwise, at the given block', async () => {
-    let signer = filled('00');
+  it('getRecord: the stored state, at the given block', async () => {
     const { state, seen } = stateWith((req) => {
-      if (req.method === 'eth_call') return { result: recordState(signer) };
+      if (req.method === 'eth_call') return { result: recordState(filled('22')) };
       if (req.method === 'eth_chainId') return { result: `0x${config.chainId.toString(16)}` };
       throw new Error(`unexpected ${req.method}`);
     });
-    expect(await state.getRecord(hash32('aa'))).toBeNull();
-    signer = filled('22');
     const got = await state.getRecord(hash32('aa'), 0x42n);
     expect(got).toEqual({
       signer: filled('22'),
@@ -108,6 +106,20 @@ describe('createChainState', () => {
     // Any other revert is not "absent": it fails, so nothing is decided from it.
     error = 'EnforcedPause';
     await expect(state.getRecord(hash32('aa'))).rejects.toBeInstanceOf(ChainError);
+  });
+
+  it('getRecord (M1-4c-d): a zero-signer struct is a bad answer, never "absent"', async () => {
+    // The Notary never returns an empty slot: an unknown ID reverts RecordNotFound. A struct with a
+    // zero signer comes from a misbehaving RPC or contract, so nothing may be decided on it.
+    const { state } = stateWith((req) => {
+      if (req.method === 'eth_call') return { result: recordState(filled('00')) };
+      throw new Error(`unexpected ${req.method}`);
+    });
+    for (const at of [undefined, 9n]) {
+      const read = state.getRecord(hash32('aa'), at);
+      await expect(read).rejects.toBeInstanceOf(ChainError);
+      await expect(read).rejects.toMatchObject({ code: 'bad_answer' });
+    }
   });
 
   it('block: reads the finalized tag and a number', async () => {
@@ -179,7 +191,8 @@ describe('createChainState', () => {
   it('simulate: refuses any function outside the direct-mode set before a request', async () => {
     const { state, seen } = stateWith(() => ({ result: '0x' }));
     for (const [contract, functionName] of [
-      ['vault', 'withdraw'],
+      ['vault', 'depositFor'],
+      ['vault', 'withdrawIntegrator'],
       ['vault', 'depositWithAuthorization'],
       ['notary', 'pause'],
       ['erc20', 'transfer'],
@@ -196,6 +209,15 @@ describe('createChainState', () => {
       ).rejects.toMatchObject({ code: 'invalid_call' });
     }
     expect(seen).toHaveLength(0);
+  });
+});
+
+describe('checkDirectCall (M1-4c-b)', () => {
+  it('allows withdraw on the vault, for the typed withdraw API (sendWithdraw)', () => {
+    expect(() => checkDirectCall({ contract: 'vault', functionName: 'withdraw' })).not.toThrow();
+    expect(() => checkDirectCall({ contract: 'notary', functionName: 'withdraw' })).toThrow(
+      ChainError,
+    );
   });
 });
 

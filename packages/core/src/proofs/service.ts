@@ -111,6 +111,15 @@ import type {
   TermsService,
 } from '../terms-flow.js';
 import type { ProofChain, ProofKit, ProofsPlatform } from './platform.js';
+import type { Page, PageQuery } from '../paging.js';
+import {
+  listProofs,
+  readCredits,
+  requestFreeCredits,
+  type CreditsView,
+  type FreeCreditsResult,
+  type ProofListItem,
+} from './reads.js';
 import { RECEIPT_REQUEST, receiptRequestKey, senderRequestedTx } from './receipt-request.js';
 
 /** A Record's `deadline` is this far after signing (proposed; 04 §5 replacement window). */
@@ -162,6 +171,18 @@ type OwnStatus =
   /** A refused (`failed`) Record whose reservation was released once it could never land. */
   | 'released';
 const LIVE: readonly OwnStatus[] = ['signed', 'pending', 'needs_credits'];
+/** The rows the proof list shows (M1-11r-a): every record, own or received, except a replaced one. */
+export const LISTED_PROOF_STATUSES: readonly (Exclude<OwnStatus, 'replaced'> | 'received')[] = [
+  'signed',
+  'pending',
+  'needs_credits',
+  'failed',
+  'conflict',
+  'recorded',
+  'announced',
+  'released',
+  'received',
+];
 const ON_CHAIN: readonly string[] = ['recorded', 'announced'];
 /**
  * A signed Receipt of this agent, kept so the same bytes are resent until they land (04 §5). Its
@@ -319,6 +340,12 @@ interface RecordedFields {
   readonly fee: ProofFee;
   /** Present (true) only when this proof's envelope asks the recipient for a delivery receipt. */
   readonly receiptRequested?: true;
+  /**
+   * Present (true) only when the call asked for a delivery receipt (`requestReceipt`) and the
+   * envelope already had a proof without one, so no request was added (M1-33d-b): the agent must
+   * not tell its user it asked.
+   */
+  readonly receiptRequestNotAdded?: true;
 }
 
 export type NotarizeResult =
@@ -489,6 +516,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #selector: Selector | undefined;
   /** Queued receipt ID -> the pass that last tried it (in memory; M1-34-b). */
   readonly #receiptTries = new Map<string, number>();
+  /** The receipt signing in progress, by receipt item ID (M1-33d-b: one signature, I-6). */
+  readonly #signing = new Map<string, Promise<AcknowledgeResult>>();
   #receiptPass = 0;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
@@ -509,11 +538,15 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const result = await this.#notarize(input);
     if (result.status !== 'ok' && result.status !== 'submitted') return result;
     // Says "asked" only when the stored marker is there: a request on an envelope already notarized
-    // without one is not claimed (M1-33d).
+    // without one is not claimed (M1-33d), and is reported as not added (M1-33d-b).
     const asked = await this.#ctx.store.transaction((tx) =>
       senderRequestedTx(tx, input.envelopeId),
     );
-    return asked ? Object.freeze({ ...result, receiptRequested: true as const }) : result;
+    if (asked) return Object.freeze({ ...result, receiptRequested: true as const });
+    if (input.requestReceipt === true) {
+      return Object.freeze({ ...result, receiptRequestNotAdded: true as const });
+    }
+    return result;
   }
 
   async #notarize(input: NotarizeInput): Promise<NotarizeResult> {
@@ -1919,6 +1952,28 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     type: ReceiptTypeName,
     claim?: (tx: StoreTx, itemJson: string) => boolean,
   ): Promise<AcknowledgeResult> {
+    // M1-33d-b (I-6): concurrent calls for one record and type (two `acknowledge {delivered}` at
+    // once) run one after the other, so the second finds the stored receipt and signs nothing. The
+    // store transaction below still keeps one per record and type across processes.
+    const id = receiptItemId(row.record_id, RECEIPT_CODE[type]);
+    for (let running = this.#signing.get(id); running !== undefined;) {
+      await running.catch(() => undefined);
+      running = this.#signing.get(id);
+    }
+    const work = this.#signReceiptOnce(row, type, claim);
+    this.#signing.set(id, work);
+    try {
+      return await work;
+    } finally {
+      if (this.#signing.get(id) === work) this.#signing.delete(id);
+    }
+  }
+
+  async #signReceiptOnce(
+    row: Row<'proofs'>,
+    type: ReceiptTypeName,
+    claim?: (tx: StoreTx, itemJson: string) => boolean,
+  ): Promise<AcknowledgeResult> {
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
     const code = RECEIPT_CODE[type];
@@ -2301,6 +2356,38 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       ...(fee === undefined ? {} : { fee }),
       receipts: Object.freeze(receipts),
     });
+  }
+
+  /**
+   * The stored proofs, own and received, newest first and paged (M1-11r-a, the local UI's proof
+   * list). Store only: no chain read. IDs, chain, status and time; never the salt, the signed
+   * Record or a transaction hash.
+   */
+  list(query: PageQuery = {}): Promise<Page<ProofListItem>> {
+    return listProofs(this.#ctx, this.#platform, LISTED_PROOF_STATUSES, query);
+  }
+
+  /**
+   * The agent's credits on every supported chain (M1-11r-a): read-only, per chain, with a chain
+   * that cannot be read marked `available: false`. `unavailable` without the proofs platform or
+   * before init.
+   */
+  async creditsBalance(): Promise<CreditsView> {
+    return readCredits(this.#platform, await this.#deps.identity.agentAddress());
+  }
+
+  /**
+   * Free test credits on `chainId` (M1-11r-a; 05 §9, M1-10b). Testnets on the hard-coded allowlist
+   * only: any other chain, mainnets included, is refused before anything is sent. Sends only the
+   * chain ID and the agent ID. The one call of the local UI reads that is not a read.
+   */
+  async requestFaucet(chainId: number): Promise<FreeCreditsResult> {
+    return requestFreeCredits(
+      this.#ctx,
+      this.#platform,
+      await this.#deps.identity.agentAddress(),
+      chainId,
+    );
   }
 
   /**

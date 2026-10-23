@@ -26,7 +26,7 @@ describe('cliPrefix (M1-36a)', () => {
   });
 
   it('no script gives the npx form', () => {
-    expect(cliPrefix({ script: undefined, onPath: () => true })).toBe(NPX_PREFIX);
+    expect(cliPrefix({ onPath: () => true })).toBe(NPX_PREFIX);
   });
 
   it('the default check follows a PATH link to the same file', () => {

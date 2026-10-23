@@ -62,6 +62,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'idempotency',
         'owner_action_nonces',
         'revoked_agents',
+        // M1-9i-a (D-115; 07 §3.4): the owner-signed own storage, schema version 5.
+        'own_storage',
         'budget_ledger',
         'budget_state',
         'commitment_parts',
@@ -76,6 +78,19 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   it('reports the code schema version by default', () => {
     expect(new MemoryStore().schemaVersion).toBe(STORE_SCHEMA_VERSION);
     expect(new MemoryStore({ schemaVersion: 7 }).schemaVersion).toBe(7);
+  });
+
+  it('own_storage (M1-9i-a, 07 §3.4): id, sealed signed_json, applied_at; at most one row', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(5);
+    expect(TABLES.own_storage).toEqual({
+      columns: {
+        id: { kind: 'id', nullable: false },
+        signed_json: { kind: 'enc', nullable: false },
+        applied_at: { kind: 'int', nullable: false },
+      },
+      primaryKey: ['id'],
+      maxRows: 1,
+    });
   });
 });
 

@@ -44,6 +44,8 @@ const MAX_DAYS = 3650;
 const MAX_DOCUMENT_BYTES = 256 * 1024;
 /** S3's limit on rules per bucket. */
 const MAX_RULES = 1000;
+/** Tries to write a lifecycle update while the bucket's configuration keeps changing. */
+const MAX_ATTEMPTS = 3;
 
 export type S3LifecycleConfig = S3SessionConfig;
 
@@ -144,37 +146,64 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
           'lifecycle days must be an integer from 1 to 3650',
         );
       }
-      const current = await currentRules();
-      if (!current.complete) {
-        log?.warn('storage lifecycle document not understood; nothing written');
-        throw failed();
+      // S3 has no conditional write for the lifecycle configuration, so the read-modify-write cannot be
+      // made atomic (M1-6b-b L3). It is made safe as far as the API allows: read twice and write only
+      // when both reads agree (a change in between is retried from the start), then read the result
+      // back and check that no rule was lost. A change that lands between the second read and the
+      // write is the one window left; the read-back reports it instead of hiding it.
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const current = await currentRules();
+        if (!current.complete) {
+          log?.warn('storage lifecycle document not understood; nothing written');
+          throw failed();
+        }
+        const again = await currentRules();
+        if (again.rules.join('') !== current.rules.join('')) {
+          log?.debug('storage lifecycle changed during update; retrying', { attempt });
+          continue;
+        }
+        const others = current.rules.filter((rule) => ruleId(rule) !== LIFECYCLE_RULE_ID);
+        if (others.length + 1 > MAX_RULES) throw failed();
+        const body = new TextEncoder().encode(
+          '<?xml version="1.0" encoding="UTF-8"?>' +
+            '<LifecycleConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
+            others.join('') +
+            ownRuleXml(days) +
+            '</LifecycleConfiguration>',
+        );
+        const digest = sha256(body);
+        const response = await session.send(lifecycleUrl(), {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/xml',
+            'X-Amz-Content-Sha256': encodeHex(digest),
+            'x-amz-checksum-sha256': toBase64(digest),
+            'x-amz-sdk-checksum-algorithm': 'SHA256',
+          },
+          body,
+        });
+        await discard(response);
+        if (!response.ok) {
+          log?.warn('storage lifecycle apply failed', { status: response.status });
+          throw failed(response.status);
+        }
+        const after = (await currentRules()).rules;
+        const key = (rule: string): string => ruleId(rule) ?? rule;
+        const present = new Set(after.map(key));
+        const ownAfter = after.find((rule) => ruleId(rule) === LIFECYCLE_RULE_ID);
+        if (
+          ownAfter === undefined ||
+          parseOwnRule(ownAfter).days !== days ||
+          !others.every((rule) => present.has(key(rule)))
+        ) {
+          log?.warn('storage lifecycle changed after the update');
+          throw failed();
+        }
+        log?.info('storage lifecycle rule applied', { days, otherRules: others.length });
+        return;
       }
-      const others = current.rules.filter((rule) => ruleId(rule) !== LIFECYCLE_RULE_ID);
-      if (others.length + 1 > MAX_RULES) throw failed();
-      const body = new TextEncoder().encode(
-        '<?xml version="1.0" encoding="UTF-8"?>' +
-          '<LifecycleConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
-          others.join('') +
-          ownRuleXml(days) +
-          '</LifecycleConfiguration>',
-      );
-      const digest = sha256(body);
-      const response = await session.send(lifecycleUrl(), {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/xml',
-          'X-Amz-Content-Sha256': encodeHex(digest),
-          'x-amz-checksum-sha256': toBase64(digest),
-          'x-amz-sdk-checksum-algorithm': 'SHA256',
-        },
-        body,
-      });
-      await discard(response);
-      if (!response.ok) {
-        log?.warn('storage lifecycle apply failed', { status: response.status });
-        throw failed(response.status);
-      }
-      log?.info('storage lifecycle rule applied', { days, otherRules: others.length });
+      log?.warn('storage lifecycle kept changing; nothing written');
+      throw failed();
     },
 
     async read(): Promise<LifecycleRuleState | null> {

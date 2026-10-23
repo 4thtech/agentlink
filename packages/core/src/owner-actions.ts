@@ -11,6 +11,9 @@
 //   pairing digest from the stored pair; `agent.revoke` is applied by M1-7h. `contact.rename` and
 //   `contact.remove` (M1-9za) change one stored contact: the owner alias (06 §2.1 rule 1), or the
 //   07 §3 tombstone. The nonce row is their audit record; nothing is sent to the contact.
+//   `storage.set` and `storage.remove` (M1-9i-a, D-115) replace or delete the one `own_storage` row
+//   with the nonce row in one transaction, then set the KeyStore `storage-mark`; `backup.export`
+//   records its nonce row only (the audit record of a recovery kit export).
 // - loadPolicy(): the G-6 loader. The stored `policy.set` is re-verified on every load and its
 //   version must equal the KeyStore high-water mark; the defaults are used only while the mark is 0
 //   and no row exists. Anything else fails closed (policy-engine.ts).
@@ -35,6 +38,7 @@ import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
 import { isRestrictedAlias } from './names.js';
+import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
 import {
   computeActionDigest,
   ownerActionHash,
@@ -86,6 +90,11 @@ export type OwnerActionOutcome =
       /** policy.set: the applied version and whether the KeyStore mark was raised to it. */
       readonly policyVersion?: number;
       readonly markRaised?: boolean;
+      /**
+       * storage.set and storage.remove (M1-9i-a): whether `storage-mark` was set to the new active
+       * id (or null) and read back. False: own storage reads `broken` until the owner connects again.
+       */
+      readonly storageMarkSet?: boolean;
     }
   | {
       readonly status: 'refused';
@@ -220,6 +229,7 @@ export class OwnerActions {
   readonly #contacts: ContactBook;
   readonly #mark: PolicyVersionMark | undefined;
   readonly #receiptsKept: ReceiptsKeptMark | undefined;
+  readonly #ownStorageKeys: OwnStorageKeys | undefined;
 
   constructor(
     ctx: CoreContext,
@@ -227,12 +237,14 @@ export class OwnerActions {
     contacts: ContactBook,
     mark?: PolicyVersionMark,
     receiptsKept?: ReceiptsKeptMark,
+    ownStorageKeys?: OwnStorageKeys,
   ) {
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
     this.#mark = mark;
     this.#receiptsKept = receiptsKept;
+    this.#ownStorageKeys = ownStorageKeys;
   }
 
   /** The own agent and its card's owner key, or why owner actions cannot apply. */
@@ -289,6 +301,11 @@ export class OwnerActions {
       case 'contact.rename':
       case 'contact.remove':
         return this.#applyContactChange(value, base);
+      case 'storage.set':
+      case 'storage.remove':
+        return this.#applyStorage(text, value, base);
+      case 'backup.export':
+        return this.#applyBackupExport(value, base);
       case 'agent.revoke': {
         // Verified for the report, applied elsewhere: revocation delivery is M1-7h. Nothing is
         // written here.
@@ -386,6 +403,116 @@ export class OwnerActions {
         { status: 'removed', updated_at: now },
       );
       return { status: 'applied', op };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `storage.set` and `storage.remove` (M1-9i-a, D-115; 04 §2.5.1; 07 §3.4). The object checks and
+   * the nonce first (L(op) = 600 s). `storage.set` then needs the KeyStore item `s3:<id>` with the
+   * signed credentialDigest (compared in constant time); `storage.remove` needs `id` to be the stored
+   * row's. In one store transaction the nonce is checked again and recorded, and the row is replaced
+   * (the sealed signed object, verbatim) or deleted. After the commit `storage-mark` is set to the
+   * new `id` (or null) and read back; the store always commits first, as for `policies`. A refusal
+   * writes nothing. The KeyStore item `s3:<id>` itself is written and deleted by the owner surface
+   * through StorageCredentialControl, never here, and no credential reaches the core (I-7).
+   */
+  async #applyStorage(
+    text: string,
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const keys = this.#ownStorageKeys;
+    if (keys === undefined) {
+      return this.#report(refused(shaped.body.op, 'storage_keys_unavailable'));
+    }
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'storage.set' && body.op !== 'storage.remove') {
+      return this.#report(refused(body.op, 'malformed'));
+    }
+    const op = body.op;
+    const id = body.params.id;
+    const now = base.now;
+
+    let sealed: Sealed | undefined;
+    if (body.op === 'storage.set') {
+      let digest: string | null;
+      try {
+        digest = await keys.credentialDigest(id);
+      } catch {
+        return this.#report(refused(op, 'storage_keys_unavailable'));
+      }
+      if (digest === null) return this.#report(refused(op, 'credential_missing'));
+      if (!credentialDigestsEqual(digest, body.params.credentialDigest)) {
+        return this.#report(refused(op, 'credential_mismatch'));
+      }
+      sealed = await seal(this.#ctx, 'own_storage', 'signed_json', [id], text);
+    }
+
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused(op, 'nonce_used');
+      }
+      if (sealed !== undefined) {
+        tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+        // One own storage per agent in M1: a newer storage.set replaces the row.
+        tx.delete('own_storage', {});
+        tx.insert('own_storage', { id, signed_json: sealed, applied_at: now });
+        return { status: 'applied', op };
+      }
+      const row = tx.select('own_storage')[0];
+      if (row === undefined || row.id !== id) return refused(op, 'storage_not_active');
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.delete('own_storage', { id });
+      return { status: 'applied', op };
+    });
+    if (outcome.status === 'refused') return this.#report(outcome);
+
+    const active = op === 'storage.set' ? id : null;
+    let storageMarkSet: boolean;
+    try {
+      await keys.writeMark(active);
+      const back = await readStorageMark(keys);
+      storageMarkSet = typeof back !== 'string' && back.active === active;
+    } catch {
+      storageMarkSet = false;
+    }
+    if (!storageMarkSet) {
+      // Fixed text only: no id, endpoint or bucket (I-7). Own storage now reads `broken`.
+      this.#ctx.log.warn('storage mark not set', { op });
+    }
+    return { status: 'applied', op, storageMarkSet };
+  }
+
+  /**
+   * `backup.export` (M1-9i-a, D-115; 04 §2.3.3, §2.5.1): the object checks and the nonce, then the
+   * nonce row alone, in one store transaction. That row (op, action hash, applied time) is the audit
+   * record of the export; the CLI asks the export control to seal the kit only after this applied.
+   */
+  async #applyBackupExport(
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'backup.export') {
+      return this.#report(refused(signed.body.op, 'malformed'));
+    }
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused('backup.export', 'nonce_used');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      return { status: 'applied', op: 'backup.export' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
