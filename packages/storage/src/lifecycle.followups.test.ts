@@ -190,16 +190,18 @@ describe('lifecycle: concurrent changes (L3)', () => {
 });
 
 describe('lifecycle: provider drops the abort-incomplete element (M1-6b-d)', () => {
-  const dropAbort = (fake: FakeMultipartS3) => async (req: Request): Promise<Response> => {
-    const response = await fake.fetch(req);
-    if (req.method === 'PUT') {
-      fake.lifecycle = (fake.lifecycle ?? '').replace(
-        /<AbortIncompleteMultipartUpload>[\s\S]*?<\/AbortIncompleteMultipartUpload>/,
-        '',
-      );
-    }
-    return response;
-  };
+  const dropAbort =
+    (fake: FakeMultipartS3) =>
+    async (req: Request): Promise<Response> => {
+      const response = await fake.fetch(req);
+      if (req.method === 'PUT') {
+        fake.lifecycle = (fake.lifecycle ?? '').replace(
+          /<AbortIncompleteMultipartUpload>[\s\S]*?<\/AbortIncompleteMultipartUpload>/,
+          '',
+        );
+      }
+      return response;
+    };
 
   it('succeeds but reports a plain-words warning when the element was dropped', async () => {
     const fake = fakeMultipartS3(BUCKET);
