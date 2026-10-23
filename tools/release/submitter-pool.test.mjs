@@ -133,4 +133,21 @@ describe('the pool alert workflow (M1-10b-e)', () => {
     expect(check).not.toMatch(/\bcat\b/);
     expect(check).not.toMatch(/jq[^\n|]*'\.'/);
   });
+
+  it('documents every alert state and gives a hint for each (M1-10b-e-c)', () => {
+    const header = source.slice(0, source.indexOf('\nname:'));
+    for (const word of ['ok', 'low', 'paused', 'off', 'unknown']) {
+      expect(header).toMatch(new RegExp(`\\b${word}\\b`));
+    }
+    const check = runScripts(source)
+      .map((s) => s.script)
+      .find((s) => s.includes('/v1/health'));
+    expect(check).toContain('SUBMITTER_FAUCET_CHAINS');
+    expect(check).toMatch(/SUBMITTER_FAUCET_ADDRESS/);
+    expect(check).toMatch(/version/i);
+    expect(check).toMatch(/[Uu]npause|funded|[Tt]op up/);
+    // The old one-size hint is gone: the top-up line is only printed for low or paused states.
+    expect(check).not.toMatch(/^\s*echo "Top up the wallet named above/m);
+    expect(check).not.toMatch(/https?:\/\/(?!submit\.agentlink\.4thtech\.io)/);
+  });
 });
