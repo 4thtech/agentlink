@@ -2355,7 +2355,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - If a mitigation is built: a fake relay that caps results and holds more than the cap of events in one second; every wrap addressed to the agent is delivered at least once across the relays of its list, or the pass reports the second as incomplete (a fixed reason, no relay text). Existing M1-5c tests stay green; no test is weakened.
 
 #### M1-5e · transport-nostr: sync follow-ups (NIP-42 identities, first-sync retention, page position, envelope hint) (new, IR-M1-5c-1 L-4, L-5, Low; IR-M1-7b-1 Q1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr (and the core/node `SyncPersistence` if the hint changes)
 - **Depends on:** M1-5c, M1-7b
 - **Spec:** 07 §3.2 (`seen` retention, `envelope` rows hold the `envelopeHash`), §4.2 (Sync, NIP-42), §4.3 (9-day first sync); 04 §3.1.1 step 9, §3.5

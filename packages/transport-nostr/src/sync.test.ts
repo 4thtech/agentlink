@@ -687,7 +687,9 @@ describe('dedup', () => {
     // Only the verified envelope's hash is recorded, as core keys it (M1-5e; 07 §3.2).
     const realHash = encodeHex0x(envelopeHash(real.envelope));
     expect(s.store.has('envelope', realHash)).toBe(true);
-    expect(s.store.marks.filter((m) => m.startsWith('envelope:'))).toEqual([`envelope:${realHash}`]);
+    expect(s.store.marks.filter((m) => m.startsWith('envelope:'))).toEqual([
+      `envelope:${realHash}`,
+    ]);
   });
 
   it('still delivers a later envelope with a seen hash, with the seen flag as a hint only', async () => {
@@ -1190,7 +1192,7 @@ describe('NIP-42 with several identities (M1-5e)', () => {
     const second = referenceKeys();
     const locked: EnvelopeKeys = {
       ...second,
-      signNostr: () => Promise.reject(new KeyStoreError('keys_unavailable')),
+      signNostr: () => Promise.reject(new KeyStoreError('owner_locked', 'locked')),
     };
     const s = setup({
       recipient: first,
