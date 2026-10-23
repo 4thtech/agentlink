@@ -68,9 +68,9 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 314 (M1a 91, M1b 223) |
+| M1 Local beta | 316 (M1a 91, M1b 225) |
 | M2 Console, desktop apps, self-host, design | 49 |
-| M3 Mainnet beta | 28 |
+| M3 Mainnet beta | 34 |
 <!-- backlog-counts:end -->
 
 Other sections:
@@ -840,6 +840,65 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - M2-GATE acceptance says "(median)" but its scope says "every tester"; 02 says "Median < 5 minutes". Align both with D-124 or state the M2 rule explicitly. The owner decides which.
 - **Acceptance:**
   - One rule, worded the same in the M2-GATE card, 02 and the gate runbook; the owner confirmed it.
+
+#### DOCS-06-TOPUP · 06 §2.4: paid tools return `topUpUrl` and `agentAddress`, not `url` (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-server.md` (§2.4)
+- **Depends on:** none (implemented by PR #482)
+- **Spec:** 06 §2.4
+- **Scope:**
+  - §2.4 says paid tools return `url`. Reword so every paid tool's `needs_credits` result carries `topUpUrl` and `agentAddress` (check each paid tool's result shape in the code first).
+- **Acceptance:**
+  - 06 §2.4 names `topUpUrl` and `agentAddress` for all paid tools and no longer says `url`; `node tools/docs-status/index.mjs --check` passes.
+
+#### CONTRACTS-PARITY-b · contract parity: live-RPC retry and the eip712 suites (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (contracts parity check)
+- **Repo/path:** occ-v2-contracts (private) · the vector parity check
+- **Depends on:** none
+- **Spec:** 04 §3; shared vectors
+- **Invariants:** I-1
+- **Scope:**
+  - Retry the live-RPC reads in the parity check with a bounded backoff so one flaky call does not fail the run.
+  - Include the eip712 suites in vector parity.
+- **Acceptance:**
+  - A test shows a transient RPC failure is retried and a persistent one still fails; the eip712 suites run in parity and a deliberately changed vector fails it.
+
+#### DOCS-RUNBOOKS-1023-b · ci-cd.md and RB-11 match the merge queue and CI changes (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`docs/process/**`; docs only)
+- **Repo/path:** agentlink · `docs/process/ci-cd.md`, `docs/runbooks/` (RB-11)
+- **Depends on:** the CI PRs #477, #478 and #480 merged
+- **Scope:**
+  - Update `ci-cd.md`: merge queue build concurrency 5, merge 5, HEADGREEN; the auto-retry (#477); the heavy-job map (#478); the Playwright budget (#480); D-126.
+  - Reword RB-11 to match.
+- **Acceptance:**
+  - Each value matches the workflow files and the merged PRs (checked by grep); `node tools/docs-status/index.mjs --check` passes.
+
+#### DOCS-RUNBOOKS-1023-c · submitter-deploy.md step 30 names a check step 14 does not make (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (docs only)
+- **Repo/path:** agentlink · `docs/runbooks/submitter-deploy.md`
+- **Depends on:** #479 merged
+- **Scope:**
+  - Step 30 says step 14's name check lists `SUBMITTER_DEPOSIT_GAS_KEY_84532`; step 14 does not. Reword step 30 so it is true.
+- **Acceptance:**
+  - Step 30 and step 14 agree; no other step changes.
+
+#### PROC-MECH-MERGE-IR-b · audit-rules §4.6 wording: the orchestrator records the `IR-` line (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (wording only; if the file is classed S1 by path, S1)
+- **Repo/path:** agentlink · `docs/process/audit-rules.md` (§4.6)
+- **Depends on:** #475 merged
+- **Scope:**
+  - Reword to "*Orchestrator wording:* it records `IR-…`".
+- **Acceptance:**
+  - §4.6 carries that wording and nothing else changes.
+
+#### CHORE-BACKLOG-COUNTS-b · generated card counts go stale when two card-adding PRs queue together (new, owner decision pending)
+- **Status:** backlog (**DECISION NEEDED**) · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `tools/docs-status/`, the merge-queue workflow, `docs/process/backlog.md`
+- **Depends on:** #476
+- **Scope:**
+  - Two PRs that add cards and queue together each pass the count check alone; the second goes stale in the merge group. The owner picks one: (a) skip the count check in `merge_group`; (b) a bot regenerates the counts after merge; (c) move the counts to a generated page so the backlog holds none.
+- **Acceptance:**
+  - The chosen option is implemented; two card-adding PRs queued together both merge without a manual recount, and the check still fails when counts are wrong on a pull request.
 
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
@@ -2467,6 +2526,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L5: handle uploads orphaned when the create or complete response is lost (abort or reclaim).
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
+
+#### M1-6b-d · storage: warn when a provider drops the abort-incomplete-multipart lifecycle element on read-back (new, follow-up of M1-6b-c, #457)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (lifecycle read-back)
+- **Depends on:** M1-6b-c (#457); implemented by PR #485
+- **Spec:** 07 §5.2, §5.4
+- **Invariants:** I-3
+- **Scope:**
+  - Some providers accept the abort-incomplete-multipart element on write and omit it on read-back. Warn (never fail) when it is missing on read-back, without logging any URL or credential.
+- **Acceptance:**
+  - A test: a read-back without the element yields the warning and the rule still counts as applied; a read-back with it yields none.
 
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** done (4thtech/agentlink#268, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -5470,6 +5540,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests for the null-faucet reading and the same-block second claim.
 
+#### M1-10b-e-c-b · submitter-pool test: URL extraction catches more forms (new, follow-up of M1-10b-e-c, PR #456)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · the submitter-pool test
+- **Depends on:** M1-10b-e-b, M1-10b-e-c (PR #456)
+- **Scope:**
+  - Make the test's URL extraction also catch a scheme followed by a quote or a space, uppercase schemes and protocol-relative `//host`.
+- **Acceptance:**
+  - Each form has a case that the extraction finds; no existing case changes.
+
 #### M1-11b-6 · cli: `init` opens the first-run page and wires owner setup (new, IR-M1-11b-1-1; #426 follow-up)
 - **Status:** backlog (draft PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, the CLI server start (`localUi.ownerSetup` wiring) and their tests
@@ -6472,6 +6551,17 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
 
+#### M3-4b-t-T2-c · submitter precheckDepositAuthorization: window-boundary tests (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (tests only; `apps/submitter/**` is S2 if code changes) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/submitter` (`precheckDepositAuthorization`)
+- **Depends on:** M3-4b-t-T2-b (#481); implemented by PR #484
+- **Spec:** 07 §7
+- **Invariants:** I-3
+- **Scope:**
+  - Give `precheckDepositAuthorization` its own tests at the window boundary: a validity window of 900 plus 120 seconds is accepted and one second more is refused.
+- **Acceptance:**
+  - Both boundary cases are tests in the submitter's own suite.
+
 #### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
 - **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
@@ -6502,6 +6592,56 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Refund the quota when the process crashes mid-send.
 - **Acceptance:**
   - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
+#### M3-4b-t-T4-a · gasless top-up: core executor `runGaslessTopUp` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (signs; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `packages/core/src/proofs/gasless-topup.ts` and test; additive hunk in `packages/core/src/proofs/platform.ts`
+- **Depends on:** M3-4b-t-T2-b (#481)
+- **Spec:** 04 §2.5.1; 07 §7
+- **Invariants:** I-1, I-3, I-4, I-7
+- **Scope:**
+  - An internal function `runGaslessTopUp(deps, {chainId, token, amount})`, run only after the caller verified an owner action: kill switch, chain and token gate, local rate limit (5 requests per agent per hour, counted from persistent applied-nonce rows), build and sign with the agent KeyStore (never the owner key), post through a `DepositAuthPort`, poll `creditsOf` for the rise. Fixed outcome words. Not exported from `packages/core/src/index.ts`.
+  - Owner decisions of 2026-10-23: owner approves each top-up; $5 minimum and $50 cap on testnet; normal deposit fee; the submitter pays the network cost; 15-minute window.
+- **Acceptance:** tests first (`RED (expected): M3-4b-t-T4-a …`): agent key only signs and the owner signer has 0 calls; the real registry (flag false) gives `refused:not_available` with 0 signs; chain and token gate; $4.99 and $50.01 refused, $5 and $50 signed with the exact value; window at most 900 s; the 6th call in an hour is `rate_limited` and survives a restart; `submitted` without a `creditsOf` rise is `pending`; no txHash, signature, nonce, address or URL in results or logs; no export from the core index; concurrent calls are serialised. Full threat note.
+
+#### M3-4b-t-T4-b · gasless top-up: runtime deposit-auth port (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `apps/cli/src/runtime/deposit-auth.ts` and test; two-line hook in `apps/cli/src/runtime/proofs.ts`
+- **Depends on:** M3-4b-t-T4-a (port type)
+- **Spec:** 07 §7
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Build the `DepositAuthPort` from `createDepositAuthClient` with the shipped submitter URLs only; map answers to fixed words (`submitted`, `rate_limited`, `already_used`, `unavailable`, `refused:<code>`); strip the txHash. Wire into `nodeProofs`.
+- **Acceptance:** tests first: an override URL failing `checkRpcUrl` is refused; 501 on all URLs is `unavailable`, 429 is `rate_limited`, 409 `already_used` is `already_used`, an unparsable answer is `unavailable`; the txHash never reaches core; the bundle check (proofs off) carries no deposit-auth code.
+
+#### M3-4b-t-T4-c · gasless top-up: `credits.deposit` gasless branch (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner action; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/core/src/proofs/credits-move.ts` and test, `packages/node/src/local-ui/api/proofs.ts` and `proofs-top-up.test.ts`, `docs/foundation/04` §2.5.1, `07` §7, changeset, `changelog.d/`
+- **Depends on:** M3-4b-t-T4-a, M3-4b-t-T4-b, draft PR #435 (stack on it or on main after it merges)
+- **Spec:** 04 §2.5, §2.5.1; 07 §7
+- **Invariants:** I-3, I-4
+- **Scope:**
+  - `credits.deposit` for Base Sepolia (84532) USDC goes to `runGaslessTopUp` after the object checks and after the nonce is recorded; `readTopUp` gains `method: 'gasless'` (addable clipped to $5..$50 and the balance) and stays `coming_soon` while the kit refuses. The node API accepts 84532/USDC behind presence. 04 §2.5.1 row extended and one line in 07 §7 (proposed, owner confirms at merge).
+- **Acceptance:** tests first: the nonce is recorded before signing (order spy); a replay gives 0 signs; an object signed by the agent key, an unknown key, another agent, or with expiry over 600 s or expired is refused with 0 signs and no nonce row; the amount comes only from the signed object; `coming_soon` while the flag is false; the API refuses without a presence session and returns no txHash; the Chiado tests from #435 pass unchanged.
+
+#### M3-4b-t-T4-d · gasless top-up: local UI method (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus audit · **Security:** S2 (money path UI, D-116 styling) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/{top-up.tsx,strings.ts,data.ts,proofs.test.tsx}`, `apps/local-ui/src/api/client.ts`, new `e2e/test/local-ui-gasless-topup.test.ts`
+- **Depends on:** M3-4b-t-T4-c, draft PR #435
+- **Spec:** 11 §5, §6.7; `docs/design/README.md`
+- **Scope:**
+  - "Add credits" for the Base Sepolia USDC method: the received amount, a picker within $5..$50, a confirm step behind presence, then pending, done and limited states, in plain words per 11 §5 (no wallet, gas, transaction, hashes or chain names in the default UI).
+- **Acceptance:** Playwright: received, pick $20, confirm with presence, pending, done; under $5 the button is disabled; above $50 the amount clamps with a note; the 6th try in an hour shows the limit copy; `lintVocabulary` and axe pass; the style matches the D-116 screens.
+
+#### M3-4b-t-T4-e · gasless top-up: switch on `GASLESS_TOPUP_ENABLED` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog (**needs the owner's go-ahead** before the flip) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner "merge") · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and tests, `README.md`, docs-site, `knowledge/`
+- **Depends on:** M3-4b-t-T4-c, M3-4b-t-T4-d, M3-4b-t-T3-c, and Tali enabling the staging submitter variables and smoke-testing them
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-3
+- **Scope:**
+  - Set `GASLESS_TOPUP_ENABLED = true`; keep the kill-switch test (S0-c) proving the refusal by injecting the flag; update the funding-detection and `pick` tests for Base Sepolia. README Status, the docs-site credits guide and `knowledge/` updated; X post.
+- **Acceptance:** with the flag true the real registry composes `eip3009` for Base Sepolia USDC only and Chiado is unchanged; the S0-c test still fails if the flag check is removed; no test weakened.
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
