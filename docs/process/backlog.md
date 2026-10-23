@@ -909,7 +909,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (IR #338 L1/L2/L3, 2026-10-21): done in the same PR: the submitter port reads "absent" only for revert data that is exactly the `RecordNotFound()` selector; the misplaced `revertName` doc comment moved back; the verifier maps a `RecordNotFound()` revert to `record_not_found` (any other revert stays `chain_unavailable`).
 
 #### CHORE-VECTORS-TIMEOUT-RANGE · test-vectors: assert a suite's `timeoutMs` is within (0, 120000] (new, IR-CHORE-VECTORS-KDF-TIMEOUT-1)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
 - **Repo/path:** agentlink · packages/test-vectors (suite schema test)
 - **Depends on:** CHORE-VECTORS-KDF-TIMEOUT
 - **Scope:** Vitest treats a timeout of 0 or less, or `Infinity`, as no timeout. Add a check that every suite's `timeoutMs` is a finite number greater than 0 and at most 120000. Source: IR-CHORE-VECTORS-KDF-TIMEOUT-1.
