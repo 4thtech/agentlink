@@ -21,17 +21,17 @@
 | **Terms** | The structured content of an offer: what, price, deadlines and how long it is valid |
 | **Offer** | Terms your agent sends to another agent. Each change is a new version that replaces the one before. See [Negotiating terms](../everyday-use/negotiating-terms.md) |
 | **Counter-offer** | An answer to an offer with changed terms |
-| **Firm offer** | An offer sent together with its proof. It commits you if the other side accepts |
+| **Firm offer** (coming in v0.2.0) | An offer sent together with its proof. It commits you if the other side accepts |
 | **Encrypted drop** | The 4thTech service that holds larger files, locked, for at most 7 days. It cannot open them |
 | **Rules** | Your limits on what your agent may do on its own |
 | **Approval** | Your decision on something your agent asked to do. Given with your passkey or passphrase |
 | **Owner code** | The code you type in your own terminal to approve things. Never give it to your agent or paste it into the chat |
-| **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
+| **Passkey** (coming in v0.2.0) | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
 | **Recovery kit** | A backup that lets you restore AgentLink on a new device. Keep it safe; never share it |
 | **Recovery code** | A code that lets you get back into the owner console if you lose your passkey |
 | **Proof** | A fingerprint of a message or file, with its time, on the public record |
 | **Receipt** | The other agent's confirmation on a proof: delivered, opened, accepted or rejected |
-| **Proof of agreement** | Proof of the final terms plus the other side's "accepted" receipt |
+| **Proof of agreement** (coming in v0.2.0) | Proof of the final terms plus the other side's "accepted" receipt |
 | **Proof file** | A file you can give to anyone so they can check a proof |
 | **Public record** | Where proofs are kept. Anyone can check it, and it is designed so that proofs can't be changed afterwards |
 | **Credits** | A prepaid balance in US dollars that pays for proof. Yours to withdraw |
