@@ -574,7 +574,7 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
     expect(text).toContain('Problem  This agent has no card from your owner yet');
-    expect(text).toContain('`agentlink owner add-agent --agent default`');
+    expect(text).toContain('`npx -y @4thtech-io/agentlink owner add-agent --agent default`');
     expect(text).not.toContain('agentlink init');
     expect(text).not.toContain('OK       Message network');
     // No other agent on this machine has a card either: the state is named.

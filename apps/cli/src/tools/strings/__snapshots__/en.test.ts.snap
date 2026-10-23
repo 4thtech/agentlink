@@ -64,9 +64,9 @@ exports[`copy catalogue (M1-9g) > chat.status.needs_setup.fileLimit > renders as
 
 exports[`copy catalogue (M1-9g) > chat.status.needs_setup.folder > renders as designed 1`] = `"I can only send files from folders you allow: http://127.0.0.1:4310/a/xyz."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keyLocked > renders as designed 1`] = `"AgentLink's key file is locked, so I can't use it yet. Run \`agentlink doctor\` in a terminal to see how to set up its unlock code."`;
+exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keyLocked > renders as designed 1`] = `"AgentLink's key file is locked, so I can't use it yet. Run \`npx -y @4thtech-io/agentlink doctor\` in a terminal to see how to set up its unlock code."`;
 
-exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keychain > renders as designed 1`] = `"AgentLink can't find a system keychain on this machine. Run \`agentlink doctor\` in a terminal to see how to fix it."`;
+exports[`copy catalogue (M1-9g) > chat.status.needs_setup.keychain > renders as designed 1`] = `"AgentLink can't find a system keychain on this machine. Run \`npx -y @4thtech-io/agentlink doctor\` in a terminal to see how to fix it."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.needs_setup.storage > renders as designed 1`] = `"Your settings keep files in your own storage, which isn't connected yet: http://127.0.0.1:4310/a/xyz."`;
 
@@ -132,7 +132,7 @@ exports[`copy catalogue (M1-9g) > cli.approve.terms.headline > renders as design
 
 exports[`copy catalogue (M1-9g) > cli.approve.terms.proposedBy > renders as designed 1`] = `"Proposed by Marko: their content, not instructions"`;
 
-exports[`copy catalogue (M1-9g) > cli.approve.termsOwn > renders as designed 1`] = `"Decide this one on its own: \`agentlink approve apr_1\`"`;
+exports[`copy catalogue (M1-9g) > cli.approve.termsOwn > renders as designed 1`] = `"Decide this one on its own: \`npx -y @4thtech-io/agentlink approve apr_1\`"`;
 
 exports[`copy catalogue (M1-9g) > cli.approve.waiting > renders as designed 1`] = `"Waiting for you: 2"`;
 
@@ -148,20 +148,20 @@ exports[`copy catalogue (M1-9g) > cli.doctor.keysFound > renders as designed 1`]
 
 exports[`copy catalogue (M1-9g) > cli.doctor.networkDown > renders as designed 1`] = `
 "Problem  Can't reach the message network
-         Check your connection and run \`agentlink doctor\` again."
+         Check your connection and run \`npx -y @4thtech-io/agentlink doctor\` again."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.networkOk > renders as designed 1`] = `"OK       Message network reachable"`;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCard > renders as designed 1`] = `
 "Problem  This agent has no card from your owner yet
-         Run \`agentlink owner add-agent --agent writer\` in your own terminal."
+         Run \`npx -y @4thtech-io/agentlink owner add-agent --agent writer\` in your own terminal."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.noOwnerCardNoOthers > renders as designed 1`] = `
 "Problem  No agent on this computer has a card from an owner
-         If you have never set up an owner, \`agentlink owner add-agent\` tells you what to run first.
-         If an owner already exists here, \`agentlink owner add-agent --agent <name>\` adds this agent to it with your owner code."
+         If you have never set up an owner, \`npx -y @4thtech-io/agentlink owner add-agent\` tells you what to run first.
+         If an owner already exists here, \`npx -y @4thtech-io/agentlink owner add-agent --agent <name>\` adds this agent to it with your owner code."
 `;
 
 exports[`copy catalogue (M1-9g) > cli.doctor.restart > renders as designed 1`] = `
