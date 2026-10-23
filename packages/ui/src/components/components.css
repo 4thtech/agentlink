@@ -1664,3 +1664,82 @@ body {
 .al-pct-100 {
   width: 100%;
 }
+
+/* Review together (M1-35b-b, brief B-2) */
+.al-rv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  max-width: 48rem;
+}
+.al-rv-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+}
+.al-rv-head h1:focus {
+  outline: none;
+}
+.al-rv-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.al-rv-empty,
+.al-rv-more {
+  margin: 0;
+}
+.al-rv-choice {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--al-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.al-rv-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--al-space-2);
+  min-height: 2.75rem;
+  padding: 0 var(--al-space-3);
+  border-radius: var(--al-radius-md);
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  background: var(--al-color-bg-surface);
+  color: var(--al-color-fg-default);
+  cursor: pointer;
+}
+.al-rv-opt:has(input:checked) {
+  border-color: var(--al-color-fg-default);
+  font-weight: 600;
+}
+.al-rv-opt:has(input:focus-visible) {
+  outline: var(--al-focus-ring-width) solid var(--al-color-focus-ring);
+  outline-offset: var(--al-focus-ring-offset);
+}
+.al-rv-opt:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.al-rv-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.al-rv-confirm p {
+  margin: 0;
+}
+@media (max-width: 480px) {
+  .al-rv-choice {
+    grid-template-columns: 1fr;
+  }
+}
+.al-rv-item {
+  margin: 0;
+  min-width: 0;
+}

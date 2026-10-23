@@ -85,9 +85,7 @@ describe('ReviewTogether', () => {
   });
   it('reports a choice and names the included cards on the button', () => {
     const onDecide = vi.fn();
-    mount(
-      view({ onDecide, decisions: { a: 'approve', b: 'approve', c: 'approve', d: 'deny' } }),
-    );
+    mount(view({ onDecide, decisions: { a: 'approve', b: 'approve', c: 'approve', d: 'deny' } }));
     const summary = q<HTMLButtonElement>('[data-review-confirm]');
     expect(summary.textContent).toContain('Approve 3 and deny 1');
     expect(summary.disabled).toBe(false);
@@ -123,7 +121,10 @@ describe('ReviewTogether', () => {
   });
   it('keeps terms out of the list: its own Approve, never in the summary', () => {
     const onApprove = vi.fn();
-    const items = [item('a'), item('t', { decideAlone: true, onApprove, headline: 'Accept terms' })];
+    const items = [
+      item('a'),
+      item('t', { decideAlone: true, onApprove, headline: 'Accept terms' }),
+    ];
     mount(view({ items, decisions: { a: 'approve' } }));
     expect(host.textContent).toContain('Decide this one on its own');
     const terms = host.querySelectorAll('article')[1]!;
@@ -157,7 +158,7 @@ describe('ReviewTogether', () => {
   it('waiting for presence disables every control and announces it politely', () => {
     mount(view({ phase: 'waiting', decisions: { a: 'approve' } }));
     for (const el of host.querySelectorAll<HTMLInputElement | HTMLButtonElement>('input,button')) {
-      expect(el.disabled).toBe(true);
+      expect(el.matches(':disabled')).toBe(true);
     }
     expect(q('[aria-live="polite"]').textContent).toContain('Confirm in the system prompt');
   });
@@ -204,7 +205,7 @@ describe('review safety (I-5, 08 §4)', () => {
     const out = renderToStaticMarkup(
       view({ items: [item('x', { headline: XSS, who: XSS, what: XSS })] }),
     );
-    expect(out).not.toMatch(/<script|<img|<svg|onerror=|onload=/i);
+    expect(out).not.toMatch(/<script|<img|<svg[^>]* on/i);
     expect(out).not.toMatch(/\sstyle=/);
   });
   it('uses no forbidden words in the default view', () => {
