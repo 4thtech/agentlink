@@ -38,10 +38,10 @@ import { removeInvisible } from './untrusted.js';
 
 export const TERMS_TEXT = Object.freeze({
   // M1-9d-3: `notarize` where no proof can be added: no proof support on this machine, or a
-  // counter or a rejection with proof (not available in this version).
+  // rejection with proof (not available; M1-9d-5 adds proof on a counter, a firm offer).
   notarizeUnavailable: "Adding proof to this isn't available here, so nothing was sent.",
   notarizeUnavailableNextStep:
-    'Call again without notarize to send it without proof. Proof works on a firm offer (agentlink_propose_terms) and on an acceptance.',
+    'Call again without notarize to send it without proof. Proof works on a firm offer (agentlink_propose_terms, or agentlink_respond_to_terms with decision counter) and on an acceptance.',
   // M1-9d-3: the terms went out, only their proof did not (as agentlink_send, IR-M1-9d-2 M2).
   proofFailed: 'Its proof was not added.',
   proofFailedNextStep:
@@ -95,6 +95,9 @@ export const TERMS_TEXT = Object.freeze({
         date,
       },
     )}`,
+  // M1-9d-5: a counter sent with proof is a firm offer (06 §2.2a).
+  firmCounterSent: (version: number, name: string): string =>
+    `Sent version ${String(version)} of the terms to ${name} as a firm offer. They can accept it, reject it or send a new version.`,
   askLate: (version: number, newVersion: number, name: string): string =>
     `${name} accepted version ${String(version)} after you sent version ${String(newVersion)}. The owner reviews it before your acceptance is added.`,
 });
@@ -202,9 +205,10 @@ function proofObject(result: Readonly<Record<string, unknown>>): Record<string, 
 
 /**
  * `needs_credits` before anything was sent or asked (06 §2.4, D-111; M1-9d-3): the fixed credits
- * text with the top-up link and agent ID in `nextStep`, and `proof`. The terms tools' output has no
- * `agentAddress` or `topUpUrl` field, and the link is not a local-UI `url` (result.ts), so neither
- * is set.
+ * text with the top-up link in `nextStep`, and `proof`. M1-9d-4: the link is also a structured
+ * field, in agentlink_send's form (06 §2.1 `topUpUrl` with `agentAddress`, D-113), never `url`,
+ * which is reserved for the local approval page's origins (result.ts). While the pay page is not
+ * live there is no link, and neither field is set.
  */
 export function termsNeedsCredits(
   agentId: string,
@@ -212,11 +216,13 @@ export function termsNeedsCredits(
   payPage?: PayPageConfig,
 ): HandlerOutput {
   const out = needsCredits(agentId, route, {}, payPage).result;
+  const link = out['topUpUrl'];
   return {
     result: {
       status: out.status,
       summary: `${out.summary} ${TERMS_TEXT.noCreditsSentNothing}`,
       ...(out.nextStep === undefined ? {} : { nextStep: out.nextStep }),
+      ...(typeof link === 'string' ? { agentAddress: out['agentAddress'], topUpUrl: link } : {}),
       proof: { status: 'needs_credits', receipts: [] },
     },
   };

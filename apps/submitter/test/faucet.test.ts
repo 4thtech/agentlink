@@ -7,7 +7,7 @@
 // The global cap test runs last: it fills what is left of the day's cap with concurrent claims.
 // The canary at the end searches the console for every IP and agent address used.
 import { SELF } from 'cloudflare:test';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Hex } from '@4thtech-io/chain';
 import { FakeFaucet, fakeFaucets } from './fake-faucet.js';
 
@@ -16,12 +16,22 @@ const CHAIN_ID = 84532;
 const DAILY_CAP = 10;
 
 const faucet = new FakeFaucet(CHAIN_ID);
+// CHORE-DEFLAKE-1: the per-IP limiter is a fixed window aligned to the clock hour (src/limits.ts),
+// so a run that crosses the hour could reset a counter mid-test. The clock is pinned to half past
+// an hour (the date is far enough ahead that the real clock never reaches the limiter's cleanup
+// alarm), so the window cannot roll inside a test; tests that cross a boundary set their own time.
+const PINNED_NOW = new Date('2030-01-01T11:30:00Z');
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(PINNED_NOW);
   faucet.mode = 'sent';
   faucet.tokenUsdCents = 10_000n;
   faucet.nativeWei = 10n ** 17n;
   faucet.failBalances = false;
   fakeFaucets.set(CHAIN_ID, faucet);
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const secrets = new Set<string>();
@@ -81,14 +91,38 @@ async function claim(body: unknown, ip: string): Promise<Response> {
 }
 
 describe('POST /v1/faucet: chains (SUB-7)', () => {
-  it('rejects every mainnet chain ID, and Chiado until it is deployed, before any send', async () => {
+  it('rejects every mainnet chain ID before any send', async () => {
     const ip = newIp();
-    for (const chainId of [1, 8453, 100, 42161, 10, 137, 10200]) {
+    for (const chainId of [1, 8453, 100, 42161, 10, 137]) {
       const res = await claim({ chainId, agent: newAgent() }, ip);
       expect(res.status, String(chainId)).toBe(400);
       expect(await res.json()).toEqual({ error: 'unsupported_chain' });
     }
     expect(faucet.calls).toHaveLength(0);
+  });
+
+  it('an allowlisted testnet this environment does not serve is unavailable, before any send (M1-3j-c)', async () => {
+    // Chiado is on the allowlist since M1-3j-c, but this test environment's SUBMITTER_FAUCET_CHAINS
+    // names Base Sepolia only (vitest.config.ts): the claim is refused as unavailable.
+    const res = await claim({ chainId: 10200, agent: newAgent() }, newIp());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'unavailable' });
+    expect(faucet.calls).toHaveLength(0);
+  });
+});
+
+describe('POST /v1/faucet: the per-IP window resets at the clock hour (CHORE-DEFLAKE-1)', () => {
+  it('refuses inside the hour and allows again once the clock crosses the hour boundary', async () => {
+    vi.setSystemTime(new Date('2030-01-01T11:59:50Z'));
+    const ip = newIp();
+    for (let i = 0; i < 20; i += 1) {
+      expect((await claim({ chainId: 1, agent: newAgent() }, ip)).status).toBe(400);
+    }
+    const blocked = await claim({ chainId: CHAIN_ID, agent: newAgent() }, ip);
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get('retry-after'))).toBe(10);
+    vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
+    expect((await claim({ chainId: 1, agent: newAgent() }, ip)).status).toBe(400);
   });
 });
 

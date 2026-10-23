@@ -11,6 +11,8 @@ export type {
 } from './approval-channel.js';
 export {
   IdentityService,
+  type FingerprintForms,
+  type OwnFingerprints,
   type IdentityView,
   type InitIdentityInput,
   type RotateIdentityInput,
@@ -122,6 +124,43 @@ export {
   type PolicyVersionMark,
   type ReceiptsKeptMark,
 } from './owner-actions.js';
+// M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
+// after presence. Owner surfaces only: no MCP tool uses them (I-4).
+export {
+  CONTACT_RULE_FIELD_LOOSENING,
+  POLICY_EDIT_WARNING_CODES,
+  POLICY_FIELD_LOOSENING,
+  PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+  buildOwnerActionBody,
+  mergePolicyPatch,
+  newOwnerActionNonce,
+  policyEditWarnings,
+  type BuiltOwnerAction,
+  type FieldLoosening,
+  type OwnerActionBodyInput,
+  type PolicyEditOptions,
+  type PolicyEditWarning,
+  type PolicyEditWarningCode,
+  type PreparableOp,
+  type PreparedOwnerAction,
+  type PreparedPolicyEdit,
+  type PrepareRefusal,
+} from './owner-prepare.js';
+// M1-9i-a (D-115; 04 §2.2, §2.5.1; 07 §3.4, §5.6): own storage as the owner signed it.
+export {
+  OwnStorage,
+  STORAGE_MARK_ITEM,
+  brokenOwnStorageAdapter,
+  credentialDigestsEqual,
+  decodeStorageMark,
+  encodeStorageMark,
+  isBrokenOwnStorageAdapter,
+  storageCredentialItem,
+  type OwnStorageKeys,
+  type OwnStorageProblem,
+  type OwnStorageState,
+  type StorageMark,
+} from './own-storage.js';
 export {
   BUDGET_WINDOW_SECONDS,
   FAIL_CLOSED_CONTACTS,
@@ -305,7 +344,23 @@ export {
 } from './terms-flow.js';
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
-export type { ProofChain, ProofKit, ProofsPlatform } from './proofs/platform.js';
+export type {
+  FreeCreditsAnswer,
+  FreeCreditsPort,
+  ProofChain,
+  ProofKit,
+  ProofsPlatform,
+} from './proofs/platform.js';
+// The local UI reads (M1-11r-a): proof list, credits, free test credits, activity feed, folders.
+export type {
+  ChainCredits,
+  CreditsView,
+  FreeCreditsResult,
+  ProofListItem,
+} from './proofs/reads.js';
+export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
+export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
+export type { FilesView, ResolvedFolders } from './files/view.js';
 export {
   PROOF_AWAITING_PER_CONTACT,
   PROOF_LOG_CODES,

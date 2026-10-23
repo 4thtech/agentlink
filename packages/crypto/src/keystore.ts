@@ -32,6 +32,8 @@ export { signDigestEcdsa } from './ecdsa.js';
 // M1-1g-e (IR-M1-6c-1): a drop request signed with the drop key, for KeyStore.signDropRequest.
 export { signDropRequest } from './keystore-drop.js';
 export { signTypedData } from './eip712.js';
+// M1-4c-b (07 §6.2): a direct-mode transaction with the agent's EVM key, for KeyStore.signTransaction.
+export { signDirectTransaction } from './evm-tx.js';
 export { signAgentCard } from './agent-card.js';
 // M1-4d-d (D-102): `cardPop` with the agent's Nostr secret key, for KeyStore.signCardPop.
 export { signCardPop } from './card-pop.js';

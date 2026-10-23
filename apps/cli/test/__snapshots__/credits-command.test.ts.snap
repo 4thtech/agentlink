@@ -4,7 +4,7 @@ exports[`credits (06 §8) > shows the agent ID, credits in dollars over every ne
 "Agent ID: 0x1111111111111111111111111111111111111111
 Credits: $1.75
 Adding proof costs $0.10. Messages and files are free.
-These are test credits: AgentLink runs on test networks during the beta.
+These are free test credits for the beta. They aren't real money.
 To see how much to add, run \`agentlink credits --topup\`."
 `;
 
@@ -12,7 +12,7 @@ exports[`credits --topup (07 §6.3, M1-26) > not enough credits: the amount to a
 "Agent ID: 0x1111111111111111111111111111111111111111
 Credits: $1.75
 Adding proof costs $0.10. Messages and files are free.
-These are test credits: AgentLink runs on test networks during the beta.
+These are free test credits for the beta. They aren't real money.
 
 Add at least $1.00 in credits to add proof ($0.10 each).
 To add credits, open this link:

@@ -47,6 +47,7 @@ import {
   KEY_LABELS,
   MASTER_SEED_LENGTH,
   MAX_KEY_EPOCH,
+  deriveAgentId,
   derivePublicIdentity,
   derivePublicKey,
   deriveSecretKey,
@@ -83,6 +84,17 @@ import {
   type UnsignedNostrEvent,
 } from './nostr-event.js';
 import { createAlf1SealerAt, type Alf1Processor } from './stream.js';
+import {
+  DIRECT_TX_ALLOWLIST,
+  DIRECT_TX_SELECTORS,
+  MAX_TX_DATA_BYTES,
+  TRANSACTION_REFUSED,
+  directTransactionSnapshot,
+  signDirectTransaction,
+  type DirectTransaction,
+  type DirectTxChain,
+  type TransactionRefusal,
+} from './evm-tx.js';
 import { wipe } from './wipe.js';
 
 export {
@@ -312,6 +324,8 @@ const epochUnavailable = (): KeyStoreError =>
  */
 interface KeyStoreState {
   readonly seed: Uint8Array;
+  /** The agent's EVM address (agentId, 04 §2.9): public, so policy checks need no seed read. */
+  readonly agentId: string;
   epoch: number;
   closed: boolean;
 }
@@ -336,8 +350,10 @@ export class MemoryKeyStore implements KeyStore {
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
     const keyEpoch = options.keyEpoch ?? 0;
     assertEpoch(keyEpoch);
+    const seed = copySeed(masterSeed, 'MemoryKeyStore: the master seed');
     this.#state = {
-      seed: copySeed(masterSeed, 'MemoryKeyStore: the master seed'),
+      seed,
+      agentId: deriveAgentId(seed),
       epoch: keyEpoch,
       closed: false,
     };
@@ -424,6 +440,17 @@ export class MemoryKeyStore implements KeyStore {
         signTypedData(typedData, secretKey),
       ),
     );
+  }
+
+  signTransaction(tx: DirectTransaction): Promise<string> {
+    // M1-4c-b: checked against the direct-mode rules before the seed is used; the EVM key is
+    // always epoch 0 (04 §2.1).
+    return Promise.resolve().then(() => {
+      const snapshot = directTransactionSnapshot(tx, this.#state.agentId);
+      return withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
+        signDirectTransaction(secretKey, snapshot, this.#state.agentId),
+      );
+    });
   }
 
   signCardPop(card: AgentCard): Promise<string> {
@@ -1228,4 +1255,132 @@ export function runKeyStoreConformance(
       });
     },
   );
+
+  runConformanceSignTransaction(backend, runner);
+}
+
+// --- signTransaction (M1-4c-b; 07 §6.2 direct mode) ----------------------------------------------
+
+/** A 32-byte ABI word of an unsigned integer or an address, as 64 lowercase hex. */
+const abiWord = (value: bigint | string): string =>
+  (typeof value === 'bigint' ? value.toString(16) : value.slice(2)).padStart(64, '0');
+
+const CONFORMANCE_ZERO = `0x${'0'.repeat(40)}`;
+
+/** A Chiado direct-mode transaction: a native deposit unless `over` changes it. */
+function conformanceTx(over: Record<string, unknown> = {}): DirectTransaction {
+  const chiado = DIRECT_TX_ALLOWLIST[10200] as DirectTxChain;
+  const amount = 10n ** 17n;
+  return {
+    type: 'eip1559',
+    chainId: 10200,
+    nonce: 4,
+    gas: 90_000n,
+    maxFeePerGas: 3_000_000_000n,
+    maxPriorityFeePerGas: 1_000_000_000n,
+    to: chiado.vault,
+    data: `${DIRECT_TX_SELECTORS.deposit}${abiWord(CONFORMANCE_ZERO)}${abiWord(amount)}`,
+    value: amount,
+    ...over,
+  } as DirectTransaction;
+}
+
+/** The same transaction signed with the agent's EVM key directly (RFC 6979: deterministic bytes). */
+function referenceSignature(seed: Uint8Array, tx: DirectTransaction): string {
+  const secretKey = deriveSecretKey(seed, KEY_LABELS.evm, 0);
+  try {
+    return signDirectTransaction(secretKey, tx, deriveAgentId(seed));
+  } finally {
+    wipe(secretKey);
+  }
+}
+
+function runConformanceSignTransaction(
+  backend: KeyStoreConformanceBackend,
+  runner: ConformanceRunner,
+): void {
+  const seed = backend.seed;
+  const own = deriveAgentId(seed);
+  const chiado = DIRECT_TX_ALLOWLIST[10200] as DirectTxChain;
+
+  runner.describe(`${backend.name}: KeyStore conformance, signTransaction (M1-4c-b)`, () => {
+    runner.it(
+      'signs with the EVM key (epoch 0 at any key epoch): the bytes of the reference signer',
+      async () => {
+        const store = await backend.open(CONFORMANCE_EPOCH);
+        try {
+          const withdraw = conformanceTx({
+            value: 0n,
+            data: `${DIRECT_TX_SELECTORS.withdraw}${abiWord(CONFORMANCE_ZERO)}${abiWord(5n)}${abiWord(own)}`,
+          });
+          const ack = conformanceTx({
+            to: chiado.notary,
+            value: 0n,
+            data: `${DIRECT_TX_SELECTORS.acknowledge}${abiWord(1n)}`,
+          });
+          for (const tx of [conformanceTx(), withdraw, ack]) {
+            const raw = await store.signTransaction(tx);
+            conformanceCheck(/^0x02[0-9a-f]+$/.test(raw), 'a type-2 transaction in lowercase hex');
+            conformanceCheck(raw === referenceSignature(seed, tx), 'the agent EVM key signs');
+          }
+        } finally {
+          await store.close();
+        }
+      },
+    );
+
+    runner.it(
+      'refuses an out-of-policy transaction with the fixed error, before any key is read',
+      async () => {
+        const store = await backend.open(CONFORMANCE_EPOCH);
+        // A closed store fails with keystore_closed once it touches its seed, so the fixed refusal
+        // shows each transaction was refused before that.
+        await store.close();
+        const other = `0x${'11'.repeat(20)}`;
+        const cases: [string, unknown, TransactionRefusal][] = [
+          ['Ethereum mainnet', conformanceTx({ chainId: 1 }), 'chain_not_allowed'],
+          ['Gnosis mainnet', conformanceTx({ chainId: 100 }), 'chain_not_allowed'],
+          ['Base mainnet', conformanceTx({ chainId: 8453 }), 'chain_not_allowed'],
+          [
+            'a destination that is not an AgentLink contract',
+            conformanceTx({ to: other }),
+            'destination_not_allowed',
+          ],
+          ['contract creation', conformanceTx({ to: null }), 'contract_creation'],
+          ['a legacy transaction', conformanceTx({ type: 'legacy' }), 'not_eip1559'],
+          [
+            'oversized data',
+            conformanceTx({ data: `0x${'00'.repeat(MAX_TX_DATA_BYTES + 1)}` }),
+            'data_too_large',
+          ],
+          [
+            'a withdraw to another account',
+            conformanceTx({
+              value: 0n,
+              data: `${DIRECT_TX_SELECTORS.withdraw}${abiWord(CONFORMANCE_ZERO)}${abiWord(5n)}${abiWord(other)}`,
+            }),
+            'call_not_allowed',
+          ],
+          ['value on a non-payable call', conformanceTx({ value: 1n }), 'value_not_allowed'],
+          ['an access list', { ...conformanceTx(), accessList: [] }, 'malformed'],
+          ['not an object', 'tx', 'malformed'],
+        ];
+        for (const [what, tx, reason] of cases) {
+          const error = await conformanceOutcome(() => store.signTransaction(tx as never));
+          conformanceCheck(codeOfError(error) === 'transaction_refused', `${what}: refused`);
+          conformanceCheck(
+            messageOfError(error) === TRANSACTION_REFUSED[reason],
+            `${what}: the fixed message`,
+          );
+        }
+      },
+    );
+
+    runner.it('a closed store refuses an allowed transaction with keystore_closed', async () => {
+      const store = await backend.open(CONFORMANCE_EPOCH);
+      await store.close();
+      const error = await conformanceOutcome(() => store.signTransaction(conformanceTx()));
+      conformanceCheck(codeOfError(error) === 'keystore_closed', 'keystore_closed');
+    });
+  });
 }

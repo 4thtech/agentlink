@@ -3,3 +3,4 @@
 export const packageName = '@4thtech-io/ui';
 export * from './tokens/index.js';
 export * from './components/index.js';
+export * from './strings/index.js';

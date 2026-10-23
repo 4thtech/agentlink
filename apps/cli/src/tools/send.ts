@@ -46,7 +46,7 @@ import {
   ok,
   type HandlerOutput,
 } from './result.js';
-import { notarizeOutput, proofThrown } from './proofs-common.js';
+import { notarizeOutput, notarizeWithFreeCredits, proofThrown } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 
@@ -328,13 +328,23 @@ async function withProofOf(
   if (proofs === undefined || !ENVELOPE_ID.test(envelopeId)) return internalError();
   let proofOut: HandlerOutput;
   try {
-    const result = await proofs.notarize({
-      envelopeId,
-      ...(typeof approvalId === 'string' ? { approvalId } : {}),
-      ...(requestReceipt ? { requestReceipt: true } : {}),
-    });
+    // M1-36i: the first proof that needs credits claims free test credits once (testnets only);
+    // M1-36i-c: after a claim that added credits, a bounded wait for them and one proof retry (the
+    // message itself is never sent again).
+    const { result, freeCredits } = await notarizeWithFreeCredits(
+      proofs,
+      {
+        envelopeId,
+        ...(typeof approvalId === 'string' ? { approvalId } : {}),
+        ...(requestReceipt ? { requestReceipt: true } : {}),
+      },
+      context,
+      agentId,
+    );
     proofOut = notarizeOutput(result, context, agentId, {
       contactName,
+      freeCredits,
+      envelopeId,
       approvalSummary: SEND_TEXT.proofApproval,
       approvalNextStepTail: (requestReceipt
         ? SEND_TEXT.proofApprovalTailReceipt
@@ -367,16 +377,15 @@ async function withProofOf(
     };
   }
   const { status, summary, nextStep, code, approvalId: pending, url, ...rest } = proofOut.result;
-  const { advanced, recordId, fee, receipts, agentAddress, topUpUrl } = rest as Record<
-    string,
-    unknown
-  >;
+  const { advanced, recordId, fee, receipts, agentAddress, topUpUrl, receiptRequestNotAdded } =
+    rest as Record<string, unknown>;
   const proof = {
     status: PROOF_STATUSES.has(status) ? status : 'error',
     ...(advanced === undefined ? {} : { advanced }),
     ...(recordId === undefined ? {} : { recordId }),
     ...(fee === undefined ? {} : { fee }),
     receipts: Array.isArray(receipts) ? receipts : [],
+    ...(receiptRequestNotAdded === true ? { receiptRequestNotAdded: true } : {}),
   };
   context.logger.info('message proof', { status });
   return {

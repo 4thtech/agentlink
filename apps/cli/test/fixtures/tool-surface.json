@@ -780,6 +780,12 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1086,10 +1092,25 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         },
         "candidates": {
           "type": "array",
@@ -1386,10 +1407,25 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         }
       },
       "required": ["status", "summary"],
@@ -2041,6 +2077,12 @@
             "additionalProperties": false
           }
         },
+        "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
+        "receiptRequested": {
+          "type": "boolean"
+        },
         "agentAddress": {
           "type": "string",
           "pattern": "^0x[0-9a-f]{40}$"
@@ -2264,6 +2306,12 @@
             "required": ["type", "at"],
             "additionalProperties": false
           }
+        },
+        "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
+        "receiptRequested": {
+          "type": "boolean"
         },
         "agentAddress": {
           "type": "string",

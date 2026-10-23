@@ -4,7 +4,9 @@
 // 1. Each file: the size cap, then an allowed folder (the realpath strictly inside a resolved
 //    `files.allowedFolders` entry, 04 §4), then where it would be stored (07 §5.6 steps 2–5).
 // 2. The D-85 packing plan, with the "cannot fit" check first (packing.ts, IR-M1-6c-1 L2).
-// 3. A stored file whose storage needs setup → `needs_setup`, before any upload.
+// 3. A stored file whose storage needs setup → `needs_setup`, before any upload. A broken own
+//    storage (the stub of own-storage.ts, M1-9i-a) is configured but cannot store: `storage_broken`,
+//    never the drop (07 §5.6).
 // 4. Each file is read once and encrypted with a fresh file key (ALF1 STREAM through
 //    @4thtech-io/storage's putEncrypted, which uses @4thtech-io/crypto; D-80): inline into the
 //    payload, or uploaded to own storage or the drop. The drop adapter signs with the KeyStore's
@@ -33,6 +35,7 @@ import {
 } from '@4thtech-io/storage';
 import { MAX_URL_LENGTH } from '@4thtech-io/types';
 import { nowOf, type CoreContext } from '../context.js';
+import { isBrokenOwnStorageAdapter } from '../own-storage.js';
 import { CoreError } from '../errors.js';
 import { evaluateFileSend, policyLimits, type EffectivePolicy } from '../policy-engine.js';
 import { decidePath, parseAbsolutePath } from '../path-guard.js';
@@ -44,8 +47,12 @@ const MAX_EXPIRY_DAYS = 7;
 const DEFAULT_MIME = 'application/octet-stream';
 const MAX_NAME_CODE_POINTS = 256;
 
-/** Why a file send needs the owner first (06 §2.3, 07 §5.6). */
-export type FilesNeedsSetup = 'no_folder' | 'outside_folder' | 'no_own_storage' | 'size' | 'quota';
+/**
+ * Why a file send needs the owner first (06 §2.3, 07 §5.6). `storage_broken` (M1-9i-a, D-115): own
+ * storage is configured but `broken` (07 §3.4), so the owner connects it again; never the drop.
+ */
+export type FilesNeedsSetup =
+  'no_folder' | 'outside_folder' | 'no_own_storage' | 'storage_broken' | 'size' | 'quota';
 
 /** Where a sent file went, as the send result reports it (06 §2.2 `FileInfo.delivery`). */
 export interface SentFile {
@@ -190,6 +197,8 @@ export async function prepareOutgoing(
   if (!Array.isArray(files) || files.length > 16) throw invalid();
   const limits = policyLimits(policy);
   const own = platform.ownStorage;
+  // A broken own storage is configured (07 §5.6): it is never skipped for the drop.
+  const ownBroken = isBrokenOwnStorageAdapter(own);
   const drop = dropAdapter(ctx, platform);
   const dropMax = drop?.maxBytes ?? DROP_MAX_CIPHERTEXT_BYTES;
   const filesPolicy = policy.mode === 'fail_closed' ? undefined : policy.policy.files;
@@ -261,7 +270,9 @@ export async function prepareOutgoing(
           ? selection.reason
           : selection.mode === 'drop' && drop === undefined
             ? 'no_own_storage'
-            : selection.mode;
+            : selection.mode === 'own' && ownBroken
+              ? 'storage_broken'
+              : selection.mode;
     }
     checked.push({ file, name, mime, size, stored });
   }

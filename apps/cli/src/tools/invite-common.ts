@@ -64,7 +64,7 @@ function checkedApprovalId(approvalId: string): string {
  * `apr_` ID, checked against its exact pattern first; the link is never echoed (I-5).
  */
 export const acceptRetryStep = (approvalId: string): string =>
-  `Then call agentlink_accept_invite with the same inviteUrl and approvalId ${checkedApprovalId(approvalId)}.`;
+  `Then retry this call with the same inviteUrl and approvalId ${checkedApprovalId(approvalId)}.`;
 
 /** The nextStep when the owner already approved but the call named no approval (M1-13a follow-up). */
 export const approvedNeedsIdStep = (approvalId: string): string =>

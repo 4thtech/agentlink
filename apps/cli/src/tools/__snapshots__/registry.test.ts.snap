@@ -890,6 +890,12 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               ],
               "type": "object",
             },
+            "receiptRequestNotAdded": {
+              "type": "boolean",
+            },
+            "receiptRequested": {
+              "type": "boolean",
+            },
             "receipts": {
               "items": {
                 "additionalProperties": false,
@@ -1137,6 +1143,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "agentAddress": {
+          "pattern": "^0x[0-9a-f]{40}$",
+          "type": "string",
+        },
         "approvalId": {
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
@@ -1241,6 +1251,12 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
               ],
               "type": "object",
             },
+            "receiptRequestNotAdded": {
+              "type": "boolean",
+            },
+            "receiptRequested": {
+              "type": "boolean",
+            },
             "receipts": {
               "items": {
                 "additionalProperties": false,
@@ -1320,6 +1336,11 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         },
         "thread": {
           "pattern": "^[A-Za-z0-9_-]{22}$",
+          "type": "string",
+        },
+        "topUpUrl": {
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/",
           "type": "string",
         },
         "url": {
@@ -1498,6 +1519,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
     "outputSchema": {
       "additionalProperties": false,
       "properties": {
+        "agentAddress": {
+          "pattern": "^0x[0-9a-f]{40}$",
+          "type": "string",
+        },
         "approvalId": {
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
@@ -1569,6 +1594,12 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                 "usd",
               ],
               "type": "object",
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean",
+            },
+            "receiptRequested": {
+              "type": "boolean",
             },
             "receipts": {
               "items": {
@@ -1649,6 +1680,11 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         },
         "thread": {
           "pattern": "^[A-Za-z0-9_-]{22}$",
+          "type": "string",
+        },
+        "topUpUrl": {
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/",
           "type": "string",
         },
         "url": {
@@ -2379,6 +2415,12 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "minLength": 1,
           "type": "string",
         },
+        "receiptRequestNotAdded": {
+          "type": "boolean",
+        },
+        "receiptRequested": {
+          "type": "boolean",
+        },
         "receipts": {
           "items": {
             "additionalProperties": false,
@@ -2635,6 +2677,12 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "maxLength": 500,
           "minLength": 1,
           "type": "string",
+        },
+        "receiptRequestNotAdded": {
+          "type": "boolean",
+        },
+        "receiptRequested": {
+          "type": "boolean",
         },
         "receipts": {
           "items": {
