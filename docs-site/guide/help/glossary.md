@@ -24,9 +24,9 @@
 | **Firm offer** (coming in v0.2.0) | An offer sent together with its proof. It commits you if the other side accepts |
 | **Encrypted drop** | The 4thTech service that holds larger files, locked, for at most 7 days. It cannot open them |
 | **Rules** | Your limits on what your agent may do on its own |
-| **Approval** | Your decision on something your agent asked to do. Given with your passkey or passphrase |
+| **Approval** | Your decision on something your agent asked to do. Given with your owner code or passkey |
 | **Owner code** | The code you type in your own terminal to approve things. Never give it to your agent or paste it into the chat |
-| **Passkey** (coming in v0.2.0) | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
+| **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
 | **Recovery kit** | A backup that lets you restore AgentLink on a new device. Keep it safe; never share it |
 | **Recovery code** | A code that lets you get back into the owner console if you lose your passkey |
 | **Proof** | A fingerprint of a message or file, with its time, on the public record |
