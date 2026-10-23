@@ -801,6 +801,36 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** PR #335 changed only `.github/scripts/worker-logging-settings.jq`, which both deploy workflows run in their logging read-back, and neither deploy started: their `on.push.paths` did not list it (nor `tools/release/wait-for-ci.mjs`). Add both to each filter and a test that fails when a workflow with a push `paths` filter runs a repo-local script (or local action) the filter does not cover.
 - **Acceptance:** the test fails on main before the fix (`RED (expected):` commit) and passes after; no other trigger or step changes.
 
+#### CHORE-DEPLOY-RECONCILE-b · reconcile: bound pending approvals; alert when no deploy is found (new, IR-CHORE-DEPLOY-RECONCILE-1, #464)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · the reconcile workflow and `tools/release/**`
+- **Depends on:** CHORE-DEPLOY-RECONCILE
+- **Scope:**
+  - While production lags, allow at most one pending approval request per service (not per head).
+  - Raise an alert instead of a notice when no deploy is found in the last 30 runs.
+  - Card bullet 3: the `check-changesets.test.mjs` 3 of 15 local failures (environmental) get a note or a fix.
+- **Acceptance:**
+  - A test with several pending heads shows one request per service; the 30-run case alerts; no step weakened.
+
+#### DOCS-PASS-1023-b · status.yaml names init global install and the gasless route (new, 2026-10-23)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (`docs/process/**` by path; docs only)
+- **Repo/path:** agentlink · `docs/status.yaml`, then `node tools/docs-status/index.mjs`
+- **Depends on:** #422 and #452 merged (both are)
+- **Scope:**
+  - Mention #422 (init offers the global install and names agents after their app) and #452 (gasless top-up route, off by default) in `docs/status.yaml` at the next docs pass; regenerate the status files.
+- **Acceptance:**
+  - `node tools/docs-status/index.mjs --check` passes; nothing claims the gasless route is on.
+
+#### DOCS-G21-b · "median" vs "every tester": align the M2 gate and 02 with D-124 (new, IR-M1-GATE-a-2, #461)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · `docs/process/backlog.md` (M2-GATE acceptance), `docs/foundation/02-product-spec.md` (line 240)
+- **Depends on:** M1-GATE-a (#461)
+- **Spec:** 02 (success metrics); G-21
+- **Scope:**
+  - M2-GATE acceptance says "(median)" but its scope says "every tester"; 02 says "Median < 5 minutes". Align both with D-124 or state the M2 rule explicitly. The owner decides which.
+- **Acceptance:**
+  - One rule, worded the same in the M2-GATE card, 02 and the gate runbook; the owner confirmed it.
+
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
 - **Repo/path:** agentlink · `apps/submitter/src/index.ts`
@@ -4597,6 +4627,37 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - A schema test accepts each new field and rejects a malformed one; the existing proof tests pass unchanged.
 
+#### M1-33d-d · proofStatusShape and 06 ProofStatus agree on `chain` and `receiptRequested` (new, IR-M1-33d-c-1, #462)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/types` (`proofStatusShape`, `proofStatusResultSchema`), `apps/cli` (proof status result), `docs/foundation/06-mcp-tools-and-ux.md` (proposed, owner confirms at merge)
+- **Depends on:** M1-33d-c
+- **Spec:** 06 `ProofStatus`; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - `proofStatusShape` requires a top-level `chain`, but 06 says it is advanced-only and the CLI never emits it, so a real result would fail `proofStatusResultSchema`. Make `chain` optional (advanced only) or move it under `advanced`, and align 06 and the schema.
+  - Add `receiptRequested` to the 06 `ProofStatus` and the CLI schema, or note in 06 why it is not there.
+  - Rated medium in the review: fix before M1-33d ships.
+- **Acceptance:**
+  - A schema test parses the CLI's real proof status result (default and advanced); a result without `chain` passes; the default result still shows no chain; the existing proof tests pass unchanged.
+
+#### M1-36d-d · next-step-limit test renders multi-argument builders (new, IR-M1-36d-c-3, #458)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`next-step-limit.test.ts`)
+- **Depends on:** M1-36d-c
+- **Scope:**
+  - The test skips builders that take 2 or 3 arguments (`TERMS_TEXT.*`, `INBOX_TEXT.headerFrom`) without saying so. Render them with sample arguments, or fail loudly (or warn) when a builder is skipped.
+- **Acceptance:**
+  - A new multi-argument builder over the 500 code point limit fails the test; no builder is skipped silently; no test weakened.
+
+#### M1-36i-e · free-credits wait counts against the approval wait (new, IR-M1-36i-c-1, #466)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`src/mcp/approval-wait.ts` and the free-credits claim)
+- **Depends on:** M1-36i-c
+- **Scope:**
+  - Subtract the time spent waiting for the free test credits from `approvalWaitMs`, so a tool call stays under the harness timeouts (Codex is about 60 s).
+- **Acceptance:**
+  - A test with a slow credits claim shows the total tool call time stays within the configured bound; with no credits wait the behaviour is unchanged.
+
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
 #### M1-20 · Commitments policy: owner approval for binding accepts and receipts (D-31) (new)
@@ -5080,7 +5141,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A test fails on any banned term in default output; the two `FIXED_BY_OTHER_CARDS` entries are gone.
 
 #### M1-36f · agent UX: credits honesty (UX-F) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (folded into M1-36i-c) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/proofs-common.ts`, `apps/cli/src/commands/credits.ts` (rebase on #344)
 - **Depends on:** #344
 - **Spec:** 06 §2.5; 11 §5
@@ -5354,7 +5415,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A test per item; no secret or URL is logged.
 
 #### M1-36i-c · free credits: bounded in-call wait and one proof retry after a claim (new, D-120 (3))
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/notarize.ts`, `send.ts`, `proofs-common.ts`, `apps/cli/src/runtime/proofs.ts` and tests
 - **Depends on:** M1-36i
 - **Spec:** 06 §2.5; 07 §5
@@ -5567,10 +5628,25 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Audit report with a verdict per invariant and zero open Critical/High findings.
   - Testing log: testers × journeys × harness combinations, with issues filed as cards; J8 completed with on-chain proof of agreement (D-32).
-  - UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows; install → first message stays under 5 minutes (median, per G-21).
+  - UX (D-39, D-40): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows; install → first message stays under 5 minutes for every tester (per G-21, D-124).
   - Files (D-48): in J1 a file over 12 KB is sent with zero storage setup through the encrypted drop; the audit covers the 04 §7 drop rows.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - Owner sign-off recorded.
+
+#### M1-GATE-a · Tester runbook, testing log and the install → first message timing method for the M1 gate (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus independent review, because it proposes a gap resolution) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · docs/runbooks
+- **Depends on:** none to write; the testers run it once the M1b cards its journeys need have merged
+- **Spec:** 10 Gate M1; 02 §5 (J1–J5, J8); 08 §2.3; G-21; `audit-rules.md` §4.5, §7; D-39, D-40, D-48
+- **Invariants:** I-1, I-5 (testers never share keys, codes or content; hostile-message check)
+- **Scope:**
+  - `docs/runbooks/m1-gate-testing.md` (RB-20): recruitment checklist for 10 testers on ≥ 3 harness combinations, per-journey script for J1, J2, J3, J4, J5 and J8 on testnets, a testing-log template with no names or secrets, how to report issues.
+  - The G-21 resolution (D-124, owner-confirmed 2026-10-23), used by the runbook.
+- **Acceptance:**
+  - The runbook follows the runbook template, covers J1, J2, J3, J4, J5 and J8 across the harness combinations, and every command it names exists on `main`.
+  - Timing needs no network telemetry (08 §2.3).
+  - Filled logs go to the private audit store, never to this repository.
+  - Card counts are recounted after #449 lands (this PR does not touch the count rows).
 
 ---
 
@@ -6205,13 +6281,13 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-1 … I-10
 - **Scope:**
   - Internal milestone audit (parts A–F of `audit-rules.md` §7) plus the M2 additions: web checklist on console, verify, invite and pay; cloud agent; Registry.
-  - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" (median) measured per G-21.
+  - External testing: 20–50 early adopters on testnets; UX metric "install → first message < 5 minutes" for every tester measured per G-21.
 - **Acceptance:**
   - Zero open Critical/High findings; per-invariant verdicts.
   - **G-1 re-decided (D-67)** before external testers start: the owner records a new decision on the same-user residual (G-1, G-42), taking into account what the desktop apps deliver; until then no external tester relies on owner presence on an `npx` install.
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message stays under 5 minutes (median).
-  - Adopter count and the measured median recorded; issues filed as cards; owner sign-off.
+  - Adopter count and each measured time recorded; issues filed as cards; owner sign-off.
 
 ---
 
@@ -6363,6 +6439,48 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - From IR-M1-3c-1 (info): a `TokenChecks` negative payee probe; client rule: always sign the `ReceiveWithAuthorization` typehash, never `TransferWithAuthorization`; the submitter simulates and rate-limits `deposit-authorization`; decide the interface file placement.
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
+#### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
+- **Depends on:** M3-4b-t
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-6
+- **Scope:**
+  - The builder accepts `windowSeconds` up to 3600, but the relay refuses a `validBefore` later than now plus 1020 s. Align them with one named constant (`GASLESS_MAX_WINDOW_SECONDS`) or document the gap.
+- **Acceptance:**
+  - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
+
+#### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
+- **Depends on:** M3-4b-t-0 (#453)
+- **Scope:**
+  - Update the comments that still say "until M1-3c" now that the ABI landed. No code change.
+- **Acceptance:**
+  - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
+
+#### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
+- **Depends on:** M3-4b-t-0 (#453)
+- **Scope:**
+  - Current tests mock the registry. Add a test against the real registry: `gaslessToken` refuses on 84532 and 10200 while `GASLESS_TOPUP_ENABLED=false`.
+  - Check the eip3009 composition in `registry.ts` also requires the flag (a note on the review, to be confirmed in the code).
+- **Acceptance:**
+  - The test fails if the flag check is removed; no test mocks the registry in it.
+
+#### M3-4b-t-T3-c · deposit relay: cap order and refund on a crash mid-send (new, IR-M3-4b-t-T3-b-1, #459)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/submitter/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/submitter` (deposit-authorization route)
+- **Depends on:** M3-4b-t-T3-b (#459)
+- **Spec:** 07 §7; 04 §7
+- **Invariants:** I-3
+- **Scope:**
+  - Count the global cap after `relay.check` (so a bad request cannot burn it, which raises the attacker's cost), or add a signature pre-verify before counting.
+  - Refund the quota when the process crashes mid-send.
+- **Acceptance:**
+  - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/submitter; agentlink-ops · monitoring
@@ -6837,7 +6955,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
 20. **G-20 (M) Revocation typed data.** **RESOLVED (D-81, Tali, in chat, 17 Oct 2026):** 05 §4 `Revocation` struct, owner-signed (EIP-712, OCC v2 chain domain, ERC-1271 accepted); random single-use nonces per owner shared with `Registration` (`usedNonces[ownerEvm][nonce]`); reverts on expiry, reuse or a `keyEpoch` other than the stored one; revoke works while paused. *Was:* 05 §4 `revoke(agentEvm, nonce, deadline, ownerSig)` has no EIP-712 struct; nonce rules for `Registration` and revoke unspecified. *Blocks:* M1-1i-b (vectors), M2-4a.
-21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. *Proposed:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
+21. **G-21 (M) Measuring beta metrics without analytics.** 02 §7 and 10 gates vs 08 §2.3 and zero access. **RESOLVED (D-124, Tali, in chat, 2026-10-23, strict):** every tester's install → first message time is under 5:00, time waiting for the counterpart excluded. Timing is self-timed with a stopwatch plus two local `date -u` lines, cross-checked against the agent folder's creation time and the counterpart's inbox time, logged by tester ID in the private audit store (RB-20 step 4). No analytics, no network telemetry. M2-GATE reuses the method. *Was:* moderated sessions plus opt-in, local-only timing exported by testers. *Blocks:* M1-GATE, M2-GATE.
 22. **G-22 (M) Owner archive mechanics.** 04 §4; 02 F-33; 06 §3: whose storage credentials, how the file key reaches the owner, who deletes. *Blocks:* M2-9.
 23. **G-23 (M) `agentId` undefined.** Resolved by branch `docs/G-23-G-28-agentid-safety-code` (pending owner; proposed, owner confirms at merge), with G-28: `agentId` is the agent's EVM address (`agentlink/v1/evm`, epoch 0), `0x` + 40 lowercase hex, the same value as card `agentEvm`, owner-action `agent` (D-58), `terms.parties` and the commitment scope, so never a second binding (04 §2.9). Derived from the seed and checked on every seed load (keychain and `ALKS`). Invites and handshakes carry `cardAgentSig`, and a handshake is accepted only from the card's own `agentNostr`, so an owner cannot claim another agent's address and a replayed card completes nothing. One contact per `agentId`; a re-pair needs unchanged owner keys and takes effect only on completion. Object keys use a random per-agent `storagePrefix`, never the address (07 §5.2). Owner and agent fingerprints are tagged hashes, short form `7F3A·19C2`, display only and never an authenticator. *Was:* Used in 04 §2.2 (keychain account), 06 §6, 07 §3, 07 §5.2 (object key). The object-key path also gives every recipient of a presigned URL a stable per-agent identifier. *Proposed:* define `agentId`; use a random per-agent prefix in object keys. Owner actions bind the canonical EVM address, not `agentId` (G-29), and `agentId` must not become a second binding. *Blocks:* M1-6a, M1-7a, M1-8a.
 24. **G-24 (M) Relays for owner copies.** RESOLVED by 4thtech/agentlink#51 (D-65; accepted by Tali, 2026-10-14, at merge, with every value below), in 07 §4.3, with pointers in 04 §3.1.1, §3.4.1, §3.5 and §4, the relay columns in 07 §3 and §3.6, and 08 §2.2. Each gift wrap goes to the relay list of the agent it concerns (the recipient's agent and owner to the recipient's list, the sender's agent and owner to the sender's own list, the union when one owner owns both agents), and an owner surface subscribes with `ownerNostr` on the bootstrap set (the release's default relays plus the owner's own Settings entries) and the lists of all its agents, inside the `OwnerSession`. A list counts only if it hashes to the `relaysHash` of a card whose `cardSig` is the owner's own; the surface learns it by signing the card, from owner copies of the agent's `handshake` or `card-update`, or from the owner link. A new owner-channel `card-update` (amends D-58) tells the owner of every new card, even with no contacts. Own lists hold 2–8 relays (3–5 by default), received lists 1–16 (unchanged); a relay change is a rotation, and the old list stays in use for 30 days. The console keeps at most 32 live connections and syncs the rest in turns. Kinds 10002 and 10050, relay hints and NIP-11 are never sources. Linkability through `ownerNostr` is stated, not removed. After IR-G-24-1 (also accepted at that merge): invite, `handshake` and `handshake-ack` lists must match `relaysHash` and `nameHash` (04 §3.6); `handshake-ack` carries `relays` (amends D-58; M1-2d); lists carried with a card hold 2–16 relays; a relay change is refused while an overlap runs; the owner `card-update` is also sent at `init`, re-published every 24 h during an overlap and every 7 days otherwise, and also published to the release default set; no agent-directory event kind now (a directory, if wanted, goes into the G-36 owner-backup blob); the 15-minute sync turn is a target. New cards M1-2d and M1-7j. The two D-58 amendments (owner-channel `card-update`, `handshake-ack` `relays`) are recorded as D-65 (accepted) in the decision log (00-README). After round 2: a 9-day look-back on a surface's first sync of a relay with no cursor, and a per-agent Advanced opt-out from announcing on the default relays, with its privacy cost stated. *Was:* 04 §3.5; 07 §4.2; 08 §2.2. AgentCard carries only the agent's `relaysHash`; owners have no relay list. *Proposed:* each owner copy goes to the relays of the agent it concerns; the console subscribes to all its agents' relays. *Blocks:* M1-5b, M2-2d.

@@ -49,7 +49,6 @@ import {
   HarnessError,
   applyHarness,
   detectHarnesses,
-  displayPath,
   harnessById,
   isHarnessId,
   planHarness,
@@ -165,9 +164,10 @@ export const INIT_TEXT = Object.freeze({
   ownerStep:
     "One step left, and you must do it yourself: run `{prefix} owner init{agentFlag}` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
   noAppsHere: "Problem  AgentLink didn't find {apps} on this computer.",
-  appsAll: 'Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity',
+  appsAll:
+    'Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
   // No Claude desktop app on Linux, so it is not named there.
-  appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode or Antigravity',
+  appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
   restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
@@ -283,7 +283,6 @@ function confirmationCode(
   target: string,
   config: ConfigTarget | undefined,
   changes: readonly ChangePlan[],
-  platform: NodeJS.Platform,
 ): string {
   // The target harness and the `--config` file are bound too, so a code shown for one harness or
   // file never confirms another (D-78).
@@ -291,7 +290,8 @@ function confirmationCode(
     `agentlink-init-v2 ${name} ${createIdentity ? 'new' : 'existing'} ${target}`,
     `config ${config === undefined ? '-' : hashText(`${config.dir}\0${config.name}`)}`,
     ...changes.map(
-      (c) => `${c.def.id} ${hashText(displayPath(c.def, config, platform))} ${hashText(c.text)}`,
+      // M1-36g-c: the path shown and the file written, as resolved by the plan (environment applied).
+      (c) => `${c.def.id} ${hashText(`${c.path}\0${c.file}`)} ${hashText(c.text)}`,
     ),
   ];
   const digest = encodeHex(sha256(new TextEncoder().encode(lines.join('\n'))));
@@ -587,14 +587,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     const blocked = plans.some((p) => p.status === 'blocked');
 
     const target = typeof harnessValue === 'string' ? harnessValue : '*';
-    const code = confirmationCode(
-      name,
-      needIdentity,
-      target,
-      config,
-      changes,
-      deps.platform ?? process.platform,
-    );
+    const code = confirmationCode(name, needIdentity, target, config, changes);
     const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
 
     if (!needIdentity && changes.length === 0) {
