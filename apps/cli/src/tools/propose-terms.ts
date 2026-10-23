@@ -26,14 +26,7 @@
 import type { NotarizeResult, ProposeTermsInput, ProposeTermsResult } from '@4thtech-io/core';
 import { contactRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
-import {
-  fail,
-  internalError,
-  notAvailable,
-  ok,
-  pendingApproval,
-  type HandlerOutput,
-} from './result.js';
+import { internalError, notAvailable, ok, pendingApproval, type HandlerOutput } from './result.js';
 import {
   TERMS_TEXT,
   contactNotReady,
@@ -49,7 +42,7 @@ import {
 } from './terms-common.js';
 import { PROOF_TEXT, claimFreeCredits } from './proofs-common.js';
 import { proofDisclosure, withDisclosure } from './strings/privacy.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerResult } from './text.js';
 
 /** M1-36i-d: the terms tools' free test credits text (11 §5: no service name, "gas" or "token"). */
 export const TERMS_FREE_CREDITS_TEXT = Object.freeze({
@@ -133,11 +126,7 @@ export async function proposeTermsHandler(
 
   const self = await client.self();
   if (self === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
   const resolved = resolveContact(to, await client.contacts());
   if (!resolved.ok) return resolved.output;

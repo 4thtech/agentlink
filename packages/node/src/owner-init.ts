@@ -30,6 +30,7 @@ import {
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
 import { restrictName } from '@4thtech-io/core';
+import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS } from './keychain-keystore.js';
 import {
@@ -105,8 +106,7 @@ const COPY = {
   code: (grouped: string): string => `Your owner code: ${grouped}`,
   retype: 'Type its last four characters to continue:',
   retypeWrong: "That doesn't match. Check the last four characters of your owner code.",
-  retypeFailed:
-    "The owner code wasn't confirmed. Nothing was saved; run `agentlink owner init` again.",
+  retypeFailed: `The owner code wasn't confirmed. Nothing was saved; run \`${CLI_COMMAND} owner init\` again.`,
   passphraseNote:
     'A passphrase you choose is weaker than a generated owner code. Any program running as you on this computer, including your AI app, can read the locked copy your passphrase protects and try to guess the passphrase offline. A generated owner code makes that infeasible.',
   passphraseConfirm: 'Use your own owner passphrase anyway? [y/N]',
@@ -114,21 +114,17 @@ const COPY = {
   passphraseAgain: 'Type it again:',
   passphraseMismatch: "The two entries don't match.",
   done: (fingerprint: string): string =>
-    `Owner set up. Your owner fingerprint: ${fingerprint}. Check that \`agentlink doctor\` shows the same one.`,
+    `Owner set up. Your owner fingerprint: ${fingerprint}. Check that \`${CLI_COMMAND} doctor\` shows the same one.`,
   fileNoPassphrase:
     'On a computer without a system keychain, approvals are protected by a generated owner code only.',
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't set up an owner for yet. Update AgentLink.",
-  ownerOnMachine:
-    "An owner is already set up on this computer, so AgentLink won't create another. To give this agent a card from it, run `agentlink owner add-agent --agent <name>` yourself, in your own terminal.",
+  ownerOnMachine: `An owner is already set up on this computer, so AgentLink won't create another. To give this agent a card from it, run \`${CLI_COMMAND} owner add-agent --agent <name>\` yourself, in your own terminal.`,
   ownerExistsCard:
     "This agent already has an owner. AgentLink won't replace it. To use an owner from another device, link it from that device.",
-  cardFailed:
-    "Your agent's card couldn't be signed, so the owner wasn't saved. Run `agentlink owner init` again.",
-  cardUnknown:
-    "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
-  keychainFailed:
-    'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+  cardFailed: `Your agent's card couldn't be signed, so the owner wasn't saved. Run \`${CLI_COMMAND} owner init\` again.`,
+  cardUnknown: `Owner setup didn't finish. Run \`${CLI_COMMAND} doctor\` in your own terminal to see what is missing.`,
+  keychainFailed: `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   // M1-8h-b: the display-name prompt (11 §5: the name is self-declared, 04 §2.4).
   nameNote: 'Contacts see this name labelled as self-declared. You can keep the suggested one.',
   nameQuestion: (suggested: string): string =>
@@ -184,7 +180,7 @@ export async function initOwnerWith(
   if (options.backend !== 'keychain') {
     throw new NodeKeyStoreError(
       'backend_unavailable',
-      "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
+      `This agent's recorded key store is not one AgentLink knows. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
     );
   }
   if (options.cardOwner !== undefined) {
@@ -438,7 +434,7 @@ export function initOwner(options: OwnerSetupOptions): Promise<OwnerInitResult> 
     if (typeof options !== 'object' || options === null || options.firstCard === undefined) {
       throw new NodeKeyStoreError(
         'owner_operation_invalid',
-        "Owner setup needs this agent's card to sign. Run `agentlink owner init`.",
+        `Owner setup needs this agent's card to sign. Run \`${CLI_COMMAND} owner init\`.`,
       );
     }
     assertNoHarnessMarker(options.env ?? process.env);

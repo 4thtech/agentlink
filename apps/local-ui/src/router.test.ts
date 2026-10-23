@@ -4,6 +4,7 @@
 import { createElement as h, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { setConnectionState } from './layout/index.js';
 import { NAV_ITEMS } from './nav.js';
 import { AppRoutes, ROUTES } from './router.js';
 
@@ -32,10 +33,10 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/settings/activity', 'Activity'],
   ['/settings/contacts', 'Contacts'],
   ['/settings/files', 'Files'],
-  ['/settings/storage', 'Storage'],
   ['/settings/proofs', 'Proofs & credits'],
   ['/settings/rules', 'Rules'],
   ['/settings/backup', 'Backup'],
+  ['/settings/passkeys', 'Passkeys'],
   ['/settings/advanced', 'Advanced'],
 ];
 
@@ -73,12 +74,72 @@ describe('nav', () => {
       'Activity',
       'Contacts',
       'Files',
-      'Storage',
       'Proofs & credits',
       'Rules',
+      'Settings',
+    ]);
+    expect(NAV_ITEMS).toHaveLength(7);
+  });
+
+  it('keeps every nav label in plain words', () => {
+    // 11 §5: no wallet, gas, seed phrase or transaction words in the default UI.
+    const text = [...NAV_ITEMS.map((i) => i.label), 'Backup', 'Passkeys', 'Advanced'].join(' ');
+    expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
+  });
+
+  it('redirects the old storage path to Files', () => {
+    mountAt('/settings/storage');
+    expect(location.pathname).toBe('/settings/files');
+    expect(host.querySelector('main h1')?.textContent).toBe('Files');
+  });
+
+  it('shows a Settings sub-navigation with Backup, Passkeys and Advanced', () => {
+    mountAt('/settings/passkeys');
+    const sub = host.querySelector('nav[aria-label="Settings"]');
+    expect(sub).not.toBeNull();
+    expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Backup',
+      'Passkeys',
       'Advanced',
     ]);
+    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
+    expect(
+      host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent,
+    ).toContain('Settings');
+  });
+
+  it('has no Settings sub-navigation on other pages', () => {
+    mountAt('/settings/rules');
+    expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
+  });
+
+  it('shows Checking… (never Connected or Paused) before the server reports', () => {
+    mountAt('/settings/rules');
+    const bar = host.querySelector('footer.al-statusbar')?.textContent ?? '';
+    expect(bar).toContain('Checking…');
+    expect(bar).not.toContain('Connected');
+    expect(bar).not.toContain('Paused');
+  });
+
+  it('shows Not connected after offline and does not turn Connected on the online event', () => {
+    mountAt('/settings/rules');
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+    expect(host.querySelector('footer.al-statusbar')?.textContent).toContain('Not connected');
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    const bar = host.querySelector('footer.al-statusbar')?.textContent ?? '';
+    expect(bar).toContain('Checking…');
+    expect(bar).not.toContain('Connected');
+  });
+
+  it('shows Connected only when the server reports healthy', () => {
+    mountAt('/settings/rules');
+    act(() => setConnectionState('connected'));
+    expect(host.querySelector('footer.al-statusbar')?.textContent).toContain('Connected');
+    act(() => setConnectionState('unknown'));
   });
 
   it('marks only the active item with aria-current', () => {
