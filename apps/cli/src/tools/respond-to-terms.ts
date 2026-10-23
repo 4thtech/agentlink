@@ -12,6 +12,8 @@
 //    built from the core's card data: the contact under the 06 §2.1 rule, the version, nothing else.
 // 4. `accept` with `notarize` (M1-9d-3): the same one approval also covers the accept's proof when
 //    the offer has none; `needs_credits` first (nothing sent); the result carries `proof`.
+// 5. `counter` with `notarize` (M1-9d-5): a firm offer, as `agentlink_propose_terms` with
+//    `notarize`: one approval covers the new version and its proof; the result carries `proof`.
 //
 // `clientRequestId` goes to the core (M1-32-b): a repeat returns the original result, another
 // request under the key is IDEMPOTENCY_KEY_REUSED, a concurrent repeat is IN_PROGRESS (as send).
@@ -108,7 +110,7 @@ export async function respondToTermsHandler(
       return termsInProgress();
     case 'needs_credits':
       logger.info('respond to terms needs credits', { answers: 0 });
-      return termsNeedsCredits(self.agentId, result.topUp);
+      return termsNeedsCredits(self.agentId, result.topUp, context.payPage);
     case 'approval_state':
       return termsApprovalState(context, 'agentlink_respond_to_terms', result);
     case 'pending_approval':
@@ -145,6 +147,17 @@ export async function respondToTermsHandler(
       logger.info('terms answer done', { answers: 1 });
       switch (result.decision) {
         case 'counter':
+          // A recorded counter (M1-9d-5): a firm offer with its own proof.
+          if (result.proof !== undefined) {
+            return termsWithProof(
+              TERMS_TEXT.firmCounterSent(result.version, name),
+              fields,
+              result.proof,
+              context,
+              self.agentId,
+              sender === undefined ? undefined : name,
+            );
+          }
           return ok(TERMS_TEXT.counterSent(result.version, name), fields);
         case 'reject':
           return ok(

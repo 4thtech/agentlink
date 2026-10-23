@@ -49,6 +49,7 @@ import {
   type FreeCreditsMarker,
   type FreeCreditsOutcome,
 } from './free-credits.js';
+import type { PayPageConfig } from '@4thtech-io/chain';
 
 /** The agent's own identity as status shows it: IDs and display fingerprints only. */
 export interface SelfView {
@@ -472,6 +473,12 @@ export interface ToolContext {
    * approval server. Undefined when no link can be given: the result then stays the M1a one.
    */
   readonly approvalLink?: (approvalId: string) => Promise<ApprovalLink | undefined>;
+  /**
+   * M1-26-e: the shipped pay page config (the chain package's `PAY_PAGE`, which is not live yet).
+   * A top-up link is given only when `live`; absent means the shipped config. Production wiring
+   * never sets it; tests do, to exercise a live page.
+   */
+  readonly payPage?: PayPageConfig;
 }
 
 /**

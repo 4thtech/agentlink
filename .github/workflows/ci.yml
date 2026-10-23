@@ -22,8 +22,15 @@ name: CI
 # `github.event.pull_request` (author and head repository, through `env:`, to recognise the bot's
 # "Version packages" PR); every other job behaves the same on a push, with the repository content
 # as the only input.
+#
+# CHORE-CI-SPEED-1: a DRAFT pull request skips the whole suite (`detect` and `context-budget` carry the
+# draft condition; every other job needs `detect` and so skips with it; `stale-precheck` has its own).
+# `ready_for_review` runs the suite when a draft is marked ready, so the required `ci-gate` is reported
+# on drafts (all upstream jobs skipped = pass) and recomputed with the full suite before it can merge.
+# GitHub refuses to merge a draft, and the merge queue (`merge_group`) always runs everything.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
   push:
     branches-ignore: [sync]
@@ -44,6 +51,9 @@ env:
 jobs:
   detect:
     name: detect
+    # Draft pull requests skip the suite. `github.event.pull_request` is null on push and merge_group
+    # runs, so there the condition is true and nothing changes.
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -57,6 +67,7 @@ jobs:
       has_vectors_script: ${{ steps.detect.outputs.has_vectors_script }}
       needs_playwright: ${{ steps.detect.outputs.needs_playwright }}
       e2e_relevant: ${{ steps.e2e_scope.outputs.e2e_relevant }}
+      code_changed: ${{ steps.e2e_scope.outputs.e2e_relevant }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -156,17 +167,21 @@ jobs:
           esac
           if [[ "$base" =~ ^[0-9a-f]{40}$ ]] && git fetch --quiet --no-tags --depth=1 origin "$base" 2> /dev/null; then
             if files="$(git diff --no-renames --name-only "$base" HEAD 2> /dev/null)"; then
-              if [ -z "$(printf '%s\n' "$files" | grep -Ev '^(docs/|docs-site/|knowledge/|changelog\.d/|\.changeset/|[^/]+\.md$)' || true)" ]; then
+              if [ -z "$(printf '%s\n' "$files" | grep -Ev '^(docs/|docs-site/|knowledge/|changelog\.d/|\.changeset/[^/]+\.md$|[^/]+\.md$)' || true)" ]; then
                 relevant=false
               fi
             fi
           fi
           echo "e2e_relevant=$relevant" >> "$GITHUB_OUTPUT"
+          # Same rule for every heavy job (CHORE-CI-MATRIX-QUEUE-ONLY): a merge group or pull request
+          # with any file outside the docs set, or an unreadable diff, runs everything.
           echo "Deterministic e2e needed: $relevant"
 
   checks:
     name: checks
     needs: detect
+    # CHORE-CI-MATRIX-QUEUE-ONLY: runs on EVERY change, docs-only included: it holds the doc-drift tests
+    # (spec, README, docs-site, knowledge), and listing them by hand would rot.
     if: needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -188,7 +203,8 @@ jobs:
       # Package tests that run in browsers (Playwright) need the engines (M1-2c).
       - name: Install Playwright browsers
         if: needs.detect.outputs.needs_playwright == 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright
 
       # Task ordering and caching are turbo's job; the root scripts call `turbo run ...`.
       - name: Lint
@@ -217,7 +233,8 @@ jobs:
   vectors:
     name: vectors
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.has_vectors_script == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -237,7 +254,8 @@ jobs:
       # The vectors run in all three Playwright engines (M0-9).
       - name: Install Playwright browsers
         if: needs.detect.outputs.needs_playwright == 'true'
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 12
+        uses: ./.github/actions/install-playwright
 
       # Python for the independent vector generators, fixed at the version requirements.txt was
       # compiled for (every pinned package has a cp312 wheel), whatever the runner image ships.
@@ -317,7 +335,8 @@ jobs:
   keychain:
     name: keychain (${{ matrix.os }})
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     permissions:
@@ -328,7 +347,9 @@ jobs:
         # Exact runner images, no `*-latest` (M1-8a-d): an image change must not silently change the
         # keychain behaviour under test. These are the images `*-latest` resolved to when pinned
         # (2026-10-15); a bump is its own reviewed change.
-        os: [macos-26, windows-2025-vs2026, ubuntu-24.04]
+        # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows only in the merge queue and on `main`;
+        # a pull request or feature-branch push runs the Linux leg alone.
+        os: ${{ fromJSON((github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && '["macos-26","windows-2025-vs2026","ubuntu-24.04"]' || '["ubuntu-24.04"]') }}
     env:
       AGENTLINK_REQUIRE_KEYCHAIN: "1"
     steps:
@@ -352,8 +373,8 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=10
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=10 --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       # The workspace dependencies of @4thtech-io/node (core, crypto) are consumed from dist/. The
       # CLI package and its dependencies are built too: the child processes of the CLI two-process
@@ -433,7 +454,11 @@ jobs:
   path-guard:
     name: path-guard (${{ matrix.os }})
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows run in the merge queue and on `main` only, not
+    # on a pull request or a feature-branch push. Skipped counts as success in `ci-gate`; the queue
+    # run is what must pass before a merge.
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     permissions:
@@ -487,7 +512,11 @@ jobs:
   node-os:
     name: node-os (${{ matrix.os }})
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: macOS and Windows run in the merge queue and on `main` only, not
+    # on a pull request or a feature-branch push. Skipped counts as success in `ci-gate`; the queue
+    # run is what must pass before a merge.
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true' && (github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main'))
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     permissions:
@@ -523,7 +552,8 @@ jobs:
   relays-docker:
     name: relays-docker
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
@@ -574,7 +604,8 @@ jobs:
   storage-minio:
     name: storage-minio
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -683,7 +714,8 @@ jobs:
   bundle-check:
     name: bundle-check
     needs: detect
-    if: needs.detect.outputs.has_skeleton == 'true'
+    # CHORE-CI-MATRIX-QUEUE-ONLY: skipped for a docs-only change (`detect`.code_changed); skipped counts as success in `ci-gate`.
+    if: needs.detect.outputs.code_changed == 'true' && needs.detect.outputs.has_skeleton == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -711,6 +743,7 @@ jobs:
   # on a docs-only repository too and does not depend on `detect`. A missing file passes.
   context-budget:
     name: context-budget
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -797,6 +830,85 @@ jobs:
           set -euo pipefail
           node tools/release/check-changelog-fragment.mjs --base origin/main
 
+  # CHORE-CI-SPEED-1: stale-PR precheck. The pull_request checkout is GitHub's test merge with the
+  # base as it was when the PR last changed; once `main` moves on, that merge is stale and the merge
+  # queue ejects the PR after a long wait. This job merges the CURRENT base into the head in a
+  # throwaway checkout and fails in about a minute, with the fix command, on (1) a merge conflict,
+  # (2) generated status files that drifted from docs/status.yaml, (3) a lockfile that no longer
+  # installs frozen against the merged tree. It never pushes. Non-draft pull requests only. The
+  # base branch name comes through `env:` and is validated; no event text reaches a script body.
+  stale-precheck:
+    name: stale-precheck
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the pull request head (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Merge the current base branch into the head
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git check-ref-format --branch "$BASE_REF" > /dev/null
+          git fetch --no-tags -- "https://github.com/${BASE_REPO}.git" "+refs/heads/${BASE_REF}:refs/remotes/base/tip"
+          if git merge-base --is-ancestor refs/remotes/base/tip HEAD; then
+            echo "The head already contains the current ${BASE_REF}; nothing to merge."
+            exit 0
+          fi
+          if git -c user.name=ci -c user.email=ci@invalid -c core.hooksPath=/dev/null merge --no-commit --no-ff refs/remotes/base/tip; then
+            echo "Clean merge with the current ${BASE_REF}."
+            exit 0
+          fi
+          echo "::error::This pull request conflicts with the current ${BASE_REF}. The merge queue would eject it."
+          echo "Conflicted files:"
+          git diff --name-only --diff-filter=U
+          {
+            echo "Fix, locally on the PR branch:"
+            echo "  git fetch origin && git merge origin/${BASE_REF}"
+            echo "  (never rebase or force-push; resolve the files above, then commit and push)"
+            echo "Generated status files (README.md, docs-site/technical/project/status-and-roadmap.md, knowledge/agentlink-overview.md) are never merged by hand: take the base copy and regenerate:"
+            echo "  git checkout origin/${BASE_REF} -- README.md docs-site/technical/project/status-and-roadmap.md knowledge/agentlink-overview.md && node tools/docs-status/index.mjs"
+            echo "  (docs/status.yaml itself is the source: merge it by hand if it conflicts, then run the command above.)"
+            echo "pnpm-lock.yaml: git checkout origin/${BASE_REF} -- pnpm-lock.yaml && pnpm install --ignore-scripts --ignore-pnpmfile"
+          } >&2
+          exit 1
+
+      - name: Set up Node.js and pnpm (no install yet)
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "false"
+
+      - name: Generated status files match docs/status.yaml on the merged tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! node tools/docs-status/index.mjs --check; then
+            echo "::error::The generated status files are out of date against the merged tree (docs/status.yaml)."
+            echo "Fix: merge origin/main, then run: node tools/docs-status/index.mjs  and commit README.md, docs-site and knowledge." >&2
+            exit 1
+          fi
+
+      - name: Frozen-lockfile install succeeds on the merged tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile; then
+            echo "::error::pnpm install --frozen-lockfile fails against the merge with the current base: pnpm-lock.yaml is stale."
+            echo "Fix: merge origin/main, run: pnpm install --ignore-scripts --ignore-pnpmfile  and commit pnpm-lock.yaml (on a lockfile conflict first take the base copy: git checkout origin/main -- pnpm-lock.yaml)." >&2
+            exit 1
+          fi
+
   # OPS-CI-6: the deterministic e2e (e2e.yml, M1-13a) is part of the merge gate. It is the same
   # job, called as a reusable workflow, so it runs on pull requests, on `main` and in the merge
   # queue and blocks `ci-gate`. Docs-only changes skip it (`detect`); a feature-branch push skips
@@ -814,7 +926,7 @@ jobs:
     # merge with `main`. Only the latter may satisfy the required check `ci-gate`, so a feature
     # branch push publishes `ci-gate (push)` instead.
     name: ${{ (github.event_name == 'push' && github.ref != 'refs/heads/main') && 'ci-gate (push)' || 'ci-gate' }}
-    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, storage-minio, bundle-check, changesets, e2e-deterministic]
+    needs: [detect, checks, vectors, keychain, path-guard, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -827,6 +939,8 @@ jobs:
         run: |
           set -euo pipefail
           echo "Upstream job results: $RESULTS"
+          # CHORE-CI-SPEED-1: on a draft pull request every upstream job is skipped, which passes here;
+          # the suite runs when the draft is marked ready for review.
           for result in $RESULTS; do
             case "$result" in
               success | skipped) ;;
