@@ -39,8 +39,10 @@
 #   rollback-rehearsal manual dispatch with `rehearse-rollback`: on staging, rolls back to the
 #                      previous version, checks it, and rolls forward again (§4.5 "rehearsed").
 #   catch-up           only when this run did not deploy its commit because main moved on (CI
-#                      superseded, or deploy-production found a newer head): dispatches this workflow
-#                      on main unless a run already exists for main's head, whose commits may not
+#                      superseded, or deploy-production found a newer head) or its CI failed (a
+#                      flake): dispatches this workflow on main unless a run for main's head is in
+#                      flight or succeeded (a failed one does not count), and writes to the run
+#                      summary which run deploys instead. The newer commits may not
 #                      touch the paths above (tools/release/catch-up-deploy.mjs). The dispatched run
 #                      passes every gate again for the head commit: its own green CI, staging and
 #                      the smoke test, the production environment, DEPLOY_FREEZE, the head check.
@@ -515,7 +517,9 @@ jobs:
             exit 1
           fi
           if [ "$head" != "$COMMIT" ]; then
-            echo "::notice::main has moved on from $COMMIT to $head; the newer run or the catch-up job handles production. Skipped."
+            # CHORE-DEPLOY-CATCHUP: not silently green; the catch-up job names the run that deploys.
+            echo "::warning::main has moved on from $COMMIT to $head; this run did not change production. The catch-up job hands it to a run for $head."
+            echo "**Superseded by \`$head\`:** this run did not change production (main moved on from \`$COMMIT\`); see the catch-up job for the run that deploys it." >> "$GITHUB_STEP_SUMMARY"
             echo "current=false" >> "$GITHUB_OUTPUT"
           else
             echo "current=true" >> "$GITHUB_OUTPUT"
@@ -856,7 +860,8 @@ jobs:
     needs: [ci-green, deploy-production]
     if: >-
       always() && github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' &&
-      (needs.ci-green.outputs.result == 'superseded' || needs.deploy-production.outputs.current == 'false')
+      (needs.ci-green.outputs.result == 'superseded' || needs.ci-green.result == 'failure' ||
+      needs.deploy-production.outputs.current == 'false')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
