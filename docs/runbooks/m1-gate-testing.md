@@ -60,15 +60,14 @@ Coverage the gate needs: every tester completes A to G once, as sender or recipi
 
 ### 4. Timing install → first message (G-21)
 
-**Proposed, owner confirms at merge.** The 5-minute target (02 §5 J1, 10 Gate M1) is measured with no analytics and no network telemetry (08 §2.3, zero access). Each tester times themselves and pastes a few local lines into their log.
+**Owner-confirmed 2026-10-23 (D-124).** The 5-minute target (02 §5 J1, 10 Gate M1) is measured with no analytics and no network telemetry (08 §2.3, zero access). Each tester times themselves and pastes a few local lines into their log.
 
 1. **Start (T0).** Before the first install command, run `date -u +%FT%TZ` in the terminal, note the time and start the stopwatch together. The clock starts when the tester begins to install, not when they open the docs.
 2. **Stop (T1).** The moment the tester's own agent says the first note was sent to a paired contact, run `date -u +%FT%TZ` again and stop the stopwatch.
 3. **Cross-check from local facts.** The tester pastes the two `date` lines, the stopwatch time, the creation time of their agent folder (`ls -ldT ~/.agentlink/agents/<name>` on macOS, `stat -c %w ~/.agentlink/agents/<name>` on Linux) and, from the counterpart, the time the note showed in their inbox. If the stopwatch and the `date` lines differ by more than 30 seconds, the log says so and the `date` lines win.
-4. **What counts.** Pairing (invite and accept) is inside the clock, because "first message" needs a contact. Time waiting for the other tester is written down as "waiting on counterpart" and subtracted. Time lost to a defect is not subtracted; it goes in the notes.
-5. **Pass rule (proposed, owner confirms at merge).** The median of the per-tester minutes is under 5:00 and no more than 2 of 10 testers exceed 8:00. The coordinator computes it from the logs; the audit session recomputes it.
-6. **Owner must accept explicitly.** Using the median, and subtracting "waiting on counterpart" time, are reinterpretations of "install → first message under 5 minutes" (02 §5 J1, 10 Gate M1). The strict alternative: every tester under 5:00, with counterpart waiting excluded. Until the owner chooses, record both results.
-7. **Never collected.** No file, folder or agent name, message text, link, code or IP address. Only minutes and seconds, the combination and the version.
+4. **What counts.** Pairing (invite and accept) is inside the clock, because "first message" needs a contact. Time waiting for the other tester is written down as "waiting on counterpart" and excluded from the time. Time lost to a defect is not subtracted; it goes in the notes.
+5. **Pass rule (owner-confirmed 2026-10-23, strict).** Every tester's install → first message time is under 5:00, with counterpart waiting excluded. One tester at or over 5:00 fails the rule: card the slowest step and rerun after the fix. The coordinator computes it from the logs; the audit session recomputes it.
+6. **Never collected.** No file, folder or agent name, message text, link, code or IP address. Only minutes and seconds, the combination and the version.
 
 A later card may add an opt-in command that prints the same local timestamps; nothing here depends on it.
 
@@ -121,6 +120,7 @@ drop, upload or download links; names, emails, file names or hashes. Words only.
 Tester ID: T__        Date (UTC): ____-__-__
 Build: agentlink --version = ______   commit/release = ______
 OS: ______   Harness: ______ (version ____)   Counterpart harness: ______   Combo: C_
+Timing rule (owner-confirmed 2026-10-23, D-124): under 5:00, counterpart waiting excluded.
 Timing (step 4): T0 ____Z   T1 ____Z   stopwatch __:__   waiting on counterpart __ min
   agent folder created ____Z   note showed in counterpart inbox ____Z
 
@@ -142,7 +142,7 @@ Anything that confused you:
 Anything you would not do again:
 ```
 
-The coordinator keeps one summary table for the audit: testers × journeys × combinations, with counts of yes, partly, no and not available, the median and the over-8-minute count from step 4, and the issue links. The gate's testing acceptance: J1, J2, J4 and J5 are yes for every tester, J3 is yes for every tester with faucet credits, J8 with proof is yes for at least one pair per combination, the timing rule of step 4 holds (median under 5:00 and at most 2 of 10 over 8:00, or the strict alternative if the owner chooses it), and no default-flow tick is left without a closed issue.
+The coordinator keeps one summary table for the audit: testers × journeys × combinations, with counts of yes, partly, no and not available, the install → first message time of each tester (step 4), and the issue links. The gate's testing acceptance: J1, J2, J4 and J5 are yes for every tester, J3 is yes for every tester with faucet credits, J8 with proof is yes for at least one pair per combination, every tester is under 5:00 (step 4), and no default-flow tick is left without a closed issue.
 
 ### 7. How to report an issue
 
@@ -155,7 +155,7 @@ The coordinator keeps one summary table for the audit: testers × journeys × co
 ## Verify
 
 - 10 filled logs exist in the private audit store, covering at least 3 combinations.
-- The summary table shows the counts of step 6 and the median install → first message time computed from the logs.
+- The summary table shows the counts of step 6 and each tester's install → first message time computed from the logs.
 - Every "no" and every ticked default-flow box links to an issue or card; every "not available" names the missing card.
 - No log holds a name, email, owner code, link, message text, file name or hash (search the filled logs before filing them).
 
@@ -163,7 +163,7 @@ The coordinator keeps one summary table for the audit: testers × journeys × co
 
 - A journey fails for most testers: stop the round, card the cause, rerun that journey after the fix. The gate does not pass on a partial round.
 - A tester posted a secret anywhere: treat it as a secret leak (`audit-rules.md` §10.3), have them replace what applies (a new agent and owner on a test network) and remove the text.
-- The median is over 5:00: card the slowest step from the per-step minutes and rerun after the fix.
+- Any tester is at or over 5:00: card the slowest step from the per-step minutes and rerun after the fix.
 - Never work around an owner step by letting an agent type the code ([permission denied](permission-denied.md)).
 
 ## Related
