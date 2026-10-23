@@ -2313,7 +2313,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Independent S2 review.
 
 #### M1-34-c · submitter: a lagging client RPC that reports `RecordNotFound` retries the receipt once (new, IR-M1-34-b-2)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter, packages/core (receipt path)
 - **Depends on:** M1-34-b
 - **Scope:** when a client RPC lags and reports `RecordNotFound` for a record that exists, the receipt must not fail for good. Retry once after a fixed delay before the receipt becomes `receipt_failed`. Source: IR-M1-34-b-2.
@@ -2424,7 +2424,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - If a mitigation is built: a fake relay that caps results and holds more than the cap of events in one second; every wrap addressed to the agent is delivered at least once across the relays of its list, or the pass reports the second as incomplete (a fixed reason, no relay text). Existing M1-5c tests stay green; no test is weakened.
 
 #### M1-5e · transport-nostr: sync follow-ups (NIP-42 identities, first-sync retention, page position, envelope hint) (new, IR-M1-5c-1 L-4, L-5, Low; IR-M1-7b-1 Q1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr (and the core/node `SyncPersistence` if the hint changes)
 - **Depends on:** M1-5c, M1-7b
 - **Spec:** 07 §3.2 (`seen` retention, `envelope` rows hold the `envelopeHash`), §4.2 (Sync, NIP-42), §4.3 (9-day first sync); 04 §3.1.1 step 9, §3.5
@@ -2850,7 +2850,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7f-3 · core: files refresh-link, MinIO round trip and the rest of M1-7f-2 (split from M1-7f-2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (refresh-link request and answer, the refreshed link in the receiver row, the 5 MB MinIO round trip in CI's `storage-minio` job; the receiver's receipt trigger, the legacy-key backfill, the expiry cursor, sent copies, D-53 re-hash, `SentFile` name and hash and the drop expiry test against the Worker stay open on this card) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, client), packages/types if the `refresh-link` answer needs a body schema
 - **Depends on:** M1-7f-2
 - **Spec:** 04 §4 (delivery, retention and crypto-shredding); 07 §3, §5.4; 06 §2.3; D-18, D-48, D-53, D-98
