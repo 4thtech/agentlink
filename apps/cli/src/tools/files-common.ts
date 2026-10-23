@@ -11,10 +11,10 @@ import { fail, type HandlerOutput } from './result.js';
 export const FILE_TEXT = Object.freeze({
   noFolder: 'No folder is allowed for sending files yet, so nothing was sent.',
   noFolderNextStep:
-    'Tell the user: files can only be sent from a folder they allow. In a terminal they opened themselves, they run `agentlink policy allow-folder <folder>`. Then call again.',
+    'Tell the user: files can only be sent from a folder they allow. In a terminal they opened themselves, they run `agentlink policy allow-folder <path>`, with `--agent <name>` if they have more than one agent. Then call again.',
   outsideFolder: "That file isn't in a folder the user allows for sending, so nothing was sent.",
   outsideFolderNextStep:
-    'Ask the user to put the file in a folder they allow for sending, or to allow its folder: in a terminal they opened themselves, they run `agentlink policy allow-folder <folder>`. Then call again.',
+    'Ask the user to put the file in a folder they allow for sending, or to allow its folder: in a terminal they opened themselves, they run `agentlink policy allow-folder <path>`, with `--agent <name>` if they have more than one agent. Then call again.',
   notAllowed: "That path can't be sent: it must be a full path to a regular, visible file.",
   notAllowedNextStep:
     "Use the file's full path. Hidden files and protected private folders can never be sent.",

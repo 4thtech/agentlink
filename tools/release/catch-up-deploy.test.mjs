@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { catchUp, parseArgs, run } from './catch-up-deploy.mjs';
 
@@ -83,15 +84,63 @@ describe('catchUp', () => {
   });
 
   it('does nothing when a push or dispatch run of this workflow already handles the head', async () => {
+    const handling = [
+      { status: 'queued' },
+      { status: 'in_progress' },
+      { status: 'waiting' },
+      { status: 'pending' },
+      { status: 'requested' },
+      { status: 'completed', conclusion: 'success' },
+    ];
     for (const event of ['push', 'workflow_dispatch']) {
-      for (const status of ['queued', 'in_progress', 'completed']) {
-        const { result, calls } = await go(
-          routes({ [runsPath]: () => ({ workflow_runs: [wfRun(7, { event, status })] }) }),
+      for (const state of handling) {
+        const { result, calls, lines } = await go(
+          routes({ [runsPath]: () => ({ workflow_runs: [wfRun(7, { event, ...state })] }) }),
         );
-        expect(result.action).toBe('none');
+        expect(result).toEqual({ action: 'none', head: HEAD, runId: 7 });
         expect(dispatched(calls)).toHaveLength(0);
+        expect(lines).toContain('7');
       }
     }
+  });
+
+  // CHORE-DEPLOY-CATCHUP: 76ad5c5c's run failed ci-green on a flake, and the chain stopped there
+  // because any run for the head counted as handling it. A finished run that did not succeed does
+  // not deploy the head: dispatch a fresh one (it waits for the head's own green CI again).
+  it('dispatches again when the only run for the head finished without success', async () => {
+    for (const conclusion of [
+      'failure',
+      'cancelled',
+      'timed_out',
+      'startup_failure',
+      'action_required',
+      null,
+    ]) {
+      const { result, calls } = await go(
+        routes({
+          [runsPath]: () => ({
+            workflow_runs: [wfRun(7, { status: 'completed', conclusion })],
+          }),
+        }),
+      );
+      expect(result.action).toBe('dispatched');
+      expect(dispatched(calls)).toHaveLength(1);
+    }
+  });
+
+  it('counts a live run for the head even next to a failed one', async () => {
+    const { result, calls } = await go(
+      routes({
+        [runsPath]: () => ({
+          workflow_runs: [
+            wfRun(6, { status: 'completed', conclusion: 'failure' }),
+            wfRun(8, { status: 'in_progress' }),
+          ],
+        }),
+      }),
+    );
+    expect(result).toEqual({ action: 'none', head: HEAD, runId: 8 });
+    expect(dispatched(calls)).toHaveLength(0);
   });
 
   it('ignores runs of another commit, branch, event or workflow file', async () => {
@@ -158,6 +207,43 @@ describe('run (the command line)', () => {
     expect(result.lines).not.toContain('secret-token-value');
   });
 
+  // CHORE-DEPLOY-CATCHUP: the run that did not deploy says in its summary who deploys instead.
+  describe('run summary', () => {
+    const withSummary = async (r) => {
+      const file = join(mkdtempSync(join(tmpdir(), 'catch-up-')), 'summary');
+      writeFileSync(file, '');
+      const result = await invoke(r, { env: { ...ENV, GITHUB_STEP_SUMMARY: file } });
+      return { ...result, summary: readFileSync(file, 'utf8') };
+    };
+
+    it("names main's head and the run that deploys it", async () => {
+      const { code, summary } = await withSummary(
+        routes({ [runsPath]: () => ({ workflow_runs: [wfRun(4242)] }) }),
+      );
+      expect(code).toBe(0);
+      expect(summary).toMatch(/Superseded by/);
+      expect(summary).toContain(HEAD);
+      expect(summary).toContain('4242');
+    });
+
+    it("says a new run was dispatched for main's head", async () => {
+      const { summary } = await withSummary(routes());
+      expect(summary).toMatch(/Superseded by/);
+      expect(summary).toContain(HEAD);
+      expect(summary).toMatch(/dispatched/);
+    });
+
+    it('says production stays behind when this commit is the head and its CI is not green', async () => {
+      const { summary } = await withSummary(routes({ [headPath]: () => ({ sha: SHA }) }));
+      expect(summary).toMatch(/production keeps the previous version/);
+      expect(summary).toContain(SHA);
+    });
+
+    it('works without a summary file', async () => {
+      expect((await invoke(routes())).code).toBe(0);
+    });
+  });
+
   it('refuses a missing or malformed environment', async () => {
     expect((await invoke(routes(), { env: { ...ENV, GITHUB_SHA: 'x' } })).code).toBe(1);
     expect((await invoke(routes(), { env: { ...ENV, GH_TOKEN: '' } })).code).toBe(1);
@@ -207,6 +293,15 @@ describe.each(['deploy-submitter.yml', 'deploy-drop.yml'])('%s catch-up job', (f
     expect(condition).toMatch(/github\.ref == 'refs\/heads\/main'/);
     expect(condition).toMatch(/needs\.ci-green\.outputs\.result == 'superseded'/);
     expect(condition).toMatch(/needs\.deploy-production\.outputs\.current == 'false'/);
+  });
+
+  // CHORE-DEPLOY-CATCHUP: a ci-green failure (a flake on this commit) also hands off to main's head.
+  it("also runs when this commit's CI failed", () => {
+    const condition = catchUpJob.slice(
+      catchUpJob.indexOf('\n    if:'),
+      catchUpJob.indexOf('\n    runs-on:'),
+    );
+    expect(condition).toMatch(/needs\.ci-green\.result == 'failure'/);
   });
 
   it('dispatches this same workflow with only actions: write and contents: read, no environment or secrets', () => {

@@ -381,6 +381,15 @@ export const TABLES = {
     },
     primaryKey: ['agent_evm'],
   },
+  // 07 §3.4 (M1-9i-a, D-115; schema version 5): the agent's own S3-compatible storage, as the owner
+  // signed it. signed_json is the applied `storage.set`, verbatim and sealed (its endpoint and bucket
+  // identify the user's account); id is its `id`, naming the KeyStore item `s3:<id>`. At most one
+  // row in M1. No credential is ever in the store.
+  own_storage: {
+    columns: { id, signed_json: enc, applied_at: int },
+    primaryKey: ['id'],
+    maxRows: 1,
+  },
   // 07 §3.5.
   budget_ledger: {
     columns: {

@@ -23,7 +23,8 @@
 ## What the next release adds
 
 - Ask "send this to Marko with proof" or "add proof to the message I sent Marko". Proof costs a small fee from credits; your agent mentions it unless you asked for proof, and your rules can make it ask you first.
-- If there are not enough credits, your agent shows your agent ID and a link to add credits.
+- **Free test credits.** While AgentLink runs on test networks, the first proof that needs credits gets a small amount of free test credits, once per agent, with nothing for you to do. Your agent says it added them and records the proof about a minute later. If the free credits are paused, your agent says so and you try again later. They are for testing and have no value.
+- If there are not enough credits and no free test credits apply, your agent shows your agent ID and a link to add credits.
 - "Send this to Ana with proof and ask her to confirm delivery": your agent asks Ana's agent for a delivery receipt. Ana's agent tells her and confirms only if she chooses **Confirm delivery**; asking never confirms anything by itself. If the message already had proof, your agent can't add the request any more and tells you so.
 - "Has Marko opened it?": your agent can show a proof and its receipts. It adds an "opened" receipt only when you asked it to open a message, and "accepted" or "rejected" only with your approval.
 - "Save a proof file": your agent saves it into your proofs folder (`~/AgentLink/Proofs` by default). The message content goes into the file only after you approve it.
@@ -32,6 +33,15 @@
 - The person you sent a proof to can save a proof file for it too, so either side can show it later.
 - `agentlink credits` shows your agent ID, your credits in dollars and the price of adding proof; `agentlink credits --topup` says how much to add. There is no page to add credits from yet.
 - Recording offers and acceptances (proof of agreement) comes with v0.2.0; until then your agent says it is not available yet, and nothing is sent.
+
+## Try it end to end
+
+The shortest path, with a paired contact (the full session is in [Send your first message](../get-started/first-message.md)):
+
+1. Send a file, or a message, with "Send this to Marko with proof".
+2. Say OK to the cost and the public notice; approve in your own terminal with `npx -y @4thtech-io/agentlink approve <approval ID>` if your agent asks.
+3. Ask "Save a proof file for it."
+4. Run `npx -y @4thtech-io/agentlink verify ~/AgentLink/Proofs/<file>.json`. Exit codes: 0 verified, 3 record only, 1 does not check out, 4 not checked.
 
 ## Outline
 

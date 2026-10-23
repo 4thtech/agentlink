@@ -152,7 +152,7 @@ describe('savePack', () => {
 
 describe('nodeProofs: the default chain set (M1-3j-b)', () => {
   it('routes automatic selection to exactly the chains the testnet faucet serves', () => {
-    // Gnosis Chiado (10200) joins once the faucet allowlist names it; today that is Base Sepolia only.
+    // Gnosis Chiado (10200) joined when the faucet allowlist named it (M1-3j-c).
     const proofs = nodeProofs();
     const ids = proofs?.platform.chains.map((c) => c.config.chainId) ?? [];
     expect(ids).toEqual(
@@ -162,7 +162,7 @@ describe('nodeProofs: the default chain set (M1-3j-b)', () => {
         .map((c) => c.chainId),
     );
     expect(ids).toContain(84532);
-    expect(ids).not.toContain(10200);
+    expect(ids).toContain(10200);
   });
 });
 
@@ -381,7 +381,7 @@ describe('nodeProofs: paid calls and status follow the automatic selection (M1-2
     expect(cheapest?.credits[0]?.chain).toBe(THIRD.key);
   });
 
-  it('Gnosis Chiado is never selected or read: not for the paid call, not for status', async () => {
+  it('Gnosis Chiado is selected and read by default: for the paid call and for status (M1-3j-c)', async () => {
     const shipped = chain.chainRegistry();
     const chiado = shipped.find((c) => c.chainId === 10200) as chain.ChainConfig;
     const base = shipped.find((c) => c.chainId === 84532) as chain.ChainConfig;
@@ -392,13 +392,31 @@ describe('nodeProofs: paid calls and status follow the automatic selection (M1-2
     const { fetchFn, hosts } = rpc(fakes, [base, chiado]);
     // The shipped defaults: no `configs`.
     const proofs = nodeProofs({ fetchFn, submitterUrls: [] })!;
+    // Base Sepolia holds no credits; Chiado is funded, so the paid call pays there.
     const selection = await coreSelect(proofs);
-    expect(selection).toMatchObject({ status: 'needs_credits', topUp: { chainId: base.chainId } });
+    expect(selection).toMatchObject({ status: 'ok', chainId: chiado.chainId, payFrom: 'credits' });
     const account = await proofs.tools.account(PAYER);
-    expect(account?.credits.map((c) => c.chain)).not.toContain(chiado.key);
-    expect(proofs.tools.chainIdOf(chiado.key)).toBeUndefined();
+    expect(account?.credits.map((c) => c.chain)).toContain(chiado.key);
+    expect(proofs.tools.chainIdOf(chiado.key)).toBe(chiado.chainId);
     const chiadoHosts = chiado.rpcUrls.map((u) => new URL(u).host);
-    expect(hosts.length).toBeGreaterThan(0);
-    for (const host of hosts) expect(chiadoHosts).not.toContain(host);
+    expect(hosts.some((host) => chiadoHosts.includes(host))).toBe(true);
+  });
+});
+
+describe('free test credits wiring (M1-36i)', () => {
+  it('the platform carries the free-credits port, and the tools call only a shipped testnet one', () => {
+    const proofs = nodeProofs({ home });
+    expect(proofs).toBeDefined();
+    expect(proofs!.platform.faucet).toBeDefined();
+    expect(proofs!.tools.isFreeCreditsChain?.(84532)).toBe(true);
+    // A mainnet is never a free-credits chain.
+    expect(proofs!.tools.isFreeCreditsChain?.(8453)).toBe(false);
+    expect(proofs!.tools.isFreeCreditsChain?.(100)).toBe(false);
+  });
+
+  it('the second check: an allowlisted chain whose config is not a testnet is refused', () => {
+    const sepolia = chain.chainRegistry().find((c) => c.chainId === 84532)!;
+    const proofs = nodeProofs({ home, configs: [{ ...sepolia, testnet: false }] });
+    expect(proofs!.tools.isFreeCreditsChain?.(84532)).toBe(false);
   });
 });

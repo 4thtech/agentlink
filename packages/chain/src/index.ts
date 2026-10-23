@@ -27,6 +27,6 @@ export {
  * never updates it (the package is in-repo and never published).
  */
 export const OCC_V2_ABI_PIN = Object.freeze({
-  tag: 'v0.1.0-testnet.3',
-  manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
+  tag: 'v0.1.0-testnet.4',
+  manifestSha256: '4d2bfc98e71da1ed3b60fed574c0333ee945a17e701e32bfab10d6cab5bb436e',
 } as const);

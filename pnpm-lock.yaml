@@ -292,7 +292,20 @@ importers:
         specifier: 4.149.0
         version: 4.149.0
 
-  apps/invite: {}
+  apps/invite:
+    dependencies:
+      '@4thtech-io/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@4thtech-io/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
 
   apps/local-ui:
     dependencies:
@@ -342,6 +355,9 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
+      '@4thtech-io/invite':
+        specifier: workspace:*
+        version: link:../apps/invite
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../packages/log
@@ -354,6 +370,12 @@ importers:
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
+      playwright:
+        specifier: 1.64.0
+        version: 1.64.0
+      vite:
+        specifier: 8.3.4
+        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1)
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@22.20.5)(@vitest/browser-playwright@4.1.11)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
