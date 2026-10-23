@@ -173,7 +173,7 @@ export function batchCalldata(items: readonly SubmitItem[]): Hex {
   } as never);
 }
 
-/** An unknown record, as `getRecord` would decode it if the Notary returned instead of reverting. */
+/** An unknown record: what the port's `getRecord` gives for the RecordNotFound() revert only. */
 const ABSENT_RECORD = Object.freeze({
   signer: ZERO_ADDRESS as string,
   recordStructHash: `0x${'0'.repeat(64)}`,
@@ -283,19 +283,23 @@ export function createSubmitterChain(
       throw error;
     }
     if (typeof raw !== 'string') throw new ChainError('bad_answer');
+    let stored: { signer: string; recordStructHash: string; receiptAt: readonly bigint[] };
     try {
-      return decodeFunctionResult({
+      stored = decodeFunctionResult({
         abi: NOTARY_CLIENT_ABI,
         functionName: 'getRecord',
         data: raw as Hex,
-      } as never) as unknown as {
-        signer: string;
-        recordStructHash: string;
-        receiptAt: readonly bigint[];
-      };
+      } as never) as unknown as typeof stored;
     } catch {
       throw new ChainError('bad_answer');
     }
+    // A returned record always has its signer: the Notary answers an unknown ID only with the
+    // RecordNotFound() revert above. A zeroed record is not its answer, so it is never "absent"
+    // either: deciding on it could sign a replacement or refuse a covered receipt (M1-4c-c).
+    if (typeof stored.signer !== 'string' || stored.signer.toLowerCase() === ZERO_ADDRESS) {
+      throw new ChainError('bad_answer');
+    }
+    return stored;
   };
 
   const nonceAt = async (tag: 'pending' | 'latest'): Promise<number> => {

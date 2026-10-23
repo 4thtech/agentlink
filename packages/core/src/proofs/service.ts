@@ -340,6 +340,12 @@ interface RecordedFields {
   readonly fee: ProofFee;
   /** Present (true) only when this proof's envelope asks the recipient for a delivery receipt. */
   readonly receiptRequested?: true;
+  /**
+   * Present (true) only when the call asked for a delivery receipt (`requestReceipt`) and the
+   * envelope already had a proof without one, so no request was added (M1-33d-b): the agent must
+   * not tell its user it asked.
+   */
+  readonly receiptRequestNotAdded?: true;
 }
 
 export type NotarizeResult =
@@ -510,6 +516,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #selector: Selector | undefined;
   /** Queued receipt ID -> the pass that last tried it (in memory; M1-34-b). */
   readonly #receiptTries = new Map<string, number>();
+  /** The receipt signing in progress, by receipt item ID (M1-33d-b: one signature, I-6). */
+  readonly #signing = new Map<string, Promise<AcknowledgeResult>>();
   #receiptPass = 0;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
@@ -530,11 +538,15 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const result = await this.#notarize(input);
     if (result.status !== 'ok' && result.status !== 'submitted') return result;
     // Says "asked" only when the stored marker is there: a request on an envelope already notarized
-    // without one is not claimed (M1-33d).
+    // without one is not claimed (M1-33d), and is reported as not added (M1-33d-b).
     const asked = await this.#ctx.store.transaction((tx) =>
       senderRequestedTx(tx, input.envelopeId),
     );
-    return asked ? Object.freeze({ ...result, receiptRequested: true as const }) : result;
+    if (asked) return Object.freeze({ ...result, receiptRequested: true as const });
+    if (input.requestReceipt === true) {
+      return Object.freeze({ ...result, receiptRequestNotAdded: true as const });
+    }
+    return result;
   }
 
   async #notarize(input: NotarizeInput): Promise<NotarizeResult> {
@@ -1936,6 +1948,28 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
    * it lands (04 §5); `resubmitPending` replaces it only when it can never land.
    */
   async #signReceipt(
+    row: Row<'proofs'>,
+    type: ReceiptTypeName,
+    claim?: (tx: StoreTx, itemJson: string) => boolean,
+  ): Promise<AcknowledgeResult> {
+    // M1-33d-b (I-6): concurrent calls for one record and type (two `acknowledge {delivered}` at
+    // once) run one after the other, so the second finds the stored receipt and signs nothing. The
+    // store transaction below still keeps one per record and type across processes.
+    const id = receiptItemId(row.record_id, RECEIPT_CODE[type]);
+    for (let running = this.#signing.get(id); running !== undefined;) {
+      await running.catch(() => undefined);
+      running = this.#signing.get(id);
+    }
+    const work = this.#signReceiptOnce(row, type, claim);
+    this.#signing.set(id, work);
+    try {
+      return await work;
+    } finally {
+      if (this.#signing.get(id) === work) this.#signing.delete(id);
+    }
+  }
+
+  async #signReceiptOnce(
     row: Row<'proofs'>,
     type: ReceiptTypeName,
     claim?: (tx: StoreTx, itemJson: string) => boolean,

@@ -17,6 +17,55 @@ import { builtinModules } from 'node:module';
 /** Node built-ins (bare and `node:`) are allowed only here (repo-reference.md, 11 §6). */
 export const NODE_ZONES = ['packages/node', 'apps/cli'];
 
+/**
+ * Test-only directories outside packages/* and apps/* that deps-check and ESLint scan in full
+ * (M1-1g-c, IR-M1-1g-b-1 C-1). e2e/ is never built or published and may use the crypto test seam
+ * (04 §3.1.1), but its suites touch real crypto paths, so the library, `/keystore`, Node crypto,
+ * `crypto.subtle`, deep-import and scope rules apply as in any zone. It runs on Node (the harness
+ * spawns processes and reads files), so built-ins are allowed there except `crypto` (CRYPTO_MSG).
+ * It may import every workspace package by name (it drives the real stack) and has no layering entry.
+ */
+export const FULL_SCAN_ZONES = ['e2e'];
+
+/** True when Node built-ins may be imported in `zone` (never `crypto`: see violationFor). */
+export const nodeBuiltinsAllowed = (zone) =>
+  NODE_ZONES.includes(zone) || FULL_SCAN_ZONES.includes(zone);
+
+/**
+ * Relative imports that may leave their zone, narrowly (M1-1g-c): e2e drives the real CLI through
+ * the built modules under apps/cli/dist/ (the runtime, the owner approve handler, the verifier). The
+ * target must be inside that directory (a target ending in `/`) or exactly that file (otherwise); the test seam rule still applies on top. Each entry needs a
+ * reason.
+ */
+export const RELATIVE_ESCAPES = [
+  {
+    zone: 'e2e',
+    target: 'apps/cli/dist/',
+    reason:
+      'the e2e scenarios run the real built CLI modules (runtime, owner approve, verify) in process; the package exports only the bundle',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/core/src/testing/chain.js',
+    reason:
+      'FakeNotary and FEE_UNITS: the core in-memory Notary test helper, never built and not exported; it imports only the chain and crypto packages',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/chain/dist/index.js',
+    reason:
+      'the harness must load the same @4thtech-io/chain module instance as the built CLI modules; e2e does not declare the package',
+  },
+];
+
+/** True when `zone` may import the repo-relative path `target` although it lies outside the zone. */
+export const relativeEscapeAllowed = (zone, target) =>
+  RELATIVE_ESCAPES.some(
+    (entry) =>
+      entry.zone === zone &&
+      (entry.target.endsWith('/') ? target.startsWith(entry.target) : target === entry.target),
+  );
+
 /** Built-ins that exist only with the prefix (node:test, node:sqlite) are covered by `node:`. */
 export const BUILTINS = builtinModules.filter((name) => !name.startsWith('node:'));
 
@@ -200,6 +249,18 @@ export function testSeamViolation(file, target) {
  * directory). Each entry needs a reason. Empty: nothing needs it today.
  */
 export const NODE_MODULE_FILES = [];
+
+/**
+ * Files that may import Node's `crypto` although their zone allows built-ins, each with a reason.
+ * Exact paths from the repository root; keep this list as short as possible.
+ */
+export const NODE_CRYPTO_EXEMPT_FILES = [
+  {
+    file: 'e2e/src/rendezvous.mjs',
+    reason:
+      '@4thtech-io/crypto exports no general AEAD; retire via card CHORE-E2E-RENDEZVOUS-AEAD (OPS-CI-7 CI glue, throwaway test agents, not product crypto)',
+  },
+];
 
 /** Property names that reach Node's module loader or native bindings around the import checks. */
 export const LOADER_MEMBERS = ['getBuiltinModule', '_linkedBinding', 'dlopen', 'mainModule'];
@@ -386,6 +447,7 @@ export const WORKSPACE_NAMES = Object.values(ZONES).map(({ name }) => name);
 
 /** Allowed workspace package names for a zone (its own name included). */
 export function allowedWorkspaceNames(zone) {
+  if (FULL_SCAN_ZONES.includes(zone)) return [...WORKSPACE_NAMES];
   const found = ZONES[zone];
   if (!found) return [];
   return [found.name, ...found.uses.map((short) => ZONES[`packages/${short}`].name)];
@@ -422,7 +484,7 @@ export function isBuiltin(specifier) {
 /** True for the Node crypto module (`crypto`, `node:crypto`, `crypto/...`). */
 export const isNodeCrypto = (specifier) => /^(node:)?crypto(\/|$)/.test(specifier);
 
-export const NODE_MSG = 'Node built-ins are allowed only in @4thtech-io/node and apps/cli.';
+export const NODE_MSG = 'Node built-ins are allowed only in @4thtech-io/node, apps/cli and e2e.';
 export const CRYPTO_MSG =
   'Node crypto is a primitive entry point; use @4thtech-io/crypto (AGENTS.md hard rules).';
 export const libraryMessage = (lib) =>
@@ -521,8 +583,10 @@ export const MODULE_MSG =
 
 export function violationFor(zone, specifier, file) {
   if (isBuiltin(specifier)) {
-    if (!NODE_ZONES.includes(zone)) return NODE_MSG;
-    if (isNodeCrypto(specifier)) return CRYPTO_MSG;
+    if (!nodeBuiltinsAllowed(zone)) return NODE_MSG;
+    if (isNodeCrypto(specifier) && !NODE_CRYPTO_EXEMPT_FILES.some((f) => f.file === file)) {
+      return CRYPTO_MSG;
+    }
     if (/^(node:)?module$/.test(specifier) && !NODE_MODULE_FILES.some((f) => f.file === file)) {
       return MODULE_MSG;
     }

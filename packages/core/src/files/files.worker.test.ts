@@ -335,8 +335,12 @@ describe('delete on receipt after a key rotation (M1-1g-h)', () => {
     expect(await a.client.deleteFilesOnReceipt()).toEqual({ deleted: 1, failed: 0 });
     expect(seen.map((r) => r.method)).toEqual(['DELETE']);
     expect((await SELF.fetch(url)).status).not.toBe(200);
-    const row = (await a.store.transaction((tx) => tx.select('files')))[0];
-    expect(row?.deleted_at).toBe(clock.t);
+    // M1-7f-2: the row, and with it the file key, is gone.
+    expect(
+      (await a.store.transaction((tx) => tx.select('files'))).filter(
+        (r) => r.envelope_id === sent.envelopeId,
+      ),
+    ).toHaveLength(0);
 
     // Done once: the next pass sends nothing.
     seen.length = 0;

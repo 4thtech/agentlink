@@ -409,14 +409,14 @@ describe('contacts (06 §2.1)', () => {
     expect(text).toContain('“Contact 7F3A·19C2” (self-declared)');
   });
 
-  it('says so when there are no contacts, and refuses --verify until M1-9m', async () => {
+  it('says so when there are no contacts, and has no --verify', async () => {
     const h = harness(fakeAgent());
     expect((await h.run(['contacts'])).out).toEqual([
       'You have no contacts yet. Create an invite to connect with someone.',
     ]);
     const verify = await h.run(['contacts', '--verify', 'x']);
-    expect(verify.code).toBe(EXIT_FAILED);
-    expect(verify.err.join('\n')).toContain('not available in this version yet');
+    expect(verify.code).toBe(2);
+    expect(verify.err.join('\n')).not.toContain('not available');
   });
 });
 

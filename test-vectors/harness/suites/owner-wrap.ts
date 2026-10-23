@@ -34,7 +34,12 @@ function parseInput(input: unknown): Argon2idInput {
   throw new TypeError('owner-wrap: input does not match any op of case.schema.json');
 }
 
+// CHORE-VECTORS-KDF-TIMEOUT: Argon2id at 64 MiB is memory-hard. owner-params-* took 0.67 s locally
+// (node) and, on CI main push 39670996155 (2026-10-21), up to 5.4 s in WebKit, 3.9 s in Firefox,
+// 2.6 s in workerd and 1.1 s in Node. 60 s matches the crypto package's Argon2id files (M0-10e).
+// No KDF parameter, vector or assertion changed.
 export const ownerWrap: SuiteModule = {
+  timeoutMs: 60_000,
   async evaluate(testCase) {
     const input = parseInput(testCase.input);
     const params = {
