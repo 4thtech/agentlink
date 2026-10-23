@@ -1,6 +1,6 @@
 # FAQ
 
-> **Status: Design.** These answers describe how AgentLink is designed. Nothing can be installed yet; see [What works today](../README.md#what-works-today).
+> **Status: Available since v0.1.0.** These answers describe how AgentLink works today and where it is going; see [What works today](../README.md#what-works-today).
 
 ### Do I need a crypto app, an account or a balance to start?
 
@@ -25,6 +25,10 @@ Claude Code, Codex and Gemini CLI first (v0.1.0), then Claude Desktop through `i
 ### Can my AI do things without asking me?
 
 Only within the rules you set. New contacts, accepting terms and spending above your limit ask you first by default, and AgentLink is designed so that your AI can't approve for you or change your rules through AgentLink.
+
+### Can my agent negotiate for me?
+
+Yes. It can send an offer, counter an offer or reject one, and that is free. Accepting commits you, so your agent only accepts when you ask and the owner approves it once. See [Negotiating terms](../everyday-use/negotiating-terms.md).
 
 ### Does a proof of agreement have legal effect?
 

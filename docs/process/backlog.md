@@ -5,6 +5,7 @@ PR-sized task cards for AgentLink (OCC v2), derived from `docs/foundation/10-bui
 - **Specs win.** A card restates the spec only to make acceptance testable. Where a card and a spec disagree, the spec wins and the mismatch is a spec gap (§8). Cards never resolve spec gaps by themselves; a gap is resolved through the spec-change process (`development-process.md` §8).
 - **Public file.** This repository is public. Cards contain no secrets, no Safe signer details and no details of unfixed vulnerabilities. Legacy items are referenced only by `OPS-L<n>` and "see private 09 §4". Docs 01 and 09 are private (D-21, D-26); where a card cites them it says "(private)" and restates what the task needs.
 - **Process.** Lifecycle, Definition of Ready/Done, routing and reviews: `development-process.md`. Security classes, reviews, threat notes, milestone audits: `audit-rules.md`. Deploys and releases: `release-and-deployment.md`. CI: `ci-cd.md`. Live coordination: `sync-protocol.md`.
+- **Card counts are generated.** The M0/M1/M2/M3 counts in the Card count section (§1) come from the card headings via `node tools/docs-status/index.mjs`; authors never edit them by hand (`repo-reference.md`).
 - **No assignees here.** Who works on what, and live status, is on the `sync` branch board (`board.md`). This file never names an assignee.
 
 Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items and the D-25 continuous-delivery group) · §3 M1 Local beta on testnets (phases M1a and M1b; incl. owner design drops D1–D3) · §4 M2 Owner console, desktop apps, self-host, design · §5 M3 Mainnet beta · §6 M4/M5 epics · §7 Dependency overview · §8 Spec gaps and inconsistencies · §9 Owner actions
@@ -61,16 +62,25 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 ### Card count
 
+**Never edit the counts below by hand.** The M0, M1 (M1a/M1b), M2 and M3 counts are generated from the card headings by `node tools/docs-status/index.mjs` (`--check`, run by `pnpm lint` and CI, fails when they are stale). A PR that adds, removes or splits a card runs the generator and commits the result; a merge conflict in the block is resolved by rerunning it, never by hand. Counted: every `#### M<n>-…` heading outside a code fence (so not the §1 example), except split parents (Status "split into …", their parts are counted) and cards whose Phase starts with "later". The M1 phase comes from the first word of the card's `**Phase:**` field. The rows after the block are fixed and hand-maintained.
+
+<!-- backlog-counts:start -->
 | Section | Cards |
 |---|---|
-| M0 Foundations | 40 (recounted from the headings on 2026-10-22; previously stated 37; incl. 7 in the D-25 group; 9 `done (setup)`; 6 follow-ups from CI findings: M0-2h, M0-10d, M0-10e, M0-10f, M0-26, OPS-CI-2) |
+| M0 Foundations | 40 |
+| M1 Local beta | 316 (M1a 91, M1b 225) |
+| M2 Console, desktop apps, self-host, design | 49 |
+| M3 Mainnet beta | 34 |
+<!-- backlog-counts:end -->
+
+Other sections:
+
+| Section | Cards |
+|---|---|
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28))))))) |
-| M2 Console, desktop apps, self-host, design | 49 (recounted from the headings on 2026-10-23; previously stated 48 and, before that, 44; incl. M2-19-b from AUDIT-FABLE-M2-19-2; incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
-| M3 Mainnet beta | 24 (recounted from the headings on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -830,6 +840,65 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - M2-GATE acceptance says "(median)" but its scope says "every tester"; 02 says "Median < 5 minutes". Align both with D-124 or state the M2 rule explicitly. The owner decides which.
 - **Acceptance:**
   - One rule, worded the same in the M2-GATE card, 02 and the gate runbook; the owner confirmed it.
+
+#### DOCS-06-TOPUP · 06 §2.4: paid tools return `topUpUrl` and `agentAddress`, not `url` (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-server.md` (§2.4)
+- **Depends on:** none (implemented by PR #482)
+- **Spec:** 06 §2.4
+- **Scope:**
+  - §2.4 says paid tools return `url`. Reword so every paid tool's `needs_credits` result carries `topUpUrl` and `agentAddress` (check each paid tool's result shape in the code first).
+- **Acceptance:**
+  - 06 §2.4 names `topUpUrl` and `agentAddress` for all paid tools and no longer says `url`; `node tools/docs-status/index.mjs --check` passes.
+
+#### CONTRACTS-PARITY-b · contract parity: live-RPC retry and the eip712 suites (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (contracts parity check)
+- **Repo/path:** occ-v2-contracts (private) · the vector parity check
+- **Depends on:** none
+- **Spec:** 04 §3; shared vectors
+- **Invariants:** I-1
+- **Scope:**
+  - Retry the live-RPC reads in the parity check with a bounded backoff so one flaky call does not fail the run.
+  - Include the eip712 suites in vector parity.
+- **Acceptance:**
+  - A test shows a transient RPC failure is retried and a persistent one still fails; the eip712 suites run in parity and a deliberately changed vector fails it.
+
+#### DOCS-RUNBOOKS-1023-b · ci-cd.md and RB-11 match the merge queue and CI changes (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`docs/process/**`; docs only)
+- **Repo/path:** agentlink · `docs/process/ci-cd.md`, `docs/runbooks/` (RB-11)
+- **Depends on:** the CI PRs #477, #478 and #480 merged
+- **Scope:**
+  - Update `ci-cd.md`: merge queue build concurrency 5, merge 5, HEADGREEN; the auto-retry (#477); the heavy-job map (#478); the Playwright budget (#480); D-126.
+  - Reword RB-11 to match.
+- **Acceptance:**
+  - Each value matches the workflow files and the merged PRs (checked by grep); `node tools/docs-status/index.mjs --check` passes.
+
+#### DOCS-RUNBOOKS-1023-c · submitter-deploy.md step 30 names a check step 14 does not make (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (docs only)
+- **Repo/path:** agentlink · `docs/runbooks/submitter-deploy.md`
+- **Depends on:** #479 merged
+- **Scope:**
+  - Step 30 says step 14's name check lists `SUBMITTER_DEPOSIT_GAS_KEY_84532`; step 14 does not. Reword step 30 so it is true.
+- **Acceptance:**
+  - Step 30 and step 14 agree; no other step changes.
+
+#### PROC-MECH-MERGE-IR-b · audit-rules §4.6 wording: the orchestrator records the `IR-` line (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (wording only; if the file is classed S1 by path, S1)
+- **Repo/path:** agentlink · `docs/process/audit-rules.md` (§4.6)
+- **Depends on:** #475 merged
+- **Scope:**
+  - Reword to "*Orchestrator wording:* it records `IR-…`".
+- **Acceptance:**
+  - §4.6 carries that wording and nothing else changes.
+
+#### CHORE-BACKLOG-COUNTS-b · generated card counts go stale when two card-adding PRs queue together (new, owner decision pending)
+- **Status:** backlog (**DECISION NEEDED**) · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `tools/docs-status/`, the merge-queue workflow, `docs/process/backlog.md`
+- **Depends on:** #476
+- **Scope:**
+  - Two PRs that add cards and queue together each pass the count check alone; the second goes stale in the merge group. The owner picks one: (a) skip the count check in `merge_group`; (b) a bot regenerates the counts after merge; (c) move the counts to a generated page so the backlog holds none.
+- **Acceptance:**
+  - The chosen option is implemented; two card-adding PRs queued together both merge without a manual recount, and the check still fails when counts are wrong on a pull request.
 
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
@@ -2115,7 +2184,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first: a zero-signer struct is not absent; `replacementAllowed` refuses on it (record and receipt); `readInclusion`, `notarize` and `acknowledge` fail with a ChainError and send nothing; `RecordNotFound` still means absent.
 
 #### M1-4c-e · chain: verify.ts treats a zero signer as not found, aligned with `bad_answer` (new, IR-M1-4c-d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
+- **Status:** in review (M1-4d-g PR) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`verify.ts`)
 - **Depends on:** M1-4c-d
 - **Scope:** `verify.ts` treats a zero-signer record as not found. The verdict is failed and therefore safe, but a zero signer is a malformed answer: align it with `bad_answer`, as the chain-state `getRecord` does after M1-4c-d. Source: IR-M1-4c-d-1.
@@ -2143,7 +2212,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): an update without the signatures from an older peer is still accepted and a forged one is dropped; a signer for an earlier epoch signs only for retained epochs, never a future one; a lost compare-and-set is reported, not ignored.
 
 #### M1-4d-g · chain: verifier reads `RecordNotFound` only as the bare selector (new, IR-CHORE-CHAIN-SUBMITTER-1)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`src/verify`, `src/clients/errors.ts`)
 - **Depends on:** M1-4d
 - **Spec:** 05 (record lookup); 07 §8
@@ -2457,6 +2526,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L5: handle uploads orphaned when the create or complete response is lost (abort or reclaim).
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
+
+#### M1-6b-d · storage: warn when a provider drops the abort-incomplete-multipart lifecycle element on read-back (new, follow-up of M1-6b-c, #457)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (lifecycle read-back)
+- **Depends on:** M1-6b-c (#457); implemented by PR #485
+- **Spec:** 07 §5.2, §5.4
+- **Invariants:** I-3
+- **Scope:**
+  - Some providers accept the abort-incomplete-multipart element on write and omit it on read-back. Warn (never fail) when it is missing on read-back, without logging any URL or credential.
+- **Acceptance:**
+  - A test: a read-back without the element yields the warning and the rule still counts as applied; a read-back with it yields none.
 
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** done (4thtech/agentlink#268, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -3999,7 +4079,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests-first: the version bump, rejection of a stale version, and byte-exact bodies against vectors where a vector exists; an unsigned body is never accepted by the core without an owner signature. Threat note and tests-first evidence (S2).
 
 #### M1-11r-c · core dropUsage and own-storage status (new, D-118)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (new module and `src/index.ts` export)
 - **Depends on:** M1-9i-a (shares own-storage), M1-11r-b (both write `packages/core/src/index.ts`)
 - **Spec:** 06 §8; 07; 08 §1; D-48, D-115, D-118
@@ -4253,7 +4333,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures render inert in every component; no `style=` attribute in rendered output; owner confirms visual match.
 
 #### M1-35b-b · ui: components, brief B-2 (new, D-118)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
 - **Depends on:** M1-35b, M1-35c-b; design brief B-2 (`docs/design/adjustments.md`)
 - **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
@@ -4985,7 +5065,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Search results and the go/no-go recorded privately; the name confirmed or changed in the decision log before M2-10 is decided.
 
 #### M1-25 · Agent-assisted install: install prompts per harness (D-39) (new)
-- **Status:** in progress (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; the negotiation, glossary and FAQ pages remain) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; negotiation page, glossary and FAQ updates in this PR; `SKILL.md` already complete) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, skills/agentlink/SKILL.md, apps/cli (`init`)
 - **Depends on:** M1-9a, M1-12a, M1-12b, M1-16
 - **Spec:** D-39, D-53; 06 §7, §7.1 (install prompts, install-and-accept prompt); 02 F-01, F-09, J1, J7; 04 §2.5; 11 §5
@@ -5175,7 +5255,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Writer tests per target (diff shown, nothing written before confirm); an Opus reviewer audits the writer.
 
 #### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/mcp/instructions.ts`, `docs/foundation/06-mcp-server.md` §2 and §5, `apps/cli/src/tools/registry.ts`, `test/fixtures/tool-surface.json`
 - **Depends on:** M1-36a
 - **Spec:** 06 §2, §5; 11 §6.1
@@ -5198,7 +5278,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Mainnet is unaffected; faucet rate limits and caps hold; no secret reaches the faucet; threat note and tests-first evidence (S2).
 
 #### M1-36a-b · remaining bare `agentlink` prefixes; owner init on fresh machines (new, IR-M1-36a-1 scope low)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, doctor strings (`tools/strings/en.ts`), `packages/node/src/approval-page.ts`, the owner-init redirect message, owner `strings.ts:65`
 - **Depends on:** M1-36a, M1-36b, M1-36d
 - **Spec:** 06 §2.5; 11 §5
@@ -5416,7 +5496,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: the first policy is signed in the same entry; a failure leaves no half-set state; defaults are unchanged apart from the Send folder; threat note and a Fable audit (S2).
 
 #### M1-36i-b · free-credits claim lows from IR-M1-36i-1 (new, IR-M1-36i-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/runtime/free-credits.ts` and its tests
 - **Depends on:** M1-36i
 - **Spec:** 07 §5; D-120
@@ -5459,6 +5539,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Pre-existing: a second claim within one block can revert (sent = broadcast); track the pending nonce.
 - **Acceptance:**
   - Tests for the null-faucet reading and the same-block second claim.
+
+#### M1-10b-e-c-b · submitter-pool test: URL extraction catches more forms (new, follow-up of M1-10b-e-c, PR #456)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · the submitter-pool test
+- **Depends on:** M1-10b-e-b, M1-10b-e-c (PR #456)
+- **Scope:**
+  - Make the test's URL extraction also catch a scheme followed by a quote or a space, uppercase schemes and protocol-relative `//host`.
+- **Acceptance:**
+  - Each form has a case that the extraction finds; no existing case changes.
 
 #### M1-11b-6 · cli: `init` opens the first-run page and wires owner setup (new, IR-M1-11b-1-1; #426 follow-up)
 - **Status:** backlog (draft PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
@@ -6462,6 +6551,17 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
 
+#### M3-4b-t-T2-c · submitter precheckDepositAuthorization: window-boundary tests (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (tests only; `apps/submitter/**` is S2 if code changes) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/submitter` (`precheckDepositAuthorization`)
+- **Depends on:** M3-4b-t-T2-b (#481); implemented by PR #484
+- **Spec:** 07 §7
+- **Invariants:** I-3
+- **Scope:**
+  - Give `precheckDepositAuthorization` its own tests at the window boundary: a validity window of 900 plus 120 seconds is accepted and one second more is refused.
+- **Acceptance:**
+  - Both boundary cases are tests in the submitter's own suite.
+
 #### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
 - **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
@@ -6492,6 +6592,56 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Refund the quota when the process crashes mid-send.
 - **Acceptance:**
   - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
+#### M3-4b-t-T4-a · gasless top-up: core executor `runGaslessTopUp` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (signs; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `packages/core/src/proofs/gasless-topup.ts` and test; additive hunk in `packages/core/src/proofs/platform.ts`
+- **Depends on:** M3-4b-t-T2-b (#481)
+- **Spec:** 04 §2.5.1; 07 §7
+- **Invariants:** I-1, I-3, I-4, I-7
+- **Scope:**
+  - An internal function `runGaslessTopUp(deps, {chainId, token, amount})`, run only after the caller verified an owner action: kill switch, chain and token gate, local rate limit (5 requests per agent per hour, counted from persistent applied-nonce rows), build and sign with the agent KeyStore (never the owner key), post through a `DepositAuthPort`, poll `creditsOf` for the rise. Fixed outcome words. Not exported from `packages/core/src/index.ts`.
+  - Owner decisions of 2026-10-23: owner approves each top-up; $5 minimum and $50 cap on testnet; normal deposit fee; the submitter pays the network cost; 15-minute window.
+- **Acceptance:** tests first (`RED (expected): M3-4b-t-T4-a …`): agent key only signs and the owner signer has 0 calls; the real registry (flag false) gives `refused:not_available` with 0 signs; chain and token gate; $4.99 and $50.01 refused, $5 and $50 signed with the exact value; window at most 900 s; the 6th call in an hour is `rate_limited` and survives a restart; `submitted` without a `creditsOf` rise is `pending`; no txHash, signature, nonce, address or URL in results or logs; no export from the core index; concurrent calls are serialised. Full threat note.
+
+#### M3-4b-t-T4-b · gasless top-up: runtime deposit-auth port (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `apps/cli/src/runtime/deposit-auth.ts` and test; two-line hook in `apps/cli/src/runtime/proofs.ts`
+- **Depends on:** M3-4b-t-T4-a (port type)
+- **Spec:** 07 §7
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Build the `DepositAuthPort` from `createDepositAuthClient` with the shipped submitter URLs only; map answers to fixed words (`submitted`, `rate_limited`, `already_used`, `unavailable`, `refused:<code>`); strip the txHash. Wire into `nodeProofs`.
+- **Acceptance:** tests first: an override URL failing `checkRpcUrl` is refused; 501 on all URLs is `unavailable`, 429 is `rate_limited`, 409 `already_used` is `already_used`, an unparsable answer is `unavailable`; the txHash never reaches core; the bundle check (proofs off) carries no deposit-auth code.
+
+#### M3-4b-t-T4-c · gasless top-up: `credits.deposit` gasless branch (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner action; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/core/src/proofs/credits-move.ts` and test, `packages/node/src/local-ui/api/proofs.ts` and `proofs-top-up.test.ts`, `docs/foundation/04` §2.5.1, `07` §7, changeset, `changelog.d/`
+- **Depends on:** M3-4b-t-T4-a, M3-4b-t-T4-b, draft PR #435 (stack on it or on main after it merges)
+- **Spec:** 04 §2.5, §2.5.1; 07 §7
+- **Invariants:** I-3, I-4
+- **Scope:**
+  - `credits.deposit` for Base Sepolia (84532) USDC goes to `runGaslessTopUp` after the object checks and after the nonce is recorded; `readTopUp` gains `method: 'gasless'` (addable clipped to $5..$50 and the balance) and stays `coming_soon` while the kit refuses. The node API accepts 84532/USDC behind presence. 04 §2.5.1 row extended and one line in 07 §7 (proposed, owner confirms at merge).
+- **Acceptance:** tests first: the nonce is recorded before signing (order spy); a replay gives 0 signs; an object signed by the agent key, an unknown key, another agent, or with expiry over 600 s or expired is refused with 0 signs and no nonce row; the amount comes only from the signed object; `coming_soon` while the flag is false; the API refuses without a presence session and returns no txHash; the Chiado tests from #435 pass unchanged.
+
+#### M3-4b-t-T4-d · gasless top-up: local UI method (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus audit · **Security:** S2 (money path UI, D-116 styling) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/{top-up.tsx,strings.ts,data.ts,proofs.test.tsx}`, `apps/local-ui/src/api/client.ts`, new `e2e/test/local-ui-gasless-topup.test.ts`
+- **Depends on:** M3-4b-t-T4-c, draft PR #435
+- **Spec:** 11 §5, §6.7; `docs/design/README.md`
+- **Scope:**
+  - "Add credits" for the Base Sepolia USDC method: the received amount, a picker within $5..$50, a confirm step behind presence, then pending, done and limited states, in plain words per 11 §5 (no wallet, gas, transaction, hashes or chain names in the default UI).
+- **Acceptance:** Playwright: received, pick $20, confirm with presence, pending, done; under $5 the button is disabled; above $50 the amount clamps with a note; the 6th try in an hour shows the limit copy; `lintVocabulary` and axe pass; the style matches the D-116 screens.
+
+#### M3-4b-t-T4-e · gasless top-up: switch on `GASLESS_TOPUP_ENABLED` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog (**needs the owner's go-ahead** before the flip) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner "merge") · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and tests, `README.md`, docs-site, `knowledge/`
+- **Depends on:** M3-4b-t-T4-c, M3-4b-t-T4-d, M3-4b-t-T3-c, and Tali enabling the staging submitter variables and smoke-testing them
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-3
+- **Scope:**
+  - Set `GASLESS_TOPUP_ENABLED = true`; keep the kill-switch test (S0-c) proving the refusal by injecting the flag; update the funding-detection and `pick` tests for Base Sepolia. README Status, the docs-site credits guide and `knowledge/` updated; X post.
+- **Acceptance:** with the flag true the real registry composes `eip3009` for Base Sepolia USDC only and Chiado is unchanged; the S0-c test still fails if the flag check is removed; no test weakened.
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
