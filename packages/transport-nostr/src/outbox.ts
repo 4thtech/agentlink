@@ -27,6 +27,9 @@ const BACKOFF_MAX_SECONDS = 3_600;
 /** Rows published at the same time by one processDue() pass. */
 const ROW_CONCURRENCY = 8;
 
+/** Failures that make a relay unusable for this wrap (not a transient fault): 07 §4.3. */
+const UNUSABLE: ReadonlySet<string> = new Set(['too_large', 'blocked_address', 'invalid_url']);
+
 /** One `outbox` row as the transport needs it (07 §3.2). */
 export interface OutboxRow {
   /** The gift-wrap event id, 64 lowercase hex. */
@@ -83,6 +86,17 @@ export interface OutboxWorkerOptions {
   readonly logger?: Logger;
   /** Clock in Unix milliseconds (default: the wall clock). */
   readonly now?: () => number;
+  /** Random source in [0, 1) for the backoff jitter (default: Math.random; not a security use). */
+  readonly random?: () => number;
+}
+
+/** Why a row is stuck with fewer than 2 usable relays. Fixed strings, no relay name or address. */
+export type OutboxNoticeReason = 'no_relay_large_enough' | 'too_few_usable_relays';
+
+/** For the activity feed (07 §4.3): which row, and why it cannot reach 2 relays. */
+export interface OutboxNotice {
+  readonly wrapId: string;
+  readonly reason: OutboxNoticeReason;
 }
 
 /** What one pass did, for the caller's scheduling and activity feed. */
@@ -94,11 +108,13 @@ export interface OutboxSummary {
   readonly failed: number;
   /** The earliest next_attempt_at among rows left pending by this pass, in Unix seconds. */
   readonly nextAttemptAt: number | undefined;
+  /** Rows left pending because fewer than 2 of their relays are usable, with the reason (07 §4.3). */
+  readonly notices: readonly OutboxNotice[];
 }
 
 type RowResult =
   | { kind: 'sent' }
-  | { kind: 'retrying'; nextAttemptAt: number }
+  | { kind: 'retrying'; nextAttemptAt: number; notice?: OutboxNotice }
   | { kind: 'not_delivered' }
   | { kind: 'skipped' };
 
@@ -134,6 +150,7 @@ export class OutboxWorker {
   private readonly pool: Pick<RelayPool, 'publish'>;
   private readonly logger: Logger | undefined;
   private readonly now: () => number;
+  private readonly random: () => number;
   private readonly inFlight = new Set<string>();
 
   constructor(options: OutboxWorkerOptions) {
@@ -141,6 +158,7 @@ export class OutboxWorker {
     this.pool = options.pool;
     this.logger = options.logger;
     this.now = options.now ?? (() => Date.now());
+    this.random = options.random ?? (() => Math.random());
   }
 
   /** Delivers every pending row that is due. Call after the core's store transaction and on a timer. */
@@ -152,6 +170,7 @@ export class OutboxWorker {
     let notDelivered = 0;
     let failed = 0;
     let nextAttemptAt: number | undefined;
+    const notices: OutboxNotice[] = [];
     for (let i = 0; i < due.length; i += ROW_CONCURRENCY) {
       const batch = due.slice(i, i + ROW_CONCURRENCY);
       const results = await Promise.all(batch.map((row) => this.processRow(row, nowSeconds)));
@@ -161,6 +180,7 @@ export class OutboxWorker {
         else if (result.kind === 'not_delivered') notDelivered += 1;
         else if (result.kind === 'retrying') {
           retrying += 1;
+          if (result.notice !== undefined) notices.push(result.notice);
           nextAttemptAt =
             nextAttemptAt === undefined
               ? result.nextAttemptAt
@@ -169,7 +189,7 @@ export class OutboxWorker {
       }
     }
     this.logger?.info('outbox pass', { sent, retrying, notDelivered, failed });
-    return { sent, retrying, notDelivered, failed, nextAttemptAt };
+    return { sent, retrying, notDelivered, failed, nextAttemptAt, notices };
   }
 
   /** Undefined when persistence failed: the row stays pending. */
@@ -225,8 +245,14 @@ export class OutboxWorker {
     // The stored event goes only to the relays of its row that have not acknowledged it yet.
     const remaining = relays.filter((relay) => acks[relay] === undefined);
     const merged: Record<string, number> = { ...acks };
+    let unusable = 0;
+    let tooLarge = false;
     if (remaining.length > 0) {
       const outcome = await this.pool.publish(event, remaining);
+      for (const r of outcome.results) {
+        if (r.reason === 'too_large') tooLarge = true;
+        if (UNUSABLE.has(r.reason)) unusable += 1;
+      }
       for (const relay of outcome.acked) {
         if (relays.includes(relay) && merged[relay] === undefined) merged[relay] = nowSeconds;
       }
@@ -237,14 +263,28 @@ export class OutboxWorker {
         : { kind: 'skipped' };
     }
     const attempts = row.attempts + 1;
-    const delay = Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), BACKOFF_MAX_SECONDS);
-    const nextAttemptAt = Math.min(nowSeconds + delay, giveUpAt);
+    const base = Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), BACKOFF_MAX_SECONDS);
+    // Jitter of up to 25 % on top, so many rows queued together do not retry in step; never past give_up_at.
+    const r = this.random();
+    const jitter = Math.floor(base * 0.25 * (Number.isFinite(r) ? Math.min(Math.max(r, 0), 1) : 0));
+    const nextAttemptAt = Math.min(nowSeconds + base + jitter, giveUpAt);
     const recorded = await this.persistence.recordAttempt(row.wrapId, {
       acks: merged,
       attempts,
       nextAttemptAt,
     });
-    return recorded ? { kind: 'retrying', nextAttemptAt } : { kind: 'skipped' };
+    if (!recorded) return { kind: 'skipped' };
+    const usable = relays.length - unusable;
+    const notice: OutboxNotice | undefined =
+      usable < MIN_ACKS
+        ? {
+            wrapId: row.wrapId,
+            reason: tooLarge ? 'no_relay_large_enough' : 'too_few_usable_relays',
+          }
+        : undefined;
+    return notice === undefined
+      ? { kind: 'retrying', nextAttemptAt }
+      : { kind: 'retrying', nextAttemptAt, notice };
   }
 
   /** Stored acks, limited to relays that are still in the row's list. */

@@ -1,0 +1,76 @@
+# Faucet and gas pool alert (M1-10b-e; owner decision 2026-10-22: free test credits are auto-claimed
+# with pool alerts).
+#
+# Every six hours, and by manual dispatch, this reads the production submitter's public
+# `GET /v1/health` and runs `.github/scripts/submitter-pool.jq` over the answer. The run fails when
+# any served chain is unavailable, its gas wallet is `low`, or its faucet is `low` or `paused`
+# (thresholds per chain in apps/submitter/src/config.ts `POOL_THRESHOLDS`). GitHub's failure notice
+# for a scheduled run tells the owner; the run log names only chain IDs and state words. Top up the
+# wallet (docs/runbooks/submitter-deploy.md, step 15) and re-run it by dispatch.
+#
+# It is NOT part of the merge gate: not called by `ci.yml`, not in `ci-gate`, never runs for a pull
+# request, and a failure never blocks a merge or a deploy. It runs on `main` only and not in a fork.
+#
+# Security posture (docs/foundation/04 §7): `permissions: {}` at the top and `contents: read` for the
+# job (to read the jq program), every action pinned to a full commit SHA, checkout without
+# persisted credentials, no secrets, no event data in shell scripts. The health answer holds public
+# on-chain balances only; it is parsed by the jq program and never printed.
+name: Submitter pool
+
+on:
+  schedule:
+    # Every six hours at minute 37, away from the other scheduled workflows.
+    - cron: "37 */6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: submitter-pool
+  cancel-in-progress: false
+
+jobs:
+  pool:
+    name: pool
+    if: github.ref == 'refs/heads/main' && github.repository == '4thtech/agentlink'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the faucet and gas pools
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="https://submit.agentlink.4thtech.io"
+          program="$GITHUB_WORKSPACE/.github/scripts/submitter-pool.jq"
+          answer="$RUNNER_TEMP/health.json"
+          # Three attempts, 30 s apart, for a passing network or edge failure; any HTTP 200 answer
+          # is judged at once.
+          status=""
+          for attempt in 1 2 3; do
+            rm -f "$answer"
+            status="$(curl -sS --proto '=https' --max-time 15 -o "$answer" -w '%{http_code}' "$origin/v1/health")" || status="000"
+            if [ "$status" = "200" ]; then break; fi
+            echo "Attempt $attempt: /v1/health answered HTTP $status; retrying in 30 s."
+            if [ "$attempt" -lt 3 ]; then sleep 30; fi
+          done
+          if [ "$status" != "200" ]; then
+            echo "::error::The submitter health read failed: HTTP $status after 3 attempts."
+            exit 1
+          fi
+          result="$(jq -r -f "$program" "$answer" 2> /dev/null)" || result="alert: unreadable answer"
+          if [ "$result" = "pool: ok" ]; then
+            echo "Pools ok: every chain available, gas ok, faucet ok."
+            exit 0
+          fi
+          while IFS= read -r line; do
+            echo "::error::$line"
+          done <<< "$result"
+          echo "Top up the wallet named above (docs/runbooks/submitter-deploy.md, step 15), then re-run this workflow."
+          exit 1

@@ -13,6 +13,15 @@
 - **Adding credits is public.** Every way of adding credits says: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."
 - **Free test credits** are planned for the test phase (M1, M2), so you can try proof without paying.
 
+## Adding credits (not available yet)
+
+Adding credits from your AI app is not available in this version: the page where credits are added does not exist yet, so AgentLink gives no link for it. When it launches, this is how it is designed to work:
+
+- Your AI app tells you in dollars how much to add and gives you one link. It explains the step, checks your credits and tells you when they arrive. It never asks for your passphrase, a recovery code or card details, and it never moves your money.
+- `agentlink credits --topup` will print the link and a QR code with your agent ID, and open the link in your browser when you run it yourself in a terminal.
+- Everything in the link after the `#` stays in your browser and is never sent to our servers.
+- The amount is a suggestion ($5, $10 or $25, at least $5). You can change it on the page.
+
 ## Outline
 
 - Checking your credits ("How many AgentLink credits do I have?")
