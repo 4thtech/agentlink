@@ -92,7 +92,13 @@ const SENSITIVE_WHOLE: ReadonlySet<string> = new Set([
 ]);
 
 // Words that make a URL-named field a capability (a presigned or download link): fully redacted.
-const CAPABILITY_URL_WORDS: ReadonlySet<string> = new Set(['signed', 'download', 'downloads']);
+const CAPABILITY_URL_WORDS: ReadonlySet<string> = new Set([
+  'signed',
+  'download',
+  'downloads',
+  'upload',
+  'uploads',
+]);
 
 /** Splits a key into lowercase words: camelCase, PascalCase, snake_case, kebab-case, "X-Amz-Foo", "seed2". */
 function words(key: string): string[] {
@@ -202,6 +208,9 @@ const WHOLE_URL =
 // older browsers. The authority is read like an absolute URL's, so user info is dropped and an
 // IPv6 host is kept. Scheme-less URLs (`host.tld/v2/key`) are an accepted residual risk.
 const PROTOCOL_RELATIVE = /(^|[^\w:/\\])\/\/([^\s/\\?#"'<>`]+)[^\s"'<>`]*/g;
+// The same with JSON-escaped slashes (`\/\/host\/path`), also nested in a string. The drive-letter
+// guard is the same: the character before must not be ':' (that is an absolute URL).
+const ESCAPED_PROTOCOL_RELATIVE = /(^|[^\w:/\\])((?:\\{1,7}\/){2})([^\s/\\?#"'<>`]+)[^\s"'<>`]*/g;
 // Percent-encoded absolute URLs (a redirect target inside a query string), single or double encoded.
 const ENCODED_URL =
   /\b(https?|wss?)(%(?:25)?3A%(?:25)?2F%(?:25)?2F)([A-Za-z0-9.-]{1,253}(?:%(?:25)?3A[0-9]{1,5})?)[^\s"'<>`&]*/gi;
@@ -378,6 +387,9 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
   let depth = 0;
   let inString = '';
   let run = 0;
+  // The last character outside strings that is not white space. An apostrophe opens a string only
+  // after `{`, `[`, `,` or `:` (a Python-style repr), not inside running text ("don't").
+  let previous = '';
   let at = start;
   for (; at < text.length; at += 1) {
     meter.work += 1;
@@ -386,7 +398,7 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
       run += 1;
       continue;
     }
-    if (char === '"' || char === "'") {
+    if (char === '"' || (char === "'" && (inString === "'" || '{[,:'.includes(previous)))) {
       if (isRealQuote(run, level)) {
         if (inString === '') inString = char;
         else if (char === inString) inString = '';
@@ -400,6 +412,7 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
         if (depth <= 0) return { end: at + 1, open: '', close: '' };
       }
     }
+    if (inString === '' && char.trim() !== '') previous = char;
     run = 0;
   }
   return { end: at, open: '', close: '' };
@@ -545,6 +558,11 @@ export function stripUrls(text: string): string {
       PROTOCOL_RELATIVE,
       (match, before: string, authority: string) =>
         `${before}//${host(authority)}${trailingBackslashes(match)}`,
+    )
+    .replace(
+      ESCAPED_PROTOCOL_RELATIVE,
+      (match, before: string, slashes: string, authority: string) =>
+        `${before}${slashes}${host(authority)}${trailingBackslashes(match)}`,
     )
     .replace(ENCODED_URL, (_match, scheme: string, separator: string, hostname: string) => {
       return `${scheme}${separator}${hostname}`;

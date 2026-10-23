@@ -314,7 +314,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A quadratic mutant of the scanner turns the L3 test red.
 
 #### M0-8c · Logger hardening, round 2 follow-ups (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8b
 - **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8b-1, round 2 (findings R2-L2 and R2-L4, both Low)
