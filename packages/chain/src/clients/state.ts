@@ -5,8 +5,9 @@
 //
 // - Reads only. Simulation (`eth_call`, `eth_estimateGas`) is bound to the few client functions the
 //   direct path sends: `notarizeDirect`, `notarizeBatch`, `acknowledge` and `acknowledgeBatch` on
-//   the Notary, `deposit` on the vault and `approve` on a fee token. Anything else is refused before
-//   any request (`depositWithAuthorization` is not even in the client ABI, D-89).
+//   the Notary, `deposit` and `withdraw` (M1-4c-b) on the vault and `approve` on a fee token.
+//   Anything else is refused before any request (`depositWithAuthorization` is not even in the
+//   client ABI, D-89).
 // - Every rejection is a fixed-text ChainError (the read client's view guarantees it): never a URL,
 //   revert text or server text.
 import { erc20Abi, type Abi } from 'viem';
@@ -83,7 +84,9 @@ export interface ChainState {
 /** The functions the direct path may send, per contract. */
 const DIRECT_FUNCTIONS: Readonly<Record<ContractName, readonly string[]>> = Object.freeze({
   notary: Object.freeze(['notarizeDirect', 'notarizeBatch', 'acknowledge', 'acknowledgeBatch']),
-  vault: Object.freeze(['deposit']),
+  // `withdraw` (M1-4c-b): through sendWithdraw only, the agent's own credits to its own account;
+  // the KeyStore refuses any other recipient.
+  vault: Object.freeze(['deposit', 'withdraw']),
   erc20: Object.freeze(['approve']),
 });
 
