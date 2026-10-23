@@ -12,6 +12,8 @@ export {
   parseSubmitRequest,
   parseSubmitResponse,
   submitRequestBody,
+  type FaucetPoolState,
+  type GasPoolState,
   type HealthResponse,
   type StatusResponse,
   type SubmitItem,
@@ -52,3 +54,27 @@ export {
   type ProofSubmitterOptions,
   type ProofVia,
 } from './notarize.js';
+export {
+  DEPOSIT_AUTH_ERROR_CODES,
+  createDepositAuthClient,
+  depositAuthorizationRequestBody,
+  parseDepositAuthorizationRequest,
+  parseDepositAuthorizationResponse,
+  type DepositAuthClient,
+  type DepositAuthErrorCode,
+  type DepositAuthorizationAuth,
+  type DepositAuthorizationRequest,
+  type DepositAuthorizationResponse,
+} from './deposit-auth.js';
+export {
+  DEPOSIT_AUTH_CLOCK_SKEW_SECONDS,
+  DEPOSIT_AUTH_GAS_MARGIN_PERCENT,
+  DEPOSIT_AUTH_MAX_GAS,
+  DEPOSIT_AUTH_MIN_REMAINING_SECONDS,
+  checkRelayAbi,
+  createDepositRelayChain,
+  depositAuthorizationCalldata,
+  type DepositRelayChain,
+  type DepositRelayCheck,
+  type DepositRelayOptions,
+} from './deposit-relay.js';

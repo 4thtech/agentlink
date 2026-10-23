@@ -10,6 +10,7 @@
 import type { McpToolName } from '@4thtech-io/types';
 import { acceptInviteHandler } from './accept-invite.js';
 import { acknowledgeHandler } from './acknowledge.js';
+import { waitForApprovalDecision } from './approval-wait.js';
 import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
 import { exportProofPackHandler } from './export-proof-pack.js';
@@ -64,6 +65,16 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** Per-call options from the MCP layer (M1-36j). */
+export interface CallToolOptions {
+  /** The client's cancel for this request. */
+  readonly signal?: AbortSignal;
+  /** How long a linked `pending_approval` may wait for the owner's decision; 0 or absent: no wait. */
+  readonly approvalWaitMs?: number;
+  /** The approval read interval (tests). */
+  readonly approvalWaitIntervalMs?: number;
+}
+
 /**
  * Runs one tool call and returns its checked result. Never throws and never echoes a value: an
  * unknown tool, a bad input or a handler failure becomes fixed text (I-5).
@@ -72,6 +83,7 @@ export async function callTool(
   name: string,
   input: unknown,
   env: HandlerEnvironment,
+  options: CallToolOptions = {},
 ): Promise<FinishedResult> {
   const origins = 'needsSetup' in env ? [] : env.urlOrigins;
   const tool = findTool(name);
@@ -99,7 +111,18 @@ export async function callTool(
   }
   // M1-11a-b: under `agentlink mcp`, a pending_approval gets the local approval UI link.
   const linked = await withApprovalLink(output, env);
-  return finalizeResult(linked.output, linked.origins);
+  // M1-36j (D4): with the page open, wait briefly for the owner's decision (read-only).
+  const waited = await waitForApprovalDecision(linked.output, env, {
+    waitMs: options.approvalWaitMs ?? 0,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.approvalWaitIntervalMs === undefined
+      ? {}
+      : { intervalMs: options.approvalWaitIntervalMs }),
+  });
+  // A decision result has no url: only the context's own origins apply to it.
+  return waited === linked.output
+    ? finalizeResult(linked.output, linked.origins)
+    : finalizeResult(waited, env.urlOrigins);
 }
 
 export { TOOLS, PENDING_M1A_TOOLS, findTool, type ToolDefinition } from './registry.js';

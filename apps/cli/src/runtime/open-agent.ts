@@ -42,8 +42,10 @@ import { readAgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 import { DROP_ORIGIN, nodeFileOpener, nodeFilesPlatform } from './files.js';
+import { fileFreeCreditsMarker } from './free-credits.js';
 import { nodeProofs, type NodeProofs } from './proofs.js';
 import type { FileOpener, ProofPlatformTools } from '../tools/context.js';
+import type { FreeCreditsMarker } from '../tools/free-credits.js';
 
 /** The Node pieces the runtime is built from. Tests pass doubles; production uses @4thtech-io/node. */
 export interface RuntimeDeps {
@@ -103,6 +105,8 @@ export interface OpenedAgent {
   readonly files?: FileOpener;
   /** The proof platform's tool half (M1-9d-2); absent: no proof tools. */
   readonly proofs?: ProofPlatformTools;
+  /** M1-36i: where the free test credits claim is remembered (the agent's folder). */
+  readonly freeCredits?: FreeCreditsMarker;
   close(): Promise<void>;
 }
 
@@ -221,7 +225,9 @@ export async function openAgent(options: OpenAgentOptions = {}): Promise<OpenAge
     client,
     approvals,
     files: nodeFileOpener({ home }),
-    ...(proofs === undefined ? {} : { proofs: proofs.tools }),
+    ...(proofs === undefined
+      ? {}
+      : { proofs: proofs.tools, freeCredits: fileFreeCreditsMarker(paths.dir, config.agentId) }),
     close: (): Promise<void> => {
       closing ??= (async () => {
         // Relay connections first: an open socket or its idle timer keeps a one-shot process alive.

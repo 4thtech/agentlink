@@ -228,6 +228,32 @@ describe('submitter answers are parsed strictly', () => {
     ).toHaveLength(1);
   });
 
+  it('health: reads the optional per-chain pool states (M1-10b-e) and refuses unknown ones', () => {
+    const chain = { chainId: CHAIN_ID, available: true, gasBalance: '12', queueDepth: 0 };
+    expect(
+      parseHealthResponse({ ok: true, chains: [{ ...chain, gas: 'low', faucet: 'paused' }] })
+        .chains[0],
+    ).toEqual({ ...chain, gas: 'low', faucet: 'paused' });
+    expect(
+      parseHealthResponse({ ok: true, chains: [{ ...chain, gas: 'ok', faucet: 'low' }] }).chains[0],
+    ).toMatchObject({ gas: 'ok', faucet: 'low' });
+    expect(
+      parseHealthResponse({ ok: true, chains: [{ ...chain, gas: null, faucet: null }] }).chains[0],
+    ).toMatchObject({ gas: null, faucet: null });
+    // An older submitter sends neither field.
+    expect(parseHealthResponse({ ok: true, chains: [chain] }).chains[0]).toEqual(chain);
+    for (const extra of [
+      { gas: 'paused' },
+      { gas: 'empty' },
+      { faucet: 'empty' },
+      { faucet: 1 },
+      { gas: true },
+      { faucetAddress: `0x${'ab'.repeat(20)}` },
+    ]) {
+      expect(() => parseHealthResponse({ ok: true, chains: [{ ...chain, ...extra }] })).toThrow();
+    }
+  });
+
   it('refuses unknown statuses, fields, mismatched IDs and odd error text', () => {
     const bad: unknown[] = [
       { chainId: CHAIN_ID, items: [{ id, recordId: id, status: 'done' }] },
@@ -305,6 +331,12 @@ interface MockChain {
   noDataError: boolean;
   /** Answer getRecord with this revert (any record ID). */
   getRecordRevert: string | null;
+  /** Answer getRecord with this raw JSON-RPC result instead (M1-4c-c). */
+  getRecordResult?: unknown;
+  /** Answer getRecord with a JSON-RPC error that carries no revert data (M1-4c-c). */
+  getRecordNoData?: boolean;
+  /** Let getRecord time out (M1-4c-c). */
+  getRecordTimeout?: boolean;
 }
 
 function newChain(): MockChain {
@@ -376,6 +408,13 @@ function mockFetch(chain: MockChain) {
         if (decoded.functionName === 'getRecord') {
           const id = (decoded.args as readonly [Hex])[0];
           const stored = chain.records.get(id);
+          if (chain.getRecordTimeout === true) {
+            throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+          }
+          if (chain.getRecordNoData === true) {
+            return replyError({ code: -32000, message: 'execution reverted' });
+          }
+          if ('getRecordResult' in chain) return reply(chain.getRecordResult);
           if (chain.getRecordRevert !== null) {
             // An error name, or raw revert data when it starts with 0x.
             const data = chain.getRecordRevert.startsWith('0x')
@@ -948,5 +987,99 @@ describe('createSubmitterClient', () => {
     expect((await client.status(hash32('55'))).state).toBe('pending');
     expect((await client.health()).ok).toBe(true);
     await expect(client.status('0x12' as Hex)).rejects.toThrow();
+  });
+});
+
+describe('the port reads "absent" only from RecordNotFound (M1-4c-c, 04 §5, I-3)', () => {
+  async function receiptItem(recordId: Hex): Promise<SubmitItem> {
+    const { built, signature } = await signedReceipt(recordId);
+    return parseSubmitRequest(
+      'receipt',
+      { chainId: CHAIN_ID, receipts: [{ receipt: built.receipt, signature }] },
+      notaryFor,
+    ).items[0] as SubmitItem;
+  }
+
+  /** Every getRecord caller of the port: none may read a failed read as "absent". */
+  async function everyCallerRejects(chain: MockChain, code?: string): Promise<void> {
+    const p = port(chain);
+    const recordId = hash32('36');
+    const failure = code === undefined ? expect.any(Error) : expect.objectContaining({ code });
+    await expect(p.simulateItem(await recordItem())).rejects.toEqual(failure);
+    await expect(p.simulateItem(await receiptItem(recordId))).rejects.toEqual(failure);
+    await expect(p.recordReceipts(recordId)).rejects.toEqual(failure);
+    // Nothing was sent or estimated on the failed read: no record is signed in its place.
+    expect(chain.sent).toEqual([]);
+  }
+
+  it('reads RecordNotFound as absent: a new record simulates, an unknown record is never charged', async () => {
+    const chain = newChain();
+    const p = port(chain);
+    expect(await p.simulateItem(await recordItem())).toEqual({
+      outcome: 'ok',
+      gas: chain.estimate,
+    });
+    expect(await p.recordReceipts(hash32('36'))).toEqual({ charged: false, set: [] });
+  });
+
+  it('keeps another contract revert an error, with or without arguments, or an Error(string)', async () => {
+    for (const data of [
+      'EnforcedPause',
+      encodeErrorResult({
+        abi: NOTARY_CLIENT_ABI,
+        errorName: 'InsufficientCredits',
+        args: [ZERO_ADDRESS, ZERO_ADDRESS, 1n, 0n],
+      } as never),
+      // Error("RecordNotFound"): a string, not the Notary's custom error.
+      encodeErrorResult({
+        abi: [{ type: 'error', name: 'Error', inputs: [{ name: 'm', type: 'string' }] }],
+        errorName: 'Error',
+        args: ['RecordNotFound'],
+      }),
+      '0x',
+    ]) {
+      const chain = newChain();
+      chain.getRecordRevert = data;
+      await everyCallerRejects(chain, 'rpc_error');
+    }
+  });
+
+  it('keeps a revert without data an error', async () => {
+    const chain = newChain();
+    chain.getRecordNoData = true;
+    await everyCallerRejects(chain, 'rpc_error');
+  });
+
+  it('keeps a transport error and a timeout errors', async () => {
+    const down = newChain();
+    down.failNetwork = true;
+    await everyCallerRejects(down);
+    const slow = newChain();
+    slow.getRecordTimeout = true;
+    await everyCallerRejects(slow, 'rpc_timeout');
+  });
+
+  it('keeps an empty or malformed result an error, never "absent"', async () => {
+    for (const result of ['0x', null, '0x1234', 42]) {
+      const chain = newChain();
+      chain.getRecordResult = result;
+      await everyCallerRejects(chain, 'bad_answer');
+    }
+  });
+
+  it('keeps an empty record (a zero signer) the Notary returned an error: only the revert is "absent"', async () => {
+    // The deployed Notary reverts RecordNotFound() for an unknown ID and never returns a zeroed
+    // record, so a zeroed answer is not the Notary's: it is a bad answer, not a new record.
+    const chain = newChain();
+    chain.records.set(hash32('36'), {
+      signer: ZERO_ADDRESS as Hex,
+      structHash: hash32('00'),
+      receiptAt: [0n, 0n, 0n, 0n],
+    });
+    const p = port(chain);
+    await expect(p.recordReceipts(hash32('36'))).rejects.toMatchObject({ code: 'bad_answer' });
+    await expect(p.simulateItem(await receiptItem(hash32('36')))).rejects.toMatchObject({
+      code: 'bad_answer',
+    });
   });
 });

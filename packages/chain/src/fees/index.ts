@@ -24,6 +24,13 @@ export {
   type SendDepositOptions,
 } from './deposit.js';
 export {
+  buildWithdraw,
+  sendWithdraw,
+  type SendWithdrawOptions,
+  type WithdrawRequest,
+  type WithdrawStep,
+} from './withdraw.js';
+export {
   MAX_LOG_BLOCK_SPAN,
   filterCreditEvents,
   readCreditHistory,
@@ -41,8 +48,28 @@ export {
   createFaucetChain,
   isFaucetChain,
   type DepositForRequest,
+  type FaucetBalances,
   type FaucetChain,
   type FaucetChainOptions,
   type FaucetCredit,
 } from './faucet.js';
 export { tokenUnitsToUsd } from './usd.js';
+export {
+  GASLESS_CHAIN_IDS,
+  GASLESS_MAX_USD_CENTS,
+  GASLESS_MAX_WINDOW_SECONDS,
+  GASLESS_MIN_USD_CENTS,
+  GASLESS_WINDOW_SECONDS,
+  buildReceiveWithAuthorization,
+  gaslessToken,
+  gaslessValueBounds,
+  readAuthorizationUsed,
+  readClientEthCall,
+  readTokenDomain,
+  recoverAuthorizationSigner,
+  type BuildGaslessOptions,
+  type EthCall,
+  type GaslessSigner,
+  type GaslessToken,
+  type GaslessTopUpRequest,
+} from './gasless.js';

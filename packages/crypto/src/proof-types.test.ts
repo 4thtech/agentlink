@@ -7,6 +7,8 @@ import {
   getAddress,
   hashTypedData as viemHashTypedData,
   keccak256 as viemKeccak256,
+  recoverTypedDataAddress,
+  toHex,
   type TypedDataDefinition,
 } from 'viem';
 import { describe, expect, it } from 'vitest';
@@ -15,6 +17,7 @@ import {
   OCC_V2_DOMAIN_NAME,
   OCC_V2_DOMAIN_VERSION,
   RECEIPT_TYPES,
+  RECEIVE_WITH_AUTHORIZATION_TYPE_HASH,
   RECEIVE_WITH_AUTHORIZATION_TYPES,
   RECORD_TYPES,
   REGISTRATION_TYPES,
@@ -37,7 +40,10 @@ import {
   recordStructHash,
   recordTypedData,
   registrationTypedData,
+  tokenDomainSeparator,
+  verifyTokenDomain,
 } from './index.js';
+import { MemoryKeyStore } from './testing.js';
 
 const hex32 = (byte: string): string => '0x' + byte.repeat(32);
 const NOTARY = '0x252d9a9c22652a8c08b12eda14d30906850542c9';
@@ -374,5 +380,197 @@ describe('EIP-3009 ReceiveWithAuthorization', () => {
       expectRefused(() => parseReceiveWithAuthorization({ ...AUTH, ...change }));
     }
     expect(parseReceiveWithAuthorization(AUTH)).toEqual(AUTH);
+  });
+});
+
+// M3-4b-t-1: the token domain is read from chain and checked here; only ReceiveWithAuthorization.
+describe('EIP-3009 type hash, token domain check and signing (M3-4b-t-1)', () => {
+  // Base Sepolia USDC, read on chain (test-vectors/eip3009, generate_eip3009.py): no eip712Domain().
+  const USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+  const ON_CHAIN_SEPARATOR = '0x71f17a3b2ff373b803d70a5a07c046c1a2bc8e89c09ef722fcb047abe94c9818';
+  const CONFIGURED = { chainId: 84532, verifyingContract: USDC.toLowerCase() };
+  const FALLBACK = {
+    source: 'domainSeparator',
+    name: 'USDC',
+    version: '2',
+    domainSeparator: ON_CHAIN_SEPARATOR,
+  };
+  const EIP5267 = {
+    source: 'eip5267',
+    fields: '0x0f',
+    name: 'USDC',
+    version: '2',
+    chainId: '84532',
+    verifyingContract: USDC,
+    salt: hex32('00'),
+    extensions: [],
+  };
+  const expectMismatch = (run: () => unknown): void => {
+    try {
+      run();
+    } catch (error) {
+      expect(error).toBeInstanceOf(CryptoInputError);
+      expect((error as CryptoInputError).code).toBe('token_domain_mismatch');
+      return;
+    }
+    throw new Error('expected a refusal');
+  };
+
+  it('pins the ReceiveWithAuthorization type hash, never the TransferWithAuthorization one', () => {
+    const receive = viemKeccak256(
+      toHex(eip712EncodeType(RECEIVE_WITH_AUTHORIZATION_TYPES, 'ReceiveWithAuthorization')),
+    );
+    const transfer = viemKeccak256(
+      toHex(
+        'TransferWithAuthorization(address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 nonce)',
+      ),
+    );
+    expect(RECEIVE_WITH_AUTHORIZATION_TYPE_HASH).toBe(receive);
+    expect(RECEIVE_WITH_AUTHORIZATION_TYPE_HASH).not.toBe(transfer);
+    expect(encodeHex0x(hashReceiveWithAuthorization(ASSET_DOMAIN, AUTH).typeHash)).toBe(receive);
+    expect(Object.keys(RECEIVE_WITH_AUTHORIZATION_TYPES).sort()).toEqual([
+      'EIP712Domain',
+      'ReceiveWithAuthorization',
+    ]);
+  });
+
+  it('recomputes the on-chain DOMAIN_SEPARATOR() of Base Sepolia USDC', () => {
+    const domain = { name: 'USDC', version: '2', chainId: 84532, verifyingContract: USDC };
+    expect(encodeHex0x(tokenDomainSeparator(domain))).toBe(ON_CHAIN_SEPARATOR);
+    expect(
+      encodeHex0x(tokenDomainSeparator({ ...domain, verifyingContract: USDC.toLowerCase() })),
+    ).toBe(ON_CHAIN_SEPARATOR);
+    expectRefused(() => tokenDomainSeparator({ ...domain, verifyingContract: USDC.toUpperCase() }));
+    expectRefused(() => tokenDomainSeparator({ ...domain, salt: hex32('00') }));
+  });
+
+  it('accepts the fallback reading and an EIP-5267 reading that match the configuration', () => {
+    const expected = {
+      name: 'USDC',
+      version: '2',
+      chainId: 84532,
+      verifyingContract: USDC.toLowerCase(),
+    };
+    expect(verifyTokenDomain(CONFIGURED, FALLBACK)).toEqual(expected);
+    expect(verifyTokenDomain({ ...CONFIGURED, verifyingContract: USDC }, FALLBACK)).toEqual(
+      expected,
+    );
+    expect(verifyTokenDomain(CONFIGURED, EIP5267)).toEqual(expected);
+    expect(verifyTokenDomain(CONFIGURED, { ...EIP5267, chainId: 84532n })).toEqual(expected);
+    expect(
+      verifyTokenDomain(CONFIGURED, { ...EIP5267, domainSeparator: ON_CHAIN_SEPARATOR }),
+    ).toEqual(expected);
+    expect(Object.isFrozen(verifyTokenDomain(CONFIGURED, FALLBACK))).toBe(true);
+  });
+
+  it('refuses a domain that does not match the chain', () => {
+    const otherSeparator = encodeHex0x(
+      tokenDomainSeparator({
+        name: 'USD Coin',
+        version: '2',
+        chainId: 84532,
+        verifyingContract: USDC,
+      }),
+    );
+    expectMismatch(() => verifyTokenDomain(CONFIGURED, { ...FALLBACK, name: 'USD Coin' }));
+    expectMismatch(() => verifyTokenDomain(CONFIGURED, { ...FALLBACK, version: '1' }));
+    expectMismatch(() => verifyTokenDomain({ ...CONFIGURED, chainId: 8453 }, FALLBACK));
+    expectMismatch(() =>
+      verifyTokenDomain({ ...CONFIGURED, verifyingContract: FEE_ASSET }, FALLBACK),
+    );
+    expectMismatch(() =>
+      verifyTokenDomain(CONFIGURED, { ...FALLBACK, domainSeparator: otherSeparator }),
+    );
+    expectMismatch(() => verifyTokenDomain(CONFIGURED, { ...EIP5267, chainId: '8453' }));
+    expectMismatch(() => verifyTokenDomain(CONFIGURED, { ...EIP5267, chainId: 8453n }));
+    expectMismatch(() =>
+      verifyTokenDomain(CONFIGURED, { ...EIP5267, verifyingContract: FEE_ASSET }),
+    );
+    expectMismatch(() =>
+      verifyTokenDomain(CONFIGURED, { ...EIP5267, domainSeparator: otherSeparator }),
+    );
+  });
+
+  it('refuses a reading it cannot check', () => {
+    for (const reading of [
+      omit(FALLBACK, 'domainSeparator'),
+      { ...FALLBACK, domainSeparator: ON_CHAIN_SEPARATOR.toUpperCase().replace('0X', '0x') },
+      { ...FALLBACK, chainId: '84532' },
+      { ...FALLBACK, source: 'config' },
+      omit(FALLBACK, 'source'),
+      { ...EIP5267, fields: '0x1f' },
+      { ...EIP5267, fields: '0x0b' },
+      { ...EIP5267, salt: hex32('01') },
+      { ...EIP5267, extensions: [1n] },
+      { ...EIP5267, chainId: 84532 },
+      { ...EIP5267, chainId: '084532' },
+      omit(EIP5267, 'salt'),
+      { ...EIP5267, extra: 1 },
+      null,
+      [],
+    ]) {
+      expectRefused(() => verifyTokenDomain(CONFIGURED, reading));
+    }
+    expectRefused(() => verifyTokenDomain({ ...CONFIGURED, name: 'USDC' }, FALLBACK));
+    expectRefused(() => verifyTokenDomain({ chainId: 84532 }, FALLBACK));
+    expectRefused(() => verifyTokenDomain({ ...CONFIGURED, chainId: 0 }, FALLBACK));
+  });
+
+  it('never echoes the input in a refusal (I-7)', () => {
+    const marker = 'MARKER-3009';
+    for (const run of [
+      () => verifyTokenDomain(CONFIGURED, { ...FALLBACK, name: marker }),
+      () => verifyTokenDomain(CONFIGURED, { ...FALLBACK, source: marker }),
+      () => verifyTokenDomain({ ...CONFIGURED, verifyingContract: marker }, FALLBACK),
+    ]) {
+      try {
+        run();
+        throw new Error('expected a refusal');
+      } catch (error) {
+        expect(error).toBeInstanceOf(CryptoInputError);
+        expect(String((error as Error).message)).not.toContain(marker);
+      }
+    }
+  });
+
+  it('refuses an authorization whose validBefore is not after validAfter', () => {
+    expectRefused(() => parseReceiveWithAuthorization({ ...AUTH, validAfter: AUTH.validBefore }));
+    expectRefused(() =>
+      parseReceiveWithAuthorization({
+        ...AUTH,
+        validAfter: '1760003601',
+        validBefore: '1760003600',
+      }),
+    );
+    expect(
+      parseReceiveWithAuthorization({
+        ...AUTH,
+        validAfter: '1760003599',
+        validBefore: '1760003600',
+      }),
+    ).toBeDefined();
+  });
+
+  it('is signed by KeyStore.sign712 and recovers the agent address', async () => {
+    const store = new MemoryKeyStore(Uint8Array.from({ length: 32 }, (_, i) => i + 7));
+    const from = encodeHex0x((await store.getPublicBundle()).agentEvm);
+    const domain = verifyTokenDomain(CONFIGURED, FALLBACK);
+    const auth = { ...AUTH, from };
+    const td = receiveWithAuthorizationTypedData(domain, auth);
+    const signature = await store.sign712(td);
+    expect(signature).toMatch(/^0x[0-9a-f]{130}$/);
+    const recovered = await recoverTypedDataAddress({
+      types: omit(RECEIVE_WITH_AUTHORIZATION_TYPES, 'EIP712Domain'),
+      primaryType: 'ReceiveWithAuthorization',
+      domain,
+      message: {
+        ...auth,
+        value: BigInt(auth.value),
+        validAfter: BigInt(auth.validAfter),
+        validBefore: BigInt(auth.validBefore),
+      },
+      signature: signature as `0x${string}`,
+    } as unknown as Parameters<typeof recoverTypedDataAddress>[0]);
+    expect(recovered.toLowerCase()).toBe(from);
   });
 });

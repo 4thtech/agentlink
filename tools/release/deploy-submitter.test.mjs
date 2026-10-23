@@ -766,6 +766,20 @@ describe('head-of-main check', () => {
     expect(run('').ok).toBe(false);
     expect(run('not-a-sha').ok).toBe(false);
   });
+
+  // CHORE-DEPLOY-CATCHUP: run 39905205426 was approved for production, deployed nothing because
+  // main had moved on, and still ended green with only a notice. A superseded production job warns
+  // and says so in the run summary, naming the newer head that the catch-up job hands it to.
+  it('warns and writes a run summary line when main moved on, nothing when current', () => {
+    const NEWER = 'b'.repeat(40);
+    const moved = run(NEWER);
+    expect(moved.output).toMatch(/::warning::/);
+    expect(moved.summary).toMatch(/Superseded/);
+    expect(moved.summary).toContain(NEWER);
+    expect(moved.summary).toMatch(/did not change production/);
+    expect(moved.summary).toMatch(/catch-up/);
+    expect(run(SHA).summary).toBe('');
+  });
 });
 
 describe('production health check', () => {

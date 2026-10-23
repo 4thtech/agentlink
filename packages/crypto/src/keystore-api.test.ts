@@ -4,6 +4,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { DropAuthRequest } from './drop-auth.js';
 import type { TypedData } from './eip712.js';
+import type { DirectTransaction } from './evm-tx.js';
 import type { JsonObject } from './jcs.js';
 import type { PublicIdentity } from './keys.js';
 import {
@@ -98,9 +99,15 @@ describe('KeyStore (type level)', () => {
     >();
   });
 
-  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, signCardPop, signDropRequest and close (G-2); no hpkeOpen', () => {
+  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, signCardPop, signDropRequest, signTransaction (M1-4c-b) and close (G-2); no hpkeOpen', () => {
     expectTypeOf<MethodNames<KeyStore>>().toEqualTypeOf<
-      EnvelopeKeyName | 'getPublicBundle' | 'sign712' | 'signCardPop' | 'signDropRequest' | 'close'
+      | EnvelopeKeyName
+      | 'getPublicBundle'
+      | 'sign712'
+      | 'signCardPop'
+      | 'signDropRequest'
+      | 'signTransaction'
+      | 'close'
     >();
     expectTypeOf<'hpkeOpen'>().not.toExtend<keyof KeyStore>();
   });
@@ -117,6 +124,7 @@ describe('KeyStore (type level)', () => {
       [(EpochOptions | undefined)?]
     >();
     expectTypeOf<Params<KeyStore, 'sign712'>>().toEqualTypeOf<[TypedData]>();
+    expectTypeOf<Params<KeyStore, 'signTransaction'>>().toEqualTypeOf<[DirectTransaction]>();
   });
 });
 

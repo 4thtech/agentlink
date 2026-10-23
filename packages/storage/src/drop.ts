@@ -277,7 +277,15 @@ function partSource(input: ReadableStream<Uint8Array> | Uint8Array): PartSource 
   let pending: Uint8Array | null = null;
   let released = false;
   const next = async (): Promise<Uint8Array | null> => {
-    const { done, value } = await reader.read();
+    let result: ReadableStreamReadResult<Uint8Array>;
+    try {
+      result = await reader.read();
+    } catch (error) {
+      // The caller's stream can throw anything, a URL included (M1-6b-b L4).
+      if (error instanceof StorageError) throw error;
+      throw new StorageError('upload_failed', 'the ciphertext stream failed');
+    }
+    const { done, value } = result;
     if (done) return null;
     if (!(value instanceof Uint8Array)) {
       throw new StorageError('invalid_argument', 'ciphertext stream must yield bytes');

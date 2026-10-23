@@ -395,6 +395,8 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     );
     expect(SqliteStore.readSetting(again, 'journal_mode')).toBe('wal');
     expect(SqliteStore.readSetting(again, 'synchronous')).toBe(2);
+    // M1-7f-2 (IR-M1-7f-2-1 L1): deleted rows, file keys among them, are zeroed on disk.
+    expect(SqliteStore.readSetting(again, 'secure_delete')).toBe(1);
     // IR-M1-8b-1 L-3: the WAL (while the store is open) and the lock file are owner-only too.
     await again.transaction((tx) => tx.insert('seen', seen('b')));
     await again.withInterProcessLock(() => undefined);

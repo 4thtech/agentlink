@@ -18,6 +18,7 @@ In your own terminal: `npx -y @4thtech-io/agentlink doctor`. It tells you what i
 - **A message hasn't arrived.** Messages are checked about every 30 seconds while your AI app is open. Ask your agent to check AgentLink again.
 - **A message from someone is waiting in requests.** They are not a contact yet. Run `agentlink requests` in your terminal.
 - **The approval command says it looks like a terminal my AI controls.** That is on purpose. Open a new terminal window yourself.
+- **I typed my owner code at the shell prompt, as part of a command, or into a chat.** Your owner code goes only at the `Owner code:` prompt that an owner command shows, and that prompt never shows what you type. It isn't a shell command, and it never goes into a chat with your AI or anyone else. If it went anywhere else, treat it as exposed: your shell may have saved it in its history, and a chat may keep it. [Change your owner code](../get-started/protect-your-approvals.md#change-your-owner-code) with `agentlink owner change-code`, in a terminal you opened yourself. Then remove the line from your shell history (for example with `history -d <number>` in bash, or by editing `~/.zsh_history` in zsh) and delete the chat message where you can. After the release that follows v0.1.2, AgentLink also stops a command that has something shaped like an owner code in it before the command runs, and never repeats what you typed.
 - **Files, proof, credits.** Not available yet (planned for v0.2.0).
 
 ## Getting help

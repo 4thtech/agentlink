@@ -226,3 +226,46 @@ describe('runClaim: the limits are unchanged', () => {
     expect(faucet.calls).toHaveLength(0);
   });
 });
+
+// M1-10b-e: a faucet that cannot cover one grant pauses before its wallet is empty.
+describe('runClaim: a paused faucet (M1-10b-e)', () => {
+  it('below one grant: `paused`, nothing sent, nothing charged', async () => {
+    const store = new MemoryStore();
+    const faucet = new FakeFaucet(CHAIN_ID);
+    faucet.tokenUsdCents = BigInt(LIMITS.usdCents - 1);
+    expect(await claim(store, faucet)).toEqual({ ok: false, error: 'paused' });
+    expect(faucet.calls).toHaveLength(0);
+    expect(store.data.size).toBe(0);
+    // Topped up: the same agent claims at once.
+    faucet.tokenUsdCents = BigInt(LIMITS.usdCents);
+    expect((await claim(store, faucet)).ok).toBe(true);
+    expect(faucet.calls).toHaveLength(1);
+  });
+
+  it('a balance read that fails is `unavailable`, sends nothing and charges nothing', async () => {
+    const store = new MemoryStore();
+    const faucet = new FakeFaucet(CHAIN_ID);
+    faucet.failBalances = true;
+    expect(await claim(store, faucet)).toEqual({ ok: false, error: 'unavailable' });
+    expect(faucet.calls).toHaveLength(0);
+    expect(store.data.size).toBe(0);
+  });
+
+  it('a retry after a lost answer still returns its transaction while paused', async () => {
+    const store = new MemoryStore();
+    const faucet = new FakeFaucet(CHAIN_ID);
+    faucet.mode = 'unknown';
+    expect(await claim(store, faucet)).toEqual({ ok: false, error: 'unavailable' });
+    faucet.tokenUsdCents = 0n;
+    expect((await claim(store, faucet, AGENT, IP_B)).ok).toBe(true);
+    expect(faucet.calls).toHaveLength(1);
+  });
+
+  it('an agent inside its window is `already_claimed`, not `paused`', async () => {
+    const store = new MemoryStore();
+    const faucet = new FakeFaucet(CHAIN_ID);
+    expect((await claim(store, faucet)).ok).toBe(true);
+    faucet.tokenUsdCents = 0n;
+    expect(await claim(store, faucet, AGENT, IP_B)).toMatchObject({ error: 'already_claimed' });
+  });
+});

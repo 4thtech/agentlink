@@ -345,14 +345,13 @@ describe('secrets at rest and in logs (I-7, IR-M1-6c-1)', () => {
     const url = own.urls[0] as string;
     const signature = /X-Amz-Signature=([0-9a-f]+)/.exec(url)?.[1] as string;
     const objectKey = /\/o\/([0-9a-f]{32})/.exec(url)?.[1] as string;
-    const payload = JSON.parse(
-      await b.cipher.open(
-        { table: 'envelopes', column: 'payload_json', rowKey: rowKeyOf([envelopeId]) },
-        (await b.store.transaction((tx) => tx.get('envelopes', { envelope_id: envelopeId })))
-          ?.payload_json as Sealed,
-      ),
-    ) as JsonObject;
-    const fileKey = fileEntry(payload).fileKey as string;
+    // M1-7f-2 (D-98): the receiver keeps the file key in its sealed `files` row, not the payload.
+    const fileKey = await b.cipher.open(
+      { table: 'files', column: 'file_key', rowKey: rowKeyOf([envelopeId, 0]) },
+      (await b.store.transaction((tx) => tx.get('files', { envelope_id: envelopeId, idx: 0 })))
+        ?.file_key as Sealed,
+    );
+    expect(fileKey).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(a.lines.length + b.lines.length).toBeGreaterThan(0);
     const canaries = [url, signature, objectKey, fileKey, 'report.pdf', 'PLAINTEXT-MARKER-7f'];
     for (const line of [...a.lines, ...b.lines]) {

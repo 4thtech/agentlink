@@ -290,11 +290,16 @@ export class PairingService implements PairingHandler {
       expiresAt: invite.expiresAt,
     });
     // M1-9ze: the counterparty staged (and sealed to, below) must be the contact this invite names,
-    // the one step 1 verified and the approval showed. Anything else is refused before any write,
-    // with the fixed invite error: no inbound text or key material in it (I-2, I-5).
+    // the one step 1 verified and the approval showed. M1-9zf: that binds the owner too (step 2
+    // shows the owner fingerprint) and the whole card, by its sha256(JCS) hash, so a card with the
+    // same contact id but another owner, keys or epoch is refused. Anything else is refused before
+    // any write, with the fixed invite error: no inbound text or key material in it (I-2, I-5).
+    const staged = prepared.staged.card;
     if (
-      prepared.staged.card.agentEvm !== contact.id ||
-      agentNostrKey(prepared.staged.card) !== agentNostrKey(checked.card)
+      staged.agentEvm !== contact.id ||
+      agentNostrKey(staged) !== agentNostrKey(checked.card) ||
+      ownerFingerprintHex(staged) !== contact.ownerFingerprint.long ||
+      encodeHex(agentCardJcsHash(staged)) !== encodeHex(agentCardJcsHash(checked.card))
     ) {
       throw new CoreError('invite_invalid', 'The invite link is not valid.');
     }
