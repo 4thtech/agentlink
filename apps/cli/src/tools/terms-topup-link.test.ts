@@ -120,7 +120,10 @@ describe.each([
     expect(r.structured).toMatchObject({ proof: { status: 'needs_credits', receipts: [] } });
     // No other URL anywhere in the result (text or structured).
     const dumped = `${r.text}\n${JSON.stringify(r.structured)}`;
-    const urls = new Set(dumped.match(/https?:\/\/[^\s"\\)]+/g) ?? []);
+    // A URL at the end of a sentence: the full stop is not part of it.
+    const urls = new Set(
+      (dumped.match(/https?:\/\/[^\s"\\)]+/g) ?? []).map((u) => u.replace(/[.,]$/, '')),
+    );
     expect([...urls]).toEqual([link]);
     expect(dumped).not.toContain('CANARY');
   });
