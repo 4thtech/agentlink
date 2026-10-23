@@ -5208,7 +5208,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Mainnet is unaffected; faucet rate limits and caps hold; no secret reaches the faucet; threat note and tests-first evidence (S2).
 
 #### M1-36a-b · remaining bare `agentlink` prefixes; owner init on fresh machines (new, IR-M1-36a-1 scope low)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, doctor strings (`tools/strings/en.ts`), `packages/node/src/approval-page.ts`, the owner-init redirect message, owner `strings.ts:65`
 - **Depends on:** M1-36a, M1-36b, M1-36d
 - **Spec:** 06 §2.5; 11 §5

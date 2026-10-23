@@ -48,7 +48,7 @@ import {
 } from './result.js';
 import { notarizeOutput, notarizeWithFreeCredits, proofThrown } from './proofs-common.js';
 import { copy } from './strings/index.js';
-import { TOOL_TEXT, noOwnerCard } from './text.js';
+import { TOOL_TEXT, noOwnerCard, noOwnerResult } from './text.js';
 
 /** Fixed text for this tool (I-5: no slot takes another party's or the agent's text). */
 export const SEND_TEXT = Object.freeze({
@@ -163,11 +163,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   const { client, logger } = context;
   const self = await client.self();
   if (self === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
   // Without the proof platform nothing is sent: the user asked for a message with proof.
   if (withProof && client.proofs === undefined) return notAvailable();
