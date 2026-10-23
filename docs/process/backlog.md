@@ -68,9 +68,9 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 324 (M1a 91, M1b 233) |
+| M1 Local beta | 330 (M1a 91, M1b 239) |
 | M2 Console, desktop apps, self-host, design | 49 |
-| M3 Mainnet beta | 34 |
+| M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
 
 Other sections:
@@ -4657,6 +4657,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-2, I-5
 - **Scope:**
   - Wire the static invite page deploy to Cloudflare (D-28). No pattern exists yet in `.github/workflows/`; follow the submitter and drop pipelines (staging on merge, smoke test, production on green, health check and rollback, `DEPLOY_FREEZE`).
+  - Owner (IR on #492): settle the invite production hostname before production Cloudflare credentials are set; a DNS conflict would trigger the repo-wide freeze.
   - The page recomputes `nameHash` from the name it shows and compares it with the payload's; a mismatch shows the invite as damaged and no prompt.
 - **Acceptance:** tests first: a payload whose `nameHash` does not match the shown name yields no prompt; a matching one still yields the template plus canonical link; the deploy workflow passes the workflow checks and the smoke test runs against staging.
 
@@ -5867,6 +5868,100 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Filled logs go to the private audit store, never to this repository.
   - Card counts are recounted after #449 lands (this PR does not touch the count rows).
 
+#### DOCS-06-TOPUP-b · 06 §2.4 with-link `nextStep` shape shows the disclosure sentence (new, follow-up of DOCS-06-TOPUP (#482))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation; proposed, owner confirms at merge) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-and-agent-interface.md` §2.4
+- **Depends on:** DOCS-06-TOPUP
+- **Scope:**
+  - The with-link `nextStep` shape in 06 §2.4 omits the `topUpDisclosure()` sentence that the code adds. Add it to the shape so spec and tool output agree.
+- **Acceptance:**
+  - The §2.4 example for the with-link case includes the `topUpDisclosure()` sentence, and a grep of 06 finds no other shape that omits it.
+
+#### PROC-ORCH-PLAYBOOK-b · orchestrator playbook lows (new, follow-up of IR-2 on #488)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process; `.github` untouched; the script is a process tool) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/runbooks/merge-and-release.md`, `docs/runbooks/ci-red.md`, the orchestrator playbook, the `record-ir.py` helper
+- **Depends on:** PROC-ORCH-PLAYBOOK
+- **Scope:**
+  - `docs/runbooks/merge-and-release.md:34` and `docs/runbooks/ci-red.md:67` still say `--auto --squash`; align it with the merge-queue wording the playbook uses.
+  - Playbook: change "where the owner asked for one" to "where §1.1/§8 require one".
+  - `record-ir.py` with a trailing `--owner-merge` and no value ends in a traceback; it should print a usage error and exit 2.
+- **Acceptance:**
+  - A test (or fixture run) of `record-ir.py --owner-merge` with no value exits 2 with a usage message and no traceback.
+  - A grep finds no `--auto --squash` in the runbooks, and the playbook wording reads as above.
+
+#### CHORE-CI-QUEUE-DEDUPE-b · comment and doc text about which job scans secrets on merge-queue runs (new, follow-up of IR-1 on #491)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** sensitive (`.github/**`; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/secret-scan-branches.yml`, `docs/process/ci-cd.md`
+- **Depends on:** CHORE-CI-QUEUE-DEDUPE (#491); fold into DOCS-RUNBOOKS-1023-b (in #483) where it fits
+- **Scope:**
+  - The comment in `secret-scan-branches.yml` and the #491 threat note say `security.yml` `merge_group` scans secrets. It does not (line 103 skips it); say which job does.
+  - `ci-cd.md:9` push-trigger text must also exclude `gh-readonly-queue/**`.
+- **Acceptance:**
+  - The comment and the doc line match the workflow files; the workflow checks pass; no trigger or step changes.
+
+#### M1-6b-d-b · abort-incomplete lifecycle: empty element, and status wording (new, follow-up of IR-1 on #485)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (storage) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/storage` (lifecycle read), `README.md` status text
+- **Depends on:** M1-6b-d
+- **Scope:**
+  - An empty `<AbortIncompleteMultipartUpload></AbortIncompleteMultipartUpload>` element reads as the rule being kept. It must read as dropped.
+  - README and status text say "gasless top-up"; the word "gas" is technical status text. Consider "credits top-up without fees" (11 §5).
+- **Acceptance:**
+  - Tests first: a lifecycle document with the empty element is reported as the rule dropped; a document with a day count still reads as kept.
+  - The docs vocabulary check passes; the status wording is reviewed against 11 §5 (change it only if the owner agrees).
+
+#### M1-34-c-b · receipt retry: acknowledge no longer blocks on a lagging RPC (new, follow-up of IR-1 on #489)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter, `packages/core` receipt path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/submitter`, `packages/core`, the `agentlink_acknowledge` tool
+- **Depends on:** M1-34-c
+- **Scope:**
+  - The acknowledge tool waits about 3 s when the RPC lags. Return at once with the receipt pending and let the retry finish in the background, or document the wait in the tool summary.
+  - The window where a direct post and the sync post both send is idempotent, but the retry sleep widens it. Add a test that two posts in that window end in one stored receipt.
+- **Acceptance:**
+  - Tests first: acknowledge against a lagging RPC returns within the tool budget; a direct post plus a sync post yield exactly one receipt; no test weakened.
+
+#### M1-36b-2-b · add-agent with an existing signed policy, and first rules in the local UI (new, follow-up of IR-1 on #493)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/core`, `packages/node`, owner signing) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core`, `packages/node`, `apps/local-ui` (first-run owner setup)
+- **Depends on:** M1-36b-2
+- **Scope:**
+  - Add a test for add-agent when a signed policy already exists: core refuses with `stale_version` and node reports `failed`. Decide whether node should re-read the version and retry once, or report a plain message.
+  - The local-UI first-run owner setup still signs no first policy. Make it sign the same first rules (Send folder) as `init` does, in the same owner-code entry.
+- **Acceptance:**
+  - Tests first: add-agent over an existing policy ends in the decided outcome with a plain message; the local-UI first run leaves a signed first policy and the agent can send to the Send folder.
+
+#### M1-7f-3-b · files: expiry assertions and refresh-link lows (new, follow-up of IR-1 on #498)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core` files) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (files), test storage doubles
+- **Depends on:** M1-7f-3
+- **Scope:**
+  - `MemoryOwnStorage.presignGet` ignores its expiry. Add a deadline assertion in the double and a test that uses it.
+  - Refresh-link on a drop entry returns `NOT_REFRESHABLE` locally, without a call.
+  - `#take` checks that the original state is `ok` before it takes.
+  - The rest of M1-7f-3 stays open as listed in #498: receipt trigger, old-key backfill, expiry cursor, sent copies, D-53 re-hash, SentFile name and hash, and the drop expiry test against the Worker. Keep those on M1-7f-3.
+- **Acceptance:**
+  - Tests first: a presigned URL past its deadline is refused by the double; a drop entry refresh returns `NOT_REFRESHABLE` with no network call; `#take` on a non-ok entry does not take.
+
+#### M1-35b-b-c · approvals review: the local UI implements `onPrune` (new, follow-up of IR-2 on #500)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (policy and approval UI) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui`
+- **Depends on:** M1-35b-b, M1-11b-4
+- **Scope:**
+  - The components call `onPrune` when a card goes away. The local UI caller must implement it so a returning card shows nothing selected; otherwise the old pick reappears, visibly.
+- **Acceptance:**
+  - Test: select an option on a card, let the card go and come back; nothing is selected.
+
+#### M1-11r-d-b · activity read API lows (new, follow-up of IR-1 on #503)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`packages/core` read API) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (activity), M1-11r-d consumers
+- **Depends on:** M1-11r-d
+- **Scope:**
+  - Compute `unknownSenderCodesTx` once per page, not per row.
+  - Remove the dead `delivery ?? queued` fallback.
+  - The consumer in #417 must render file names as data (escaped text), never as markup.
+- **Acceptance:**
+  - Tests first: one page does one `unknownSenderCodesTx` computation (spy count); a file name with markup renders as text in the #417 view.
+
 ---
 
 ## 4. M2 — Owner console, desktop apps, self-host, design
@@ -7047,6 +7142,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Acceptance:**
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
   - A fixture PR touching only `docs-site/` is derived as S1 by `review-gate`.
+
+#### M3-4b-t-T4-ab-reconcile · gasless top-up: reconcile the core step and the CLI port (new, follow-up of IR-1 on #494 and #490)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core`, `apps/cli`) · **Phase:** M3
+- **Repo/path:** agentlink · `packages/core` (T4-a step), `apps/cli` (T4-b port)
+- **Depends on:** M3-4b-t-T4-a (#494), M3-4b-t-T4-b (#490); starts after both merge
+- **Scope:**
+  - Use the core `DepositAuthPort` type in the CLI instead of the local copy.
+  - A remote `gasless_unavailable` fails over to the next URL, then ends `unavailable`. A local pre-send refusal stays `refused` with `gasless_unavailable`.
+  - Lows: check the body length before reading it whole (`bodyOf`); a 200 with `failed` or `rate_limited` honours `Retry-After`.
+- **Acceptance:**
+  - Tests first: a first URL answering `gasless_unavailable` fails over to the second, and both failing ends `unavailable`; the local pre-send refusal is unchanged; an oversized body is refused before it is read; `Retry-After` on a 200 `rate_limited` is honoured.
 
 ---
 
