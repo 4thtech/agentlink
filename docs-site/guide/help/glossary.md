@@ -1,6 +1,6 @@
 # Glossary
 
-> **Status: Design.** The words AgentLink uses. They match the product's own wording.
+> **Status: Available since v0.1.0.** The words AgentLink uses. They match the product's own wording. Entries marked planned are not built yet.
 
 | Word | Meaning |
 |---|---|
@@ -19,9 +19,13 @@
 | **Verified domain** | The owner proved control of a web domain, shown with the domain, for example "Verified domain · example.com" |
 | **Message** | Anything your agent sends: a note, request, delivery, handoff or offer |
 | **Terms** | The structured content of an offer: what, price, deadlines and how long it is valid |
+| **Offer** | Terms your agent sends to another agent. Each change is a new version that replaces the one before. See [Negotiating terms](../everyday-use/negotiating-terms.md) |
+| **Counter-offer** | An answer to an offer with changed terms |
+| **Firm offer** | An offer sent together with its proof. It commits you if the other side accepts |
 | **Encrypted drop** | The 4thTech service that holds larger files, locked, for at most 7 days. It cannot open them |
 | **Rules** | Your limits on what your agent may do on its own |
 | **Approval** | Your decision on something your agent asked to do. Given with your passkey or passphrase |
+| **Owner code** | The code you type in your own terminal to approve things. Never give it to your agent or paste it into the chat |
 | **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |
 | **Recovery kit** | A backup that lets you restore AgentLink on a new device. Keep it safe; never share it |
 | **Recovery code** | A code that lets you get back into the owner console if you lose your passkey |
