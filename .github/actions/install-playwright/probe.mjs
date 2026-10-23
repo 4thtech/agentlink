@@ -7,12 +7,15 @@ import { createRequire } from 'node:module';
 const names = (process.env.BROWSERS ?? '').split(/\s+/).filter(Boolean);
 const require = createRequire(`${process.cwd()}/`);
 const failed = [];
+const failing = []; // browsers that exist but cannot start
+let unclear = false; // an error we cannot tie to one browser
 try {
   const pw = require('playwright');
   for (const name of names) {
     const type = pw[name];
     if (!type || typeof type.launch !== 'function') {
       failed.push(`${name}: unknown browser`);
+      unclear = true;
       continue;
     }
     try {
@@ -20,13 +23,17 @@ try {
       await browser.close();
     } catch (e) {
       failed.push(`${name}: ${String(e?.message ?? e).split('\n')[0]}`);
+      failing.push(name);
     }
   }
 } catch (e) {
   failed.push(`probe error: ${String(e?.message ?? e).split('\n')[0]}`);
+  unclear = true;
 }
 if (failed.length > 0) {
   console.log(failed.join('\n'));
+  // Only a clean list of failing browsers narrows the apt work; anything unclear installs for all.
+  if (!unclear) console.log(`failing=${failing.join(' ')}`);
   process.exit(1);
 }
 console.log('ok');

@@ -64,12 +64,22 @@ runs:
       run: |
         set -uo pipefail
         missing=false
+        failing=$BROWSERS
         if [ "$RUNNER_OS" = "Linux" ]; then
-          if ! timeout 240 node "$PROBE"; then
+          out="$(timeout 240 node "$PROBE")" && rc=0 || rc=$?
+          printf '%s\n' "$out"
+          if [ "$rc" -ne 0 ]; then
             missing=true
+            # A clean "failing=<names>" line narrows apt to those browsers; anything else (crash,
+            # timeout, unknown name, probe error) keeps the full list.
+            line="$(printf '%s\n' "$out" | grep '^failing=' | tail -n 1 || true)"
+            if [ -n "$line" ] && [ -n "${line#failing=}" ]; then
+              failing="${line#failing=}"
+            fi
           fi
         fi
         echo "missing=$missing" >> "$GITHUB_OUTPUT"
+        echo "failing=$failing" >> "$GITHUB_OUTPUT"
 
     # Only now apt. Short timeouts and retries: the CI failure was ~250 timeouts of 30 s from
     # azure.archive.ubuntu.com, one after another. The settings only apply to this runner.
@@ -87,7 +97,7 @@ runs:
       continue-on-error: true
       shell: bash
       env:
-        BROWSERS: ${{ inputs.browsers }}
+        BROWSERS: ${{ steps.libs.outputs.failing }}
       run: |
         set -euo pipefail
         # shellcheck disable=SC2086
@@ -97,7 +107,7 @@ runs:
       if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true' && steps.deps1.outcome == 'failure'
       shell: bash
       env:
-        BROWSERS: ${{ inputs.browsers }}
+        BROWSERS: ${{ steps.libs.outputs.failing }}
       run: |
         set -euo pipefail
         echo "::warning::Playwright system libraries failed once (slow or unreachable mirror); retrying."

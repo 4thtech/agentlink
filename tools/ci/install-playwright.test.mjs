@@ -84,6 +84,16 @@ describe("probe.mjs (Playwright's own host validation)", () => {
     expect(r.stdout.trim()).toBe('ok');
   });
 
+  it('names only the failing browsers, and no list at all when the cause is unclear', () => {
+    const src = readFileSync(probe, 'utf8');
+    expect(src).toContain('failing=');
+    const deps = readFileSync(join(root, '.github/actions/install-playwright/action.yml'), 'utf8');
+    expect(deps.match(/BROWSERS: \$\{\{ steps\.libs\.outputs\.failing \}\}/g)?.length).toBe(2);
+    expect(deps).toContain('echo "failing=$failing" >> "$GITHUB_OUTPUT"');
+    // unknown name: unclear, so no failing= line and the caller keeps the full list
+    expect(run('nosuchbrowser').stdout).not.toContain('failing=');
+  });
+
   it('fails towards installing the libraries on an unknown browser', () => {
     const r = run('nosuchbrowser');
     expect(r.status).toBe(1);
