@@ -1,0 +1,52 @@
+# Deploy reconcile (CHORE-DEPLOY-RECONCILE): production cannot stay behind main for long. The
+# catch-up job of deploy-submitter.yml and deploy-drop.yml hands a run that did not deploy to main's
+# head, but when the head's own CI flakes while it is still the head, and the later merges do not
+# touch the deploy paths, no deploy run starts again. Once an hour this compares, per service, the
+# commit production runs (the newest run whose deploy-production job deployed) with main's head; when
+# a commit in between touched the workflow's `on.push.paths`, the head's CI is green and no run for
+# the head is in flight, it dispatches the deploy workflow on main (at most once per service per
+# tick, and at most twice per head in all). Logic and tests: tools/release/reconcile-deploy.mjs and
+# reconcile-deploy.test.mjs.
+#
+# D-52: the dispatched run is an ordinary deploy run: it waits for the head's own green CI and
+# passes staging, the smoke test, the `production` environment, DEPLOY_FREEZE and the head-of-main
+# check. This workflow deploys nothing and holds no deploy credential. While DEPLOY_FREEZE is set it
+# does nothing (the job is skipped, and the script re-checks the variable).
+name: Deploy reconcile
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: reconcile
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write # dispatch the deploy workflows on main; the only job here, and it holds no other write
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Dispatch a deploy for each service that lags main's green head
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          node tools/release/reconcile-deploy.mjs \
+            --workflow deploy-submitter.yml \
+            --workflow deploy-drop.yml

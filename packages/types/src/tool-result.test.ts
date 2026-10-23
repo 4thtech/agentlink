@@ -150,7 +150,6 @@ describe('toolResult(): the common fields plus a tool-specific shape', () => {
     );
     expectRoundTrip(notarizeResult, {
       status: 'pending_approval',
-      chain: 'base',
       receipts: [],
       summary: 'Notarize for $0.10',
       approvalId: APPROVAL_ID,

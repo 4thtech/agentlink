@@ -13,6 +13,9 @@
 // - `occNotaryClientAbi` and `occFeeVaultClientAbi` are what client code binds to: the `client`
 //   functions of tags.ts plus every event and error (the inherited OpenZeppelin ones included) for
 //   decoding. The full interface ABIs are exported for decoding and review, not for calls.
+// - `occFeeVaultRelayAbi` is the submitter's: only the `relay` function (`depositWithAuthorization`,
+//   the gasless top-up it sends on an agent's behalf) plus every event and error. Client code never
+//   binds it (D-89).
 // - Addresses: Base Sepolia (84532) and Gnosis Chiado (10200), testnets in development (05 §9). No mainnet entry exists
 //   and the check refuses one.
 // - The EIP-712 types (domain, Record, Receipt) are not here: they live in @4thtech-io/crypto, and
@@ -35,6 +38,7 @@ import {
   NOTARY_FUNCTION_TAGS,
   type ClientFunctionName,
   type FunctionTag,
+  type RelayFunctionName,
 } from './tags.js';
 
 export const packageName = '@4thtech-io/occ-v2-abi';
@@ -45,6 +49,7 @@ export {
   NOTARY_FUNCTION_TAGS,
   type ClientFunctionName,
   type FunctionTag,
+  type RelayFunctionName,
 } from './tags.js';
 
 function deepFreeze<T>(value: T): T {
@@ -82,27 +87,52 @@ export type ClientAbi<Abi extends readonly AbiEntry[], Tags> = readonly (
   | NonFunction<typeof ozAbi>
 )[];
 
-function clientAbi<Abi extends readonly AbiEntry[], Tags extends Record<string, FunctionTag>>(
-  abi: Abi,
-  tags: Tags,
-): ClientAbi<Abi, Tags> {
+/** A relay ABI: the relay-tagged functions, plus every event and error for decoding. */
+export type RelayAbi<Abi extends readonly AbiEntry[], Tags> = readonly (
+  | Extract<Abi[number], { readonly type: 'function'; readonly name: RelayFunctionName<Tags> }>
+  | NonFunction<Abi>
+  | NonFunction<typeof ozAbi>
+)[];
+
+/** The functions of `abi` tagged `tag`, plus every event and error (inherited OpenZeppelin ones too). */
+function taggedAbi(
+  abi: readonly AbiEntry[],
+  tags: Record<string, FunctionTag>,
+  tag: 'client' | 'relay',
+): AbiEntry[] {
   const items: AbiEntry[] = abi.filter(
-    (item) => item.type !== 'function' || tags[item.name ?? ''] === 'client',
+    (item) => item.type !== 'function' || tags[item.name ?? ''] === tag,
   );
   const seen = new Set(items.map((item) => `${item.type}:${item.name ?? ''}`));
   for (const item of ozAbi) {
     if (!seen.has(`${item.type}:${item.name}`)) items.push(item);
   }
-  return deepFreeze(items) as unknown as ClientAbi<Abi, Tags>;
+  return deepFreeze(items);
+}
+
+function clientAbi<Abi extends readonly AbiEntry[], Tags extends Record<string, FunctionTag>>(
+  abi: Abi,
+  tags: Tags,
+): ClientAbi<Abi, Tags> {
+  return taggedAbi(abi, tags, 'client') as unknown as ClientAbi<Abi, Tags>;
 }
 
 /** OCCNotary for client code: notarize, acknowledge and views; no admin or upgrade function. */
 export const occNotaryClientAbi = clientAbi(occNotaryAbi, NOTARY_FUNCTION_TAGS);
 /**
  * OCCFeeVault for client code: deposits, withdrawals, credits, quotes and views. No admin, module,
- * integrator or maintenance function, and no `depositWithAuthorization` until M1-3c.
+ * integrator or maintenance function, and no `depositWithAuthorization` (relay-only, D-89).
  */
 export const occFeeVaultClientAbi = clientAbi(occFeeVaultAbi, FEE_VAULT_FUNCTION_TAGS);
+/**
+ * OCCFeeVault for the submitter only (M3-4b-t-0; 05 §2.5; 07 §7): `depositWithAuthorization`, the
+ * gasless EIP-3009 top-up it relays for an agent, plus every event and error. Never client code.
+ */
+export const occFeeVaultRelayAbi = taggedAbi(
+  occFeeVaultAbi,
+  FEE_VAULT_FUNCTION_TAGS,
+  'relay',
+) as unknown as RelayAbi<typeof occFeeVaultAbi, typeof FEE_VAULT_FUNCTION_TAGS>;
 
 /** An EVM address as the release spells it (EIP-55 mixed case). */
 export type Address = `0x${string}`;

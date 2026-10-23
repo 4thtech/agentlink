@@ -171,6 +171,25 @@ describe('credits (06 §8)', () => {
     }
   });
 
+  it('M1-36f: plain words only, with one next step when nothing answered', async () => {
+    // No network talk, no "public record": what it is, and what to do.
+    const all = Object.values(CREDITS_TEXT).join('\n');
+    expect(all).not.toMatch(/network|public record|blockchain|on-chain|\bchain\b/i);
+    expect(vocabularyHits(all)).toEqual([]);
+    expect(CREDITS_TEXT.testCredits).toBe(
+      "These are free test credits for the beta. They aren't real money.",
+    );
+    expect(CREDITS_TEXT.creditsUnknown).toBe(
+      "Credits: can't be checked right now. Try again in a few minutes.",
+    );
+    expect(CREDITS_TEXT.unavailable).toBe(
+      "Can't check right now how much to add. Try again in a few minutes.",
+    );
+    const t = setup({ account: undefined });
+    const r = await t.run(['credits']);
+    expect(r.text).not.toMatch(/network|public record/i);
+  });
+
   it('without proofs in this build: a fixed line', async () => {
     const t = setup({ proofs: false });
     const r = await t.run(['credits']);

@@ -18,7 +18,12 @@ export interface OccV2Contracts {
     readonly native: boolean;
     readonly symbol: string;
   }[];
-  /** False until the vault accepts EIP-3009 deposits (M1-3c); clients use deposit/depositFor. */
+  /**
+   * Whether this chain's vault accepts `depositWithAuthorization` (the gasless EIP-3009 top-up,
+   * M1-3c): true on Base Sepolia from v0.1.0-testnet.4. The submitter sends it (relay ABI); the
+   * client never does. registry.ts composes it into `feeTokens[].eip3009` behind
+   * `GASLESS_TOPUP_ENABLED`.
+   */
   readonly depositWithAuthorization: boolean;
   readonly testnet: boolean;
 }

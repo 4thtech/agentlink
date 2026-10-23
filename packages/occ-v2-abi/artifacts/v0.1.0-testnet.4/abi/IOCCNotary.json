@@ -647,6 +647,11 @@
   },
   {
     "inputs": [],
+    "name": "DepositMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "EnforcedPause",
     "type": "error"
   },
