@@ -1095,9 +1095,10 @@ describe('IR-M1-11s-c-1 L-6: a file-KeyStore owner refuses setup too (D-78)', ()
   }
 
   it('defaults to the owner files under the home folder', () => {
+    // Built with node:path `join` so the expectation uses the platform separator (Windows CI).
     expect(defaultOwnerFiles('/home/u')).toEqual([
-      '/home/u/.agentlink/keystore/owner.alko',
-      '/home/u/.agentlink/keystore/owner.alkp',
+      join('/home/u', '.agentlink', 'keystore', 'owner.alko'),
+      join('/home/u', '.agentlink', 'keystore', 'owner.alkp'),
     ]);
   });
 });
