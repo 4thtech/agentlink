@@ -1424,6 +1424,10 @@ body {
 .al-dot.is-paused {
   border: var(--al-border-width-thick) solid var(--al-color-status-neutral-icon);
 }
+.al-dot.is-checking {
+  border: var(--al-border-width-thin) solid var(--al-color-status-neutral-icon);
+}
+.al-dot.is-disconnected,
 .al-dot.is-offline {
   background: transparent;
   border: var(--al-border-width-thin) dashed var(--al-color-status-neutral-icon);
