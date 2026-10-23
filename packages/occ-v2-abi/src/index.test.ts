@@ -15,6 +15,7 @@ import {
   occErrorsAbi,
   occFeeVaultAbi,
   occFeeVaultClientAbi,
+  occFeeVaultRelayAbi,
   occManagedAbi,
   occNotaryAbi,
   occNotaryClientAbi,
@@ -57,9 +58,9 @@ describe('@4thtech-io/occ-v2-abi', () => {
     expect(packageName).toBe('@4thtech-io/occ-v2-abi');
     expect(OCC_V2_RELEASE).toEqual({
       repository: '4thtech/occ-v2-contracts',
-      tag: 'v0.1.0-testnet.3',
-      sourceCommit: '26e7d0a8da8c7dda67256ea05bf91a592fcc77f8',
-      manifestSha256: '4dc60bdfeaaf286c1198a678a1abafd9537dc6a316fa0b781c8bb9e97948b999',
+      tag: 'v0.1.0-testnet.4',
+      sourceCommit: 'd4f4c79d783d87cca90409e5084b8c466bb67cfd',
+      manifestSha256: '4d2bfc98e71da1ed3b60fed574c0333ee945a17e701e32bfab10d6cab5bb436e',
       compiler: '0.8.37+commit.f401782d',
     });
   });
@@ -110,14 +111,33 @@ describe('@4thtech-io/occ-v2-abi', () => {
     );
   });
 
-  it('keeps depositWithAuthorization out of the client ABI while no chain enables it (M1-3c)', () => {
-    expect(FEE_VAULT_FUNCTION_TAGS.depositWithAuthorization).toBe('pending');
+  it('tags depositWithAuthorization relay-only: in the relay ABI, never in the client ABI (D-89)', () => {
+    expect(FEE_VAULT_FUNCTION_TAGS.depositWithAuthorization).toBe('relay');
+    expect(Object.values(FEE_VAULT_FUNCTION_TAGS)).not.toContain('pending');
     expect(functionNames(occFeeVaultClientAbi)).not.toContain('depositWithAuthorization');
-    for (const chainId of DEPLOYMENT_CHAIN_IDS) {
-      const deployment = getDeployment(chainId);
-      expect(deployment?.capabilities.depositWithAuthorization).toBe(false);
-      for (const token of deployment?.feeTokens ?? []) expect(token.eip3009).toBe(false);
+    // The submitter's relay ABI: exactly the relay-tagged function, plus every event and error.
+    expect(functionNames(occFeeVaultRelayAbi)).toEqual(['depositWithAuthorization']);
+    for (const name of NEVER_CLIENT) expect(functionNames(occFeeVaultRelayAbi)).not.toContain(name);
+    for (const type of ['event', 'error']) {
+      expect(namesOf(occFeeVaultRelayAbi, type)).toEqual(
+        [
+          ...new Set([
+            ...namesOf(occFeeVaultAbi, type),
+            ...namesOf(openZeppelinInheritedAbi, type),
+          ]),
+        ].sort(),
+      );
     }
+    expect(Object.isFrozen(occFeeVaultRelayAbi)).toBe(true);
+  });
+
+  it('enables the gasless top-up on Base Sepolia only (v0.1.0-testnet.4, M1-3c)', () => {
+    expect(getDeployment(84532)?.capabilities.depositWithAuthorization).toBe(true);
+    expect(getDeployment(84532)?.feeTokens.map((t) => [t.symbol, t.eip3009])).toEqual([
+      ['USDC', true],
+    ]);
+    expect(getDeployment(10200)?.capabilities.depositWithAuthorization).toBe(false);
+    for (const token of getDeployment(10200)?.feeTokens ?? []) expect(token.eip3009).toBe(false);
   });
 
   it('keeps every event and error, including the inherited OpenZeppelin ones, for decoding', () => {
@@ -159,7 +179,7 @@ describe('@4thtech-io/occ-v2-abi', () => {
       name: 'Base Sepolia',
       testnet: true,
       schemaVersion: 1,
-      capabilities: { depositWithAuthorization: false },
+      capabilities: { depositWithAuthorization: true },
     });
     const evm = /^0x[0-9a-fA-F]{40}$/;
     expect(Object.keys(base?.contracts ?? {}).sort()).toEqual([
@@ -172,7 +192,7 @@ describe('@4thtech-io/occ-v2-abi', () => {
     expect(base?.feeTokens).toHaveLength(1);
     expect(base?.feeTokens[0]).toMatchObject({
       decimals: 6,
-      eip3009: false,
+      eip3009: true,
       native: false,
       symbol: 'USDC',
     });
