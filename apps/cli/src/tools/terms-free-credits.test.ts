@@ -35,14 +35,16 @@ const PAUSED = 'Free test credits are paused right now. Try again later.';
 /** 11 §5: never these words in a result about free test credits. */
 const JARGON = /faucet|\bgas\b|\btokens?\b|wallet|transaction|sepolia|chain|USDC|https?:\/\//i;
 
-const topUp = (chainId = 84532) => ({
-  chainId,
-  chain: chainId === 84532 ? 'base-sepolia' : 'base',
-  token: 'USDC',
-  usd: '1.00',
-  feeUsd: '0.10',
-  agentAddress: A as `0x${string}`,
-});
+type TopUpRoute = NonNullable<Extract<ProposeTermsResult, { status: 'needs_credits' }>['topUp']>;
+const topUp = (chainId = 84532): TopUpRoute =>
+  ({
+    chainId,
+    chain: chainId === 84532 ? 'base-sepolia' : 'base',
+    token: 'USDC',
+    usd: '1.00',
+    feeUsd: '0.10',
+    agentAddress: A as `0x${string}`,
+  }) as TopUpRoute;
 
 function contact(): ContactView {
   return {

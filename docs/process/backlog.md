@@ -5426,7 +5426,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests: claim then one retry; no second retry; timeout returns the plain `needs_credits` text; threat note and tests-first evidence (S2).
 
 #### M1-36i-d · terms tools claim free test credits on needs_credits (new, D-120 (3))
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/propose-terms.ts`, `apps/cli/src/tools/respond-to-terms.ts` and their tests only (not `notarize.ts`, `send.ts` or `proofs-common.ts`, which M1-36i-c owns)
 - **Depends on:** M1-36i, M1-36i-c
 - **Spec:** 06 §2.5
