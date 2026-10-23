@@ -25,11 +25,18 @@ bytes, the old alg `A256GCM` and the whole earlier envelope form are refused; a 
 and confirmed with `cryptography`) opens only under the CEK its `kc` commits to; a signature by
 another key, over the untagged hash, or under the owner-action tag (04 §2.5.1) does not verify.
 
+Version 3 (M1-1h-b, D-128): `verifyJson` cases give the reference envelope as received JSON text
+(04 §3.1.1 step 3, §2.5.1 "Received text"). Its JCS text and an escape inside a string value are
+accepted; a member name written with an escape (at the top, in `aead`, in a recipient, upper-case
+hex, an escaped duplicate), a duplicate member name at each depth and a non-integer `createdAt`
+token are refused, each text parsing to exactly the valid signed envelope.
+
 Usage: python3 -I tools/vectors/generate_aead_envelope.py --check [FILE] | --write
 """
 
 import copy
 import hmac
+import json
 import re
 import sys
 from pathlib import Path
@@ -39,7 +46,8 @@ import generate_hpke as hpke  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "aead-envelope"
-VERSION = 2
+VERSION = 3
+SPEC_TEXT = "04 §3.1.1 step 3, §2.5.1 Received text (D-128)"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 OWNER_ACTION_TAG = "agentlink/owner-action/v1"
 AEAD_ALG = "A256GCM-KC"
@@ -528,6 +536,44 @@ def build():
         if (case_id.startswith(("kc-", "alg-", "missing-kc")) or case_id == "earlier-form") and not verify(m):
             v.fail(f"validate-reject-{case_id}: the signature is not valid, so the structure check is not isolated")
         cases.append(v.case(f"validate-reject-{case_id}", f"{STRUCTURE}: {why}; rejected, never normalised", {"op": "validate", "envelope": m}, {"outcome": "reject"}))
+
+    # 04 §3.1.1 step 3 and §2.5.1 "Received text" (D-128, M1-1h-b): the envelope is parsed from the
+    # exact text received. A duplicate member name at any depth, a member name written with an
+    # escape, or a number token other than 0|[1-9][0-9]* refuses it before the structure and the
+    # signature are checked. Each refused text parses (by a plain JSON parser) to exactly the valid
+    # signed reference envelope, so only the text rule refuses it.
+    text = v.jcs(env).decode()
+
+    def received(case_id, why, candidate, outcome):
+        if case_id != "jcs-canonical" and candidate == text:
+            v.fail(f"verify-json-{case_id}: substitution")
+        # Equal values (1760000000.0 == 1760000000 in Python): the text differs only in its tokens.
+        if json.loads(candidate) != env or not validate(env):
+            v.fail(f"verify-json-{case_id}: the text does not parse to the valid reference envelope")
+        try:
+            v.parse_received_text(candidate)
+            refused = False
+        except ValueError:
+            refused = True
+        if refused != (outcome == "reject"):
+            v.fail(f"verify-json-{case_id}: the received-text rule disagrees with the expected outcome")
+        cases.append(v.case(f"verify-json-{case_id}", f"{SPEC_TEXT}: {why}", {"op": "verifyJson", "json": candidate}, {"outcome": outcome}))
+
+    received("jcs-canonical", "the JCS text of the reference envelope verifies", text, "accept")
+    received("escaped-value", "an escape inside a string value (aead.alg) is unaffected", text.replace('"alg":"A256GCM-KC"', '"alg":"\\u0041256GCM-KC"', 1), "accept")
+    first_kid = env["recipients"][0]["kid"]
+    for case_id, why, old, new in [
+        ("escaped-v", "`v` spelled \\u0076", '"v":1', '"\\u0076":1'),
+        ("escaped-name-upper-hex", "`createdAt` spelled created\\u0041t", '"createdAt":', '"created\\u0041t":'),
+        ("escaped-name-in-aead", "aead `ct` spelled \\u0063t", '"ct":', '"\\u0063t":'),
+        ("escaped-name-in-recipient", "a recipient's `kid` spelled \\u006bid", '"kid":', '"\\u006bid":'),
+        ("escaped-name-equals-another", "a second `v` spelled \\u0076 (a duplicate only after unescaping)", '"v":1', '"v":1,"\\u0076":1'),
+        ("duplicate-v", "a duplicate `v`", '"v":1', '"v":1,"v":1'),
+        ("duplicate-in-aead", "a duplicate aead `alg`", '"alg":"A256GCM-KC"', '"alg":"A256GCM-KC","alg":"A256GCM-KC"'),
+        ("duplicate-in-recipient", "a duplicate `kid` in a recipient", f'"kid":"{first_kid}"', f'"kid":"{first_kid}","kid":"{first_kid}"'),
+        ("created-at-fraction", "createdAt spelled with .0 (04 §2.4.1)", f'"createdAt":{env["createdAt"]}', f'"createdAt":{env["createdAt"]}.0'),
+    ]:
+        received(f"reject-{case_id}", why, text.replace(old, new, 1), "reject")
     return cases
 
 
@@ -539,7 +585,9 @@ SCHEMA = v.case_schema(
     "base64url kc and base64url ct||tag (AES-256-GCM under encKey) for header, CEK, IV and plaintext. "
     "`decryptPayload`: plaintext or rejection (kc checked first). `checkCommitment`: whether aead.kc "
     "is the kc of the CEK. `sign`: envelopeHash, tagged signature input and sig. `verify`: accept or "
-    "reject. `validate`: structure, encodings and signature together (strict).",
+    "reject. `validate`: structure, encodings and signature together (strict). `verifyJson`: the "
+    "envelope as received JSON text, parsed strictly (no duplicate or escaped member names, integer "
+    "tokens only; 04 §3.1.1 step 3, §2.5.1), then `validate`.",
     {
         "deriveFromCek": ({"label": v.STRING, "cek": v.HEX, "envelopeId": v.B64U}, [{"okm": v.hexn(32)}, v.REJECT]),
         "envelopeHash": ({"envelope": v.OBJECT}, [{"envelopeHash": v.hexn(32)}]),
@@ -556,6 +604,7 @@ SCHEMA = v.case_schema(
         ),
         "verify": ({"envelope": v.OBJECT}, [v.ACCEPT, v.REJECT]),
         "validate": ({"envelope": v.OBJECT}, [v.ACCEPT, v.REJECT]),
+        "verifyJson": ({"json": v.STRING}, [v.ACCEPT, v.REJECT]),
     },
 )
 

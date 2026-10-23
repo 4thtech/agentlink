@@ -71,6 +71,12 @@ a local name, a port with a leading zero, percent-encoding), a provider outside 
 region and digest spellings, `kitId` padding and length, other `contents`, `expiresAt` = 0 and
 another signer. The credential item, the `own_storage` row and `storage-mark` are the core's rules.
 
+Received text (M1-1h-b, D-128; 04 §2.5.1), version 8: `verifyJson` vectors whose raw text writes a
+member name with an escape (at the top, in `body`, in `params`, an upper-case hex escape, and an
+escaped name that equals another name after unescaping) or repeats a member name at depth, each
+parsing to exactly the validly signed object, so only the text rule refuses it; and accepted texts
+with escapes inside string values and in JCS form.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -88,7 +94,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 7
+VERSION = 8
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -754,6 +760,47 @@ def build():
                 {"outcome": "reject"},
             )
         )
+
+    # 04 §2.5.1 "Received text" (D-128, M1-1h-b): before any other check, a duplicate member name at
+    # any depth or a member name written with an escape is refused. Each refused text parses (by a
+    # plain JSON parser) to exactly the signed object, so its signature is valid and only the text
+    # rule refuses it. Escapes in string values are unaffected.
+    def received(case_id, why, candidate, outcome):
+        if candidate == text:
+            v.fail(f"{case_id}: substitution")
+        if json.loads(candidate) != good_signed:
+            v.fail(f"{case_id}: the text does not parse to the signed object")
+        try:
+            v.parse_received_text(candidate)
+            refused = False
+        except ValueError:
+            refused = True
+        if refused != (outcome == "reject"):
+            v.fail(f"{case_id}: the received-text rule disagrees with the expected outcome")
+        cases.append(
+            v.case(
+                f"verify-json-{case_id}",
+                f"{SPEC} Received text (D-128): {why}",
+                {"op": "verifyJson", "json": candidate, "context": context},
+                {"outcome": outcome},
+            )
+        )
+
+    jcs_text = v.jcs(good_signed).decode()
+    received("jcs-canonical", "the JCS form of the SignedOwnerAction verifies", jcs_text, "accept")
+    received("escaped-value", "an escape inside a string value (`op`) is unaffected", text.replace('"op":"agent.revoke"', '"op":"\\u0061gent.revoke"', 1), "accept")
+    received("escaped-value-nonce", "an escape inside a string value (`nonce`) is unaffected", text.replace('"nonce":"-', '"nonce":"\\u002d', 1), "accept")
+    for case_id, why, old, new in [
+        ("escaped-agent", "`agent` spelled \\u0061gent", '"agent":', '"\\u0061gent":'),
+        ("escaped-sig", "`sig` (top level) spelled \\u0073ig", '"sig":', '"\\u0073ig":'),
+        ("escaped-name-upper-hex", "`issuedAt` spelled issued\\u0041t", '"issuedAt":', '"issued\\u0041t":'),
+        ("escaped-name-at-depth", "a name in `params` spelled re\\u0061son", '"reason":', '"re\\u0061son":'),
+        ("escaped-name-equals-another", "a second `op` spelled \\u006fp (a duplicate only after unescaping)", '"op":"agent.revoke"', '"op":"agent.revoke","\\u006fp":"agent.revoke"'),
+        ("duplicate-at-depth", "a duplicate name in `params`", '"reason":"compromised"', '"reason":"compromised","reason":"compromised"'),
+        ("duplicate-sig", "a duplicate `sig` with the same value", '"sig":', f'"sig":"{good_sig}","sig":'),
+        ("duplicate-body", "a duplicate `body` with the same value", '"body":', '"body":' + json.dumps(good, separators=(",", ":")) + ',"body":'),
+    ]:
+        received(f"reject-{case_id}", why, text.replace(old, new, 1), "reject")
     return cases
 
 
