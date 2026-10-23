@@ -425,8 +425,6 @@ export const proofStatus = () => ({
   txHash: hex0x(32, '7e'),
   fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1', protocolUsd: '0.1', integratorUsd: '0' },
   receipts: [{ type: 'DELIVERED', at: '2026-10-14T12:00:00Z' }],
-  explorerUrl: `https://basescan.org/tx/${hex0x(32, '7e')}`,
-  verifyUrl: `https://verify.agentlink.example/r/${B32}`,
 });
 
 /** The 06 §2.5 `pending_approval` example with its placeholders filled. */

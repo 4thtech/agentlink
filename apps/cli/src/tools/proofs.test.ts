@@ -1949,11 +1949,54 @@ describe('real agentlink_notarize and agentlink_get_proof results against the sh
     expect(issuesOf(e.structured)).toBeUndefined();
   });
 
-  it('notarize ok and submitted with a requested receipt carry receiptRequested; the schema agrees on chain and receiptRequested', async () => {
-    // Known gap outside this card (flagged in the PR): the core returns no `txHash` and no fee
-    // split, which the shared rules ask of ok and submitted. Only those issues may remain here:
-    // nothing about chain, advanced, receiptRequested or an unknown key.
-    const allowed = new Set(['txHash', 'fee.protocolUsd']);
+  it('notarize ok and submitted results (no txHash, no fee split from the core) parse, advanced and default view', async () => {
+    for (const status of ['ok', 'submitted'] as const) {
+      const { client } = fake({
+        notarize: () => ({ ...recorded(), status, fee: FEE_CANONICAL }) as NotarizeResult,
+      });
+      const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+      expect(r.structured.status).toBe(status);
+      expect(issuesOf(r.structured), status).toBeUndefined();
+      expect(issuesOf(defaultView(r.structured)), status).toBeUndefined();
+    }
+  });
+
+  it('get_proof ok, submitted and needs_credits results parse', async () => {
+    for (const stored of ['announced', 'received', 'pending', 'needs_credits']) {
+      const { client } = fake({
+        get: () => ({
+          direction: stored === 'received' ? 'received' : 'sent',
+          status: stored,
+          recordId: RECORD,
+          chainId: 84532,
+          chain: 'base-sepolia',
+          fee: FEE_CANONICAL,
+          receipts: stored === 'pending' ? [] : [{ type: 'DELIVERED', at: '2026-10-19T10:05:00Z' }],
+        }),
+      });
+      const r = await call('agentlink_get_proof', { recordId: RECORD }, client);
+      expect(issuesOf(r.structured), stored).toBeUndefined();
+      expect(issuesOf(defaultView(r.structured)), stored).toBeUndefined();
+    }
+  });
+
+  it('notarize needs_credits results parse, with and without the top-up link', async () => {
+    for (const payPage of [LIVE_PAY, PAY_PAGE]) {
+      const { client } = fake({
+        notarize: () =>
+          ({
+            status: 'needs_credits',
+            topUp: { chainId: 84532, feeUsd: '0.1', usd: '0.1' },
+          }) as unknown as NotarizeResult,
+      });
+      const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client, { payPage });
+      expect(r.structured.status).toBe('needs_credits');
+      expect(r.structured['agentAddress']).toBe(A);
+      expect(issuesOf(r.structured), JSON.stringify(r.structured)).toBeUndefined();
+    }
+  });
+
+  it('notarize ok and submitted with a requested receipt carry receiptRequested and parse', async () => {
     for (const status of ['ok', 'submitted'] as const) {
       const { client } = fake({
         notarize: () =>
@@ -1975,11 +2018,8 @@ describe('real agentlink_notarize and agentlink_get_proof results against the sh
         receiptRequested: true,
       });
       expect(r.structured, status).not.toHaveProperty('chain');
-      for (const value of [r.structured, defaultView(r.structured)]) {
-        const issues = issuesOf(value) ?? [];
-        const unexpected = issues.filter((i) => !allowed.has(i.path.join('.')));
-        expect(unexpected, `${status}: ${JSON.stringify(issues)}`).toEqual([]);
-      }
+      expect(issuesOf(r.structured), status).toBeUndefined();
+      expect(issuesOf(defaultView(r.structured)), status).toBeUndefined();
     }
   });
 });
