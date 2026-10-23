@@ -5416,7 +5416,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: the first policy is signed in the same entry; a failure leaves no half-set state; defaults are unchanged apart from the Send folder; threat note and a Fable audit (S2).
 
 #### M1-36i-b · free-credits claim lows from IR-M1-36i-1 (new, IR-M1-36i-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/runtime/free-credits.ts` and its tests
 - **Depends on:** M1-36i
 - **Spec:** 07 §5; D-120
