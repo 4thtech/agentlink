@@ -5,9 +5,14 @@
 //   POST /v1/notarize                 {chainId, records: [{record, signature}]}
 //   POST /v1/receipt                  {chainId, receipts: [{receipt, signature}]}
 //   GET  /v1/status/:txHash           a sent transaction and the current status of its items
-//   GET  /v1/health                   per chain: available, gas balance (wei), queue depth
-//   POST /v1/deposit-authorization    present, disabled until M3-4b (501)
-//   POST /v1/faucet                   {chainId, agent}: testnet credits (faucet.ts; M1-10b)
+//   GET  /v1/health                   per chain: available, gas balance (wei), queue depth, and
+//                                     the pool states gas: ok|low and faucet: ok|low|paused
+//                                     (pool.ts; M1-10b-e)
+//   POST /v1/deposit-authorization    {chainId, token, auth}: a gasless top-up (deposit-auth.ts;
+//                                     M3-4b-t-3); 501 `not_available` unless
+//                                     SUBMITTER_DEPOSIT_AUTH_CHAINS enables it
+//   POST /v1/faucet                   {chainId, agent}: testnet credits (faucet.ts; M1-10b);
+//                                     503 `paused` while the faucet cannot cover one grant
 //
 // Logging (07 §7, I-7): this Worker writes nothing to the console and logs no request, IP, signer,
 // signature or record. It keeps only the aggregate counters of limits.ts (METRICS). Errors are fixed
@@ -15,14 +20,34 @@
 import {
   getChainConfig,
   isTxHash,
+  parseDepositAuthorizationRequest,
   parseSubmitRequest,
+  type DepositAuthErrorCode,
+  type DepositAuthorizationRequest,
   type ChainInputError,
+  type FaucetBalances,
+  type FaucetChain,
+  type FaucetPoolState,
   type Hex,
   type SubmitKind,
   type SubmitterChain,
 } from '@4thtech-io/chain';
 import { encodeHex, encodeUtf8, hmacSha256, parseJson } from '@4thtech-io/crypto';
-import { pinnedFaucet, readConfig, readFaucetConfig, type SubmitterConfig } from './config.js';
+import {
+  pinnedFaucet,
+  poolThresholds,
+  readConfig,
+  readDepositAuthConfig,
+  readFaucetConfig,
+  type SubmitterConfig,
+} from './config.js';
+import {
+  MAX_DEPOSIT_AUTH_BODY_BYTES,
+  createDepositRelayClass,
+  precheckDepositAuthorization,
+  type SubmitterDepositRelayApi,
+} from './deposit-auth.js';
+import { faucetPoolState, gasPoolState } from './pool.js';
 import {
   MAX_FAUCET_BODY_BYTES,
   createFaucetClass,
@@ -34,15 +59,18 @@ import { ipBucket } from './ip.js';
 import { SubmitterLimits, type Metric } from './limits.js';
 import { createQueueClass, type QueueDeps, type SubmitterQueueApi } from './queue.js';
 
-export { SubmitterLimits, createFaucetClass, createQueueClass };
+export { SubmitterLimits, createDepositRelayClass, createFaucetClass, createQueueClass };
 export { METRICS, type Metric } from './limits.js';
 export {
   DEFAULTS,
+  DEPOSIT_AUTH_DEFAULTS,
   FAUCET_DEFAULTS,
   pinnedFaucet,
   readConfig,
+  readDepositAuthConfig,
   readFaucetAddress,
   readFaucetConfig,
+  type DepositAuthConfig,
   type FaucetConfig,
   type Limits,
   type SubmitterConfig,
@@ -53,16 +81,29 @@ export {
   type FaucetDeps,
   type SubmitterFaucetApi,
 } from './faucet.js';
+export {
+  MAX_DEPOSIT_AUTH_BODY_BYTES,
+  precheckDepositAuthorization,
+  type DepositRelayDeps,
+  type RelayAnswer,
+  type SubmitterDepositRelayApi,
+} from './deposit-auth.js';
 
 export interface SubmitterEnv {
   readonly SUBMITTER_QUEUE: DurableObjectNamespace<SubmitterQueueApi>;
   readonly SUBMITTER_LIMITS: DurableObjectNamespace<SubmitterLimits>;
   /** The faucet (M1-10b); without the binding the faucet is unavailable. */
   readonly SUBMITTER_FAUCET?: DurableObjectNamespace<SubmitterFaucetApi>;
+  /** The gasless top-up relay (M3-4b-t-3); without the binding the route is unavailable. */
+  readonly SUBMITTER_DEPOSIT_RELAY?: DurableObjectNamespace<SubmitterDepositRelayApi>;
   readonly [name: string]: unknown;
 }
 
-export type WorkerDeps = QueueDeps & FaucetDeps;
+export type WorkerDeps = QueueDeps &
+  FaucetDeps & {
+    /** How long one isolate reuses a balance read for `/v1/health`; default BALANCE_CACHE_MS. */
+    readonly balanceCacheMs?: number;
+  };
 
 /**
  * Largest request body (IR-M1-10a-1 L-4): 20 items, each with a signature of the full 2 048 bytes
@@ -70,19 +111,43 @@ export type WorkerDeps = QueueDeps & FaucetDeps;
  */
 export const MAX_BODY_BYTES = 128 * 1024;
 
-/** How long one isolate reuses a chain's gas balance for `/v1/health` (an RPC read each). */
+/** A paused faucet's `retry-after`: the owner tops it up within hours, not seconds. */
+const PAUSED_RETRY_AFTER_SECONDS = 3_600;
+
+/**
+ * How long one isolate reuses a chain's gas balance and faucet balances for `/v1/health` (an RPC
+ * read each).
+ */
 const BALANCE_CACHE_MS = 10_000;
 const balances = new Map<number, { readonly at: number; readonly wei: string | null }>();
+const faucetBalances = new Map<
+  number,
+  { readonly at: number; readonly value: FaucetBalances | null }
+>();
 
-async function gasBalanceOf(port: SubmitterChain): Promise<string | null> {
+async function gasBalanceOf(port: SubmitterChain, cacheMs: number): Promise<string | null> {
   const cached = balances.get(port.chainId);
-  if (cached && Date.now() - cached.at < BALANCE_CACHE_MS) return cached.wei;
+  if (cached && Date.now() - cached.at < cacheMs) return cached.wei;
   const wei = await port.gasBalance().then(
     (value) => value.toString(10),
     () => null,
   );
   balances.set(port.chainId, { at: Date.now(), wei });
   return wei;
+}
+
+async function faucetBalancesOf(
+  faucet: FaucetChain,
+  cacheMs: number,
+): Promise<FaucetBalances | null> {
+  const cached = faucetBalances.get(faucet.chainId);
+  if (cached && Date.now() - cached.at < cacheMs) return cached.value;
+  const value = await faucet.balances().then(
+    (b) => b,
+    () => null,
+  );
+  faucetBalances.set(faucet.chainId, { at: Date.now(), value });
+  return value;
 }
 
 const HEADERS: Readonly<Record<string, string>> = {
@@ -148,13 +213,14 @@ function ipTag(config: SubmitterConfig, request: Request, label: string): string
 
 /**
  * Charges the caller's IP bucket (`prefix` `i`: items; `r`: status and health reads; `f`: faucet
- * requests); returns a 429 when it is over its hourly limit, else null.
+ * requests; `g`: gasless top-up requests); returns a 429 when it is over its hourly limit, else
+ * null.
  */
 async function takeIp(
   c: Ctx,
   config: SubmitterConfig,
   request: Request,
-  prefix: 'i' | 'r' | 'f',
+  prefix: 'i' | 'r' | 'f' | 'g',
   n: number,
   limit: number,
 ): Promise<Response | null> {
@@ -244,12 +310,30 @@ async function health(c: Ctx, config: SubmitterConfig | null, request: Request):
   if (!config) return json(200, { ok: false, chains: [] });
   const limited = await takeIp(c, config, request, 'r', 1, config.limits.ipReadsPerHour);
   if (limited) return limited;
+  const cacheMs = c.deps.balanceCacheMs ?? BALANCE_CACHE_MS;
+  const faucetConfig = readFaucetConfig(c.env);
   const chains = await Promise.all(
     config.chains.map(async (chainId) => {
       const port: SubmitterChain | null = c.deps.portFor(c.env, chainId);
-      const gasBalance = port ? await gasBalanceOf(port) : null;
+      const gasBalance = port ? await gasBalanceOf(port, cacheMs) : null;
       const queueDepth = await queueOf(c.env, chainId).depth();
-      return { chainId, available: port !== null && gasBalance !== null, gasBalance, queueDepth };
+      const thresholds = poolThresholds(chainId);
+      // M1-10b-e: states only, never the faucet's balances or address. A chain the faucet does not
+      // serve has `faucet: null`; one it serves whose wallet is missing or unreadable is paused.
+      let faucet: FaucetPoolState | null = null;
+      if (faucetConfig?.chains.includes(chainId) === true) {
+        const wallet = pinnedFaucet(c.env, chainId, c.deps.faucetFor(c.env, chainId));
+        const walletBalances = wallet ? await faucetBalancesOf(wallet, cacheMs) : null;
+        faucet = faucetPoolState(walletBalances, faucetConfig.usdCents, thresholds);
+      }
+      return {
+        chainId,
+        available: port !== null && gasBalance !== null,
+        gasBalance,
+        queueDepth,
+        gas: gasPoolState(gasBalance, thresholds),
+        faucet,
+      };
     }),
   );
   return json(200, { ok: chains.every((x) => x.available), chains });
@@ -304,8 +388,105 @@ async function faucetClaim(
     count(c, 'unavailable');
     return refuse(503, 'unavailable');
   }
+  if (answer.error === 'paused') {
+    // M1-10b-e: a stable code clients map to plain words; the owner tops the wallet up.
+    count(c, 'faucet_paused');
+    return refuse(503, 'paused', { 'retry-after': String(PAUSED_RETRY_AFTER_SECONDS) });
+  }
   count(c, 'rate_limited');
   return refuse(429, answer.error, { 'retry-after': String(answer.retryAfter) });
+}
+
+/** A deposit-authorization refusal: `{status: "failed", error}` with a fixed code. */
+const failed = (
+  status: number,
+  error: DepositAuthErrorCode,
+  extra?: Record<string, string>,
+): Response => json(status, { status: 'failed', error }, extra);
+
+/** The HTTP status of a relay refusal: the request's fault is 4xx; the submitter's is 503. */
+function refusalStatus(error: DepositAuthErrorCode): number {
+  if (error === 'unavailable') return 503;
+  if (error === 'rate_limited') return 429;
+  if (error === 'already_used') return 409;
+  return 400;
+}
+
+/** POST /v1/deposit-authorization (deposit-auth.ts; 07 §7; 05 §2.5; M3-4b-t-3). */
+async function depositAuthorization(
+  c: Ctx,
+  config: SubmitterConfig | null,
+  request: Request,
+): Promise<Response> {
+  const depositConfig = readDepositAuthConfig(c.env);
+  // Off (the default): the route stays as it was before M3-4b, uncounted.
+  if (!depositConfig) return refuse(501, 'not_available');
+  count(c, 'request_deposit_auth');
+  const namespace = c.env.SUBMITTER_DEPOSIT_RELAY;
+  if (!config || !namespace) {
+    count(c, 'unavailable');
+    return failed(503, 'unavailable');
+  }
+  // Every request counts against its IP's hourly limit, whatever its outcome.
+  const limited = await takeIp(c, config, request, 'g', 1, depositConfig.ipRequestsPerHour);
+  if (limited) {
+    return failed(429, 'rate_limited', {
+      'retry-after': limited.headers.get('retry-after') ?? '1',
+    });
+  }
+  let text: string | null;
+  try {
+    text = await readBody(request, MAX_DEPOSIT_AUTH_BODY_BYTES);
+  } catch {
+    count(c, 'bad_request');
+    return refuse(400, 'bad_request');
+  }
+  if (text === null) {
+    count(c, 'bad_request');
+    return refuse(413, 'too_large');
+  }
+  let parsed: DepositAuthorizationRequest;
+  try {
+    parsed = parseDepositAuthorizationRequest(parseJson(text));
+  } catch {
+    count(c, 'bad_request');
+    return refuse(400, 'bad_request');
+  }
+  const chain = getChainConfig(parsed.chainId);
+  if (!depositConfig.chains.includes(parsed.chainId) || !chain) {
+    count(c, 'deposit_auth_refused');
+    return failed(400, 'unsupported_chain');
+  }
+  const early = precheckDepositAuthorization(
+    parsed,
+    chain.contracts.vault.toLowerCase() as Hex,
+    Math.floor(Date.now() / 1000),
+  );
+  if (early !== null) {
+    count(c, 'deposit_auth_refused');
+    return failed(refusalStatus(early), early);
+  }
+  const stub = namespace.get(namespace.idFromName(`deposit:${String(parsed.chainId)}`));
+  const answer = await stub.relay(parsed.chainId, parsed);
+  if (answer.ok) {
+    count(c, 'deposit_auth_submitted');
+    return json(200, { status: 'submitted', txHash: answer.txHash });
+  }
+  if (answer.txHash !== undefined) {
+    // A repeat of a sent authorization whose transaction reverted.
+    count(c, 'deposit_auth_refused');
+    return json(200, { status: 'failed', error: answer.error, txHash: answer.txHash });
+  }
+  if (answer.error === 'unavailable') count(c, 'unavailable');
+  else if (answer.error === 'rate_limited') count(c, 'rate_limited');
+  else count(c, 'deposit_auth_refused');
+  return failed(
+    refusalStatus(answer.error),
+    answer.error,
+    answer.error === 'rate_limited'
+      ? { 'retry-after': String(Math.max(1, answer.retryAfter ?? 1)) }
+      : undefined,
+  );
 }
 
 async function route(c: Ctx, request: Request): Promise<Response> {
@@ -318,8 +499,10 @@ async function route(c: Ctx, request: Request): Promise<Response> {
     return method === 'GET' ? health(c, config, request) : refuse(405, 'method_not_allowed');
   }
   if (path === '/v1/deposit-authorization') {
-    // 07 §7: present but disabled until M3-4b (gasless top-ups need M1-3c first).
-    return method === 'POST' ? refuse(501, 'not_available') : refuse(405, 'method_not_allowed');
+    // 07 §7: gasless top-ups, off unless SUBMITTER_DEPOSIT_AUTH_CHAINS enables them (M3-4b-t-3).
+    return method === 'POST'
+      ? depositAuthorization(c, config, request)
+      : refuse(405, 'method_not_allowed');
   }
   if (path === '/v1/faucet') {
     return method === 'POST' ? faucetClaim(c, config, request) : refuse(405, 'method_not_allowed');

@@ -11,6 +11,7 @@
 import { decodeBase64url } from '@4thtech-io/crypto';
 import {
   FAUCET_MAX_USD_CENTS,
+  GASLESS_CHAIN_IDS,
   getChainConfig,
   isFaucetChain,
   type FaucetChain,
@@ -51,6 +52,8 @@ export const DEFAULTS = Object.freeze({
   stuckAfterSeconds: 180,
   /** M-2: replacements before a transaction counts as dropped and its items are queued again. */
   maxReplacements: 3,
+  /** M1-10a-c: a held item stops retrying a day after intake. */
+  maxHeldSeconds: 86_400,
   /** D-62: 1 h. */
   soloAfterRevertSeconds: 3_600,
   codeSignerMode: 'solo' as const,
@@ -121,6 +124,13 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
   );
   const stuck = intVar(env, 'SUBMITTER_STUCK_AFTER_SECONDS', DEFAULTS.stuckAfterSeconds, 30, 3_600);
   const replacements = intVar(env, 'SUBMITTER_MAX_REPLACEMENTS', DEFAULTS.maxReplacements, 0, 10);
+  const maxHeld = intVar(
+    env,
+    'SUBMITTER_MAX_HELD_SECONDS',
+    DEFAULTS.maxHeldSeconds,
+    300,
+    7 * 86_400,
+  );
   const reads = intVar(env, 'SUBMITTER_IP_READS_PER_HOUR', DEFAULTS.ipReadsPerHour, 1, 100_000);
   const feeRaw = env.SUBMITTER_MAX_FEE_PER_GAS_WEI;
   let maxFeePerGasWei: bigint | null = null;
@@ -145,6 +155,7 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
     maxItemGas === null ||
     stuck === null ||
     replacements === null ||
+    maxHeld === null ||
     reads === null ||
     ipItems === null ||
     signerItems === null
@@ -162,6 +173,7 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
       maxItemGas: BigInt(maxItemGas),
       stuckAfterSeconds: stuck,
       maxReplacements: replacements,
+      maxHeldSeconds: maxHeld,
     }),
     limits: Object.freeze({
       ipItemsPerHour: ipItems,
@@ -175,8 +187,8 @@ export function readConfig(env: Record<string, unknown>): SubmitterConfig | null
 
 /**
  * The testnet credits faucet (05 §9; SUB-7; M1-10b). Off unless SUBMITTER_FAUCET_CHAINS names
- * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia until
- * Chiado's smoke test has passed, M1-3j-b) and a testnet in the shipped config. Anything invalid turns the faucet off
+ * chains, each on the hard-coded allowlist of @4thtech-io/chain (`isFaucetChain`; Base Sepolia and
+ * Gnosis Chiado, M1-3j-c) and a testnet in the shipped config. Anything invalid turns the faucet off
  * (null) and leaves the rest of the submitter running.
  *
  * Vars: SUBMITTER_FAUCET_CHAINS, SUBMITTER_FAUCET_ADDRESS_<chainId> (below) and the bounded
@@ -201,8 +213,8 @@ export interface FaucetConfig {
 }
 
 export const FAUCET_DEFAULTS = Object.freeze({
-  /** $1: ten proofs at the beta price (12 §2). */
-  usdCents: 100,
+  /** $0.50: five proofs at the beta price (12 §2); owner decision 2026-10-22 (M1-10b-e). */
+  usdCents: 50,
   agentWindowSeconds: 86_400,
   ipClaimsPerDay: 3,
   dailyCap: 200,
@@ -263,6 +275,48 @@ export function readFaucetConfig(env: Record<string, unknown>): FaucetConfig | n
   });
 }
 
+/**
+ * Low-balance thresholds of one chain's gas and faucet wallets (M1-10b-e). `/v1/health` reports
+ * `gas: low` under `gasLowWei` and `faucet: low` under `faucetLowUsdCents` of the faucet's fee
+ * token (or when the faucet's own gas is under `gasLowWei`); the scheduled pool alert
+ * (`.github/workflows/submitter-pool.yml`) fails on either. A faucet that cannot cover one grant is
+ * `paused` and refuses claims, whatever the thresholds (pool.ts, faucet-claim.ts).
+ */
+export interface PoolThresholds {
+  /** The faucet is low under this many US cents of the fee token it credits. */
+  readonly faucetLowUsdCents: number;
+  /** A gas wallet (the submitter's, or the faucet's own gas) is low under this many wei. */
+  readonly gasLowWei: bigint;
+  /** False until the figures are checked against the chain's own measured costs. */
+  readonly measured: boolean;
+}
+
+/**
+ * Per chain, in the chain's native units. Base Sepolia, measured 2026-10-22 on the production
+ * wallets: the pool is bound by the faucet's test USDC, not by gas; low under $20 (40 grants of
+ * $0.50); a proof costs about 1.1e-6 ETH of gas, so the gas wallet is low under 1 000 proofs
+ * (0.0011 ETH). Chiado: no measurement yet; the same figures in xDAI (its native coin and fee
+ * token), to verify after the first Chiado transactions.
+ */
+export const POOL_THRESHOLDS: Readonly<Record<number, PoolThresholds>> = Object.freeze({
+  84532: Object.freeze({
+    faucetLowUsdCents: 2_000,
+    gasLowWei: 1_100_000_000_000_000n,
+    measured: true,
+  }),
+  // To verify after the first Chiado transactions (M1-10b-e).
+  10200: Object.freeze({
+    faucetLowUsdCents: 2_000,
+    gasLowWei: 1_100_000_000_000_000n,
+    measured: false,
+  }),
+});
+
+/** The pool thresholds of a chain, or null when it has none. */
+export function poolThresholds(chainId: number): PoolThresholds | null {
+  return Object.hasOwn(POOL_THRESHOLDS, chainId) ? (POOL_THRESHOLDS[chainId] ?? null) : null;
+}
+
 const FAUCET_ADDRESS = /^0x[0-9a-f]{40}$/;
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
 
@@ -291,4 +345,69 @@ export function pinnedFaucet(
   if (faucet === null || typeof env !== 'object' || env === null) return null;
   const pinned = readFaucetAddress(env as Record<string, unknown>, chainId);
   return pinned !== null && faucet.faucetAddress.toLowerCase() === pinned ? faucet : null;
+}
+
+/**
+ * Gasless top-ups (07 §7 `POST /v1/deposit-authorization`; 05 §2.5; 12 §4.1; M3-4b-t-3). Off unless
+ * SUBMITTER_DEPOSIT_AUTH_CHAINS names chains, each a gasless testnet of @4thtech-io/chain
+ * (`GASLESS_CHAIN_IDS`: Base Sepolia only) and a testnet in the shipped config. While it is off the
+ * route answers 501 `not_available`, as before. Anything invalid turns it off (null) and leaves
+ * the rest of the submitter running.
+ *
+ * Vars: SUBMITTER_DEPOSIT_AUTH_CHAINS and the bounded overrides below.
+ * Worker secrets (set by the owner with `wrangler secret put`, never in a file):
+ *   SUBMITTER_DEPOSIT_GAS_KEY_<chainId>  the relay's own gas key, 0x + 64 hex, never the chain's
+ *                                        submitter gas key or faucet key (index.ts): its wallet
+ *                                        pays the network cost of top-ups only, so griefing it
+ *                                        cannot drain the wallet that relays proofs
+ * The relay uses the submitter's RPC URLs, fee ceiling and per-IP bucket key.
+ */
+export interface DepositAuthConfig {
+  readonly chains: readonly number[];
+  /** Top-ups sent per agent (`auth.from`) per chain per hour; only checked authorizations count. */
+  readonly agentRequestsPerHour: number;
+  /** Requests per IP (IPv6 /64) per hour, whatever their outcome. */
+  readonly ipRequestsPerHour: number;
+}
+
+export const DEPOSIT_AUTH_DEFAULTS = Object.freeze({
+  /** Owner decision 2026-10-23: 5 per agent per hour. */
+  agentRequestsPerHour: 5,
+  ipRequestsPerHour: 20,
+});
+
+/** Reads and checks the gasless top-up settings; null when the route is off or anything is invalid. */
+export function readDepositAuthConfig(env: Record<string, unknown>): DepositAuthConfig | null {
+  const chainsRaw = env.SUBMITTER_DEPOSIT_AUTH_CHAINS;
+  if (typeof chainsRaw !== 'string' || chainsRaw === '') return null;
+  const chains: number[] = [];
+  for (const part of chainsRaw.split(',')) {
+    if (!INTEGER.test(part)) return null;
+    const chainId = Number(part);
+    if (!GASLESS_CHAIN_IDS.includes(chainId) || getChainConfig(chainId)?.testnet !== true) {
+      return null;
+    }
+    if (chains.includes(chainId)) return null;
+    chains.push(chainId);
+  }
+  const agent = intVar(
+    env,
+    'SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR',
+    DEPOSIT_AUTH_DEFAULTS.agentRequestsPerHour,
+    1,
+    60,
+  );
+  const ip = intVar(
+    env,
+    'SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR',
+    DEPOSIT_AUTH_DEFAULTS.ipRequestsPerHour,
+    1,
+    1_000,
+  );
+  if (agent === null || ip === null) return null;
+  return Object.freeze({
+    chains: Object.freeze(chains),
+    agentRequestsPerHour: agent,
+    ipRequestsPerHour: ip,
+  });
 }

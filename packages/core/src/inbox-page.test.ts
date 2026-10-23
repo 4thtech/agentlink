@@ -13,7 +13,7 @@ import {
 } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
 import { PAGE_TYPES, type InboxPage, type InboxPageItem, type InboxPageQuery } from './inbox.js';
@@ -711,5 +711,86 @@ describe('unread counts count exactly what the page can return (M1-9p-b; IR-M1-7
       await put({ contact: b.id, createdAt: t, type, payload: text('x', type) });
     }
     expect(await unreadOf(b.id)).toBe(PAGE_TYPES.length);
+  });
+});
+
+// ---- M1-33d-b: one read per page for the receipt-request flag (IR-M1-33d-1) ----------------------
+
+/** A received, checked proof row for `envelopeId`, optionally asking for a delivery receipt. */
+async function putReceivedProof(envelopeId: string, asks: boolean): Promise<string> {
+  const recordId = `0x${encodeHex(randomBytes(32))}`;
+  const salt = await a.cipher.seal(
+    { table: 'proofs', column: 'salt', rowKey: rowKeyOf([recordId]) },
+    '',
+  );
+  await a.store.transaction((tx) =>
+    tx.insert('proofs', {
+      record_id: recordId,
+      envelope_id: envelopeId,
+      chain_id: 10200,
+      record_json: JSON.stringify({ recordId, ...(asks ? { receiptRequest: 'delivered' } : {}) }),
+      tx_hash: null,
+      status: 'received',
+      fee_token: null,
+      fee_amount: null,
+      salt,
+      created_at: T0,
+    }),
+  );
+  return recordId;
+}
+
+describe('inbox page: the receipt-request flag costs no transaction per item (M1-33d-b)', () => {
+  async function transactionsFor(items: number): Promise<number> {
+    a = await makeAgent(1, 'Alice');
+    b = await makeAgent(2, 'Bob');
+    c = await makeAgent(3, 'Carol');
+    await pairWith(clock, a, b);
+    await pairWith(clock, a, c);
+    for (let i = 0; i < items; i += 1) {
+      const id = await put({ contact: i % 2 ? b.id : c.id, createdAt: T0 + i });
+      await putReceivedProof(id, i % 3 === 0);
+    }
+    const spy = vi.spyOn(a.store, 'transaction');
+    try {
+      expect(await page({ limit: 100 })).toHaveLength(items);
+      return spy.mock.calls.length;
+    } finally {
+      spy.mockRestore();
+    }
+  }
+
+  it('a page of 12 inbound items opens as many transactions as a page of 2', async () => {
+    const small = await transactionsFor(2);
+    const large = await transactionsFor(12);
+    expect(large).toBe(small);
+  });
+
+  it('the flag is still exact per item: asked and unsigned only', async () => {
+    const asked = await put({ contact: b.id, createdAt: T0 });
+    const signed = await put({ contact: b.id, createdAt: T0 + 1 });
+    const plain = await put({ contact: c.id, createdAt: T0 + 2 });
+    const none = await put({ contact: c.id, createdAt: T0 + 3 });
+    await putReceivedProof(asked, true);
+    const signedRecord = await putReceivedProof(signed, true);
+    await putReceivedProof(plain, false);
+    await a.store.transaction((tx) =>
+      tx.insert('receipts', {
+        record_id: signedRecord,
+        type: 1,
+        signer: a.id,
+        tx_hash: null,
+        at: T0,
+      }),
+    );
+    const items = await page();
+    const flag = (id: string) =>
+      (items.find((i) => i.envelopeId === id) as { receiptRequested?: true } | undefined)
+        ?.receiptRequested;
+    expect(items).toHaveLength(4);
+    expect(flag(asked)).toBe(true);
+    expect(flag(signed)).toBeUndefined();
+    expect(flag(plain)).toBeUndefined();
+    expect(flag(none)).toBeUndefined();
   });
 });

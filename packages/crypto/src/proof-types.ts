@@ -16,10 +16,18 @@
 // spelled, so a message read from JSON text needs a token-level check first (parseJson
 // `integersOnly`), as for the AgentCard.
 //
-// EIP-3009: this module never hard-codes a token domain and never checks the payee. A caller that
-// signs a `ReceiveWithAuthorization` MUST read the token's domain from chain (EIP-5267
-// `eip712Domain()`) and MUST refuse to sign unless `to` equals the configured fee vault for that
-// chain (05 §2.5: payee = vault, so front-running cannot redirect funds). That is M3-4b's duty.
+// EIP-3009: only `ReceiveWithAuthorization` exists here (its type hash is pinned below); the
+// `TransferWithAuthorization` type, which has the same fields and lets anyone submit the transfer, is
+// never built, so a signature made here can only be redeemed by its payee (05 §2.5). An
+// authorization whose `validBefore` is not after `validAfter` can never be valid and is refused.
+// This module never hard-codes a token domain and never checks the payee. A caller that signs a
+// `ReceiveWithAuthorization` MUST read the token's domain from chain and pass it through
+// `verifyTokenDomain` (M3-4b-t-1): EIP-5267 `eip712Domain()` where the token has it, otherwise
+// `name()`, `version()` and `DOMAIN_SEPARATOR()`, recomputed and compared (Circle's FiatToken has no
+// `eip712Domain()`; test-vectors/eip3009). The chain ID and the token address are the configured
+// ones, never the token's word. The caller MUST also refuse to sign unless `to` equals the
+// configured fee vault for that chain (05 §2.5: payee = vault, so front-running cannot redirect
+// funds). Both are the chain builder's duty (M3-4b-t-2).
 //
 // `Revocation` (05 §4, D-81) is signed by the agent's `ownerEvm` under the OCC v2 chain domain with
 // the Registry as `verifyingContract`. Its nonce is random and single use per owner, in the same
@@ -28,7 +36,7 @@
 // the typed data the builders below return.
 //
 // Errors never contain the input (I-7): see errors.ts.
-import { concatBytes } from './bytes.js';
+import { concatBytes, equalBytes } from './bytes.js';
 import {
   eip712HashStruct,
   eip712TypeHash,
@@ -180,7 +188,10 @@ export const REVOCATION_TYPES: TypedDataTypes = Object.freeze({
   ]),
 });
 
-/** EIP-3009 `ReceiveWithAuthorization` (the vault calls `receiveWithAuthorization`, 05 §2.5). */
+/**
+ * EIP-3009 `ReceiveWithAuthorization` (the vault calls `receiveWithAuthorization`, 05 §2.5). Its type
+ * hash is RECEIVE_WITH_AUTHORIZATION_TYPE_HASH; `TransferWithAuthorization` is never defined here.
+ */
 export const RECEIVE_WITH_AUTHORIZATION_TYPES: TypedDataTypes = Object.freeze({
   EIP712Domain: DOMAIN_TYPE,
   ReceiveWithAuthorization: Object.freeze([
@@ -193,8 +204,19 @@ export const RECEIVE_WITH_AUTHORIZATION_TYPES: TypedDataTypes = Object.freeze({
   ]),
 });
 
+/**
+ * keccak256("ReceiveWithAuthorization(address from,address to,uint256 value,uint256 validAfter,
+ * uint256 validBefore,bytes32 nonce)"), equal to FiatToken's `RECEIVE_WITH_AUTHORIZATION_TYPEHASH()`
+ * (test-vectors/eip3009). Never the `TransferWithAuthorization` type hash.
+ */
+export const RECEIVE_WITH_AUTHORIZATION_TYPE_HASH =
+  '0xd099cc98ef71107a616c4f0f941f04c322d8e254fe26b3c6668db87aae413de8';
+
 const invalid = (message: string): CryptoInputError =>
   new CryptoInputError('invalid_proof_struct', message);
+
+const mismatch = (message: string): CryptoInputError =>
+  new CryptoInputError('token_domain_mismatch', message);
 
 function isPlainObject(value: unknown): value is object {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
@@ -366,13 +388,20 @@ export function parseRevocation(value: unknown): OccRevocation {
   return parseJsonForm(REVOCATION_TYPES, 'Revocation', value) as OccRevocation;
 }
 
-/** Parses an EIP-3009 authorization: addresses and `nonce` `0x` hex, amounts and times decimal. */
+/**
+ * Parses an EIP-3009 authorization: addresses and `nonce` `0x` hex, amounts and times decimal, and
+ * `validBefore` after `validAfter` (otherwise it can never be redeemed, so it is never signed).
+ */
 export function parseReceiveWithAuthorization(value: unknown): ReceiveWithAuthorization {
-  return parseJsonForm(
+  const parsed = parseJsonForm(
     RECEIVE_WITH_AUTHORIZATION_TYPES,
     'ReceiveWithAuthorization',
     value,
   ) as ReceiveWithAuthorization;
+  if (decodeUint256Decimal(parsed.validBefore) <= decodeUint256Decimal(parsed.validAfter)) {
+    throw invalid('validBefore must be after validAfter');
+  }
+  return parsed;
 }
 
 function typedData(
@@ -434,6 +463,136 @@ export function receiveWithAuthorizationTypedData(
     parseTokenDomain(tokenDomain),
     parseReceiveWithAuthorization(authorization),
   );
+}
+
+const TOKEN_DOMAIN_TYPES: TypedDataTypes = Object.freeze({ EIP712Domain: DOMAIN_TYPE });
+
+/** The EIP-712 domain separator of a token domain {name, version, chainId, verifyingContract}. */
+export function tokenDomainSeparator(tokenDomain: unknown): Uint8Array {
+  const domain = parseTokenDomain(tokenDomain);
+  return eip712HashStruct(
+    TOKEN_DOMAIN_TYPES,
+    'EIP712Domain',
+    domain as unknown as Readonly<Record<string, unknown>>,
+  );
+}
+
+/** The configured chain and token (never read from the token itself). */
+interface ConfiguredToken {
+  readonly chainId: number;
+  readonly verifyingContract: string;
+}
+
+const ZERO_SALT = new Uint8Array(32);
+
+/** A `bytes32` as read from chain: `0x` + 64 lowercase hex (viem's form). */
+function readBytes32(value: unknown): Uint8Array {
+  if (typeof value !== 'string') throw invalid('a bytes32 reading must be 0x + 64 lowercase hex');
+  try {
+    return decodeHex0x(value, { length: 32 });
+  } catch {
+    throw invalid('a bytes32 reading must be 0x + 64 lowercase hex');
+  }
+}
+
+/** A `uint256` as read from chain: a bigint, or its canonical decimal string. */
+function readUint256(value: unknown): bigint {
+  if (typeof value === 'bigint') {
+    if (value < 0n || value > (1n << 256n) - 1n) throw invalid('a uint256 reading is out of range');
+    return value;
+  }
+  if (typeof value !== 'string') throw invalid('a uint256 reading must be a bigint or decimal');
+  try {
+    return decodeUint256Decimal(value);
+  } catch {
+    throw invalid('a uint256 reading must be a canonical decimal string');
+  }
+}
+
+function parseConfigured(value: unknown): ConfiguredToken {
+  const raw = exactFields(value, ['chainId', 'verifyingContract']);
+  // The same address and chainId rules as a token domain; the name and version are placeholders.
+  const domain = parseTokenDomain({ name: '', version: '', ...raw });
+  return { chainId: domain.chainId, verifyingContract: domain.verifyingContract.toLowerCase() };
+}
+
+/**
+ * Checks a token's EIP-712 domain as read from chain against the configured chain ID and token
+ * address, and returns the domain to sign under (address lowercase), frozen. `reading` is exactly
+ * one of:
+ * - `{source: "eip5267", fields, name, version, chainId, verifyingContract, salt, extensions,
+ *   domainSeparator?}`: EIP-5267 `eip712Domain()` as returned (`fields` exactly "0x0f": name,
+ *   version, chainId and verifyingContract; a zero salt; no extensions), plus `DOMAIN_SEPARATOR()`
+ *   when the token has it, which must then match too;
+ * - `{source: "domainSeparator", name, version, domainSeparator}`: `name()`, `version()` and
+ *   `DOMAIN_SEPARATOR()` of a token without EIP-5267 (Circle's FiatToken). The separator recomputed
+ *   from them with the configured chain ID and address must equal the token's.
+ * A reading that is malformed or incomplete is `invalid_proof_struct`; one that does not match is
+ * `token_domain_mismatch`. This function reads nothing itself (the caller does the chain reads).
+ */
+export function verifyTokenDomain(expected: unknown, reading: unknown): TokenDomain {
+  const configured = parseConfigured(expected);
+  if (!isPlainObject(reading)) throw invalid('a token domain reading must be a plain object');
+  const source = Object.getOwnPropertyDescriptor(reading, 'source');
+  if (source === undefined || !('value' in source)) {
+    throw invalid('a token domain reading must name its source');
+  }
+  let domain: TokenDomain;
+  let onChainSeparator: Uint8Array | undefined;
+  if (source.value === 'eip5267') {
+    const names = ['source', 'fields', 'name', 'version', 'chainId', 'verifyingContract', 'salt'];
+    names.push('extensions');
+    if (Reflect.ownKeys(reading).includes('domainSeparator')) names.push('domainSeparator');
+    const raw = exactFields(reading, names);
+    if (raw.fields !== '0x0f') {
+      throw invalid('eip712Domain() fields must be exactly name, version, chainId and contract');
+    }
+    if (!equalBytes(readBytes32(raw.salt), ZERO_SALT)) {
+      throw invalid('eip712Domain() salt must be zero');
+    }
+    if (!Array.isArray(raw.extensions) || raw.extensions.length !== 0) {
+      throw invalid('eip712Domain() extensions must be empty');
+    }
+    const chainId = readUint256(raw.chainId);
+    const read = parseTokenDomain({
+      name: raw.name,
+      version: raw.version,
+      chainId: configured.chainId,
+      verifyingContract: raw.verifyingContract,
+    });
+    if (chainId !== BigInt(configured.chainId)) {
+      throw mismatch('the token domain is for another chain');
+    }
+    if (read.verifyingContract.toLowerCase() !== configured.verifyingContract) {
+      throw mismatch('the token domain is for another contract');
+    }
+    domain = read;
+    if ('domainSeparator' in raw) onChainSeparator = readBytes32(raw.domainSeparator);
+  } else if (source.value === 'domainSeparator') {
+    const raw = exactFields(reading, ['source', 'name', 'version', 'domainSeparator']);
+    domain = parseTokenDomain({
+      name: raw.name,
+      version: raw.version,
+      chainId: configured.chainId,
+      verifyingContract: configured.verifyingContract,
+    });
+    onChainSeparator = readBytes32(raw.domainSeparator);
+  } else {
+    throw invalid('a token domain reading has an unknown source');
+  }
+  const result: TokenDomain = Object.freeze({
+    name: domain.name,
+    version: domain.version,
+    chainId: configured.chainId,
+    verifyingContract: configured.verifyingContract,
+  });
+  if (
+    onChainSeparator !== undefined &&
+    !equalBytes(tokenDomainSeparator(result), onChainSeparator)
+  ) {
+    throw mismatch('the token domain does not reproduce the token DOMAIN_SEPARATOR()');
+  }
+  return result;
 }
 
 function hashesOf(td: TypedData): ProofTypeHashes {

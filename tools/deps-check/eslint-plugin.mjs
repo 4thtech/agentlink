@@ -27,6 +27,7 @@ import {
   LOADER_MEMBERS,
   SUBTLE_ZONES,
   isNonCanonicalWorkspaceSpecifier,
+  relativeEscapeAllowed,
   testSeamViolation,
   violationFor,
 } from './policy.mjs';
@@ -104,7 +105,8 @@ const rule = {
         if (zoneDir === null) return;
         const target = resolve(dirname(context.filename), specifier);
         const rel = relative(zoneDir, target);
-        if (rel.startsWith('..') || isAbsolute(rel)) {
+        const repoTarget = relative(ROOT, target).split(sep).join('/');
+        if ((rel.startsWith('..') || isAbsolute(rel)) && !relativeEscapeAllowed(zone, repoTarget)) {
           context.report({ node, messageId: 'escapes', data: { specifier, zone } });
         }
         const seam = testSeamViolation(file, relative(ROOT, target).split(sep).join('/'));

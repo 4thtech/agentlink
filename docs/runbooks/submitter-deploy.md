@@ -96,7 +96,7 @@ All four wallets are on **Base Sepolia only**. Testnet funds have no value; keep
     | Wallet | What | About how much | Why |
     |---|---|---|---|
     | production gas | Base Sepolia ETH | 0.05 ETH | Pays every relayed proof (about 160 000 gas per item, batched) |
-    | production faucet | Base Sepolia USDC | 20 USDC or more | Each claim credits an agent $1 (1 USDC); the default daily cap is 200 claims |
+    | production faucet | Base Sepolia USDC | 50 USDC or more | Each claim credits an agent $0.50 (0.5 USDC, 5 proofs; M1-10b-e); the default daily cap is 200 claims. Under 20 USDC the faucet reports `low` and the pool alert fails |
     | production faucet | Base Sepolia ETH | 0.02 ETH | Gas for the faucet's own `approve` + `depositFor` per claim |
     | staging gas | Base Sepolia ETH | 0.005 ETH (optional) | The staging smoke never sends a transaction; this only serves later rehearsals |
     | staging faucet | nothing | 0 | The staging smoke never claims |
@@ -104,7 +104,7 @@ All four wallets are on **Base Sepolia only**. Testnet funds have no value; keep
     Faucets (open in the phone browser, paste the address, pick **Base Sepolia**):
     - ETH: <https://portal.cdp.coinbase.com/products/faucet> or <https://www.alchemy.com/faucets/base-sepolia>.
     - USDC (Circle's testnet USDC, the fee token the Notary accepts): <https://faucet.circle.com/>. It gives a fixed amount per request; repeat until the faucet wallet holds the amount above.
-16. Check a balance any time on <https://sepolia.basescan.org/> (search the address), or later in `https://submit.agentlink.4thtech.io/v1/health` (`gasBalance`, in wei).
+16. Check a balance any time on <https://sepolia.basescan.org/> (search the address), or later in `https://submit.agentlink.4thtech.io/v1/health` (`gasBalance`, in wei; per chain `gas`: `ok` or `low`, and `faucet`: `ok`, `low` or `paused`, M1-10b-e). The scheduled workflow `Submitter pool` (`.github/workflows/submitter-pool.yml`, every six hours) fails when any of them is not `ok`, and GitHub emails you the failure. Thresholds per chain are in `apps/submitter/src/config.ts` (`POOL_THRESHOLDS`): on Base Sepolia, gas `low` under 0.0011 ETH (about 1 000 proofs) and faucet `low` under 20 USDC; the faucet is `paused`, and refuses claims, when it cannot cover one grant. Chiado uses the same figures in xDAI until its first transactions are measured.
 
 **Part D · Deploy and approve (phone browser)**
 
@@ -125,6 +125,8 @@ CI reads back each Worker's own settings after every deploy, but its narrow API 
 
 **Part F · Add Gnosis Chiado (chain 10200; M1-3j-b; laptop, then phone)**
 
+> **Done (2026-10-22).** Steps 26 and 27 are done: the owner set the four Chiado keys in both environments and sent the two faucet addresses. The enabling PR (M1-3j-c) pins them in `wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_10200`, with `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` = `"84532,10200"`, the two 10200 names in `SUBMITTER_REQUIRED_SECRETS` and 10200 in `FAUCET_CHAIN_IDS`. Step 28 (fund the wallets) stays with the owner. Step 29 is checked after that PR deploys: production `/v1/health` shows `10200` with `"available":true` before an npm release that routes to Chiado is promoted.
+
 Automatic selection uses exactly the chains the testnet faucet serves (`autoSelectableChains()` in `packages/chain`, gated on `FAUCET_CHAIN_IDS`). Chiado is not routed to until a later reviewed PR adds 10200 to that allowlist, so these steps can run at any time and nothing changes for users until that PR merges. Do them **before** that PR: its deploy waits (skips with "Worker secrets not set") until all four keys exist.
 
 26. Part B steps 3 to 5, then the four Chiado keys, each with its own address (write each one down):
@@ -138,6 +140,13 @@ Automatic selection uses exactly the chains the testnet faucet serves (`autoSele
 27. Send the two **faucet** addresses (staging, production; public) to the orchestrator in chat. They go into `wrangler.toml` as `SUBMITTER_FAUCET_ADDRESS_10200` in the enabling PR, together with `SUBMITTER_CHAINS` and `SUBMITTER_FAUCET_CHAINS` = `"84532,10200"`, the two 10200 names in the workflow's `SUBMITTER_REQUIRED_SECRETS` and 10200 in `FAUCET_CHAIN_IDS`.
 28. Fund the production gas and faucet wallets with Chiado test xDAI (the native coin, used for gas and as the fee token, D-46). Use the official Gnosis Chiado faucet; this runbook names no link until one is confirmed. Check balances on <https://gnosis-chiado.blockscout.com/>.
 29. After the enabling PR merges and deploys: `https://submit.agentlink.4thtech.io/v1/health` shows chain `10200` with `"available":true`.
+
+**Part G · Gasless top-ups (`POST /v1/deposit-authorization`; M3-4b-t-3; laptop)**
+
+Off by default: while the var `SUBMITTER_DEPOSIT_AUTH_CHAINS` is unset the route answers 501 `not_available`, and nothing else changes. Base Sepolia (84532) is the only chain it accepts. Turn it on only after the fee vault's `depositWithAuthorization` capability and the relay ABI are wired (M3-4b-t-0), staging first.
+
+30. Part B steps 3 to 5, then the relay's own gas key per environment (never the gas key or the faucet key: the relay refuses either): `newkey SUBMITTER_DEPOSIT_GAS_KEY_84532 staging`, then `production`; step 12 (`unset -f newkey`). Fund each address with a little Base Sepolia ETH (it pays the network cost of top-ups only).
+31. A reviewed PR sets `SUBMITTER_DEPOSIT_AUTH_CHAINS = "84532"` in that environment's `[env.<name>.vars]` (never a Worker secret). Optional bounded overrides: `SUBMITTER_DEPOSIT_AUTH_AGENT_REQUESTS_PER_HOUR` (default 5, 1 to 60) and `SUBMITTER_DEPOSIT_AUTH_IP_REQUESTS_PER_HOUR` (default 20, 1 to 1 000). An invalid value turns the route off (501). To turn it off again, remove the var.
 
 Residual (04 §4): Cloudflare, as the infrastructure operator, still sees request metadata, and the zone's Security Events show the IPs of requests a WAF rule blocks (the drop's rate-limit rule). These cannot be turned off and are not logged by us.
 
@@ -158,6 +167,9 @@ Residual (04 §4): Cloudflare, as the infrastructure operator, still sees reques
 - **Health shows a chain `"available":false`**: its gas key is missing or malformed (must be `0x` + 64 lowercase hex), or the RPC URLs are unreachable. Create and store a new key (step 6 or 9; then fund the new address) and rerun.
 - **Faucet answers `faucet_empty` or `unavailable`**: fund the faucet wallet (step 15); check that its key differs from the gas key, and that its address is that environment's `SUBMITTER_FAUCET_ADDRESS_84532` in `wrangler.toml` (steps 7 and 10).
 - **Faucet answers `unavailable` to every new agent, and the faucet address on the Base Sepolia explorer shows a pending transaction**: an earlier `approve` is stuck in the mempool (its fee was too low, for example under `SUBMITTER_MAX_FEE_PER_GAS_WEI`). The faucet then refuses claims that need a new approve at once and sends nothing, so nothing queues behind it (M1-10b-c). It clears by itself once the stuck transaction is mined or dropped. If it stays stuck for more than an hour, raise or remove `SUBMITTER_MAX_FEE_PER_GAS_WEI` through a PR; claims resume once the faucet's pending and latest nonces match again.
+- **The `Submitter pool` workflow failed** (M1-10b-e): its log names each chain and state, for example `alert chain 84532: faucet low` or `alert chain 84532: gas low`. Fund that wallet (step 15): `faucet` means the faucet wallet's USDC (or its own ETH for gas), `gas` the gas wallet. Then re-run the workflow by dispatch (Actions → Submitter pool → Run workflow). `faucet paused` means the faucet cannot cover one grant and is refusing claims with `paused` until it is funded. `not available` or `gas unknown`: see the `"available":false` entry above. `alert: …` alone means the health answer had an unexpected shape (an older submitter, or the read failed).
+- **`/v1/deposit-authorization` answers 501 `not_available`**: `SUBMITTER_DEPOSIT_AUTH_CHAINS` is unset or invalid in that environment (step 31). **503 `unavailable`**: the relay's gas key is missing, malformed or equal to the gas or faucet key (step 30), the relay ABI is not wired yet (M3-4b-t-0), or the RPC failed.
+- **Faucet answers `paused`**: the faucet wallet holds less than one grant (M1-10b-e). Fund it (step 15); claims resume on the next request.
 - **Production failed after deploying**: CI rolled back and set `DEPLOY_FREEZE`. Read the run summary; only the owner clears the freeze ([RB-11](rollback-and-freeze.md)).
 - **Rolled back to a version before M1-10b-b**: the older faucet does not read the newer per-agent claim records. An agent who claimed earlier that UTC day can claim once more. The per-IP daily limit (3 claims by default) and the global daily cap still hold, because their records did not change format. The extra credits are therefore bounded by that day's global cap (by default 200 claims at $1 testnet USDC, at most $200 of testnet funds), and the risk ends with the one-day agent window.
 - **Before rolling the faucet back to a version before M1-10b-b, account for the clean-up** (M1-10b-c). The older version's daily clean-up (the faucet's alarm, just after 00:00 UTC) deletes **every** per-agent claim record in the newer format, whatever its age, because it keeps only plain numbers. Rolling forward again does not bring them back. So:

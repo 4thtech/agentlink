@@ -60,6 +60,15 @@ export const OWNER_TEXT = Object.freeze({
   // Owner change-code (M1-9z; 04 §2.8 "Changing the owner code").
   changeCodeDone: 'OK       Use your new owner code from now on, for every agent on this computer.',
 
+  // The owner code prompt (M1-9zd; 11 §5.5, §6.10). Printed right before every owner code prompt,
+  // and after a wrong code: the code goes only at the prompt, never into a command or a chat.
+  codeHint:
+    "Type your owner code only at the prompt below. It isn't a shell command, and never paste it into a chat.",
+  newCodeHint:
+    "Your new owner code is shown below. Type it only at AgentLink's own prompts. It isn't a shell command, and never paste it into a chat.",
+  wrongCode:
+    "Problem  That owner code didn't work. Nothing was changed. Type only your owner code at the prompt, not a shell command, then run the command again.",
+
   // Owner init.
   ownerUnknownAgent:
     'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.',

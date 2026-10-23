@@ -1,6 +1,6 @@
 # Credits
 
-> **Status: Partly built.** Seeing your credits (`agentlink credits`, and the status summary): in v0.1.2. The link for adding credits is built but off until the pay page exists. Free test credits: v0.2.0 (M1). Real credits: v1.0.0 (M3). Messages and files stay free.
+> **Status: Partly built.** Seeing your credits (`agentlink credits`, and the status summary): in v0.1.2. The link for adding credits is built but off until the pay page exists. Free test credits: merged for the next release (v0.2.0, M1). Real credits: v1.0.0 (M3). Messages and files stay free.
 
 **Purpose:** pay for proof.
 
@@ -11,7 +11,16 @@
 - **Price before you pay.** Every paid action shows the price in dollars first. You also set a daily limit; above it, your agent asks you.
 - **No network choice.** AgentLink picks where to record proof automatically.
 - **Adding credits is public.** Every way of adding credits says: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."
-- **Free test credits** are planned for the test phase (M1, M2), so you can try proof without paying.
+- **Free test credits** let you try proof without paying, on the test networks only. Merged for the next release, not in v0.1.2: the first time a proof needs credits, your AI claims a small free amount for your agent once per test network and tells you in one line, then asks you to try the proof again in about a minute. If the free supply is paused, it says "Free test credits are paused right now. Try again later." (M1-36i). Real credits come with v1.0.0.
+
+## Adding credits (not available yet)
+
+Adding credits from your AI app is not available in this version: the page where credits are added does not exist yet, so AgentLink gives no link for it. When it launches, this is how it is designed to work:
+
+- Your AI app tells you in dollars how much to add and gives you one link. It explains the step, checks your credits and tells you when they arrive. It never asks for your passphrase, a recovery code or card details, and it never moves your money.
+- `agentlink credits --topup` will print the link and a QR code with your agent ID, and open the link in your browser when you run it yourself in a terminal.
+- Everything in the link after the `#` stays in your browser and is never sent to our servers.
+- The amount is a suggestion ($5, $10 or $25, at least $5). You can change it on the page.
 
 ## Outline
 

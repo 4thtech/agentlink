@@ -63,14 +63,14 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 | Section | Cards |
 |---|---|
-| M0 Foundations | 37 (incl. 7 in the D-25 group; 9 `done (setup)`; 6 follow-ups from CI findings: M0-2h, M0-10d, M0-10e, M0-10f, M0-26, OPS-CI-2) |
+| M0 Foundations | 40 (recounted from the headings on 2026-10-22; previously stated 37; incl. 7 in the D-25 group; 9 `done (setup)`; 6 follow-ups from CI findings: M0-2h, M0-10d, M0-10e, M0-10f, M0-26, OPS-CI-2) |
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 230 (M1a 88, M1b 142, recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28)) |
-| M2 Console, desktop apps, self-host, design | 44 (incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
-| M3 Mainnet beta | 22 (incl. M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
+| M1 Local beta | 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28))))))) |
+| M2 Console, desktop apps, self-host, design | 49 (recounted from the headings on 2026-10-23; previously stated 48 and, before that, 44; incl. M2-19-b from AUDIT-FABLE-M2-19-2; incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
+| M3 Mainnet beta | 24 (recounted from the headings on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -809,6 +809,27 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** `wrangler dev` starts locally from `apps/submitter`; the entry module exports only what the Worker runtime expects; the deploy bundle and every submitter test stay green; no test weakened.
 - Review note (IR #338 L1/L2/L3, 2026-10-21): done in the same PR: the submitter port reads "absent" only for revert data that is exactly the `RecordNotFound()` selector; the misplaced `revertName` doc comment moved back; the verifier maps a `RecordNotFound()` revert to `record_not_found` (any other revert stays `chain_unavailable`).
 
+#### CHORE-VECTORS-TIMEOUT-RANGE · test-vectors: assert a suite's `timeoutMs` is within (0, 120000] (new, IR-CHORE-VECTORS-KDF-TIMEOUT-1)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
+- **Repo/path:** agentlink · packages/test-vectors (suite schema test)
+- **Depends on:** CHORE-VECTORS-KDF-TIMEOUT
+- **Scope:** Vitest treats a timeout of 0 or less, or `Infinity`, as no timeout. Add a check that every suite's `timeoutMs` is a finite number greater than 0 and at most 120000. Source: IR-CHORE-VECTORS-KDF-TIMEOUT-1.
+- **Acceptance:** the check fails for 0, a negative number, `Infinity`, `NaN` and 120001, and passes for the shipped suites; no vector changes.
+
+#### DOCS-04-28-WORDING · 04 §2.8: "64 KiB KeyStore item limit" means the total across all items (new, IR-M1-9i-b2-2)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
+- **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md §2.8
+- **Depends on:** —
+- **Scope:** in 04 §2.8, state that the "64 KiB KeyStore item limit" is the total across all items, not a per-item limit. Source: IR-M1-9i-b2-2.
+- **Acceptance:** 04 §2.8 reads unambiguously as a total; no other spec text changes; a changelog fragment if required.
+
+#### CHORE-PR-HYGIENE-ID-REGEX · pr-hygiene `TITLE_RE` allows two trailing letters in task IDs (new, owner decision)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`
+- **Depends on:** —
+- **Scope:** `TITLE_RE` accepts `M1-9z`-style IDs with one trailing letter, so a title starting `M1-9ze` is refused. Allow up to two trailing letters (`[a-z]{0,2}`) in `M[0-9]+-<n>` IDs. Owner decision; this changes a required check, so it merges only on Tali's "merge".
+- **Acceptance:** titles `M1-9ze ...` and `M1-1g-j ...` pass; `M1-9zzz`, a missing ID and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`
@@ -852,6 +873,15 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - A test that no submitter log line or metric carries an IP, signer, recipient, `recordId` or transaction hash.
 - **Acceptance:**
   - The deploy check fails on a fixture configuration with logging on and passes on the shipped one; the log test passes; the runbook names the account-level settings and who checks them.
+
+#### CHORE-CI-HARDEN-1b · cap keyring watchdog restarts (new, IR-CHORE-CI-HARDEN-1-1 low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`.github/**`)
+- **Repo/path:** agentlink · the CI keyring watchdog added by CHORE-CI-HARDEN-1 (PR #433)
+- **Depends on:** CHORE-CI-HARDEN-1 (#433)
+- **Spec:** `ci-cd.md`
+- **Invariants:** none
+- **Scope:** cap the watchdog restarts at about 5 so a broken keyring fails the job instead of looping.
+- **Acceptance:** a test or log check shows the sixth restart is refused and the job fails with a clear message.
 
 ### Documentation (DOCS) (new)
 
@@ -1003,7 +1033,7 @@ Goal (10 M1): two people on different harnesses exchange messages and files and 
 
 The owner designs in Claude Design and delivers in three drops (10 "Design deliveries"; intake and live status in `docs/design/README.md`). Until a surface's drop has landed, every UI card builds it **functional and unstyled, strings externalized, no invented visual design**. A late D2 slips M2: the M2 critical path starts from DESIGN-D2.
 
-**D-116 (build-plan deviation, 21 Oct 2026).** D1 and the D2 first pass have been in `docs/design/` since 14 Oct 2026. Every surface with a screen in the `docs/design/README.md` screen index is built **styled** from it, after DESIGN-ADJ-1 has listed its adjustments; only surfaces with no screen stay functional and unstyled. UI build order (*orchestrator plan, not the owner's words*): wave 0 DESIGN-ADJ-1 and M1-35a in parallel; wave 1 M1-35b and M1-35c (and the owner's redesigns from the (b) briefs); wave 2 M1-11b, M1-11c and M1-19-c; wave 3 (M2) M2-5a, M2-1a/b, then the console and desktop cards.
+**D-116 (build-plan deviation, 21 Oct 2026).** D1 and the D2 first pass have been in `docs/design/` since 14 Oct 2026. Every surface with a screen in the `docs/design/README.md` screen index is built **styled** from it, after DESIGN-ADJ-1 has listed its adjustments; only surfaces with no screen stay functional and unstyled. UI build order (*orchestrator plan, not the owner's words*): wave 0 DESIGN-ADJ-1 and M1-35a in parallel; wave 1 M1-35b and M1-35c (and the owner's redesigns from the (b) briefs); wave 2 M1-11b, M1-11c and M1-19-c, built as the D-118 `apps/local-ui` app (shell cards M1-11s-a/-b and core cards M1-11r-a/-b first, then the page cards); wave 3 (M2) M2-5a, M2-1a/b, then the console and desktop cards.
 
 #### DESIGN-D1 · Design drop D1: foundations and M1 surfaces
 - **Status:** done (4thtech/agentlink#33, merged 2026-10-14; partial points listed in `docs/design/README.md`) · **Size:** — · **Tier:** Owner · **Security:** S0 · **Phase:** M1a
@@ -1029,7 +1059,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **D-116 (2026-10-21):** the first pass landed on 14 Oct 2026 with DESIGN-D1 (#33) and is recorded in `docs/design/README.md`; UI work no longer waits for this card. It stays open for the gaps listed there and for the owner's redesigns from DESIGN-ADJ-1.
 
 #### DESIGN-ADJ-1 · Design adjustment audit (new, D-116)
-- **Status:** in review (4thtech/agentlink#362; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Status:** done (landed through #356 and #364; #362 closed as superseded; `docs/design/adjustments.md`: 101 (a), 20 (b) in 10 briefs; the owner reviews the (b) briefs) · **Size:** M · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/adjustments.md` (new; the only file this card writes, plus a link from `docs/design/README.md`)
 - **Depends on:** — (runs in parallel with M1-35a)
 - **Spec:** 06, 07, 08, 11 §5 and §5.6, 12; D-56 onward, especially D-96…D-115 (D-109, D-111…D-115) and D-39, D-40; `docs/design/README.md` (screen index, known gaps)
@@ -1364,6 +1394,15 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
 
+#### CHORE-E2E-RENDEZVOUS-AEAD · Retire the rendezvous.mjs node:crypto exemption (new, IR-M1-1g-c-1 L-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (crypto package API) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto, e2e/src/rendezvous.mjs, tools/deps-check/policy.mjs
+- **Depends on:** M1-1g-c
+- **Scope:**
+  - `@4thtech-io/crypto` exports no general AEAD, so `e2e/src/rendezvous.mjs` (AES-256-GCM and HKDF, OPS-CI-7) imports `node:crypto` under `NODE_CRYPTO_EXEMPT_FILES`. Provide a crypto-package API for this, move rendezvous.mjs onto it, then remove the exemption.
+- **Acceptance:**
+  - `NODE_CRYPTO_EXEMPT_FILES` is empty; rendezvous tests and the nightly jobs pass.
+
 #### M1-1g-f · crypto: drop DELETE signed with an older epoch's drop key (new, IR-M1-1g-e-1)
 - **Status:** done (4thtech/agentlink#294, merged 2026-10-19) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface, MemoryKeyStore, `keystore-drop.ts`), packages/node (keychain KeyStore and facade)
@@ -1651,13 +1690,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Withdraw of credits in a token that was removed from the allowlist succeeds (05 §2.2, 12 §3.2).
 
 #### M1-3c · contracts: vault EIP-3009 `depositWithAuthorization`
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (pulled forward by D-123, 22 Oct 2026; testnet Safe upgrade is the owner's) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** occ-v2-contracts · src/OCCFeeVault.sol
 - **Depends on:** M1-3b, M1-14; gap G-17 resolved (D-89)
 - **Spec:** 05 §2.5; 03 §4.4; 07 §7
 - **Invariants:** I-6, I-10
 - **Scope:**
   - Calls the token's `receiveWithAuthorization` with payee = vault (never `transferWithAuthorization`); credits `from` by measured delta; requires `value ≥ minDeposit[token]` and an allowed token; EIP-3009 capability is an off-chain flag (G-17, D-89, 05 §2.5): the vault keeps none, but measures its balance before and after the call and reverts `DepositMismatch()` unless the increase equals `value`.
+  - D-123 (build-plan deviation, Tali 2026-10-22): pulled into the Chiado QR top-up work. The deployed testnet vault refuses gasless USDC top-up until this lands and the testnet Safe upgrades it; the former candidate card M1-26-f (enable gasless top-up on testnets) is folded into this card and M3-4b-t. Fable audit; contracts live in the private `occ-v2-contracts`.
+  - Carried over from the dropped M1-26-f: on the testnet vault, allow the test USDC token and set `minDeposit[token]` (config steps after the upgrade). These are the owner's Safe or config operation (D-123), not an agent action.
 - **Acceptance:**
   - Mock EIP-3009 token tests plus a fork test against Base Sepolia Circle USDC.
   - A front-run of the same authorization cannot redirect funds; a replayed nonce reverts; below minimum reverts `BelowMinDeposit()`.
@@ -2017,7 +2058,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** a pack whose card is valid but carries no proof of possession stays `record_only` (`card_pop_missing`); a pack with a valid proof becomes `verified`; a forged `cardPop` or `cardAgentSig`, and one replayed from another card (another key epoch, owner or display name), are refused with `card_pop_invalid`; one signature without the other is `malformed_pack`; a contract-account signer with both stays `record_only`; a recipient-exported pack with the sender's received signatures becomes `verified`; a `card-update` or `handshake` whose `cardPop` does not verify is dropped, and one without it from an older peer is accepted (RED commit).
 
 #### M1-4c-b · crypto and chain: KeyStore `signTransaction` for direct-mode sends (new, M1-4c follow-up)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in-progress (pulled forward by D-123, 22 Oct 2026) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/crypto (KeyStore interface and backends), packages/chain (direct mode)
 - **Depends on:** M1-4c
 - **Spec:** 04 §2; 07 §6.2
@@ -2042,6 +2083,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Invariants:** I-3
 - **Scope:** the chain-state port's `getRecord` reads only the Notary's `RecordNotFound` revert as "absent". A returned struct with a zero signer cannot come from the deployed Notary, so it is ChainError `bad_answer` (retryable), never "absent": `replacementAllowed` refuses, and no record or receipt is sent on it.
 - **Acceptance:** tests first: a zero-signer struct is not absent; `replacementAllowed` refuses on it (record and receipt); `readInclusion`, `notarize` and `acknowledge` fail with a ChainError and send nothing; `RecordNotFound` still means absent.
+
+#### M1-4c-e · chain: verify.ts treats a zero signer as not found, aligned with `bad_answer` (new, IR-M1-4c-d-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain (`verify.ts`)
+- **Depends on:** M1-4c-d
+- **Scope:** `verify.ts` treats a zero-signer record as not found. The verdict is failed and therefore safe, but a zero signer is a malformed answer: align it with `bad_answer`, as the chain-state `getRecord` does after M1-4c-d. Source: IR-M1-4c-d-1.
+- **Acceptance:** test: a zero-signer struct yields the `bad_answer` verdict, a true `RecordNotFound` stays not found; no verdict that was a failure becomes a pass.
 
 #### M1-4d-e · chain: card confirmation for contract-account signers (new, D-102 follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** later (not M1)
@@ -2100,7 +2148,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Snapshot tests of CLI and MCP default outputs contain no chain prompt and no chain name outside Advanced; a proof pack verifies with no chain configured.
 
 #### M1-26-c · cli/core: paid tools and `agentlink_status` use `selectPayingChain` (new, M1-26-b follow-up)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#322, merged 2026-10-20) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/tools/**`), packages/core
 - **Depends on:** M1-26-b; M1-26-d for the top-up link
 - **Spec:** D-40, D-108; 06 §2.1 (`credits`, `topUpUrl`), §2.4 (`chain?`, `needs_credits`); 07 §6.3
@@ -2124,7 +2172,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A decision-log entry and 08 §1 updated.
 
 #### M1-26-e · top-up link in the tools and CLI (new, D-111)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
+- **Status:** in review (4thtech/agentlink#344) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b (with M1-26-c)
 - **Repo/path:** agentlink · packages/core, apps/cli
 - **Depends on:** M1-26-d (decided, D-113), M1-26-c
 - **Spec:** 06 §2.4 (`needs_credits`), §8 (`credits --topup`); 08 §1
@@ -2132,6 +2180,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Build the top-up link in the decided format from the shipped config; `needs_credits` `url` and `nextStep` per 06 §2.4; `agentlink credits --topup` prints the link, the agent's address with a terminal QR code, and opens the browser when one is available.
   - Agent-assisted funding (D-111, 06 §2.4): the skill file and server instructions tell the agent to explain the one step, share the link or address and QR, watch `credits` and confirm; never ask for keys, recovery codes or card details, never move funds.
+  - SKILL.md top-up rule lands with the live pay page (M2-10), together with relaxing `tools/skill-file.test.mjs:142`.
 - **Acceptance:**
   - Tests first: the link host comes only from the shipped config; no network, token or "wallet" in `nextStep` or the CLI default output; no tool or `nextStep` asks for a key, recovery code or card detail.
 
@@ -2150,7 +2199,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Outcome (2026-10-21):** D-114: B, with D as the fallback when the submitter is unreachable; a recipient is never charged without asking. Spec lines in 12 §2, §11, 07 §7 and `docs/design/topup-ux.md` §8. The submitter work is M1-34-b. The specs state no contract change; if M1-34-b finds one is needed, it opens a card noting the work happens in the private `occ-v2-contracts` repo.
 
 #### M1-34-b · submitter: receipts covered by the sender's proof fee, and the deferred fallback (new, D-114)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
+- **Status:** done (4thtech/agentlink#377, merged 2026-10-22) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before receipts go live on testnets)
 - **Repo/path:** agentlink · the submitter (07 §7), packages/chain (submitter port, deferred posting), packages/core (receipt queue)
 - **Depends on:** M1-34, M1-10a, M1-4c
 - **Spec:** 07 §7; 12 §2, §11; `docs/design/topup-ux.md` §8; D-114, D-111
@@ -2163,6 +2212,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first (S2, with a `RED (expected):` commit): the first 3 receipts for a charged record are accepted with a recipient that holds nothing on the network, the 4th is refused; a record whose fee was not charged gets none; an unreachable submitter queues the receipt and a later post succeeds; no path charges the recipient without asking.
   - Independent S2 review.
+
+#### M1-34-c · submitter: a lagging client RPC that reports `RecordNotFound` retries the receipt once (new, IR-M1-34-b-2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/submitter, packages/core (receipt path)
+- **Depends on:** M1-34-b
+- **Scope:** when a client RPC lags and reports `RecordNotFound` for a record that exists, the receipt must not fail for good. Retry once after a fixed delay before the receipt becomes `receipt_failed`. Source: IR-M1-34-b-2.
+- **Acceptance:** tests first: a lagging RPC that answers `RecordNotFound` once and then finds the record yields a stored receipt; a record still absent after the retry ends `receipt_failed`; the retry count and delay are fixed; no test weakened.
 
 #### M1-5a · transport-nostr: gift wrap / unwrap
 - **Status:** done (4thtech/agentlink#45, merged 2026-10-14) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -2359,7 +2415,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - An aborted upload leaves no open multipart uploads; lifecycle rule applied and read back on MinIO and R2.
 
 #### M1-6b-b · storage: lifecycle and upload follow-ups (new, follow-up from #254)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review (L3, L4, L5 in this PR; the R2 lifecycle read-back stays open on M1-28) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/storage
 - **Depends on:** M1-6b, M1-28
 - **Spec:** 07 §5.2, §5.4; 04 §4
@@ -2668,7 +2724,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-6c-1, 2026-10-18): a drop object's `locator` is its signed GET URL, a bearer secret like any presigned URL (I-7). Store it encrypted at rest with the file key; send it only inside end-to-end-encrypted payloads or owner copies, never to any 4thTech service other than the drop itself; never log it. Also (IR-M1-6c-1 L2): `planInline` returns an all-stored plan even when that plan cannot fit; check the all-stored payload size before any upload so a send that can never fit is refused before anything reaches storage.
 
 #### M1-7f-2 · core: files refresh-link, retention and crypto-shredding (IR-M1-7f-1 L2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (receiver-side key rows, retention at expiry on both sides, the receipt pass deleting the key row; refresh-link, the MinIO round trip, D-53 re-hash, `SentFile` name and hash, and the receiver's receipt trigger moved to M1-7f-3) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7f (#278)
 - **Spec:** 04 §4 (delivery, retention and crypto-shredding, encrypted drop); 07 §3 (`files`), §3.3, §5.4; 06 §2.3; D-18, D-48, D-53
@@ -2682,6 +2738,24 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Added by M1-33d (#333): with `files.deleteAfter: receipt`, a file whose record never gets a DELIVERED receipt is deleted at `expiry` (06 §3), on both sides and for the drop.
 - **Added by IR-M1-9d-1-1 L-1 (2026-10-19):** `SentFile` (the `files` of a `sendMessage` result) also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again. Until then `agentlink_send` with `path` re-reads the file through the checked open on a repeat to report the hash (M1-9d-1). Acceptance: a repeat returns the original name and hash after the file on disk changed, and the platform's open is not called.
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
+
+#### M1-7f-3 · core: files refresh-link, MinIO round trip and the rest of M1-7f-2 (split from M1-7f-2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (files, client), packages/types if the `refresh-link` answer needs a body schema
+- **Depends on:** M1-7f-2
+- **Spec:** 04 §4 (delivery, retention and crypto-shredding); 07 §3, §5.4; 06 §2.3; D-18, D-48, D-53, D-98
+- **Invariants:** I-2, I-5, I-7, I-9
+- **Scope (left after M1-7f-2):**
+  - `refresh-link` request (`request` envelope, `body.kind = "refresh-link"`, the proposed body in packages/types) and the sender's answer from its sealed `files` row; an expired link on the recipient side leads into it; the answer updates the receiver row's `url` and `expires_at`. Decide how a refreshed link relates to retention at `expiresAt` (today both sides delete at the first `expiresAt`, so a refresh only helps before it).
+  - The receiver deleting its key row on its own DELIVERED receipt under `receipt` (today it deletes at `expiresAt`); keep it out of the proofs service files touched by open PRs, or land it after them.
+  - Payloads stored before M1-7f-2 still carry their `fileKey` and have no receiver row, so they keep their keys until this backfill (IR-M1-7f-2-1 L2): move each key into a capped receiver row and replace it in the stored payload with the placeholder.
+  - The expiry pass takes the oldest 200 due rows each time, so rows whose delete keeps failing can stall it for good (IR-M1-7f-2-1 L3): give it a rotating cursor like the receipt pass (`ReceiptRetentionDeps.cursor`).
+  - A sent copy (07 §4.3, another device of the same agent) keeps its payload's keys and gets no row; decide whether it should.
+  - The 5 MB round trip via MinIO (own S3 storage), next to the drop round trip of #278.
+  - D-53 re-hash binding (resolved realpath and `plaintextSha256` in the action digest, re-hashed when the approved action runs) once file sends can need approval; today `evaluateFileSend` never returns `approval`.
+  - From IR-M1-9d-1-1 L-1: `SentFile` also carries each file's `name` and `plaintextSha256`, stored with the idempotent result, so a repeat with the same `clientRequestId` returns them without the CLI reading the file again.
+  - A drop expiry test against the real Worker (the signed DELETE's timestamp after an advanced clock); M1-7f-2 covers the drop path through deleteFileObject only.
+- **Acceptance:** expired link → refresh-link returns a working URL; 5 MB via MinIO; a repeat send returns the original name and hash after the file on disk changed, and the platform's open is not called; tests first, a `RED (expected):` commit before the fix.
 
 #### M1-7g · core: proofs and receipts
 - **Status:** done (4thtech/agentlink#306, merged 2026-10-19); recipient export is M1-7g-b (done); follow-ups in M1-7g-c · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2759,7 +2833,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** Tests first: a mismatch sets the flag; no MCP tool clears it (I-4).
 
 #### M1-7g-f · proofs spec and `respondToTerms` confirm status (new, IR-M1-7g-d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#375, merged 2026-10-22) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, terms-flow), docs/foundation (04 §3.4)
 - **Depends on:** M1-7g-d
 - **Spec:** 04 §3.4; 07 §2.1, §3.2
@@ -2798,7 +2872,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** after a contact's revoke, an approval pending for an action with that contact is `void` and its commitment parts are void, in the revoke's transaction; a peer's acks do not raise `catchUp` counts; `syncInbox` returns within its budget with 200 acks pending.
 
 #### M1-7h-d · core: faster sync rate-limit tests (new, follow-up from #252)
-- **Status:** in review (4thtech/agentlink#371) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#371, merged 2026-10-22) · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core
 - **Depends on:** M1-7h
 - **Spec:** `development-process.md` (CI budget)
@@ -2920,7 +2994,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - One conformance suite runs against every backend; the node package keeps no copy of the sign and decrypt logic.
 
 #### M1-8a-d · CI: pin the keychain job's runner images; gating decision (new, IR-M1-8a-b-1 notes)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
+- **Status:** done (4thtech/agentlink#83, merged 2026-10-15) · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a
 - **Repo/path:** agentlink · .github/workflows/ci.yml
 - **Depends on:** M1-8a-b (PR #57, open: the `keychain` job does not exist on `main` yet). Pinning can start only after #57 merges; the gating decision needs 5–10 green PR runs of the job after that
 - **Spec:** M1-8a-b; docs/process/ci-cd.md
@@ -3028,28 +3102,82 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-31-1 L-1, 2026-10-17): add "on `http://localhost:<port>`" to this card's acceptance (the approval page origin is localhost, D-79).
 - Review note (IR-M1-1k-1 (PR #223), 2026-10-17): wiping the PRF output after use is the caller's duty (JSDoc in `@4thtech-io/crypto`); do it in the node and console callers and test it.
 
-#### M1-8f · node: passphrase-locked file KeyStore for headless machines (new, D-54)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card; proposed, owner confirms at merge)
+#### M1-8f · node: passphrase-locked file KeyStore backend for headless machines (new, D-54)
+- **Status:** in review (4thtech/agentlink#392; the backend slice; CLI, MCP unlock, CI and `KeyEpochControl` split into M1-8f-b … M1-8f-e) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path and not on the M1a path, D-73 (4): there is no headless dogfood for M1a, M1-9a needs only M1-8a's `needs_setup`, and only the `--keystore file` branch of M1-9a waits for this card and M1-8f-b; proposed, owner confirms at merge)
 - **Repo/path:** agentlink · packages/node
 - **Depends on:** M1-1f (`ALKS`/`ALKO` seal/open), M1-1g, M1-8a (keychain probe, recorded backend), M1-8c (owner passphrase path); M1-8b for the shared inter-process lock; M1-8g (the policy-version mark item of the file KeyStore)
-- **Spec:** 04 §2.8 (format, KDF, unlock, owner key on a headless machine, file handling, threat delta, required tests); 07 §9; 06 §7; D-54
+- **Spec:** 04 §2.8 (format, KDF, unlock, file handling, threat delta, required tests); 07 §9.1, §9.2; D-54
 - **Invariants:** I-1, I-4, I-7, I-10
 - **Scope:**
   - File `KeyStore` with the same interface as the keychain backend, holding the same items (agent seed, store key, storage credentials) in `~/.agentlink/keystore/<agentId>.alks`; `agentId` charset check and exact 04 §2.9 form (`0x` + 40 lowercase hex); expected-agent-ID check before the KDF and seed-derived check (the seed's EVM address) after decryption. All crypto through `@4thtech-io/crypto`; this package only handles files, locking and unlock sources.
-  - Selection per 07 §9.1: opt-in only, only when the keychain probe fails (with timeout and fix message), only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; backend recorded per agent and never switched.
-  - Unlock sources per 07 §9.2: passphrase file (`O_NOFOLLOW`, `fstat` checks), environment variable (allowed with the 04 §2.8 conditions; both variables removed from `process.env`; never written by `init`), interactive prompt for CLI commands; no CLI argument takes a passphrase. Async unlock after MCP `initialize`. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
-  - Secrets: generated unlock code by default (pinned base32 encoding, `secretKind` in the header); chosen passphrase ≥ 12 characters. Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko`, generated 120-bit owner code required. Agent ≠ owner enforced in both directions across all agents, with the owner wrap's normalisation.
-  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; `keystore passphrase` asks for the current passphrase at the prompt; `doctor` reporting and warnings (07 §9.4).
-  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit) and record whether `@noble/hashes` clears its Argon2id buffers.
-  - Full threat note (04 §2.8 threat delta, including the faked-terminal case) and quickstart input for M1-12b.
+  - Selection per 07 §9.1 in the create entry point: opt-in only, only when the keychain probe fails, only from an interactive terminal with no harness marker set (UX guards, not boundaries); no forced file mode; the recorded backend `file` opens only from its unlocked file, never from the keychain.
+  - Unlock sources per 07 §9.2: passphrase file (`realpath`, `O_NOFOLLOW`, `fstat` checks), environment variable (both variables removed from `process.env`), a prompt callback for CLI commands; no CLI argument takes a passphrase. `kek` kept in memory with its salt and parameters; entries decrypted per operation and wiped.
+  - Secrets: generated unlock code by default (`secretKind` in the header); chosen passphrase ≥ 12 characters. Agent ≠ owner on the agent side (a candidate that unlocks `owner.alko` is refused), with the owner wrap's normalisation, and a helper for the owner side (does a candidate open any agent file).
+  - File handling per 04 §2.8: 0700/0600, descriptor-based checks, `realpath` of both sides, mode-sticks check (DrvFs, 9p, SMB, FUSE), write protocol (lock, re-read, header check, fail closed on mismatch), stale temp cleanup, zeroisation; the passphrase change asks for the current secret at the prompt only.
+  - Measure Argon2id unlock time and record whether `@noble/hashes` clears its Argon2id buffers.
+  - Threat note (04 §2.8 threat delta, including the faked-terminal case) in the PR.
 - **Acceptance:**
-  - Every test listed in 04 §2.8 "Required tests", written first: canary (I-7), wrong passphrase, tamper detection, agent binding, parser, normalisation, permissions, write protocol, selection, owner key, environment, unlock timing, `ALKS` v1 vectors (M1-1h).
-  - CI: an Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
-  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
-  - `KeyEpochControl` as in M1-8a (IR-M1-1g-d-1 M-1, L-5). The advance writes the epoch with the 04 §2.8 write protocol, so it is atomic and durable. Every open `KeyStore` instance over the same file sees it at once. The control accepts only sessions the paired `OwnerKeyStore` minted.
-  - Unlock time on the reference container is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
+  - Tests first, the 04 §2.8 "Required tests" this package owns: canary (I-7), wrong passphrase, tamper detection, agent binding, permissions, write protocol, selection, environment, agent ≠ owner (agent side); parser, normalisation and `ALKS` v1 vectors stay with M1-1f/M1-1h.
+  - The KeyStore conformance suite passes against the file backend.
+  - Unlock time is recorded in the PR. Up to 5 s is accepted (async); above that it goes to the owner (04 §2.8), never a silent parameter change. Node's built-in `crypto.argon2` is not used without an owner allowlist decision.
   - (M1-8g) The policy-version mark is the `ALKS` entry `policy-version`, written with the 04 §2.8 write protocol; M1-8g's mark contract test (`policy-mark.fixture.ts`) passes against the file backend, and `openAgentStore` hands the file backend's mark to the client.
+
+#### M1-8f-b · cli: `init --keystore file`, `keystore passphrase`, `doctor` and `owner init` with `owner.alko` on file-KeyStore machines (new, split from M1-8f)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · apps/cli, packages/node (owner store over `owner.alko`)
+- **Depends on:** M1-8f, M1-8c, M1-8h, M1-9a, M1-9t, M1-9z
+- **Spec:** 04 §2.8 (Selection, Passphrase strength, The owner key on a headless machine, Changing the passphrase, Logging and display); 07 §9.1–§9.4; 06 §7; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - `agentlink init --keystore file` (and the `init` question) on M1-8f's `createFileKeyStoreAgent`: interactive terminal only, harness-marker guard, generated unlock code shown once with its last group re-typed (`confirmCode`) and the screen cleared; the optional code file (`O_CREAT | O_EXCL | O_NOFOLLOW`, 0600, never under `~/.agentlink`); `init` and the harness config writers write only `AGENTLINK_KEYSTORE_PASSPHRASE_FILE`, never the value; the one-time trade-off copy at opt-in (07 §9.4); probe timeout with the fix message.
+  - `agentlink keystore passphrase` on `changeFileKeyStorePassphrase`, current secret at the prompt, with its copy.
+  - `doctor` reporting and warnings (07 §9.4): value variable set, passphrase file readable by others, `AGENTLINK_OWNER_*` set and ignored, owner key present on a file-KeyStore machine; owner fingerprint and creation time.
+  - Owner key on file-KeyStore machines: separate `owner init` step, `owner.alko` (`ALKO` v1, the `.alks` file-handling rules), generated 120-bit owner code required, display-only; agent ≠ owner on the owner side across all agents; `owner add-agent` and `owner change-code` on `owner.alko`.
+  - The redacting logger treats both environment variable names as secret-bearing; the CI secret-pattern test knows the code pattern.
+  - Quickstart input for M1-12b.
+- **Acceptance:**
+  - The 04 §2.8 "Owner key" required tests, written first: no non-interactive source unlocks `OwnerKeyStore` (`AGENTLINK_OWNER_*`, a file, an argument, piped stdin); on file-KeyStore machines a chosen owner passphrase is refused and `init --keystore file` creates no owner key; `owner init` refuses when the owner key exists or the card names an owner, never overwrites, and points to `owner add-agent` (D-78); `owner init` writes the owner code to no file and offers no code file; fingerprint and lost-code consequence before the code, and `doctor` shows the fingerprint and creation time; agent ≠ owner in both directions across several agents, with matching normalisation.
+  - Canary (I-7) over CLI output and `doctor`; no CLI command accepts the agent passphrase as an argument; `init` never writes the value variable into a harness config.
+  - The M1-8c same-user script test passes on the file backend with the agent passphrase readable by the script.
   - (IR-M1-8c-1 F-10, F-11) The TTY prompt tests run unconditionally in CI (a pseudo-terminal, not skipped when no TTY is present), and the owner and passphrase prompts refuse C0 control characters in the typed input.
+
+#### M1-8f-c · cli: async file KeyStore unlock in the MCP server (new, split from M1-8f)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · apps/cli (MCP server start-up, open-agent runtime)
+- **Depends on:** M1-8f, M1-8f-b (recorded backend `file` from `init`)
+- **Spec:** 04 §2.8 (Unlocking the agent key; KDF target); 07 §9.2; 06 §2.5
+- **Invariants:** I-1, I-7
+- **Scope:**
+  - For an agent recorded with the backend `file`, the MCP server calls `unlockFileKeyStoreAgent` after answering MCP `initialize` (no prompt), then opens the KeyStore and the store with `fileAgent`. Until it finishes, tools return `needs_setup` (`keystore_locked`, "unlocking"); with no source or a failed unlock, `needs_setup` (`keystore_locked`) naming the fix without revealing anything about the file.
+  - A later `keystore_locked` (a passphrase change elsewhere) keeps tools at `needs_setup` until restart.
+- **Acceptance:**
+  - Unlock timing: the async unlock answers MCP `initialize` before the KDF finishes, and tools return `keystore_locked` until it does.
+  - Environment: both variables are removed from `process.env` at start-up and child processes started later do not inherit them; canary (I-7) over tool results.
+
+#### M1-8f-d · CI: Ubuntu job without D-Bus or Secret Service for the file KeyStore (new, split from M1-8f)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive path `.github/**`: merges only on Tali's "merge") · **Phase:** M1a (off the critical path, as M1-8f)
+- **Repo/path:** agentlink · .github/workflows/ci.yml
+- **Depends on:** M1-8f-b, M1-8f-c
+- **Spec:** 04 §2.8 (Required tests: Vectors and the CI job); docs/process/ci-cd.md
+- **Invariants:** I-1
+- **Scope:**
+  - An Ubuntu job without D-Bus or Secret Service runs `init --keystore file` and `owner init` (with a pseudo-terminal) and a full M1a Talk round trip on the file backend; the same job without the opt-in gets `needs_setup`.
+  - Measure Argon2id unlock time on the reference container (2 vCPU, 512 MiB limit, x86); M1-8f measured on arm64 only.
+- **Acceptance:**
+  - The job is green and required. Unlock time on the reference container is recorded; up to 5 s is accepted, above that it goes to the owner (04 §2.8).
+
+#### M1-8f-e · node: `KeyEpochControl` for the keychain and file KeyStores (new, split from M1-8f; IR-M1-1g-d-1 M-1, L-5)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Repo/path:** agentlink · packages/node
+- **Depends on:** M1-1g-d, M1-8a, M1-8f
+- **Spec:** 04 §2.6, §2.8 (Writes), §3.1.1 (Epoch advance); 07 §9
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - `KeyEpochControl` as in M1-8a for both Node backends (packages/node has none yet): a separate object, built only by owner flows and unreachable from the `KeyStore` instance.
+- **Acceptance:**
+  - `advanceEpoch` accepts only sessions the paired `OwnerKeyStore` minted, checked by identity; a look-alike gets `presence_required`.
+  - The compare-and-set is atomic and durable across processes, and every open `KeyStore` instance over the same keychain entry or file sees an advance at once; on the file backend the advance writes the epoch with the 04 §2.8 write protocol.
+  - Tests: a fake session, a cast of the agent `KeyStore`, two processes advancing concurrently, and a kill during the advance.
 
 #### M1-8g · node: policy-version mark in the keychain and file KeyStores (new, IR-M1-7d-1 F-2)
 - **Status:** ready (planning 2026-10-15: dependencies M1-7d #79, M1-8a #54 and M1-8b #60 merged) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -3531,7 +3659,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `init` with the passkey option on a virtual authenticator completes; the recovery kit offered by `init` restores on a clean machine (with M1-9i).
 
 #### M1-9h-b · CLI: verify and credits polish (new, M1-9h review)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#321, merged 2026-10-20) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`src/commands/{verify,credits}.ts`, `src/tools/**`)
 - **Depends on:** M1-9h
 - **Spec:** 06 §2.4, §8 (D-108); 11 §5
@@ -3594,13 +3722,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first (local red run) for each item, with the in-memory chain (engine) and, for the nonce, the mock RPC.
 
 #### M1-10a-c · submitter: bound how long `held` items retry (new, IR-M1-10a-b review)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
+- **Status:** in review (`apps/submitter/src/engine.ts`, `apps/submitter/src/config.ts`) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the submitter serves public beta traffic)
 - **Repo/path:** agentlink · apps/submitter/src/engine.ts
 - **Depends on:** M1-10a-b
 - **Spec:** 07 §7 (Implementation); 05 §3.3
 - **Invariants:** I-3
 - **Scope:** cap how long a `held` item keeps retrying, using an intake deadline: past the cap the item becomes `failed` with the existing fixed reason, and the queue does not grow without bound.
 - **Acceptance:** tests first (local red run): an item held past the cap is failed; one held within it keeps retrying.
+
+#### M1-10a-d · submitter: a held receipt that fails at the intake cap frees its per-record cap slot (new, IR-M1-10a-c-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/submitter (tests)
+- **Depends on:** M1-10a-c, M1-34-b
+- **Scope:** add a test that a held receipt which fails at the intake cap releases its per-record slot (cap of 3 per record, M1-34-b), so later receipts for the record are not blocked. Source: IR-M1-10a-c-1.
+- **Acceptance:** the test fails if the slot is not freed and passes on the current behaviour; existing tests unchanged.
 
 #### M1-10b · testnet credits faucet
 - **Status:** done (4thtech/agentlink#298, merged 2026-10-19; code only, deployed by M1-10c) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -3695,7 +3830,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - Review note (IR-M1-27a-2 (PR #218, open), 2026-10-17): tighten per-network limits; account downloads after delivery; document URL normalisation in 07 §5.4; set `cpu_ms` in the deploy config; add a header-whitespace test.
 
 #### M1-27b-b · drop: deploy pipeline follow-ups (new, follow-up from #255)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (rollback on cancel and timeout, `cpu_ms`, lifecycle check before the deploy; `actionlint` and the 100 MB staging round trip stay open) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `.github/workflows/deploy-drop.yml`, `docs/process/release-and-deployment.md`
 - **Depends on:** M1-27b
 - **Spec:** `release-and-deployment.md` §4.5, §8; 07 §5.4
@@ -3771,9 +3906,70 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - A `pending_approval` result carries the UI `url`; a test checks the origin pin; "Remember for this contact" adds the contact rule through a `policy.set` whose refusal or success is reported accurately.
 
-#### M1-11c · local UI: settings pages
+#### M1-11s-a · local UI: client shell (`apps/local-ui`) (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · packages/node (new settings page modules; `approval-page.ts` belongs to M1-11b); consumes `packages/ui`
+- **Repo/path:** agentlink · `apps/local-ui/**`: `package.json`, `vite.config.ts`, `index.html`, `src/main.tsx`, `router.tsx`, `nav.ts`, `api/client.ts`, `layout/**`, its own `pnpm-lock.yaml` importer entry, stub pages `src/pages/{first-run,approvals,approve,activity,contacts,files,storage,proofs,rules,backup,advanced}/index.tsx` and `src/states/index.tsx`
+- **Depends on:** #370 (React components in `packages/ui`, lockfile); merges after M1-11s-b (the deps-check zone for `apps/local-ui` exists only then); lockfile conflicts are resolved by regenerating with `pnpm install` at merge
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - New zone `apps/local-ui` (D-118): a browser-only React app built with Vite, using `packages/ui`; no Node APIs. Owns the router, navigation, layout and the API client that sends the session token; every page card fills in its own stub.
+  - Page copy lives locally per page and is linted with `lintVocabulary` (the strings coverage scan is `packages/ui` only).
+  - The browser never signs and holds no key: owner presence and signing stay server-side.
+- **Acceptance:**
+  - Builds to static assets; the app renders every stub page in light and dark; no external URL, no inline style (08 §4 CSP); bundle-size limit recorded in the PR.
+
+#### M1-11s-b · local UI: server shell (static assets, routes, context, CLI embedding) (new, D-118)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` (static `/assets/*`, CSP `font-src 'self'`, SPA fallback for the new routes only), `packages/node/src/local-ui/{context.ts,route-types.ts,routes.ts}`, `packages/node/src/local-ui/api/{first-run,approvals,activity,contacts,files,storage,proofs,rules,backup,advanced}.ts` (501 stubs, so wave 1 never edits `routes.ts`), `packages/node/src/index.ts`, `apps/cli/src/mcp/command.ts` and `agentlink ui` wiring, the `apps/cli` build (embeds the built `apps/local-ui` assets), `tools/deps-check/policy.mjs` (zone `apps/local-ui`), the `pnpm-lock.yaml` entries other than the `apps/local-ui` importer
+- **Depends on:** #348, #370
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Serve the embedded `apps/local-ui` build from the existing approval server (D-118): static assets, SPA fallback for `/settings/*` and `/first-run` behind the existing session token. Approvals stay on the old page (`/`, `/approve/<id>`, `APP_JS`) until M1-11b-2.
+  - One `LocalUiContext` (core client, store, policy, owner-operation helper, presence check) for every handler. Every mutating route is declared `presence: true` in `route-types.ts` and presence is enforced centrally, not per handler.
+  - `packages/node` stays React-free (deps-check); `apps/cli` bundles the assets and passes them to the server. The deps-check policy gets the `apps/local-ui` zone (`react`, `react-dom`, `packages/ui`; no node).
+- **Acceptance:**
+  - Tests: a mutating route without `presence` fails to register; a missing or wrong token, wrong `Host` or foreign origin is rejected for the new routes as for the old; stub API routes return 501; deps-check rejects React in `packages/node`; the old approval flows pass unchanged. Threat note and tests-first evidence (S2).
+
+#### M1-11r-a · core read APIs for the local UI (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (new modules) and their `src/index.ts` exports
+- **Depends on:** —
+- **Spec:** 06; 07; 08 §1; 04 §4; D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Read-side APIs the local pages need (gaps from the core API audit, D-118): `identity.fingerprints()` for the agent and the owner; `files.resolvedFolders()`; `ProofService.list()`; `creditsBalance()` per chain; `requestFaucet(chain)`, testnet only; `identity.agentAddress()` for the QR code; read accessors for the relay list and for RPC and chain overrides; `ActivityService.list()`, a merged feed of non-message events.
+  - Read-only: no signing, no key material in any result; paths and URLs follow the 04 §4 realpath and SSRF rules.
+- **Acceptance:**
+  - Unit tests per API including empty and large inputs; no secret, key or URL of the user's storage appears in any result (fixture grep); `requestFaucet` refuses a mainnet chain. Threat note and tests-first evidence (S2).
+
+#### M1-11r-b · owner-operation prepare helpers for the local UI (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (the owner-action files shared with M1-9i-a) and their `src/index.ts` exports
+- **Depends on:** M1-9i-a (same owner-action files), M1-11r-a (both write `packages/core/src/index.ts`)
+- **Spec:** 04 §2.5; 06 §8; 07; 08 §1; D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Helpers that build the unsigned body the server then signs after the presence check (D-118): `preparePolicyEdit(patch)` with a version bump (for the Rules and Files writes); the unsigned `contact.check`, `contact.rename` and `contact.remove` bodies. Relay and RPC writes are not here: they depend on M1-7j and M1-9n (see M1-11c-a6).
+  - The browser never signs: these return unsigned bodies to the server-side handler only.
+- **Acceptance:**
+  - Tests-first: the version bump, rejection of a stale version, and byte-exact bodies against vectors where a vector exists; an unsigned body is never accepted by the core without an owner signature. Threat note and tests-first evidence (S2).
+
+#### M1-11r-c · core dropUsage and own-storage status (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (new module and `src/index.ts` export)
+- **Depends on:** M1-9i-a (shares own-storage), M1-11r-b (both write `packages/core/src/index.ts`)
+- **Spec:** 06 §8; 07; 08 §1; D-48, D-115, D-118
+- **Invariants:** I-7
+- **Scope:**
+  - `files.dropUsage()`: used bytes against the quota for the encrypted drop, and a read of the own-storage status (connected or not, last test result) for the Storage page. Read-only; no credential, presigned URL or share link in any result.
+- **Acceptance:**
+  - Unit tests for empty, partly used and over-quota states and for own storage connected and not; a fixture grep shows no credential or URL in any result. Threat note and tests-first evidence (S2).
+
+#### M1-11c · local UI: settings pages
+- **Status:** split into M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-11c-a1…a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c (D-118, 2026-10-22) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui` (pages) and `packages/node/src/local-ui` (server handlers); consumes `packages/ui`; see D-118
 - **Depends on:** M1-11a, M1-9b, M1-9i, M1-26; DESIGN-ADJ-1, M1-35a, M1-35b, M1-35c (D-116)
 - **Spec:** 08 §1 (pages); 11 §6.2; 10 M1-11; D-116; `docs/design/README.md` (screen index)
 - **Invariants:** I-4, I-10
@@ -3784,9 +3980,142 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Playwright flow per page; every mutating action requires presence; default views pass the vocabulary lint; owner confirms fidelity to the adjusted design.
 
+#### M1-11c-a1 · local UI page: Activity (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/activity.ts` and its test, `e2e/test/local-ui-activity.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Activity (Local-activity): the merged feed of non-message events from `ActivityService.list()`.
+  - The server handler in `packages/node/src/local-ui/api/activity.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a1b · local UI page: Activity, brief B-5 follow-up (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**` and its tests
+- **Depends on:** M1-11c-a1; design brief B-5
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Apply the owner's redesign from brief B-5 to the Activity page (D-118).
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a2 · local UI page: Contacts (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/contacts.ts` and its test, `e2e/test/local-ui-contacts.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a, M1-11r-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Contacts (Local-contacts): safety-code compare per 04 §3.6.1 ("They match" signs `contact.check` with presence, "They don't" blocks), rename, remove, block.
+  - The server handler in `packages/node/src/local-ui/api/contacts.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a3 · local UI page: Files (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/files.ts` and its test, `e2e/test/local-ui-files.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a, M1-11r-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Files (Local-files): allowed folders with resolved paths, inbox folder, expiry; edits through `preparePolicyEdit`.
+  - The server handler in `packages/node/src/local-ui/api/files.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+  - D-119: the server refuses to sign a policy edit while any warning code from `preparePolicyEdit` is unacknowledged; the confirm screen lists each warning and the owner acknowledges each one (test: a sign attempt with a missing acknowledgement is refused).
+
+#### M1-11c-a4 · local UI page: Proofs and credits (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/proofs.ts` and its test, `e2e/test/local-ui-proofs.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Proofs and credits (Local-proofs): proof list, balances, agent address QR, faucet on testnets. The Add credits control stays hidden until the pay page is live (`PAY_PAGE.live`).
+  - The server handler in `packages/node/src/local-ui/api/proofs.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a4b · local UI page: Proofs and credits, brief B-5 follow-up (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**` and its tests
+- **Depends on:** M1-11c-a4; design brief B-5
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Apply the owner's redesign from brief B-5 to the Proofs and credits page (D-118).
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a5 · local UI page: Rules (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/rules.ts` and its test, `e2e/test/local-ui-rules.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Rules (Local-rules): plain-language rules to owner-signed policy, including `commitments` limits.
+  - The server handler in `packages/node/src/local-ui/api/rules.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+  - D-119: the server refuses to sign a policy edit while any warning code from `preparePolicyEdit` is unacknowledged; the confirm screen lists each warning and the owner acknowledges each one (test: a sign attempt with a missing acknowledgement is refused).
+
+#### M1-11c-a5b · local UI page: Rules, brief B-5 follow-up (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**` and its tests
+- **Depends on:** M1-11c-a5; design brief B-5
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Apply the owner's redesign from brief B-5 to the Rules page (D-118).
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-a6 · local UI page: Advanced (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/advanced/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/advanced.ts` and its test, `e2e/test/local-ui-advanced.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b, M1-11r-a, M1-11r-b, M1-7j, M1-9n; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the page in `apps/local-ui` from the D1 screen with the DESIGN-ADJ-1 fixes: Advanced (Local-advanced): fingerprints, relays, RPCs and chains; the only place a chain can be chosen (D-40). Relay and RPC writes go through the M1-7j relay republish and M1-9n owner operations, not through M1-11r-b; if no RPC or chain-override owner operation is specified by then, the page shows these read-only.
+  - The server handler in `packages/node/src/local-ui/api/advanced.ts` calls the core APIs; no new crypto or signing code; mutating routes are presence-gated centrally.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11c-b · local UI page: Storage (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/storage/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/storage.ts` and its test, `e2e/test/local-ui-storage.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-9i, M1-11r-c, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-4
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Storage (Local-storage): drop usage against the quota (`dropUsage`, M1-11r-c) and, under Advanced, the status of own storage with a "connect in terminal" step and a test. Credential entry stays in the terminal (D-117, `agentlink storage connect`); the page never takes a storage credential.
+- **Acceptance:**
+  - I-7 holds: no storage credential or URL of the user's storage reaches the page, a log or an error (fixture grep).
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+  - No storage credential, presigned URL or share link reaches the page or any log.
+
+#### M1-11c-c · local UI page: Backup (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/backup.ts` and its test, `e2e/test/local-ui-backup.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-9i, M1-11s-a, M1-11s-b, M1-35c-b; design brief B-3
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5, I-7, I-10
+- **Scope:**
+  - Backup (Local-backup): recovery-kit export behind the owner's passkey; restore stays in the terminal only (D-117, 06 §8, 04 §2.3). The kit is shown through the `SecretDisplay` component and never logged.
+- **Acceptance:**
+  - I-7 and I-10 hold: the kit needs owner presence, is shown once through `SecretDisplay` and never reaches a log, URL or the 4thTech services.
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+  - The kit never appears in a URL, a log or an error.
+
 #### M1-11b · local UI: apply design drop D1 (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus for the passkey, approval and policy screens) · **Security:** S1 (S2 where a change touches owner-presence or approval flows) · **Phase:** M1b
-- **Repo/path:** agentlink · packages/node (`approval-page.ts` and its tests: first run, approvals, review together); consumes `packages/ui` (M1-35a, M1-35b), never edits it
+- **Status:** split into M1-11b-1…5 (D-118, 2026-10-22) · **Size:** M · **Tier:** Sonnet (Opus for the passkey, approval and policy screens) · **Security:** S1 (S2 where a change touches owner-presence or approval flows) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui` (first run, approvals, states) and `packages/node/src/local-ui`; `approval-page.ts` is deleted by M1-11b-2; consumes `packages/ui` (M1-35a, M1-35b), never edits it
 - **Depends on:** DESIGN-D1, DESIGN-ADJ-1, M1-35a, M1-35b, M1-35c, M1-11a
 - **Spec:** 11 §6.2, §8, §9, §11; D-30, D-116; `docs/design/README.md` (screen index), `docs/design/adjustments.md`
 - **Invariants:** I-4, I-5
@@ -3798,10 +4127,68 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - All M1-11a/M1-11c Playwright flows pass unchanged; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to D1.
   - Untrusted strings still render as text (XSS fixtures re-run); no external URL in the bundle.
 
+#### M1-11b-1 · local UI: first run and shared states (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1, M1-11s-c
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the first run (Local-firstrun) and the shared states (Local-states) in `apps/local-ui` from the D1 screens with the DESIGN-ADJ-1 (a) fixes; the passkey registration calls the server; the browser never signs.
+  - Also owns `src/states/**` and `approval-passkey-browser.test.ts`.
+  - From IR-M1-11s-a-1: derive the status bar's connection state from the real network status (it is hardcoded "connected" in `layout/index.tsx:15`); align the "not available yet" and "not found" copy with the d1 shared-states design; reject `..` segments in `api/client.ts` paths.
+- **Acceptance:**
+  - Passkey browser test still passes; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-2 · local UI: approvals, and `/` switches to the new app (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/approvals.ts` and its test, `e2e/test/local-ui-approvals.test.ts`, its `changelog.d/` fragment and changeset; also `approval-page.ts`, `approval-server.ts`, `approval-ui-browser.test.ts`, `approval-review.test.ts`, `approval-ui.fixture.ts`
+- **Depends on:** M1-11b-1, M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the approvals list and the approval and commitment review (Local-approvals) in `apps/local-ui`, switch `/` and `/approve/<id>` to the new app and delete `APP_JS`.
+  - Sole editor of `approval-server.ts` in wave 1. Playwright selectors that #398 renamed are updated deliberately and listed in the PR. Merges after M1-11b-1.
+- **Acceptance:**
+  - All M1-11a approval flows pass; untrusted strings render as text (XSS fixtures re-run); no external URL in the bundle; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-3 · local UI: first-run recovery-code step per brief B-3 (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/recovery/**` and its tests only
+- **Depends on:** M1-11b-1, M1-9i; design brief B-3
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wave 2 follow-up to M1-11b-1/-2: apply first-run recovery-code step per brief B-3 in `apps/local-ui` (D-118). Owns only the files the brief names; the browser never signs.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-4 · local UI: states and cards using the components from M1-35b-b (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/states/**` and its tests only
+- **Depends on:** M1-11b-1, M1-11b-2, M1-35b-b
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wave 2 follow-up to M1-11b-1/-2: apply states and cards using the components from M1-35b-b in `apps/local-ui` (D-118). Owns only the files the brief names; the browser never signs.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
+#### M1-11b-5 · local UI: approval and commitment cards per brief B-9 (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/cards/**` and `apps/local-ui/src/pages/approve/**` with their tests only
+- **Depends on:** M1-11b-2, M1-11b-4 (serial; no overlapping files); design brief B-9
+- **Spec:** 08 §1; 11 §6.2; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Wave 2 follow-up to M1-11b-1/-2: apply approval and commitment cards per brief B-9 in `apps/local-ui` (D-118). Owns only the files the brief names; the browser never signs.
+- **Acceptance:**
+  - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
-- **Status:** ready · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#361, merged 2026-10-21) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/ui (`src/tokens/**`, `fonts/**`, a third-party notices file, `package.json` exports, `src/index.ts`). This card owns `src/index.ts`; M1-35b only appends component exports to it after this card lands
 - **Depends on:** — (parallel with DESIGN-ADJ-1)
 - **Spec:** 11 §11.7; 08 §4; D-30, D-116; `docs/design/d1/tokens/`, `d1/design-system/contrast.md`
@@ -3823,6 +4210,39 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures render inert in every component; no `style=` attribute in rendered output; owner confirms visual match.
 
+#### M1-35b-b · ui: components, brief B-2 (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
+- **Depends on:** M1-35b, M1-35c-b; design brief B-2 (`docs/design/adjustments.md`)
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the components of brief B-2 from the component specs with the DESIGN-ADJ-1 fixes. M1-35b-b, -c and -d run serially (shared `components.css` and `index.ts`).
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures inert; no `style=` attribute in rendered output; owner confirms visual match.
+
+#### M1-35b-c · ui: components, brief B-1 (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
+- **Depends on:** M1-35b-b; design brief B-1 (`docs/design/adjustments.md`)
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the components of brief B-1 from the component specs with the DESIGN-ADJ-1 fixes. M1-35b-b, -c and -d run serially (shared `components.css` and `index.ts`).
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures inert; no `style=` attribute in rendered output; owner confirms visual match.
+
+#### M1-35b-d · ui: components, brief B-8 (new, D-118)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
+- **Depends on:** M1-35b-c; design brief B-8 (`docs/design/adjustments.md`)
+- **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Build the components of brief B-8 from the component specs with the DESIGN-ADJ-1 fixes. M1-35b-b, -c and -d run serially (shared `components.css` and `index.ts`).
+- **Acceptance:**
+  - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures inert; no `style=` attribute in rendered output; owner confirms visual match.
+
 #### M1-35c · Copy audit of strings and screens against 11 §5 (new, D-116)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/ui (`src/strings/**`: the shipped English strings and their vocabulary test)
@@ -3833,6 +4253,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Audit `docs/design/d1/copy/strings.en.json` and the copy of every screen against 11 §5; ship the corrected strings in `packages/ui`. Known items: the Pay network line ("choose Base (cheapest)") leaves the default view; raw `0x…` record IDs move to Advanced or detail; the 11 §5.6 disclosure lines are present; the `@4thtech-io` package scope.
 - **Acceptance:**
   - A vocabulary test fails on any banned term in a default-view string; every changed string lists its 11 § reference in the PR.
+
+#### M1-35c-b · ui: strings export and `lintVocabulary` (new, D-118)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/index.ts`, `packages/ui/src/strings/{index.ts,lint.ts}` (`StringKey`, `lintVocabulary`)
+- **Depends on:** #370, #398 (M1-35c)
+- **Spec:** 11 §5, §5.1, §5.6; D-116, D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Export the corrected strings as typed `StringKey`s and a `lintVocabulary` helper the page cards in `apps/local-ui` use to lint their local copy against 11 §5.
+  - `packages/ui/src/index.ts` is owned by #370, then this card.
+- **Acceptance:**
+  - Vocabulary test fails on any banned term in a default-view string; `lintVocabulary` is covered for each banned term and for the Advanced exemptions.
 
 ### Agent instructions, docs, end-to-end
 
@@ -3853,7 +4285,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
     - Met for Claude Code (2026-10-16, E2E run 38866218869, L06, L10, L11; wording of L10 and L11 for human review): the transcripts are in the run artifact and the test report. Codex has no passing L06 to L11 transcript with this skill yet.
 
 #### M1-12c · skill file: file and proof workflows (new, split from M1-12a)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#341, merged 2026-10-21) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · skills/agentlink/SKILL.md
 - **Depends on:** M1-12a, M1-9d
 - **Spec:** 06 §5; 02 F-43, F-51, J2, J3, J5, J8; 04 §3.4 (proof of agreement); 11 §5, §6.1; D-32, D-40
@@ -4071,7 +4503,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - **Deploy (D-25)** block as in M1-19.
 
 #### M1-33a · Delivery receipts off by default; sender request and recipient opt-in (new, D-109)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#325, merged 2026-10-21) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/types (policy default, `ContactRule.receipts`, `proof` body `receiptRequest`), packages/core (proofs, inbox, policy engine), apps/cli (tool inputs, policy review, local UI rule)
 - **Depends on:** M1-7g, M1-7g-b, M1-9d-2
 - **Spec:** 04 §3.4 (`proof`, receipt request), §5, §5.1; 06 §2.2, §2.4, §3 (delivery receipts, contact rules); 11 §5.6; D-109
@@ -4100,7 +4532,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Snapshot tests of each summary and card; a vocabulary test (11 §5.1) over the new strings; the user-guide privacy page and the proof page match the strings.
 
 #### M1-33c · `parentRecordId` rule: zero or the agent's own record (new, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#323, merged 2026-10-20) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs), packages/chain (record builder)
 - **Depends on:** M1-7g
 - **Spec:** 05 §3.1 (`parentRecordId` rule); 04 §5.1; D-109
@@ -4141,7 +4573,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Other fields of an existing rule for the contact stay as they are; a refused `policy.set` is reported and changes nothing.
 
 #### M1-33d-b · Receipt request follow-ups from IR-M1-33d-1 (new, split from M1-33d on #333, D-109)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, inbox), apps/cli (tool summaries), docs-site/guide
 - **Depends on:** M1-33d
 - **Spec:** 04 §3.4 (`proof`, receipt request); 06 §2.4, §3 (delivery receipts); 11 §5.6; D-109
@@ -4153,6 +4585,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Inbox page: remove the N+1 database transaction (one read per page, not one per item).
 - **Acceptance (tests first; a `RED (expected):` commit before the fix):**
   - The concurrency test signs exactly one DELIVERED; the already-notarized case is reported in the result field and the summary line; the inbox page test shows one transaction per page; no test weakened.
+
+#### M1-33d-c · proofStatusShape follows 06 ProofStatus (new, from IR-M1-33d-b-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/types` (`proofStatusShape` and its schema test)
+- **Depends on:** M1-33d-b
+- **Spec:** 06 `ProofStatus`; D-109
+- **Invariants:** I-5
+- **Scope:**
+  - Align `proofStatusShape` with 06 `ProofStatus`: add `receiptRequested`, `receiptRequestNotAdded` and `advanced`.
+- **Acceptance:**
+  - A schema test accepts each new field and rejects a malformed one; the existing proof tests pass unchanged.
 
 ### Walking skeleton, negotiation and UX (D-31…D-41) (new)
 
@@ -4282,7 +4725,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests with a fake ssh for the file protocol (nonce, invite via stdin, status parsing, timeouts); existing modes unchanged.
 
 #### M1-23-f · Dogfood lows: error text cap, SSH keychain wording, auto-sync cleanup (new, review lows 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#384, merged 2026-10-22) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`tools/dogfood/**`; sensitive path `docs/runbooks/**`: merges only on Tali's "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · `tools/dogfood/**`, `docs/runbooks/dogfood-m1a.md` (RB-17)
 - **Depends on:** M1-23-e
 - **Scope:** source: review lows, 2026-10-18.
@@ -4400,12 +4843,27 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** M1-9y relies on `cli.ts` checking Node >= 22.14 before `main.ts` loads any native module. Add a test on the built bundle that fails if a static import of a native module (or `main.ts`) is reachable before the check runs. Source: review low, 2026-10-18.
 - **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
 
+#### M1-9zc-b · cli: the runtime-guard mutation copies sit next to `dist/` (new, IR-M1-9zc-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (bundle test)
+- **Depends on:** M1-9zc
+- **Scope:** the M1-9zc mutation copies of the bundle are written outside `dist/`, so a moved native import fails with `ERR_MODULE_NOT_FOUND` instead of a real `.node` load. Write the copies next to `dist/` so relative resolution works and the test catches an actual native module load before the Node version check. Source: IR-M1-9zc-1.
+- **Acceptance:** the mutated copy fails the test because a native module really loads (not because a module is missing); the unmutated bundle passes; existing tests unchanged.
+
+
 #### M1-9zd · cli: owner code typed at a shell prompt (new, UX review low 2026-10-18)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (`commands/owner/**`, `strings.ts`), docs-site troubleshooting; 11 §5
 - **Depends on:** M1-9z
 - **Scope:** `owner-code-typed-at-shell-prompt` (the M1-9z incident: a code typed into a shell and a chat). The code prompt states that it is not a shell command and not for chat; guard where feasible (for example a hint when the entry looks like a command). Never log or echo the entry (I-1).
 - **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
+
+#### M1-9zd-b · cli: the owner-code prompt rejects an entry that looks like a shell command; argv guard trims whitespace (new, IR-M1-9zd-1, IR-M1-9zd-2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (owner presence) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (prompt side); apps/cli (`commands/owner/**`, `strings.ts`)
+- **Depends on:** M1-9zd
+- **Scope:** add a prompt-side check that the typed owner code does not look like a shell command (refuse it with the 11 §5 hint; never log or echo the entry, I-1). Also trim trailing whitespace in the argv guard, and cover lowercase all-letter codes pasted into a command (IR-M1-9zd-2, info). Source: IR-M1-9zd-1, IR-M1-9zd-2.
+- **Acceptance:** tests first for each case: a command-like entry is refused at the prompt, a valid code is accepted, an argv code with trailing whitespace is caught, an all-letter lowercase pasted code is caught; nothing about the entry is logged.
 
 #### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
 - **Status:** done (4thtech/agentlink#353, merged 2026-10-21) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
@@ -4415,13 +4873,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit; test with a mismatching invite is refused and writes nothing; the matching case passes.
 
 #### M1-9zf · core: invite acceptance binds the counterparty's owner fingerprint or card hash (new, IR-M1-9ze-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (`client.ts`, `card.ts`, pairing tests)
 - **Depends on:** M1-9ze
 - **Spec:** 04 §3.3 (pairing); 06 §2.1 (`accept_invite`)
 - **Invariants:** I-2, I-5
 - **Scope:** when an invite is accepted, bind the staged counterparty to the `ownerFingerprint` or the `agentCardJcsHash` the invite carries (as the spec chooses), so a card that matches the contact id but belongs to another owner is refused with no state change. Source: IR-M1-9ze-1.
 - **Acceptance:** RED commit; a test with a matching contact id but a different owner fingerprint or card hash is refused and writes nothing; the matching case passes; no test is weakened.
+
+#### M1-9zf-b · core: a test that isolates the owner-fingerprint clause of invite binding (new, IR-M1-9zf-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (pairing tests)
+- **Depends on:** M1-9zf
+- **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
+- **Acceptance:** the test fails when the owner-fingerprint clause is removed (mutation check recorded in the PR) and passes with it; no test weakened.
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
@@ -4554,6 +5019,540 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first (RED commit). The reviewer's repro: v1 and v2 created in the same second and received in one sync → v2 is applied, v1 gives `TERMS_SUPERSEDED`, v2 gives `pending_approval`.
   - Property test: a chain from both parties arriving in random permutations and random sync batches, the same second and a reversed createdAt included, always ends in the same state.
   - A repeated propose, counter, reject or accept under one `clientRequestId` sends exactly once (relay spy) and returns the identical result; a different request under the key is `IDEMPOTENCY_KEY_REUSED`.
+
+#### M1-36a · agent UX: correct command prefix everywhere (UX-A) (new, UX audit, agent side, 2026-10-22)
+- **Status:** in-review (#413) · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/approval/next-step.ts`, `apps/cli/src/mcp/approval-ui.ts`, new `apps/cli/src/runtime/cli-prefix.ts`, `apps/cli/src/tools/text.ts`
+- **Depends on:** none
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Every command a result names uses the prefix that works on the user's machine (`npx -y @4thtech-io/agentlink` when `agentlink` is not on PATH); the right owner step shows on first status (findings F1, F4).
+- **Acceptance:**
+  - Tests for the prefix helper and each rewritten string; the approval text is audited by an Opus reviewer.
+
+#### M1-36b · agent UX: init flow; global install, automatic agent names, default send folder (UX-B) (new, UX audit, agent side, 2026-10-22; D-121)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (D6 changes a policy default) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests, `apps/cli/src/harness/**` as needed
+- **Depends on:** M1-36a
+- **Spec:** 06 §5; 11 §5; D-121
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Clear end-of-run message and a readable diff layout (findings F8, F9).
+  - D1: `init` offers a global install after the diff (y/N); MCP entries point at the installed program, `npx` stays the fallback.
+  - D5: `init` names agents from the harness; owner commands infer the agent when there is one.
+  - D6: `init` creates an empty `~/AgentLink/Send` and allows only that folder for sending; the owner can remove it (orchestrator wording: a policy default change, S2 review).
+- **Acceptance:**
+  - Tests for each point; `init` still shows the diff and requires `--confirm <code>`; the created folder is empty and no existing file becomes sendable; threat note and tests-first evidence (S2).
+
+#### M1-36c · agent UX: no dead-end commands, help, registered-command test (UX-C) (new, UX audit, agent side, 2026-10-22)
+- **Status:** in-review (#409) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/dispatch.ts`, `apps/cli/src/commands/contacts.ts`, `apps/cli/src/commands/shared.ts`, new `apps/cli/src/commands/registered-commands.test.ts`
+- **Depends on:** none
+- **Spec:** 06 §5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Every command a result or help text names exists and works; help lists real commands (findings F6 CLI side, F7, F17).
+- **Acceptance:**
+  - A registered-command test fails when a named command is not registered.
+
+#### M1-36d · agent UX: tool copy and nextStep gaps (UX-D) (new, UX audit, agent side, 2026-10-22)
+- **Status:** in-review (#412) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/strings/en.ts`, `apps/cli/src/tools/invite-common.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/tools/result.ts`
+- **Depends on:** none
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Fill the nextStep gaps (get_approval hint, allow-folder command), drop dead-end wording, plain copy (findings F5a, F6 tools side, F7 copy, F12, F18).
+- **Acceptance:**
+  - Each tool result with a pending step carries one next action; vocabulary lint passes.
+
+#### M1-36e · agent UX: vocabulary lint everywhere, fix terminal leaks (UX-E) (new, UX audit, agent side, 2026-10-22)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (touches `packages/node`) · **Phase:** M1b
+- **Repo/path:** agentlink · new `apps/cli/src/vocabulary.ts` and `vocabulary.test.ts`, `packages/node/src/approval-page.test.ts`, docs-site lint in `tools/`
+- **Depends on:** M1-36a, M1-36c, M1-36d
+- **Spec:** 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Run `lintVocabulary` over terminal output, approval-page text and the docs-site default pages and fix the leaks (finding F14). Lands after A, C and D, or fixes their leaks with them.
+  - After #409 and #412 land, remove the `FIXED_BY_OTHER_CARDS` entries for `en.ts` and `invite-common.ts`.
+- **Acceptance:**
+  - A test fails on any banned term in default output; the two `FIXED_BY_OTHER_CARDS` entries are gone.
+
+#### M1-36f · agent UX: credits honesty (UX-F) (new, UX audit, agent side, 2026-10-22)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/proofs-common.ts`, `apps/cli/src/commands/credits.ts` (rebase on #344)
+- **Depends on:** #344
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - `needs_credits` says plainly what is missing and the one next step; the terminal credits output drops jargon (findings F3 interim, F15).
+- **Acceptance:**
+  - Tests for the `needs_credits` text and the credits command output.
+
+#### M1-36g · agent UX: Cursor and Windsurf init targets (UX-G) (new, UX audit, agent side, 2026-10-22)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/harness/harnesses.ts`, `apps/cli/src/harness/files.ts`, docs-site `get-started/cursor.md` and `windsurf.md`
+- **Depends on:** none
+- **Spec:** 06 §5; 08
+- **Invariants:** I-4
+- **Scope:**
+  - `init` can write the MCP entry for Cursor and Windsurf, with the same diff-and-confirm flow as the other harnesses (finding F11).
+- **Acceptance:**
+  - Writer tests per target (diff shown, nothing written before confirm); an Opus reviewer audits the writer.
+
+#### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/mcp/instructions.ts`, `docs/foundation/06-mcp-server.md` §2 and §5, `apps/cli/src/tools/registry.ts`, `test/fixtures/tool-surface.json`
+- **Depends on:** M1-36a
+- **Spec:** 06 §2, §5; 11 §6.1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Server instructions wording; hide the `chain` parameter from the tool surface (findings F13, F16). Spec edits are marked proposed, owner confirms at merge.
+  - Spec-drift sync list: 06:94 (accept_invite nextStep still names `contacts --verify`), 06:273, 11 §6.1 (:402, :405, :470, :783), and M1-36a's 06 §2.5 approval-link text (:264, :273).
+- **Acceptance:**
+  - Spec and code agree on every line of the sync list; `tool-surface.json` is regenerated and the tool-surface test passes.
+
+#### M1-36i · agent UX: automatic free test credits (UX-I) (new, UX audit, agent side, 2026-10-22)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` proofs, `apps/cli/src/tools/notarize.ts` and `send.ts`, `apps/submitter` route if needed
+- **Depends on:** D-120 (3) (decided); M1-36f
+- **Spec:** 06; 07 §5
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - On testnets only, the first `needs_credits` claims the faucet once for this agent after one plain sentence of disclosure, then retries (finding F3). Decided in D-120 (3): auto-claim once per agent, a small fixed amount, testnet only, within the faucet rate limits; the pool alert is M1-10b-e.
+- **Acceptance:**
+  - Mainnet is unaffected; faucet rate limits and caps hold; no secret reaches the faucet; threat note and tests-first evidence (S2).
+
+#### M1-36a-b · remaining bare `agentlink` prefixes; owner init on fresh machines (new, IR-M1-36a-1 scope low)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, doctor strings (`tools/strings/en.ts`), `packages/node/src/approval-page.ts`, the owner-init redirect message, owner `strings.ts:65`
+- **Depends on:** M1-36a, M1-36b, M1-36d
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Use `cliPrefix` for the remaining bare `agentlink` strings where the runtime allows.
+  - Wire `ownerExists: false` from callers (status and others) so owner init shows on fresh machines; add a length test for the invalid-name hint branch.
+- **Acceptance:**
+  - A grep test finds no bare prefix in the listed files; `status` on a fresh machine names the owner step.
+
+#### M1-36d-b · tool copy lows from IR-M1-36d-1 (new, IR-M1-36d-1)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/next-action.test.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/tools/invite-common.ts`
+- **Depends on:** M1-36d
+- **Spec:** 06 §2.5
+- **Invariants:** I-5
+- **Scope:**
+  - L-1: restore the nextStep prefix assertion in `next-action.test.ts`. L-2: `files-common.ts:14,17` use `<path>` plus the `--agent` hint.
+  - L-3 (pre-existing): `accept_invite` loses the approval link for agent names above about 21 characters (511 code points); shorten the copy or raise the budget per 06.
+- **Acceptance:**
+  - The restored assertion passes; a long agent name still carries the approval link.
+
+#### M1-37a · app UX P0 copy and flow fixes (first run, approvals, invite landing) (new, UX audit, app, 2026-10-22, section 12 "orchestrator can just do")
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` is S1 by path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/**`, `apps/invite/**` copy, `apps/cli/src/commands/init.ts` (restart line)
+- **Depends on:** M1-11b-1, M1-11b-2, M1-19
+- **Spec:** 08 §1; 11 §5, §6.2; D-116, D-118
+- **Invariants:** I-5
+- **Scope:**
+  - 1b: demote the "Weaker setup" box to one neutral line and remove dead "Get the desktop app" links (first run, approvals footer, storage) until M2.
+  - 1c and 10a: draw "Ready" as the hand-back to chat with a Copy prompt; empty states with a "Try: ..." prompt on every page.
+  - 2a and 2b: approval done and denied state (copy final after D-121 D4: "your AI carries on, close this tab" is true only once the tool waits for the decision; until then the AI resumes when the user says so); the expired link leads with "Ask your AI: 'Open AgentLink'".
+  - 2c and 5b: status bar reads "Connected · N proofs left"; the credits card leads with proofs left; Agent ID and QR only under Advanced while the pay page is off.
+  - 9a, 9b and 9c: invite landing "about 5 minutes", AI-app tabs that work in M1, inviter block order, a 3-bullet "what happens next" (worded neutrally, or per D-120 (1) once page-first setup lands); build the prompt from the source string (`@4thtech-io`).
+  - 4c and 10d: plain-language error and jargon sweep (integrity check, localhost, document key, OWNER ACTIONS BLOCKED).
+  - 1e: harness-specific restart line in `init`.
+- **Acceptance:**
+  - Each item is covered by a test or Playwright step; default views pass `lintVocabulary`; no design is invented beyond the D-116 screens.
+
+#### M1-9i-a-b · own-storage lows from IR-M1-9i-a-1 (new, IR-M1-9i-a-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/own-storage.test.ts`, `docs/foundation/04-security-and-crypto.md` (threat note and bucket-rule prose), M1-9i and doctor logging
+- **Depends on:** M1-9i-a
+- **Spec:** 04 §2.5.1; 07 §3.4
+- **Invariants:** I-1, I-7
+- **Scope:**
+  - Add a flipped-signature case per new op asserting `signature_invalid`.
+  - Note the pre-transaction digest read (`owner-actions.ts:447`) in 04 and the threat note; follow up the 04 bucket-rule prose.
+  - M1-9i and doctor must never log the ready-state endpoint or bucket.
+- **Acceptance:**
+  - Each new op has a flipped-sig test; a log-redaction test covers endpoint and bucket.
+
+#### M1-11s-b-c · owner gate timeout and first real passkey test (new, IR-M1-11s-b-2 info)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (ownerGate) and its tests
+- **Depends on:** M1-11s-b
+- **Spec:** 08 §1; D-118
+- **Invariants:** I-4
+- **Scope:**
+  - Race the ownerGate `run(owner)` against a timeout no longer than the session TTL so a hanging handler cannot hold `busy`.
+  - Add a positive passkey test on `/api/ui/` with the first real presence route (put it in M1-11b-1 or the first page card brief).
+- **Acceptance:**
+  - A hanging handler releases `busy` within the TTL; the positive passkey test passes.
+
+#### M1-11r-a-b · blocked-code paging in the read APIs (new, IR-M1-11r-a-3 low)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` read APIs (`candidatesTx`) and their tests
+- **Depends on:** M1-11r-a
+- **Spec:** 08 §1; D-118
+- **Invariants:** I-5
+- **Scope:**
+  - Store the blocked long code in a column and page by (`blocked_at`, `code`) via `candidatesTx`; skipped malformed rows must not count toward `limit + 1`.
+- **Acceptance:**
+  - A paging test with malformed rows returns the right page and cursor.
+
+#### M1-5b-d · outbox notices in tool results and the activity feed (new, IR-M1-5b-c-2 low, 07 §4.2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` tool results and activity feed, `packages/core` outbox notice mapping
+- **Depends on:** M1-11r-a
+- **Spec:** 07 §4.2
+- **Invariants:** I-5
+- **Scope:**
+  - Surface outbox notices (fixed reason codes only) in tool results and the activity feed.
+- **Acceptance:**
+  - Each reason code maps to one plain sentence; no relay URL or payload appears.
+
+#### M1-3j-d · docs pass: README Chiado line and wording (new, IR-M1-3j-c-2 lows)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `README.md`, `docs/process/backlog.md`
+- **Depends on:** M1-3j-c
+- **Spec:** 11 §5
+- **Invariants:** none
+- **Scope:**
+  - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass. Confirmed again by IR-DOCS-FOLLOWUPS-1022B-1 (2026-10-22): this card is the home for that README line.
+- **Acceptance:**
+  - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/**` (accept_invite, respond_to_terms), `packages/node` approval wait
+- **Depends on:** M1-36d
+- **Spec:** 06 §2.5; D-121
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - When the local approval page has opened, the tool waits up to about 45 s for the owner's decision and returns the finished result; otherwise it returns `pending_approval` as today. Approval and owner presence are unchanged.
+  - Check each harness's tool timeout first (Codex about 60 s) and pick the wait per harness (orchestrator wording).
+  - Residual (documented, harmless): a harness timeout lowered by the user, or an agent name reuse, can make the wait exceed half the timeout. Spec nit: align "cancel" and "abort" wording in 06 §2.5.
+- **Acceptance:**
+  - Tests: approved, denied and timed-out waits; a decision made after the timeout is picked up by the retry; no approval is granted by waiting; threat note and tests-first evidence (S2).
+
+#### M1-10b-e · submitter faucet and gas pool: low signal and alert (new, D-120 (3))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/submitter` and its tests
+- **Depends on:** M1-10b-c
+- **Spec:** 07 §5; D-120
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - Grant set to 50 cents of test credits (5 proofs) per agent, claimed once. When the pool is low the claim returns a fixed "test credits paused" status that the tools word plainly.
+  - Alert when the faucet or gas balance falls under $20 (orchestrator wording: threshold and grant are the orchestrator's figures from the decision).
+- **Acceptance:**
+  - Tests for the low-pool status and the alert threshold; the status leaks no balance, address or key; threat note and tests-first evidence (S2).
+
+#### M1-11s-a-b · local UI navigation from 10 to 7 items (new, D-120 (4))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/nav.ts`, `apps/local-ui/src/router.tsx` and their tests
+- **Depends on:** #407 (M1-11s-a)
+- **Spec:** 08 §1; 11 §6.2.1; D-120
+- **Invariants:** I-5
+- **Scope:**
+  - Navigation becomes Approvals, Activity, Contacts, Files (storage folded in), Proofs and credits, Rules, Settings (Backup, Passkeys, Advanced). Keep old paths redirecting.
+- **Acceptance:**
+  - Router and nav tests list exactly seven items; old routes redirect; default views pass `lintVocabulary`. Spec edits to 11 §6.2.1 and 08 §1 are proposed, owner confirms at merge.
+
+#### M1-37b · app UX P1 copy and flow fixes (Wave 1) (new, UX audit, app, 2026-10-22, section 12 items 8 to 14)
+- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` is S1 by path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/**`
+- **Depends on:** M1-37a, M1-11s-a-b, M1-11c-a1..a6, M1-11c-a4c
+- **Spec:** 08 §1; 11 §5, §6.2; D-116, D-118, D-120
+- **Invariants:** I-5
+- **Scope:**
+  - 8 (4a): folder access as a prefilled approval card from the failed send, so the AI retries itself.
+  - 9 (3a): the recipient's first run continues straight into the pending contact approval.
+  - 10 (3b and 3c): safety-code nudge with They match, Don't match and Skip; a sender "waiting for Marko" row.
+  - 11 (6a to 6c): Rules in two groups, selling warning only when turning it on, unsaved-changes bar (record as a D-116 deviation).
+  - 12 (5c): one-time first-proof disclosure banner.
+  - 13 (10b): getting-started checklist (deviation note).
+  - 14 (7b, 8a, 8b): Backup simplified with B-3, passkeys under Settings, Copy diagnostics, network change confirm.
+- **Acceptance:**
+  - Each item has a Playwright step; default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; deviations from D-116 recorded in the PR.
+
+#### M1-11s-c · owner setup route: passkey-first owner creation (setup gate) (new, D-120 (1); M1-11b-1 bootstrap stop)
+- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/local-ui/{route-types.ts,routes.ts,context.ts}`, `packages/node/src/owner-keystore.ts`, `packages/node/src/owner-passkey.ts`, `packages/node/src/owner-init.ts`, specs 04 §2.2, §2.3.1, 06 and 08
+- **Depends on:** M1-11s-b
+- **Spec:** 04 §2.2, §2.3.1, §2.5, §2.8; 06 §7; 08 §1; D-78, D-120
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - A separate `presence: 'setup'` route kind (only POST, only under `/api/ui/first-run/`, at most one setup route) handled by its own `setupGate`; `ownerGate` stays unchanged.
+  - Only when no owner exists: refuse `owner_exists` unless the agent card names no owner and no owner item exists (never overwrite, D-78).
+  - Begin and finish with one gesture: begin generates the seed through KeyStore/crypto, holds it in memory bound to the session for a short time (about 2 minutes) and returns only public values; finish verifies the passkey assertion and seals the owner key. The pending seed is wiped on finish, expiry, session drop or server close.
+  - The first card is signed in the same atomic operation, with all-or-nothing rollback as owner init does (share the first-card logic in a helper).
+  - An owner code is created as well and returned once for a collapsed "backup way to approve" display (D-120 (1) follow-up), so every existing owner-code path keeps working.
+  - G-1 residual note: a same-user process holding a session link can race the human to set up an owner it controls; mitigate by showing "Approvals are already protected on this computer" and the `agentlink doctor` check.
+  - Spec updates to 04 §2.2, §2.3.1, 06 and 08, marked proposed, owner confirms at merge.
+- **Acceptance:**
+  - Tests first: setup refused when an owner exists; the pending seed expires and is wiped; a failed finish leaves no owner item (rollback); the first card is signed in the same operation; `ownerGate` tests pass unchanged; no seed, code or PRF output is logged. Threat note, tests-first evidence and a Fable audit (S2).
+
+#### M1-11c-a4c · local UI: add credits by QR, and Withdraw credits (new, D-122, D-123)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (money path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`, `packages/node/src/local-ui/api/proofs.ts` and its tests, `packages/core` (new owner actions `credits.deposit` and `credits.withdraw`) and its tests, `docs/foundation/04-security-and-crypto.md` §2.5.1 (proposed, owner confirms at merge), `e2e/test/local-ui-proofs-topup.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** Chiado path (QR top-up with xDAI, Withdraw): #418, M1-4c-b (KeyStore `signTransaction`), M1-11c-a4. Base Sepolia gasless USDC part only: M1-3c and M3-4b-t (it ships when they land; the Chiado part does not wait)
+- **Spec:** 08 §1; 11 §5.6, §6.2; 12 §4; D-122, D-123
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - Add credits by QR: shows the agent's address and the named network in plain words with a privacy note; Chiado now (D-123: xDAI sent to the agent's address, then the agent's deposit), gasless USDC top-up once M3-4b-t lands. A card-to-stablecoin provider comes later, when the legal entity exists (D-122).
+  - Withdraw credits under Advanced on the Proofs page: owner presence, a confirm screen with the amount and destination, signed server-side by the existing owner-operation helper. Orchestrator wording: the destination is typed or pasted by the owner and shown in full before signing.
+  - New core owner actions `credits.deposit` and `credits.withdraw` (owner-signed, presence-gated) back the two controls; 04 §2.5.1 gets the two rows (proposed, owner confirms at merge).
+  - The QR ships only together with crediting: the QR and the deposit/withdraw actions land in this card, never the QR alone.
+  - New dependency `qrcode-generator` (MIT, no dependencies): renders the QR in the browser with no network call; justify it in the PR (a hand-written QR encoder would be riskier than a small audited library).
+- **Acceptance:**
+  - Playwright flow for both controls; withdraw requires presence (enforced centrally); the QR and copy pass `lintVocabulary` outside Advanced; no secret or URL is logged; threat note, tests-first evidence and a Fable audit (S2).
+
+#### M1-11r-d · core: activity entries carry contact name, cost, file and message events (new, M1-11c-a1 build)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` ActivityService and its tests
+- **Depends on:** M1-11r-a
+- **Spec:** 08 §1; 11 §6.2; D-118
+- **Invariants:** I-5
+- **Scope:**
+  - ActivityService entries gain the contact display name, the cost, and file and message events, so the Activity page can show Cost and Contact and filter as the d1 design does.
+- **Acceptance:**
+  - Tests per new field; display names are wrapped as untrusted (I-5); no payload or URL in entries.
+
+#### M1-11t · shared Playwright and axe browser-test harness for local UI pages (new, M1-11c-a1 build)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui` test support, `e2e/**` helpers
+- **Depends on:** M1-11s-a
+- **Spec:** 08 §1; D-118
+- **Invariants:** I-5
+- **Scope:**
+  - One harness for Playwright plus axe-core that every `apps/local-ui` page card reuses. Note: page cards each add one bound read to `packages/node/src/local-ui/context.ts`; merge them serially (trivial conflicts).
+- **Acceptance:**
+  - Two pages use the harness; axe-core reports zero WCAG 2.1 AA violations on both.
+
+#### M1-36b-2 · owner init and add-agent sign a first policy (D6 part 2) (new, D-121 D6, #422 stop)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node` initOwner and addAgent, `packages/node/src/owner-init.ts`, specs 04 §2.5 and 06 §3, §7
+- **Depends on:** M1-36b (#422), M1-11r-b (#415)
+- **Spec:** 04 §2.5; 06 §3, §7; D-121
+- **Invariants:** I-4
+- **Scope:**
+  - Owner init and owner add-agent sign a first `policy.set` (v1 = defaults plus the `~/AgentLink/Send` real path) in the same owner-code entry, using `preparePolicyEdit`.
+  - Spec edits marked proposed, owner confirms at merge.
+- **Acceptance:**
+  - Tests first: the first policy is signed in the same entry; a failure leaves no half-set state; defaults are unchanged apart from the Send folder; threat note and a Fable audit (S2).
+
+#### M1-36i-b · free-credits claim lows from IR-M1-36i-1 (new, IR-M1-36i-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/runtime/free-credits.ts` and its tests
+- **Depends on:** M1-36i
+- **Spec:** 07 §5; D-120
+- **Invariants:** I-1
+- **Scope:**
+  - L-3: cap the `limitCode` body read before parsing. L-2: a 429 retry honours Retry-After with a minimum of 5 minutes. L-4: stop the daily retry on a permanent 4xx. L-1 (optional): a cross-process claim lock.
+- **Acceptance:**
+  - A test per item; no secret or URL is logged.
+
+#### M1-36i-c · free credits: bounded in-call wait and one proof retry after a claim (new, D-120 (3))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/notarize.ts`, `send.ts`, `proofs-common.ts`, `apps/cli/src/runtime/proofs.ts` and tests
+- **Depends on:** M1-36i
+- **Spec:** 06 §2.5; 07 §5
+- **Invariants:** I-1
+- **Scope:**
+  - After a successful claim the tool waits a bounded time for the credits to land and retries the proof once.
+- **Acceptance:**
+  - Tests: claim then one retry; no second retry; timeout returns the plain `needs_credits` text; threat note and tests-first evidence (S2).
+
+#### M1-36i-d · terms tools claim free test credits on needs_credits (new, D-120 (3))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/propose-terms.ts`, `apps/cli/src/tools/respond-to-terms.ts` and their tests only (not `notarize.ts`, `send.ts` or `proofs-common.ts`, which M1-36i-c owns)
+- **Depends on:** M1-36i, M1-36i-c
+- **Spec:** 06 §2.5
+- **Invariants:** I-5
+- **Scope:**
+  - The terms tools claim free test credits on `needs_credits` with terms-specific next steps.
+- **Acceptance:**
+  - A test per terms tool for the claim path and the wording; vocabulary lint passes.
+
+#### M1-10b-e-b · pool alert lows from IR-M1-10b-e-1 (new, IR-M1-10b-e-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `e2e/test/world.ts`, `apps/submitter` pool script (`submitter-pool.jq`), faucet claim path
+- **Depends on:** M1-10b-e
+- **Spec:** 07 §5
+- **Invariants:** I-4
+- **Scope:**
+  - `e2e/test/world.ts:117` says "$1"; change it to 50 cents. `faucet: null` must not read as ok in `submitter-pool.jq`.
+  - Pre-existing: a second claim within one block can revert (sent = broadcast); track the pending nonce.
+- **Acceptance:**
+  - Tests for the null-faucet reading and the same-block second claim.
+
+#### M1-11b-6 · cli: `init` opens the first-run page and wires owner setup (new, IR-M1-11b-1-1; #426 follow-up)
+- **Status:** backlog (draft PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, the CLI server start (`localUi.ownerSetup` wiring) and their tests
+- **Depends on:** M1-11b-1, M1-11s-c
+- **Spec:** 06 §7; 08 §1; D-120 (1)
+- **Invariants:** I-4
+- **Scope:**
+  - Wire `localUi.ownerSetup` in the CLI and make `init` open `/first-run` on the owner's machine (OS opener only; nothing sensitive in tool results).
+  - Inherited lint fixes from the draft stack (`eslint-disable` in #424, `router.test.tsx` name in #407) are handled in those PRs.
+  - L-1 `init.ts:464` guard and L-2 seam tests from IR-M1-11b-6-1 are in M1-11b-8.
+- **Acceptance:**
+  - Tests first: `init` on a fresh machine opens the first-run page; with an owner present it does not; no secret, code or URL appears in output or logs.
+
+#### M1-11b-7 · local UI: recovery kit "Later" kept on the server, banner on every page, reminder after first contact (new, IR-M1-11b-1-1 M-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (state and read API), `apps/local-ui/src/layout/**`, tests
+- **Depends on:** M1-11b-1, M1-11b-3
+- **Spec:** 08 §1; 11 §6.2; D-120 (2)
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Keep the recovery-kit "Later" state on the server, because the browser origin changes with the port on every start; the persistent banner shows on all pages.
+  - Show the reminder after the first contact (needs the contacts read from M1-11r-a).
+- **Acceptance:**
+  - Tests: "Later" survives a server restart on a new port; the banner shows on every page until the kit is saved; the reminder appears after the first contact; default views pass `lintVocabulary`.
+
+#### M1-11b-8 · cli: open the first-run page once per start (new, IR-M1-11b-6-1 rec c)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli` (`agentlink mcp` start, `init.ts`), `docs/foundation/06-mcp-server.md` §7 (proposed), tests
+- **Depends on:** M1-11b-6
+- **Spec:** 06 §7; D-120 (1)
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - `agentlink mcp` calls `openFirstRun()` once per start while owner setup is wired (OS opener only, never in tool results); tools keep `needs_setup` and the fixed command fallback.
+  - L-1 `init.ts:464` guard; L-2 seam tests. Update 06 §7 (proposed, owner confirms at merge).
+- **Acceptance:**
+  - Tests: one open per start, none when an owner exists, none in tool output; the fallback command is unchanged; threat note and tests-first evidence (S2).
+
+#### M1-11s-c-b · owner setup lows from IR-M1-11s-c (new, IR-M1-11s-c-1/2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/owner-passkey.ts`, `packages/node/src/local-ui/**` setup route, `docs/foundation/04-security-and-crypto.md` §2.2
+- **Depends on:** M1-11s-c
+- **Spec:** 04 §2.2, §2.3.1
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - L-8: the canary uses seed bytes that are not a real seed (decide and test).
+  - L-9: 04 §2.2 wording exception for the setup route (proposed, owner confirms at merge).
+- **Acceptance:**
+  - Tests for the canary; the 04 §2.2 text names the setup exception; no seed, code or PRF output is logged.
+
+#### M1-11s-c-c · owner setup: passkeys that give PRF only on `get()`; re-show of the owner code (new, IR-M1-11b-1-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` setup route, `apps/local-ui/src/pages/first-run/**`, `packages/node/src/owner-passkey.ts`
+- **Depends on:** M1-11s-c, M1-11b-1
+- **Spec:** 04 §2.2, §2.3.1; 08 §1; D-120 (1)
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - Authenticators that return PRF output only on `get()`: ask for a second `get()` gesture at setup instead of falling back to the owner code.
+  - If the finish response is lost, the server re-shows the owner code once within the hold window (same bounds as the pending seed); never after it.
+- **Acceptance:**
+  - Tests first: a PRF-on-get authenticator completes setup with two gestures; a lost finish response lets the owner code be shown again inside the window and not after; the pending seed still expires and is wiped; threat note and Fable audit.
+
+#### M1-11c-a2b · local UI Contacts: a protective route kind for the mismatch block (new, IR-M1-11c-a2-1, option A)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/route-types.ts`, `packages/node/src/local-ui/api/contacts.ts`, tests
+- **Depends on:** M1-11c-a2
+- **Spec:** 04 §3.6.1; 08 §1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - The "They don't match" block is a protective action: give it its own route kind that blocks without owner presence (it only reduces trust) and is still rate-limited and audited, instead of using a presence-gated route.
+- **Acceptance:**
+  - Tests: the block works without presence and cannot unblock, verify or loosen anything; the presence-gated routes are unchanged.
+
+#### M1-11c-a3b · local UI Files: folder-access approval card (new, IR-M1-11c-a3-1 Q2)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (core approval kind) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (approval kind), `packages/node/src/local-ui/api/files.ts`, `apps/local-ui/src/pages/files/**`, tests
+- **Depends on:** M1-11c-a3, M1-11b-2
+- **Spec:** 04 §2.5; 06 §2.5; 08 §1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - A core approval kind for folder access so the Approvals page can show and decide it.
+  - Check that the other pages (Rules, #432) also pass `baseVersion` on policy edits.
+- **Acceptance:**
+  - Tests first: a folder-access request appears as an approval card and is granted or denied with presence; every policy-editing page passes `baseVersion` (test per page).
+
+#### M1-11c-a4d · credits: an owner-signed grant lets withdrawn credits leave to an owner-chosen address (new, IR-M1-11c-a4c-1 L-4)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (signing, money) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/crypto` (KeyStore verification), `packages/core`, `packages/node`, `apps/local-ui/src/pages/proofs/**`, specs 04 §2.5.1 and 07 §6.2 (proposed)
+- **Depends on:** M1-11c-a4c
+- **Spec:** 04 §2.5.1; 07 §6.2; D-122
+- **Invariants:** I-1, I-3, I-4
+- **Scope:**
+  - Owner-signed `credits.grant` `{recipient, maxAmount, expiry <= 600 s}`, verified by the KeyStore before the key read, plus an amount field on Withdraw.
+  - Default stays withdraw-to-self. Mainnet card note: live fee versus the fixed 0.01 reserve (L-3).
+- **Acceptance:**
+  - Tests first: no grant means no outside recipient; an expired, over-amount or wrong-recipient grant is refused before any key read; threat note and Fable audit.
+
+#### M1-11c-shared · Files and Rules: one acknowledgement helper; cap pending reviews (new, IR-M1-11c-a5-1 lows)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts`, `packages/node/src/local-ui/api/rules.ts` and a shared helper, tests
+- **Depends on:** M1-11c-a3, M1-11c-a5
+- **Spec:** 08 §1; D-119
+- **Invariants:** I-4
+- **Scope:**
+  - Share `acknowledgedExactly` and the prepare surface between Files and Rules.
+  - Cap pending reviews per owner action so a session caller cannot evict the owner's pending review.
+- **Acceptance:**
+  - Tests: both pages use the one helper; a flood of reviews cannot evict the owner's pending one; the D-119 acknowledgement tests pass unchanged.
+
+#### M1-11s-a-c · local UI shell follow-ups: sub-navigation, Storage stub, layout (new, IR-M1-11s-a-b-1; #426)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/layout/**`, `apps/local-ui/src/pages/**` (Storage stub), tests
+- **Depends on:** M1-11s-a-b, M1-11b-1
+- **Spec:** 08 §1; 11 §6.2
+- **Invariants:** I-5
+- **Scope:**
+  - Style `al-subnav` from the design or use an existing `packages/ui` component.
+  - Remove the dead `StoragePage` stub and fold its content into Files (with M1-11c-b).
+  - Layout: both banners and the first-run step header (from #426); the status bar uses `connectionOf` (the health read itself is M1-11s-a-d).
+  - Design note: the "checking" status dot (a thin neutral ring) is not in the d1 design files; confirm with design or add it to the design brief.
+- **Acceptance:**
+  - Playwright and axe checks pass; the design owner confirms the "checking" dot.
+
+#### M1-11s-a-d · local UI server: health read that sets the connection state (new, IR-M1-11s-a-b-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (health read) and its test
+- **Depends on:** M1-11s-a-b, M1-11s-b
+- **Spec:** 08 §1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - A read-only health route (server `/v1` health in local-ui) that returns a fixed connection state (connected, checking, offline) for the status bar; no URLs, keys or relay details in the response.
+- **Acceptance:**
+  - Tests: each state is returned; the route needs no presence and reveals nothing sensitive; the status bar in M1-11s-a-c reads it.
+
+#### M1-4c-b-b · KeyStore `signTransaction` lows from IR-M1-4c-b-1 (new, IR-M1-4c-b-1)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/crypto`, `packages/chain` (direct mode), tests
+- **Depends on:** M1-4c-b
+- **Spec:** 04 §2; 07 §6.2
+- **Invariants:** I-1, I-3
+- **Scope:**
+  - L-1: cap `approve(vault, amount)`. L-2: `notarizeDirect` head-size check. L-3: per-chain caps before mainnet. L-4: runtime fee-token check.
+  - Merge order: if #392 lands after #425 or the reverse, the second adds the file-KeyStore `signTransaction` (mirrors `keychain-keystore.ts`) plus a delta review.
+- **Acceptance:**
+  - Tests first: an over-cap approve, an oversize head and a wrong fee token are refused before any key read.
+
+#### M1-3c-b-b · contracts repo: vault implementation check emits an error for a missing label (new, IR-M1-3c-b-1; cross-repo)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy scripts) · **Phase:** M1b
+- **Repo/path:** `occ-v2-contracts` (private; cross-repo card: the work and its PR live there) · `vault-impl-check.sh` and its workflow
+- **Depends on:** M1-3c
+- **Spec:** 07 §7; `release-and-deployment.md`
+- **Invariants:** I-6
+- **Scope:**
+  - `vault-impl-check.sh` emits `::error` when a label is missing; optionally scope the secret only to the deploy step.
+- **Acceptance:**
+  - A run with a missing label fails with an error annotation; the secret is not available to other steps (if scoped).
+
+#### M1-35c-c · vocabulary lint: more banned words; app pages use `lintVocabulary` (new, IR-M1-35c-b-1 low)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui` (`NEVER_SAY`, `lintVocabulary`), `apps/local-ui` page tests
+- **Depends on:** M1-35c-b
+- **Spec:** 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Add "mint(s)" and "gasless" to `NEVER_SAY` (word boundary and inflections); switch the app pages from their local regex to `lintVocabulary`.
+- **Acceptance:**
+  - Tests: each new word and its inflections are caught and ordinary words are not; no page keeps a private regex.
 
 #### M1-GATE · Milestone 1 gate: internal audit and user testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2 · **Phase:** M1b
@@ -5182,13 +6181,21 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - No payment data is sent to or stored by any 4thTech service; the record names no network outside Advanced.
 
 #### M2-19 · transport-nostr: bounded `ids` re-query for a relay-cap gap (new, IR-M1-5d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2
+- **Status:** done (4thtech/agentlink#374, merged 2026-10-22) · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M2
 - **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M1-5d, M1-5g
 - **Spec:** 07 §4.2 (Sync); 04 §3.5
 - **Invariants:** I-3, I-5
 - **Scope:** for a second a relay returned at its cap (M1-5d), do one bounded re-query by `ids` learned from the agent's other relays, with a fixed cap on queries and ids per gap, so the gap closes where another relay holds the events. NIP-77 negentropy is a later step, only for relays that support it.
 - **Acceptance:** tests first: a capped relay plus a second relay that holds the missing events closes the gap; the re-query count and id count stay within the fixed bounds; a gap no relay can close stays reported as incomplete (M1-5g).
+
+#### M2-19-b · transport-nostr: re-hash a `duplicate` before using it as page evidence (new, AUDIT-FABLE-M2-19-2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (inbound events; sync completeness) · **Phase:** M2
+- **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
+- **Depends on:** M2-19
+- **Spec:** 07 §4.2; 04 §3.5
+- **Scope:** a hostile relay S could return an event with a forged older `created_at` as a `duplicate` and make the re-query treat a gap as closed. Re-hash the event (id over its content) and verify it before using a `duplicate` as page evidence. Source: AUDIT-FABLE-M2-19-2.
+- **Acceptance:** tests first: a duplicate with a forged `created_at` or a mismatched id is not counted as evidence and the gap stays reported as incomplete; a genuine duplicate still closes it.
 
 #### M2-GATE · Milestone 2 gate: internal audit and external testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2
@@ -5344,6 +6351,18 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Independent EIP-3009 vectors (an `eip3009` case set) cover the `ReceiveWithAuthorization` digest (IR-M1-1j-1 L-2).
 - Review note (IR-M1-1j-1 L-1/L-2, 2026-10-17): acceptance: document the EIP-3009 recipient rule and per-chain token domain handling; add an `eip3009` vector case set.
 
+
+#### M3-4b-t · testnet slice of the gasless USDC top-up, pulled forward (new, D-123)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/core`, `packages/chain`, `apps/submitter` (route `/v1/deposit-authorization`)
+- **Depends on:** M1-3c (ABI)
+- **Spec:** 03 §4.4; 05 §2.5; 07 §7; D-123
+- **Invariants:** I-1, I-6
+- **Scope:**
+  - Core EIP-3009 signing and the submitter `/v1/deposit-authorization` route on testnets only, after the M1-3c ABI exists. Mainnet and the rest of M3-4b stay in M3-4b.
+  - From IR-M1-3c-1 (info): a `TokenChecks` negative payee probe; client rule: always sign the `ReceiveWithAuthorization` typehash, never `TransferWithAuthorization`; the submitter simulates and rate-limits `deposit-authorization`; decide the interface file placement.
+- **Acceptance:**
+  - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/submitter; agentlink-ops · monitoring
@@ -5545,6 +6564,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Follow-up (IR-M1-3b-1 I-1): the contracts page states that native coin sent to the vault outside the deposit functions, or attached to an upgrade call, is surplus that no one can recover (no admin path moves funds, I-10).
 - **Acceptance:**
   - As DOCS-M1a, for v0.2.0; testnet contract addresses on the Contracts page equal `@4thtech-io/occ-v2-abi`.
+
+#### DOCS-PAY-TRUST · Public payment and trust documentation (new, D-122)
+- **Status:** in review (#423) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `README.md`, `docs-site/`
+- **Depends on:** none
+- **Spec:** 12 §4; 11 §5.6; D-122
+- **Invariants:** —
+- **Scope:**
+  - Explain the payment model (prepaid withdrawable credits, QR top-up, Withdraw credits) and a trust bridge for the private contracts in the README and the docs-site guide and technical pages, with diagrams.
+- **Acceptance:**
+  - Pages follow 11 §5 vocabulary outside the technical pages; links check; `docs-status --check` passes.
 
 #### DOCS-KNOW · Consolidate `knowledge/` into an overview and a user guide (new)
 - **Status:** done (4thtech/agentlink#210) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b

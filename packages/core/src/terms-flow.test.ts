@@ -4,15 +4,21 @@
 // receive path (04 §3.1.1), so the chain rules run where they run in production: on receive.
 import {
   canonicalize,
+  createGiftWrap,
   parseJson,
   termsHash,
+  type EnvelopeKeys,
   type JsonObject,
   type KeyStore,
   type NostrEvent,
 } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { defaultPolicy, type Policy } from '@4thtech-io/types';
-import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
+import {
+  GIFT_WRAP_MAX_BACKDATE_SECONDS,
+  wrapEnvelope,
+  type PublishOutcome,
+} from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { policyDocumentHash } from './commitments.js';
@@ -42,9 +48,44 @@ class RelaySpy {
   mode: 'ack' | 'none' = 'ack';
   /** While set, every publish waits for it (holds a call between its claim and its publish). */
   gate: Promise<void> | undefined;
+  /**
+   * While set, every gift wrap's created_at is this many seconds before now instead of the random
+   * NIP-59 back-dating, so a test can pin the worst case for the outbox give_up_at (07 §3.2). The
+   * seals wrapEnvelope signed are wrapped again at that created_at: still validly signed gift wraps.
+   */
+  backdate: number | undefined;
   readonly factory: TransportFactory = (deps) => ({
-    wrap: (envelope, recipients, keys) =>
-      wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
+    wrap: async (envelope, recipients, keys) => {
+      const backdate = this.backdate;
+      if (backdate === undefined)
+        return wrapEnvelope(envelope, recipients, keys, { now: deps.now });
+      const seals: NostrEvent[] = [];
+      const recording: EnvelopeKeys = {
+        signEnvelopeHash: (hash) => keys.signEnvelopeHash(hash),
+        signNostr: async (event) => {
+          const seal = await keys.signNostr(event);
+          seals.push(seal);
+          return seal;
+        },
+        nip44Encrypt: (peer, plaintext) => keys.nip44Encrypt(peer, plaintext),
+        nip44Decrypt: (peer, payload, options) => keys.nip44Decrypt(peer, payload, options),
+        unwrapCek: (wrapped, envelopeId, options) => keys.unwrapCek(wrapped, envelopeId, options),
+      };
+      const wrapped = await wrapEnvelope(envelope, recipients, recording, { now: deps.now });
+      const createdAt = deps.now() - backdate;
+      return {
+        ...wrapped,
+        wraps: wrapped.wraps.map((w, i) => {
+          const event = createGiftWrap(seals[i]!, w.recipient, createdAt);
+          return {
+            ...w,
+            event,
+            eventBytes: new TextEncoder().encode(JSON.stringify(event)).length,
+            frameBytes: new TextEncoder().encode(JSON.stringify(['EVENT', event])).length,
+          };
+        }),
+      };
+    },
     publish: async (event, relays) => {
       this.published.push(event);
       if (this.gate !== undefined) await this.gate;
@@ -1011,6 +1052,9 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     );
     await approve(b, p.approvalId);
     b.spy.mode = 'none';
+    // The worst case of the random back-dating (NIP-59; 04 §3.5): give_up_at is then only S = 300 s
+    // after now (07 §3.2), so the retry below must come before it.
+    b.spy.backdate = GIFT_WRAP_MAX_BACKDATE_SECONDS;
     const first = ok(
       await b.client.respondToTerms({
         envelopeId: offer.envelopeId,
@@ -1020,7 +1064,9 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     );
     expect(await parts(b, p.approvalId)).toMatchObject({ envelope: 'claimed' });
     b.spy.mode = 'ack';
-    clock.t += 600; // past the outbox retry delay (07 §4.2)
+    // Past the first backoff step and its jitter (30 s, at most 25 % more; 07 §4.2, M1-5b-c) and
+    // before give_up_at: with the worst-case back-dating that is only S = 300 s away (CHORE-DEFLAKE-2).
+    clock.t += 40;
     const published = b.spy.published.length;
     // The repeat republishes the stored envelope and reports the approval as used: the first call
     // already reported `ok` for it (04 §3.4.2).

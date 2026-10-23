@@ -9,7 +9,7 @@
 // transaction hashes the tests used (07 §7, D-109 (8), OPS-PRIV-1: no request logging; no log line
 // or metric carries any of them).
 import { SELF, env as testEnv, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   RECORD_KIND,
   buildReceipt,
@@ -21,6 +21,7 @@ import type { SubmitterEnv } from '../src/worker.js';
 import { METRICS } from '../src/limits.js';
 import { POLL_MS } from '../src/queue.js';
 import { FakeChain, fakeChains } from './fake-chain.js';
+import { FakeFaucet, fakeFaucets } from './fake-faucet.js';
 
 const env = testEnv as SubmitterEnv;
 const HOST = 'https://submitter.test';
@@ -31,10 +32,20 @@ const NOTARY = config.contracts.notary as Hex;
 const ZERO = `0x${'0'.repeat(40)}`;
 
 let chain: FakeChain;
+// CHORE-DEFLAKE-1: the per-IP limiter is a fixed window aligned to the clock hour (src/limits.ts),
+// so a run that crosses the hour could reset a counter mid-test. The clock is pinned to half past
+// an hour (the date is far enough ahead that the real clock never reaches the limiter's cleanup
+// alarm), so the window cannot roll inside a test; tests that cross a boundary set their own time.
+const PINNED_NOW = new Date('2030-01-01T11:30:00Z');
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(PINNED_NOW);
   chain = new FakeChain(CHAIN_ID, NOTARY);
   chain.signatureCheck = 'real';
   fakeChains.set(CHAIN_ID, chain);
+});
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // Everything a log line or metric must never contain, collected as the tests run. Hex values are
@@ -162,15 +173,24 @@ const queueStub = () =>
   env.SUBMITTER_QUEUE.get(env.SUBMITTER_QUEUE.idFromName(`chain:${String(CHAIN_ID)}`));
 
 describe('GET /v1/health', () => {
-  it('reports per-chain gas balance and queue depth', async () => {
+  it('reports per-chain gas balance, queue depth and the gas and faucet pool states', async () => {
+    fakeFaucets.set(CHAIN_ID, new FakeFaucet(CHAIN_ID));
     const res = await SELF.fetch(`${HOST}/v1/health`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       ok: true,
       chains: [
-        { chainId: CHAIN_ID, available: true, gasBalance: String(10n ** 17n), queueDepth: 0 },
+        {
+          chainId: CHAIN_ID,
+          available: true,
+          gasBalance: String(10n ** 17n),
+          queueDepth: 0,
+          gas: 'ok',
+          faucet: 'ok',
+        },
       ],
     });
+    fakeFaucets.delete(CHAIN_ID);
   });
 });
 
@@ -384,6 +404,22 @@ describe('GET /v1/status/:txHash', () => {
   });
 });
 
+describe('per-IP window boundary (CHORE-DEFLAKE-1)', () => {
+  it('refuses reads inside the hour and allows them again once the clock crosses the hour', async () => {
+    vi.setSystemTime(new Date('2030-01-01T11:59:50Z'));
+    const ip = newIp();
+    const read = () => SELF.fetch(`${HOST}/v1/health`, { headers: { 'cf-connecting-ip': ip } });
+    for (let i = 0; i < 30; i += 1) {
+      if ((await read()).status === 429) break;
+    }
+    const blocked = await read();
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get('retry-after'))).toBe(10);
+    vi.setSystemTime(new Date('2030-01-01T12:00:00Z'));
+    expect((await read()).status).toBe(200);
+  });
+});
+
 describe('read limits (IR-M1-10a-1 L-2)', () => {
   it('limits /v1/status and /v1/health per IP', async () => {
     const ip = newIp();
@@ -401,10 +437,11 @@ describe('read limits (IR-M1-10a-1 L-2)', () => {
 });
 
 describe('other routes', () => {
-  it('keeps /v1/deposit-authorization present but disabled', async () => {
+  it('serves /v1/deposit-authorization once enabled (M3-4b-t-3; test/deposit-auth.test.ts)', async () => {
+    // The Miniflare settings enable Base Sepolia; the default (flag unset) is 501, tested there.
     const res = await post('/v1/deposit-authorization', { chainId: CHAIN_ID }, newIp());
-    expect(res.status).toBe(501);
-    expect(await res.json()).toEqual({ error: 'not_available' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'bad_request' });
   });
 
   it('answers 404 and 405 with fixed codes', async () => {

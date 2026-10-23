@@ -170,6 +170,8 @@ export async function putEncrypted(
     // A target that failed before reading (or stopped without cancelling) leaves the pipe open:
     // cancelling it cancels the plaintext source. Refused while the target still holds the reader.
     await ciphertext?.cancel().catch(() => undefined);
-    throw error;
+    // A caller's stream or a custom target can throw anything, a URL included (M1-6b-b L4).
+    if (error instanceof StorageError) throw error;
+    throw new StorageError('upload_failed', 'storage upload failed');
   }
 }

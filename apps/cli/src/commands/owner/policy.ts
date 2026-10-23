@@ -48,13 +48,7 @@ import {
   type PathFlavor,
   type PolicyProblem,
 } from '@4thtech-io/core';
-import {
-  KeyStoreError,
-  encodeBase64url,
-  encodeHex,
-  randomBytes,
-  type JsonObject,
-} from '@4thtech-io/crypto';
+import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import {
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_BOUNDS,
@@ -71,7 +65,13 @@ import {
 } from '../../dispatch.js';
 import type { Output } from '../../output.js';
 import { sanitizeTerminalText, terminalOneLine } from '../../terminal/sanitize.js';
-import { badArguments, chooseAgent, ownerContext, ownerStep } from './common.js';
+import {
+  badArguments,
+  chooseAgent,
+  isPresenceRejected,
+  ownerContext,
+  ownerStep,
+} from './common.js';
 import type { OwnerAgent, OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
@@ -111,15 +111,12 @@ export const POLICY_TEXT = Object.freeze({
   alreadyAllowed: 'OK       That folder is already allowed. Nothing was changed.',
   notAllowed:
     "That folder isn't one of your allowed folders. Run `agentlink policy show` to see them.",
-  codeHint:
-    "Type your owner code only at the prompt below. It isn't a shell command, and never paste it into a chat.",
   allowSummary: (folder: string): string =>
     `Allow your AI to send files from ${folder} and its subfolders to your contacts. Hidden files are never sent.`,
   removeSummary: (folders: readonly string[]): string =>
     `Stop your AI from sending files from ${folders.join(', ')}.`,
   allowed: 'OK       Allowed. Your AI can now send files from this folder.',
   removed: 'OK       Removed. Your AI can no longer send files from this folder.',
-  wrongCode: "That owner code didn't work. Nothing was changed. Run the command again to retry.",
   failed: "Problem  That didn't go through. Nothing was changed.",
   notConfirmed:
     "Problem  Your new rules were saved, but AgentLink couldn't confirm them, so it uses its strictest settings until they are set again. Run `agentlink doctor` in your own terminal.",
@@ -358,19 +355,6 @@ function reviewLines(policy: Policy): readonly string[] | undefined {
   return lines;
 }
 
-/**
- * A wrong owner code (`presence_rejected`). By name and code as well as by class: the owner store
- * may come from another copy of @4thtech-io/crypto than this module's.
- */
-function isPresenceRejected(error: unknown): boolean {
-  if (error instanceof KeyStoreError) return error.code === 'presence_rejected';
-  return (
-    error instanceof Error &&
-    error.name === 'KeyStoreError' &&
-    (error as { code?: unknown }).code === 'presence_rejected'
-  );
-}
-
 const defaultFlavor = (): PathFlavor => (process.platform === 'win32' ? 'win32' : 'posix');
 
 type Checked =
@@ -597,7 +581,7 @@ async function signAndApply(
     issuedAt,
     expiresAt: issuedAt + POLICY_SET_LIFETIME_SECONDS,
   };
-  output.print(POLICY_TEXT.codeHint);
+  // The owner code reminder is printed by signOwnerAction itself (M1-9zd, prompts.ts).
   let signature;
   try {
     signature = await deps.signOwnerAction(owner.owner, {
@@ -607,7 +591,7 @@ async function signAndApply(
     });
   } catch (error) {
     if (isPresenceRejected(error)) {
-      output.printError(POLICY_TEXT.wrongCode);
+      output.printError(OWNER_TEXT.wrongCode);
       return EXIT_FAILED;
     }
     throw error;
@@ -816,5 +800,5 @@ export function policyHandler(
   deps: OwnerCommandDeps,
   options: PolicyCommandOptions = {},
 ): CommandHandler {
-  return (context) => ownerStep(context, () => runPolicy(deps, context, options));
+  return (context) => ownerStep(context, deps, (deps) => runPolicy(deps, context, options));
 }

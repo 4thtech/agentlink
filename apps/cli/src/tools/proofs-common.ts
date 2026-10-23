@@ -6,12 +6,21 @@
 // - 11 §5.1: user-facing text says "proof", "credits", "agent ID"; never the network's name, a
 //   token, "chain", "contract", "on-chain", "transaction" or "gas". The core's and the chain
 //   package's own wording is never passed through: their results map by code to the text here.
-// - The top-up link (06 §2.1 `topUpUrl`, 02 F-46, 08 §1 `pay.`): the deposit page on its own
-//   origin. The spec gives no form for the link (open question, IR-M1-9d-2 M3), so it is the plain
-//   origin: no amount, network or token in it. The agent address travels as its own field
-//   (`agentAddress`) and in the nextStep, for the user to paste on the page.
-import { CoreError, type NotarizeResult, type ProofView } from '@4thtech-io/core';
+// - The top-up link (06 §2.1 `topUpUrl`, 08 §1, D-113): `https://{payHost}/#v=1&a=<agent
+//   address>&usd=<suggested amount>`, built by the core's `buildTopUpLink` from the shipped pay
+//   host. Address and amount sit in the fragment; no network or token is in it. The host is never
+//   read from a route, a result or any inbound text. The agent address also travels as its own
+//   field (`agentAddress`).
+import { PAY_PAGE, type PayPageConfig } from '@4thtech-io/chain';
+import {
+  CoreError,
+  buildTopUpLink,
+  suggestTopUpUsd,
+  type NotarizeResult,
+  type ProofView,
+} from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
+import type { FreeCreditsOutcome } from './free-credits.js';
 import {
   fail,
   internalError,
@@ -24,10 +33,6 @@ import {
 import { proofDisclosure, topUpDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard } from './text.js';
 
-/** The deposit page origin (D-28 testing hostnames; 08 §1: a separate origin, no owner keys). */
-export const TOP_UP_ORIGIN = 'https://pay.agentlink.4thtech.io';
-
-const AGENT_ID = /^0x[0-9a-f]{40}$/;
 const USD = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$/;
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
 
@@ -38,23 +43,43 @@ export function dollars(usd: unknown): string | undefined {
   return `$${whole ?? '0'}.${(frac + '00').slice(0, Math.max(2, frac.replace(/0+$/, '').length))}`;
 }
 
-/** The top-up link (06 §2.1): the plain deposit origin. Undefined for a malformed agent ID. */
-export function topUpUrl(agentId: string): string | undefined {
-  return AGENT_ID.test(agentId) ? `${TOP_UP_ORIGIN}/` : undefined;
+/**
+ * The top-up link (06 §2.1, D-113). Undefined while the pay page is not live (the shipped config
+ * says so until the page exists) or when the agent ID is malformed. `shortfallUsd` (a checked USD
+ * decimal) sets the suggested amount per 08 §1; without it the link has no `usd`.
+ */
+export function topUpUrl(
+  agentId: string,
+  shortfallUsd?: string,
+  payPage: PayPageConfig = PAY_PAGE,
+): string | undefined {
+  if (!payPage.live) return undefined;
+  const usd = shortfallUsd === undefined ? undefined : suggestTopUpUsd(shortfallUsd);
+  return buildTopUpLink({
+    agentAddress: agentId,
+    payHost: payPage.host,
+    ...(usd === undefined ? {} : { usd }),
+  });
 }
 
 export const PROOF_TEXT = Object.freeze({
   recorded: 'Proof recorded. {fee} from credits.',
   recordedNoFee: 'Proof recorded.',
+  // M1-33d-b: `requestReceipt` on a message that already had proof. Fixed text, no slot (I-5).
+  receiptRequestNotAdded:
+    'This message already had proof, so no delivery confirmation was asked for.',
   recording: 'The proof is being recorded; this usually takes under a minute.',
   recordingNextStep:
     'Call agentlink_get_proof with this envelopeId in a minute to check that it was recorded.',
   needsCredits: 'Adding proof costs {fee}, and there are not enough credits for it.',
   needsCreditsNoFee: 'There are not enough credits to add proof.',
   needsCreditsNextStep:
-    'Tell the user to add credits for agent ID {agentId} here: {url} (messages and files stay free). Then call this tool again.',
+    'Adding proof needs credits. Tell the user to add at least {usd} here: {url}. {covers}Messages and files stay free. Then call this tool again.',
+  needsCreditsNextStepNoAmount:
+    'Adding proof needs credits. Tell the user to add credits here: {url}. {covers}Messages and files stay free. Then call this tool again.',
+  covers: '$5 covers {n} proofs. ',
   needsCreditsNoLink:
-    'Tell the user to add credits in the AgentLink app (messages and files stay free). Then call this tool again.',
+    'Tell the user there are not enough credits to add proof, and that adding credits is not available yet in this version of AgentLink (messages and files stay free). Do not give a link.',
   approval: "Adding proof needs the owner's approval, so nothing was recorded yet.",
   failed: "The proof couldn't be recorded.",
   failedNextStep:
@@ -88,6 +113,14 @@ export const PROOF_TEXT = Object.freeze({
     'Call the tool again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
+  // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that
+  // needed credits. 11 §5: never the service's own name, nor "gas" or "token".
+  freeCreditsAdded: 'Added free test credits so you can try proof. Nothing was recorded yet.',
+  freeCreditsAddedNextStep:
+    'In about a minute, call agentlink_notarize with envelopeId {envelopeId} to add the proof.',
+  freeCreditsPaused: 'Free test credits are paused right now. Try again later.',
+  freeCreditsPausedNextStep:
+    'Tell the user free test credits are paused right now, so the proof has to wait. Try again later.',
 });
 
 const fill = (template: string, slots: Readonly<Record<string, string>>): string =>
@@ -96,26 +129,96 @@ const fill = (template: string, slots: Readonly<Record<string, string>>): string
     template,
   );
 
-/** The `needs_credits` result (06 §1 rule 3, §2.1): agent address and top-up link. */
+/** How many proofs $5 covers at this fee (06 §2.4), or undefined when the fee is unknown or zero. */
+function proofsPerFiveDollars(feeUsd: string | undefined): number | undefined {
+  if (feeUsd === undefined || !USD.test(feeUsd)) return undefined;
+  const fee = Number(feeUsd);
+  return fee > 0 ? Math.floor(5 / fee + 1e-9) : undefined;
+}
+
+/**
+ * The `needs_credits` result (06 §1 rule 3, §2.1, §2.4): agent address and the top-up link. The
+ * route's `usd` is the shortfall: it sets "add at least" and the link's suggested amount.
+ */
 export function needsCredits(
   agentId: string,
-  route: { readonly feeUsd?: string } | undefined,
+  route: { readonly feeUsd?: string; readonly usd?: string } | undefined,
   fields: Readonly<Record<string, unknown>> = {},
+  payPage: PayPageConfig = PAY_PAGE,
 ): HandlerOutput {
-  const url = topUpUrl(agentId);
+  const shortfall = dollars(route?.usd) === undefined ? undefined : route?.usd;
+  const url = topUpUrl(agentId, shortfall, payPage);
   const fee = dollars(route?.feeUsd);
   const summary =
     fee === undefined ? PROOF_TEXT.needsCreditsNoFee : fill(PROOF_TEXT.needsCredits, { fee });
+  const proofs = proofsPerFiveDollars(route?.feeUsd);
+  const covers = proofs === undefined ? '' : fill(PROOF_TEXT.covers, { n: String(proofs) });
+  const add = dollars(shortfall);
   const nextStep =
     url === undefined
       ? PROOF_TEXT.needsCreditsNoLink
-      : fill(PROOF_TEXT.needsCreditsNextStep, { url, agentId });
+      : add === undefined
+        ? fill(PROOF_TEXT.needsCreditsNextStepNoAmount, { url, covers })
+        : fill(PROOF_TEXT.needsCreditsNextStep, { usd: add, url, covers });
   // 11 §5.6: the top-up method says the paying account is publicly linked (D-109).
-  return fail('needs_credits', summary, withDisclosure(nextStep, topUpDisclosure()), undefined, {
+  const stepText = url === undefined ? nextStep : withDisclosure(nextStep, topUpDisclosure());
+  return fail('needs_credits', summary, stepText, undefined, {
     ...fields,
     agentAddress: agentId,
     ...(url === undefined ? {} : { topUpUrl: url }),
   });
+}
+
+/**
+ * M1-36i: free test credits on the first `needs_credits` with a route (tools/free-credits.ts). The
+ * runtime's claim checks the testnet allowlist and remembers the claim; anything it throws is
+ * `none`, so the result is the plain `needs_credits` one. Only the route's chain ID is passed.
+ */
+export async function claimFreeCredits(
+  result: NotarizeResult,
+  context: ToolContext,
+): Promise<FreeCreditsOutcome> {
+  const claim = context.client.proofs?.freeCredits;
+  if (claim === undefined || result.status !== 'needs_credits') return 'none';
+  const chainId = result.topUp?.chainId;
+  if (typeof chainId !== 'number' || !Number.isSafeInteger(chainId)) return 'none';
+  try {
+    const outcome = await claim(chainId);
+    return outcome === 'added' || outcome === 'paused' ? outcome : 'none';
+  } catch {
+    context.logger.info('free test credits not added', { code: 'claim_failed' });
+    return 'none';
+  }
+}
+
+/** The `needs_credits` result after a free test credits claim (M1-36i): fixed text only. */
+function withFreeCredits(
+  output: HandlerOutput,
+  outcome: FreeCreditsOutcome | undefined,
+  envelopeId: string | undefined,
+): HandlerOutput {
+  if (outcome === 'added' && envelopeId !== undefined && ENVELOPE_ID.test(envelopeId)) {
+    // The credits are on their way: no top-up link to share, one next action.
+    const rest: Record<string, unknown> = { ...output.result };
+    delete rest['topUpUrl'];
+    return {
+      result: {
+        ...(rest as typeof output.result),
+        summary: PROOF_TEXT.freeCreditsAdded,
+        nextStep: fill(PROOF_TEXT.freeCreditsAddedNextStep, { envelopeId }),
+      },
+    };
+  }
+  if (outcome === 'paused') {
+    return {
+      result: {
+        ...output.result,
+        summary: `${String(output.result.summary)} ${PROOF_TEXT.freeCreditsPaused}`,
+        nextStep: PROOF_TEXT.freeCreditsPausedNextStep,
+      },
+    };
+  }
+  return output;
 }
 
 /**
@@ -236,17 +339,29 @@ export function notarizeOutput(
     readonly approvalNextStepTail?: string;
     /** The recipient under the name rule (06 §2.1), when the caller knows it (send). */
     readonly contactName?: string;
+    /** M1-36i: the free test credits claim this attempt made (claimFreeCredits). */
+    readonly freeCredits?: FreeCreditsOutcome;
+    /** The proof's envelope, for the next step after free test credits were added. */
+    readonly envelopeId?: string;
   } = {},
 ): HandlerOutput {
   const fields = options.fields ?? {};
   const disclosure = proofDisclosure(options.contactName);
   // M1-33d (06 §2.4, 11 §5.6): a proof that asks for a delivery receipt always says what the
   // receipt makes public; any other proof says it the first time in a session.
-  const disclose = (text: string): string =>
-    firstProofOfSession(context) ||
-    ((result.status === 'ok' || result.status === 'submitted') && result.receiptRequested === true)
+  const recorded = result.status === 'ok' || result.status === 'submitted';
+  // M1-33d-b: a request on a message that already had proof was not added; the result says so in
+  // a field and a fixed line, so the agent cannot claim it asked.
+  const notAdded = recorded && result.receiptRequestNotAdded === true;
+  // Nothing new was recorded or asked then, so that result has the not-added line instead of the
+  // disclosure (and leaves the session's first-proof disclosure for the next proof).
+  const disclose = (text: string): string => {
+    if (notAdded) return `${text} ${PROOF_TEXT.receiptRequestNotAdded}`;
+    return firstProofOfSession(context) || (recorded && result.receiptRequested === true)
       ? withDisclosure(text, disclosure)
       : text;
+  };
+  const notAddedField = notAdded ? { receiptRequestNotAdded: true } : {};
   switch (result.status) {
     case 'ok': {
       const fee = dollars(result.fee.usd);
@@ -255,6 +370,7 @@ export function notarizeOutput(
       return ok(disclose(text), {
         ...fields,
         ...proofFields(result),
+        ...notAddedField,
       });
     }
     case 'submitted':
@@ -263,14 +379,23 @@ export function notarizeOutput(
         disclose(PROOF_TEXT.recording),
         PROOF_TEXT.recordingNextStep,
         undefined,
-        { ...fields, ...proofFields(result) },
+        { ...fields, ...proofFields(result), ...notAddedField },
       );
     case 'needs_credits':
-      return needsCredits(agentId, result.topUp, {
-        ...fields,
-        ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
-        receipts: [],
-      });
+      return withFreeCredits(
+        needsCredits(
+          agentId,
+          result.topUp,
+          {
+            ...fields,
+            ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
+            receipts: [],
+          },
+          context.payPage,
+        ),
+        options.freeCredits,
+        options.envelopeId,
+      );
     case 'error':
       return fail('error', PROOF_TEXT.failed, PROOF_TEXT.failedNextStep, result.code, {
         ...fields,
@@ -300,7 +425,11 @@ export function notarizeOutput(
 }
 
 /** The ProofStatus of a stored proof (06 §2.4 `agentlink_get_proof`), by its stored status. */
-export function proofViewOutput(view: ProofView, agentId: string): HandlerOutput {
+export function proofViewOutput(
+  view: ProofView,
+  agentId: string,
+  payPage?: PayPageConfig,
+): HandlerOutput {
   const fields = proofFields(view);
   switch (view.status) {
     case 'recorded':
@@ -328,6 +457,7 @@ export function proofViewOutput(view: ProofView, agentId: string): HandlerOutput
         agentId,
         view.fee === undefined ? undefined : { feeUsd: view.fee.usd },
         fields,
+        payPage,
       );
     case 'failed':
     case 'released':
