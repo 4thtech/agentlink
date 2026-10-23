@@ -243,10 +243,10 @@ describe('files.dropUsage (M1-11r-c; 07 §5.4 Limits)', () => {
   it('near: at 80 % of the quota or more', async () => {
     const quota = 10_000_000;
     const a = await agent({ files: dropPlatform(quota) });
-    await insertFile(a, { kind: 'drop', size: 7_900_000, createdAt: a.clock.t - 60 });
+    await insertFile(a, { kind: 'drop', size: 8_000_000, createdAt: a.clock.t - 60 });
     const got = await a.client.files.dropUsage();
     expect(got.quotaBytes).toBe(quota);
-    expect(got.usedBytes).toBe(alf1CiphertextSize(7_900_000));
+    expect(got.usedBytes).toBe(alf1CiphertextSize(8_000_000));
     expect(got.usedBytes / quota).toBeGreaterThanOrEqual(0.8);
     expect(got.level).toBe('near');
   });
