@@ -27,7 +27,7 @@
 | 2 | **Plan and decide** | Orchestrator, then owner | Options with value, risk and effort; the owner picks; product calls become a D-number in `docs/foundation/00-README.md` |
 | 3 | **Delegate** | Orchestrator | A complete brief per builder (`development-process.md` §4) naming owned and forbidden files |
 | 4 | **Build** | Builder | Code, tests with negative controls and docs on its own branch and worktree, pushed to the branch (CI runs on the push, first run green; S2 tests-first red is proved by a local run, `audit-rules.md` §3.4); **no PR yet** |
-| 5 | **Independent review** | Reviewer, on the branch diff | `IR-<task>-<n>`; required for S1 and S2, optional Sonnet review for S0 |
+| 5 | **Independent review** | Reviewer, on the branch diff | `IR-<task>-<n>`; required for S1 and S2, optional Sonnet review for S0. A head that moves only by a mechanical merge of `origin/main` (empty `git show --remerge-diff`, own diff byte-identical) needs only a lightweight check, recorded `PASS (mechanical)` (`audit-rules.md` §4.6, D-126) |
 | 6 | **Fix rounds** | Builder, reviewer re-checks | Every finding fixed or dispositioned; judgement calls decided in favour of safety or escalated to the owner |
 | 7 | **Orchestrator audit** | Orchestrator | The verification protocol (`development-process.md` §5), including checking load-bearing claims against reality |
 | 7a | **Open the PR** | Orchestrator, or the builder when the brief says so | Not a draft. Opened only after steps 5 to 7 pass, with every template section filled and the `IR-…` line already in **Independent review**, so `review-gate` is green on its first run |
