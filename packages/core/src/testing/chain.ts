@@ -380,7 +380,8 @@ export class FakeNotary implements ChainState {
       state: this,
       submitter: this.proofSubmitter(),
     };
-    return { kit: chainKit, chains: [chain] };
+    // No real wait before a receipt's RecordNotFound retry (M1-34-c).
+    return { kit: chainKit, chains: [chain], sleep: () => Promise.resolve() };
   }
 }
 

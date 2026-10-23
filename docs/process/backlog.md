@@ -2244,7 +2244,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Independent S2 review.
 
 #### M1-34-c · submitter: a lagging client RPC that reports `RecordNotFound` retries the receipt once (new, IR-M1-34-b-2)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter, packages/core (receipt path)
 - **Depends on:** M1-34-b
 - **Scope:** when a client RPC lags and reports `RecordNotFound` for a record that exists, the receipt must not fail for good. Retry once after a fixed delay before the receipt becomes `receipt_failed`. Source: IR-M1-34-b-2.
