@@ -3658,7 +3658,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); the SDK client conformance test passes for every tool.
 
 #### M1-9f · Claude Desktop one-click extension bundle
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli/desktop-extension
 - **Depends on:** M1-9c, M1-16; build, signing and distribution decided (D-91, `release-and-deployment.md` §2)
 - **Spec:** 02 F-01; 06 §7

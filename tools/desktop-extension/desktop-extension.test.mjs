@@ -1,6 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -20,14 +27,6 @@ const workflow = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8
 
 const ENTRY = 'server/node_modules/@4thtech-io/agentlink/dist/agentlink.js';
 
-/** Every string value in a JSON value, recursively. */
-function strings(value) {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(strings);
-  if (value && typeof value === 'object') return Object.values(value).flatMap(strings);
-  return [];
-}
-
 /** The body of one job: from `  <name>:` to the next job header or the end. */
 function job(name) {
   const start = workflow.indexOf(`\n  ${name}:\n`);
@@ -45,7 +44,12 @@ function steps(body) {
 /** The `permissions:` block of a job body as `key: value` lines. */
 function permissions(body) {
   const m = /\n {4}permissions:\n((?: {6}[a-z-]+: [a-z]+.*\n)+)/.exec(body);
-  return m ? m[1].trim().split('\n').map((l) => l.trim().replace(/\s*#.*$/, '')) : [];
+  return m
+    ? m[1]
+        .trim()
+        .split('\n')
+        .map((l) => l.trim().replace(/\s*#.*$/, ''))
+    : [];
 }
 
 function run(cmd, args, opts = {}) {
@@ -159,8 +163,19 @@ describe('MCPB signature block (MCPB_SIG_V1, @anthropic-ai/mcpb 2.1.2 src/node/s
     const dir = mkdtempSync(join(tmpdir(), 'm1-9f-sign-'));
     const mk = (name) => {
       run('openssl', [
-        'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '1', '-subj', `/O=Test/CN=${name}`,
-        '-keyout', join(dir, `${name}.key`), '-out', join(dir, `${name}.crt`),
+        'req',
+        '-x509',
+        '-newkey',
+        'rsa:2048',
+        '-nodes',
+        '-days',
+        '1',
+        '-subj',
+        `/O=Test/CN=${name}`,
+        '-keyout',
+        join(dir, `${name}.key`),
+        '-out',
+        join(dir, `${name}.crt`),
       ]);
     };
     mk('good');
@@ -171,10 +186,16 @@ describe('MCPB signature block (MCPB_SIG_V1, @anthropic-ai/mcpb 2.1.2 src/node/s
     run('bash', [join(scripts, 'sign.sh'), join(dir, 'good.key'), join(dir, 'good.crt'), bundle]);
     const signed = readFileSync(bundle);
     expect(extractSignatureBlock(signed).content.toString()).toBe('unsigned zip bytes');
-    expect(() => run('bash', [join(scripts, 'verify.sh'), join(dir, 'good.crt'), bundle])).not.toThrow();
-    expect(() => run('bash', [join(scripts, 'verify.sh'), join(dir, 'other.crt'), bundle])).toThrow();
+    expect(() =>
+      run('bash', [join(scripts, 'verify.sh'), join(dir, 'good.crt'), bundle]),
+    ).not.toThrow();
+    expect(() =>
+      run('bash', [join(scripts, 'verify.sh'), join(dir, 'other.crt'), bundle]),
+    ).toThrow();
     writeFileSync(bundle, Buffer.concat([Buffer.from('X'), signed.subarray(1)]));
-    expect(() => run('bash', [join(scripts, 'verify.sh'), join(dir, 'good.crt'), bundle])).toThrow();
+    expect(() =>
+      run('bash', [join(scripts, 'verify.sh'), join(dir, 'good.crt'), bundle]),
+    ).toThrow();
   });
 });
 
@@ -202,9 +223,7 @@ describe('release.yml desktop extension jobs (D-91)', () => {
       'contents: write',
       'id-token: write',
     ]);
-    expect(release).toMatch(
-      /uses: actions\/attest-build-provenance@[0-9a-f]{40} # v\d+\.\d+\.\d+/,
-    );
+    expect(release).toMatch(/uses: actions\/attest-build-provenance@[0-9a-f]{40} # v\d+\.\d+\.\d+/);
     expect(release).toMatch(/sha256sum/);
     expect(release).toMatch(/gh release upload/);
     expect(release).toMatch(/Stop if DEPLOY_FREEZE is set/);
@@ -241,7 +260,14 @@ describe('release.yml desktop extension jobs (D-91)', () => {
   });
 
   it('documents the build script, scripts and certificate that the jobs use', () => {
-    for (const f of ['build.mjs', 'sign.sh', 'verify.sh', 'manifest.mjs', 'zip.mjs', 'signature.mjs']) {
+    for (const f of [
+      'build.mjs',
+      'sign.sh',
+      'verify.sh',
+      'manifest.mjs',
+      'zip.mjs',
+      'signature.mjs',
+    ]) {
       expect(existsSync(join(root, 'tools/desktop-extension', f))).toBe(true);
     }
     expect(existsSync(join(extDir, 'README.md'))).toBe(true);
