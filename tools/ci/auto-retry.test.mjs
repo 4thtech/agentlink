@@ -45,7 +45,14 @@ describe('decide', () => {
   });
 
   it('never reruns cancelled, successful or other conclusions', () => {
-    for (const conclusion of ['cancelled', 'success', 'timed_out', 'skipped', 'action_required', ''])
+    for (const conclusion of [
+      'cancelled',
+      'success',
+      'timed_out',
+      'skipped',
+      'action_required',
+      '',
+    ])
       expect(decide({ ...base, conclusion }).rerun).toBe(false);
   });
 
@@ -67,7 +74,13 @@ describe('decide', () => {
   });
 
   it('skips when a deterministic job failed too (a rerun cannot help)', () => {
-    for (const name of ['changesets', 'context-budget', 'stale-precheck', 'detect', 'path-guard (ubuntu-24.04)']) {
+    for (const name of [
+      'changesets',
+      'context-budget',
+      'stale-precheck',
+      'detect',
+      'path-guard (ubuntu-24.04)',
+    ]) {
       const jobs = [...base.jobs, { name, conclusion: 'failure' }];
       const d = decide({ ...base, jobs });
       expect(d.rerun).toBe(false);
@@ -96,9 +109,12 @@ describe('decide', () => {
   it('uses the per-workflow allowlist (Security: codeql and dependency-review only)', () => {
     const sec = { ...base, workflow: 'Security' };
     expect(
-      decide({ ...sec, jobs: [{ name: 'codeql (javascript-typescript)', conclusion: 'failure' }] }).rerun,
+      decide({ ...sec, jobs: [{ name: 'codeql (javascript-typescript)', conclusion: 'failure' }] })
+        .rerun,
     ).toBe(true);
-    expect(decide({ ...sec, jobs: [{ name: 'secret-scan / gitleaks', conclusion: 'failure' }] }).rerun).toBe(false);
+    expect(
+      decide({ ...sec, jobs: [{ name: 'secret-scan / gitleaks', conclusion: 'failure' }] }).rerun,
+    ).toBe(false);
     expect(decide({ ...sec, jobs: [{ name: 'checks', conclusion: 'failure' }] }).rerun).toBe(false);
   });
 
@@ -116,7 +132,14 @@ describe('decide', () => {
         'vectors',
       ].sort(),
     );
-    for (const j of ['pr-hygiene', 'review-gate', 'changesets', 'context-budget', 'detect', 'ci-gate'])
+    for (const j of [
+      'pr-hygiene',
+      'review-gate',
+      'changesets',
+      'context-budget',
+      'detect',
+      'ci-gate',
+    ])
       expect(FLAKY_JOBS.CI.has(j)).toBe(false);
   });
 });
@@ -162,7 +185,9 @@ describe('ci-auto-retry.yml', () => {
   it('guards attempt, conclusion, event and repository in the job condition too', () => {
     expect(wf).toContain("github.event.workflow_run.conclusion == 'failure'");
     expect(wf).toContain('github.event.workflow_run.run_attempt == 1');
-    expect(wf).toContain('github.event.workflow_run.head_repository.full_name == github.repository');
+    expect(wf).toContain(
+      'github.event.workflow_run.head_repository.full_name == github.repository',
+    );
   });
 
   it('one concurrency group per run id, never cancelling', () => {
@@ -181,7 +206,10 @@ describe('ci-auto-retry.yml', () => {
   });
 
   it('passes event data only through env:, never interpolated into run:', () => {
-    const runs = wf.split(/\n {8}run: \|/).slice(1).map((s) => s.split(/\n {6}- /)[0]);
+    const runs = wf
+      .split(/\n {8}run: \|/)
+      .slice(1)
+      .map((s) => s.split(/\n {6}- /)[0]);
     expect(runs.length).toBeGreaterThan(0);
     for (const r of runs) expect(r).not.toContain('${{');
     expect(wf).toMatch(/RUN_ID: \$\{\{ github\.event\.workflow_run\.id \}\}/);
