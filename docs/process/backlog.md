@@ -5567,7 +5567,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two pages use the harness; axe-core reports zero WCAG 2.1 AA violations on both.
 
 #### M1-36b-2 · owner init and add-agent sign a first policy (D6 part 2) (new, D-121 D6, #422 stop)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node` initOwner and addAgent, `packages/node/src/owner-init.ts`, specs 04 §2.5 and 06 §3, §7
 - **Depends on:** M1-36b (#422), M1-11r-b (#415)
 - **Spec:** 04 §2.5; 06 §3, §7; D-121
