@@ -225,7 +225,10 @@ async function signed(
       ? {
           ...td,
           primaryType: 'TransferWithAuthorization',
-          types: { TransferWithAuthorization: td.types.ReceiveWithAuthorization },
+          types: {
+            EIP712Domain: td.types.EIP712Domain,
+            TransferWithAuthorization: td.types.ReceiveWithAuthorization,
+          },
         }
       : td;
   const sig = (await sign({

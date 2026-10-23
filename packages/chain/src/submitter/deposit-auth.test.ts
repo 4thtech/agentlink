@@ -56,6 +56,9 @@ async function signedRequest(): Promise<DepositAuthorizationRequest> {
   };
 }
 
+const without = (o: object, key: string): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(o).filter(([k]) => k !== key));
+
 const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
 describe('parseDepositAuthorizationRequest', () => {
@@ -76,8 +79,8 @@ describe('parseDepositAuthorizationRequest', () => {
       { chainId: req.chainId, auth: req.auth },
       { ...req, auth: { ...req.auth, extra: 1 } },
       { ...req, auth: { ...req.auth, signature: '0x' } },
-      { ...req, auth: (({ nonce: _n, ...rest }) => rest)(req.auth) },
-      { ...req, auth: (({ v: _v, ...rest }) => rest)(req.auth) },
+      { ...req, auth: without(req.auth, 'nonce') },
+      { ...req, auth: without(req.auth, 'v') },
       null,
       [],
       'x',
