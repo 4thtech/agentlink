@@ -82,8 +82,11 @@ function toolContext(client: ToolClient = toolClient()): ToolContext {
   };
 }
 
-async function connect(env: Parameters<typeof createMcpServer>[0]) {
-  const server = createMcpServer(env, '0.0.0-test');
+async function connect(
+  env: Parameters<typeof createMcpServer>[0],
+  options: Parameters<typeof createMcpServer>[2] = {},
+) {
+  const server = createMcpServer(env, '0.0.0-test', options);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test', version: '0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
@@ -96,6 +99,29 @@ describe('MCP server (stdio binding, 06 §1)', () => {
     expect(client.getServerVersion()).toMatchObject({ name: SERVER_NAME, version: '0.0.0-test' });
     expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
     expect(client.getServerCapabilities()?.tools).toBeDefined();
+  });
+
+  it('M1-36h: tools/list hides the chain override unless the server runs Advanced', async () => {
+    const chainOf = async (advanced: boolean) => {
+      const { client } = await connect(toolContext(), advanced ? { advanced: true } : {});
+      const { tools } = await client.listTools();
+      const notarize = tools.find((t) => t.name === 'agentlink_notarize');
+      return {
+        listed: Object.keys(notarize?.inputSchema.properties ?? {}).includes('chain'),
+        anyChain: tools.some((t) => 'chain' in (t.inputSchema.properties ?? {})),
+        call: await client.callTool({
+          name: 'agentlink_notarize',
+          arguments: { envelopeId: 'Q2xhaW1zQ2xhaW1zQ2xhaQ', chain: 'base-sepolia' },
+        }),
+      };
+    };
+    const plain = await chainOf(false);
+    expect(plain.listed).toBe(false);
+    expect(plain.anyChain).toBe(false);
+    expect(plain.call.structuredContent).toMatchObject({ code: 'INVALID_ARGUMENT' });
+    const advanced = await chainOf(true);
+    expect(advanced.listed).toBe(true);
+    expect(advanced.call.structuredContent).not.toMatchObject({ code: 'INVALID_ARGUMENT' });
   });
 
   it('the instructions are 06 §5 verbatim', () => {

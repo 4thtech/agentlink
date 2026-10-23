@@ -44,7 +44,7 @@ An Opus builder: `test-vectors/**` is S2 (`audit-rules.md` §2.2). Vectors chang
 - **"no passing runtime identity test" or a runtime MISSING:** a project ran somewhere else or not at all (for example, the browser or Workers project fell back to Node). Fix the config; never shrink `REQUIRED_RUNTIMES` in `tools/vectors/rules.mjs`.
 - **"changed during the run":** a test wrote under `test-vectors/`. Tests only read vectors.
 - **Provenance check fails:** the committed file is not what its generator produces. Regenerate only with a spec change.
-- **CI fails at `pnpm exec playwright install`:** see lesson [LL-07](../lessons/LL-07-playwright-lockfile-heuristic.md).
+- **CI fails at the Playwright install:** CI uses the `install-playwright` action (browser cache keyed by OS, Playwright version and browser list; a download retried once; apt only for missing system libraries, bounded). A `::warning::` that it retried is not a failure; a failure after the retry is [RB-08](ci-red.md) step 3. Lesson [LL-07](../lessons/LL-07-playwright-lockfile-heuristic.md) covers the older lockfile heuristic.
 
 ## Related
 - Card: M0-9 in [`backlog.md`](../process/backlog.md); also M1-1h and M1-1i (the suites).
