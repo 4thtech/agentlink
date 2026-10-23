@@ -64,7 +64,14 @@ export {
 } from './owner-change-code.js';
 // M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
 // types: the restricted session stays inside the package (owner-first-card.ts).
-export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';
+export type {
+  FirstAgentCard,
+  FirstCardIdentity,
+  FirstPolicy,
+  FirstPolicyActions,
+} from './owner-first-card.js';
+// M1-36b-2: the first rules (the Send folder) signed in the same entry; only the result type.
+export type { SendFolderResult } from './owner-first-policy.js';
 export {
   performOwnerOperation,
   type OwnerOperationItem,

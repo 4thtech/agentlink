@@ -18,6 +18,10 @@
 // - M1-8h-b (IR-M1-8h-1): the rollback removes the owner item only while it is still exactly the
 //   item this run stored (L2); before the code is shown, the owner is asked for the display name the
 //   card commits to (11 §5; Enter keeps the local agent name).
+// - M1-36b-2 (D-121 D6): with `firstCard.firstPolicy`, the same entry also signs the agent's first
+//   rules, the 06 §3 defaults plus the empty `~/AgentLink/Send` folder, after the card is stored
+//   (owner-first-policy.ts). The owner reads about the folder before the code is shown; when the
+//   rules don't take effect, the agent keeps the defaults and the folder this run created is removed.
 import {
   OWNER_SESSION_DEFAULT_TTL_MS,
   encodeHex0x,
@@ -39,6 +43,17 @@ import {
   type KeychainBackend,
 } from './keychain.js';
 import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+import {
+  keepsFolder,
+  notAttempted,
+  prepareSendFolder,
+  removeCreated,
+  sendFolderOutcome,
+  sendFolderReview,
+  signFirstPolicy,
+  type SendFolderPlan,
+  type SendFolderResult,
+} from './owner-first-policy.js';
 
 export type { FirstAgentCard } from './owner-first-card.js';
 import {
@@ -82,6 +97,8 @@ export interface OwnerInitResult {
   readonly secretKind: 1 | 2;
   /** M1-8h: the first card, signed by the new owner and stored, when `firstCard` was given. */
   readonly card?: AgentCard;
+  /** M1-36b-2: the first rules (the Send folder), when `firstCard.firstPolicy` was given. */
+  readonly sendFolder?: SendFolderResult;
 }
 
 /** Internal options (tests): Argon2id parameters and keychain timeout. */
@@ -211,6 +228,30 @@ export async function initOwnerWith(
   // M1-8h-b: the display name the first card commits to, asked before any code is shown.
   const named = first === undefined ? undefined : await withDisplayName(terminal, first);
 
+  // M1-36b-2: the Send folder for the first rules, checked or created before any code is shown, and
+  // removed again (only while empty and only if this run created it) unless the rules took effect.
+  const plan =
+    first?.firstPolicy === undefined ? undefined : await prepareSendFolder(first.firstPolicy.home);
+  let sendFolder: SendFolderResult | undefined;
+  try {
+    if (plan !== undefined) terminal.write(sendFolderReview(plan));
+    const done = await setUpOwner(keychain, terminal, choose, named, plan, internals);
+    sendFolder = done.sendFolder;
+    return done;
+  } finally {
+    if (!keepsFolder(sendFolder)) await removeCreated(plan);
+  }
+}
+
+/** The rest of `owner init` once every refusal passed (initOwnerWith). */
+async function setUpOwner(
+  keychain: KeychainBackend,
+  terminal: OwnerTerminal,
+  choose: boolean,
+  named: FirstAgentCard | undefined,
+  plan: SendFolderPlan | undefined,
+  internals: OwnerInitInternals,
+): Promise<OwnerInitResult> {
   let usePassphrase = false;
   if (choose) {
     terminal.write(COPY.passphraseNote);
@@ -240,16 +281,20 @@ export async function initOwnerWith(
       { secret, secretKind: usePassphrase ? 2 : 1 },
       internals,
     );
-    const card =
+    const issued =
       named === undefined
         ? undefined
-        : await issueFirstCard(keychain, keys, secret, named, blob, internals.timeoutMs);
+        : await issueFirstCard(keychain, keys, secret, named, blob, internals.timeoutMs, plan);
     terminal.write(COPY.done(fingerprint));
+    const sendFolder = issued?.sendFolder ?? (plan === undefined ? undefined : notAttempted(plan));
+    const line = sendFolder === undefined ? undefined : sendFolderOutcome(sendFolder);
+    if (line !== undefined) terminal.write(line);
     return Object.freeze({
       owner: keys,
       fingerprint,
       secretKind: usePassphrase ? 2 : 1,
-      ...(card === undefined ? {} : { card }),
+      ...(issued === undefined ? {} : { card: issued.card }),
+      ...(sendFolder === undefined ? {} : { sendFolder }),
     });
   } finally {
     wipe(seed, secret);
@@ -274,7 +319,12 @@ function namesOwner(
 
 /** M1-11s-c: what signFirstCardWith found in core afterwards. */
 export type FirstCardOutcome =
-  | { readonly kind: 'signed'; readonly card: AgentCard }
+  | {
+      readonly kind: 'signed';
+      readonly card: AgentCard;
+      /** M1-36b-2: the first rules, when a ready Send folder plan was given. */
+      readonly sendFolder?: SendFolderResult;
+    }
   /** No verified card naming this owner is stored: the caller rolls the new owner back. */
   | { readonly kind: 'not_signed' }
   /** Core could not be read back: whether a card names this owner is unknown (keep the owner). */
@@ -294,7 +344,9 @@ export async function signFirstCardWith(
   secret: Uint8Array,
   first: FirstAgentCard,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+  plan?: SendFolderPlan,
 ): Promise<FirstCardOutcome> {
+  let sendFolder: SendFolderResult | undefined;
   try {
     const store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
     try {
@@ -311,6 +363,12 @@ export async function signFirstCardWith(
           name: first.name,
           relays: first.relays,
         });
+        // M1-36b-2: the first rules, with the same unlocked owner session (one entry), only after
+        // the card is stored and verified (signFirstPolicy checks it again).
+        const { firstPolicy } = first;
+        if (plan?.status === 'ready' && firstPolicy !== undefined) {
+          sendFolder = await signFirstPolicy(inner, { ...first, firstPolicy }, plan, owner);
+        }
       } finally {
         await session.close();
       }
@@ -326,7 +384,13 @@ export async function signFirstCardWith(
   } catch {
     return { kind: 'unknown' };
   }
-  if (namesOwner(stored, first.agent, owner)) return { kind: 'signed', card: stored.card };
+  if (namesOwner(stored, first.agent, owner)) {
+    return {
+      kind: 'signed',
+      card: stored.card,
+      ...(sendFolder === undefined ? {} : { sendFolder }),
+    };
+  }
   return { kind: 'not_signed' };
 }
 
@@ -343,9 +407,10 @@ async function issueFirstCard(
   first: FirstAgentCard,
   blob: Uint8Array,
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
-): Promise<AgentCard> {
-  const outcome = await signFirstCardWith(keychain, owner, secret, first, timeoutMs);
-  if (outcome.kind === 'signed') return outcome.card;
+  plan?: SendFolderPlan,
+): Promise<{ readonly card: AgentCard; readonly sendFolder?: SendFolderResult }> {
+  const outcome = await signFirstCardWith(keychain, owner, secret, first, timeoutMs, plan);
+  if (outcome.kind === 'signed') return outcome;
   if (outcome.kind === 'unknown')
     throw new NodeKeyStoreError('owner_card_failed', COPY.cardUnknown);
   // IR-M1-8h-1 L2: remove only the item this run stored; another run's item is never deleted.

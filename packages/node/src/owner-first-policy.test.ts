@@ -170,7 +170,9 @@ async function sendFolder(): Promise<string> {
 
 /** The 06 §3 defaults with only `files.allowedFolders` replaced. */
 function defaultsWith(folders: readonly string[]): string {
-  const base = JSON.parse(JSON.stringify(POLICY_DEFAULTS_EFFECTIVE.policy)) as {
+  const effective = POLICY_DEFAULTS_EFFECTIVE;
+  if (effective.mode !== 'defaults') throw new Error('core defaults changed shape');
+  const base = JSON.parse(JSON.stringify(effective.policy)) as {
     files: Record<string, unknown>;
   };
   return canonicalize({ ...base, files: { ...base.files, allowedFolders: [...folders] } });
@@ -381,9 +383,14 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
     };
     const run = ownerAtInit();
     await expect(
-      initOwnerWith(keychain, run.terminal, { backend: 'keychain', env: {}, firstCard: card }, {
-        kdf: KDF,
-      }),
+      initOwnerWith(
+        keychain,
+        run.terminal,
+        { backend: 'keychain', env: {}, firstCard: card },
+        {
+          kdf: KDF,
+        },
+      ),
     ).rejects.toMatchObject({ code: 'owner_card_failed' });
     expect(spy.applied).toEqual([]);
     expect(spy.prepared).toEqual([]);
@@ -442,10 +449,17 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
 
   it.each([
     [
-      'a looser proof rule',
+      'a looser commitment rule',
       (body: JsonObject) => {
         const policy = (body['params'] as JsonObject)['policy'] as JsonObject;
-        (policy['proofs'] as JsonObject)['notarize'] = 'allow';
+        (policy['commitments'] as JsonObject)['accept'] = 'allow';
+      },
+    ],
+    [
+      'a higher daily proof budget',
+      (body: JsonObject) => {
+        const policy = (body['params'] as JsonObject)['policy'] as JsonObject;
+        (policy['proofs'] as JsonObject)['dailyBudgetUSD'] = '500';
       },
     ],
     [
