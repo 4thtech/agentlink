@@ -105,7 +105,8 @@ export async function callTool(
     return finalizeResult(output, origins);
   }
   // M1-36i-e: one time budget per call; the time the handler spends counts against the wait.
-  const started = Date.now();
+  // Monotonic (performance.now): a wall clock that jumps back can never give the wait more time.
+  const started = performance.now();
   let output: HandlerOutput;
   try {
     output = await handler(args, env);
@@ -118,7 +119,7 @@ export async function callTool(
   const linked = await withApprovalLink(output, env);
   // M1-36j (D4): with the page open, wait briefly for the owner's decision (read-only).
   const waited = await waitForApprovalDecision(linked.output, env, {
-    waitMs: approvalWaitLeft(options.approvalWaitMs ?? 0, Date.now() - started),
+    waitMs: approvalWaitLeft(options.approvalWaitMs ?? 0, performance.now() - started),
     ...(options.signal === undefined ? {} : { signal: options.signal }),
     ...(options.approvalWaitIntervalMs === undefined
       ? {}

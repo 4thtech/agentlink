@@ -2271,6 +2271,40 @@ describe('one time budget per call: the free test credits wait shortens the appr
     expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
     expect(reads()).toBeGreaterThanOrEqual(CODEX_WAIT_MS / READ_MS - 1);
   });
+
+  it('a wall clock that jumps back mid-call never gives the wait more time (monotonic budget)', async () => {
+    const { client } = slowCredits();
+    const { reads, ctx } = waiting(client);
+    const approvalState = client.approvalState;
+    let jumped = false;
+    // The wall clock jumps back a minute during the credits wait and again during the approval wait.
+    const account = client.proofs!.account;
+    (client.proofs as { account: typeof account }).account = (id) => {
+      vi.setSystemTime(Date.now() - 60_000);
+      return account(id);
+    };
+    (client as { approvalState: ToolClient['approvalState'] }).approvalState = (id) => {
+      if (!jumped) {
+        jumped = true;
+        vi.setSystemTime(Date.now() - 60_000);
+      }
+      return approvalState(id);
+    };
+    const started = performance.now();
+    const { value: r } = await settle(
+      callTool('agentlink_notarize', { envelopeId: ENVELOPE }, ctx, options(CODEX_WAIT_MS)),
+    );
+    const elapsedMs = performance.now() - started;
+    expect(jumped).toBe(true);
+    expect(r.structured).toMatchObject({ status: 'pending_approval', approvalId: APPROVAL });
+    expect(elapsedMs).toBeGreaterThanOrEqual(
+      FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs,
+    );
+    expect(elapsedMs).toBeLessThanOrEqual(CODEX_WAIT_MS + 250);
+    expect(reads()).toBeLessThanOrEqual(
+      (CODEX_WAIT_MS - (FREE_CREDITS_WAIT.maxMs - FREE_CREDITS_WAIT.intervalMs)) / READ_MS,
+    );
+  });
 });
 
 // ---- M1-36f: needs_credits says plainly what is missing and the one next step ----------------------

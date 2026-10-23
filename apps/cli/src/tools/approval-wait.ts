@@ -117,14 +117,15 @@ export async function waitForApprovalDecision(
     return output;
   }
   const interval = Math.max(1, options.intervalMs ?? APPROVAL_WAIT_INTERVAL_MS);
-  const deadline = Date.now() + options.waitMs;
+  // Monotonic (M1-36i-e): a wall clock change never moves the deadline.
+  const deadline = performance.now() + options.waitMs;
   // A function, so each check reads the signal now (it can abort during any await).
   const cancelled = (): boolean => signal?.aborted === true;
   for (;;) {
-    const left = deadline - Date.now();
+    const left = deadline - performance.now();
     if (left <= 0) return output;
     await pause(Math.min(interval, left), signal);
-    if (cancelled() || Date.now() > deadline) return output;
+    if (cancelled() || performance.now() > deadline) return output;
     const decision = await readDecision(context, approvalId);
     if (cancelled()) return output;
     if (decision === 'other') return output;
