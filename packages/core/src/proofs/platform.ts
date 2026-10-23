@@ -77,4 +77,9 @@ export interface ProofsPlatform {
   readonly selector?: Pick<ChainSelector, 'select' | 'clear'>;
   /** Free test credits (testnets only; M1-11r-a). Without it, `requestFaucet` is unavailable. */
   readonly faucet?: FreeCreditsPort;
+  /**
+   * Waits `ms` milliseconds; the fixed delay before a receipt's one retry after `RecordNotFound`
+   * (M1-34-c). Default: a timer.
+   */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
