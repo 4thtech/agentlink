@@ -306,6 +306,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      wrangler:
+        specifier: 4.149.0
+        version: 4.149.0
 
   apps/local-ui:
     dependencies:
