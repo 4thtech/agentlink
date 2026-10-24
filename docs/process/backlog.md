@@ -6754,7 +6754,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
 #### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
 - **Depends on:** M3-4b-t
 - **Spec:** 07 §7; D-123
@@ -6776,7 +6776,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Both boundary cases are tests in the submitter's own suite.
 
 #### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**
@@ -6785,7 +6785,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
 
 #### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**
