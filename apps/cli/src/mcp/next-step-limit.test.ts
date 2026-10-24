@@ -26,6 +26,7 @@ import * as tool_accept_action from '../tools/accept-action.js';
 import * as tool_accept_invite from '../tools/accept-invite.js';
 import * as tool_acknowledge from '../tools/acknowledge.js';
 import * as tool_approval_wait from '../tools/approval-wait.js';
+import * as tool_cli_command from '../tools/cli-command.js';
 import * as tool_contacts from '../tools/contacts.js';
 import * as tool_context from '../tools/context.js';
 import * as tool_create_invite from '../tools/create-invite.js';
@@ -151,6 +152,7 @@ const modules: Record<string, Exports> = {
   '../tools/accept-invite.ts': tool_accept_invite,
   '../tools/acknowledge.ts': tool_acknowledge,
   '../tools/approval-wait.ts': tool_approval_wait,
+  '../tools/cli-command.ts': tool_cli_command,
   '../tools/contacts.ts': tool_contacts,
   '../tools/context.ts': tool_context,
   '../tools/create-invite.ts': tool_create_invite,
