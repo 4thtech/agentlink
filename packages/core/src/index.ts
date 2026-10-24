@@ -349,6 +349,8 @@ export {
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
 export type {
+  DepositAuthAnswer,
+  DepositAuthPort,
   FreeCreditsAnswer,
   FreeCreditsPort,
   ProofChain,
@@ -477,6 +479,13 @@ export {
 // fetch and download, the inbox file operations) is supplied by @4thtech-io/node (M1-9d).
 export type { DropConfig, FilesPlatform, InboxFolder, OutgoingFile } from './files/platform.js';
 export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export {
+  MAX_LINK_ANSWERS_PER_PASS,
+  REFRESH_LINK_KIND,
+  type FileLinksResult,
+  type RequestFileLinkInput,
+  type RequestFileLinkResult,
+} from './files/refresh-link.js';
 export type { FileEntry, FilesNeedsSetup, SentFile } from './files/outgoing.js';
 export {
   measurePayload,

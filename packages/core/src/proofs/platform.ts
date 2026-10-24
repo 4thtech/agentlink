@@ -82,8 +82,17 @@ export interface FreeCreditsPort {
  * answer is untrusted: the core confirms the credit by reading `creditsOf` on chain.
  */
 export type DepositAuthAnswer =
-  | { readonly status: 'submitted' | 'rate_limited' | 'already_used' | 'unavailable' }
-  | { readonly status: 'refused'; readonly code: DepositAuthErrorCode };
+  | { readonly status: 'submitted' | 'already_used' | 'unavailable' }
+  | {
+      readonly status: 'rate_limited';
+      /** Seconds until another try may succeed (from Retry-After, bounded by the runtime). */
+      readonly retryAfter?: number;
+    }
+  | {
+      readonly status: 'refused';
+      /** A fixed submitter code, or `bad_request` for a malformed request or an unknown code. */
+      readonly code: DepositAuthErrorCode | 'bad_request';
+    };
 
 /**
  * The runtime's call to the shipped submitters' deposit-authorization route (M3-4b-t-T4-a). It sends
@@ -107,4 +116,9 @@ export interface ProofsPlatform {
    * refused `not_available` before anything is signed.
    */
   readonly depositAuth?: DepositAuthPort;
+  /**
+   * Waits `ms` milliseconds; the fixed delay before a receipt's one retry after `RecordNotFound`
+   * (M1-34-c). Default: a timer.
+   */
+  readonly sleep?: (ms: number) => Promise<void>;
 }

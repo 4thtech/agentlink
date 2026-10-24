@@ -23,9 +23,12 @@ describe('the npx command form (M1-36a-b)', () => {
     expect(CLI_COMMAND).toBe('npx -y @4thtech-io/agentlink');
   });
 
-  it.each(['approval-page.ts', 'owner-init.ts'])('%s has no bare prefix', (file) => {
-    expect(codeLines(file).filter((line) => BARE.test(line))).toEqual([]);
-  });
+  it.each(['approval-page.ts', 'owner-init.ts', 'owner-first-policy.ts'])(
+    '%s has no bare prefix',
+    (file) => {
+      expect(codeLines(file).filter((line) => BARE.test(line))).toEqual([]);
+    },
+  );
 
   it('the page texts have no bare prefix and no dead `ui` command', () => {
     const texts = [...Object.values(UI_STRINGS), EXPIRED_HTML, pageHtml('abc')];

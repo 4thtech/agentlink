@@ -258,7 +258,7 @@ Agents push branches and open PRs as a dedicated machine account, never with you
 | Environment | Used by | Required reviewer | Deployment branches and tags | Secrets / variables |
 |---|---|---|---|---|
 | `npm-next` | `release.yml` → `publish-next` | none (staging is automatic) | `main` only | none |
-| `npm-publish` | `release.yml` → `publish-latest`, `rollback-latest` | **`@talirezun`** (kept, no removal date, D-52) | `main`, and tags matching the Changesets tag pattern (`*@*`) | none |
+| `npm-publish` | `release.yml` → `publish-latest`, `rollback-latest`, `desktop-extension-release` (M1-9f) | **`@talirezun`** (kept, no removal date, D-52) | `main`, and tags matching the Changesets tag pattern (`*@*`) | optional secret `DESKTOP_EXT_SIGNING_KEY` (desktop extension signing key, RSA 4096 PEM; `apps/cli/desktop-extension/README.md`); unset, the bundles ship unsigned |
 | `staging` | `deploy-drop.yml` → `deploy-staging`, `rollback-rehearsal`; later the Cloudflare deploy workflow | none | `main` only | secret `CLOUDFLARE_API_TOKEN` (staging token); variable `CLOUDFLARE_ACCOUNT_ID`; optional variable `DROP_STAGING_URL` |
 | `production` | `deploy-drop.yml` → `deploy-production`; later the Cloudflare deploy workflow | **`@talirezun`** until the owner removes it (M1b, D-52) | `main`, and release tags | secret `CLOUDFLARE_API_TOKEN` (production token); variable `CLOUDFLARE_ACCOUNT_ID` |
 | `deploy-freeze` | `release.yml` → `freeze`, `deploy-freeze.yml` → `freeze`, `deploy-drop.yml` → `freeze` | none | `main` only | secret `DEPLOY_FREEZE_TOKEN` (section 8) |
