@@ -212,7 +212,7 @@ Everything below is manual (GitHub, npm or Cloudflare settings) and owner-only: 
 ### 1. Repository settings (Settings, General and Code security)
 
 - [ ] Merging: allow **squash merging only** (default message: pull request title and description); disable merge commits and rebase merging; auto-delete head branches. The PR title, which `pr-hygiene` validates, becomes the commit subject.
-- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge --auto --squash`); GitHub merges when every required check is green. On S2 and sensitive paths the orchestrator enables it only after Tali's "merge" in chat (D-51, D-52).
+- [ ] **Allow auto-merge: on** (D-25). Agents enable it per PR (`gh pr merge N --auto --match-head-commit <sha>`; the merge queue decides the method); GitHub merges when every required check is green. On S2 and sensitive paths the orchestrator enables it only after Tali's "merge" in chat (D-51, D-52).
 - [ ] Private vulnerability reporting: **enable** (`SECURITY.md` depends on it).
 - [ ] Dependency graph and Dependabot alerts: **enable** (dependency review and Renovate's `vulnerabilityAlerts` use them). **Decision:** leave Dependabot *security updates* off, Renovate opens those PRs.
 - [ ] Secret scanning and **push protection**: **enable**.

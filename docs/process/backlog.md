@@ -3539,7 +3539,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** `credentialDigest` vectors in the `recovery-kit` suite (salt, Unicode and JCS escaping cases); no raw seed crosses the control interfaces (type test); the controls are reachable from no MCP tool handler (import fence); tests first (`RED (expected):` commit).
 
 #### M1-9i-c · node: KeyStore export, import and storage credential items (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (PR "M1-9i-c node: KeyStore export, import and restore") · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node/src/\*\*
 - **Depends on:** M1-9i-b (kit format), M1-9i-b2 (the three controls)
 - **Spec:** 04 §2.2 (`s3:<id>`), §2.3.3 (restore order and refusals), §2.8 (`owner-next`, write protocol); 07 §9.1
@@ -4300,7 +4300,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-1 · local UI: first run and shared states (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `packages/node/src/local-ui-first-run-browser.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1, M1-11s-c
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
@@ -6754,7 +6754,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
 #### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
 - **Depends on:** M3-4b-t
 - **Spec:** 07 §7; D-123
@@ -6776,7 +6776,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Both boundary cases are tests in the submitter's own suite.
 
 #### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**
@@ -6785,7 +6785,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
 
 #### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**

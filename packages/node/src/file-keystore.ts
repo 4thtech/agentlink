@@ -16,8 +16,10 @@
 import { homedir } from 'node:os';
 import { isatty } from 'node:tty';
 import { join } from 'node:path';
+import { unlink } from 'node:fs/promises';
 import {
   CryptoInputError,
+  KeyStoreError,
   KEYSTORE_KDF_DEFAULTS,
   MASTER_SEED_LENGTH,
   randomBytes,
@@ -254,6 +256,44 @@ export async function writeAgentFile(
   } finally {
     wipe(storeKey);
   }
+}
+
+/**
+ * M1-9i-c (04 §2.3.3 restore step 5, D-115 C): writes a restored agent's items as a new `ALKS` file
+ * under `kek` (a new generated unlock code) and reads it back. Under the agent's lock: an existing
+ * file is `item_exists` and is left as it was, so a restore never overwrites. A file that does not
+ * read back and open under `kek` is removed again. The caller owns `entries` and `kek`.
+ */
+export async function importAgentFile(
+  dir: string,
+  agentId: string,
+  kek: KeystoreKek,
+  entries: readonly KeystoreEntry[],
+  fs: KeystoreFsOptions = {},
+): Promise<void> {
+  assertAgentId(agentId);
+  await ensureKeystoreDir(dir, fs);
+  await withAgentLock(dir, agentId, async () => {
+    const existing = await readKeystoreFile(dir, agentFile(agentId), fs);
+    if (existing !== null) {
+      wipe(existing);
+      throw new KeyStoreError('item_exists', 'keystore: this agent already has a key file');
+    }
+    const sealed = await sealKeystoreFile(kek, agentId, entries);
+    await writeKeystoreFile(dir, agentFile(agentId), sealed, fs);
+    let back: Uint8Array | null = null;
+    try {
+      back = await readKeystoreFile(dir, agentFile(agentId), fs);
+      if (back === null) throw keystoreFailed();
+      const opened = await openKeystoreFileWithKek(back, kek, agentId);
+      wipe(...opened.map((entry) => entry.value));
+    } catch {
+      await unlink(join(dir, agentFile(agentId))).catch(() => undefined);
+      throw keystoreFailed();
+    } finally {
+      wipe(sealed, back ?? undefined);
+    }
+  });
 }
 
 export interface CreateFileAgentOptions {

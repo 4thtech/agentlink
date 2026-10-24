@@ -40,9 +40,11 @@ vi.mock('../clients/registry.js', async (importOriginal) => {
 });
 
 const { getChainConfig } = await import('../clients/registry.js');
+const { DEPOSIT_AUTH_CLOCK_SKEW_SECONDS } = await import('../submitter/deposit-relay.js');
 const {
   GASLESS_CHAIN_IDS,
   GASLESS_MAX_USD_CENTS,
+  GASLESS_MAX_WINDOW_SECONDS,
   GASLESS_MIN_USD_CENTS,
   GASLESS_WINDOW_SECONDS,
   buildReceiveWithAuthorization,
@@ -494,12 +496,18 @@ describe('buildReceiveWithAuthorization', () => {
     expect(signer.sign712).not.toHaveBeenCalled();
   });
 
-  it('takes a window of 60 s to 1 h, 15 minutes by default', async () => {
+  it('takes a window of 60 s to the relay bound, 15 minutes by default (M3-4b-t-T2-b)', async () => {
+    expect(GASLESS_MAX_WINDOW_SECONDS).toBe(GASLESS_WINDOW_SECONDS);
     expect((await build({ windowSeconds: 60 })).auth.validBefore).toBe(String(NOW + 60));
-    expect((await build({ windowSeconds: 3_600 })).auth.validBefore).toBe(String(NOW + 3_600));
-    for (const windowSeconds of [59, 3_601, 1.5]) {
+    expect((await build({ windowSeconds: 900 })).auth.validBefore).toBe(String(NOW + 900));
+    // A window the relay would refuse (validBefore beyond now + 900 + 120 s) is never signed.
+    for (const windowSeconds of [59, 901, 1_021, 3_600, 3_601, 1.5]) {
       expect((await refusal(build({ windowSeconds }))).code).toBe('invalid_option');
     }
+    const built = await build({ windowSeconds: GASLESS_MAX_WINDOW_SECONDS });
+    expect(Number(built.auth.validBefore)).toBeLessThanOrEqual(
+      NOW + GASLESS_MAX_WINDOW_SECONDS + DEPOSIT_AUTH_CLOCK_SKEW_SECONDS,
+    );
   });
 
   it('never echoes the agent address, the vault or a signature in an error', async () => {

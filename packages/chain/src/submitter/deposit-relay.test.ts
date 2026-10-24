@@ -368,6 +368,11 @@ describe('check: relay validation before the gas key signs', () => {
     ['expired', async () => ({ req: await signed({ validBefore: String(NOW) }) })],
     ['expired', async () => ({ req: await signed({ validBefore: String(NOW + 30) }) })],
     ['invalid_window', async () => ({ req: await signed({ validBefore: String(NOW + 3_600) }) })],
+    // One past the builder's longest window plus the clock skew (M3-4b-t-T2-b).
+    [
+      'invalid_window',
+      async () => ({ req: await signed({ validBefore: String(NOW + 900 + 120 + 1) }) }),
+    ],
     ['invalid_window', async () => ({ req: await signed({ validAfter: String(NOW + 10) }) })],
     ['invalid_signature', async () => ({ req: await signed({}, { key: OTHER_KEY }) })],
     ['invalid_signature', async () => ({ req: await signed({}, { primaryType: 'Transfer' }) })],

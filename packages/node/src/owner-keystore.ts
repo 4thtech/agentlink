@@ -518,6 +518,98 @@ export async function replaceOwnerWrap(
   );
 }
 
+const restoreOwnerFailed = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'keychain_failed',
+    "The system keychain refused the request, so the owner key wasn't restored. Nothing was changed; unlock the keychain and run the restore again.",
+  );
+
+/**
+ * M1-9i-c (04 §2.3.3 restore step 6, §2.8 "Changing the owner code"): stores a restored owner seed as
+ * the `owner` item under `secret` (a new generated owner code, kind 1) with the `owner-next` write,
+ * read-back and open protocol, and never overwrites:
+ *
+ * 1. refuse (`item_exists`) while an `owner`, `owner-next` or `owner-passkey` item exists;
+ * 2. seal a fresh `ALKO` v1 blob under `secret`, write it to `owner-next`, read it back, require the
+ *    same bytes, and open the read-back bytes with `secret`: they must derive `expectedOwnerNostr`;
+ * 3. require the `owner` item to still be absent, write the blob as `owner` and read it back;
+ * 4. remove `owner-next`.
+ *
+ * Any failure removes `owner-next` (the kit still holds the seed) and leaves no `owner` item this
+ * run wrote. `seed` and `secret` are not modified; the kek and every read-back are wiped.
+ */
+export async function storeRestoredOwnerSeed(
+  keychain: KeychainBackend,
+  seed: Uint8Array,
+  expectedOwnerNostr: Uint8Array,
+  secret: Uint8Array,
+  options: StoreOwnerSeedOptions = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  for (const account of [OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT, OWNER_PASSKEY_ACCOUNT]) {
+    const existing = await guarded(() => keychain.get(account), timeoutMs);
+    if (existing !== null) {
+      wipe(existing);
+      throw new KeyStoreError('item_exists', 'owner keystore: an owner item already exists');
+    }
+  }
+  const kek = await newKeystoreKek(
+    'ALKO',
+    { secret, secretKind: 1, source: 'prompt' },
+    options.kdf,
+  );
+  let blob: Uint8Array;
+  try {
+    blob = await sealOwnerSeed(kek, seed, { destination: 'local', fileKeystoreMachine: false });
+  } finally {
+    wipe(kek.kek);
+  }
+  let staged = false;
+  try {
+    staged = true;
+    await guarded(() => keychain.set(OWNER_NEXT_ACCOUNT, blob), timeoutMs);
+    const back = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), timeoutMs);
+    let check: Uint8Array | undefined;
+    try {
+      if (back === null || !equalBytes(back, blob)) throw restoreOwnerFailed();
+      check = await openOwnerSeedWithoutCard(
+        back,
+        { secret, source: 'prompt' },
+        { fileKeystoreMachine: false },
+      ).catch(() => {
+        throw restoreOwnerFailed();
+      });
+      if (!equalBytes(publicKeysOf(check).ownerNostr, expectedOwnerNostr)) {
+        throw restoreOwnerFailed();
+      }
+    } finally {
+      wipe(back, check);
+    }
+    const current = await readOwnerItem(keychain, timeoutMs);
+    if (current !== null) {
+      wipe(current);
+      throw new KeyStoreError('item_exists', 'owner keystore: an owner item already exists');
+    }
+    try {
+      await guarded(() => keychain.set(OWNER_ACCOUNT, blob), timeoutMs);
+    } catch {
+      // Decided below from what the keychain now holds.
+    }
+    const after = await readOwnerItem(keychain, timeoutMs).catch(() => null);
+    const ownerWritten = after !== null && equalBytes(after, blob);
+    if (after !== null) wipe(after);
+    if (!ownerWritten) throw restoreOwnerFailed();
+  } catch (error) {
+    if (error instanceof KeyStoreError || error instanceof NodeKeyStoreError) throw error;
+    throw restoreOwnerFailed();
+  } finally {
+    if (staged) {
+      await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), timeoutMs).catch(() => false);
+    }
+    wipe(blob);
+  }
+}
+
 /**
  * M1-9z: the staged `owner-next` item of an unfinished owner-code change, or null. Ciphertext only;
  * the caller wipes it.
@@ -612,6 +704,33 @@ export function issuedBy(session: unknown, store: KeychainOwnerKeyStore): boolea
     session !== null &&
     ISSUED_SESSIONS.get(session as OwnerSession) === store
   );
+}
+
+/**
+ * M1-9i-c (04 §2.3.3 "Export: who sees the seeds"): a copy of the owner seed for the sessions that
+ * unlockForExport issued, and only those, so the paired KeyExportControl can seal it into a recovery
+ * kit inside this package. Module-private: no session method, field or reference reaches it. The copy
+ * is wiped when the session ends (expiry, close, lock or store close).
+ */
+const SESSION_SEEDS = new WeakMap<OwnerSession, Uint8Array>();
+
+/**
+ * M1-9i-c: what the export control may do with `session`: `foreign` for anything `store` did not
+ * issue (a look-alike, a Proxy, another store's session), `ended` once it ended, `no_seed` for a
+ * genuine session without the export capability, else `ok` with a copy of the seed (wipe it).
+ */
+export function exportSeedOf(
+  session: unknown,
+  store: KeychainOwnerKeyStore,
+):
+  | { readonly status: 'foreign' | 'ended' | 'no_seed' }
+  | { readonly status: 'ok'; readonly seed: Uint8Array } {
+  if (!issuedBy(session, store)) return { status: 'foreign' };
+  const genuine = session as OwnerSession;
+  if (!genuine.isActive()) return { status: 'ended' };
+  const seed = SESSION_SEEDS.get(genuine);
+  if (seed === undefined) return { status: 'no_seed' };
+  return { status: 'ok', seed: seed.slice() };
 }
 
 const monotonicNow = (): number => performance.now();
@@ -910,7 +1029,24 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
    * owner and a blob of another type are one answer, `presence_rejected`. The caller has checked the
    * assertion (credential ID, user handle, rpIdHash, UP and UV) before it hands the PRF output here.
    */
-  async unlock(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
+  unlock(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
+    return this.#unlock(presence, options, false);
+  }
+
+  /**
+   * M1-9i-c: unlock() for `agentlink backup export` † only. The same presence proof and checks; the
+   * session also lets this store's KeyExportControl read a copy of the owner seed (04 §2.3.3 "Export:
+   * who sees the seeds"), which is wiped when the session ends. Never offered to the agent path.
+   */
+  unlockForExport(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
+    return this.#unlock(presence, options, true);
+  }
+
+  async #unlock(
+    presence: OwnerPresence,
+    options: UnlockOptions,
+    keepSeed: boolean,
+  ): Promise<OwnerSession> {
     const generation = this.#generation;
     const proof = presenceProof(presence);
     let blob: Uint8Array | null | undefined;
@@ -955,7 +1091,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
       if (this.#closed || generation !== this.#generation) {
         throw new KeyStoreError('owner_locked', 'owner keystore: locked while unlocking');
       }
-      return this.#issue(seed, ttlMs);
+      return this.#issue(seed, ttlMs, keepSeed);
     } finally {
       // The presented secret, the blob and the seed never outlive this call (04 §8.3).
       wipe(proof.bytes, blob ?? undefined, seed);
@@ -963,7 +1099,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   }
 
   /** Derives the session's owner keys from `seed` (not modified; the caller wipes it). */
-  #issue(seed: Uint8Array, ttlMs: number): OwnerSession {
+  #issue(seed: Uint8Array, ttlMs: number, keepSeed = false): OwnerSession {
     let nostr: Uint8Array | undefined;
     let evm: Uint8Array | undefined;
     let enc: Uint8Array | undefined;
@@ -977,7 +1113,12 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
         { nostr, evm, enc },
         encodeHex(this.#expected.ownerNostr),
         ttlMs,
-        (ended) => this.#sessions.delete(ended),
+        (ended) => {
+          this.#sessions.delete(ended);
+          const kept = SESSION_SEEDS.get(ended);
+          SESSION_SEEDS.delete(ended);
+          if (kept !== undefined) wipe(kept);
+        },
       );
     } catch (error) {
       wipe(nostr, evm, enc);
@@ -985,6 +1126,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
     }
     this.#sessions.add(session);
     ISSUED_SESSIONS.set(session, this);
+    if (keepSeed) SESSION_SEEDS.set(session, seed.slice());
     return session;
   }
 
