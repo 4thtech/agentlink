@@ -245,7 +245,7 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       notarize: vi.fn(),
     };
     const view = readOnlyClient(client as never);
-    expect(Object.keys(view).sort()).toEqual(['agentId', 'getProof', 'listActivity']);
+    expect(Object.keys(view).sort()).toEqual(['agentId', 'getProof', 'listActivity', 'proofs']);
     expect(Object.isFrozen(view)).toBe(true);
     await expect(view.listActivity({ limit: 3 })).resolves.toBe(page);
     expect(activityList).toHaveBeenCalledWith({ limit: 3 });

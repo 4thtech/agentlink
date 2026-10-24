@@ -739,8 +739,13 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     });
     expect(res.status).toBe(200);
     expect(client).not.toBe(full);
-    // M1-11c-a1 adds the activity feed read (context.ts).
-    expect(Object.keys(client as object).sort()).toEqual(['agentId', 'getProof', 'listActivity']);
+    // M1-11c-a1 adds the activity feed read, M1-11c-a4 the proofs read (context.ts).
+    expect(Object.keys(client as object).sort()).toEqual([
+      'agentId',
+      'getProof',
+      'listActivity',
+      'proofs',
+    ]);
     expect(Object.isFrozen(client)).toBe(true);
   });
 });

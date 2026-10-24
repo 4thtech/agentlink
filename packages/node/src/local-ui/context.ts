@@ -10,9 +10,11 @@
 import type {
   ActivityEntry,
   AgentLinkClient,
+  CreditsView,
   OwnerActionOutcome,
   Page,
   PageQuery,
+  ProofListItem,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
@@ -63,6 +65,14 @@ export interface LocalUiReadClient {
   getProof(
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
+  /**
+   * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
+   * only. Not `requestFaucet` (owner decision D2) and nothing that notarizes.
+   */
+  readonly proofs: {
+    list(query: PageQuery): Promise<Page<ProofListItem>>;
+    creditsBalance(): Promise<CreditsView>;
+  };
   /** M1-11c-a1: one page of core's activity feed (`ActivityService.list`); store only, no write. */
   listActivity(query: PageQuery): Promise<Page<ActivityEntry>>;
 }
@@ -72,6 +82,10 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    proofs: Object.freeze({
+      list: (query: PageQuery) => client.proofs.list(query),
+      creditsBalance: () => client.proofs.creditsBalance(),
+    }),
     listActivity: (query) => client.activity.list(query),
   });
 }
