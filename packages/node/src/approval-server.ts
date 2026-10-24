@@ -90,8 +90,9 @@
 //   event. The held seed is wiped on finish (whatever the outcome), on expiry, when its session is
 //   dropped and when the server closes.
 // - M1-11b-6: `openFirstRun()` opens the first-run page with a one-shot session link, as `open()`
-//   does for `/`; the CLI's `init` calls it for a new owner (apps/cli first-run.ts). G-1: a same-user process holding a session link can race the
-//   human to set up an owner it controls (owner-setup.ts threat note).
+//   does for `/`; the CLI's `init` calls it for a new owner (the CLI's first-run step). G-1: a
+//   same-user process holding a session link can race the human to set up an owner it controls
+//   (owner-setup.ts threat note).
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
