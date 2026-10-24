@@ -10,7 +10,7 @@ import { SELF, env as testEnv } from 'cloudflare:test';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createSha256, encodeBase64url, encodeHex, encodeUtf8 } from '@4thtech-io/crypto';
 import { signDropAuthorization } from '@4thtech-io/crypto/testing';
-import type { DropEnv } from '../src/index.js';
+import type { DropEnv } from '../src/lib.js';
 
 const env = testEnv as DropEnv;
 
