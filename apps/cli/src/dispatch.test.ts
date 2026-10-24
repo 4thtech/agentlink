@@ -59,6 +59,7 @@ describe('--help (06 §8)', () => {
       'deny',
       'cancel',
       'doctor',
+      'ui',
       'mcp',
     ]);
     const help = helpText();

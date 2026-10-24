@@ -19,6 +19,7 @@ New to this? Follow [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md
 
    Without `--harness`, `init` sets up every supported tool it finds. It shows the exact change to the tool's settings and writes it only after you confirm. Restart the tool afterwards. Next release: `init` also supports Cursor and Windsurf (`--harness cursor`, `--harness windsurf`), names the agent after its app when you set up one app, and offers to install AgentLink on your computer so later commands are shorter; that install happens only after you confirm.
 2. **Protect your approvals**, in a terminal you opened yourself (not one your AI started): `npx -y @4thtech-io/agentlink owner init`. For a second agent on the same computer: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`.
+   Once it is set up, `npx -y @4thtech-io/agentlink ui` (next release) opens your AgentLink pages in your browser, starting with your activity. Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself. Press Ctrl+C when you're done; it stops by itself after 30 minutes.
 3. **Or ask your agent to do step 1:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." Check that the package name is exactly `@4thtech-io/agentlink`.
 
 ## How it connects: MCP
