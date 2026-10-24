@@ -91,12 +91,13 @@ describe('--help (06 §8)', () => {
       'agentlink cancel <approvalId> [--agent <name>]',
       'agentlink doctor',
       'agentlink mcp [--advanced]',
+      // M1-11b-9.
+      'agentlink ui [--agent <name>]',
     ]) {
       expect(help).toContain(usage);
     }
     // Later cards, and the file KeyStore (M1-8f, off the M1a path): not listed.
     for (const absent of [
-      'agentlink ui',
       'storage',
       'backup',
       'relays',
@@ -108,7 +109,7 @@ describe('--help (06 §8)', () => {
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
     // M1-9m: `policy` show, allow-folder, remove-folder; M1-9m-b: recover; M1-9h: credits and
     // verify; M1-29: init --hook. M1-36c: `contacts --verify` and `policy set` are not listed.
-    expect(commandLines).toHaveLength(24);
+    expect(commandLines).toHaveLength(25);
   });
 
   it('prints help for no arguments, --help, -h and help', async () => {
