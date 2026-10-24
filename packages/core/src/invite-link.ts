@@ -26,7 +26,7 @@ import {
   decodeUtf8,
   encodeBase64url,
   encodeUtf8,
-  parseJson,
+  parseReceivedJson,
 } from '@4thtech-io/crypto';
 import { inviteSchema, type Invite } from '@4thtech-io/types';
 import { CoreError } from './errors.js';
@@ -217,7 +217,8 @@ export async function decodeInviteLink(link: unknown): Promise<Invite> {
   // Step 4: strict text, I-JSON and the strict schema.
   let value: unknown;
   try {
-    value = parseJson(decodeUtf8(inflated), { integersOnly: true });
+    // The invite carries the inviter's card: the received-text parse (04 §2.5.1, D-128).
+    value = parseReceivedJson(decodeUtf8(inflated));
   } catch {
     throw invalid();
   }

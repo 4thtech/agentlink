@@ -11,7 +11,7 @@ import {
   encodeHex0x,
   ownerFingerprint,
   parseAgentCard,
-  parseJson,
+  parseReceivedJson,
   verifyCardAgentSig,
   verifyCardOwnerSig,
   verifyCardPop,
@@ -66,7 +66,7 @@ const storedUnreadable = (): never => {
 function parseStoredJson(text: string): Record<string, unknown> {
   let value: unknown;
   try {
-    value = parseJson(text, { integersOnly: true });
+    value = parseReceivedJson(text);
   } catch {
     return storedUnreadable();
   }
