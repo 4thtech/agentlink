@@ -18,6 +18,7 @@ import {
   type Argon2idParams,
   type KeyImportControl,
   type OwnerSession,
+  type RecoveryKitExportRequest,
   type RecoveryKitImport,
   type StorageCredentialControl,
 } from '@4thtech-io/crypto';
@@ -29,6 +30,7 @@ import {
   parseStorageCredentialItem,
   sealRecoveryKit,
   type RecoveryKitStoreSink,
+  type RecoveryKitStoreSource,
 } from '@4thtech-io/crypto/keystore';
 import { encodeStorageMark, rowKeyOf } from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -40,7 +42,7 @@ import {
 } from './key-controls.js';
 import { unlockFileAgent, fileKeychain, writeAgentFile, OWNER_FILE } from './file-keystore.js';
 import { generateSecretCode, newKeystoreKek } from '@4thtech-io/crypto/keystore';
-import { withInterProcessLock } from './inter-process-lock.js';
+import { withInterProcessLock, type LockHold } from './inter-process-lock.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
 import {
@@ -307,10 +309,11 @@ describe.runIf(POSIX)('KeyExportControl (keychain and file items)', () => {
         createdAt: 1,
         contents: 'full',
         agents: [{ agentId: agent.agentId, name: 'helper' }],
-        snapshots: (_agentId, hold) =>
+        // The Node backend also passes its LockHold, beyond the public one-argument contract.
+        snapshots: ((_agentId: string, hold: LockHold): Promise<RecoveryKitStoreSource> =>
           withInterProcessLock(`${agent.storePath}.lock`, () => source(agent.snapshot), {
             within: hold,
-          }),
+          })) as RecoveryKitExportRequest['snapshots'],
         path,
       }),
       'store_busy',
