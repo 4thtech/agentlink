@@ -864,6 +864,38 @@ describe('the agent-visible approval url (M1-11a-b, 06 §2.5, I-4)', () => {
     expect(res.body).toContain('This link has expired');
   });
 
+  it('M1-11b-6: openFirstRun hands the opener a one-shot link to /first-run and nothing else', async () => {
+    const h = await harness();
+    const at = h.opened.length;
+    await expect(h.server.openFirstRun()).resolves.toBe(true);
+    expect(h.opened.length).toBe(at + 1);
+    const link = new URL(h.opened[at] ?? '');
+    expect(link.origin).toBe(h.origin);
+    expect(link.pathname).toBe('/first-run');
+    expect([...link.searchParams.keys()]).toEqual(['t']);
+    const token = link.searchParams.get('t') ?? '';
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const first = await send(h.port, `${link.pathname}${link.search}`);
+    expect(first.status).toBe(303);
+    expect(first.headers.location).toBe('/first-run');
+    expect(first.headers['set-cookie']?.[0]).toContain('HttpOnly; SameSite=Strict');
+    // One-shot: the same link never opens a session again.
+    const again = await send(h.port, `${link.pathname}${link.search}`);
+    expect(again.status).toBe(401);
+    expect(again.headers['set-cookie']).toBeUndefined();
+    // The token is in no event.
+    expect(JSON.stringify(h.events)).not.toContain(token);
+  });
+
+  it('M1-11b-6: openFirstRun resolves false when no browser could be opened', async () => {
+    const server = await startApprovalServerWith(
+      { source: fakeSource() },
+      { opener: () => Promise.reject(new Error('no opener')) },
+    );
+    servers.push(server);
+    await expect(server.openFirstRun()).resolves.toBe(false);
+  });
+
   it('the one-shot link the opener gets for a request works once, then lands on the same url', async () => {
     const h = await harness();
     h.source.add(1);

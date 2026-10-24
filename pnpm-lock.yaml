@@ -254,6 +254,9 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@4thtech-io/local-ui':
+        specifier: workspace:*
+        version: link:../local-ui
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../../packages/log
