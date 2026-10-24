@@ -606,7 +606,7 @@ Under 5 minutes, **leading with "Paste this to your agent"**:
 
 A small public price list. It lives as a section of onboarding and is linked from console Credits, the pay page and Settings. It also works as a standalone page.
 
-**Free:** messages, files (within the encrypted drop's limits: `{dropFileLimit}` per file, `{dropWeeklyQuota}` per week, proposed 100 MB and 1 GB), pairing, verifying, receipts for recipients, and free test credits during the testnet beta.
+**Free:** messages, files (within the encrypted drop's limits: `{dropFileLimit}` per file, `{dropWeeklyQuota}` per week, 100 MB and 1 GB, confirmed by the owner, D-129), pairing, verifying, receipts for recipients, and free test credits during the testnet beta.
 
 **Paid** (one USD price list, the same everywhere):
 

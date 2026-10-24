@@ -856,7 +856,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - `node tools/docs-status/index.mjs --check` passes; nothing claims the gasless route is on.
 
 #### DOCS-G21-b · "median" vs "every tester": align the M2 gate and 02 with D-124 (new, IR-M1-GATE-a-2, #461)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Status:** done (4thtech/agentlink#470, merged 2026-10-23; D-124, D-125) · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
 - **Repo/path:** agentlink · `docs/process/backlog.md` (M2-GATE acceptance), `docs/foundation/02-product-spec.md` (line 240)
 - **Depends on:** M1-GATE-a (#461)
 - **Spec:** 02 (success metrics); G-21
@@ -1247,13 +1247,13 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
 
 #### M1-1h-b · Raw-text vectors for signed JSON objects (new, split from M1-1h, IR-M1-1h-1 F3)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** backlog (spec decided: D-128, 04 §2.5.1; implementation and vectors open) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
-- **Depends on:** M1-1h; a spec decision in 04 §2.5.1 (below)
+- **Depends on:** M1-1h; 04 §2.5.1 "Received text" (D-128, decided)
 - **Spec:** 04 §2.5.1, §2.4.1; RFC 7493; RFC 8785 §3.1
 - **Invariants:** I-4, I-8
 - **Scope:**
-  - 04 §2.4.1 (#22) already refuses non-canonical integer tokens (`1.0`, `1e3`, `-0`) on the token text; M1-1h vectors that rule (`encodings` `parseInteger`, `eip712` `agentCardJson`). Still open: decide in 04 §2.5.1 that a `SignedOwnerAction` and an envelope are verified from their received JSON text, with duplicate keys and escaped key spellings refused there.
+  - 04 §2.4.1 (#22) already refuses non-canonical integer tokens (`1.0`, `1e3`, `-0`) on the token text; M1-1h vectors that rule (`encodings` `parseInteger`, `eip712` `agentCardJson`). Decided (D-128): 04 §2.5.1 "Received text" verifies every owner-signed object (`SignedOwnerAction`, its carrier envelope, the card JSON form) from the received text, refusing duplicate member names and escaped member-name spellings (`malformed`) before the signature check. Implement it in the parsers.
   - Then add `verifyText` vectors (input: the raw text) for `owner-action` and the envelope, with one rejection per form.
 - **Acceptance:**
   - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.
@@ -2970,7 +2970,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: an unlisted code is not logged; `confirm` produces a signed `ACCEPTED` receipt; one contact cannot take more than its share of the waiting pool; if the stored flag is added, a mismatch sets it and no MCP tool clears it (I-4).
 
 #### M1-7g-e · core: stored per-contact proof flag (new, split from M1-7g-d; owner decides)
-- **Status:** backlog (owner decides whether to build it) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** won't do (M1; D-127: the refused row already flags the contact and no tool can clear it, 04 §3.4, I-4; reopen only if the console needs a fast lookup) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, inbox), packages/node (store schema)
 - **Depends on:** M1-7g-c
 - **Spec:** 04 §3.4; 07 §3.2
@@ -4028,15 +4028,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 awaits the owner's 10 vs 16; counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
 - **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **DECISION NEEDED (owner):** terms of service and takedown process.
-  - Confirm the proposed limits: 100 MB per file, 1 GB per drop key per week, 10 downloads per object.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off.
+  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; download limit per object as in 07 §5.4 (16), owner to confirm 10 vs 16.
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**
   - Buckets and lifecycle rule exist and are read back (with M1-27b); confirmed limits recorded in 07 §5.4 and 12 §2.
@@ -7432,7 +7432,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |
 | M1-23 | Run the J9 dogfood with @denisjazbec (install, pair, daily project sync, a J8 negotiation); sign off the M1a gate |
 | M1-24 | Trademark and name check (D-38) with counsel before the production domain (M2-10); start early |
-| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; confirm the drop limits; engage counsel on the hosting terms; **DECISION NEEDED:** terms of service and takedown process |
+| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 10 vs 16 open); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
 | M1-GATE, M2-GATE, M3-GATE | Recruit testers; sign off the gate; accept or reject residual risks |
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
