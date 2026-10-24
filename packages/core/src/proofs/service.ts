@@ -93,6 +93,7 @@ import type { EnvelopeService, InboundReport } from '../envelopes.js';
 import type { IdentityService } from '../identity.js';
 import { renderContactName } from '../names.js';
 import type { OutboxService } from '../outbox.js';
+import { parseOwnerActionText } from '../owner-action.js';
 import type { OwnerActions } from '../owner-actions.js';
 import {
   evaluate,
@@ -141,6 +142,19 @@ export const QUEUED_RECEIPT_WAIT_MS = 2_000;
  * on-chain, the signature or the recipient commitment is wrong. `Expired` is not here: 04 §5 may
  * allow a replacement.
  */
+/**
+ * A receipt the client's chain reads answer `RecordNotFound` for is posted again this many times,
+ * after RECEIPT_NOT_FOUND_RETRY_MS, before it becomes `receipt_failed` (M1-34-c): a client RPC that
+ * lags behind the block holding the record must not fail the receipt for good. Fixed, so a record
+ * that never existed costs one extra post per receipt, once.
+ */
+export const RECEIPT_NOT_FOUND_RETRIES = 1;
+/** The fixed delay before that retry (M1-34-c): a few blocks on the supported chains. */
+export const RECEIPT_NOT_FOUND_RETRY_MS = 3_000;
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 const TERMINAL_RECEIPT_ERRORS: ReadonlySet<string> = new Set([
   'RecordNotFound',
   'InvalidSignature',
@@ -514,6 +528,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #deps: ProofServiceDeps;
   readonly #platform: ProofsPlatform | undefined;
   readonly #selector: Selector | undefined;
+  readonly #sleep: (ms: number) => Promise<void>;
   /** Queued receipt ID -> the pass that last tried it (in memory; M1-34-b). */
   readonly #receiptTries = new Map<string, number>();
   /** The receipt signing in progress, by receipt item ID (M1-33d-b: one signature, I-6). */
@@ -525,6 +540,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     this.#log = ctx.log.withCodes(PROOF_LOG_CODES);
     this.#deps = deps;
     this.#platform = platform;
+    this.#sleep = platform?.sleep ?? defaultSleep;
     this.#selector =
       platform === undefined
         ? undefined
@@ -2067,12 +2083,25 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   ): Promise<ProofOutcome['status'] | 'error' | 'terminal'> {
     const chain = this.#chain(stored.chain_id);
     if (chain === undefined) return 'error';
+    const item = parseJson(stored.record_json) as never;
+    const call = waitMs === undefined ? undefined : { waitMs };
     let outcome: ProofOutcome;
     try {
-      outcome = await chain.submitter.acknowledge(
-        parseJson(stored.record_json) as never,
-        waitMs === undefined ? undefined : { waitMs },
-      );
+      outcome = await chain.submitter.acknowledge(item, call);
+      // M1-34-c: a client RPC that lags behind the block holding the record answers
+      // `RecordNotFound` for a record that exists. The same signed item is posted again, a fixed
+      // RECEIPT_NOT_FOUND_RETRIES times after RECEIPT_NOT_FOUND_RETRY_MS, before it counts as
+      // refused for good. Nothing is signed again; a receipt carries no fee (05 §3.3).
+      for (
+        let retry = 0;
+        retry < RECEIPT_NOT_FOUND_RETRIES &&
+        outcome.status === 'failed' &&
+        outcome.error === 'RecordNotFound';
+        retry += 1
+      ) {
+        await this.#sleep(RECEIPT_NOT_FOUND_RETRY_MS);
+        outcome = await chain.submitter.acknowledge(item, call);
+      }
     } catch {
       this.#log.warn('receipt submit failed', { code: 'submit_error' });
       return 'error';
@@ -2600,7 +2629,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         return { standingRule: true, policyHash };
       }
       if (approval.signed_decision === null) return null;
-      const signed = signedApprovalDecideSchema.safeParse(parseJson(approval.signed_decision));
+      const signed = signedApprovalDecideSchema.safeParse(
+        parseOwnerActionText(approval.signed_decision),
+      );
       if (!signed.success) return null;
       const action = parseJson(
         await open(
@@ -2611,7 +2642,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           approval.action_json,
         ),
       );
-      return { signed: parseJson(approval.signed_decision), action };
+      return { signed: parseOwnerActionText(approval.signed_decision), action };
     } catch {
       return null;
     }

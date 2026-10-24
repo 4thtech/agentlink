@@ -116,7 +116,7 @@ describe('an owner code typed as part of a command (M1-9zd)', () => {
     expect(text).toMatch(/chat/);
     // 11 §6.10: 80 columns; the command on its own line.
     for (const line of text.split('\n')) expect(line.length).toBeLessThanOrEqual(80);
-    expect(text.split('\n')).toContain('         agentlink owner change-code');
+    expect(text.split('\n')).toContain('         npx -y @4thtech-io/agentlink owner change-code');
     // 11 §5.1 and §5.5: never "password", "wallet", "seed phrase".
     expect(text.toLowerCase()).not.toMatch(/password|wallet|seed phrase/);
   });

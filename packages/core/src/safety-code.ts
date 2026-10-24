@@ -31,7 +31,7 @@ import {
   envelopeHash,
   parseAgentCard,
   parseEnvelope,
-  parseJson,
+  parseReceivedJson,
   verifyCardAgentSig,
   verifyCardOwnerSig,
   verifyEnvelope,
@@ -99,7 +99,8 @@ export async function openPairingMessage(
     parsed = parseEnvelope(envelope);
     if (!envelopeSchema.safeParse(parsed).success) throw unavailable();
     plaintext = await decryptPayload(parsed, cek);
-    const payload = payloadSchema.safeParse(parseJson(decodeUtf8(plaintext)));
+    // The stored pairing payload carries the contact's card: the received-text parse (04 §2.5.1).
+    const payload = payloadSchema.safeParse(parseReceivedJson(decodeUtf8(plaintext)));
     if (!payload.success) throw unavailable();
     return { envelope: parsed, payload: payload.data };
   } catch {

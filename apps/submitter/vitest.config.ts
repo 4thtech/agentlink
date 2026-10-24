@@ -99,6 +99,7 @@ export default defineConfig({
             'test/submitter.test.ts',
             'test/faucet.test.ts',
             'test/deposit-auth.test.ts',
+            'test/deposit-auth-precheck.test.ts',
             'test/smoke.test.ts',
             'test/entry.test.ts',
           ],

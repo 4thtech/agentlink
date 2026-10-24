@@ -135,7 +135,7 @@ export const HOOK_TEXT = Object.freeze({
   intro:
     'This adds a start-of-session note to Claude Code: a line or two saying who has written to you. It runs the AgentLink program installed on this computer. It never reads message text and changes nothing.',
   noInstall:
-    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run `agentlink init --hook` again. Nothing was changed.',
+    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run the same command again. Nothing was changed.',
   notFound: "Problem  AgentLink didn't find Claude Code on this computer. Nothing was changed.",
   present: 'OK       The AgentLink start-of-session note is already set up in Claude Code',
   conflict:
@@ -171,7 +171,7 @@ export const INIT_TEXT = Object.freeze({
   restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
-    'No app was changed. Your agent identity is kept. To set up one app later, run: {prefix} init --harness <app>',
+    'No app was changed. Your agent identity is kept. To set up one app later, run `{prefix} init --harness <app>`.',
   ownerStepAdd:
     "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',

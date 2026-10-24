@@ -1,8 +1,9 @@
 // Strict parsing of a proof pack (07 §8; 04 §2.4.1; I-5). The pack is untrusted: it is bounded in
-// size before it is read, parsed by the strict JSON parser of @4thtech-io/crypto (no duplicate keys,
-// protocol integers only) and then by the ProofPack v1 schema of @4thtech-io/types. Nothing is
-// normalised, and a refusal is a fixed code: no parse detail, field value or path leaves this file.
-import { decodeUtf8, encodeUtf8, parseJson, type JsonValue } from '@4thtech-io/crypto';
+// size before it is read, parsed by the received-text parser of @4thtech-io/crypto (no duplicate
+// or escaped member names, protocol integers only; 04 §2.5.1, D-128) and then by the ProofPack v1
+// schema of @4thtech-io/types. Nothing is normalised, and a refusal is a fixed code: no parse
+// detail, field value or path leaves this file.
+import { decodeUtf8, encodeUtf8, parseReceivedJson, type JsonValue } from '@4thtech-io/crypto';
 import {
   RECORD_KINDS,
   base64urlByteLength,
@@ -82,7 +83,9 @@ export function parseProofPack(input: unknown): ParseResult {
   if (text === 'pack_too_large' || text === 'malformed_pack') return refuse(text);
   let value: JsonValue;
   try {
-    value = parseJson(text as string, { integersOnly: true });
+    // The 04 §2.5.1 received-text parse (D-128): the pack embeds an envelope, an owner approval
+    // and a card, so no duplicate or escaped member name, integer tokens only.
+    value = parseReceivedJson(text as string);
   } catch {
     return refuse('malformed_pack');
   }

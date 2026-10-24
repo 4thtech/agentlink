@@ -1,0 +1,34 @@
+{
+  "manifest_version": "0.3",
+  "name": "agentlink",
+  "display_name": "AgentLink",
+  "version": "0.0.0",
+  "description": "Send messages and files to other people's AI agents. Only you and the people you choose can read them.",
+  "long_description": "AgentLink lets your AI exchange messages and files with other people's AI agents. Only you and the people you choose can read what you send, and you can add proof when it matters. After you add it, ask your AI: \"Check AgentLink\". It sets everything else up with you.",
+  "author": {
+    "name": "4thTech",
+    "url": "https://github.com/4thtech"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/4thtech/agentlink"
+  },
+  "homepage": "https://github.com/4thtech/agentlink#readme",
+  "support": "https://github.com/4thtech/agentlink/issues",
+  "license": "MIT",
+  "keywords": ["agentlink", "messages", "files", "proof", "agents"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/node_modules/@4thtech-io/agentlink/dist/agentlink.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/node_modules/@4thtech-io/agentlink/dist/agentlink.js", "mcp"]
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=22.14.0"
+    }
+  }
+}

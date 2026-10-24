@@ -3,7 +3,7 @@
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { STORE_SCHEMA_VERSION, rowKeyOf, type Sealed } from '@4thtech-io/core';
+import { STORE_SCHEMA_VERSION, encodeStorageMark, rowKeyOf, type Sealed } from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith } from './agent-store.js';
 import { NodeKeyStoreError } from './errors.js';
@@ -112,5 +112,19 @@ describe('openAgentStoreWith', () => {
       keychain,
     }).catch((e: unknown) => e);
     expect((error as NodeKeyStoreError).code).toBe('store_key_invalid');
+  });
+
+  it('hands out the own-storage items (M1-9i-c): storage-mark in the keychain, refused after close', async () => {
+    const opened = await openAgentStoreWith('keychain', agentId, join(dir, 'own.sqlite'), {
+      keychain,
+    });
+    expect(await opened.ownStorageKeys.readMark()).toBeNull();
+    await opened.ownStorageKeys.writeMark('0123456789abcdef');
+    expect(keychain.items.get(keychainAccount(agentId, 'storage-mark'))).toEqual(
+      encodeStorageMark('0123456789abcdef'),
+    );
+    expect(await opened.ownStorageKeys.credentialDigest('0123456789abcdef')).toBeNull();
+    await opened.close();
+    await expect(opened.ownStorageKeys.readMark()).rejects.toThrow();
   });
 });

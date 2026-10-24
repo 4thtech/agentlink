@@ -479,6 +479,16 @@ export interface ToolContext {
    * never sets it; tests do, to exercise a live page.
    */
   readonly payPage?: PayPageConfig;
+  /**
+   * M1-36a-b: the command prefix that works on this machine (the runtime's `cliPrefix()`, M1-36a).
+   * Only the two fixed forms are used (`noOwnerFor`); absent or anything else: the npx form.
+   */
+  readonly cliPrefix?: string;
+  /**
+   * M1-36a-b: whether an owner exists on this machine, for the no-owner text: `false` only when it is
+   * known that none does (then `owner init`), undefined when unknown (then `owner add-agent`).
+   */
+  readonly ownerExists?: () => Promise<boolean | undefined>;
 }
 
 /**

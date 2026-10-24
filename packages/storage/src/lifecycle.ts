@@ -57,9 +57,24 @@ export interface LifecycleRuleState {
   readonly enabled: boolean;
 }
 
+/** What `apply` reports on success (M1-6b-d). */
+export interface LifecycleApplyResult {
+  /**
+   * `dropped` when the provider kept the expiry rule but silently left out the abort-incomplete-upload
+   * element (some S3-compatible providers do), so unfinished uploads are not cleaned up automatically.
+   */
+  readonly abortIncomplete: 'kept' | 'dropped';
+  /** Plain-words text for the owner when `abortIncomplete` is `dropped`; null otherwise. */
+  readonly warning: string | null;
+}
+
+/** 11 §5 plain words: no provider jargon, no URL, no bucket name. */
+export const LIFECYCLE_ABORT_DROPPED_WARNING =
+  'Your storage provider did not accept the clean-up of unfinished uploads. Files are still removed on time, but an upload that is interrupted may leave unused data in your storage until you delete it there.';
+
 export interface S3Lifecycle {
   /** Sets (or replaces) the AgentLink rule; keeps the bucket's other rules. */
-  apply(opts?: { readonly days?: number }): Promise<void>;
+  apply(opts?: { readonly days?: number }): Promise<LifecycleApplyResult>;
   /** The AgentLink rule as the provider reports it, or null when there is none. */
   read(): Promise<LifecycleRuleState | null>;
 }
@@ -246,7 +261,7 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
   }
 
   return {
-    async apply(opts = {}): Promise<void> {
+    async apply(opts = {}): Promise<LifecycleApplyResult> {
       const days = opts.days ?? LIFECYCLE_DEFAULT_DAYS;
       if (!Number.isSafeInteger(days) || days < 1 || days > MAX_DAYS) {
         throw new StorageError(
@@ -306,8 +321,13 @@ export function createS3Lifecycle(config: S3LifecycleConfig): S3Lifecycle {
           log?.warn('storage lifecycle changed after the update');
           throw failed();
         }
+        const dropped = !/<AbortIncompleteMultipartUpload[\s>]/.test(ownAfter);
         log?.info('storage lifecycle rule applied', { days, otherRules: others.length });
-        return;
+        if (dropped) {
+          log?.warn('storage provider dropped the abort-incomplete-upload rule');
+          return { abortIncomplete: 'dropped', warning: LIFECYCLE_ABORT_DROPPED_WARNING };
+        }
+        return { abortIncomplete: 'kept', warning: null };
       }
       log?.warn('storage lifecycle kept changing; nothing written');
       throw failed();

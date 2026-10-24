@@ -12,6 +12,7 @@
 //   offending text.
 import { toolResultCommonSchema, type McpStatus } from '@4thtech-io/types';
 import type { ToolContext } from './context.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 /** A tool result: the common fields plus the tool's own `structuredContent` fields. */
 export type ToolResult = {
@@ -39,8 +40,7 @@ export interface HandlerOutput {
 /** Fixed text (I-5: never built from a value). */
 export const RESULT_TEXT = Object.freeze({
   internalSummary: 'Something went wrong in AgentLink, so nothing was done.',
-  internalNextStep:
-    'Tell the user AgentLink hit a problem. They can run `agentlink doctor` in their own terminal to see why.',
+  internalNextStep: `Tell the user AgentLink hit a problem. They can run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
   invalidSummary: "That request isn't valid for this tool, so nothing was done.",
   invalidNextStep: "Check the tool's input fields and call it again.",
   notAvailableSummary:

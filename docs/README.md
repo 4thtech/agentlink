@@ -35,7 +35,7 @@ Read the documents in order. Each list is the minimum; open the rest by section 
 
 ### Orchestrator (the owner's main session)
 
-1. [`../AGENTS.md`](../AGENTS.md) § Orchestration and context economy.
+1. [`../AGENTS.md`](../AGENTS.md) § Orchestration and context economy, then [`process/orchestrator-playbook.md`](process/orchestrator-playbook.md) (every session).
 2. [`process/delivery-process.md`](process/delivery-process.md): roles, lifecycle, go-ahead model.
 3. [`process/development-process.md`](process/development-process.md) §3 (routing), §4 (briefs), §5 (verification protocol).
 4. Runbooks [RB-03 worker brief](runbooks/worker-brief.md), [RB-04 independent review](runbooks/independent-review.md), [RB-09 merge and release](runbooks/merge-and-release.md), [RB-15 save and hand off](runbooks/save-and-handoff.md). Dogfooding M1a: [RB-17 multi-harness dogfood](runbooks/dogfood-m1a.md). Releasing v0.1.0: [RB-18 owner checklist](runbooks/release-v0.1.0.md) and the [draft release note](releases/v0.1.0.md).
@@ -118,6 +118,7 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | Doc | Purpose |
 |---|---|
 | [`development-process.md`](process/development-process.md) | Roles, orchestration of AI agents, task flow, verification and the spec-change process |
+| [`orchestrator-playbook.md`](process/orchestrator-playbook.md) | What the orchestrator does every session: delegate everything, keep 8–15 workers busy, four-model routing, merge-queue procedures, recording reviews, builder rules |
 | [`delivery-process.md`](process/delivery-process.md) | The end-to-end delivery process: roles, 14-step lifecycle, safety nets, owner go-ahead model and definition of done |
 | [`audit-rules.md`](process/audit-rules.md) | Security classes S0/S1/S2, review requirements, independent reviews and external audits |
 | [`release-and-deployment.md`](process/release-and-deployment.md) | Environments, releases, automatic service deploys, owner-approved npm `latest`, rollback and secrets handling |

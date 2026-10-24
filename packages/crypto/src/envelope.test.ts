@@ -21,6 +21,7 @@ import {
   envelopeSignatureInput,
   parseEnvelope,
   parseEnvelopeHeader,
+  parseEnvelopeText,
   parseUnsignedEnvelope,
   randomBytes,
   sha256,
@@ -487,6 +488,43 @@ describe('envelope signature: BIP-340 over taggedHash("agentlink/envelope/v1", e
     const malformed = changed(envelope, ['sig'], (envelope.sig as string).toUpperCase());
     expect(refusal(() => verifyEnvelope(malformed as unknown as Envelope)).code).toBe(
       'invalid_envelope',
+    );
+  });
+});
+
+describe('parseEnvelopeText: the received text (04 §3.1.1 step 3, §2.5.1, D-128, M1-1h-b)', () => {
+  const envelope = signedBy(SECRET);
+  const text = canonicalize(envelope);
+
+  it('parses JCS-canonical text, and the signature verifies', () => {
+    const parsed = parseEnvelopeText(text);
+    expect(parsed).toEqual(parseEnvelope(envelope));
+    expect(verifyEnvelope(parsed)).toBe(true);
+  });
+
+  it('parses an escape inside a string value', () => {
+    const escaped = text.replace('"aead":{"alg":"A256GCM-KC"', '"aead":{"alg":"\\u0041256GCM-KC"');
+    expect(escaped).not.toBe(text);
+    expect(verifyEnvelope(parseEnvelopeText(escaped))).toBe(true);
+  });
+
+  it.each([
+    ['an escaped name at the top', '"v":1', '"\\u0076":1'],
+    ['an escaped name in aead', '"ct":', '"\\u0063t":'],
+    ['an escaped name in a recipient', '"kid":', '"\\u006bid":'],
+    ['a duplicate name at the top', '"v":1', '"v":1,"v":1'],
+    ['a duplicate name in aead', '"alg":"A256GCM-KC"', '"alg":"A256GCM-KC","alg":"A256GCM-KC"'],
+    ['a non-integer createdAt token', '"createdAt":1760000000', '"createdAt":1760000000.0'],
+  ])('refuses %s', (_, from, to) => {
+    const candidate = text.replace(from, to);
+    expect(candidate).not.toBe(text);
+    // The parsed value would still be the signed envelope; only the text check refuses it.
+    expect(refusal(() => parseEnvelopeText(candidate))).toBeInstanceOf(CryptoInputError);
+  });
+
+  it('refuses a non-string', () => {
+    expect(refusal(() => parseEnvelopeText(envelope as unknown as string)).code).toBe(
+      'invalid_argument',
     );
   });
 });

@@ -64,6 +64,7 @@ import {
   type CommandHandler,
 } from '../../dispatch.js';
 import type { Output } from '../../output.js';
+import { commandPrefix } from '../../runtime/cli-prefix.js';
 import { sanitizeTerminalText, terminalOneLine } from '../../terminal/sanitize.js';
 import {
   badArguments,
@@ -103,14 +104,18 @@ export const POLICY_TEXT = Object.freeze({
   hidden: 'Hidden folders, and folders inside them, can’t be allowed for sending files.',
   protectedFolder:
     "Files in this folder can never be sent (it holds keys or AgentLink's own data). Choose another folder.",
-  tooMany: `You can allow at most ${String(POLICY_BOUNDS.allowedFolders.max)} folders. Remove one first with \`agentlink policy remove-folder <path>\`.`,
+  get tooMany(): string {
+    return `You can allow at most ${String(POLICY_BOUNDS.allowedFolders.max)} folders. Remove one first with \`${commandPrefix()} policy remove-folder <path>\`.`;
+  },
   containsProtected: (shown: string): string =>
     `That folder contains ${shown}, which holds keys or AgentLink's own data, so it can't be allowed. Choose a narrower folder inside it that doesn't contain ${shown}.`,
-  rulesUnreadable:
-    "AgentLink can't use your rules right now, so it uses its strictest settings and no folder is allowed. Nothing was changed. To review and confirm your rules again, run `agentlink policy recover` in your own terminal.",
+  get rulesUnreadable(): string {
+    return `AgentLink can't use your rules right now, so it uses its strictest settings and no folder is allowed. Nothing was changed. To review and confirm your rules again, run \`${commandPrefix()} policy recover\` in your own terminal.`;
+  },
   alreadyAllowed: 'OK       That folder is already allowed. Nothing was changed.',
-  notAllowed:
-    "That folder isn't one of your allowed folders. Run `agentlink policy show` to see them.",
+  get notAllowed(): string {
+    return `That folder isn't one of your allowed folders. Run \`${commandPrefix()} policy show\` to see them.`;
+  },
   allowSummary: (folder: string): string =>
     `Allow your AI to send files from ${folder} and its subfolders to your contacts. Hidden files are never sent.`,
   removeSummary: (folders: readonly string[]): string =>
@@ -118,15 +123,17 @@ export const POLICY_TEXT = Object.freeze({
   allowed: 'OK       Allowed. Your AI can now send files from this folder.',
   removed: 'OK       Removed. Your AI can no longer send files from this folder.',
   failed: "Problem  That didn't go through. Nothing was changed.",
-  notConfirmed:
-    "Problem  Your new rules were saved, but AgentLink couldn't confirm them, so it uses its strictest settings until they are set again. Run `agentlink doctor` in your own terminal.",
+  get notConfirmed(): string {
+    return `Problem  Your new rules were saved, but AgentLink couldn't confirm them, so it uses its strictest settings until they are set again. Run \`${commandPrefix()} doctor\` in your own terminal.`;
+  },
 
   // show
   header: (version: number | undefined): string =>
     version === undefined ? 'Your rules (the defaults)' : `Your rules (version ${String(version)})`,
   foldersHeader: 'Folders your AI can send files from:',
-  noFolder:
-    'No folder is allowed for sending files yet. Allow one with `agentlink policy allow-folder <path>`.',
+  get noFolder(): string {
+    return `No folder is allowed for sending files yet. Allow one with \`${commandPrefix()} policy allow-folder <path>\`.`;
+  },
   inbox: (folder: string): string => `Received files are saved in: ${folder}`,
   sizes: (send: number, receive: number): string =>
     `Largest file: ${String(send)} MB to send, ${String(receive)} MB to receive`,
@@ -134,10 +141,12 @@ export const POLICY_TEXT = Object.freeze({
     auto ? 'New contacts: accepted automatically' : 'New contacts: wait for your approval',
 
   // recover (D-100)
-  nothingToRecover:
-    'Your rules are in use, so there is nothing to recover. Nothing was changed. Run `agentlink policy show` to see them.',
-  cannotRecover:
-    "AgentLink can't recover your rules right now: it can't read what it needs on this computer. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+  get nothingToRecover(): string {
+    return `Your rules are in use, so there is nothing to recover. Nothing was changed. Run \`${commandPrefix()} policy show\` to see them.`;
+  },
+  get cannotRecover(): string {
+    return `AgentLink can't recover your rules right now: it can't read what it needs on this computer. Nothing was changed. Run \`${commandPrefix()} doctor\` in your own terminal.`;
+  },
   whatHappened: (kind: string): string =>
     `Your rules can't be used, so AgentLink uses its strictest settings. What happened: ${kind}`,
   reviewStored:

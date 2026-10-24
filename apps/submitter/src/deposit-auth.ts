@@ -39,7 +39,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   DEPOSIT_AUTH_CLOCK_SKEW_SECONDS,
   DEPOSIT_AUTH_MIN_REMAINING_SECONDS,
-  GASLESS_WINDOW_SECONDS,
+  GASLESS_MAX_WINDOW_SECONDS,
   depositAuthorizationRequestBody,
   parseDepositAuthorizationRequest,
   type DepositAuthErrorCode,
@@ -107,7 +107,7 @@ export function precheckDepositAuthorization(
   const validBefore = BigInt(auth.validBefore);
   if (BigInt(auth.validAfter) >= now) return 'invalid_window';
   if (validBefore <= now + BigInt(DEPOSIT_AUTH_MIN_REMAINING_SECONDS)) return 'expired';
-  if (validBefore > now + BigInt(GASLESS_WINDOW_SECONDS + DEPOSIT_AUTH_CLOCK_SKEW_SECONDS)) {
+  if (validBefore > now + BigInt(GASLESS_MAX_WINDOW_SECONDS + DEPOSIT_AUTH_CLOCK_SKEW_SECONDS)) {
     return 'invalid_window';
   }
   return null;

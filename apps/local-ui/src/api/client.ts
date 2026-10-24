@@ -35,6 +35,11 @@ function checkPath(path: string): void {
   if (!path.startsWith('/api/') || path.startsWith('//') || /[\\\t\n\r]/.test(path)) {
     throw new Error('api path must start with /api/');
   }
+  // IR-M1-11b-1-1 L-4: no `.` or `..` segment, plain or percent-encoded, in the path part.
+  const pathPart = path.split(/[?#]/, 1)[0] ?? '';
+  if (pathPart.split('/').some((seg) => /^(?:\.|%2e){1,2}$/i.test(seg))) {
+    throw new Error('api path must not contain dot segments');
+  }
 }
 
 async function readJson(res: Response): Promise<{ ok: true; value: unknown } | { ok: false }> {

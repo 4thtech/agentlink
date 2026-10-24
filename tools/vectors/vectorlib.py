@@ -287,6 +287,54 @@ def jcs(value):
     return rfc8785.dumps(value)
 
 
+def escaped_member_name(text):
+    """True when JSON `text` writes any object member name with an escape sequence (04 §2.5.1
+    "Received text", D-128). A token scan of the raw text, independent of any JSON library: a string
+    is a member name exactly when the next non-whitespace character after it is a colon."""
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] != '"':
+            i += 1
+            continue
+        j, escaped = i + 1, False
+        while j < n and text[j] != '"':
+            if text[j] == "\\":
+                escaped = True
+                j += 1
+            j += 1
+        k = j + 1
+        while k < n and text[k] in " \t\n\r":
+            k += 1
+        if escaped and k < n and text[k] == ":":
+            return True
+        i = j + 1
+    return False
+
+
+def parse_received_text(text):
+    """The 04 §2.5.1 "Received text" parse (D-128): refuses an escaped member name, a duplicate
+    member name at any depth (RFC 7493 §2.3) and any number token other than 0|[1-9][0-9]* up to
+    2^53 - 1 (04 §2.4.1). Raises ValueError on refusal; returns the parsed value."""
+    if escaped_member_name(text):
+        raise ValueError("escaped member name")
+
+    def pairs(items):
+        names = [k for k, _ in items]
+        if len(set(names)) != len(names):
+            raise ValueError("duplicate member name")
+        return dict(items)
+
+    def integer(token):
+        if not re.fullmatch(r"0|[1-9][0-9]*", token) or int(token) > 2**53 - 1:
+            raise ValueError("non-canonical integer token")
+        return int(token)
+
+    def no_float(token):
+        raise ValueError("non-integer number token")
+
+    return json.loads(text, object_pairs_hook=pairs, parse_int=integer, parse_float=no_float, parse_constant=no_float)
+
+
 def jcs_lenient(value):
     """JCS for objects that deliberately break the integer rules. `rfc8785` refuses integers beyond
     2^53 - 1; RFC 8785 serialises numbers as IEEE 754 doubles, which is what a JavaScript verifier
