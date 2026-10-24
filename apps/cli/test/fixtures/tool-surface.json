@@ -780,6 +780,12 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
@@ -1086,10 +1092,25 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         },
         "candidates": {
           "type": "array",
@@ -1386,10 +1407,25 @@
                 "required": ["type", "at"],
                 "additionalProperties": false
               }
+            },
+            "receiptRequestNotAdded": {
+              "type": "boolean"
+            },
+            "receiptRequested": {
+              "type": "boolean"
             }
           },
           "required": ["status", "receipts"],
           "additionalProperties": false
+        },
+        "agentAddress": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{40}$"
+        },
+        "topUpUrl": {
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         }
       },
       "required": ["status", "summary"],
@@ -1910,17 +1946,13 @@
   {
     "name": "agentlink_notarize",
     "title": "AgentLink: add proof to a sent message",
-    "description": "Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically; leave chain out unless the user explicitly asks for one. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "envelopeId": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]{22}$"
-        },
-        "chain": {
-          "type": "string",
-          "pattern": "^[a-z0-9-]{1,32}$"
         },
         "requestReceipt": {
           "type": "boolean"
@@ -2040,6 +2072,12 @@
             "required": ["type", "at"],
             "additionalProperties": false
           }
+        },
+        "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
+        "receiptRequested": {
+          "type": "boolean"
         },
         "agentAddress": {
           "type": "string",
@@ -2264,6 +2302,12 @@
             "required": ["type", "at"],
             "additionalProperties": false
           }
+        },
+        "receiptRequestNotAdded": {
+          "type": "boolean"
+        },
+        "receiptRequested": {
+          "type": "boolean"
         },
         "agentAddress": {
           "type": "string",

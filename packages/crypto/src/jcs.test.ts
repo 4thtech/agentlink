@@ -8,6 +8,7 @@ import {
   canonicalizeToBytes,
   encodeHex,
   parseJson,
+  parseReceivedJson,
   serializeNumber,
 } from './index.js';
 
@@ -262,5 +263,47 @@ describe('parseJson integersOnly (M1-1e, 04 §2.4.1)', () => {
   it('leaves the default parser unchanged', () => {
     expect(parseJson('[1.0,1e3,-0,-1]')).toEqual([1, 1000, -0, -1]);
     expect(parseJson('[1.0]', { integersOnly: false })).toEqual([1]);
+  });
+});
+
+describe('received text (M1-1h-b, D-128, 04 §2.5.1)', () => {
+  const plain = { plainMemberNames: true } as const;
+
+  it.each([
+    ['an escaped name at the top', '{"\\u0061gent":1}'],
+    ['an escaped name at depth', '{"a":[{"b":{"\\u0063":1}}]}'],
+    ['an upper-case hex escape', '{"\\u0041":1}'],
+    ['a short escape in a name', '{"a\\/b":1}'],
+    ['an escaped quote in a name', '{"a\\"b":1}'],
+    ['an escaped name that spells another name', '{"op":1,"\\u006fp":1}'],
+  ])('refuses %s with plainMemberNames', (_, text) => {
+    rejects(() => parseJson(text, plain), 'invalid_json');
+    rejects(() => parseReceivedJson(text), 'invalid_json');
+  });
+
+  it('still refuses a duplicate name at any depth', () => {
+    rejects(() => parseReceivedJson('{"a":{"b":[{"c":1,"c":1}]}}'), 'invalid_json');
+    rejects(() => parseReceivedJson('{"a":1,"a":1}'), 'invalid_json');
+  });
+
+  it('leaves escapes in string values alone', () => {
+    expect(parseReceivedJson('{"a":"\\u0061\\/\\n","b":["\\u00e9"]}')).toEqual({
+      a: 'a/\n',
+      b: ['é'],
+    });
+  });
+
+  it('accepts JCS-canonical text', () => {
+    const text = canonicalize({ z: [1, { y: 'x\u0001' }], a: 0 });
+    expect(canonicalize(parseReceivedJson(text))).toBe(text);
+  });
+
+  it('refuses non-integer number tokens as well (04 §2.4.1)', () => {
+    rejects(() => parseReceivedJson('{"a":1.0}'), 'invalid_json');
+  });
+
+  it('leaves the default parser unchanged (the RFC 8785 vectors have escaped names)', () => {
+    expect(parseJson('{"\\u0061":1}')).toEqual({ a: 1 });
+    expect(parseJson('{"\\u0061":1}', { plainMemberNames: false })).toEqual({ a: 1 });
   });
 });

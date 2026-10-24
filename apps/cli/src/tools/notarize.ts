@@ -12,6 +12,7 @@
 // `requestReceipt` (M1-33d, D-109): asks the recipient for a delivery receipt through the `proof`
 // envelope. The summary then always says what a receipt makes public (11 §5.6), not only the first
 // time in a session; it is said only when the core reports the request was kept.
+// Free test credits (M1-36i, M1-36i-c): proofs-common `notarizeWithFreeCredits`.
 import type { NotarizeInput } from '@4thtech-io/core';
 import type { ToolContext } from './context.js';
 import {
@@ -20,6 +21,7 @@ import {
   needsIdentity,
   notAvailable,
   notarizeOutput,
+  notarizeWithFreeCredits,
   proofRefusal,
   proofThrown,
 } from './proofs-common.js';
@@ -51,13 +53,16 @@ export async function notarizeHandler(
     ...(typeof approvalId === 'string' ? { approvalId } : {}),
     ...(requestReceipt === true ? { requestReceipt: true } : {}),
   };
-  let result;
+  // M1-36i: the first proof that needs credits claims free test credits once (testnets only);
+  // M1-36i-c: after a claim that added credits, a bounded wait for them and one retry.
+  let attempt;
   try {
-    result = await proofs.notarize(request);
+    attempt = await notarizeWithFreeCredits(proofs, request, context, self.agentId);
   } catch (error) {
     context.logger.info('notarize failed', { tool: 'agentlink_notarize' });
     return proofThrown(error);
   }
+  const { result, freeCredits } = attempt;
   context.logger.info('notarize', { status: result.status });
-  return notarizeOutput(result, context, self.agentId);
+  return notarizeOutput(result, context, self.agentId, { freeCredits, envelopeId });
 }

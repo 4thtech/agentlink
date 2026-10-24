@@ -12,6 +12,8 @@
 //   quotes followed by its label, or "Contact" plus the short fingerprint. `{senderCode}` is the
 //   D-72 sender code. Subjects, prices, notes, deliverables and file names from others never
 //   appear in a summary, `nextStep` or error (I-5, 06 §2.1).
+// - `{prefix}` (M1-36a-b) is the command prefix the runtime's `cliPrefix()` gives (one of two fixed
+//   forms); chat texts, which tools/ build without the runtime, name the npx form.
 // - The untrusted-content wrapper (06 §4) is not copy: `UNTRUSTED_FOOTER` in index.ts is fixed.
 
 export const en = {
@@ -20,11 +22,11 @@ export const en = {
     'Sent to {contactName}. End-to-end encrypted: only you, {contactFirstName} and your agents can read it.',
   'chat.status.ok.proof': 'Sent with proof. Recorded {date} at {time}. {fee} from credits.',
   'chat.status.ok.invite':
-    "Invite ready: it works once, until {date}. Send it only to {contactFirstName}: whoever uses it first is connected. Once they accept, you'll both see a safety code to compare in AgentLink, not in this chat.",
+    "Invite ready: it works once, until {date}. Send it only to {contactFirstName}: whoever uses it first is connected. You'll be connected as soon as they accept.",
   'chat.status.ok.inviteShare':
     "Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until {date}: {inviteUrl}",
   'chat.status.ok.acceptedInvite':
-    'You are connected to {contactName}. Compare the safety code on your own screen (local app or terminal), not in this chat.',
+    'You are connected to {contactName}. Nothing else is needed now.',
   'chat.status.ok.contacts':
     '{count, plural, one {You have 1 contact: {contacts}.} other {You have # contacts: {contacts}.}}',
   'chat.status.ok.contactsNone':
@@ -40,7 +42,7 @@ export const en = {
     'This needs your approval: {action} ({fee}).\nApprove here: {url}',
   'chat.status.pending_approval.free': 'This needs your approval: {action}.\nApprove here: {url}',
   'chat.status.pending_approval.nextStep':
-    'Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId.',
+    'Tell the user approval is needed and share the link. After approval, call the same tool again with approvalId. To check the decision, call agentlink_get_approval.',
 
   // ---- Tool results: needs setup / credits ------------------------------------------------
   'chat.status.needs_setup.fileLimit':
@@ -49,9 +51,9 @@ export const en = {
   'chat.status.needs_setup.storage':
     "Your settings keep files in your own storage, which isn't connected yet: {url}.",
   'chat.status.needs_setup.keychain':
-    "AgentLink can't find a system keychain on this machine. Set it up in a terminal: `agentlink init --keystore file`.",
+    "AgentLink can't find a system keychain on this machine. Run `npx -y @4thtech-io/agentlink doctor` in a terminal to see how to fix it.",
   'chat.status.needs_setup.keyLocked':
-    "AgentLink's key file is locked, so I can't use it yet. Run `agentlink doctor` in a terminal to see how to set up its unlock code.",
+    "AgentLink's key file is locked, so I can't use it yet. Run `npx -y @4thtech-io/agentlink doctor` in a terminal to see how to set up its unlock code.",
   'chat.status.needs_credits':
     'Adding proof costs {fee} and your credits are at {balance}. Add credits: {url}. Messages and files stay free.',
 
@@ -199,12 +201,12 @@ export const en = {
   'cli.owner.done': 'OK Approvals are protected.',
   'cli.doctor.keysFound': 'OK       Agent keys found',
   'cli.doctor.noOwnerCard':
-    'Problem  This agent has no card from your owner yet\n         Run `agentlink owner add-agent --agent {agent}` in your own terminal.',
+    'Problem  This agent has no card from your owner yet\n         Run `{prefix} owner add-agent --agent {agent}` in your own terminal.',
   'cli.doctor.noOwnerCardNoOthers':
-    'Problem  No agent on this computer has a card from an owner\n         If you have never set up an owner, `agentlink owner add-agent` tells you what to run first.\n         If an owner already exists here, `agentlink owner add-agent --agent <name>` adds this agent to it with your owner code.',
+    'Problem  No agent on this computer has a card from an owner\n         If you have never set up an owner, `{prefix} owner add-agent` tells you what to run first.\n         If an owner already exists here, `{prefix} owner add-agent --agent <name>` adds this agent to it with your owner code.',
   'cli.doctor.networkOk': 'OK       Message network reachable',
   'cli.doctor.networkDown':
-    "Problem  Can't reach the message network\n         Check your connection and run `agentlink doctor` again.",
+    "Problem  Can't reach the message network\n         Check your connection and run `{prefix} doctor` again.",
   'cli.doctor.connected': 'OK       {appName} connected',
   'cli.doctor.restart': 'Warning  {appName} needs a restart\n         Quit and reopen {appName}.',
   'cli.doctor.keyLocked':
@@ -217,7 +219,7 @@ export const en = {
   'cli.approve.waiting': 'Waiting for you: {count}',
   'cli.approve.nothing': 'Nothing is waiting for your approval.',
   'cli.approve.question': 'Approve, deny or later? (a/d/L)',
-  'cli.approve.termsOwn': 'Decide this one on its own: `agentlink approve {approvalId}`',
+  'cli.approve.termsOwn': 'Decide this one on its own: `{prefix} approve {approvalId}`',
   'cli.approve.summary':
     'Approve {approved} and deny {denied}. Your owner code or passphrase covers exactly these {total}. Anything new waits for your next review.',
   'cli.approve.continue': 'Continue? (y/N)',
@@ -240,8 +242,7 @@ export const en = {
   'cli.status.brief.requests':
     '{count, plural, one {1 request from an unknown sender.} other {# requests from unknown senders.}}',
   'cli.status.brief.nothing': 'Nothing new on AgentLink.',
-  'local.linkExpired':
-    'This link has expired. Open AgentLink again from your AI, or run `agentlink ui`.',
+  'local.linkExpired': 'This link has expired. Ask your AI to open AgentLink again.',
 } as const;
 
 export type CopyKey = keyof typeof en;

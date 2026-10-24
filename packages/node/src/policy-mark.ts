@@ -16,6 +16,7 @@ import type { PolicyVersionMark } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 /** The item name: the keychain account suffix and the `ALKS` entry name (04 §2.2, §2.8). */
 export const POLICY_MARK_ITEM = 'policy-version';
@@ -36,7 +37,7 @@ const ASCII_DIGITS = /^[0-9]*$/;
 const markInvalid = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'policy_mark_invalid',
-    "This agent's policy version record is damaged, so no policy can be applied. Run `agentlink doctor` for the fix.",
+    `This agent's policy version record is damaged, so no policy can be applied. Run \`${CLI_COMMAND} doctor\` for the fix.`,
   );
 
 const versionInvalid = (): NodeKeyStoreError =>

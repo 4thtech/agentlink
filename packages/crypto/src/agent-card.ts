@@ -22,7 +22,7 @@ import {
 import { decodeHex0x, encodeUtf8 } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { keccak256, sha256 } from './hash.js';
-import { canonicalizeToBytes, parseJson } from './jcs.js';
+import { canonicalizeToBytes, parseReceivedJson } from './jcs.js';
 
 /** An AgentCard in its JSON form (04 §2.4), as parseAgentCard returns it. */
 export interface AgentCard {
@@ -123,9 +123,10 @@ function canonicalHex(value: unknown, length: number): Uint8Array {
  * `ownerEvm` (04 §2.9).
  *
  * An object no longer shows how its numbers were spelled, so this cannot refuse the tokens `1.0`,
- * `1e3` or `-0` (04 §2.4.1; IR-M1-1e-1 I-2). A card read from JSON text must be parsed with
- * parseAgentCardJson, or its enclosing payload with parseJson `integersOnly` (or another
- * token-level check) before it gets here.
+ * `1e3` or `-0` (04 §2.4.1; IR-M1-1e-1 I-2), nor escaped or duplicate member names (04 §2.5.1,
+ * D-128). A card read from JSON text must be parsed with parseAgentCardJson, or its enclosing
+ * text with parseReceivedJson (or parseJson `integersOnly` and `plainMemberNames`) before it gets
+ * here.
  */
 export function parseAgentCard(value: unknown): AgentCard {
   if (!isPlainObject(value)) throw invalidCard('a card must be a plain JSON object');
@@ -166,11 +167,12 @@ export function parseAgentCard(value: unknown): AgentCard {
 }
 
 /**
- * Parses a card from its JSON text: strict I-JSON (no duplicate key, 04 §2.4) and every number
- * token a protocol integer (`1.0`, `1e3`, `-0` refused on the token, 04 §2.4.1), then parseAgentCard.
+ * Parses a card from its JSON text with the received-text parse (04 §2.5.1, D-128): strict I-JSON
+ * (no duplicate key, 04 §2.4), no member name written with an escape, and every number token a
+ * protocol integer (`1.0`, `1e3`, `-0` refused on the token, 04 §2.4.1); then parseAgentCard.
  */
 export function parseAgentCardJson(text: string): AgentCard {
-  return parseAgentCard(parseJson(text, { integersOnly: true }));
+  return parseAgentCard(parseReceivedJson(text));
 }
 
 const typedData = (card: AgentCard) => ({

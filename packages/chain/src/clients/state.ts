@@ -5,8 +5,9 @@
 //
 // - Reads only. Simulation (`eth_call`, `eth_estimateGas`) is bound to the few client functions the
 //   direct path sends: `notarizeDirect`, `notarizeBatch`, `acknowledge` and `acknowledgeBatch` on
-//   the Notary, `deposit` on the vault and `approve` on a fee token. Anything else is refused before
-//   any request (`depositWithAuthorization` is not even in the client ABI, D-89).
+//   the Notary, `deposit` and `withdraw` (M1-4c-b) on the vault and `approve` on a fee token.
+//   Anything else is refused before any request (`depositWithAuthorization` is not even in the
+//   client ABI, D-89).
 // - Every rejection is a fixed-text ChainError (the read client's view guarantees it): never a URL,
 //   revert text or server text.
 import { erc20Abi, type Abi } from 'viem';
@@ -18,7 +19,7 @@ import type { ReadClient } from './read-client.js';
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
 
-/** `getRecord` as the client reads it; `null` only for the Notary's `RecordNotFound` revert. */
+/** `getRecord` as the client reads it; `null` only for the Notary's bare `RecordNotFound()` revert. */
 export interface StoredRecord {
   readonly signer: Hex;
   readonly recordStructHash: Hex;
@@ -83,7 +84,9 @@ export interface ChainState {
 /** The functions the direct path may send, per contract. */
 const DIRECT_FUNCTIONS: Readonly<Record<ContractName, readonly string[]>> = Object.freeze({
   notary: Object.freeze(['notarizeDirect', 'notarizeBatch', 'acknowledge', 'acknowledgeBatch']),
-  vault: Object.freeze(['deposit']),
+  // `withdraw` (M1-4c-b): through sendWithdraw only, the agent's own credits to its own account;
+  // the KeyStore refuses any other recipient.
+  vault: Object.freeze(['deposit', 'withdraw']),
   erc20: Object.freeze(['approve']),
 });
 
@@ -154,10 +157,13 @@ export function createChainState(reader: {
       } catch (error) {
         // The deployed Notary reverts `RecordNotFound()` for an unknown ID: that, and only that
         // revert, means "absent". Any other failure stays a failure, so nothing is decided on it.
+        // The revert data must be exactly the 4-byte selector: viem names a no-argument error and
+        // ignores trailing bytes, and those are not RecordNotFound() (M1-4d-h, as verify.ts).
         if (
           error instanceof ChainError &&
           error.code === 'call_reverted' &&
-          error.revertName === 'RecordNotFound'
+          error.revertName === 'RecordNotFound' &&
+          error.revertBare
         ) {
           return null;
         }

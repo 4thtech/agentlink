@@ -52,10 +52,17 @@ export interface HostResolver {
 /**
  * Fetches the NIP-11 relay information document: an HTTPS GET of the relay's host with
  * `Accept: application/nostr+json`, to the same checked address, no redirects. Returns the body text.
- * The pool bounds its size and reads only `limitation.max_message_length` from it.
+ * The pool bounds its size and its wait (it gives up after NIP11_TIMEOUT_MS and uses the default
+ * limits) and reads only `limitation.max_message_length` from it. The document is untrusted (I-5).
  */
 export interface Nip11Fetcher {
-  fetch(target: RelayTarget): Promise<string>;
+  fetch(target: RelayTarget, options?: Nip11FetchOptions): Promise<string>;
+}
+
+/** Bounds the pool asks the fetcher to enforce (M1-5b-c). The pool also enforces both itself. */
+export interface Nip11FetchOptions {
+  /** Stop reading and fail once the body exceeds this many bytes. */
+  readonly maxBytes: number;
 }
 
 /**

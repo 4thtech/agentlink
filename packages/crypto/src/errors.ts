@@ -46,7 +46,17 @@ export type CryptoInputErrorCode =
   /** M1-1f (IR-M1-1f-1 M-2): codeReveal (nonceA) does not open codeCommit; no code (04 §3.6.1 step 3). */
   | 'commitment_mismatch'
   /** M1-1f (IR-M1-1f-1 L-4): a chosen agent passphrase under 12 code points after NFKC (04 §2.8). */
-  | 'passphrase_too_short';
+  | 'passphrase_too_short'
+  /**
+   * M1-4c-b: a transaction KeyStore.signTransaction does not sign (07 §6.2 direct mode). The message
+   * is one of TRANSACTION_REFUSED's fixed sentences, which name the rule, never the input.
+   */
+  | 'transaction_refused'
+  /**
+   * M3-4b-t-1: a token's EIP-712 domain as read from chain does not match the configured chain and
+   * token, or does not reproduce the token's own DOMAIN_SEPARATOR(); nothing may be signed under it.
+   */
+  | 'token_domain_mismatch';
 
 /**
  * The one error type @4thtech-io/crypto throws for input it refuses.

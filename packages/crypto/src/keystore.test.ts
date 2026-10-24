@@ -31,6 +31,8 @@ const SEED_OR_SECRET = [
   // M1-1g-e: a drop request signed with a drop secret key (KeyStore backends only).
   'signDropRequest',
   'signTypedData',
+  // M1-4c-b: a direct-mode transaction with the agent EVM secret key (KeyStore.signTransaction).
+  'signDirectTransaction',
   'signAgentCard',
   // M1-4d-d (D-102): cardPop with the agent Nostr secret key (KeyStore.signCardPop).
   'signCardPop',

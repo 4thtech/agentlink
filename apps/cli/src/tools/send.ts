@@ -46,9 +46,10 @@ import {
   ok,
   type HandlerOutput,
 } from './result.js';
-import { notarizeOutput, proofThrown } from './proofs-common.js';
+import { notarizeOutput, notarizeWithFreeCredits, proofThrown } from './proofs-common.js';
 import { copy } from './strings/index.js';
-import { TOOL_TEXT, noOwnerCard } from './text.js';
+import { TOOL_TEXT, noOwnerCard, noOwnerResult } from './text.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 /** Fixed text for this tool (I-5: no slot takes another party's or the agent's text). */
 export const SEND_TEXT = Object.freeze({
@@ -66,8 +67,7 @@ export const SEND_TEXT = Object.freeze({
   policyDenied: "The owner's rules don't allow this message, so nothing was sent.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',
-  networkNextStep:
-    'Try again in a minute. If it keeps failing, the user can run `agentlink doctor`.',
+  networkNextStep: `Try again in a minute. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\`.`,
   revoked: 'The owner has turned this agent off, so nothing was sent.',
   revokedNextStep: 'Tell the user this agent was revoked. Only they can set up a new one.',
   tooLarge: 'The message is too large to send, so nothing was sent.',
@@ -163,11 +163,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   const { client, logger } = context;
   const self = await client.self();
   if (self === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
   // Without the proof platform nothing is sent: the user asked for a message with proof.
   if (withProof && client.proofs === undefined) return notAvailable();
@@ -328,13 +324,23 @@ async function withProofOf(
   if (proofs === undefined || !ENVELOPE_ID.test(envelopeId)) return internalError();
   let proofOut: HandlerOutput;
   try {
-    const result = await proofs.notarize({
-      envelopeId,
-      ...(typeof approvalId === 'string' ? { approvalId } : {}),
-      ...(requestReceipt ? { requestReceipt: true } : {}),
-    });
+    // M1-36i: the first proof that needs credits claims free test credits once (testnets only);
+    // M1-36i-c: after a claim that added credits, a bounded wait for them and one proof retry (the
+    // message itself is never sent again).
+    const { result, freeCredits } = await notarizeWithFreeCredits(
+      proofs,
+      {
+        envelopeId,
+        ...(typeof approvalId === 'string' ? { approvalId } : {}),
+        ...(requestReceipt ? { requestReceipt: true } : {}),
+      },
+      context,
+      agentId,
+    );
     proofOut = notarizeOutput(result, context, agentId, {
       contactName,
+      freeCredits,
+      envelopeId,
       approvalSummary: SEND_TEXT.proofApproval,
       approvalNextStepTail: (requestReceipt
         ? SEND_TEXT.proofApprovalTailReceipt
@@ -367,16 +373,15 @@ async function withProofOf(
     };
   }
   const { status, summary, nextStep, code, approvalId: pending, url, ...rest } = proofOut.result;
-  const { advanced, recordId, fee, receipts, agentAddress, topUpUrl } = rest as Record<
-    string,
-    unknown
-  >;
+  const { advanced, recordId, fee, receipts, agentAddress, topUpUrl, receiptRequestNotAdded } =
+    rest as Record<string, unknown>;
   const proof = {
     status: PROOF_STATUSES.has(status) ? status : 'error',
     ...(advanced === undefined ? {} : { advanced }),
     ...(recordId === undefined ? {} : { recordId }),
     ...(fee === undefined ? {} : { fee }),
     receipts: Array.isArray(receipts) ? receipts : [],
+    ...(receiptRequestNotAdded === true ? { receiptRequestNotAdded: true } : {}),
   };
   context.logger.info('message proof', { status });
   return {

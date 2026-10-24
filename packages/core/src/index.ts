@@ -67,6 +67,14 @@ export {
   type PendingContact,
 } from './pairing.js';
 export {
+  TOP_UP_MAX_USD,
+  TOP_UP_MIN_USD,
+  TOP_UP_PRESETS_USD,
+  buildTopUpLink,
+  suggestTopUpUsd,
+  type TopUpLinkInput,
+} from './top-up-link.js';
+export {
   INVITE_INFLATE_SLICE_BYTES,
   INVITE_LINK_PREFIX,
   INVITE_MAX_JSON_BYTES,
@@ -116,6 +124,47 @@ export {
   type PolicyVersionMark,
   type ReceiptsKeptMark,
 } from './owner-actions.js';
+// M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
+// after presence. Owner surfaces only: no MCP tool uses them (I-4).
+export {
+  CONTACT_RULE_FIELD_LOOSENING,
+  POLICY_EDIT_WARNING_CODES,
+  POLICY_FIELD_LOOSENING,
+  PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+  buildOwnerActionBody,
+  mergePolicyPatch,
+  newOwnerActionNonce,
+  policyEditWarnings,
+  type BuiltOwnerAction,
+  type FieldLoosening,
+  type OwnerActionBodyInput,
+  type PolicyEditOptions,
+  type PolicyEditWarning,
+  type PolicyEditWarningCode,
+  type PreparableOp,
+  type PreparedOwnerAction,
+  type PreparedPolicyEdit,
+  type PrepareRefusal,
+} from './owner-prepare.js';
+// M1-9i-a (D-115; 04 §2.2, §2.5.1; 07 §3.4, §5.6): own storage as the owner signed it.
+export {
+  OwnStorage,
+  STORAGE_MARK_ITEM,
+  brokenOwnStorageAdapter,
+  credentialDigestsEqual,
+  decodeStorageMark,
+  encodeStorageMark,
+  isBrokenOwnStorageAdapter,
+  storageCredentialItem,
+  type OwnStorageKeys,
+  type OwnStorageProblem,
+  type OwnStorageState,
+  type OwnStorageStatus,
+  type OwnStorageTest,
+  type OwnStorageTestCode,
+  type OwnStorageTestInput,
+  type StorageMark,
+} from './own-storage.js';
 export {
   BUDGET_WINDOW_SECONDS,
   FAIL_CLOSED_CONTACTS,
@@ -300,6 +349,8 @@ export {
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
 export type {
+  DepositAuthAnswer,
+  DepositAuthPort,
   FreeCreditsAnswer,
   FreeCreditsPort,
   ProofChain,
@@ -316,6 +367,14 @@ export type {
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
 export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
+// M1-11r-c: the Storage page's drop meter (07 §5.4 Limits). Numbers only.
+export {
+  DROP_NEAR_FRACTION,
+  DROP_QUOTA_WINDOW_SECONDS,
+  DROP_WEEKLY_QUOTA_BYTES,
+  type DropUsage,
+  type DropUsageLevel,
+} from './files/usage.js';
 export {
   PROOF_AWAITING_PER_CONTACT,
   PROOF_LOG_CODES,
@@ -420,6 +479,13 @@ export {
 // fetch and download, the inbox file operations) is supplied by @4thtech-io/node (M1-9d).
 export type { DropConfig, FilesPlatform, InboxFolder, OutgoingFile } from './files/platform.js';
 export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export {
+  MAX_LINK_ANSWERS_PER_PASS,
+  REFRESH_LINK_KIND,
+  type FileLinksResult,
+  type RequestFileLinkInput,
+  type RequestFileLinkResult,
+} from './files/refresh-link.js';
 export type { FileEntry, FilesNeedsSetup, SentFile } from './files/outgoing.js';
 export {
   measurePayload,

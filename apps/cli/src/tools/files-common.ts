@@ -7,14 +7,13 @@
 import type { CoreErrorCode, FilesNeedsSetup } from '@4thtech-io/core';
 import type { AttachRefusal } from './context.js';
 import { fail, type HandlerOutput } from './result.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 export const FILE_TEXT = Object.freeze({
   noFolder: 'No folder is allowed for sending files yet, so nothing was sent.',
-  noFolderNextStep:
-    'Tell the user that files can only be sent from a folder they allow in their AgentLink rules. Only they can allow one; then call again.',
+  noFolderNextStep: `Tell the user: files can only be sent from a folder they allow. In a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-folder <path>\`, with \`--agent <name>\` if they have more than one agent. Then call again.`,
   outsideFolder: "That file isn't in a folder the user allows for sending, so nothing was sent.",
-  outsideFolderNextStep:
-    'Ask the user to put the file in a folder they allow for sending, or to allow its folder in their AgentLink rules. Only they can change that.',
+  outsideFolderNextStep: `Ask the user to put the file in a folder they allow for sending, or to allow its folder: in a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-folder <path>\`, with \`--agent <name>\` if they have more than one agent. Then call again.`,
   notAllowed: "That path can't be sent: it must be a full path to a regular, visible file.",
   notAllowedNextStep:
     "Use the file's full path. Hidden files and protected private folders can never be sent.",
@@ -30,16 +29,13 @@ export const FILE_TEXT = Object.freeze({
   payloadTooLarge: "These files don't fit in one message, so nothing was sent.",
   payloadTooLargeNextStep: 'Send fewer or smaller files in this message, or send them one by one.',
   storageUnavailable: "File storage isn't available right now, so nothing was sent.",
-  storageUnavailableNextStep:
-    'Try again later. If it keeps failing, the user can run `agentlink doctor` in their own terminal.',
+  storageUnavailableNextStep: `Try again later. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\` in their own terminal.`,
   storageFailed: "The file couldn't be stored, so nothing was sent.",
-  storageFailedNextStep:
-    'Try again later. If it keeps failing, the user can run `agentlink doctor` in their own terminal.',
+  storageFailedNextStep: `Try again later. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\` in their own terminal.`,
   fileChanged: 'The file changed while it was being sent, so nothing was sent.',
   fileChangedNextStep: 'Wait until the file is no longer being written, then call again.',
   filesUnavailable: "Files can't be sent or saved here right now, so nothing was done.",
-  filesUnavailableNextStep:
-    'Tell the user AgentLink could not use files on this machine. They can run `agentlink doctor` in their own terminal.',
+  filesUnavailableNextStep: `Tell the user AgentLink could not use files on this machine. They can run \`${NPX_COMMAND} doctor\` in their own terminal.`,
 });
 
 /** The `needs_setup` for a path the platform refused (06 §2.3; nothing was opened or sent). */

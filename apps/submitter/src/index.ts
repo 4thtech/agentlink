@@ -13,15 +13,25 @@
 // A chain without its faucet key has no faucet (503); the submitter is not affected. The faucet
 // serves only a key whose address is the environment's pinned SUBMITTER_FAUCET_ADDRESS_<chainId>
 // (a wrangler.toml var; staging and production pin different wallets, M1-10b-b; worker.ts).
+//
+// Per gasless top-up chain (SUBMITTER_DEPOSIT_AUTH_CHAINS; off by default; M3-4b-t-3), the owner
+// sets:
+//   SUBMITTER_DEPOSIT_GAS_KEY_<chainId> the relay's own gas key, 0x + 64 lowercase hex: never the
+//                                       chain's gas key or faucet key (either equal is refused)
+// A chain without it, or before the relay ABI is wired (DEPOSIT_RELAY_ABI below), answers 503
+// `unavailable` on that route; nothing else is affected.
 import {
+  createDepositRelayChain,
   createFaucetChain,
   createSubmitterChain,
   getChainConfig,
+  type DepositRelayChain,
   type FaucetChain,
   type SubmitterChain,
 } from '@4thtech-io/chain';
 import {
   SubmitterLimits,
+  createDepositRelayClass,
   createFaucetClass,
   createQueueClass,
   createSubmitterWorker,
@@ -87,9 +97,53 @@ function faucetFor(env: unknown, chainId: number): FaucetChain | null {
   return faucet;
 }
 
-const deps = { portFor, faucetFor };
+/**
+ * The vault's relay ABI (`depositWithAuthorization` only; @4thtech-io/chain checkRelayAbi). Null
+ * until M3-4b-t-0 exports `occFeeVaultRelayAbi` (tag `relay`) from @4thtech-io/occ-v2-abi; the
+ * wiring PR sets it here. While it is null no relay exists and an enabled route answers 503.
+ */
+const DEPOSIT_RELAY_ABI: unknown = null;
+
+/** One gasless top-up relay per chain per isolate; a changed secret starts a new isolate. */
+const relays = new Map<number, DepositRelayChain | null>();
+
+function relayFor(env: unknown, chainId: number): DepositRelayChain | null {
+  if (relays.has(chainId)) return relays.get(chainId) ?? null;
+  const vars = env as Record<string, unknown>;
+  const relayKey = vars[`SUBMITTER_DEPOSIT_GAS_KEY_${String(chainId)}`];
+  const gasKey = vars[`SUBMITTER_GAS_KEY_${String(chainId)}`];
+  const faucetKey = vars[`SUBMITTER_FAUCET_KEY_${String(chainId)}`];
+  const rpcRaw = vars[`SUBMITTER_RPC_URLS_${String(chainId)}`];
+  const config = getChainConfig(chainId);
+  const maxFee = readConfig(vars)?.maxFeePerGasWei ?? null;
+  let relay: DepositRelayChain | null = null;
+  if (
+    config &&
+    DEPOSIT_RELAY_ABI !== null &&
+    typeof relayKey === 'string' &&
+    relayKey !== gasKey &&
+    relayKey !== faucetKey
+  ) {
+    try {
+      relay = createDepositRelayChain(config, {
+        fetchFn: (input: string, init: never) => fetch(input, init),
+        gasKey: relayKey,
+        relayAbi: DEPOSIT_RELAY_ABI,
+        ...(maxFee === null ? {} : { maxFeePerGasWei: maxFee }),
+        ...(typeof rpcRaw === 'string' && rpcRaw !== '' ? { rpcUrls: rpcRaw.split(',') } : {}),
+      });
+    } catch {
+      relay = null; // not a gasless chain, a malformed key or RPC URL: unavailable, no detail
+    }
+  }
+  relays.set(chainId, relay);
+  return relay;
+}
+
+const deps = { portFor, faucetFor, relayFor };
 
 export default createSubmitterWorker(deps);
 export const SubmitterQueue = createQueueClass(deps);
 export const SubmitterFaucet = createFaucetClass(deps);
+export const SubmitterDepositRelay = createDepositRelayClass(deps);
 export { SubmitterLimits };

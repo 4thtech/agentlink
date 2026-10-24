@@ -60,13 +60,13 @@ describe('init and the first-run page (M1-11b-6)', () => {
     expect(run.code).toBe(EXIT_OK);
     expect(run.calls).toEqual([{ name: 'default', interactive: true }]);
     // Handled by the page: no `agentlink owner init` line.
-    expect(run.out).not.toContain(INIT_TEXT.ownerStep);
+    expect(run.out).not.toContain(' owner init');
   });
 
   it('when the step did not handle it, the terminal way is printed as before', async () => {
     const run = await init(['--harness', 'none'], TTY, false);
     expect(run.calls).toEqual([{ name: 'default', interactive: true }]);
-    expect(run.out).toContain(INIT_TEXT.ownerStep);
+    expect(run.out).toContain(' owner init');
   });
 
   it('an agent run with --confirm is never interactive', async () => {

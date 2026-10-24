@@ -123,6 +123,10 @@ const proofStatusFields = {
     ['token', 'amount', 'usd'],
   ),
   receipts: arr(obj({ type: receiptType, at: timestamp }, ['type', 'at'])),
+  /** M1-33d-b: `requestReceipt` on a message that already had proof; no request was added. */
+  receiptRequestNotAdded: bool(),
+  /** M1-33d-d: this proof asks the recipient for a delivery receipt (D-109). */
+  receiptRequested: bool(),
 };
 /** `proof?: ProofStatus` inside a send or terms result (06 §2.2, §2.2a). */
 const proofStatus = obj(
@@ -516,7 +520,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
       },
       ['to', 'terms'],
     ),
-    outputSchema: output({ envelopeId, ...termsOutput, proof: proofStatus, candidates }, true),
+    // M1-9d-4: `needs_credits` carries the top-up link as agentlink_send does (06 §2.1).
+    outputSchema: output(
+      { envelopeId, ...termsOutput, proof: proofStatus, ...creditFields, candidates },
+      true,
+    ),
     annotations: WRITE(true),
     approval: true,
   },
@@ -543,6 +551,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         envelopeId,
         ...termsOutput,
         proof: proofStatus,
+        ...creditFields,
       },
       true,
     ),
@@ -608,11 +617,11 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_notarize',
     title: 'AgentLink: add proof to a sent message',
     description:
-      'Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically; leave chain out unless the user explicitly asks for one. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent.',
-    inputSchema: obj(
-      { envelopeId, chain: chainKey, requestReceipt: bool(), approvalId, clientRequestId },
-      ['envelopeId'],
-    ),
+      'Add a proof to a message this agent already sent, named by its envelopeId: a public record that this exact message existed and was exchanged. It costs a small fee from credits (see agentlink_status prices); mention it unless the user asked for proof. Offers and answers to offers get their proof through agentlink_propose_terms and agentlink_respond_to_terms instead. AgentLink picks where to record it automatically. Set requestReceipt only when the user asked for a delivery receipt; a receipt, if the contact confirms, shows publicly that the message went to their agent.',
+    // M1-36h: no `chain` here. The Advanced surface adds it (ADVANCED_NOTARIZE below).
+    inputSchema: obj({ envelopeId, requestReceipt: bool(), approvalId, clientRequestId }, [
+      'envelopeId',
+    ]),
     outputSchema: output({ ...proofStatusFields, ...creditFields }, true),
     annotations: WRITE(true),
     approval: true,
@@ -706,17 +715,63 @@ function deepFreeze<T>(value: T): T {
 export const APPROVAL_LINK_NOTE =
   "A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.";
 
-/** The registered tools, in 06 §2.0 order. Frozen. */
-export const TOOLS: readonly ToolDefinition[] = deepFreeze(
-  DEFINITIONS.map((tool) => ({
+/**
+ * M1-36h (06 §2.4; D-39, D-40; 11 §5.1): which tool surface a server serves. `default` is what
+ * every harness gets: no tool takes or names a chain, and the proof network is picked
+ * automatically. `advanced` (`agentlink mcp --advanced`, set by the user in their own harness
+ * config) adds only the `chain?` override of agentlink_notarize. The surface is fixed for the life
+ * of the process and never depends on a tool call or on inbound content.
+ */
+export type ToolSurface = 'default' | 'advanced';
+
+/** The Advanced-only additions to agentlink_notarize (06 §2.4 `chain?`). Fixed text. */
+const ADVANCED_NOTARIZE = {
+  chain: chainKey,
+  sentence: 'Leave chain out unless the user explicitly asks for one.',
+} as const;
+
+const withApprovalNote = (tool: ToolDefinition): ToolDefinition => ({
+  ...tool,
+  description: tool.approval ? `${tool.description} ${APPROVAL_LINK_NOTE}` : tool.description,
+});
+
+function advancedTool(tool: ToolDefinition): ToolDefinition {
+  if (tool.name !== 'agentlink_notarize') return tool;
+  const schema = tool.inputSchema as { properties: Record<string, JsonSchema> };
+  const { envelopeId: envelope, ...rest } = schema.properties;
+  return {
     ...tool,
-    description: tool.approval ? `${tool.description} ${APPROVAL_LINK_NOTE}` : tool.description,
-  })),
+    description: tool.description.replace(
+      'AgentLink picks where to record it automatically.',
+      `AgentLink picks where to record it automatically. ${ADVANCED_NOTARIZE.sentence}`,
+    ),
+    inputSchema: {
+      ...tool.inputSchema,
+      // The same property order as before M1-36h: envelopeId, chain, then the rest.
+      properties: { envelopeId: envelope!, chain: ADVANCED_NOTARIZE.chain, ...rest },
+    },
+  };
+}
+
+/** The registered tools of the default surface, in 06 §2.0 order. Frozen. */
+export const TOOLS: readonly ToolDefinition[] = deepFreeze(DEFINITIONS.map(withApprovalNote));
+
+/** The Advanced surface (M1-36h): TOOLS plus the `chain?` override on agentlink_notarize. Frozen. */
+export const ADVANCED_TOOLS: readonly ToolDefinition[] = deepFreeze(
+  DEFINITIONS.map((tool) => withApprovalNote(advancedTool(tool))),
 );
+
+/** The tools of one surface. */
+export function toolsFor(surface: ToolSurface = 'default'): readonly ToolDefinition[] {
+  return surface === 'advanced' ? ADVANCED_TOOLS : TOOLS;
+}
 
 /** The tools still to be registered, and the card that adds them. None: all 15 are here. */
 export const PENDING_M1A_TOOLS: Readonly<Partial<Record<McpToolName, string>>> = Object.freeze({});
 
-export function findTool(name: string): ToolDefinition | undefined {
-  return TOOLS.find((tool) => tool.name === name);
+export function findTool(
+  name: string,
+  surface: ToolSurface = 'default',
+): ToolDefinition | undefined {
+  return toolsFor(surface).find((tool) => tool.name === name);
 }

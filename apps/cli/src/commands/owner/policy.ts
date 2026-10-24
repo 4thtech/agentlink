@@ -48,13 +48,7 @@ import {
   type PathFlavor,
   type PolicyProblem,
 } from '@4thtech-io/core';
-import {
-  KeyStoreError,
-  encodeBase64url,
-  encodeHex,
-  randomBytes,
-  type JsonObject,
-} from '@4thtech-io/crypto';
+import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import {
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_BOUNDS,
@@ -70,8 +64,15 @@ import {
   type CommandHandler,
 } from '../../dispatch.js';
 import type { Output } from '../../output.js';
+import { commandPrefix } from '../../runtime/cli-prefix.js';
 import { sanitizeTerminalText, terminalOneLine } from '../../terminal/sanitize.js';
-import { badArguments, chooseAgent, ownerContext, ownerStep } from './common.js';
+import {
+  badArguments,
+  chooseAgent,
+  isPresenceRejected,
+  ownerContext,
+  ownerStep,
+} from './common.js';
 import type { OwnerAgent, OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
@@ -103,33 +104,36 @@ export const POLICY_TEXT = Object.freeze({
   hidden: 'Hidden folders, and folders inside them, can’t be allowed for sending files.',
   protectedFolder:
     "Files in this folder can never be sent (it holds keys or AgentLink's own data). Choose another folder.",
-  tooMany: `You can allow at most ${String(POLICY_BOUNDS.allowedFolders.max)} folders. Remove one first with \`agentlink policy remove-folder <path>\`.`,
+  get tooMany(): string {
+    return `You can allow at most ${String(POLICY_BOUNDS.allowedFolders.max)} folders. Remove one first with \`${commandPrefix()} policy remove-folder <path>\`.`;
+  },
   containsProtected: (shown: string): string =>
     `That folder contains ${shown}, which holds keys or AgentLink's own data, so it can't be allowed. Choose a narrower folder inside it that doesn't contain ${shown}.`,
-  rulesUnreadable:
-    "AgentLink can't use your rules right now, so it uses its strictest settings and no folder is allowed. Nothing was changed. To review and confirm your rules again, run `agentlink policy recover` in your own terminal.",
+  get rulesUnreadable(): string {
+    return `AgentLink can't use your rules right now, so it uses its strictest settings and no folder is allowed. Nothing was changed. To review and confirm your rules again, run \`${commandPrefix()} policy recover\` in your own terminal.`;
+  },
   alreadyAllowed: 'OK       That folder is already allowed. Nothing was changed.',
-  notAllowed:
-    "That folder isn't one of your allowed folders. Run `agentlink policy show` to see them.",
-  codeHint:
-    "Type your owner code only at the prompt below. It isn't a shell command, and never paste it into a chat.",
+  get notAllowed(): string {
+    return `That folder isn't one of your allowed folders. Run \`${commandPrefix()} policy show\` to see them.`;
+  },
   allowSummary: (folder: string): string =>
     `Allow your AI to send files from ${folder} and its subfolders to your contacts. Hidden files are never sent.`,
   removeSummary: (folders: readonly string[]): string =>
     `Stop your AI from sending files from ${folders.join(', ')}.`,
   allowed: 'OK       Allowed. Your AI can now send files from this folder.',
   removed: 'OK       Removed. Your AI can no longer send files from this folder.',
-  wrongCode: "That owner code didn't work. Nothing was changed. Run the command again to retry.",
   failed: "Problem  That didn't go through. Nothing was changed.",
-  notConfirmed:
-    "Problem  Your new rules were saved, but AgentLink couldn't confirm them, so it uses its strictest settings until they are set again. Run `agentlink doctor` in your own terminal.",
+  get notConfirmed(): string {
+    return `Problem  Your new rules were saved, but AgentLink couldn't confirm them, so it uses its strictest settings until they are set again. Run \`${commandPrefix()} doctor\` in your own terminal.`;
+  },
 
   // show
   header: (version: number | undefined): string =>
     version === undefined ? 'Your rules (the defaults)' : `Your rules (version ${String(version)})`,
   foldersHeader: 'Folders your AI can send files from:',
-  noFolder:
-    'No folder is allowed for sending files yet. Allow one with `agentlink policy allow-folder <path>`.',
+  get noFolder(): string {
+    return `No folder is allowed for sending files yet. Allow one with \`${commandPrefix()} policy allow-folder <path>\`.`;
+  },
   inbox: (folder: string): string => `Received files are saved in: ${folder}`,
   sizes: (send: number, receive: number): string =>
     `Largest file: ${String(send)} MB to send, ${String(receive)} MB to receive`,
@@ -137,10 +141,12 @@ export const POLICY_TEXT = Object.freeze({
     auto ? 'New contacts: accepted automatically' : 'New contacts: wait for your approval',
 
   // recover (D-100)
-  nothingToRecover:
-    'Your rules are in use, so there is nothing to recover. Nothing was changed. Run `agentlink policy show` to see them.',
-  cannotRecover:
-    "AgentLink can't recover your rules right now: it can't read what it needs on this computer. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+  get nothingToRecover(): string {
+    return `Your rules are in use, so there is nothing to recover. Nothing was changed. Run \`${commandPrefix()} policy show\` to see them.`;
+  },
+  get cannotRecover(): string {
+    return `AgentLink can't recover your rules right now: it can't read what it needs on this computer. Nothing was changed. Run \`${commandPrefix()} doctor\` in your own terminal.`;
+  },
   whatHappened: (kind: string): string =>
     `Your rules can't be used, so AgentLink uses its strictest settings. What happened: ${kind}`,
   reviewStored:
@@ -356,19 +362,6 @@ function reviewLines(policy: Policy): readonly string[] | undefined {
     lines.push(`  ${row.label}: ${text}`);
   }
   return lines;
-}
-
-/**
- * A wrong owner code (`presence_rejected`). By name and code as well as by class: the owner store
- * may come from another copy of @4thtech-io/crypto than this module's.
- */
-function isPresenceRejected(error: unknown): boolean {
-  if (error instanceof KeyStoreError) return error.code === 'presence_rejected';
-  return (
-    error instanceof Error &&
-    error.name === 'KeyStoreError' &&
-    (error as { code?: unknown }).code === 'presence_rejected'
-  );
 }
 
 const defaultFlavor = (): PathFlavor => (process.platform === 'win32' ? 'win32' : 'posix');
@@ -597,7 +590,7 @@ async function signAndApply(
     issuedAt,
     expiresAt: issuedAt + POLICY_SET_LIFETIME_SECONDS,
   };
-  output.print(POLICY_TEXT.codeHint);
+  // The owner code reminder is printed by signOwnerAction itself (M1-9zd, prompts.ts).
   let signature;
   try {
     signature = await deps.signOwnerAction(owner.owner, {
@@ -607,7 +600,7 @@ async function signAndApply(
     });
   } catch (error) {
     if (isPresenceRejected(error)) {
-      output.printError(POLICY_TEXT.wrongCode);
+      output.printError(OWNER_TEXT.wrongCode);
       return EXIT_FAILED;
     }
     throw error;
@@ -816,5 +809,5 @@ export function policyHandler(
   deps: OwnerCommandDeps,
   options: PolicyCommandOptions = {},
 ): CommandHandler {
-  return (context) => ownerStep(context, () => runPolicy(deps, context, options));
+  return (context) => ownerStep(context, deps, (deps) => runPolicy(deps, context, options));
 }

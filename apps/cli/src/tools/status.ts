@@ -27,8 +27,8 @@ import { copy } from './strings/index.js';
 import { activeContacts, contactRef, renderRef, type ContactRef } from './contacts.js';
 import type { Counts, ToolContext } from './context.js';
 import { topUpUrl } from './proofs-common.js';
-import { fail, ok, type HandlerOutput } from './result.js';
-import { TOOL_TEXT, noOwnerCard } from './text.js';
+import { ok, type HandlerOutput } from './result.js';
+import { TOOL_TEXT, noOwnerResult } from './text.js';
 
 /** 06 §2.1: the catch-up's time budget. */
 export const STATUS_CATCH_UP_BUDGET_MS = 3_000;
@@ -38,12 +38,7 @@ const SUMMARY_CONTACTS = 3;
 export async function statusHandler(_input: unknown, context: ToolContext): Promise<HandlerOutput> {
   const { client, logger } = context;
   const self = await client.self();
-  if (self === undefined)
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+  if (self === undefined) return noOwnerResult(context);
 
   // Credits are read in parallel with the catch-up, within the platform's own budget.
   const accountRead = accountFields(context, self.agentId);
@@ -120,7 +115,7 @@ async function accountFields(
 ): Promise<Record<string, unknown>> {
   const proofs = context.client.proofs;
   if (proofs === undefined) return {};
-  const url = topUpUrl(agentId);
+  const url = topUpUrl(agentId, undefined, context.payPage);
   const base = { agentAddress: agentId, ...(url === undefined ? {} : { topUpUrl: url }) };
   let account;
   try {

@@ -21,7 +21,8 @@ import {
 import { createDeps } from '../src/commands/shared.js';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../src/dispatch.js';
 import type { AccountView } from '../src/tools/context.js';
-import { TOP_UP_ORIGIN } from '../src/tools/proofs-common.js';
+import { PAY_PAGE, type PayPageConfig } from '@4thtech-io/chain';
+import { renderQr } from '../src/terminal/qr.js';
 import { copy } from '../src/tools/strings/index.js';
 import {
   AGENT_ID,
@@ -61,13 +62,33 @@ const quote = (usd: string): chain.FeeQuote => ({
   usd,
 });
 
+/** A live pay page for the tests of the link; the shipped PAY_PAGE is not live yet. */
+const LIVE: PayPageConfig = { host: 'pay.agentlink.4thtech.io', live: true };
+const TOP_UP_PAY_HOST = LIVE.host;
+
+const needs = (agentId: string): chain.ChainSelection => ({
+  status: 'needs_credits',
+  topUp: {
+    chainId: 84532,
+    chain: 'base-sepolia',
+    token: 'USDC',
+    usd: '1',
+    feeUsd: '0.1',
+    agentAddress: agentId as chain.Hex,
+  },
+  unavailable: [],
+});
+
 function setup(
   options: {
     account?: AccountView | undefined | 'throw';
     topUp?: TopUpCheck;
     proofs?: boolean;
+    payPage?: PayPageConfig;
+    browser?: boolean | 'throw';
   } = {},
 ) {
+  const opened: string[] = [];
   const accountCalls: string[] = [];
   const topUpCalls: string[] = [];
   const fake = fakeAgent(
@@ -97,8 +118,15 @@ function setup(
       return (options.topUp ?? (() => Promise.resolve(undefined)))(agentId);
     },
     testnetOnly: () => true,
+    payPage: options.payPage ?? LIVE,
+    openBrowser: (url: string) => {
+      opened.push(url);
+      if (options.browser === 'throw') return Promise.reject(new Error('no browser'));
+      return Promise.resolve(options.browser !== false);
+    },
   };
   return {
+    opened,
     run: runner({ credits: createCreditsHandler(deps) }),
     calls: fake.calls,
     accountCalls,
@@ -143,6 +171,25 @@ describe('credits (06 §8)', () => {
     }
   });
 
+  it('M1-36f: plain words only, with one next step when nothing answered', async () => {
+    // No network talk, no "public record": what it is, and what to do.
+    const all = Object.values(CREDITS_TEXT).join('\n');
+    expect(all).not.toMatch(/network|public record|blockchain|on-chain|\bchain\b/i);
+    expect(vocabularyHits(all)).toEqual([]);
+    expect(CREDITS_TEXT.testCredits).toBe(
+      "These are free test credits for the beta. They aren't real money.",
+    );
+    expect(CREDITS_TEXT.creditsUnknown).toBe(
+      "Credits: can't be checked right now. Try again in a few minutes.",
+    );
+    expect(CREDITS_TEXT.unavailable).toBe(
+      "Can't check right now how much to add. Try again in a few minutes.",
+    );
+    const t = setup({ account: undefined });
+    const r = await t.run(['credits']);
+    expect(r.text).not.toMatch(/network|public record/i);
+  });
+
   it('without proofs in this build: a fixed line', async () => {
     const t = setup({ proofs: false });
     const r = await t.run(['credits']);
@@ -177,19 +224,156 @@ describe('credits --topup (07 §6.3, M1-26)', () => {
     const r = await t.run(['credits', '--topup']);
     expect(r.code).toBe(EXIT_OK);
     expect(r.text).toContain('Add at least $1.00 in credits to add proof ($0.10 each).');
-    expect(r.text).toContain(
-      `To add credits, open ${TOP_UP_ORIGIN}/ and enter your agent ID: ${AGENT_ID}`,
-    );
+    // M1-26-e (D-113): one link, everything in the fragment; the suggested amount is the shortfall
+    // rounded up to the first preset.
+    const link = `https://${TOP_UP_PAY_HOST}/#v=1&a=${AGENT_ID}&usd=5`;
+    expect(r.out).toContain(link);
+    expect(r.text).toContain(CREDITS_TEXT.topUpHow);
     expect(t.topUpCalls).toEqual([AGENT_ID]);
     // M1-33b (D-109, 11 §5.6): the paying account is publicly linked, said once with the method.
     expect(r.text).toContain(copy('common.privacy.topUp'));
     expect(r.text.split(copy('common.privacy.topUp')).length).toBe(2);
-    // The only URL is our own deposit page; no network, token or chain.
+    // The only URL is the top-up link; no network, token or chain.
     const urls = r.text.match(/https?:\/\/[^\s]+/g) ?? [];
-    expect(urls).toEqual([`${TOP_UP_ORIGIN}/`]);
-    expect(vocabularyHits(r.text.replace(`${TOP_UP_ORIGIN}/`, ''))).toEqual([]);
+    expect(urls).toEqual([link]);
+    expect(vocabularyHits(r.text.replace(link, ''))).toEqual([]);
     expect(r.text).not.toMatch(/base|gnosis|usdc|native|sepolia/i);
     expect(r.text).toMatchSnapshot();
+  });
+
+  it('prints the agent ID with a terminal QR code, and opens the browser on a terminal', async () => {
+    const t = setup({ topUp: (agentId) => Promise.resolve(needs(agentId)) });
+    const r = await t.run(['credits', '--topup']);
+    const qr = renderQr(AGENT_ID);
+    expect(qr.length).toBeGreaterThan(10);
+    // The QR block appears whole and in order, once.
+    const text = r.out.join('\n');
+    expect(text).toContain(qr.join('\n'));
+    expect(text.split(qr[3] ?? 'x').length).toBe(2);
+    expect(r.text).toContain(CREDITS_TEXT.qrIntro);
+    expect(t.opened).toEqual([`https://${TOP_UP_PAY_HOST}/#v=1&a=${AGENT_ID}&usd=5`]);
+    expect(r.text).toContain(CREDITS_TEXT.openedBrowser);
+    expect(vocabularyHits(r.text.replace(/https:\/\/\S+/, ''))).toEqual([]);
+  });
+
+  it('no browser when stdout is not a terminal, or when it cannot open: the link is still printed', async () => {
+    const piped = setup({ topUp: (agentId) => Promise.resolve(needs(agentId)) });
+    const r1 = await piped.run(['credits', '--topup'], PIPED_IN_HARNESS);
+    expect(piped.opened).toEqual([]);
+    expect(r1.text).toContain(`https://${TOP_UP_PAY_HOST}/#v=1&a=${AGENT_ID}&usd=5`);
+    expect(r1.text).not.toContain(CREDITS_TEXT.openedBrowser);
+
+    const refused = setup({ topUp: (agentId) => Promise.resolve(needs(agentId)), browser: false });
+    const r2 = await refused.run(['credits', '--topup']);
+    expect(r2.text).not.toContain(CREDITS_TEXT.openedBrowser);
+    expect(r2.text).toContain(`#v=1&a=${AGENT_ID}`);
+
+    const thrown = setup({ topUp: (agentId) => Promise.resolve(needs(agentId)), browser: 'throw' });
+    const r3 = await thrown.run(['credits', '--topup']);
+    expect(r3.code).toBe(EXIT_OK);
+    expect(r3.text).not.toContain('no browser');
+  });
+
+  it('the link host comes only from the config dependency; a bad host prints no link and opens nothing', async () => {
+    const custom = setup({
+      topUp: (agentId) => Promise.resolve(needs(agentId)),
+      payPage: { host: 'pay.example.test', live: true },
+    });
+    const r1 = await custom.run(['credits', '--topup']);
+    expect(r1.text).toContain(`https://pay.example.test/#v=1&a=${AGENT_ID}&usd=5`);
+    expect(r1.text).not.toContain(TOP_UP_PAY_HOST);
+
+    const bad = setup({
+      topUp: (agentId) => Promise.resolve(needs(agentId)),
+      payPage: { host: 'https://evil.test/x', live: true },
+    });
+    const r2 = await bad.run(['credits', '--topup']);
+    expect(r2.text).not.toContain('evil.test');
+    expect(r2.text).not.toMatch(/https?:\/\//);
+    expect(bad.opened).toEqual([]);
+  });
+
+  it('opens the browser only on an interactive terminal outside an AI app (M-2)', async () => {
+    const link = `#v=1&a=${AGENT_ID}`;
+    // A harness that gives commands a pty: stdout is a terminal but stdin is not.
+    const ptyOnly = setup({ topUp: (id) => Promise.resolve(needs(id)) });
+    const r1 = await ptyOnly.run(['credits', '--topup'], {
+      stdinIsTTY: false,
+      stdoutIsTTY: true,
+      env: {},
+    });
+    expect(ptyOnly.opened).toEqual([]);
+    expect(r1.text).toContain(link);
+    // Both are terminals but an AI app marked the environment.
+    const marked = setup({ topUp: (id) => Promise.resolve(needs(id)) });
+    await marked.run(['credits', '--topup'], {
+      stdinIsTTY: true,
+      stdoutIsTTY: true,
+      env: { CLAUDECODE: '1' },
+    });
+    expect(marked.opened).toEqual([]);
+  });
+
+  it('never opens the browser when the balance is enough or the check failed (M-2)', async () => {
+    const enough = setup({
+      topUp: () =>
+        Promise.resolve({
+          status: 'ok',
+          chainId: 84532,
+          chain: 'base-sepolia',
+          token: 'USDC',
+          payFrom: 'credits',
+          quote: quote('0.1'),
+          reason: 'cheapest',
+          unavailable: [],
+        }),
+    });
+    await enough.run(['credits', '--topup']);
+    expect(enough.opened).toEqual([]);
+    const failed = setup({
+      topUp: () => Promise.resolve({ status: 'unavailable', unavailable: [84532] }),
+    });
+    await failed.run(['credits', '--topup']);
+    expect(failed.opened).toEqual([]);
+  });
+
+  it('the shipped pay page is not live: no link, no QR, no browser, an honest line (M-3)', async () => {
+    for (const payPage of [PAY_PAGE, { host: LIVE.host, live: false }]) {
+      const t = setup({ topUp: (id) => Promise.resolve(needs(id)), payPage });
+      const r = await t.run(['credits', '--topup']);
+      expect(r.code).toBe(EXIT_OK);
+      expect(r.text).toContain('Add at least $1.00 in credits to add proof ($0.10 each).');
+      expect(r.text).toContain(CREDITS_TEXT.topUpNotLive);
+      expect(r.text).not.toMatch(/https?:\/\/|#v=1|\u2588/);
+      expect(r.text).not.toContain(copy('common.privacy.topUp'));
+      expect(t.opened).toEqual([]);
+    }
+  });
+
+  it('the shipped config in the real handler deps is not live', async () => {
+    const { nodeCreditsDeps } = await import('../src/commands/credits.js');
+    expect(nodeCreditsDeps().payPage).toBe(PAY_PAGE);
+    expect(nodeCreditsDeps().payPage.live).toBe(false);
+  });
+
+  it('with enough credits there is no suggested amount; no key, recovery code or card is ever asked for', async () => {
+    const t = setup({
+      topUp: () =>
+        Promise.resolve({
+          status: 'ok',
+          chainId: 84532,
+          chain: 'base-sepolia',
+          token: 'USDC',
+          payFrom: 'credits',
+          quote: quote('0.1'),
+          reason: 'cheapest',
+          unavailable: [],
+        }),
+    });
+    const r = await t.run(['credits', '--topup']);
+    expect(r.text).toContain(`#v=1&a=${AGENT_ID}`);
+    expect(r.text).not.toContain('usd=');
+    expect(r.text).not.toMatch(/\bkeys?\b|recovery|seed|card number|password|passphrase/i);
   });
 
   it('enough credits: says so; nothing answered: fixed text and exit 1', async () => {

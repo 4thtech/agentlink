@@ -44,6 +44,12 @@ import {
   ownerFingerprint,
 } from '@4thtech-io/crypto';
 import type { Logger } from '@4thtech-io/log';
+import {
+  createFreeCreditsClaimer,
+  type FreeCreditsMarker,
+  type FreeCreditsOutcome,
+} from './free-credits.js';
+import type { PayPageConfig } from '@4thtech-io/chain';
 
 /** The agent's own identity as status shows it: IDs and display fingerprints only. */
 export interface SelfView {
@@ -367,6 +373,11 @@ export interface ProofTools {
   account(agentId: string): Promise<AccountView | undefined>;
   /** The Advanced `chain?` override: a shipped chain's key to its ID; undefined if unsupported. */
   chainIdOf(key: string): number | undefined;
+  /**
+   * M1-36i: free test credits on a testnet, claimed once per agent (tools/free-credits.ts). Absent
+   * where the runtime has no free-credits service or no place to remember the claim.
+   */
+  freeCredits?(chainId: number): Promise<FreeCreditsOutcome>;
 }
 
 /** The platform half of the proof tools (src/runtime/proofs.ts in Node). */
@@ -377,6 +388,11 @@ export interface ProofPlatformTools {
   /** Credits and the price where the paid path would pay (M1-26-c, the same selection). */
   account(agentId: string, options?: AccountOptions): Promise<AccountView | undefined>;
   chainIdOf(key: string): number | undefined;
+  /**
+   * M1-36i: true only for a chain on the chain package's testnet allowlist whose shipped config says
+   * testnet (the second check beside the core's own). Absent: no free test credits.
+   */
+  isFreeCreditsChain?(chainId: number): boolean;
 }
 
 /** The core surface the handlers use. */
@@ -457,6 +473,22 @@ export interface ToolContext {
    * approval server. Undefined when no link can be given: the result then stays the M1a one.
    */
   readonly approvalLink?: (approvalId: string) => Promise<ApprovalLink | undefined>;
+  /**
+   * M1-26-e: the shipped pay page config (the chain package's `PAY_PAGE`, which is not live yet).
+   * A top-up link is given only when `live`; absent means the shipped config. Production wiring
+   * never sets it; tests do, to exercise a live page.
+   */
+  readonly payPage?: PayPageConfig;
+  /**
+   * M1-36a-b: the command prefix that works on this machine (the runtime's `cliPrefix()`, M1-36a).
+   * Only the two fixed forms are used (`noOwnerFor`); absent or anything else: the npx form.
+   */
+  readonly cliPrefix?: string;
+  /**
+   * M1-36a-b: whether an owner exists on this machine, for the no-owner text: `false` only when it is
+   * known that none does (then `owner init`), undefined when unknown (then `owner add-agent`).
+   */
+  readonly ownerExists?: () => Promise<boolean | undefined>;
 }
 
 /**
@@ -491,6 +523,8 @@ export interface CoreToolClientOptions {
   readonly files?: FileOpener;
   /** The proof platform (pack files, verifier, credits); without it there are no proof tools. */
   readonly proofs?: ProofPlatformTools;
+  /** M1-36i: where the free test credits claim is remembered; without it nothing is claimed. */
+  readonly freeCredits?: FreeCreditsMarker;
 }
 
 /** Builds the handlers' read surface from a core client (pure: no Node, no store access). */
@@ -537,7 +571,9 @@ export function coreToolClient(
     invites: coreInviteTools(client),
     terms: coreTermsTools(client),
     ...(options.files === undefined ? {} : { files: coreFileTools(client, options.files) }),
-    ...(options.proofs === undefined ? {} : { proofs: coreProofTools(client, options.proofs) }),
+    ...(options.proofs === undefined
+      ? {}
+      : { proofs: coreProofTools(client, options.proofs, options.freeCredits) }),
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'
@@ -559,7 +595,21 @@ function coreFileTools(client: AgentLinkClient, opener: FileOpener): FileTools {
   });
 }
 
-function coreProofTools(client: AgentLinkClient, platform: ProofPlatformTools): ProofTools {
+function coreProofTools(
+  client: AgentLinkClient,
+  platform: ProofPlatformTools,
+  marker: FreeCreditsMarker | undefined,
+): ProofTools {
+  // M1-36i: only with both the runtime's testnet check and a marker; the core checks again.
+  const isFreeCreditsChain = platform.isFreeCreditsChain?.bind(platform);
+  const freeCredits =
+    isFreeCreditsChain === undefined || marker === undefined
+      ? undefined
+      : createFreeCreditsClaimer({
+          request: (chainId) => client.proofs.requestFaucet(chainId),
+          isFreeCreditsChain,
+          marker,
+        });
   /** The verified policy's folders, or undefined while it fails closed (06 §3). */
   const folders = async (): Promise<PackFolders | undefined> => {
     const effective = await client.ownerActions.loadPolicy();
@@ -595,6 +645,7 @@ function coreProofTools(client: AgentLinkClient, platform: ProofPlatformTools): 
       return platform.account(agentId, defaultChain === undefined ? {} : { defaultChain });
     },
     chainIdOf: (key) => platform.chainIdOf(key),
+    ...(freeCredits === undefined ? {} : { freeCredits }),
   });
 }
 

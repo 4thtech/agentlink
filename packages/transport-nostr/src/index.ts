@@ -53,6 +53,8 @@ export {
   OutboxWorker,
   type OutboxAttempt,
   type OutboxGiveUpReason,
+  type OutboxNotice,
+  type OutboxNoticeReason,
   type OutboxPersistence,
   type OutboxRow,
   type OutboxSummary,

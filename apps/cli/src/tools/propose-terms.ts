@@ -15,19 +15,18 @@
 // 07 §3.3): a repeat returns the original result and sends nothing; another request under the key is
 // IDEMPOTENCY_KEY_REUSED; a concurrent repeat is IN_PROGRESS, as for agentlink_send.
 //
+// 5. `needs_credits` (M1-36i-d, D-120 (3)): the first one with a testnet route claims free test
+//    credits once, as agentlink_notarize and agentlink_send do (proofs-common `claimFreeCredits`).
+//    Nothing was sent or asked, and the core does not keep a `needs_credits` result under the
+//    clientRequestId, so the next step is the same call again a minute later. No wait and no retry
+//    in this call: a firm offer still asks the owner first, and the call stays short.
+//
 // I-5, I-7: the terms, the note and the `to` query are agent-written (steerable) text; none of it
 // reaches a summary, `nextStep`, error or log line.
-import type { ProposeTermsInput } from '@4thtech-io/core';
+import type { NotarizeResult, ProposeTermsInput, ProposeTermsResult } from '@4thtech-io/core';
 import { contactRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
-import {
-  fail,
-  internalError,
-  notAvailable,
-  ok,
-  pendingApproval,
-  type HandlerOutput,
-} from './result.js';
+import { internalError, notAvailable, ok, pendingApproval, type HandlerOutput } from './result.js';
 import {
   TERMS_TEXT,
   contactNotReady,
@@ -41,8 +40,70 @@ import {
   termsRefusal,
   termsWithProof,
 } from './terms-common.js';
+import { PROOF_TEXT, claimFreeCredits } from './proofs-common.js';
 import { proofDisclosure, withDisclosure } from './strings/privacy.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerResult } from './text.js';
+
+/** M1-36i-d: the terms tools' free test credits text (11 §5: no service name, "gas" or "token"). */
+export const TERMS_FREE_CREDITS_TEXT = Object.freeze({
+  added: 'Added free test credits so you can try proof.',
+  addedNothingSent: 'Nothing was sent yet.',
+  addedProposeNextStep:
+    'In about a minute, call agentlink_propose_terms again with the same arguments to send the offer with its proof.',
+  addedRespondNextStep:
+    'In about a minute, call agentlink_respond_to_terms again with the same arguments to send the answer with its proof.',
+  pausedProposeNextStep:
+    'Tell the user free test credits are paused right now, so the offer with proof has to wait. Try again later, or ask the user whether to send the offer without proof.',
+  pausedRespondNextStep:
+    'Tell the user free test credits are paused right now, so the answer with proof has to wait. Try again later, or ask the user whether to answer without proof.',
+});
+
+type TermsTool = 'agentlink_propose_terms' | 'agentlink_respond_to_terms';
+
+/**
+ * A terms tool's `needs_credits` (nothing sent, nothing asked), after the free test credits claim
+ * (M1-36i-d): `added` says so with the terms tool's own next step and no top-up link; `paused`
+ * adds the paused sentence; `none` (claimed before, not a testnet, no route, a failed claim) is the
+ * unchanged `termsNeedsCredits` result. Fixed text only (I-5).
+ */
+export async function termsNeedsCreditsAfterClaim(
+  result: Extract<ProposeTermsResult, { status: 'needs_credits' }>,
+  context: ToolContext,
+  agentId: string,
+  tool: TermsTool,
+): Promise<HandlerOutput> {
+  const plain = termsNeedsCredits(agentId, result.topUp, context.payPage);
+  const quote: NotarizeResult =
+    result.topUp === undefined
+      ? { status: 'needs_credits' }
+      : { status: 'needs_credits', topUp: result.topUp };
+  const outcome = await claimFreeCredits(quote, context);
+  const propose = tool === 'agentlink_propose_terms';
+  if (outcome === 'added') {
+    return {
+      result: {
+        status: 'needs_credits',
+        summary: `${TERMS_FREE_CREDITS_TEXT.added} ${TERMS_FREE_CREDITS_TEXT.addedNothingSent}`,
+        nextStep: propose
+          ? TERMS_FREE_CREDITS_TEXT.addedProposeNextStep
+          : TERMS_FREE_CREDITS_TEXT.addedRespondNextStep,
+        proof: { status: 'needs_credits', receipts: [] },
+      },
+    };
+  }
+  if (outcome === 'paused') {
+    return {
+      result: {
+        ...plain.result,
+        summary: `${String(plain.result.summary)} ${PROOF_TEXT.freeCreditsPaused}`,
+        nextStep: propose
+          ? TERMS_FREE_CREDITS_TEXT.pausedProposeNextStep
+          : TERMS_FREE_CREDITS_TEXT.pausedRespondNextStep,
+      },
+    };
+  }
+  return plain;
+}
 
 interface ProposeInput {
   to: string;
@@ -65,11 +126,7 @@ export async function proposeTermsHandler(
 
   const self = await client.self();
   if (self === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
   const resolved = resolveContact(to, await client.contacts());
   if (!resolved.ok) return resolved.output;
@@ -126,7 +183,7 @@ export async function proposeTermsHandler(
     }
     case 'needs_credits':
       logger.info('propose terms needs credits', { offers: 0 });
-      return termsNeedsCredits(self.agentId, result.topUp);
+      return termsNeedsCreditsAfterClaim(result, context, self.agentId, 'agentlink_propose_terms');
     case 'rejected':
       logger.info('propose terms refused', { kind: 'terms' });
       return termsRefusal(result.code, false);

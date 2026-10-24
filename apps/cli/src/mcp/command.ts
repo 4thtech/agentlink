@@ -22,6 +22,7 @@
 // - M1-11b-6: owner setup on the first-run page is wired (local-ui-wiring.ts) only for a keychain
 //   agent while no owner exists anywhere, the file-KeyStore owner files included; checked each
 //   time the server starts.
+import { dirname } from 'node:path';
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -38,8 +39,11 @@ import {
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
+import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
+import { approvalWaitMsFor } from './approval-wait.js';
 import { localUiOptions, logOwnerSetupEvent } from './local-ui-wiring.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
@@ -77,6 +81,7 @@ export function agentToolContext(
     client: coreToolClient(agent.client, {
       ...(agent.files === undefined ? {} : { files: agent.files }),
       ...(agent.proofs === undefined ? {} : { proofs: agent.proofs }),
+      ...(agent.freeCredits === undefined ? {} : { freeCredits: agent.freeCredits }),
     }),
     clock,
     logger,
@@ -87,6 +92,11 @@ export function agentToolContext(
     ...(approvalUi === undefined
       ? {}
       : { approvalLink: (approvalId: string) => approvalUi.link(approvalId) }),
+    // M1-36a-b: the no-owner text names the command that works here, and `owner init` on a
+    // machine known to have no owner (folder names and file presence only; never a key).
+    cliPrefix: cliPrefix(),
+    ownerExists: async () =>
+      (await ownerKnownAbsent(dirname(agent.paths.root), agent.name)) ? false : undefined,
   });
 }
 
@@ -104,7 +114,12 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         ? agentToolContext(opened.agent, logger, deps.clock, approvalUi)
         : { needsSetup: { message: opened.message }, logger };
 
-    const server = createMcpServer(env, deps.version);
+    // M1-36j (D4): only with the approval page can a call wait for the owner's decision.
+    // M1-36h: `--advanced` (the user's own harness config) serves the Advanced tool surface.
+    const server = createMcpServer(env, deps.version, {
+      ...(approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor }),
+      ...(parsed.values['advanced'] === true ? { advanced: true } : {}),
+    });
     const loop =
       agent === undefined
         ? undefined

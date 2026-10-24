@@ -379,7 +379,9 @@ describe('invite and accept: a pairing round trip over a relay double (M1-9l; 04
 
     const result = await w.run(w.bob, ['accept', url], NO_TTY);
     expect(result.code).toBe(EXIT_OK);
-    expect(result.text).toMatch(/run `agentlink approve apr_[A-Za-z0-9_-]{22} --agent bob`/);
+    expect(result.text).toMatch(
+      /run `(?:agentlink|npx -y @4thtech-io\/agentlink) approve apr_[A-Za-z0-9_-]{22} --agent bob`/,
+    );
     expect(result.text).toContain("Your AI can't approve this for you");
     expect(w.prompts.count).toBe(0);
     // Nothing staged, nothing published, no contact.

@@ -409,14 +409,14 @@ describe('contacts (06 §2.1)', () => {
     expect(text).toContain('“Contact 7F3A·19C2” (self-declared)');
   });
 
-  it('says so when there are no contacts, and refuses --verify until M1-9m', async () => {
+  it('says so when there are no contacts, and has no --verify', async () => {
     const h = harness(fakeAgent());
     expect((await h.run(['contacts'])).out).toEqual([
       'You have no contacts yet. Create an invite to connect with someone.',
     ]);
     const verify = await h.run(['contacts', '--verify', 'x']);
-    expect(verify.code).toBe(EXIT_FAILED);
-    expect(verify.err.join('\n')).toContain('not available in this version yet');
+    expect(verify.code).toBe(2);
+    expect(verify.err.join('\n')).not.toContain('not available');
   });
 });
 
@@ -574,7 +574,7 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
     expect(text).toContain('Problem  This agent has no card from your owner yet');
-    expect(text).toContain('`agentlink owner add-agent --agent default`');
+    expect(text).toContain('`npx -y @4thtech-io/agentlink owner add-agent --agent default`');
     expect(text).not.toContain('agentlink init');
     expect(text).not.toContain('OK       Message network');
     // No other agent on this machine has a card either: the state is named.
@@ -609,7 +609,7 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_OK);
     const text = result.out.join('\n');
     expect(text).toContain('OK       Agent keys found');
-    expect(text).toContain('OK       1 own relay');
+    expect(text).toContain('OK       Message network: 1 server for this agent');
     expect(text).toContain('OK       Message network reachable');
     expect(text).toContain('OK       This agent can send and sign');
     expect(text).toContain('Not checked in this version');
@@ -628,18 +628,18 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
     expect(text).toContain("Problem  Can't reach the message network");
-    expect(text).toContain('Problem  No own relays');
+    expect(text).toContain('Problem  This agent has no message network servers');
     expect(text).toContain("Problem  This agent can't send or sign right now");
     expect(text).not.toContain('secret detail');
   });
 
-  it('warns when some relays did not answer', async () => {
+  it('warns when part of the message network did not answer', async () => {
     const f = fakeAgent({
       catchUp: () => Promise.resolve({ partial: true, inbox: [], requests: 0 }),
     });
     const result = await harness(f).run(['doctor']);
     expect(result.code).toBe(EXIT_OK);
-    expect(result.out.join('\n')).toContain('Warning  Some relays did not answer');
+    expect(result.out.join('\n')).toContain('Warning  Part of the message network did not answer');
   });
 
   it('explains needs_setup: no agent, and no keychain with its fix', async () => {

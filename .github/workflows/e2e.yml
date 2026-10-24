@@ -82,8 +82,8 @@ jobs:
       - name: Install gnome-keyring and D-Bus
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=10
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=10 --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       - name: Build the e2e dependencies (the CLI and its packages)
         run: pnpm exec turbo run build --filter='@4thtech-io/e2e^...'
@@ -222,15 +222,15 @@ jobs:
       - name: Install gnome-keyring and D-Bus
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=10
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=10 --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       # The Claude Code Bash sandbox on Linux needs bubblewrap and socat; Ubuntu 24.04 restricts
       # unprivileged user namespaces, so bwrap gets the AppArmor profile from the Claude Code docs.
       - name: Install the Claude Code sandbox dependencies
         run: |
           set -euo pipefail
-          sudo apt-get install -y --no-install-recommends bubblewrap socat
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=10 --no-install-recommends bubblewrap socat
           if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo 0)" = "1" ]; then
             printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' '' 'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '  include if exists <local/bwrap>' '}' | sudo tee /etc/apparmor.d/bwrap > /dev/null
             sudo apparmor_parser -r /etc/apparmor.d/bwrap
@@ -357,8 +357,8 @@ jobs:
       - name: Install gnome-keyring and D-Bus
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=10
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=10 --no-install-recommends gnome-keyring libsecret-1-0 libsecret-tools dbus
 
       - name: Build the e2e dependencies (the CLI and its packages)
         run: pnpm exec turbo run build --filter='@4thtech-io/e2e^...'

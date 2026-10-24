@@ -1,0 +1,45 @@
+/* Activity table (M1-11c-a1): the layout of d1 Local-activity (docs/design/d2/source/screens/
+   Local-activity.dc.html) as classes, because the CSP allows no inline styles (08 §4). Tokens only:
+   the same borders, radius, surfaces and spacing the design uses. */
+.al-activity-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--al-space-5);
+}
+.al-activity-head h1 {
+  margin: 0;
+}
+.al-activity-wrap {
+  overflow-x: auto;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.al-activity-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+.al-activity-table th {
+  padding: 10px var(--al-space-5);
+  border-bottom: var(--al-border-width-thin) solid var(--al-color-border-default);
+  color: var(--al-color-fg-muted);
+  font-weight: var(--al-font-weight-medium);
+  text-align: left;
+}
+.al-activity-table td {
+  padding: var(--al-space-4) var(--al-space-5);
+  vertical-align: top;
+}
+.al-activity-table tbody tr + tr td {
+  border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.al-activity-time {
+  color: var(--al-color-fg-muted);
+  white-space: nowrap;
+}
+.al-activity-more {
+  display: flex;
+  justify-content: center;
+}

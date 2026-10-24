@@ -1,0 +1,232 @@
+name: Install Playwright browsers
+description: >-
+  CHORE-CI-HARDEN-1, CHORE-CI-PLAYWRIGHT-2, CHORE-CI-PLAYWRIGHT-3. Restores the Playwright browser
+  downloads from a cache keyed by OS, exact Playwright version and browser list, downloads whatever
+  is missing (no apt), and touches apt only when a browser needs a system library the runner lacks.
+  The system packages apt needs come from a cache (each file checked against apt's signed index)
+  so a slow Ubuntu mirror is rarely touched. Every network sub-step shares one deadline well inside
+  the caller's timeout-minutes, and only a push to main saves a cache. Needs Node and pnpm already
+  set up (the repository's setup-node-pnpm action) and `playwright` as a root devDependency.
+
+inputs:
+  browsers:
+    description: Space-separated Playwright browsers to install.
+    required: false
+    default: chromium firefox webkit
+
+runs:
+  using: composite
+  steps:
+    # The version comes from the root package.json (exact pin), never from the network.
+    # CHORE-CI-PLAYWRIGHT-3: one deadline for every bounded sub-step below (budget.sh). The callers
+    # give this step timeout-minutes: 12 (720 s); 510 s leaves more than 3 minutes for what the
+    # action cannot bound itself (cache restores, main-only cache saves, kill grace), so a slow
+    # mirror ends in a clear error instead of "The action has timed out".
+    - name: Resolve the Playwright version and the time budget
+      id: version
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        set -euo pipefail
+        BUDGET_SECONDS=510
+        echo "deadline=$(( $(date +%s) + BUDGET_SECONDS ))" >> "$GITHUB_OUTPUT"
+        version="$(jq -r '(.devDependencies.playwright // .devDependencies["@playwright/test"] // "")' package.json | sed 's/^[^0-9]*//')"
+        if [ -z "$version" ]; then
+          echo "::error::playwright is not a root devDependency; cannot key the browser cache."
+          exit 1
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        # System package cache key: runner image (ImageOS, ImageVersion are set on GitHub-hosted
+        # runners), Playwright version and browser list. The prefix without the image version lets
+        # a new image start from the last image's packages; verify-debs.sh checks every file.
+        image_os="${ImageOS:-}"
+        image_version="${ImageVersion:-}"
+        [[ "$image_os" =~ ^[A-Za-z0-9._-]{1,40}$ ]] || image_os=none
+        [[ "$image_version" =~ ^[A-Za-z0-9._-]{1,40}$ ]] || image_version=none
+        prefix="playwright-debs-$RUNNER_OS-$image_os-$version-$BROWSERS-"
+        echo "debs_prefix=$prefix" >> "$GITHUB_OUTPUT"
+        echo "debs_key=$prefix$image_version" >> "$GITHUB_OUTPUT"
+
+    # Browser downloads only (no system packages). The key holds the version, the OS and the browser
+    # list, so a new version or a different list gets a fresh download. Restore only: a pull request
+    # never saves (see "Save the Playwright browsers").
+    - name: Restore the Playwright browsers
+      id: cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '1'
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
+
+    # Browser binaries only (CDN download, no apt). On a cache hit this verifies and returns at once;
+    # on a miss, or a partial cache, it downloads what is missing. Bounded, one retry.
+    - name: Download the Playwright browsers
+      id: download
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        DEADLINE: ${{ steps.version.outputs.deadline }}
+        BUDGET: ${{ github.action_path }}/budget.sh
+      run: |
+        set -euo pipefail
+        t="$(bash "$BUDGET" 240)"
+        # shellcheck disable=SC2086 # BROWSERS is a fixed, space-separated list of browser names
+        timeout -k 10 "$t" pnpm exec playwright install $BROWSERS || {
+          echo "::warning::Playwright browser download failed once; retrying."
+          t="$(bash "$BUDGET" 240)"
+          # shellcheck disable=SC2086
+          timeout -k 10 "$t" pnpm exec playwright install $BROWSERS
+        }
+
+    # Only a push to main writes the cache that pull requests and the merge queue read (a cache
+    # saved by a pull request or a merge-queue branch is not visible to other pull requests).
+    - name: Save the Playwright browsers (main only)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.cache.outputs.cache-hit != 'true' && steps.download.outcome == 'success'
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
+
+    # Linux only: launch each browser once through Playwright's own API (probe.mjs). Playwright
+    # validates its host requirements (system libraries, bundled library paths) at launch, so the
+    # answer is exactly the one the tests would get. Any failure or error counts as missing (fail
+    # towards installing).
+    - name: Check the browsers' system libraries
+      id: libs
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+        PROBE: ${{ github.action_path }}/probe.mjs
+        DEADLINE: ${{ steps.version.outputs.deadline }}
+        BUDGET: ${{ github.action_path }}/budget.sh
+      run: |
+        set -uo pipefail
+        missing=false
+        failing=$BROWSERS
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          t="$(bash "$BUDGET" 150)" || exit 1
+          out="$(timeout -k 5 "$t" node "$PROBE")" && rc=0 || rc=$?
+          printf '%s\n' "$out"
+          if [ "$rc" -ne 0 ]; then
+            missing=true
+            # A clean "failing=<names>" line narrows apt to those browsers; anything else (crash,
+            # timeout, unknown name, probe error) keeps the full list.
+            line="$(printf '%s\n' "$out" | grep '^failing=' | tail -n 1 || true)"
+            if [ -n "$line" ] && [ -n "${line#failing=}" ]; then
+              failing="${line#failing=}"
+            fi
+          fi
+        fi
+        echo "missing=$missing" >> "$GITHUB_OUTPUT"
+        echo "failing=$failing" >> "$GITHUB_OUTPUT"
+
+    # Only now apt. Short timeouts and retries: the CI failure was ~250 timeouts of 30 s from
+    # azure.archive.ubuntu.com, one after another. apt-get keeps what it downloads (the main-only
+    # cache below collects it). The settings only apply to this runner.
+    - name: Bound the apt network waits (Linux)
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf '%s\n' 'Acquire::Retries "3";' 'Acquire::http::Timeout "10";' 'Acquire::https::Timeout "10";' \
+          'APT::Keep-Downloaded-Packages "true";' 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+          | sudo tee /etc/apt/apt.conf.d/99agentlink-ci-network > /dev/null
+
+    # CHORE-CI-PLAYWRIGHT-3: WebKit needs about 180 system packages (about 117 MB) that the runner
+    # image lacks; downloading them from a slow mirror was what held the step on 2026-10-23.
+    - name: Restore the system packages (Linux)
+      id: debs
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true'
+      continue-on-error: true
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '1'
+      with:
+        path: ~/.cache/agentlink-playwright-debs
+        key: ${{ steps.version.outputs.debs_key }}
+        restore-keys: ${{ steps.version.outputs.debs_prefix }}
+
+    # A cached file reaches apt's archive directory only if its SHA-256 equals the one apt's signed
+    # index lists for that package and version (verify-debs.sh); apt itself still decides what to
+    # install. Anything left out is downloaded as before. Any failure here only costs the shortcut.
+    - name: Seed the verified system packages (Linux)
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true' && steps.debs.outputs.cache-matched-key != ''
+      continue-on-error: true
+      shell: bash
+      env:
+        DEADLINE: ${{ steps.version.outputs.deadline }}
+        BUDGET: ${{ github.action_path }}/budget.sh
+        VERIFY: ${{ github.action_path }}/verify-debs.sh
+      run: |
+        set -euo pipefail
+        t="$(bash "$BUDGET" 60)"
+        sudo timeout -k 10 "$t" apt-get update -o Acquire::Retries=3
+        t="$(bash "$BUDGET" 60)"
+        sudo timeout -k 10 "$t" bash "$VERIFY" "$HOME/.cache/agentlink-playwright-debs" /var/cache/apt/archives
+
+    - name: Install the Playwright system libraries (attempt 1)
+      id: deps1
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        BROWSERS: ${{ steps.libs.outputs.failing }}
+        DEADLINE: ${{ steps.version.outputs.deadline }}
+        BUDGET: ${{ github.action_path }}/budget.sh
+      run: |
+        set -euo pipefail
+        t="$(bash "$BUDGET" 240)"
+        # Run as root under the time limit: a user-level `timeout` could not stop root's apt, and a
+        # slow mirror then held the step until the job limit (seen in CI, 12 minutes).
+        # shellcheck disable=SC2086
+        sudo -E env "PATH=$PATH" timeout -k 10 "$t" node_modules/.bin/playwright install-deps $BROWSERS
+
+    - name: Install the Playwright system libraries (attempt 2)
+      id: deps2
+      if: runner.os == 'Linux' && steps.libs.outputs.missing == 'true' && steps.deps1.outcome == 'failure'
+      shell: bash
+      env:
+        BROWSERS: ${{ steps.libs.outputs.failing }}
+        DEADLINE: ${{ steps.version.outputs.deadline }}
+        BUDGET: ${{ github.action_path }}/budget.sh
+      run: |
+        set -euo pipefail
+        echo "::warning::Playwright system libraries failed once (slow or unreachable mirror); retrying."
+        # Mirror fallback: the runner image points apt at azure.archive.ubuntu.com; try the main
+        # archive for this run (the runner is discarded afterwards).
+        if [ -f /etc/apt/sources.list.d/ubuntu.sources ]; then
+          sudo sed -i -E 's#^URIs: .*#URIs: http://archive.ubuntu.com/ubuntu/#' /etc/apt/sources.list.d/ubuntu.sources
+        fi
+        t="$(bash "$BUDGET" 60)"
+        sudo timeout -k 10 "$t" apt-get update -o Acquire::Retries=3 || true
+        t="$(bash "$BUDGET" 240)"
+        # shellcheck disable=SC2086
+        sudo -E env "PATH=$PATH" timeout -k 10 "$t" node_modules/.bin/playwright install-deps $BROWSERS
+
+    # Main only, after a successful install: keep the downloaded packages for the next runs.
+    - name: Keep the system packages for the cache (main only)
+      id: collect
+      if: runner.os == 'Linux' && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.libs.outputs.missing == 'true' && steps.debs.outputs.cache-hit != 'true' && (steps.deps1.outcome == 'success' || steps.deps2.outcome == 'success')
+      continue-on-error: true
+      shell: bash
+      run: |
+        set -euo pipefail
+        dir="$HOME/.cache/agentlink-playwright-debs"
+        rm -rf -- "$dir"
+        mkdir -p -- "$dir"
+        shopt -s nullglob
+        files=(/var/cache/apt/archives/*.deb)
+        if [ "${#files[@]}" -gt 0 ]; then cp -- "${files[@]}" "$dir/"; fi
+        echo "Keeping ${#files[@]} system packages for the cache."
+        echo "count=${#files[@]}" >> "$GITHUB_OUTPUT"
+
+    - name: Save the system packages (main only)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.collect.outcome == 'success' && steps.collect.outputs.count != '0'
+      continue-on-error: true
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/agentlink-playwright-debs
+        key: ${{ steps.version.outputs.debs_key }}

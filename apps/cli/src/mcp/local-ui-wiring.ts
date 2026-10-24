@@ -26,6 +26,7 @@ import {
 // The card relay list `owner init` uses (commands/owner/card-relays.ts re-exports this same list;
 // the MCP side never imports an owner command, test/policy-command.test.ts).
 import { DEFAULT_RELAYS } from '@4thtech-io/transport-nostr';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import { readAgentConfig } from '../runtime/index.js';
 import { embeddedLocalUiAssets } from './local-ui-assets.js';
 
@@ -102,7 +103,7 @@ export function logOwnerSetupEvent(logger: Logger, event: ApprovalServerEvent): 
   if (!ownerSetupDone(event) || event.kind !== 'owner_setup') return;
   if (event.fingerprint === undefined) return;
   logger.info(
-    'Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with `agentlink doctor`.',
+    `Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with \`${cliPrefix()} doctor\`.`,
     { fingerprint: event.fingerprint },
   );
 }

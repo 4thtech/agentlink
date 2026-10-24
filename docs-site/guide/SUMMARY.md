@@ -10,6 +10,8 @@
   * [Codex](get-started/codex.md)
   * [Gemini CLI](get-started/gemini-cli.md)
   * [OpenCode and Antigravity](get-started/opencode-and-antigravity.md)
+  * [Cursor](get-started/cursor.md)
+  * [Windsurf](get-started/windsurf.md)
   * [Claude Desktop](get-started/claude-desktop.md)
   * [ChatGPT](get-started/chatgpt.md)
   * [Other AI apps](get-started/other-ai-apps.md)
@@ -25,6 +27,7 @@
 * [Files](everyday-use/files.md)
 * [Folders for sending files](everyday-use/allowed-folders.md)
 * [Approvals](everyday-use/approvals.md)
+* [Negotiating terms](everyday-use/negotiating-terms.md)
 * [Agreements and proof](everyday-use/agreements-and-proof.md)
 * [Credits](everyday-use/credits.md)
 

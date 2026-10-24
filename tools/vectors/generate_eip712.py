@@ -15,6 +15,9 @@ keccak256(utf8(name)); relaysHash = keccak256(JCS(relays)) (RFC 8785, `rfc8785`)
 the card JSON form and `cardSig` is 0x + 130 lowercase hex (r || s || v, v in {27, 28}, low s),
 per 04 §2.4 and §2.4.1 (canonical ECDSA: r and s in [1, n - 1], s <= n/2, v in {27, 28}). The card
 is I-JSON with integer tokens matching 0|[1-9][0-9]*, so `agentCardJson` cases give raw JSON text. Keys are synthetic test values (the Mail key is the EIP's keccak256("cow")).
+Version 2 (M1-1h-b, D-128, 04 §2.5.1 "Received text"): the card JSON text also refuses a member
+name written with any escape (`agentCardJson` rejections at the first and last member, upper-case
+hex, and an escaped duplicate); an escape inside a string value is accepted and hashes like the card.
 
 Negative cases: non-canonical cards (encodings, integer ranges, unknown or missing fields); a card
 signature that does not verify for the card's ownerEvm after a field changes, under a domain that
@@ -34,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vectorlib as v  # noqa: E402
 
 SUITE = "eip712"
-VERSION = 1
+VERSION = 2
 EXAMPLE = "EIP-712 Example.js (ethereum/EIPs@e1e9c0c0)"
 
 AGENT_CARD_TYPES = {
@@ -203,7 +206,10 @@ def parse_card(card):
 
 def parse_card_text(text):
     """Strict parse of a card's JSON text: duplicate keys refused, and every number token must match
-    0|[1-9][0-9]* (04 §2.4.1), checked on the token, not the parsed value."""
+    0|[1-9][0-9]* (04 §2.4.1), checked on the token, not the parsed value; and no member name is
+    written with an escape (04 §2.5.1 "Received text", D-128)."""
+    if v.escaped_member_name(text):
+        raise ValueError("escaped member name")
 
     def pairs(items):
         names = [k for k, _ in items]
@@ -493,6 +499,36 @@ def build():
         except ValueError:
             pass
         cases.append(v.case(f"card-json-reject-{case_id}", f"{CARD_FORM}: {why}; rejected on the token, never normalised", {"op": "agentCardJson", "json": text}, {"outcome": "reject"}))
+
+    # 04 §2.5.1 "Received text" (D-128, M1-1h-b): a member name written with an escape is refused;
+    # each text parses (plain json) to exactly the card. An escape in a string value is unaffected.
+    received = "04 §2.5.1 Received text (D-128)"
+    escaped_value = canonical_text.replace('"agentEvm": "0x', '"agentEvm": "\\u0030x', 1)
+    if escaped_value == canonical_text or json.loads(escaped_value) != card:
+        v.fail("card-json-escaped-value: substitution")
+    cases.append(
+        v.case(
+            "card-json-escaped-value",
+            f"{CARD_FORM}, {received}: an escape inside a string value is unaffected and hashes like the card",
+            {"op": "agentCardJson", "json": escaped_value},
+            {"digest": card_digest(parse_card_text(escaped_value)).hex()},
+        )
+    )
+    for case_id, why, old, new in [
+        ("escaped-version", "`version` spelled \\u0076ersion (first member)", '"version":', '"\\u0076ersion":'),
+        ("escaped-key-epoch", "`keyEpoch` spelled keyEpoc\\u0068 (last member)", '"keyEpoch":', '"keyEpoc\\u0068":'),
+        ("escaped-name-upper-hex", "`issuedAt` spelled issued\\u0041t", '"issuedAt":', '"issued\\u0041t":'),
+        ("escaped-name-equals-another", "a second `keyEpoch` spelled \\u006beyEpoch (a duplicate only after unescaping)", '"keyEpoch": 0', '"keyEpoch": 0, "\\u006beyEpoch": 0'),
+    ]:
+        text = canonical_text.replace(old, new, 1)
+        if text == canonical_text or json.loads(text) != card:
+            v.fail(f"{case_id}: substitution")
+        try:
+            parse_card_text(text)
+            v.fail(f"{case_id} parses")
+        except ValueError:
+            pass
+        cases.append(v.case(f"card-json-reject-{case_id}", f"{CARD_FORM}, {received}: {why}; rejected on the text, never normalised", {"op": "agentCardJson", "json": text}, {"outcome": "reject"}))
     return cases
 
 

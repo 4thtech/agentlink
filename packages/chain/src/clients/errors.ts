@@ -34,6 +34,11 @@ export type ChainErrorCode =
   | 'signer_mismatch'
   /** Direct mode: the account cannot pay the gas for the call. Nothing was signed. */
   | 'no_gas'
+  /**
+   * Direct mode (M1-4c-b): the KeyStore refused to sign the transaction (not one direct mode may
+   * send on this chain). Nothing was signed or sent.
+   */
+  | 'signing_refused'
   /** A sent transaction reverted on-chain. */
   | 'tx_reverted'
   /** A sent transaction was not included within the wait. */
@@ -51,6 +56,7 @@ const MESSAGES: Record<ChainErrorCode, string> = {
   bad_answer: 'The chain returned an answer that does not add up.',
   signer_mismatch: 'The signed transaction does not match the contract call.',
   no_gas: 'The account cannot pay the chain fee for this contract call.',
+  signing_refused: 'The account key refused to sign this contract call.',
   tx_reverted: 'The contract refused the transaction.',
   tx_not_included: 'The transaction was not included on the chain in time.',
   rpc_failed: 'The chain request failed.',
@@ -61,16 +67,25 @@ export class ChainError extends Error {
   readonly code: ChainErrorCode;
   /** The contract error's ABI name for `call_reverted`, when known (from the bound ABI). */
   readonly revertName: string | undefined;
+  /**
+   * True only when the revert data was exactly a 4-byte selector, with nothing after it: the whole
+   * encoding of a no-argument error. viem names a no-argument error and ignores trailing bytes, so
+   * a reader that decides on such an error (`RecordNotFound()`) checks this too (M1-4d-g). Carries
+   * no revert bytes (I-7).
+   */
+  readonly revertBare: boolean;
 
-  constructor(code: ChainErrorCode, revertName?: string) {
+  constructor(code: ChainErrorCode, revertName?: string, revertBare = false) {
     super(MESSAGES[code]);
     this.name = 'ChainError';
     this.code = code;
     this.revertName = revertName;
+    this.revertBare = revertBare;
   }
 }
 
 const IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const BARE_SELECTOR = /^0x[0-9a-fA-F]{8}$/;
 
 /** Maps any error to a URL-free ChainError. */
 export function toChainError(error: unknown): ChainError {
@@ -79,9 +94,11 @@ export function toChainError(error: unknown): ChainError {
   const reverted = error.walk((e) => e instanceof ContractFunctionRevertedError);
   if (reverted instanceof ContractFunctionRevertedError) {
     const name = reverted.data?.errorName;
+    const raw = reverted.raw;
     return new ChainError(
       'call_reverted',
       typeof name === 'string' && IDENTIFIER.test(name) ? name : undefined,
+      typeof raw === 'string' && BARE_SELECTOR.test(raw),
     );
   }
   const has = (cls: new (...args: never[]) => Error): boolean =>

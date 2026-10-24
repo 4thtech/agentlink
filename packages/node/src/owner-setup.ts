@@ -7,6 +7,8 @@
 // server memory; `finish` checks the page's passkey creation response here (checkSetupRegistration)
 // and completes the setup in one all-or-nothing operation (completeOwnerSetup):
 //
+// 0. refuse, before reading or writing anything, a seed that does not derive the owner keys given
+//    (the key the page saw as user.id; M1-11s-c-b);
 // 1. refuse unless no owner exists anywhere: no card names one, and none of the `owner`,
 //    `owner-passkey` and `owner-next` items exists (a partial earlier setup is never reused or
 //    overwritten, D-78, 04 §2.8);
@@ -59,6 +61,7 @@ import {
   OWNER_NEXT_ACCOUNT,
   OWNER_PASSKEY_ACCOUNT,
   removeOwnerItemIfOurs,
+  sameOwnerKeys,
   storeOwnerSeed,
   type OwnerItemRemoval,
 } from './owner-keystore.js';
@@ -67,6 +70,7 @@ import {
   removeOwnerPasskeyItemIfOurs,
   storeOwnerPasskeySeed,
 } from './owner-passkey.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 /** How long `begin`'s seed is held for `finish` (proposed, owner confirms at merge): 2 minutes. */
 export const SETUP_HOLD_MS = 120_000;
@@ -341,9 +345,19 @@ const setupFailed = (): NodeKeyStoreError =>
     "Setup didn't finish, so nothing was saved. Start again on this page.",
   );
 
+/** True when `seed` derives exactly `keys`; a malformed seed or key set is false, never thrown. */
+function seedIsOwner(seed: Uint8Array, keys: OwnerPublicKeys): boolean {
+  try {
+    return seed instanceof Uint8Array && sameOwnerKeys(seed, keys);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Completes an owner setup (steps 1 to 5 above), all or nothing. Errors: `owner_exists` (nothing
- * written), `owner_card_failed` (rolled back), `keychain_failed` (a rollback delete failed; items may
+ * written), `owner_card_failed` (rolled back, or nothing written when `seed` does not derive
+ * `keys`, M1-11s-c-b), `keychain_failed` (a rollback delete failed; items may
  * remain). When core cannot be read back after signing, the owner is kept and the result has
  * `confirmed: false` (with the owner code). Error texts are fixed.
  */
@@ -354,6 +368,10 @@ export async function completeOwnerSetup(
 ): Promise<OwnerSetupResult> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const { seed, keys, credentialId, prfOutput, firstCard } = input;
+  // M1-11s-c-b: the seed must be the owner whose key the page saw as user.id (`keys`), checked
+  // before any keychain read or write. Otherwise a PRF-less setup would store an `owner` item for
+  // an owner nobody was shown, and an unconfirmed card read-back would keep it.
+  if (!seedIsOwner(seed, keys)) throw setupFailed();
   if (!(await noOwnerAnywhere(keychain, firstCard, timeoutMs, options.ownerFiles))) {
     throw ownerExists();
   }
@@ -403,7 +421,7 @@ export async function completeOwnerSetup(
       if (removal === 'failed') {
         throw new NodeKeyStoreError(
           'keychain_failed',
-          'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+          `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
         );
       }
       if (error instanceof NodeKeyStoreError && error.code === 'owner_exists') throw ownerExists();
@@ -438,7 +456,7 @@ export async function completeOwnerSetup(
     if (removal === 'failed') {
       throw new NodeKeyStoreError(
         'keychain_failed',
-        'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
       );
     }
     throw setupFailed();

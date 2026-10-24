@@ -222,16 +222,24 @@ describe('file entries', () => {
 });
 
 describe('request: refresh-link (04 §4, 07 §5.2)', () => {
-  const body = () => ({ kind: 'refresh-link', envelopeId: ID16, ciphertextSha256: SHA });
+  const body = () => ({ kind: 'refresh-link', envelopeId: ID16, fileIndex: 0 });
 
   it('round-trips', () => expectRoundTrip(refreshLinkRequestBodySchema, body()));
 
+  it('names the last possible file', () =>
+    expectAccept(refreshLinkRequestBodySchema, { ...body(), fileIndex: 15 }));
+
   it.each([
     ['unknown key', ['url'], 'https://evil.example/'],
+    // M1-7f-3: a request is shown in the inbox, so it never carries the ciphertext hash (06 §2.1).
+    ['a ciphertextSha256', ['ciphertextSha256'], SHA],
     ['missing envelopeId', ['envelopeId'], DELETE],
-    ['missing ciphertextSha256', ['ciphertextSha256'], DELETE],
+    ['missing fileIndex', ['fileIndex'], DELETE],
     ['envelopeId padded', ['envelopeId'], `${ID16}==`],
-    ['ciphertextSha256 uppercase', ['ciphertextSha256'], SHA.toUpperCase()],
+    ['fileIndex negative', ['fileIndex'], -1],
+    ['fileIndex past the last file', ['fileIndex'], 16],
+    ['fileIndex not an integer', ['fileIndex'], 0.5],
+    ['fileIndex a string', ['fileIndex'], '0'],
   ] as const)('rejects %s (alone and inside a request payload)', (_l, path, value) => {
     const bad = edit(body(), path, value);
     expectReject(refreshLinkRequestBodySchema, bad);

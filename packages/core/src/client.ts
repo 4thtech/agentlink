@@ -13,6 +13,7 @@ import { EnvelopeService } from './envelopes.js';
 import type { CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
+import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
 import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
@@ -27,8 +28,17 @@ import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
 import { FilesView } from './files/view.js';
+import {
+  FileLinks,
+  type RequestFileLinkInput,
+  type RequestFileLinkResult,
+} from './files/refresh-link.js';
 import { ActivityService } from './activity.js';
-import { deleteFilesOnReceipt, type ReceiptRetentionResult } from './files/retention.js';
+import {
+  deleteExpiredFiles,
+  deleteFilesOnReceipt,
+  type ReceiptRetentionResult,
+} from './files/retention.js';
 import { InboxService } from './inbox.js';
 import { policyLimits } from './policy-engine.js';
 import { RevocationService } from './revocation.js';
@@ -87,6 +97,12 @@ export interface AgentLinkClientOptions {
    */
   readonly receiptsKept?: ReceiptsKeptMark;
   /**
+   * The own-storage KeyStore items, `storage-mark` and the `credentialDigest` of `s3:<id>` (04 §2.2,
+   * §2.5.1; M1-9i-a, D-115). Without them no `storage.set` or `storage.remove` applies, and
+   * `ownStorage.load()` reads `broken` (fail closed).
+   */
+  readonly ownStorageKeys?: OwnStorageKeys;
+  /**
    * The relay transport (07 §4.1; M1-7k): `nostrTransport({connector, addressCheck, nip11})` with the
    * runtime's relay I/O (packages/node supplies it). Without one the client cannot send or publish
    * (`transport_unavailable`); reading the store still works.
@@ -135,6 +151,8 @@ export class AgentLinkClient {
   readonly approvals: ApprovalChannel;
   /** Owner-signed actions and the signed policy (M1-7d; 04 §2.5.1). Authority is the signature. */
   readonly ownerActions: OwnerActions;
+  /** Own storage as the owner signed it: `none`, `ready` or `broken` (M1-9i-a; 07 §3.4, §5.6). */
+  readonly ownStorage: OwnStorage;
   /** Approval requests and their one use (M1-7e; 04 §3.4.1, 06 §2.5). Decides nothing. */
   readonly approvalService: ApprovalService;
   /** The requests queue for unknown senders: count, list and ignore (M1-7e; 07 §3.2). */
@@ -160,6 +178,8 @@ export class AgentLinkClient {
   readonly proofs: ProofService;
   /** The allowed folders as the rules name them and as resolved (M1-11r-a, the local UI). Read-only. */
   readonly files: FilesView;
+  /** refresh-link (M1-7f-3; 04 §4): requests, and answers after each processing pass. */
+  readonly fileLinks: FileLinks;
   /** The non-message activity feed (M1-11r-a, the local UI): approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
@@ -182,6 +202,7 @@ export class AgentLinkClient {
     dropOrigins: readonly string[],
     files: FilesPlatform | undefined,
     proofs: ProofsPlatform | undefined,
+    ownStorageKeys: OwnStorageKeys | undefined,
   ) {
     this.agentId = agentId;
     this.#ctx = ctx;
@@ -194,7 +215,9 @@ export class AgentLinkClient {
       this.contacts,
       policyMark,
       receiptsKept,
+      ownStorageKeys,
     );
+    this.ownStorage = new OwnStorage(ctx, this.identity, ownStorageKeys);
     const ownerActions = this.ownerActions;
     // M1-7h: revoke envelopes are applied or dropped (IR-M1-7h-1 F01), and the per-contact rate
     // limit is counted where the contact's envelope is stored (07 §3.2; IR-M1-7h-1 F02).
@@ -230,6 +253,16 @@ export class AgentLinkClient {
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
+    this.fileLinks = new FileLinks(
+      ctx,
+      {
+        identity: this.identity,
+        envelopes: this.envelopes,
+        outbox: this.outbox,
+        ownerActions: this.ownerActions,
+      },
+      files,
+    );
     this.activity = new ActivityService(ctx);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
@@ -281,6 +314,7 @@ export class AgentLinkClient {
       inbox: this.inbox,
       acks: this.acks,
       proofs: this.proofs,
+      fileLinks: this.fileLinks,
     });
   }
 
@@ -300,7 +334,22 @@ export class AgentLinkClient {
     await this.deleteFilesOnReceipt().catch(() => {
       this.#ctx.log.warn('delete on receipt not run');
     });
+    // M1-7f-2: retention at expiry on both sides. Best effort, as above.
+    await this.deleteExpiredFiles().catch(() => {
+      this.#ctx.log.warn('expiry retention not run');
+    });
     return result;
+  }
+
+  /**
+   * Retention at expiry (M1-7f-2; 04 §4, 06 §3, D-98), under every policy: for each file whose
+   * `expiresAt` has passed, the sender deletes the stored object (the drop with a DELETE signed at
+   * the upload epoch) and its `files` row with the sealed file key; the receiver deletes its own
+   * row, after which the file cannot be opened. Nothing is deleted before `expiresAt` (I-9).
+   * `syncInbox` runs it; idempotent, and a failed delete is retried on the next pass.
+   */
+  deleteExpiredFiles(): Promise<ReceiptRetentionResult> {
+    return deleteExpiredFiles(this.#ctx, this.#filesPlatform);
   }
 
   /**
@@ -366,6 +415,17 @@ export class AgentLinkClient {
    */
   fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
     return this.#files.fetch(input);
+  }
+
+  /**
+   * Asks the contact that sent a stored file for a fresh link (M1-7f-3; 04 §4 "Delivery", 07 §5.2):
+   * a `request` envelope `{kind: "refresh-link", envelopeId, fileIndex}`. The sender's core answers
+   * when it is online, from its own storage and never past the file's `expiresAt`; the answer
+   * replaces this file's link, so `fetchFile` works again. Refused locally once retention has passed
+   * (`LINK_EXPIRED`) and for an inline file (`NOT_REFRESHABLE`).
+   */
+  requestFileLink(input: RequestFileLinkInput): Promise<RequestFileLinkResult> {
+    return this.fileLinks.request(input);
   }
 
   /**
@@ -529,6 +589,7 @@ export class AgentLinkClient {
       options.dropOrigins ?? [],
       options.files,
       options.proofs,
+      options.ownStorageKeys,
     );
   }
 }

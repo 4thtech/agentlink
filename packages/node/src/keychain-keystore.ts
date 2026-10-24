@@ -12,6 +12,7 @@ import {
   cardPopSnapshot,
   decodeHex,
   decodeHex0x,
+  directTransactionSnapshot,
   dropRequestEpoch,
   dropRequestSnapshot,
   encodeHex,
@@ -21,6 +22,7 @@ import {
   randomBytes,
   wipe,
   type AgentCard,
+  type DirectTransaction,
   type DropAuthRequest,
   type EpochOptions,
   type KeyLabel,
@@ -41,12 +43,20 @@ import {
   nip44DecryptWithKey,
   nip44EncryptWithKey,
   signCardPop,
+  signDirectTransaction,
   signDropRequest,
   signEnvelopeHash,
   signTypedData,
   unwrapCek,
 } from '@4thtech-io/crypto/keystore';
 import { NodeKeyStoreError } from './errors.js';
+import {
+  createFileKeyStoreAgentWith,
+  fileKeychain,
+  isUnlockedFileAgent,
+  type FileKeyStoreSetupOptions,
+  type UnlockedFileAgent,
+} from './file-keystore.js';
 import {
   assertAgentId,
   keychainAccount,
@@ -58,11 +68,12 @@ import {
   type KeychainProbe,
   type ProbeOptions,
 } from './keychain.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 const keychainFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
-    'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+    `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 const identityMissing = (): NodeKeyStoreError =>
@@ -74,7 +85,7 @@ const identityMissing = (): NodeKeyStoreError =>
 const identityMismatch = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'identity_mismatch',
-    "The keychain item for this agent belongs to a different agent. Restore this agent's item from a backup; `agentlink doctor` shows the expected agent ID.",
+    `The keychain item for this agent belongs to a different agent. Restore this agent's item from a backup; \`${CLI_COMMAND} doctor\` shows the expected agent ID.`,
   );
 
 /**
@@ -102,7 +113,10 @@ export async function guarded<T>(call: () => Promise<T>, timeoutMs: number): Pro
   });
   try {
     return await Promise.race([pending, timeout]);
-  } catch {
+  } catch (error) {
+    // The file backend (M1-8f) throws only fixed-sentence NodeKeyStoreErrors, which pass through;
+    // anything else (a native keychain error, a timeout) becomes the fixed `keychain_failed`.
+    if (error instanceof NodeKeyStoreError) throw error;
     throw keychainFailed();
   } finally {
     clearTimeout(timer);
@@ -336,6 +350,18 @@ export class KeychainKeyStore implements KeyStore {
     );
   }
 
+  async signTransaction(tx: DirectTransaction): Promise<string> {
+    // M1-4c-b (07 §6.2): checked against the direct-mode rules before the keychain is read, with
+    // this agent's own address (the agent ID, 04 §2.9) as the only withdraw recipient. The EVM key
+    // exists only at epoch 0 (04 §2.1).
+    const snapshot = directTransactionSnapshot(tx, this.#agentId);
+    return this.#withSeed((seed) =>
+      withSecret(seed, KEY_LABELS.evm, 0, (secretKey) =>
+        signDirectTransaction(secretKey, snapshot, this.#agentId),
+      ),
+    );
+  }
+
   async signCardPop(card: AgentCard): Promise<string> {
     // 04 §2.9 (D-102): only the own card at the current epoch. A card of another agent or epoch, or
     // one that does not parse, is refused before the keychain is read; the message keys are checked
@@ -448,17 +474,38 @@ export async function createKeychainAgent(
 export async function openRecordedKeyStore(
   backend: KeyStoreBackendKind,
   agentId: string,
-  backends: { readonly keychain: KeychainBackend },
+  backends: { readonly keychain: KeychainBackend; readonly file?: UnlockedFileAgent },
   options: KeychainKeyStoreOptions = {},
 ): Promise<KeyStore> {
-  if (backend === 'keychain') {
-    return keyStoreFacade(await KeychainKeyStore.open(backends.keychain, agentId, options));
+  return keyStoreFacade(
+    await KeychainKeyStore.open(recordedBackend(backend, agentId, backends), agentId, options),
+  );
+}
+
+/**
+ * The item backend of the recorded KeyStore (07 §9.1): the OS keychain, or the unlocked `ALKS` file
+ * of this agent (M1-8f). A file agent that was not unlocked is `keystore_locked`; it never falls
+ * back to the keychain, and a keychain agent never opens a file.
+ */
+export function recordedBackend(
+  backend: KeyStoreBackendKind,
+  agentId: string,
+  backends: { readonly keychain: KeychainBackend; readonly file?: UnlockedFileAgent },
+): KeychainBackend {
+  if (backend === 'keychain') return backends.keychain;
+  if (backend === 'file') {
+    assertAgentId(agentId);
+    if (backends.file === undefined || !isUnlockedFileAgent(backends.file, agentId)) {
+      throw new NodeKeyStoreError(
+        'keystore_locked',
+        `The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; \`${CLI_COMMAND} doctor\` shows how.`,
+      );
+    }
+    return fileKeychain(backends.file);
   }
   throw new NodeKeyStoreError(
     'backend_unavailable',
-    backend === 'file'
-      ? "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't open yet. Update AgentLink."
-      : "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
+    `This agent's recorded key store is not one AgentLink knows. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
   );
 }
 
@@ -478,6 +525,7 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
       store.unwrapCek(wrapped, envelopeId, options),
     sign712: (typedData: TypedData) => store.sign712(typedData),
     signCardPop: (card: AgentCard) => store.signCardPop(card),
+    signTransaction: (tx: DirectTransaction) => store.signTransaction(tx),
     signDropRequest: (request: DropAuthRequest, createdAt: number, options?: EpochOptions) =>
       store.signDropRequest(request, createdAt, options),
     close: () => store.close(),
@@ -497,11 +545,35 @@ export function createOsKeychainAgent(): Promise<string> {
   return createKeychainAgent(osKeychain());
 }
 
+export interface OpenAgentKeyStoreOptions extends KeychainKeyStoreOptions {
+  /** For the backend `file` (M1-8f): the handle unlockFileKeyStoreAgent returned for this agent. */
+  readonly fileAgent?: UnlockedFileAgent;
+}
+
 /** Opens an agent with its recorded backend (07 §9.1). Returns only the KeyStore interface. */
 export function openAgentKeyStore(
   backend: KeyStoreBackendKind,
   agentId: string,
-  options: KeychainKeyStoreOptions = {},
+  options: OpenAgentKeyStoreOptions = {},
 ): Promise<KeyStore> {
-  return openRecordedKeyStore(backend, agentId, { keychain: osKeychain() }, options);
+  const { fileAgent, ...keyOptions } = options;
+  return openRecordedKeyStore(
+    backend,
+    agentId,
+    fileAgent === undefined
+      ? { keychain: osKeychain() }
+      : { keychain: osKeychain(), file: fileAgent },
+    keyOptions,
+  );
+}
+
+/**
+ * M1-8f: `agentlink init --keystore file` (04 §2.8). Probes the OS keychain itself, so the file
+ * KeyStore is refused whenever the keychain works; refused too without an interactive terminal or
+ * with an AI-app marker set. Returns the new agent ID and the generated unlock code to show once.
+ */
+export function createFileKeyStoreAgent(
+  options: FileKeyStoreSetupOptions = {},
+): Promise<{ readonly agentId: string; readonly unlockCode: Uint8Array | null }> {
+  return createFileKeyStoreAgentWith(() => probeOsKeychain(), options);
 }

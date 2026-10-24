@@ -6,12 +6,31 @@
 // - 11 §5.1: user-facing text says "proof", "credits", "agent ID"; never the network's name, a
 //   token, "chain", "contract", "on-chain", "transaction" or "gas". The core's and the chain
 //   package's own wording is never passed through: their results map by code to the text here.
-// - The top-up link (06 §2.1 `topUpUrl`, 02 F-46, 08 §1 `pay.`): the deposit page on its own
-//   origin. The spec gives no form for the link (open question, IR-M1-9d-2 M3), so it is the plain
-//   origin: no amount, network or token in it. The agent address travels as its own field
-//   (`agentAddress`) and in the nextStep, for the user to paste on the page.
-import { CoreError, type NotarizeResult, type ProofView } from '@4thtech-io/core';
-import type { ToolContext } from './context.js';
+// - The top-up link (06 §2.1 `topUpUrl`, 08 §1, D-113): `https://{payHost}/#v=1&a=<agent
+//   address>&usd=<suggested amount>`, built by the core's `buildTopUpLink` from the shipped pay
+//   host. Address and amount sit in the fragment; no network or token is in it. The host is never
+//   read from a route, a result or any inbound text. The agent address also travels as its own
+//   field (`agentAddress`).
+// - M1-36f: `needs_credits` says plainly what is missing (the price and, when known, the amount
+//   missing, in dollars) and gives one next step.
+// - M1-36i-c (D-120 (3)): after a free test credits claim added credits, `notarizeWithFreeCredits`
+//   waits for them to arrive, at most FREE_CREDITS_WAIT.maxMs, reading the agent's credits through
+//   the same read-only `account` call as `agentlink_status`, and then tries the same proof request
+//   exactly once more. Never a second claim and never a second retry; when the credits do not
+//   arrive in time, the result is the plain `needs_credits` one (call again in a minute). The retry
+//   spends nothing the first call did not already ask for: the same request, under the same policy
+//   and approvals in the core. Nothing read during the wait reaches a result or a log line.
+import { PAY_PAGE, type PayPageConfig } from '@4thtech-io/chain';
+import {
+  CoreError,
+  buildTopUpLink,
+  suggestTopUpUsd,
+  type NotarizeInput,
+  type NotarizeResult,
+  type ProofView,
+} from '@4thtech-io/core';
+import type { AccountView, ProofTools, ToolContext } from './context.js';
+import type { FreeCreditsOutcome } from './free-credits.js';
 import {
   fail,
   internalError,
@@ -22,12 +41,9 @@ import {
   type HandlerOutput,
 } from './result.js';
 import { proofDisclosure, topUpDisclosure, withDisclosure } from './strings/privacy.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerCard, noOwnerResult } from './text.js';
+import { NPX_COMMAND } from './cli-command.js';
 
-/** The deposit page origin (D-28 testing hostnames; 08 §1: a separate origin, no owner keys). */
-export const TOP_UP_ORIGIN = 'https://pay.agentlink.4thtech.io';
-
-const AGENT_ID = /^0x[0-9a-f]{40}$/;
 const USD = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$/;
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
 
@@ -38,30 +54,52 @@ export function dollars(usd: unknown): string | undefined {
   return `$${whole ?? '0'}.${(frac + '00').slice(0, Math.max(2, frac.replace(/0+$/, '').length))}`;
 }
 
-/** The top-up link (06 §2.1): the plain deposit origin. Undefined for a malformed agent ID. */
-export function topUpUrl(agentId: string): string | undefined {
-  return AGENT_ID.test(agentId) ? `${TOP_UP_ORIGIN}/` : undefined;
+/**
+ * The top-up link (06 §2.1, D-113). Undefined while the pay page is not live (the shipped config
+ * says so until the page exists) or when the agent ID is malformed. `shortfallUsd` (a checked USD
+ * decimal) sets the suggested amount per 08 §1; without it the link has no `usd`.
+ */
+export function topUpUrl(
+  agentId: string,
+  shortfallUsd?: string,
+  payPage: PayPageConfig = PAY_PAGE,
+): string | undefined {
+  if (!payPage.live) return undefined;
+  const usd = shortfallUsd === undefined ? undefined : suggestTopUpUsd(shortfallUsd);
+  return buildTopUpLink({
+    agentAddress: agentId,
+    payHost: payPage.host,
+    ...(usd === undefined ? {} : { usd }),
+  });
 }
 
 export const PROOF_TEXT = Object.freeze({
   recorded: 'Proof recorded. {fee} from credits.',
   recordedNoFee: 'Proof recorded.',
+  // M1-33d-b: `requestReceipt` on a message that already had proof. Fixed text, no slot (I-5).
+  receiptRequestNotAdded:
+    'This message already had proof, so no delivery confirmation was asked for.',
   recording: 'The proof is being recorded; this usually takes under a minute.',
   recordingNextStep:
     'Call agentlink_get_proof with this envelopeId in a minute to check that it was recorded.',
-  needsCredits: 'Adding proof costs {fee}, and there are not enough credits for it.',
-  needsCreditsNoFee: 'There are not enough credits to add proof.',
+  // M1-36f: what is missing, in dollars.
+  needsCredits: 'Adding proof costs {fee}. This agent needs {usd} more in credits.',
+  needsCreditsPriceOnly:
+    "Adding proof costs {fee}, and this agent doesn't have enough credits for it.",
+  needsCreditsShortOnly: 'This agent needs {usd} more in credits to add proof.',
+  needsCreditsNoFee: "This agent doesn't have enough credits to add proof.",
   needsCreditsNextStep:
-    'Tell the user to add credits for agent ID {agentId} here: {url} (messages and files stay free). Then call this tool again.',
+    'Adding proof needs credits. Tell the user to add at least {usd} here: {url}. {covers}Messages and files stay free. Then call this tool again.',
+  needsCreditsNextStepNoAmount:
+    'Adding proof needs credits. Tell the user to add credits here: {url}. {covers}Messages and files stay free. Then call this tool again.',
+  covers: '$5 covers {n} proofs. ',
   needsCreditsNoLink:
-    'Tell the user to add credits in the AgentLink app (messages and files stay free). Then call this tool again.',
+    'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
   approval: "Adding proof needs the owner's approval, so nothing was recorded yet.",
   failed: "The proof couldn't be recorded.",
-  failedNextStep:
-    'Tell the user the proof was not recorded. They can run `agentlink doctor` in their own terminal to see why.',
+  failedNextStep: `Tell the user the proof was not recorded. They can run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
   unavailable: "Adding proof isn't available on this machine, so nothing was recorded.",
-  unavailableNextStep:
-    'Tell the user proof needs AgentLink set up with proof support. They can run `agentlink doctor` to check.',
+  unavailableNextStep: `Tell the user proof needs AgentLink set up with proof support. They can run \`${NPX_COMMAND} doctor\` to check.`,
   notFound:
     "That message wasn't found among the messages this agent sent, so nothing was recorded.",
   notFoundNextStep: 'Check the envelopeId in agentlink_inbox (with includeSent), then call again.',
@@ -75,11 +113,9 @@ export const PROOF_TEXT = Object.freeze({
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this. Only they can change the rules.',
   cardExpired: "This agent's profile expires too soon to add proof, so nothing was recorded.",
-  cardExpiredNextStep:
-    "Tell the user to renew this agent's profile in their own terminal (`agentlink owner`), then try again.",
+  cardExpiredNextStep: `Tell the user to renew this agent's profile in their own terminal (\`${NPX_COMMAND} owner\`), then try again.`,
   network: "Proof recording can't be reached right now, so nothing was recorded.",
-  networkNextStep:
-    'Try again in a few minutes. If it keeps failing, the user can run `agentlink doctor`.',
+  networkNextStep: `Try again in a few minutes. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\`.`,
   unsupported: "That proof option isn't supported in this version, so nothing was recorded.",
   unsupportedNextStep:
     'Call again without that override: AgentLink picks where to record the proof automatically.',
@@ -88,6 +124,16 @@ export const PROOF_TEXT = Object.freeze({
     'Call the tool again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
+  // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that
+  // needed credits. 11 §5: never the service's own name, nor "gas" or "token".
+  freeCreditsAdded: 'Added free test credits so you can try proof. Nothing was recorded yet.',
+  freeCreditsAddedNextStep:
+    'In about a minute, call agentlink_notarize with envelopeId {envelopeId} to add the proof.',
+  // M1-36i-c: the retry after the wait recorded the proof (or started recording it).
+  freeCreditsUsed: 'Added free test credits.',
+  freeCreditsPaused: 'Free test credits are paused right now. Try again later.',
+  freeCreditsPausedNextStep:
+    'Tell the user free test credits are paused right now, so the proof has to wait. Try again later.',
 });
 
 const fill = (template: string, slots: Readonly<Record<string, string>>): string =>
@@ -96,26 +142,176 @@ const fill = (template: string, slots: Readonly<Record<string, string>>): string
     template,
   );
 
-/** The `needs_credits` result (06 §1 rule 3, §2.1): agent address and top-up link. */
+/** How many proofs $5 covers at this fee (06 §2.4), or undefined when the fee is unknown or zero. */
+function proofsPerFiveDollars(feeUsd: string | undefined): number | undefined {
+  if (feeUsd === undefined || !USD.test(feeUsd)) return undefined;
+  const fee = Number(feeUsd);
+  return fee > 0 ? Math.floor(5 / fee + 1e-9) : undefined;
+}
+
+/**
+ * The `needs_credits` result (06 §1 rule 3, §2.1, §2.4): agent address and the top-up link. The
+ * route's `usd` is the shortfall: it sets "add at least" and the link's suggested amount.
+ */
 export function needsCredits(
   agentId: string,
-  route: { readonly feeUsd?: string } | undefined,
+  route: { readonly feeUsd?: string; readonly usd?: string } | undefined,
   fields: Readonly<Record<string, unknown>> = {},
+  payPage: PayPageConfig = PAY_PAGE,
 ): HandlerOutput {
-  const url = topUpUrl(agentId);
+  const shortfall = dollars(route?.usd) === undefined ? undefined : route?.usd;
+  const url = topUpUrl(agentId, shortfall, payPage);
   const fee = dollars(route?.feeUsd);
+  const add = dollars(shortfall);
   const summary =
-    fee === undefined ? PROOF_TEXT.needsCreditsNoFee : fill(PROOF_TEXT.needsCredits, { fee });
+    fee !== undefined && add !== undefined
+      ? fill(PROOF_TEXT.needsCredits, { fee, usd: add })
+      : fee !== undefined
+        ? fill(PROOF_TEXT.needsCreditsPriceOnly, { fee })
+        : add !== undefined
+          ? fill(PROOF_TEXT.needsCreditsShortOnly, { usd: add })
+          : PROOF_TEXT.needsCreditsNoFee;
+  const proofs = proofsPerFiveDollars(route?.feeUsd);
+  const covers = proofs === undefined ? '' : fill(PROOF_TEXT.covers, { n: String(proofs) });
   const nextStep =
     url === undefined
       ? PROOF_TEXT.needsCreditsNoLink
-      : fill(PROOF_TEXT.needsCreditsNextStep, { url, agentId });
+      : add === undefined
+        ? fill(PROOF_TEXT.needsCreditsNextStepNoAmount, { url, covers })
+        : fill(PROOF_TEXT.needsCreditsNextStep, { usd: add, url, covers });
   // 11 §5.6: the top-up method says the paying account is publicly linked (D-109).
-  return fail('needs_credits', summary, withDisclosure(nextStep, topUpDisclosure()), undefined, {
+  const stepText = url === undefined ? nextStep : withDisclosure(nextStep, topUpDisclosure());
+  return fail('needs_credits', summary, stepText, undefined, {
     ...fields,
     agentAddress: agentId,
     ...(url === undefined ? {} : { topUpUrl: url }),
   });
+}
+
+/**
+ * M1-36i: free test credits on the first `needs_credits` with a route (tools/free-credits.ts). The
+ * runtime's claim checks the testnet allowlist and remembers the claim; anything it throws is
+ * `none`, so the result is the plain `needs_credits` one. Only the route's chain ID is passed.
+ */
+export async function claimFreeCredits(
+  result: NotarizeResult,
+  context: ToolContext,
+): Promise<FreeCreditsOutcome> {
+  const claim = context.client.proofs?.freeCredits;
+  if (claim === undefined || result.status !== 'needs_credits') return 'none';
+  const chainId = result.topUp?.chainId;
+  if (typeof chainId !== 'number' || !Number.isSafeInteger(chainId)) return 'none';
+  try {
+    const outcome = await claim(chainId);
+    return outcome === 'added' || outcome === 'paused' ? outcome : 'none';
+  } catch {
+    context.logger.info('free test credits not added', { code: 'claim_failed' });
+    return 'none';
+  }
+}
+
+/**
+ * M1-36i-c: how long a proof tool waits for free test credits to arrive before its one retry, and
+ * how often it reads the credits meanwhile. A fixed bound: well under the shortest tool-call
+ * timeout of the AI apps we checked (60 s, mcp/approval-wait.ts), with room for the retry itself.
+ */
+export const FREE_CREDITS_WAIT = Object.freeze({ maxMs: 20_000, intervalMs: 2_000 });
+
+/** A checked decimal USD amount (credits reads carry up to 18 decimals). */
+const USD_READ = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,18})?$/;
+
+/** True when one credits balance covers the price of a proof (any balance when no price is known). */
+function creditsCoverProof(view: AccountView | undefined): boolean {
+  if (view === undefined) return false;
+  const price = view.prices.find((p) => p.action === 'notarize')?.usd;
+  const needed = typeof price === 'string' && USD_READ.test(price) ? Number(price) : 0;
+  return view.credits.some(
+    (c) =>
+      typeof c.usd === 'string' &&
+      USD_READ.test(c.usd) &&
+      Number(c.usd) > 0 &&
+      Number(c.usd) >= needed,
+  );
+}
+
+const pause = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
+ * Waits for the credits to arrive, within FREE_CREDITS_WAIT; true once they cover a proof. Reads
+ * only (`account`); an error or no answer is "not yet". Nothing it reads is logged or returned.
+ */
+async function freeCreditsArrived(context: ToolContext, agentId: string): Promise<boolean> {
+  const proofs = context.client.proofs;
+  if (proofs === undefined) return false;
+  const { maxMs, intervalMs } = FREE_CREDITS_WAIT;
+  const started = Date.now();
+  const reads = Math.floor(maxMs / intervalMs);
+  for (let read = 0; read < reads; read += 1) {
+    if (Date.now() - started + intervalMs > maxMs) break;
+    await pause(intervalMs);
+    let view: AccountView | undefined;
+    try {
+      view = await proofs.account(agentId);
+    } catch {
+      view = undefined; // the error could carry an RPC URL (I-7): never read
+    }
+    if (creditsCoverProof(view)) return true;
+  }
+  return false;
+}
+
+/**
+ * Core `notarize`, then (M1-36i, M1-36i-c) on the first `needs_credits` with a testnet route: the
+ * free test credits claim and, only when it added credits, a bounded wait for them and exactly one
+ * retry of the same request. The retry's result is final: it never claims or retries again. A
+ * thrown error from either call reaches the caller (proofThrown).
+ */
+export async function notarizeWithFreeCredits(
+  proofs: Pick<ProofTools, 'notarize'>,
+  request: NotarizeInput,
+  context: ToolContext,
+  agentId: string,
+): Promise<{ readonly result: NotarizeResult; readonly freeCredits: FreeCreditsOutcome }> {
+  const first = await proofs.notarize(request);
+  const freeCredits = await claimFreeCredits(first, context);
+  if (freeCredits !== 'added') return { result: first, freeCredits };
+  const arrived = await freeCreditsArrived(context, agentId);
+  context.logger.info('free test credits wait', { arrived });
+  if (!arrived) return { result: first, freeCredits };
+  return { result: await proofs.notarize(request), freeCredits };
+}
+
+/** The `needs_credits` result after a free test credits claim (M1-36i): fixed text only. */
+function withFreeCredits(
+  output: HandlerOutput,
+  outcome: FreeCreditsOutcome | undefined,
+  envelopeId: string | undefined,
+): HandlerOutput {
+  if (outcome === 'added' && envelopeId !== undefined && ENVELOPE_ID.test(envelopeId)) {
+    // The credits are on their way: no top-up link to share, one next action.
+    const rest: Record<string, unknown> = { ...output.result };
+    delete rest['topUpUrl'];
+    return {
+      result: {
+        ...(rest as typeof output.result),
+        summary: PROOF_TEXT.freeCreditsAdded,
+        nextStep: fill(PROOF_TEXT.freeCreditsAddedNextStep, { envelopeId }),
+      },
+    };
+  }
+  if (outcome === 'paused') {
+    return {
+      result: {
+        ...output.result,
+        summary: `${String(output.result.summary)} ${PROOF_TEXT.freeCreditsPaused}`,
+        nextStep: PROOF_TEXT.freeCreditsPausedNextStep,
+      },
+    };
+  }
+  return output;
 }
 
 /**
@@ -203,8 +399,7 @@ export async function needsIdentity(
 ): Promise<{ readonly agentId: string } | HandlerOutput> {
   const self = await context.client.self();
   if (self === undefined) {
-    const text = noOwnerCard(context.agentName);
-    return fail('needs_setup', text.summary, text.nextStep);
+    return noOwnerResult(context);
   }
   return { agentId: self.agentId };
 }
@@ -236,41 +431,70 @@ export function notarizeOutput(
     readonly approvalNextStepTail?: string;
     /** The recipient under the name rule (06 §2.1), when the caller knows it (send). */
     readonly contactName?: string;
+    /** M1-36i: the free test credits claim this attempt made (claimFreeCredits). */
+    readonly freeCredits?: FreeCreditsOutcome;
+    /** The proof's envelope, for the next step after free test credits were added. */
+    readonly envelopeId?: string;
   } = {},
 ): HandlerOutput {
   const fields = options.fields ?? {};
   const disclosure = proofDisclosure(options.contactName);
   // M1-33d (06 §2.4, 11 §5.6): a proof that asks for a delivery receipt always says what the
   // receipt makes public; any other proof says it the first time in a session.
-  const disclose = (text: string): string =>
-    firstProofOfSession(context) ||
-    ((result.status === 'ok' || result.status === 'submitted') && result.receiptRequested === true)
+  const recorded = result.status === 'ok' || result.status === 'submitted';
+  // M1-33d-b: a request on a message that already had proof was not added; the result says so in
+  // a field and a fixed line, so the agent cannot claim it asked.
+  const notAdded = recorded && result.receiptRequestNotAdded === true;
+  // Nothing new was recorded or asked then, so that result has the not-added line instead of the
+  // disclosure (and leaves the session's first-proof disclosure for the next proof).
+  const disclose = (text: string): string => {
+    if (notAdded) return `${text} ${PROOF_TEXT.receiptRequestNotAdded}`;
+    return firstProofOfSession(context) || (recorded && result.receiptRequested === true)
       ? withDisclosure(text, disclosure)
       : text;
+  };
+  // M1-33d-d (06 §2.4): the core's `receiptRequested` (this proof asks for a delivery receipt) is
+  // a result field too, so the agent can see it without parsing the summary.
+  const requestField =
+    notAdded || !recorded || result.receiptRequested !== true ? {} : { receiptRequested: true };
+  const notAddedField = notAdded ? { receiptRequestNotAdded: true } : requestField;
+  // M1-36i-c: a proof recorded after free test credits were added says so first.
+  const withCreditsUsed = (text: string): string =>
+    options.freeCredits === 'added' ? `${PROOF_TEXT.freeCreditsUsed} ${text}` : text;
   switch (result.status) {
     case 'ok': {
       const fee = dollars(result.fee.usd);
       const text =
         fee === undefined ? PROOF_TEXT.recordedNoFee : fill(PROOF_TEXT.recorded, { fee });
-      return ok(disclose(text), {
+      return ok(disclose(withCreditsUsed(text)), {
         ...fields,
         ...proofFields(result),
+        ...notAddedField,
       });
     }
     case 'submitted':
       return fail(
         'submitted',
-        disclose(PROOF_TEXT.recording),
+        disclose(withCreditsUsed(PROOF_TEXT.recording)),
         PROOF_TEXT.recordingNextStep,
         undefined,
-        { ...fields, ...proofFields(result) },
+        { ...fields, ...proofFields(result), ...notAddedField },
       );
     case 'needs_credits':
-      return needsCredits(agentId, result.topUp, {
-        ...fields,
-        ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
-        receipts: [],
-      });
+      return withFreeCredits(
+        needsCredits(
+          agentId,
+          result.topUp,
+          {
+            ...fields,
+            ...(result.recordId === undefined ? {} : { recordId: result.recordId }),
+            receipts: [],
+          },
+          context.payPage,
+        ),
+        options.freeCredits,
+        options.envelopeId,
+      );
     case 'error':
       return fail('error', PROOF_TEXT.failed, PROOF_TEXT.failedNextStep, result.code, {
         ...fields,
@@ -300,7 +524,11 @@ export function notarizeOutput(
 }
 
 /** The ProofStatus of a stored proof (06 §2.4 `agentlink_get_proof`), by its stored status. */
-export function proofViewOutput(view: ProofView, agentId: string): HandlerOutput {
+export function proofViewOutput(
+  view: ProofView,
+  agentId: string,
+  payPage?: PayPageConfig,
+): HandlerOutput {
   const fields = proofFields(view);
   switch (view.status) {
     case 'recorded':
@@ -328,6 +556,7 @@ export function proofViewOutput(view: ProofView, agentId: string): HandlerOutput
         agentId,
         view.fee === undefined ? undefined : { feeUsd: view.fee.usd },
         fields,
+        payPage,
       );
     case 'failed':
     case 'released':

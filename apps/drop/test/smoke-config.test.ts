@@ -56,8 +56,10 @@ describe('wrangler.toml', () => {
         ]);
       });
 
-      it('raises the CPU limit for large commits (IR-M1-27a-1 L-3)', () => {
-        expect(read(env).limits?.cpu_ms).toBe(30_000);
+      // M1-27b-b: the measured need (about 0.42 s of CPU to hash 100 MiB) plus a wide margin
+      // for slower edge hardware and a cold isolate; tighter than the paid plan's 30 s default.
+      it('sets the CPU limit for large commits to the measured need plus margin (IR-M1-27a-1 L-3)', () => {
+        expect(read(env).limits?.cpu_ms).toBe(5_000);
       });
 
       it('keeps observability, request logging, Logpush and Tail Workers off (04 §4)', () => {

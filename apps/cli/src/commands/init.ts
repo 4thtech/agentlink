@@ -20,6 +20,16 @@
 // An existing agent is reused and never replaced, so `init` can be re-run to add another harness.
 // All key creation is `@4thtech-io/node`'s (`createOsKeychainAgent`); nothing here is crypto, apart
 // from hashing the proposed changes into the confirmation code.
+//
+// M1-36b (owner decisions D1, D5 of 2026-10-22):
+// - D5: without `--agent`, a run for exactly one app names the agent after it (`codex`,
+//   `claude-code`, …; already valid 06 §6 names). Several apps at once, `--harness none`, or a
+//   computer that already has an agent with the usual name keep `default`, so earlier setups and
+//   their MCP entries stay as they are. `--agent` always wins.
+// - D1: in a terminal the owner opened, after the app changes, `init` offers to install AgentLink on
+//   this computer: the exact `npm` command is shown and runs only after a `y`. Run by an agent it
+//   never installs and never asks; it prints the command for the user. Declined or failed, npx stays
+//   the fallback, and every command printed here starts with the form that works (M1-36a).
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
@@ -39,7 +49,6 @@ import {
   HarnessError,
   applyHarness,
   detectHarnesses,
-  displayPath,
   harnessById,
   isHarnessId,
   planHarness,
@@ -65,6 +74,8 @@ import {
   writeAgentConfig,
 } from '../runtime/index.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
+import { GLOBAL_PREFIX, cliPrefix } from '../runtime/cli-prefix.js';
+import { INSTALL_COMMAND, installGlobally, isAgentlinkOnPath } from './global-install.js';
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
 import { copy } from '../tools/strings/index.js';
 import { firstRunStep } from './first-run.js';
@@ -87,6 +98,12 @@ export interface InitDeps {
    * temporary or unsafe copy is running (installed-cli.ts).
    */
   readonly installedCli?: () => Promise<string | undefined>;
+  /** The command that runs AgentLink as it was started (M1-36a `cliPrefix`). */
+  readonly cliPrefix?: () => string;
+  /** Whether an `agentlink` program is on PATH. Absent: treated as installed (no offer, no tip). */
+  readonly agentlinkOnPath?: () => boolean;
+  /** Runs the global install (M1-36b, D1); true when it succeeded. Absent: never offered. */
+  readonly installGlobal?: () => Promise<boolean>;
   /** M1-11b-6: the first-run page step (first-run.ts); true when it handled the owner step. */
   readonly firstRun?: (
     context: CommandContext,
@@ -114,6 +131,9 @@ export function nodeInitDeps(): InitDeps {
     },
     clock: () => Math.floor(Date.now() / 1000),
     installedCli: () => resolveInstalledCli(process.argv[1], process.execPath),
+    cliPrefix: () => cliPrefix(),
+    agentlinkOnPath: () => isAgentlinkOnPath(process.env),
+    installGlobal: () => installGlobally(),
     firstRun: (context, name, interactive) => firstRunStep(context, name, interactive),
   };
 }
@@ -123,7 +143,7 @@ export const HOOK_TEXT = Object.freeze({
   intro:
     'This adds a start-of-session note to Claude Code: a line or two saying who has written to you. It runs the AgentLink program installed on this computer. It never reads message text and changes nothing.',
   noInstall:
-    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run `agentlink init --hook` again. Nothing was changed.',
+    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run the same command again. Nothing was changed.',
   notFound: "Problem  AgentLink didn't find Claude Code on this computer. Nothing was changed.",
   present: 'OK       The AgentLink start-of-session note is already set up in Claude Code',
   conflict:
@@ -131,38 +151,131 @@ export const HOOK_TEXT = Object.freeze({
   updated: 'OK       Claude Code updated. Backup of the old file: {backup}',
   created: 'OK       Claude Code start-of-session note set up',
   restart: 'Warning Claude Code needs a restart. Quit and reopen Claude Code.',
-  rerun: 'Then run: agentlink init --hook{agentFlag} --confirm {code}',
+  rerun: 'Then run: {prefix} init --hook{agentFlag} --confirm {code}',
 });
 
 /** Fixed text that has no entry in the copy sheet yet (no value from a file or the user is inserted). */
 export const INIT_TEXT = Object.freeze({
   badCode:
-    "That confirmation code isn't right. Run `agentlink init` again to see the changes and the code.",
+    "That confirmation code isn't right. Run `{prefix} init` again to see the changes and the code.",
   codeMismatch:
-    "That confirmation code doesn't match the changes proposed now (they may have changed). Run `agentlink init` again to see them and the new code.",
+    "That confirmation code doesn't match the changes proposed now (they may have changed). Run `{prefix} init` again to see them and the new code.",
   identity: "AgentLink will create this agent's identity and keep it in your system keychain.",
   identityDone: 'OK       Agent identity created',
   nothingToDo: 'OK AgentLink is already set up. Nothing to change.',
   present: 'OK       {appName} is already set up for AgentLink',
   conflict:
     '{appName} already has an entry named agentlink that is different, so AgentLink left it as it is. Nothing was changed there.',
-  rerun: 'Then run: agentlink init{agentFlag}{harnessFlag}{configFlag} --confirm {code}',
+  rerun: 'Then run: {prefix} init{agentFlag}{harnessFlag}{configFlag} --confirm {code}',
   updated: 'OK       {appName} updated. Backup of the old file: {backup}',
   created: 'OK       {appName} set up',
   ownerStep:
-    "One step left, and you must do it yourself: run `agentlink owner init` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
+    "One step left, and you must do it yourself: run `{prefix} owner init{agentFlag}` in your own terminal. Don't let your AI run it or see the code it shows. It's what stops any AI, including your own, from approving its own actions.",
   noAppsHere: "Problem  AgentLink didn't find {apps} on this computer.",
-  appsAll: 'Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity',
+  appsAll:
+    'Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
   // No Claude desktop app on Linux, so it is not named there.
-  appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode or Antigravity',
+  appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
   restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
-    'No app was changed. Your agent identity is kept. To set up one app later, run: agentlink init --harness <app>',
+    'No app was changed. Your agent identity is kept. To set up one app later, run `{prefix} init --harness <app>`.',
   ownerStepAdd:
-    "One step left, and you must do it yourself: run `agentlink owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
+    "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',
+  chooseAgent:
+    'This computer has more than one AgentLink agent, so AgentLink won’t pick one for you. Run `{prefix} init --agent <name>` with the agent this app should use. Nothing was changed.',
+  // M1-36b (D1). Fixed text: the command is a constant, nothing from a file or the user.
+  installOffer:
+    'Recommended: install AgentLink on this computer. Your AI apps then start it faster, and the commands AgentLink shows you are shorter.',
+  installCommand: `This runs: ${INSTALL_COMMAND}`,
+  installQuestion: 'Install it now? (y/N)',
+  installing: 'Installing AgentLink. This can take a minute…',
+  installed: 'OK       AgentLink is installed on this computer',
+  installSkipped: `OK       Not installed. AgentLink keeps working without it. To install it later, run: ${INSTALL_COMMAND}`,
+  installFailed: `Problem  The install didn't finish, so AgentLink keeps working without it. To try again, run: ${INSTALL_COMMAND}`,
+  installTip: `Recommended: install AgentLink on this computer, so it starts faster. In a terminal, run: ${INSTALL_COMMAND}`,
 });
+
+/** `{prefix}` (M1-36a) and `{agentFlag}` filled in; the name is a checked 06 §6 name. */
+function initText(text: string, prefix: string, name?: string): string {
+  return text
+    .replaceAll('{prefix}', prefix)
+    .replaceAll(
+      '{agentFlag}',
+      name === undefined || name === DEFAULT_AGENT_NAME ? '' : ` --agent ${name}`,
+    );
+}
+
+/** D5: the agent name an app gets when `--agent` is not given (each id is a valid 06 §6 name). */
+export const agentNameForApp = (def: HarnessDef): string => def.id;
+
+/** Local agent names on this computer, or undefined when they can't be listed. */
+async function knownAgents(deps: InitDeps): Promise<readonly string[] | undefined> {
+  try {
+    return await listAgentNames(deps.home, deps.uid === undefined ? {} : { uid: deps.uid });
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * D5 (IR-M1-36b-1): an existing agent is always reused, never a second one created without
+ * `--agent`. `default` when it exists; else the only agent on this computer; with several and no
+ * `default`, undefined (the owner must name one). Only a computer with no agent yet gets a new one:
+ * named after the app when the run is for exactly one app, otherwise `default`. Agents that can't be
+ * listed: `default`, as before M1-36b.
+ */
+async function defaultAgentName(
+  deps: InitDeps,
+  apps: readonly HarnessDef[] | undefined,
+): Promise<string | undefined> {
+  const known = await knownAgents(deps);
+  if (known === undefined) return DEFAULT_AGENT_NAME;
+  const valid = known.filter((n) => isAgentName(n));
+  if (valid.includes(DEFAULT_AGENT_NAME)) return DEFAULT_AGENT_NAME;
+  if (valid.length === 1) return valid[0];
+  if (valid.length > 1) return undefined;
+  const [app] = apps ?? [];
+  if (apps?.length !== 1 || app === undefined) return DEFAULT_AGENT_NAME;
+  return agentNameForApp(app);
+}
+
+/**
+ * D1: in a terminal the owner opened, offers the global install with its exact command and runs it
+ * only after a `y`. Returns the command prefix to print from now on.
+ */
+async function offerInstall(context: CommandContext, deps: InitDeps): Promise<string> {
+  const { output } = context;
+  const prefix = deps.cliPrefix?.() ?? cliPrefix();
+  if (deps.installGlobal === undefined || deps.agentlinkOnPath === undefined) return prefix;
+  if (prefix === GLOBAL_PREFIX || deps.agentlinkOnPath()) return prefix;
+  output.print('');
+  output.print(INIT_TEXT.installOffer);
+  output.print(INIT_TEXT.installCommand);
+  output.print(INIT_TEXT.installQuestion);
+  if (!/^\s*y(es)?\s*$/i.test(await deps.readLine())) {
+    output.print(INIT_TEXT.installSkipped);
+    return prefix;
+  }
+  output.print(INIT_TEXT.installing);
+  if (!(await deps.installGlobal())) {
+    output.printError(INIT_TEXT.installFailed);
+    return prefix;
+  }
+  output.print(INIT_TEXT.installed);
+  // The bare name only when the new program is really reachable; npx works either way.
+  return deps.agentlinkOnPath() ? GLOBAL_PREFIX : prefix;
+}
+
+/** D1, run by an agent: the command for the user, never run here. */
+function installTip(context: CommandContext, deps: InitDeps): void {
+  const prefix = deps.cliPrefix?.() ?? cliPrefix();
+  if (deps.agentlinkOnPath === undefined || prefix === GLOBAL_PREFIX || deps.agentlinkOnPath()) {
+    return;
+  }
+  context.output.print(INIT_TEXT.installTip);
+}
 
 const DESKTOP_APP_NAME = harnessById('claude-desktop').appName;
 const CODE_PATTERN = /^[0-9a-f]{4}-?[0-9a-f]{4}$/i;
@@ -178,7 +291,6 @@ function confirmationCode(
   target: string,
   config: ConfigTarget | undefined,
   changes: readonly ChangePlan[],
-  platform: NodeJS.Platform,
 ): string {
   // The target harness and the `--config` file are bound too, so a code shown for one harness or
   // file never confirms another (D-78).
@@ -186,7 +298,8 @@ function confirmationCode(
     `agentlink-init-v2 ${name} ${createIdentity ? 'new' : 'existing'} ${target}`,
     `config ${config === undefined ? '-' : hashText(`${config.dir}\0${config.name}`)}`,
     ...changes.map(
-      (c) => `${c.def.id} ${hashText(displayPath(c.def, config, platform))} ${hashText(c.text)}`,
+      // M1-36g-c: the path shown and the file written, as resolved by the plan (environment applied).
+      (c) => `${c.def.id} ${hashText(`${c.path}\0${c.file}`)} ${hashText(c.text)}`,
     ),
   ];
   const digest = encodeHex(sha256(new TextEncoder().encode(lines.join('\n'))));
@@ -195,12 +308,19 @@ function confirmationCode(
 
 const withApp = (text: string, appName: string): string => text.replaceAll('{appName}', appName);
 
+function printDiff(output: CommandContext['output'], plan: ChangePlan): void {
+  output.print(copy('cli.init.changesFor', { appName: plan.def.appName }));
+  // The diff holds text from the user's own file: sanitized like any printed value (06 §8).
+  for (const line of plan.diff) output.print(sanitizeTerminalText(line));
+}
+
 function printPlan(
   context: CommandContext,
   plans: readonly HarnessPlan[],
   createIdentity: boolean,
   listApps: boolean,
   platform: NodeJS.Platform,
+  showDiffs = true,
 ): void {
   const { output } = context;
   // With `--harness <id|none>` the owner chose, and nothing was looked for.
@@ -213,12 +333,12 @@ function printPlan(
   }
   if (createIdentity) output.print(INIT_TEXT.identity);
   for (const plan of plans) {
+    if (plan.status === 'change' && !showDiffs) continue;
     output.print('');
     switch (plan.status) {
       case 'change':
-        output.print(copy('cli.init.changesFor', { appName: plan.def.appName }));
-        // The diff holds text from the user's own file: sanitized like any printed value (06 §8).
-        for (const line of plan.diff) output.print(sanitizeTerminalText(line));
+        // In a terminal, each diff is printed right above its own question instead (UX-B F9).
+        if (showDiffs) printDiff(output, plan);
         break;
       case 'present':
         output.print(withApp(INIT_TEXT.present, plan.def.appName));
@@ -253,10 +373,21 @@ async function createIdentity(deps: InitDeps, name: string): Promise<void> {
 async function runHookOptIn(
   context: CommandContext,
   deps: InitDeps,
-  name: string,
+  requested: string,
   confirmValue: string | undefined,
 ): Promise<number> {
   const { output, terminal } = context;
+  let name = requested;
+  // D5: `default` when it exists, else the Claude Code agent, else the only agent.
+  if (context.parsed.agent === undefined) {
+    const known = await knownAgents(deps);
+    if (known !== undefined && !known.includes(DEFAULT_AGENT_NAME)) {
+      const claude = agentNameForApp(HOOK_HARNESS);
+      const valid = known.filter((n) => isAgentName(n));
+      if (valid.includes(claude)) name = claude;
+      else if (valid.length === 1 && valid[0] !== undefined) name = valid[0];
+    }
+  }
   const prefix = deps.installedCli === undefined ? undefined : await deps.installedCli();
   if (prefix === undefined) {
     output.printError(HOOK_TEXT.noInstall);
@@ -321,10 +452,15 @@ async function runHookOptIn(
   } else if (confirmValue === undefined) {
     output.print('');
     output.print(copy('cli.init.agentConfirm', { code }));
-    output.print(HOOK_TEXT.rerun.replace('{agentFlag}', agentFlag).replace('{code}', code));
+    output.print(
+      HOOK_TEXT.rerun
+        .replace('{prefix}', deps.cliPrefix?.() ?? cliPrefix())
+        .replace('{agentFlag}', agentFlag)
+        .replace('{code}', code),
+    );
     return EXIT_OK;
   } else if (confirmValue.replace('-', '').toLowerCase() !== code.replace('-', '')) {
-    output.printError(INIT_TEXT.codeMismatch);
+    output.printError(initText(INIT_TEXT.codeMismatch, deps.cliPrefix?.() ?? cliPrefix()));
     return EXIT_FAILED;
   }
 
@@ -346,10 +482,10 @@ async function runHookOptIn(
 export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandler {
   return async (context) => {
     const { output, parsed, terminal } = context;
+    const startPrefix = deps.cliPrefix?.() ?? cliPrefix();
 
     // Arguments: `--agent` is checked here too (the dispatcher already did), the code by its form.
-    const name = parsed.agent ?? DEFAULT_AGENT_NAME;
-    if (!isAgentName(name)) {
+    if (parsed.agent !== undefined && !isAgentName(parsed.agent)) {
       output.printError(RUNTIME_MESSAGES.agent_name_invalid);
       return EXIT_USAGE;
     }
@@ -362,7 +498,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       return EXIT_USAGE;
     }
     if (typeof confirmValue === 'string' && !CODE_PATTERN.test(confirmValue)) {
-      output.printError(INIT_TEXT.badCode);
+      output.printError(initText(INIT_TEXT.badCode, startPrefix));
       return EXIT_USAGE;
     }
     // D-78 (06 §7): `--harness <id|none>`; `--config` only with OpenCode or Antigravity. The typed
@@ -394,7 +530,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
         output.printError(DISPATCH_TEXT.badArguments);
         return EXIT_USAGE;
       }
-      return runHookOptIn(context, deps, name, confirmValue);
+      return runHookOptIn(context, deps, parsed.agent ?? DEFAULT_AGENT_NAME, confirmValue);
     }
     const chosen: HarnessDef | undefined =
       typeof harnessValue === 'string' && isHarnessId(harnessValue)
@@ -421,18 +557,10 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       }
     }
 
-    const existing = await readAgentConfig(
-      deps.home,
-      name,
-      deps.uid === undefined ? {} : { uid: deps.uid },
-    );
-    const needIdentity = existing === undefined;
-
-    const harnessContext: HarnessContext = {
+    const baseContext: HarnessContext = {
       home: deps.home,
       env: terminal.env,
       ...(deps.platform === undefined ? {} : { platform: deps.platform }),
-      ...(name === DEFAULT_AGENT_NAME ? {} : { agent: name }),
       now: deps.clock(),
       ...(deps.uid === undefined ? {} : { uid: deps.uid }),
       ...(config === undefined ? {} : { config }),
@@ -440,7 +568,26 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     let targets: readonly HarnessDef[];
     if (harnessValue === 'none') targets = [];
     else if (chosen !== undefined) targets = [chosen];
-    else targets = await detectHarnesses(harnessContext);
+    else targets = await detectHarnesses(baseContext);
+
+    // D5: named after the app unless `--agent` says otherwise.
+    const name =
+      parsed.agent ?? (await defaultAgentName(deps, harnessValue === 'none' ? undefined : targets));
+    if (name === undefined) {
+      // Local names are agent-written text: none is shown (agent-name.ts).
+      output.printError(initText(INIT_TEXT.chooseAgent, startPrefix));
+      return EXIT_USAGE;
+    }
+    const existing = await readAgentConfig(
+      deps.home,
+      name,
+      deps.uid === undefined ? {} : { uid: deps.uid },
+    );
+    const needIdentity = existing === undefined;
+    const harnessContext: HarnessContext = {
+      ...baseContext,
+      ...(name === DEFAULT_AGENT_NAME ? {} : { agent: name }),
+    };
     const listApps = harnessValue === undefined;
     const plans: HarnessPlan[] = [];
     for (const def of targets) plans.push(await planHarness(def, harnessContext));
@@ -448,20 +595,16 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     const blocked = plans.some((p) => p.status === 'blocked');
 
     const target = typeof harnessValue === 'string' ? harnessValue : '*';
-    const code = confirmationCode(
-      name,
-      needIdentity,
-      target,
-      config,
-      changes,
-      deps.platform ?? process.platform,
-    );
+    const code = confirmationCode(name, needIdentity, target, config, changes);
     const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
 
     if (!needIdentity && changes.length === 0) {
       printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
       output.print(INIT_TEXT.nothingToDo);
-      await deps.firstRun?.(context, name, interactive); // M1-11b-6
+      if (interactive) await offerInstall(context, deps);
+      else installTip(context, deps);
+      // M1-11b-6: after the install offer (M1-36b), so the step's fallback names the working command.
+      await deps.firstRun?.(context, name, interactive);
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
@@ -472,15 +615,23 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     }
 
     // Nothing has been written yet. Show everything first (D-39).
-    printPlan(context, plans, needIdentity, listApps, deps.platform ?? process.platform);
+    printPlan(
+      context,
+      plans,
+      needIdentity,
+      listApps,
+      deps.platform ?? process.platform,
+      !interactive,
+    );
 
     let approved: readonly ChangePlan[];
     let declined = false;
     if (interactive) {
       const yes: ChangePlan[] = [];
       for (const change of changes) {
+        // UX-B F9: the header and diff once, right above their question.
         output.print('');
-        output.print(copy('cli.init.changesFor', { appName: change.def.appName }));
+        printDiff(output, change);
         output.print(copy('cli.init.apply'));
         const answer = await deps.readLine();
         if (/^\s*y(es)?\s*$/i.test(answer)) yes.push(change);
@@ -494,17 +645,17 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       output.print('');
       output.print(copy('cli.init.agentConfirm', { code }));
       output.print(
-        INIT_TEXT.rerun
-          .replace('{agentFlag}', name === DEFAULT_AGENT_NAME ? '' : ` --agent ${name}`)
+        initText(INIT_TEXT.rerun, startPrefix, name)
           // Fixed values only: the checked harness id, never the typed --config path (I-5).
           .replace('{harnessFlag}', typeof harnessValue === 'string' ? ` --harness ${target}` : '')
           .replace('{configFlag}', config === undefined ? '' : ` --config ${INIT_TEXT.configPlace}`)
           .replace('{code}', code),
       );
+      installTip(context, deps);
       return blocked && changes.length === 0 && !needIdentity ? EXIT_FAILED : EXIT_OK;
     } else {
       if (confirmValue.replace('-', '').toLowerCase() !== code.replace('-', '')) {
-        output.printError(INIT_TEXT.codeMismatch);
+        output.printError(initText(INIT_TEXT.codeMismatch, startPrefix));
         return EXIT_FAILED;
       }
       approved = changes;
@@ -545,7 +696,11 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
         );
       }
     }
-    if (declined) output.print(INIT_TEXT.declinedKept);
+    // D1: offered after the app changes, so the owner step below uses the command that works.
+    let prefix = startPrefix;
+    if (interactive) prefix = await offerInstall(context, deps);
+    else installTip(context, deps);
+    if (declined) output.print(initText(INIT_TEXT.declinedKept, prefix));
     // D-78: with another agent already on this computer, the owner adds this one to the existing
     // owner instead of a second `owner init`. Names follow the 06 §6 pattern (nothing to sanitize).
     let others: string[] = [];
@@ -561,7 +716,9 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       return failed ? EXIT_FAILED : EXIT_OK;
     }
     output.print(
-      others.length > 0 ? INIT_TEXT.ownerStepAdd.replace('{name}', name) : INIT_TEXT.ownerStep,
+      others.length > 0
+        ? initText(INIT_TEXT.ownerStepAdd, prefix).replace('{name}', name)
+        : initText(INIT_TEXT.ownerStep, prefix, name),
     );
     return failed ? EXIT_FAILED : EXIT_OK;
   };

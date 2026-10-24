@@ -1,6 +1,6 @@
 // Tool results (06 §1 rules 2 and 3, §2.5; M1-9c). Every tool returns a `status`, a one-sentence
 // `summary` and, when the status is not `ok`, a `nextStep`; `pending_approval` adds the
-// `approvalId`. The handlers build results only through these helpers, and `finalizeResult` checks
+// `approvalId` and points at `agentlink_get_approval` to check the decision (M1-36d). The handlers build results only through these helpers, and `finalizeResult` checks
 // each one before it leaves the server:
 //
 // - `summary` and `nextStep` are our text: I-JSON, 1 to 500 code points, no control or format
@@ -12,6 +12,7 @@
 //   offending text.
 import { toolResultCommonSchema, type McpStatus } from '@4thtech-io/types';
 import type { ToolContext } from './context.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 /** A tool result: the common fields plus the tool's own `structuredContent` fields. */
 export type ToolResult = {
@@ -39,12 +40,12 @@ export interface HandlerOutput {
 /** Fixed text (I-5: never built from a value). */
 export const RESULT_TEXT = Object.freeze({
   internalSummary: 'Something went wrong in AgentLink, so nothing was done.',
-  internalNextStep:
-    'Tell the user AgentLink hit a problem. They can run `agentlink doctor` in their own terminal to see why.',
+  internalNextStep: `Tell the user AgentLink hit a problem. They can run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
   invalidSummary: "That request isn't valid for this tool, so nothing was done.",
   invalidNextStep: "Check the tool's input fields and call it again.",
   notAvailableSummary:
     "This AgentLink tool isn't available in this version yet, so nothing was done.",
+  approvalCheckHint: 'To check the decision, call agentlink_get_approval.',
   notAvailableNextStep:
     'Tell the user this AgentLink feature is coming in a later version. Nothing else is needed now.',
 });
@@ -91,7 +92,7 @@ export function pendingApproval(
       status: 'pending_approval',
       summary,
       approvalId,
-      nextStep: context.approvalNextStep(approvalId),
+      nextStep: `${context.approvalNextStep(approvalId)} ${RESULT_TEXT.approvalCheckHint}`,
     },
   };
 }

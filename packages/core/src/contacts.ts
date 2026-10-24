@@ -38,7 +38,6 @@ import {
   encodeBase64url,
   encodeHex,
   formatFingerprint,
-  parseJson,
   randomBytes,
   type AgentCard,
   type JsonValue,
@@ -65,6 +64,7 @@ import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { openOwnCard, readIdentity } from './identity.js';
 import { restrictName } from './names.js';
+import { parseOwnerActionText } from './owner-action.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
 import {
@@ -399,7 +399,8 @@ export class ContactBook {
     if (row.safety_check === null || row.pairing !== 'complete') return false;
     let stored: unknown;
     try {
-      stored = parseJson(row.safety_check);
+      // The stored contact.check is a SignedOwnerAction: the received-text parse (04 §2.5.1).
+      stored = parseOwnerActionText(row.safety_check);
     } catch {
       return false;
     }
@@ -471,6 +472,24 @@ export class ContactBook {
     const row = await this.#ctx.store.transaction((tx) => tx.get('contacts', { contact_id: id }));
     if (row === undefined || row.status === 'removed') return notFound();
     return this.#view(row);
+  }
+
+  /**
+   * The digest of a contact's current pairing, recomputed now from its stored signed `handshake` and
+   * `handshake-ack` (04 §3.6.1 steps 1-5), exactly as applyContactCheck recomputes it: `unknown` for
+   * a contact that is not stored, removed, revoked or not paired; `unavailable` when the stored pair
+   * does not verify. For the `contact.check` prepare helper (M1-11r-b) on owner surfaces only.
+   */
+  async currentPairingDigest(contact: string): Promise<PairingDigestLookup> {
+    const ctx = this.#ctx;
+    const row = await ctx.store.transaction((tx) => {
+      const r = tx.get('contacts', { contact_id: contact });
+      return r === undefined || r.status === 'removed' || isRevoked(tx, contact, r) ? undefined : r;
+    });
+    if (row === undefined) return { status: 'unknown' };
+    const pair = await recomputeStoredPairing(ctx, contact, await this.#card(row));
+    if (pair.status === 'ok') return { status: 'ok', pairingDigest: pair.pairingDigest };
+    return pair.reason === 'not_paired' ? { status: 'unknown' } : { status: 'unavailable' };
   }
 
   /**

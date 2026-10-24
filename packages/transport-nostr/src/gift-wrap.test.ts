@@ -797,6 +797,22 @@ describe('unwrapGiftWrap: fail closed (04 §3.1.1 step 2)', () => {
     }
   });
 
+  it('rejects a rumor whose envelope text spells a member name with an escape (D-128, M1-1h-b)', async () => {
+    const sender = referenceKeys();
+    const recipient = referenceKeys();
+    const text = canonicalize(makeEnvelope(sender.pubkey));
+    for (const [from, to] of [
+      ['"v":1', '"\\u0076":1'],
+      ['"ct":', '"\\u0063t":'],
+      ['"kid":', '"\\u006bid":'],
+    ] as const) {
+      const content = text.replace(from, to);
+      expect(content).not.toBe(text);
+      const wrap = referenceWrap(sender, recipient, { content });
+      expect(await codeOf(unwrapGiftWrap(wrap, recipient))).toBe('invalid_envelope');
+    }
+  });
+
   it('rejects a seal or rumor that is not JSON', async () => {
     const sender = referenceKeys();
     const recipient = referenceKeys();

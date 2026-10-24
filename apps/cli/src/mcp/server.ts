@@ -8,6 +8,8 @@
 //   2 and 3, §4). Results are status-driven, never protocol errors (rule 3).
 // - The server instructions are 06 §5, verbatim. No tool list change is ever announced: the list is
 //   fixed for the life of the process.
+// - M1-36h: the default surface hides the `chain?` override (D-39, D-40); `advanced` serves it.
+//   Inputs are checked against the served surface, so a hidden argument is refused, not ignored.
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   CallToolRequestSchema,
@@ -15,7 +17,12 @@ import {
   type CallToolResult,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
-import { callTool, TOOLS, type HandlerEnvironment, type ToolDefinition } from '../tools/index.js';
+import {
+  callTool,
+  toolsFor,
+  type HandlerEnvironment,
+  type ToolDefinition,
+} from '../tools/index.js';
 import { SERVER_INSTRUCTIONS } from './instructions.js';
 
 /** The server name in `initialize` (06: binary `agentlink`, subcommand `mcp`). */
@@ -33,19 +40,48 @@ export function toMcpTool(tool: ToolDefinition): Tool {
   };
 }
 
-export function createMcpServer(env: HandlerEnvironment, version: string): Server {
+/** M1-36j: the per-harness approval wait (approval-wait.ts). Absent: no wait. */
+export interface McpServerOptions {
+  /** The wait in ms for the client's `clientInfo.name` (undefined before `initialize`). */
+  readonly approvalWaitMs?: (clientName: string | undefined) => number;
+  /** The approval read interval (tests). */
+  readonly approvalWaitIntervalMs?: number;
+  /**
+   * M1-36h: serve the Advanced tool surface (`agentlink mcp --advanced`): the `chain?` override of
+   * agentlink_notarize is listed and accepted. Default: the default surface, where it is neither.
+   */
+  readonly advanced?: boolean;
+}
+
+export function createMcpServer(
+  env: HandlerEnvironment,
+  version: string,
+  options: McpServerOptions = {},
+): Server {
   const server = new Server(
     { name: SERVER_NAME, version },
     { capabilities: { tools: { listChanged: false } }, instructions: SERVER_INSTRUCTIONS },
   );
-  const tools = TOOLS.map(toMcpTool);
+  const surface = options.advanced === true ? 'advanced' : 'default';
+  const tools = toolsFor(surface).map(toMcpTool);
   server.setRequestHandler(ListToolsRequestSchema, () => ({ tools }));
-  server.setRequestHandler(CallToolRequestSchema, async (request): Promise<CallToolResult> => {
-    const finished = await callTool(request.params.name, request.params.arguments, env);
-    return {
-      content: [{ type: 'text', text: finished.text }],
-      structuredContent: { ...finished.structured },
-    };
-  });
+  server.setRequestHandler(
+    CallToolRequestSchema,
+    async (request, extra): Promise<CallToolResult> => {
+      const clientName = server.getClientVersion()?.name;
+      const finished = await callTool(request.params.name, request.params.arguments, env, {
+        signal: extra.signal,
+        surface,
+        approvalWaitMs: options.approvalWaitMs?.(clientName) ?? 0,
+        ...(options.approvalWaitIntervalMs === undefined
+          ? {}
+          : { approvalWaitIntervalMs: options.approvalWaitIntervalMs }),
+      });
+      return {
+        content: [{ type: 'text', text: finished.text }],
+        structuredContent: { ...finished.structured },
+      };
+    },
+  );
   return server;
 }

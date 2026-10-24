@@ -12,7 +12,7 @@
 
 **Proof** records a fingerprint of a message or file on a public record, with the time. The other agent can add receipts: delivered, opened, and accepted or rejected. The record holds no content, names or file names.
 
-**What a proof makes public.** Your agent says this before the first proof of a session and on every approval that adds a proof: "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." If the other side confirms delivery, it also becomes public that it went to their agent. That is why delivery confirmations are off by default. You can ask the other side to confirm delivery when you add proof; your agent first says: "Ask Ana to confirm delivery? If they do, anyone can see that this went to their agent." When a contact asks you, your agent says: "Ana asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content." It confirms only if you choose **Confirm delivery**. Turning confirmations on automatically for a contact is planned for v0.2.0. When your agent opens, accepts or rejects something, that receipt is public too: anyone can see that your agent did it, and when. See [What leaves your computer](../privacy-and-security.md).
+**What a proof makes public.** Your agent says this before the first proof of a session and on every approval that adds a proof: "A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says." If the other side confirms delivery, it also becomes public that it went to their agent. That is why delivery confirmations are off by default. You can ask the other side to confirm delivery when you add proof; your agent first says: "Ask Ana to confirm delivery? If they do, anyone can see that this went to their agent." Ana's agent confirms only if she chooses to. When a contact asks you, your agent says: "Ana asked you to confirm delivery. Confirming shows publicly that this reached your agent. Nothing about the content." It confirms only if you choose **Confirm delivery**; **Not now** sends nothing. Turning confirmations on automatically for a contact is planned for v0.2.0. When your agent opens, accepts or rejects something, that receipt is public too: anyone can see that your agent did it, and when. See [What leaves your computer](../privacy-and-security.md).
 
 **A proof of agreement** combines the final terms, their proof and the other side's "accepted" receipt. It shows that both agents agreed to exactly the same terms, and when. For example: "Terms recorded by Tali's agent on 12 Oct 2026 14:02. Accepted by Ana's agent 15:10."
 
@@ -23,15 +23,25 @@
 ## What the next release adds
 
 - Ask "send this to Marko with proof" or "add proof to the message I sent Marko". Proof costs a small fee from credits; your agent mentions it unless you asked for proof, and your rules can make it ask you first.
-- If there are not enough credits, your agent shows your agent ID and a link to add credits.
-- "Send this to Ana with proof and ask her to confirm delivery": your agent asks Ana's agent for a delivery receipt. Ana's agent tells her and confirms only if she says so.
+- **Free test credits.** While AgentLink runs on test networks, the first proof that needs credits gets a small amount of free test credits, once per agent, with nothing for you to do. Your agent says it added them and records the proof about a minute later. If the free credits are paused, your agent says so and you try again later. They are for testing and have no value.
+- If there are not enough credits and no free test credits apply, your agent shows your agent ID and a link to add credits.
+- "Send this to Ana with proof and ask her to confirm delivery": your agent asks Ana's agent for a delivery receipt. Ana's agent tells her and confirms only if she chooses **Confirm delivery**; asking never confirms anything by itself. If the message already had proof, your agent can't add the request any more and tells you so.
 - "Has Marko opened it?": your agent can show a proof and its receipts. It adds an "opened" receipt only when you asked it to open a message, and "accepted" or "rejected" only with your approval.
 - "Save a proof file": your agent saves it into your proofs folder (`~/AgentLink/Proofs` by default). The message content goes into the file only after you approve it.
 - "Check this proof file": your agent can check a proof file from your proofs or inbox folder (never any other folder), or one pasted into the chat.
 - Check one yourself in a terminal: `agentlink verify <proof file>` with a file in your proofs or inbox folder. The first line says whether the proof checks out; "Record only" means the record is real but the proof doesn't show who wrote the content. A proof on a test network is labelled "Test network" and is not a live proof.
 - The person you sent a proof to can save a proof file for it too, so either side can show it later.
-- `agentlink credits` shows your agent ID, your credits in dollars and the price of adding proof; `agentlink credits --topup` says how much to add and where.
+- `agentlink credits` shows your agent ID, your credits in dollars and the price of adding proof; `agentlink credits --topup` says how much to add. There is no page to add credits from yet.
 - Recording offers and acceptances (proof of agreement) comes with v0.2.0; until then your agent says it is not available yet, and nothing is sent.
+
+## Try it end to end
+
+The shortest path, with a paired contact (the full session is in [Send your first message](../get-started/first-message.md)):
+
+1. Send a file, or a message, with "Send this to Marko with proof".
+2. Say OK to the cost and the public notice; approve in your own terminal with `npx -y @4thtech-io/agentlink approve <approval ID>` if your agent asks.
+3. Ask "Save a proof file for it."
+4. Run `npx -y @4thtech-io/agentlink verify ~/AgentLink/Proofs/<file>.json`. Exit codes: 0 verified, 3 record only, 1 does not check out, 4 not checked.
 
 ## Outline
 

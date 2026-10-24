@@ -46,6 +46,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `packages/storage/**` | S1 | Storage credentials, presigned URLs, OAuth tokens, SSRF (the drop adapter's request signing → S2) |
 | `packages/types/**` | S1 | Inbound validation schemas (envelope, payload, policy schema changes → S2) |
 | `packages/ui/**` | S1 | Approval and policy UI; runs inside the console origin |
+| `apps/local-ui/**` | S1 | Local owner UI; the browser never signs; presence is enforced server-side (proposed, owner confirms at merge; D-118) |
 | `apps/cli/**` | S1 | MCP tool surface, files, inbound content (owner operations → S2) |
 | `apps/console/**` | S2 | Generates and holds the owner seed; signs approvals and policies |
 | `apps/cloud-agent/**` | S2 | Generates and holds agent seeds; OAuth owner proof |
@@ -202,6 +203,16 @@ VERDICT:           PASS | PASS WITH FINDINGS | FAIL
 Full reports MAY contain unfixed vulnerability details, so they are stored privately, in `4thtech/agentlink-ops` (D-26) under `audits/reviews/` for both repositories. The PR (public) gets one line in its **Independent review** section: report ID, verdict, finding counts by severity, tracker IDs, and the link to the private report. A report MAY be published under `docs/audits/reviews/` once all its findings are closed.
 
 ---
+
+### 4.6 Moved head: mechanical merge of `origin/main` (D-126)
+
+When an approved PR's head moves **only** by a mechanical merge of `origin/main`, the fresh review may be a lightweight automated verification by a fresh-context worker (any model, for example Haiku) instead of a full session. It checks exactly three facts and nothing else:
+
+1. `git show --remerge-diff <merge sha>` is empty (no hand conflict resolution).
+2. The PR's own diff against `main` is byte-identical to the previously approved head's diff.
+3. Required CI is green on the new head.
+
+It records the result as follows (*Orchestrator wording:*) `IR-<TASK-ID>-<n>: PASS (mechanical) at <full sha>`; `review-gate` (c) accepts the `(mechanical)` marker unchanged. Any non-empty remerge-diff, any change to the PR's own diff, or any S2 conflict resolution still needs a full independent review (Opus; Fable for keys, crypto, money or contracts, §4.1).
 
 ## 5. Area checklists
 
