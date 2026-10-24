@@ -30,6 +30,7 @@ function fakeClient(
   return {
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
+    listActivity: () => Promise.reject(new Error('not used')),
     proofs: { list, creditsBalance: credits },
   };
 }
