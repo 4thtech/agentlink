@@ -6839,7 +6839,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 
 #### M3-4b-t-T4-d · gasless top-up: local UI method (new, D-123, T4 plan 2026-10-23)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus audit · **Security:** S2 (money path UI, D-116 styling) · **Phase:** M3 (pulled forward by D-123)
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/{top-up.tsx,strings.ts,data.ts,proofs.test.tsx}`, `apps/local-ui/src/api/client.ts`, new `e2e/test/local-ui-gasless-topup.test.ts`
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/{top-up.tsx,strings.ts,data.ts,proofs.test.ts}`, `apps/local-ui/src/api/client.ts`, new `e2e/test/local-ui-gasless-topup.test.ts`
 - **Depends on:** M3-4b-t-T4-c, draft PR #435
 - **Spec:** 11 §5, §6.7; `docs/design/README.md`
 - **Scope:**

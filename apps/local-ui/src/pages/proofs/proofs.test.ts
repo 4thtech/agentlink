@@ -9,7 +9,7 @@
 // - An empty list shows one next step: what to ask the AI.
 // - Server values render as text; a row the page does not recognise is left out. Reads only: the
 //   page never sends anything but GET.
-import { act } from 'react';
+import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
@@ -84,7 +84,7 @@ async function mount(routes: Routes): Promise<Call[]> {
   const s = server(routes);
   const api = createApiClient({ fetch: s.fetch, token: 't' });
   await act(async () => {
-    root.render(<ProofsPage api={api} />);
+    root.render(h(ProofsPage, { api }));
     await Promise.resolve();
   });
   // Let both reads settle.
