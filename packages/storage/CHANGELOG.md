@@ -1,5 +1,22 @@
 # @4thtech-io/storage
 
+## 0.2.0
+
+### Patch Changes
+
+- 82a60e6: Storage follow-ups (M1-6b-b): the lifecycle update re-reads before writing and checks the result, errors thrown by a caller's stream surface as a fixed StorageError, and an upload whose create or complete answer was lost is aborted or its object removed.
+- 607dc70: M1-6b-c: the lifecycle helper's read-back now compares the full content of every rule, not only the rule IDs, so a rule another writer changed in place is reported as `lifecycle_failed`.
+- 2286724: M1-6b-d: `apply()` on the lifecycle helper now returns `{ abortIncomplete, warning }`; when the provider drops the abort-incomplete-upload element it reports `dropped` with a plain-words warning (still a success).
+- Updated dependencies [9c56860]
+- Updated dependencies [cb4a63a]
+- Updated dependencies [3a3837b]
+- Updated dependencies [4be1e27]
+- Updated dependencies [0ece43e]
+- Updated dependencies [c6aa21f]
+- Updated dependencies [9dbaa44]
+  - @4thtech-io/log@0.2.0
+  - @4thtech-io/crypto@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes
