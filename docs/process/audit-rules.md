@@ -204,6 +204,16 @@ Full reports MAY contain unfixed vulnerability details, so they are stored priva
 
 ---
 
+### 4.6 Moved head: mechanical merge of `origin/main` (D-126)
+
+When an approved PR's head moves **only** by a mechanical merge of `origin/main`, the fresh review may be a lightweight automated verification by a fresh-context worker (any model, for example Haiku) instead of a full session. It checks exactly three facts and nothing else:
+
+1. `git show --remerge-diff <merge sha>` is empty (no hand conflict resolution).
+2. The PR's own diff against `main` is byte-identical to the previously approved head's diff.
+3. Required CI is green on the new head.
+
+It records the result as follows (*Orchestrator wording:*) `IR-<TASK-ID>-<n>: PASS (mechanical) at <full sha>`; `review-gate` (c) accepts the `(mechanical)` marker unchanged. Any non-empty remerge-diff, any change to the PR's own diff, or any S2 conflict resolution still needs a full independent review (Opus; Fable for keys, crypto, money or contracts, §4.1).
+
 ## 5. Area checklists
 
 Reviewers apply every checklist the diff touches. Item IDs are stable; new items are appended.

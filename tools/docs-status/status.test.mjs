@@ -15,6 +15,8 @@ import { parseYaml } from './yaml.mjs';
 import {
   STATUS_FILE,
   TARGETS,
+  countBacklogCards,
+  renderBacklogCounts,
   renderReadmeRoadmap,
   renderReadmeStatus,
   renderSiteMilestones,
@@ -226,6 +228,86 @@ describe('run', () => {
       expect(run({ root }).changed).toEqual([KB]);
       expect(run({ root, check: true }).problems).toEqual([]);
       expect(existsSync(join(root, KB))).toBe(true);
+    });
+  });
+});
+
+describe('the backlog card counts', () => {
+  const BACKLOG = 'docs/process/backlog.md';
+  const card = (id, status, phase) =>
+    `#### ${id} · title\n- **Status:** ${status} · **Size:** S · **Phase:** ${phase}\n- **Scope:** x\n`;
+  const sample = [
+    '## 1. How to read a card',
+    '```',
+    '#### M1-5a · example in the format fence',
+    '- **Status:** backlog · **Phase:** M1a',
+    '```',
+    card('M0-1', 'done', 'n/a'),
+    card('M1-1a', 'backlog', 'M1a'),
+    card('M1-1b', 'backlog', 'M1b'),
+    card('M1-2', 'backlog', 'M1b (files)'),
+    card('M1-3', 'split into M1-3a, M1-3b (D-118)', 'M1a'),
+    card('M1-4', 'backlog', 'later (not M1)'),
+    card('M2-1', 'backlog', 'M2'),
+    card('M2-2', 'backlog', 'M2 (testnets)'),
+    card('M3-1', 'backlog', 'M3'),
+    card('OPS-L1', 'backlog', 'n/a'),
+    '',
+  ].join('\n');
+
+  it('counts headings, skipping the format example, split parents and later cards', () => {
+    expect(countBacklogCards(sample)).toEqual({ M0: 1, M1a: 1, M1b: 2, M1: 3, M2: 2, M3: 1 });
+  });
+
+  it('renders a table with the totals and the phase split', () => {
+    const out = renderBacklogCounts(null, sample);
+    expect(out).toContain('| M1 Local beta | 3 (M1a 1, M1b 2) |');
+    expect(out).toContain('| M0 Foundations | 1 |');
+    expect(out).toContain('| M2 Console, desktop apps, self-host, design | 2 |');
+    expect(out).toContain('| M3 Mainnet beta | 1 |');
+  });
+
+  describe('in a repository copy', () => {
+    let root;
+    beforeEach(() => {
+      root = mkdtempSync(join(tmpdir(), 'docs-status-counts-'));
+      for (const file of [STATUS_FILE, ...TARGETS.filter((t) => !t.optional).map((t) => t.file)]) {
+        mkdirSync(dirname(join(root, file)), { recursive: true });
+        cpSync(join(repo, file), join(root, file));
+      }
+    });
+    afterEach(() => rmSync(root, { recursive: true, force: true }));
+    const read = () => readFileSync(join(root, BACKLOG), 'utf8');
+
+    it('is in sync in this repository and is a target', () => {
+      expect(TARGETS.some((t) => t.file === BACKLOG)).toBe(true);
+      expect(run({ root, check: true }).problems).toEqual([]);
+    });
+
+    it('fails the check when a card was added without regenerating, then regenerates', () => {
+      writeFileSync(
+        join(root, BACKLOG),
+        `${read()}\n#### M2-999 · added card\n- **Status:** backlog · **Phase:** M2\n`,
+      );
+      const { problems } = run({ root, check: true });
+      expect(problems.join('\n')).toContain(BACKLOG);
+      expect(problems.join('\n')).toContain('node tools/docs-status/index.mjs');
+      expect(problems.join('\n')).toContain('never edit the card counts by hand');
+      expect(run({ root }).changed).toEqual([BACKLOG]);
+      expect(run({ root, check: true }).problems).toEqual([]);
+    });
+
+    it('fails the check when the counts were edited by hand', () => {
+      writeFileSync(
+        join(root, BACKLOG),
+        read().replace(/\| M0 Foundations \| \d+ \|/, '| M0 Foundations | 1 |'),
+      );
+      expect(run({ root, check: true }).problems.join('\n')).toContain(BACKLOG);
+    });
+
+    it('fails when the markers are missing', () => {
+      writeFileSync(join(root, BACKLOG), read().replace('<!-- backlog-counts:start -->', ''));
+      expect(run({ root, check: true }).problems.join('\n')).toContain('backlog-counts');
     });
   });
 });

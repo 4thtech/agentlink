@@ -260,6 +260,59 @@ export function renderKnowledgeMilestones(data) {
 
 // --- Targets: which file gets which block ----------------------------------------------------------
 
+// --- Backlog card counts ----------------------------------------------------------------------------
+// The counts in docs/process/backlog.md are derived from the card headings, never typed by hand.
+// A card is a `#### <ID> · title` heading outside a code fence (so the §1 format example is not
+// one). Not counted: split parents (Status starts with "split into", their parts are counted) and
+// cards whose Phase starts with "later" (not in a milestone). M1 cards split into M1a and M1b by
+// the first word of their `**Phase:**` field.
+
+const BACKLOG_FILE = 'docs/process/backlog.md';
+
+/** Counts cards per section: { M0, M1a, M1b, M1, M2, M3 } (M1 is M1a + M1b + M1 cards with no phase). */
+export function countBacklogCards(text) {
+  const lines = text.split('\n');
+  const counts = { M0: 0, M1a: 0, M1b: 0, M1: 0, M2: 0, M3: 0 };
+  let fenced = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].startsWith('```')) fenced = !fenced;
+    if (fenced) continue;
+    const heading = /^#### (M[0-3])-\S+/.exec(lines[i]);
+    if (!heading) continue;
+    let status = '';
+    let phase = '';
+    for (let j = i + 1; j < lines.length && !lines[j].startsWith('#'); j += 1) {
+      status = status || (/\*\*Status:\*\*\s*(.*)$/.exec(lines[j])?.[1] ?? '');
+      phase = phase || (/\*\*Phase:\*\*\s*(.*)$/.exec(lines[j])?.[1] ?? '');
+      if (status && phase) break;
+    }
+    if (/^split into/i.test(status) || /^later/i.test(phase)) continue;
+    const section = heading[1];
+    if (section === 'M1') {
+      const word = /^M1([ab])\b/.exec(phase);
+      if (word) counts[`M1${word[1]}`] += 1;
+      counts.M1 += 1;
+    } else {
+      counts[section] += 1;
+    }
+  }
+  return counts;
+}
+
+export function renderBacklogCounts(_data, backlogText) {
+  const c = countBacklogCards(backlogText);
+  return [
+    '| Section | Cards |',
+    '|---|---|',
+    `| M0 Foundations | ${c.M0} |`,
+    `| M1 Local beta | ${c.M1} (M1a ${c.M1a}, M1b ${c.M1b}) |`,
+    `| M2 Console, desktop apps, self-host, design | ${c.M2} |`,
+    `| M3 Mainnet beta | ${c.M3} |`,
+  ].join('\n');
+}
+
+// --- Targets ---------------------------------------------------------------------------------------
+
 /**
  * `optional` targets (the knowledge overview) are skipped when the
  * file is absent or carries none of the markers; once a file has the markers they are enforced.
@@ -277,6 +330,12 @@ export const TARGETS = [
       'status-milestones': renderSiteMilestones,
       'status-roadmap-detail': renderSiteRoadmapDetail,
     },
+  },
+  {
+    file: BACKLOG_FILE,
+    handEditHint:
+      'the card counts are generated from the card headings: never edit the card counts by hand',
+    blocks: { 'backlog-counts': renderBacklogCounts },
   },
   {
     file: 'knowledge/agentlink-overview.md',
@@ -361,7 +420,7 @@ export function run({ root, check = false }) {
     let text = original;
     let applied = 0;
     for (const [name, render] of Object.entries(target.blocks)) {
-      const result = replaceBlock(text, name, render(data));
+      const result = replaceBlock(text, name, render(data, original));
       if (result.missing) {
         if (target.optional) skipped.push(`${target.file} has no ${name} markers; skipped`);
         else
@@ -383,7 +442,9 @@ export function run({ root, check = false }) {
       changed.push(target.file);
       if (check) {
         problems.push(
-          `${target.file} is out of date with ${STATUS_FILE}; run: node tools/docs-status/index.mjs`,
+          target.handEditHint
+            ? `${target.file} is out of date (${target.handEditHint}); run: node tools/docs-status/index.mjs`
+            : `${target.file} is out of date with ${STATUS_FILE}; run: node tools/docs-status/index.mjs`,
         );
       } else {
         writeFileSync(path, text);

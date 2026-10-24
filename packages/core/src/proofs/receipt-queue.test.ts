@@ -10,7 +10,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from '../client.js';
 import { MemoryStore } from '../store/memory-store.js';
 import { FakeNotary, FEE_UNITS } from '../testing/chain.js';
-import { QUEUED_RECEIPT_WAIT_MS } from './service.js';
+import {
+  QUEUED_RECEIPT_WAIT_MS,
+  RECEIPT_NOT_FOUND_RETRIES,
+  RECEIPT_NOT_FOUND_RETRY_MS,
+} from './service.js';
 import {
   FakeClock,
   RecordingApprovalChannel,
@@ -247,5 +251,104 @@ describe('queued posts stay short and come after new envelopes (IR-M1-34-b-1 M-1
     expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
       status: 'rejected',
     });
+  });
+});
+
+describe('a lagging client RPC that reports RecordNotFound retries the receipt once (M1-34-c)', () => {
+  /** B's platform with a recorded sleep; `onSleep` runs when the fixed retry delay has passed. */
+  function lagging(sleeps: number[], onSleep: () => void): ProofsPlatform {
+    return {
+      ...chain.platform(),
+      sleep: (ms: number) => {
+        sleeps.push(ms);
+        onSleep();
+        return Promise.resolve();
+      },
+    };
+  }
+
+  const failedRows = (agent: Agent) =>
+    agent.store.transaction((tx) => tx.select('proofs', { status: 'receipt_failed' }));
+  const recordedRows = (agent: Agent) =>
+    agent.store.transaction((tx) => tx.select('proofs', { status: 'receipt_recorded' }));
+
+  /** Hides the record from the chain reads until the returned function runs (a lagging RPC). */
+  function hide(recordId: string): () => void {
+    const saved = chain.records.get(recordId);
+    if (saved === undefined) throw new Error('test: no record');
+    chain.records.delete(recordId);
+    return () => {
+      chain.records.set(recordId, saved);
+    };
+  }
+
+  it('the retry count and delay are fixed: one retry after a short fixed delay', () => {
+    expect(RECEIPT_NOT_FOUND_RETRIES).toBe(1);
+    expect(RECEIPT_NOT_FOUND_RETRY_MS).toBeGreaterThan(0);
+    expect(RECEIPT_NOT_FOUND_RETRY_MS).toBeLessThanOrEqual(5_000);
+  });
+
+  it('RecordNotFound once, then the record is found: the receipt is stored on-chain', async () => {
+    const sleeps: number[] = [];
+    let show: () => void = () => undefined;
+    const { a, b } = await twoAgents(lagging(sleeps, () => show()));
+    const { envelopeId, recordId } = await notarizedText(a, b);
+    const senderCredits = chain.creditOf(a.id);
+    show = hide(recordId);
+    const calls = chain.calls.acknowledge;
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'ok',
+      receipt: 'OPENED',
+      onChain: true,
+    });
+    expect(sleeps).toEqual([RECEIPT_NOT_FOUND_RETRY_MS]);
+    expect(chain.records.get(recordId)?.receiptAt[1]).not.toBe(0n);
+    expect(await recordedRows(b)).toHaveLength(1);
+    expect(await failedRows(b)).toEqual([]);
+    // Only the retried post reached the submitter: the client's own simulation refused the first.
+    expect(chain.calls.acknowledge - calls).toBe(1);
+    // Nobody pays again: the recipient holds nothing, the sender's fee was charged once (12 §2).
+    expect(chain.creditOf(b.id)).toBe(0n);
+    expect(chain.creditOf(a.id)).toBe(senderCredits);
+  });
+
+  it('a record still absent after the retry ends receipt_failed, after exactly one retry', async () => {
+    const sleeps: number[] = [];
+    const { a, b } = await twoAgents(lagging(sleeps, () => undefined));
+    const { envelopeId, recordId } = await notarizedText(a, b);
+    hide(recordId);
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      onChain: false,
+    });
+    expect(sleeps).toEqual([RECEIPT_NOT_FOUND_RETRY_MS]);
+    expect(await failedRows(b)).toHaveLength(1);
+    expect(await queued(b)).toEqual([]);
+    // Terminal: later passes and asks neither wait nor post again.
+    const calls = chain.calls.acknowledge;
+    await b.client.proofs.processInbound([]);
+    await b.client.acknowledge({ envelopeId, type: 'opened' });
+    expect(sleeps).toHaveLength(1);
+    expect(chain.calls.acknowledge).toBe(calls);
+  });
+
+  it('a queued receipt posted on a later pass retries once too, with the same signed bytes', async () => {
+    const sleeps: number[] = [];
+    let show: () => void = () => undefined;
+    const { a, b } = await twoAgents(lagging(sleeps, () => show()));
+    const { envelopeId, recordId } = await notarizedText(a, b);
+    chain.censor = true;
+    await b.client.acknowledge({ envelopeId, type: 'opened' });
+    const signed = (await queued(b))[0]?.record_json;
+    expect(signed).toBeTypeOf('string');
+    show = hide(recordId);
+    chain.censor = false;
+    await b.client.proofs.processInbound([]);
+    expect(sleeps).toEqual([RECEIPT_NOT_FOUND_RETRY_MS]);
+    expect(chain.records.get(recordId)?.receiptAt[1]).not.toBe(0n);
+    expect(await queued(b)).toEqual([]);
+    const rows = await recordedRows(b);
+    expect(rows).toHaveLength(1);
+    // The retry re-sent the stored item; nothing was signed again (04 §5).
+    expect(rows[0]?.record_json).toBe(signed);
   });
 });
