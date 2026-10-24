@@ -349,6 +349,8 @@ export {
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
 export type {
+  DepositAuthAnswer,
+  DepositAuthPort,
   FreeCreditsAnswer,
   FreeCreditsPort,
   ProofChain,

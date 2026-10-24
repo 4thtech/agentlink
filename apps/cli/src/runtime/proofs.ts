@@ -268,7 +268,7 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
 
   // M3-4b-t-T4-b: the gasless top-up route, on the same fixed submitter URLs. Off by default: it
   // sends nothing while the chain package's kill switch is off, and only the core's owner-approved
-  // path calls it (never an MCP tool, I-4). The core's `depositAuth` field lands with T4-a.
+  // path calls it (never an MCP tool, I-4); the core's `ProofsPlatform.depositAuth` (T4-a).
   const ports =
     urls.length === 0 ? {} : { depositAuth: nodeDepositAuthPort({ fetchFn, urls, configs }) };
   const platform: ProofsPlatform = Object.freeze({
