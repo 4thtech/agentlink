@@ -940,7 +940,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** the check fails for 0, a negative number, `Infinity`, `NaN` and 120001, and passes for the shipped suites; no vector changes.
 
 #### DOCS-04-28-WORDING · 04 §2.8: "64 KiB KeyStore item limit" means the total across all items (new, IR-M1-9i-b2-2)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
+- **Status:** in review · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md §2.8
 - **Depends on:** —
 - **Scope:** in 04 §2.8, state that the "64 KiB KeyStore item limit" is the total across all items, not a per-item limit. Source: IR-M1-9i-b2-2.
