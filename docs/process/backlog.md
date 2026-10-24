@@ -324,7 +324,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A quadratic mutant of the scanner turns the L3 test red.
 
 #### M0-8c · Logger hardening, round 2 follow-ups (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8b
 - **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8b-1, round 2 (findings R2-L2 and R2-L4, both Low)
@@ -940,7 +940,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** the check fails for 0, a negative number, `Infinity`, `NaN` and 120001, and passes for the shipped suites; no vector changes.
 
 #### DOCS-04-28-WORDING · 04 §2.8: "64 KiB KeyStore item limit" means the total across all items (new, IR-M1-9i-b2-2)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
+- **Status:** in review · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md §2.8
 - **Depends on:** —
 - **Scope:** in 04 §2.8, state that the "64 KiB KeyStore item limit" is the total across all items, not a per-item limit. Source: IR-M1-9i-b2-2.
@@ -954,7 +954,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:** titles `M1-9ze ...` and `M1-1g-j ...` pass; `M1-9zzz`, a missing ID and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
 
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`
 - **Depends on:** —
 - **Scope:** The same entry-export problem as CHORE-SUBMITTER-WRANGLER-DEV (#342): `apps/drop/src/index.ts` exports `DEFAULTS`, `readConfig`, `ipBucket`, `METRICS`, `packageName` and types next to the Worker handler and the `DropState` Durable Object, and local `wrangler dev` breaks on non-handler exports. Keep only the handler and the Durable Object class on the entry module; move the shared constants and helpers behind a separate module that tests and other code import directly.
@@ -3539,7 +3539,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** `credentialDigest` vectors in the `recovery-kit` suite (salt, Unicode and JCS escaping cases); no raw seed crosses the control interfaces (type test); the controls are reachable from no MCP tool handler (import fence); tests first (`RED (expected):` commit).
 
 #### M1-9i-c · node: KeyStore export, import and storage credential items (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (PR "M1-9i-c node: KeyStore export, import and restore") · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node/src/\*\*
 - **Depends on:** M1-9i-b (kit format), M1-9i-b2 (the three controls)
 - **Spec:** 04 §2.2 (`s3:<id>`), §2.3.3 (restore order and refusals), §2.8 (`owner-next`, write protocol); 07 §9.1
@@ -4300,7 +4300,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-1 · local UI: first run and shared states (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `packages/node/src/local-ui-first-run-browser.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1, M1-11s-c
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
@@ -5055,7 +5055,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
 
 #### M1-9zc-b · cli: the runtime-guard mutation copies sit next to `dist/` (new, IR-M1-9zc-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (bundle test)
 - **Depends on:** M1-9zc
 - **Scope:** the M1-9zc mutation copies of the bundle are written outside `dist/`, so a moved native import fails with `ERR_MODULE_NOT_FOUND` instead of a real `.node` load. Write the copies next to `dist/` so relative resolution works and the test catches an actual native module load before the Node version check. Source: IR-M1-9zc-1.
@@ -5093,7 +5093,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit; a test with a matching contact id but a different owner fingerprint or card hash is refused and writes nothing; the matching case passes; no test is weakened.
 
 #### M1-9zf-b · core: a test that isolates the owner-fingerprint clause of invite binding (new, IR-M1-9zf-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review (test only) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (pairing tests)
 - **Depends on:** M1-9zf
 - **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
@@ -5279,7 +5279,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Each tool result with a pending step carries one next action; vocabulary lint passes.
 
 #### M1-36e · agent UX: vocabulary lint everywhere, fix terminal leaks (UX-E) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (touches `packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (touches `packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · new `apps/cli/src/vocabulary.ts` and `vocabulary.test.ts`, `packages/node/src/approval-page.test.ts`, docs-site lint in `tools/`
 - **Depends on:** M1-36a, M1-36c, M1-36d
 - **Spec:** 11 §5
@@ -6762,7 +6762,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
 #### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
 - **Depends on:** M3-4b-t
 - **Spec:** 07 §7; D-123
@@ -6784,7 +6784,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Both boundary cases are tests in the submitter's own suite.
 
 #### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**
@@ -6793,7 +6793,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
 
 #### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**

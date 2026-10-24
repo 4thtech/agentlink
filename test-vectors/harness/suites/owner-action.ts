@@ -1,7 +1,7 @@
 // Suite `owner-action` (M1-7d; 04 §2.5.1, §2.5.2, D-68, G-28): the core's SignedOwnerAction
 // verification. `sign` computes the JCS text, the body hash and the tagged signature input through
 // @4thtech-io/core, and signs that input with BIP-340 and the case's aux randomness. `verify` and
-// `verifyJson` run the core's pure verifier against the receiving core described by `context`: its
+// `verifyText` run the core's pure verifier against the receiving core described by `context`: its
 // agent address, the card's ownerNostr and the clock, an empty nonce table, the applied policy
 // version (absent = 0) and the pending request(s) an approval names. `outcome` is whether the core
 // accepts the object. A `verify` case whose signed body is a `contact.check` (selected by its op,
@@ -56,7 +56,7 @@ interface VectorContext {
 type OwnerActionInput =
   | { op: 'sign'; body: Record<string, unknown>; secretKey: string; auxRand: string }
   | { op: 'verify'; signed: unknown; context: VectorContext }
-  | { op: 'verifyJson'; json: string; context: VectorContext };
+  | { op: 'verifyText'; json: string; context: VectorContext };
 
 function parseInput(input: unknown): OwnerActionInput {
   const i = input as Record<string, unknown> | null;
@@ -72,7 +72,7 @@ function parseInput(input: unknown): OwnerActionInput {
   if (i?.op === 'verify' && Object.hasOwn(i, 'signed') && isObject(i.context)) {
     return i as OwnerActionInput;
   }
-  if (i?.op === 'verifyJson' && typeof i.json === 'string' && isObject(i.context)) {
+  if (i?.op === 'verifyText' && typeof i.json === 'string' && isObject(i.context)) {
     return i as OwnerActionInput;
   }
   throw new TypeError('owner-action: input does not match any op of case.schema.json');

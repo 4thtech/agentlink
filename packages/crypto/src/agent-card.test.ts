@@ -241,6 +241,12 @@ describe('parseAgentCardJson', () => {
     expect(hashAgentCard(parseAgentCardJson(text)).digest).toEqual(hashAgentCard(CARD).digest);
   });
 
+  it('parses an escape inside a string value (M1-1h-b, 04 §2.5.1)', () => {
+    const escaped = text.replace('"agentEvm":"0x', '"agentEvm":"\\u0030x');
+    expect(escaped).not.toBe(text);
+    expect(parseAgentCardJson(escaped)).toEqual(CARD);
+  });
+
   it.each([
     ['a duplicate key', text.slice(0, -1) + ',"keyEpoch":0}'],
     ['version 1.0', text.replace('"version":1,', '"version":1.0,')],
@@ -258,6 +264,9 @@ describe('parseAgentCardJson', () => {
     ],
     ['issuedAt 01760000000', text.replace('"issuedAt":1760000000', '"issuedAt":01760000000')],
     ['trailing content', text + 'x'],
+    // M1-1h-b (D-128, 04 §2.5.1): a member name written with an escape.
+    ['an escaped member name', text.replace('"agentEvm":', '"\\u0061gentEvm":')],
+    ['an escaped member name at the end', text.replace('"keyEpoch":', '"keyEpoc\\u0068":')],
     ['not an object', '[' + text + ']'],
   ])('refuses %s', (_, candidate) => {
     expect(candidate).not.toBe(text);

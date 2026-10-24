@@ -16,8 +16,10 @@
 import { homedir } from 'node:os';
 import { isatty } from 'node:tty';
 import { join } from 'node:path';
+import { unlink } from 'node:fs/promises';
 import {
   CryptoInputError,
+  KeyStoreError,
   KEYSTORE_KDF_DEFAULTS,
   MASTER_SEED_LENGTH,
   randomBytes,
@@ -53,6 +55,7 @@ import {
   type KeychainProbe,
 } from './keychain.js';
 import { HARNESS_MARKERS } from './owner-terminal.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 type KeystoreKek = Awaited<ReturnType<typeof newKeystoreKek>>;
 type KeystoreEntry = Awaited<ReturnType<typeof openKeystoreFile>>['entries'][number];
@@ -81,13 +84,13 @@ const lockFile = (dir: string, agentId: string): string => join(dir, `${agentId}
 const keystoreLocked = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_locked',
-    "The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; `agentlink doctor` shows how.",
+    `The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; \`${CLI_COMMAND} doctor\` shows how.`,
   );
 
 const openFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_open_failed',
-    "The agent's key file did not open: the unlock code is wrong, or the file is damaged or belongs to another agent. Check the code; `agentlink doctor` shows what is wrong.",
+    `The agent's key file did not open: the unlock code is wrong, or the file is damaged or belongs to another agent. Check the code; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 const fileMissing = (): NodeKeyStoreError =>
@@ -117,13 +120,13 @@ const keychainAvailable = (): NodeKeyStoreError =>
 const needsTerminal = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_opt_in_refused',
-    'A key file is set up only in an interactive terminal. Run `agentlink init --keystore file` yourself, in a terminal window you opened.',
+    `A key file is set up only in an interactive terminal. Run \`${CLI_COMMAND} init --keystore file\` yourself, in a terminal window you opened.`,
   );
 
 const harnessDetected = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'harness_detected',
-    'This looks like a terminal your AI app controls. Run `agentlink init --keystore file` yourself, in a terminal window you opened, so your AI never sees the unlock code.',
+    `This looks like a terminal your AI app controls. Run \`${CLI_COMMAND} init --keystore file\` yourself, in a terminal window you opened, so your AI never sees the unlock code.`,
   );
 
 /** The inter-process lock's own errors (NodeStoreError) become `keystore_failed` here. */
@@ -253,6 +256,44 @@ export async function writeAgentFile(
   } finally {
     wipe(storeKey);
   }
+}
+
+/**
+ * M1-9i-c (04 §2.3.3 restore step 5, D-115 C): writes a restored agent's items as a new `ALKS` file
+ * under `kek` (a new generated unlock code) and reads it back. Under the agent's lock: an existing
+ * file is `item_exists` and is left as it was, so a restore never overwrites. A file that does not
+ * read back and open under `kek` is removed again. The caller owns `entries` and `kek`.
+ */
+export async function importAgentFile(
+  dir: string,
+  agentId: string,
+  kek: KeystoreKek,
+  entries: readonly KeystoreEntry[],
+  fs: KeystoreFsOptions = {},
+): Promise<void> {
+  assertAgentId(agentId);
+  await ensureKeystoreDir(dir, fs);
+  await withAgentLock(dir, agentId, async () => {
+    const existing = await readKeystoreFile(dir, agentFile(agentId), fs);
+    if (existing !== null) {
+      wipe(existing);
+      throw new KeyStoreError('item_exists', 'keystore: this agent already has a key file');
+    }
+    const sealed = await sealKeystoreFile(kek, agentId, entries);
+    await writeKeystoreFile(dir, agentFile(agentId), sealed, fs);
+    let back: Uint8Array | null = null;
+    try {
+      back = await readKeystoreFile(dir, agentFile(agentId), fs);
+      if (back === null) throw keystoreFailed();
+      const opened = await openKeystoreFileWithKek(back, kek, agentId);
+      wipe(...opened.map((entry) => entry.value));
+    } catch {
+      await unlink(join(dir, agentFile(agentId))).catch(() => undefined);
+      throw keystoreFailed();
+    } finally {
+      wipe(sealed, back ?? undefined);
+    }
+  });
 }
 
 export interface CreateFileAgentOptions {

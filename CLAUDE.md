@@ -7,5 +7,5 @@ Only Claude-Code-specific notes belong below.
 
 ## Claude Code notes
 
-- Delegate with the Agent tool and set `model` per the routing table in AGENTS.md (`haiku` / `sonnet` / `opus`). Use `isolation: "worktree"` for workers that write in parallel.
+- Delegate with the Agent tool and set `model` per the routing table in AGENTS.md (`haiku` / `sonnet` / `opus`, effort medium / Fable 5.1 → model `fable`). Use `isolation: "worktree"` for workers that write in parallel.
 - The `curator-continuity` skill describes the Curator calls; the block in AGENTS.md applies even if the skill is not activated.

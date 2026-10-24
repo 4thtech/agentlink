@@ -42,6 +42,7 @@ import {
 } from './result.js';
 import { proofDisclosure, topUpDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard, noOwnerResult } from './text.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 const USD = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$/;
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
@@ -96,11 +97,9 @@ export const PROOF_TEXT = Object.freeze({
     'Tell the user this agent needs credits to add proof, and adding credits is not available yet in this version of AgentLink. Messages and files stay free. Do not give a link.',
   approval: "Adding proof needs the owner's approval, so nothing was recorded yet.",
   failed: "The proof couldn't be recorded.",
-  failedNextStep:
-    'Tell the user the proof was not recorded. They can run `agentlink doctor` in their own terminal to see why.',
+  failedNextStep: `Tell the user the proof was not recorded. They can run \`${NPX_COMMAND} doctor\` in their own terminal to see why.`,
   unavailable: "Adding proof isn't available on this machine, so nothing was recorded.",
-  unavailableNextStep:
-    'Tell the user proof needs AgentLink set up with proof support. They can run `agentlink doctor` to check.',
+  unavailableNextStep: `Tell the user proof needs AgentLink set up with proof support. They can run \`${NPX_COMMAND} doctor\` to check.`,
   notFound:
     "That message wasn't found among the messages this agent sent, so nothing was recorded.",
   notFoundNextStep: 'Check the envelopeId in agentlink_inbox (with includeSent), then call again.',
@@ -114,11 +113,9 @@ export const PROOF_TEXT = Object.freeze({
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this. Only they can change the rules.',
   cardExpired: "This agent's profile expires too soon to add proof, so nothing was recorded.",
-  cardExpiredNextStep:
-    "Tell the user to renew this agent's profile in their own terminal (`agentlink owner`), then try again.",
+  cardExpiredNextStep: `Tell the user to renew this agent's profile in their own terminal (\`${NPX_COMMAND} owner\`), then try again.`,
   network: "Proof recording can't be reached right now, so nothing was recorded.",
-  networkNextStep:
-    'Try again in a few minutes. If it keeps failing, the user can run `agentlink doctor`.',
+  networkNextStep: `Try again in a few minutes. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\`.`,
   unsupported: "That proof option isn't supported in this version, so nothing was recorded.",
   unsupportedNextStep:
     'Call again without that override: AgentLink picks where to record the proof automatically.',

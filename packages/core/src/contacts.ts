@@ -38,7 +38,6 @@ import {
   encodeBase64url,
   encodeHex,
   formatFingerprint,
-  parseJson,
   randomBytes,
   type AgentCard,
   type JsonValue,
@@ -65,6 +64,7 @@ import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { openOwnCard, readIdentity } from './identity.js';
 import { restrictName } from './names.js';
+import { parseOwnerActionText } from './owner-action.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
 import {
@@ -399,7 +399,8 @@ export class ContactBook {
     if (row.safety_check === null || row.pairing !== 'complete') return false;
     let stored: unknown;
     try {
-      stored = parseJson(row.safety_check);
+      // The stored contact.check is a SignedOwnerAction: the received-text parse (04 §2.5.1).
+      stored = parseOwnerActionText(row.safety_check);
     } catch {
       return false;
     }
