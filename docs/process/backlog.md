@@ -5047,7 +5047,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
 
 #### M1-9zc-b · cli: the runtime-guard mutation copies sit next to `dist/` (new, IR-M1-9zc-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (bundle test)
 - **Depends on:** M1-9zc
 - **Scope:** the M1-9zc mutation copies of the bundle are written outside `dist/`, so a moved native import fails with `ERR_MODULE_NOT_FOUND` instead of a real `.node` load. Write the copies next to `dist/` so relative resolution works and the test catches an actual native module load before the Node version check. Source: IR-M1-9zc-1.
