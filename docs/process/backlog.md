@@ -5085,7 +5085,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit; a test with a matching contact id but a different owner fingerprint or card hash is refused and writes nothing; the matching case passes; no test is weakened.
 
 #### M1-9zf-b · core: a test that isolates the owner-fingerprint clause of invite binding (new, IR-M1-9zf-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review (test only) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (pairing tests)
 - **Depends on:** M1-9zf
 - **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
