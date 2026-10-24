@@ -50,3 +50,13 @@ export function cliPrefix(info?: LaunchInfo): string {
   const onPath = info?.onPath ?? defaultOnPath;
   return onPath(script) ? GLOBAL_PREFIX : NPX_PREFIX;
 }
+
+let commandPrefixCache: string | undefined;
+
+/**
+ * M1-36e: `cliPrefix()` worked out once per process, for the fixed text tables whose commands are
+ * read through getters (the launch does not change while the program runs).
+ */
+export function commandPrefix(): string {
+  return (commandPrefixCache ??= cliPrefix());
+}

@@ -12,7 +12,7 @@ Your AI sends and reads messages through AgentLink. Some actions need your appro
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
 2. **Run `npx -y @4thtech-io/agentlink owner init`.** (If you have installed the `agentlink` command, `agentlink owner init` does the same. The same goes for every command on this page.)
-3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Keep it in your password manager. It is 24 characters, generated for you, so it is far harder to guess than a password you would choose.
+3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Keep it in your password manager. It is 24 characters, generated for you, so it is far harder to guess than anything you would make up.
 4. **Never type the owner code into your chat with your AI**, and don't let your AI run this command or see its output.
 
 You can approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `agentlink approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Each time you type it, it covers one approval, or one list you review together when you run `agentlink approve` with no ID (agreements are still decided one by one).

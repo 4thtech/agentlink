@@ -227,7 +227,7 @@ export const mcpCommand = (version: string): CommandHandler => {
                 event.fingerprint !== undefined
               ) {
                 logger.info(
-                  'Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with `agentlink doctor`.',
+                  `Approvals on this computer are now protected by a new owner, set up on the setup page. If you did not do this yourself, do not use this agent; check with \`${cliPrefix()} doctor\`.`,
                   { fingerprint: event.fingerprint },
                 );
               }

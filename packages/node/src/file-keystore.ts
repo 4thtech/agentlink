@@ -55,6 +55,7 @@ import {
   type KeychainProbe,
 } from './keychain.js';
 import { HARNESS_MARKERS } from './owner-terminal.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 type KeystoreKek = Awaited<ReturnType<typeof newKeystoreKek>>;
 type KeystoreEntry = Awaited<ReturnType<typeof openKeystoreFile>>['entries'][number];
@@ -83,13 +84,13 @@ const lockFile = (dir: string, agentId: string): string => join(dir, `${agentId}
 const keystoreLocked = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_locked',
-    "The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; `agentlink doctor` shows how.",
+    `The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; \`${CLI_COMMAND} doctor\` shows how.`,
   );
 
 const openFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_open_failed',
-    "The agent's key file did not open: the unlock code is wrong, or the file is damaged or belongs to another agent. Check the code; `agentlink doctor` shows what is wrong.",
+    `The agent's key file did not open: the unlock code is wrong, or the file is damaged or belongs to another agent. Check the code; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 const fileMissing = (): NodeKeyStoreError =>
@@ -119,13 +120,13 @@ const keychainAvailable = (): NodeKeyStoreError =>
 const needsTerminal = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_opt_in_refused',
-    'A key file is set up only in an interactive terminal. Run `agentlink init --keystore file` yourself, in a terminal window you opened.',
+    `A key file is set up only in an interactive terminal. Run \`${CLI_COMMAND} init --keystore file\` yourself, in a terminal window you opened.`,
   );
 
 const harnessDetected = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'harness_detected',
-    'This looks like a terminal your AI app controls. Run `agentlink init --keystore file` yourself, in a terminal window you opened, so your AI never sees the unlock code.',
+    `This looks like a terminal your AI app controls. Run \`${CLI_COMMAND} init --keystore file\` yourself, in a terminal window you opened, so your AI never sees the unlock code.`,
   );
 
 /** The inter-process lock's own errors (NodeStoreError) become `keystore_failed` here. */

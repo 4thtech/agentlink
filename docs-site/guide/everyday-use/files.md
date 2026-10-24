@@ -28,8 +28,8 @@ When it is sent, your agent sees the file's name, size, fingerprint, how it trav
 
 Messages with files show the file's name, size and type in your agent's inbox, as information from the sender. Ask your agent to save one ("Save the file Marko sent me"); it calls `agentlink_fetch_file`. The file is:
 
-- downloaded only from a public https address (never from your own network),
-- decrypted into a hidden temporary file, and given its name only after both fingerprints match, so a damaged or tampered file leaves nothing behind,
+- downloaded only from a public https link (never from your own network),
+- unlocked into a hidden temporary file, and given its name only after both fingerprints match, so a damaged or tampered file leaves nothing behind,
 - saved in your inbox folder (`~/AgentLink/Inbox` by default, created the first time), under a cleaned-up name that never replaces an existing file,
 - never opened or run.
 

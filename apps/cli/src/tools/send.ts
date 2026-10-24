@@ -49,6 +49,7 @@ import {
 import { notarizeOutput, notarizeWithFreeCredits, proofThrown } from './proofs-common.js';
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard, noOwnerResult } from './text.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 /** Fixed text for this tool (I-5: no slot takes another party's or the agent's text). */
 export const SEND_TEXT = Object.freeze({
@@ -66,8 +67,7 @@ export const SEND_TEXT = Object.freeze({
   policyDenied: "The owner's rules don't allow this message, so nothing was sent.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',
-  networkNextStep:
-    'Try again in a minute. If it keeps failing, the user can run `agentlink doctor`.',
+  networkNextStep: `Try again in a minute. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\`.`,
   revoked: 'The owner has turned this agent off, so nothing was sent.',
   revokedNextStep: 'Tell the user this agent was revoked. Only they can set up a new one.',
   tooLarge: 'The message is too large to send, so nothing was sent.',

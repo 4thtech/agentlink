@@ -10,7 +10,7 @@ You never edit a settings file by hand. The installer shows the exact change, an
 
 - **Node.js, the current LTS (22.14 or newer).** Check in a terminal: `node --version`. If it prints `v22.14.0` or higher, you are fine. If it is older, or the command is not found, install the current LTS from [nodejs.org](https://nodejs.org). If you use nvm: `nvm install --lts`, then `nvm use --lts`.
 - One of the supported AI tools, installed.
-- No account, wallet, browser extension or payment.
+- No account, browser extension or payment.
 
 ## 2. Install into your AI tool
 

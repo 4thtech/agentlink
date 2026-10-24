@@ -19,15 +19,21 @@ import * as chain from '@4thtech-io/chain';
 import { hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
-import { cliPrefix } from '../runtime/cli-prefix.js';
+import { cliPrefix, commandPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '../tools/strings/index.js';
 import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } from './shared.js';
 
-/** D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). */
-const DOCTOR_RULES_OK = 'OK       Your rules are in use';
-const DOCTOR_RULES_FAIL_CLOSED =
-  "Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run `agentlink policy recover` to review and confirm them again.";
+/**
+ * D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). M1-36e: the
+ * command starts with `commandPrefix()`, never the bare name.
+ */
+export const DOCTOR_TEXT = Object.freeze({
+  rulesOk: 'OK       Your rules are in use',
+  get rulesFailClosed(): string {
+    return `Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run \`${commandPrefix()} policy recover\` to review and confirm them again.`;
+  },
+});
 
 /** M1-33a (06 §3, D-109; decided by Tali in chat, 2026-10-20): the exact line, after a status word. */
 export const DOCTOR_RECEIPTS_OLDER_DEFAULT =
@@ -50,12 +56,14 @@ export interface DoctorDeps extends CommandDeps {
 /** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
 export const DOCTOR_PROOF_TEXT = Object.freeze({
   ok: 'OK       The public record answers, so proofs can be added and checked',
-  partial:
-    'Warning  Part of the public record did not answer\n         Proofs still work where it answers. Run `agentlink doctor` again later.',
+  get partial(): string {
+    return `Warning  Part of the public record did not answer\n         Proofs still work where it answers. Run \`${commandPrefix()} doctor\` again later.`;
+  },
   down: "Problem  The public record can't be reached\n         Proofs can't be added or checked right now; messages and files still work. Check your connection.",
   none: 'Problem  This version of AgentLink has no public record to add proofs to\n         Update AgentLink.',
-  notChecked:
-    'Not checked in this version: file storage and AI apps (`agentlink doctor` adds them later).',
+  get notChecked(): string {
+    return `Not checked in this version: file storage and AI apps (\`${commandPrefix()} doctor\` adds them later).`;
+  },
 });
 
 /** The default check: one `eth_blockNumber` per automatically selectable chain, in parallel. */
@@ -215,7 +223,7 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         .catch(() => undefined);
       if (rules !== undefined) {
         emit(
-          rules.mode === 'fail_closed' ? DOCTOR_RULES_FAIL_CLOSED : DOCTOR_RULES_OK,
+          rules.mode === 'fail_closed' ? DOCTOR_TEXT.rulesFailClosed : DOCTOR_TEXT.rulesOk,
           rules.mode === 'fail_closed',
         );
         // M1-33a (06 §3 "Existing policies", D-109): a notice, not a problem. A runtime that can't

@@ -4,6 +4,7 @@
 // (04 §2.8 "Selection", 07 §9.1).
 import { CryptoInputError, equalBytes, encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { NodeKeyStoreError } from './errors.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 /** The keychain service of every AgentLink item (04 §2.2). */
 export const KEYCHAIN_SERVICE = 'agentlink';
@@ -197,8 +198,7 @@ export type KeyStoreSelection =
     };
 
 /** 07 §9.4 copy (string key `needs_setup.no_keychain`). */
-const NO_KEYCHAIN =
-  "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `agentlink init --keystore file` yourself, in your own terminal.";
+const NO_KEYCHAIN = `This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run \`${CLI_COMMAND} init --keystore file\` yourself, in your own terminal.`;
 
 /**
  * The backend for a new agent at `init` (04 §2.8, 07 §9.1): the keychain whenever the probe

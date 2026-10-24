@@ -70,6 +70,7 @@ import {
   removeOwnerPasskeyItemIfOurs,
   storeOwnerPasskeySeed,
 } from './owner-passkey.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 /** How long `begin`'s seed is held for `finish` (proposed, owner confirms at merge): 2 minutes. */
 export const SETUP_HOLD_MS = 120_000;
@@ -398,7 +399,7 @@ export async function completeOwnerSetup(
       if (removal === 'failed') {
         throw new NodeKeyStoreError(
           'keychain_failed',
-          'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+          `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
         );
       }
       if (error instanceof NodeKeyStoreError && error.code === 'owner_exists') throw ownerExists();
@@ -433,7 +434,7 @@ export async function completeOwnerSetup(
     if (removal === 'failed') {
       throw new NodeKeyStoreError(
         'keychain_failed',
-        'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
       );
     }
     throw setupFailed();

@@ -171,7 +171,7 @@ export const INIT_TEXT = Object.freeze({
   restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
-    'No app was changed. Your agent identity is kept. To set up one app later, run: {prefix} init --harness <app>',
+    'No app was changed. Your agent identity is kept. To set up one app later, run `{prefix} init --harness <app>`.',
   ownerStepAdd:
     "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',

@@ -60,6 +60,7 @@ import {
   type RecoveryKitStoreSource,
 } from '@4thtech-io/crypto/keystore';
 import { STORAGE_MARK_ITEM, encodeStorageMark, type OwnStorageKeys } from '@4thtech-io/core';
+import { CLI_COMMAND } from './cli-command.js';
 import { NodeKeyStoreError } from './errors.js';
 import { OWNER_FILE, defaultKeystoreDir, importAgentFile } from './file-keystore.js';
 import { readKeystoreFile, type KeystoreFsOptions } from './file-keystore-fs.js';
@@ -133,7 +134,7 @@ const kitOpenFailed = (): CryptoInputError =>
 const keychainFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
-    'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+    `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 /** A genuine, live session of `store` (by identity, never by shape). */
