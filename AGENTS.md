@@ -1,6 +1,6 @@
 # AGENTS.md — AgentLink
 
-> The canonical instructions for every agent in every harness. Claude Code loads this file through `CLAUDE.md`. It is auto-loaded every session, so it holds **rules and pointers only (≤ 8 KB)**. Details live in `docs/`.
+> Canonical instructions for every agent in every harness (Claude Code loads it via `CLAUDE.md`). Auto-loaded every session: **rules and pointers only (≤ 8 KB)**; details live in `docs/`.
 
 AgentLink (working name) by 4thTech is *encrypted, provable exchange between AI agents*, on protocol OCC v2.
 - Specs (source of truth): `docs/foundation/`.
@@ -31,19 +31,19 @@ New collaborator, or an agent working for one? Start with `docs/process/onboardi
 
 ## Orchestration and context economy
 
-The main session is the **orchestrator**. Its job is to **orchestrate, deploy workers and audit**, not to implement. That keeps its context window free for as much work per session as possible.
+The main session is the **orchestrator**: it orchestrates, deploys workers and audits. **The orchestrator never implements; it keeps 8–15 workers busy.** Playbook: `docs/process/orchestrator-playbook.md`.
 
-- **Delegate.** Reading, implementation and verification go to worker subagents. Take back conclusions, not file dumps. Worker reports stay **≤ 400 words**; details go into files.
-- **Route by complexity:**
-  - **Haiku 5.5**: simple, read-only or mechanical work. Never S1/S2.
-  - **Sonnet 5.5**: clear-spec implementation, tests, CI, docs, non-security review.
-  - **Opus 5.5**: all S2 work, architecture, decomposition, independent reviews, audits.
-  - When in doubt, route up.
+- **Delegate** reading, implementation and verification to worker subagents. Take back conclusions, not file dumps; reports **≤ 400 words**, details in files.
+- **Route** (owner instruction 2026-10-23; when in doubt, route up):
+  - **Haiku 5.5**: read-only, mechanical, status, verifiers. Never S1/S2 builds.
+  - **Sonnet 5.5**: clear-spec builds, tests, CI, docs, UI, keepers.
+  - **Opus 5.5** (medium): all S2 builds, architecture, planning, every independent review.
+  - **Fable 5.1**: security audits (keys, crypto, owner presence, money, contracts, supply chain).
 - **Audit, don't relay.** Verify through targeted checks (tests, CI status, `git diff --stat`, specific hunks). For S1/S2, use an **independent auditor worker** that gets only the spec and the diff. Never present a worker's claim as verified.
-- **Load only what you need.** Open specs by section; use `grep`, `head` and line ranges; keep large outputs in files. Run independent workers in parallel and in the background.
-- **Save early.** Keep the Curator handoff and your sync file current so a fresh session resumes cheaply. At about 60% context, save and suggest a fresh session.
-- **Respect the session-start budgets** in `docs/process/development-process.md` (context economy). Auto-loaded files never accumulate history.
-- **No subagents?** Harnesses that can't spawn them follow the same rules sequentially and say so.
+- **Load only what you need.** Open specs by section; use `grep`, `head` and line ranges; keep large outputs in files. Run workers in parallel, in the background.
+- **Save early.** Keep the Curator handoff and your sync file current; at about 60% context, save and suggest a fresh session.
+- **Respect the session-start budgets** (`docs/process/development-process.md` §3.6). Auto-loaded files never accumulate history.
+- **No subagents?** Follow the same rules sequentially and say so.
 
 ## Before you change anything
 
