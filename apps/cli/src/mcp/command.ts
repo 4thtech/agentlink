@@ -112,11 +112,11 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         : { needsSetup: { message: opened.message }, logger };
 
     // M1-36j (D4): only with the approval page can a call wait for the owner's decision.
-    const server = createMcpServer(
-      env,
-      deps.version,
-      approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor },
-    );
+    // M1-36h: `--advanced` (the user's own harness config) serves the Advanced tool surface.
+    const server = createMcpServer(env, deps.version, {
+      ...(approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor }),
+      ...(parsed.values['advanced'] === true ? { advanced: true } : {}),
+    });
     const loop =
       agent === undefined
         ? undefined

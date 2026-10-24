@@ -188,6 +188,16 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
     expect(m.out.join('\n')).toContain(OWNER_TEXT.addAgentDone);
   });
 
+  it('M1-36b-2: hands node the agent’s own owner actions for the first rules (Send folder)', async () => {
+    const m = await machine(['alice', 'bob']);
+    expect(await m.run(['owner', 'add-agent', '--agent', 'bob'])).toBe(0);
+    const first = m.calls[0]?.card.firstPolicy;
+    expect(first).toBeDefined();
+    expect(typeof first?.actions.preparePolicyEdit).toBe('function');
+    expect(typeof first?.actions.apply).toBe('function');
+    expect(first?.home).toBeUndefined();
+  });
+
   it('needs --agent: without it nothing runs', async () => {
     const m = await machine(['alice', 'bob']);
     expect(await m.run(['owner', 'add-agent'])).toBe(2);

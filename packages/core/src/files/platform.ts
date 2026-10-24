@@ -45,6 +45,8 @@ export interface DropConfig {
   readonly fetch: FetchLike;
   /** A smaller size cap for a staging or self-hosted drop. */
   readonly maxBytes?: number;
+  /** The drop's quota per drop key in 7 days, for a staging or self-hosted drop (M1-11r-c). */
+  readonly weeklyQuotaBytes?: number;
 }
 
 export interface FilesPlatform {

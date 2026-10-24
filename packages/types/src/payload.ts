@@ -118,13 +118,18 @@ export const messageBodySchema = z.union([messageText, jsonObjectSchema]);
 
 /**
  * `request` with `kind: "refresh-link"` (04 §4, 07 §5.2): ask the sender for a fresh download URL.
- * PROPOSED shape (the spec names the kind only): the envelope that carried the file and the file's
- * `ciphertextSha256`, which identifies one entry without revealing anything new.
+ * PROPOSED shape (M1-7f-3; the spec names the kind only): the envelope that carried the file and the
+ * file's position in its `files[]`. It names one entry without any value that 06 §2.1 keeps out of
+ * results (`ciphertextSha256`, a URL or a key), because a `request` is shown in the inbox. The
+ * sender's answer is a `file` payload whose body has this same shape (04 §4).
  */
 export const refreshLinkRequestBodySchema = z.strictObject({
   kind: z.literal('refresh-link'),
   envelopeId,
-  ciphertextSha256: sha256Hex,
+  fileIndex: z
+    .int()
+    .min(0)
+    .max(MAX_FILES_PER_PAYLOAD - 1),
 });
 
 const isRefreshLinkKind = (v: unknown) =>

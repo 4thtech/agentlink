@@ -704,6 +704,18 @@ describe('owner init (04 §2.2, §2.8; D-67, D-68 (3))', () => {
     expect(w.err).toEqual(["This agent already has an owner. AgentLink won't replace it."]);
   });
 
+  it('M1-36b-2: hands node the agent’s own owner actions for the first rules (Send folder)', async () => {
+    const w = await world();
+    await w.run(['owner', 'init']);
+    const first = w.inits[0]?.firstCard.firstPolicy;
+    expect(first).toBeDefined();
+    // The agent's own core OwnerActions: node prepares, checks, signs and applies through it.
+    expect(typeof first?.actions.preparePolicyEdit).toBe('function');
+    expect(typeof first?.actions.apply).toBe('function');
+    // The home folder is node's (the OS user's), never chosen by the command line.
+    expect(first?.home).toBeUndefined();
+  });
+
   it('refuses an unknown subcommand and an agent that is not set up', async () => {
     const w = await world();
     expect(await w.run(['owner'])).toBe(2);

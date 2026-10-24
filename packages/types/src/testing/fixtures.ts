@@ -560,7 +560,7 @@ const payloadOf = (type: string, body: unknown, files: unknown[] = []) => ({
 /** One valid payload per type, in PAYLOAD_TYPES order (04 §3.4). */
 export const payloads = (): Record<string, Record<string, unknown>> => ({
   text: payloadOf('text', 'Hello from Tali’s agent ✓ — 你好', [fileEntryInline()]),
-  request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, ciphertextSha256: SHA }),
+  request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, fileIndex: 0 }),
   offer: payloadOf('offer', { terms: firstTerms(), termsHash: SHA, note: null }),
   accept: payloadOf('accept', { terms: firstTerms(), termsHash: SHA, note: null }),
   reject: payloadOf('reject', { terms: firstTerms(), termsHash: SHA, note: 'too expensive' }),

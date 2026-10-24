@@ -13,6 +13,9 @@
 //   agent and this owner, through the restricted FirstCardSession (owner-first-card.ts), which
 //   refuses every other signing request. The session is closed and the secret wiped. Three wrong
 //   entries end the command and nothing is written.
+// - M1-36b-2 (D-121 D6): with `card.firstPolicy`, the same entry also signs the agent's first rules
+//   (the 06 §3 defaults plus the empty `~/AgentLink/Send` folder) after the card is stored, shown
+//   before the prompt; node signs only that exact document (owner-first-policy.ts).
 // - It never shows, generates, changes or re-wraps the owner code and never writes or deletes the
 //   owner item: unlike `owner init` (M1-8h) there is no rollback that removes the owner item.
 //
@@ -45,6 +48,17 @@ import {
   type KeychainBackend,
 } from './keychain.js';
 import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+import {
+  keepsFolder,
+  notAttempted,
+  prepareSendFolder,
+  removeCreated,
+  sendFolderOutcome,
+  sendFolderReview,
+  signFirstPolicy,
+  type SendFolderPlan,
+  type SendFolderResult,
+} from './owner-first-policy.js';
 import {
   KeychainOwnerKeyStore,
   ownerFingerprintText,
@@ -79,6 +93,8 @@ export interface AddAgentResult {
   readonly card: AgentCard;
   /** The short owner fingerprint (11 §5.2). */
   readonly fingerprint: string;
+  /** M1-36b-2: the first rules (the Send folder), when `card.firstPolicy` was given. */
+  readonly sendFolder?: SendFolderResult;
 }
 
 /** Internal options (tests): keychain timeout. */
@@ -96,6 +112,9 @@ const COPY = {
     `Your owner fingerprint: ${fingerprint}. Check that it's the one you saw at \`${CLI_COMMAND} owner init\`.`,
   agent: (name: string, fingerprint: string): string =>
     `This gives the agent "${name}" (${fingerprint}) a card from your owner key. Your owner code signs this one card and nothing else.`,
+  // M1-36b-2: with the first rules, the code signs the card and that one rule (shown next).
+  agentWithRule: (name: string, fingerprint: string): string =>
+    `This gives the agent "${name}" (${fingerprint}) a card from your owner key. Your owner code signs this one card and the first rule below, and nothing else.`,
   // A wrong code and an owner item that isn't the owner the other agents name get one answer
   // (04 §2.8: a wrong secret, a damaged item and a foreign owner are not told apart), so the copy
   // names both causes without saying which (IR-M1-9t-1 Info).
@@ -194,15 +213,56 @@ export async function addAgentWith(
     throw new NodeKeyStoreError('owner_exists', COPY.hasCard);
   }
   const timeoutMs = internals.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
-  // M1-9x: no local agent names the owner, so its keys come from the owner item itself.
-  if (owner === undefined)
-    return addAgentWithoutCard(
-      keychain,
-      terminal,
-      card,
-      timeoutMs,
-      internals.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS,
-    );
+  // M1-36b-2: the Send folder for the first rules, checked or created before the owner code is
+  // asked, and removed again (only while empty and only if this run created it) unless the rules
+  // took effect.
+  const plan =
+    card.firstPolicy === undefined ? undefined : await prepareSendFolder(card.firstPolicy.home);
+  let sendFolder: SendFolderResult | undefined;
+  try {
+    const result =
+      // M1-9x: no local agent names the owner, so its keys come from the owner item itself.
+      owner === undefined
+        ? await addAgentWithoutCard(
+            keychain,
+            terminal,
+            card,
+            timeoutMs,
+            internals.ttlMs ?? OWNER_SESSION_DEFAULT_TTL_MS,
+            plan,
+          )
+        : await addAgentWithOwner(keychain, terminal, card, owner, timeoutMs, plan);
+    sendFolder = result.sendFolder;
+    return result;
+  } finally {
+    if (!keepsFolder(sendFolder)) await removeCreated(plan);
+  }
+}
+
+/** What the owner reads about the agent (and its first rule) before the owner code. */
+function writeAgentReview(
+  terminal: OwnerTerminal,
+  card: FirstAgentCard,
+  plan: SendFolderPlan | undefined,
+): void {
+  const fingerprint = agentFingerprintText(card.agent);
+  if (plan?.status === 'ready') {
+    terminal.write(COPY.agentWithRule(card.name, fingerprint));
+  } else {
+    terminal.write(COPY.agent(card.name, fingerprint));
+  }
+  if (plan !== undefined) terminal.write(sendFolderReview(plan));
+}
+
+/** `owner add-agent` with the expected owner from another local agent's card. */
+async function addAgentWithOwner(
+  keychain: KeychainBackend,
+  terminal: OwnerTerminal,
+  card: FirstAgentCard,
+  owner: OwnerPublicKeys,
+  timeoutMs: number,
+  plan: SendFolderPlan | undefined,
+): Promise<AddAgentResult> {
   let store: KeychainOwnerKeyStore;
   try {
     store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
@@ -213,15 +273,16 @@ export async function addAgentWith(
     throw error;
   }
   const fingerprint = ownerFingerprintText(owner);
+  let sendFolder: SendFolderResult | undefined;
   try {
     terminal.write(COPY.owner(fingerprint));
-    terminal.write(COPY.agent(card.name, agentFingerprintText(card.agent)));
+    writeAgentReview(terminal, card, plan);
     const inner = await unlockOnce(store, terminal);
-    await signFirstCard(inner, card, owner);
+    sendFolder = await signFirstCard(inner, card, owner, plan);
   } finally {
     await store.close();
   }
-  return storedCard(terminal, card, owner, fingerprint);
+  return storedCard(terminal, card, owner, fingerprint, sendFolder, plan);
 }
 
 /**
@@ -233,7 +294,8 @@ async function signFirstCard(
   inner: OwnerSession,
   card: FirstAgentCard,
   owner: OwnerPublicKeys,
-): Promise<void> {
+  plan: SendFolderPlan | undefined,
+): Promise<SendFolderResult | undefined> {
   const session = new FirstCardSession(inner, card.agent, owner);
   try {
     await card.identity.init({
@@ -242,11 +304,18 @@ async function signFirstCard(
       name: card.name,
       relays: card.relays,
     });
+    // M1-36b-2: the first rules, with the same unlocked owner session (one entry), only after the
+    // card is stored and verified (signFirstPolicy checks it again).
+    const { firstPolicy } = card;
+    if (plan?.status === 'ready' && firstPolicy !== undefined) {
+      return await signFirstPolicy(inner, { ...card, firstPolicy }, plan, owner);
+    }
   } catch {
     // Decided by storedCard from what core stored.
   } finally {
     await session.close();
   }
+  return undefined;
 }
 
 /** Success only for a verified stored card naming exactly this agent and this owner. */
@@ -255,6 +324,8 @@ async function storedCard(
   card: FirstAgentCard,
   owner: OwnerPublicKeys,
   fingerprint: string,
+  signed: SendFolderResult | undefined,
+  plan: SendFolderPlan | undefined,
 ): Promise<AddAgentResult> {
   let stored: Awaited<ReturnType<FirstAgentCard['identity']['get']>>;
   try {
@@ -267,7 +338,14 @@ async function storedCard(
     throw new NodeKeyStoreError('owner_card_failed', COPY.cardFailed);
   }
   terminal.write(COPY.done(card.name, fingerprint));
-  return Object.freeze({ card: stored.card, fingerprint });
+  const sendFolder = signed ?? (plan === undefined ? undefined : notAttempted(plan));
+  const line = sendFolder === undefined ? undefined : sendFolderOutcome(sendFolder);
+  if (line !== undefined) terminal.write(line);
+  return Object.freeze({
+    card: stored.card,
+    fingerprint,
+    ...(sendFolder === undefined ? {} : { sendFolder }),
+  });
 }
 
 /**
@@ -285,13 +363,14 @@ async function addAgentWithoutCard(
   card: FirstAgentCard,
   timeoutMs: number,
   ttlMs: number,
+  plan: SendFolderPlan | undefined,
 ): Promise<AddAgentResult> {
   // Header byte only: no secret is read and nothing is unlocked before the prompt.
   const kind = await storedOwnerSecretKind(keychain, timeoutMs);
   if (kind === null) throw new NodeKeyStoreError('owner_missing', COPY.noOwner);
   terminal.write(COPY.noCardNamesOwner);
   terminal.write(COPY.ownCodeOnly);
-  terminal.write(COPY.agent(card.name, agentFingerprintText(card.agent)));
+  writeAgentReview(terminal, card, plan);
   const label = secretLabel(kind);
   for (let attempt = 0; attempt < ATTEMPTS; attempt += 1) {
     const secret = await terminal.readSecret(label);
@@ -320,13 +399,14 @@ async function addAgentWithoutCard(
     }
     const { store, session, owner } = unlocked;
     const fingerprint = ownerFingerprintText(owner);
+    let sendFolder: SendFolderResult | undefined;
     try {
-      await signFirstCard(session, card, owner);
+      sendFolder = await signFirstCard(session, card, owner, plan);
     } finally {
       await session.close();
       await store.close();
     }
-    return storedCard(terminal, card, owner, fingerprint);
+    return storedCard(terminal, card, owner, fingerprint, sendFolder, plan);
   }
   throw new NodeKeyStoreError('owner_secret_refused', COPY.refusedWithoutCard);
 }

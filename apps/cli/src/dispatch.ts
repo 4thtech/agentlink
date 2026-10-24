@@ -191,7 +191,13 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     approvalIdAt: [0],
   },
   { name: 'doctor', usage: ['agentlink doctor'], guard: 'none', options: AGENT },
-  { name: 'mcp', usage: ['agentlink mcp'], guard: 'none', options: AGENT },
+  {
+    name: 'mcp',
+    // M1-36h: `--advanced` serves the Advanced tool surface (the `chain?` override, 06 §2.4).
+    usage: ['agentlink mcp [--advanced]'],
+    guard: 'none',
+    options: { ...AGENT, advanced: { type: 'boolean' } },
+  },
 ] satisfies CommandSpec[]);
 
 /** The command names, for tests and for the harness config writers. */
