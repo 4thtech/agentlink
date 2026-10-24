@@ -116,11 +116,14 @@ export function specProblem(spec) {
  * field), transitively: what a bundle of them must still install (OPS-REL-1). `manifests` maps
  * workspace package names to their parsed package.json. Returns { runtime: Map name -> spec,
  * problems } where a problem is one dependency declared with two different specs. Pure.
+ * M1-11b-6: `embedded` names workspace packages whose built files are embedded (policy `embeds`,
+ * apps/local-ui), not bundled: they are not traversed, and their (browser) dependencies are not
+ * part of the bundle's runtime.
  */
-export function bundledRuntimeOf(manifest, manifests) {
+export function bundledRuntimeOf(manifest, manifests, embedded = []) {
   const runtime = new Map();
   const problems = [];
-  const seen = new Set();
+  const seen = new Set(embedded);
   const queue = [];
   const enqueueWorkspace = (pkg, fields) => {
     for (const field of fields) {
@@ -631,7 +634,8 @@ export function runChecks(root) {
     if (manifest) {
       let bundledRuntime = new Map();
       if (ZONES[zone]?.bundles === true) {
-        const bundled = bundledRuntimeOf(manifest, byName);
+        const embedded = (ZONES[zone].embeds ?? []).map((app) => ZONES[app].name);
+        const bundled = bundledRuntimeOf(manifest, byName, embedded);
         problems.push(...bundled.problems);
         bundledRuntime = bundled.runtime;
       }

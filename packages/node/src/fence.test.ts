@@ -54,6 +54,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'openAgentKeyStore',
       'openAgentStore',
       'openAllowedFile',
+      // M1-11b-6: a store-only boolean (no owner anywhere: card, owner items, owner files).
+      'ownerSetupAvailable',
       'packageName',
       'performOwnerOperation',
       'probeOsKeychain',
@@ -81,6 +83,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'runOwnerOperation',
       'decideReviewedWith',
       'initOwnerWith',
+      // M1-11b-6: the keychain seam of ownerSetupAvailable stays inside.
+      'ownerSetupAvailableWith',
+      'noOwnerAnywhere',
       'addAgentWith',
       'ttyOwnerTerminal',
       'openAgentStoreWith',

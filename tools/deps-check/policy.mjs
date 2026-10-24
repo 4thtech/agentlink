@@ -56,6 +56,24 @@ export const RELATIVE_ESCAPES = [
     reason:
       'the harness must load the same @4thtech-io/chain module instance as the built CLI modules; e2e does not declare the package',
   },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/approval-server.js',
+    reason:
+      'M1-11b-6 first-run smoke: startApprovalServerWith with a recording opener, so the one-shot link never goes to a real browser in CI; the package entry exports only the OS-opener server',
+  },
+  {
+    zone: 'e2e',
+    target: 'packages/node/dist/owner-setup.js',
+    reason:
+      'M1-11b-6 first-run smoke: ownerSetupAvailableWith and defaultOwnerFiles against a temp home and a keychain stand-in, never the OS keychain or the real home',
+  },
+  {
+    zone: 'e2e',
+    target: 'apps/cli/scripts/local-ui-embed.mjs',
+    reason:
+      'M1-11b-6 first-run smoke: the build script that lists the local app files, to compare with what the bundle embeds',
+  },
 ];
 
 /** True when `zone` may import the repo-relative path `target` although it lies outside the zone. */

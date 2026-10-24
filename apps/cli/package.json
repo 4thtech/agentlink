@@ -57,6 +57,7 @@
     "@4thtech-io/core": "workspace:*",
     "@4thtech-io/crypto": "workspace:*",
     "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/local-ui": "workspace:*",
     "@4thtech-io/node": "workspace:*",
     "@4thtech-io/storage": "workspace:*",
     "@4thtech-io/transport-nostr": "workspace:*",
