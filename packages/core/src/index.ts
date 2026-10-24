@@ -365,7 +365,15 @@ export type {
   ProofListItem,
 } from './proofs/reads.js';
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
-export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
+export {
+  ActivityService,
+  type ActivityContact,
+  type ActivityCost,
+  type ActivityEntry,
+  type ActivityFile,
+  type ApprovalDecision,
+  type ActivityMessageStatus,
+} from './activity.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
 // M1-11r-c: the Storage page's drop meter (07 §5.4 Limits). Numbers only.
 export {
