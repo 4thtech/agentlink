@@ -4300,7 +4300,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-1 · local UI: first run and shared states (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `packages/node/src/local-ui-first-run-browser.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1, M1-11s-c
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
