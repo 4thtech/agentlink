@@ -2,4 +2,4 @@
 section: Added
 ---
 
-- The Claude Desktop extension bundles are signed with the 4thTech certificate from the next release (M1-9f-cert); the public certificate is in the repository so anyone can check a bundle.
+- The Claude Desktop extension bundles are signed with the 4thTech certificate from this release (0.2.0) (M1-9f-cert); the public certificate is in the repository so anyone can check a bundle.
