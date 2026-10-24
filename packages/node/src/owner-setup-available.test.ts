@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { KeychainBackend } from './keychain.js';
 import type { FirstAgentCard } from './owner-init.js';
-import { defaultOwnerFiles, ownerSetupAvailableWith } from './owner-setup.js';
+import { defaultOwnerFiles, noOwnerAnywhere, ownerSetupAvailableWith } from './owner-setup.js';
 
 class MapKeychain implements KeychainBackend {
   readonly items = new Map<string, Uint8Array>();
@@ -93,6 +93,55 @@ describe('ownerSetupAvailable (M1-11b-6)', () => {
     ).resolves.toBe(false);
     await expect(
       ownerSetupAvailableWith(new MapKeychain(), firstCard('throws'), defaultOwnerFiles(home)),
+    ).resolves.toBe(false);
+  });
+
+  // M1-9i-c (#507) restore order (04 §2.3.3 steps 5 and 6): the agents (items, a store whose card
+  // names the kit's owner, then config) are written before the owner seed. A restore that stopped in
+  // between, or a store restored beside this agent, means an owner exists although no owner item
+  // does yet: setup here would create a second, unrelated owner (D-78).
+  it('is false when another agent folder exists on this computer (a restored or added agent)', async () => {
+    await mkdir(join(home, '.agentlink', 'agents', 'restored'), { recursive: true });
+    await expect(
+      ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), defaultOwnerFiles(home)),
+    ).resolves.toBe(false);
+  });
+
+  it('is false while a restore left anything else in the agents folder (a quarantined store)', async () => {
+    await mkdir(join(home, '.agentlink', 'agents', 'default'), { recursive: true });
+    await writeFile(join(home, '.agentlink', 'agents', '.restore-0011223344556677.sqlite'), 'x');
+    await expect(
+      ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), defaultOwnerFiles(home)),
+    ).resolves.toBe(false);
+  });
+
+  it('is false when the file KeyStore holds anything (an imported agent file or its lock)', async () => {
+    await mkdir(join(home, '.agentlink', 'keystore'), { recursive: true });
+    await writeFile(join(home, '.agentlink', 'keystore', `0x${'cd'.repeat(20)}.alks`), 'x');
+    await expect(
+      ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), defaultOwnerFiles(home)),
+    ).resolves.toBe(false);
+  });
+
+  it("is still true with only this agent's own folder", async () => {
+    await mkdir(join(home, '.agentlink', 'agents', 'default'), { recursive: true });
+    await expect(
+      ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), defaultOwnerFiles(home)),
+    ).resolves.toBe(true);
+  });
+
+  it('fails closed when the agents folder cannot be listed', async () => {
+    await mkdir(join(home, '.agentlink'), { recursive: true });
+    await writeFile(join(home, '.agentlink', 'agents'), 'not a folder');
+    await expect(
+      ownerSetupAvailableWith(new MapKeychain(), firstCard('none'), defaultOwnerFiles(home)),
+    ).resolves.toBe(false);
+  });
+
+  it('the server re-check (noOwnerAnywhere) refuses with another agent too', async () => {
+    await mkdir(join(home, '.agentlink', 'agents', 'restored'), { recursive: true });
+    await expect(
+      noOwnerAnywhere(new MapKeychain(), firstCard('none'), 1_000, defaultOwnerFiles(home)),
     ).resolves.toBe(false);
   });
 });

@@ -6,6 +6,9 @@
 //   then the settings pages) and stops on Ctrl+C or after a time limit.
 // - Run by an agent (no TTY, a harness marker, or `--confirm`): no server, no browser, no link; one
 //   fixed line tells the user to run `agentlink init` in their own terminal.
+import { readdir, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CommandContext } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
@@ -14,6 +17,8 @@ import { FIRST_RUN_TEXT, firstRunStep, type FirstRunDeps } from './first-run.js'
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const AGENT: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
 const PIPE: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };
+/** The command as this run was started (M1-36a `cliPrefix`), as init passes it on. */
+const PREFIX = 'npx -y @4thtech-io/agentlink';
 
 interface Probe {
   readonly out: string[];
@@ -105,7 +110,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('opens the first-run page, waits for setup and the settings pages, then stops on Ctrl+C', async () => {
     const p = probe(TTY);
     const { deps, calls } = fakeDeps({});
-    await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(true);
+    await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(true);
     expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1, available: 0 });
     expect(calls.unsubscribed).toBeGreaterThan(0);
     expect(p.out).toEqual([FIRST_RUN_TEXT.opened, FIRST_RUN_TEXT.done]);
@@ -116,7 +121,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('when no owner can be set up here (owner exists, file KeyStore, no app): nothing at all', async () => {
     const p = probe(TTY);
     const { deps, calls } = fakeDeps({ start: 'none' });
-    await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(false);
+    await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(false);
     expect(calls).toMatchObject({ start: 1, opened: 0, closed: 0 });
     expect(p.out).toEqual([]);
   });
@@ -124,7 +129,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('a server that cannot start leaves the terminal way (false, nothing printed)', async () => {
     const p = probe(TTY);
     const { deps } = fakeDeps({ start: 'throws' });
-    await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(false);
+    await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(false);
     expect(p.out).toEqual([]);
     expect(p.err).toEqual([]);
   });
@@ -134,7 +139,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
     async (opens) => {
       const p = probe(TTY);
       const { deps, calls } = fakeDeps({ opens });
-      await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(false);
+      await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(false);
       expect(calls).toMatchObject({ opened: 1, closed: 1 });
       expect(p.out).toEqual([FIRST_RUN_TEXT.noBrowser]);
       expectNoLink(p);
@@ -144,7 +149,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('Ctrl+C before setup finished: closes and falls back to the terminal way', async () => {
     const p = probe(TTY);
     const { deps, calls } = fakeDeps({ setUp: 'never', stop: 'at_once' });
-    await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(false);
+    await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(false);
     expect(calls.closed).toBe(1);
     expect(p.out).toEqual([FIRST_RUN_TEXT.opened, FIRST_RUN_TEXT.notFinished]);
   });
@@ -152,7 +157,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('stops waiting after the time limit', async () => {
     const p = probe(TTY);
     const { deps, calls } = fakeDeps({ setUp: 'never', stop: 'never', waitMs: 30 });
-    await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(false);
+    await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(false);
     expect(calls.closed).toBe(1);
     expect(p.out).toEqual([FIRST_RUN_TEXT.opened, FIRST_RUN_TEXT.notFinished]);
   });
@@ -160,7 +165,7 @@ describe('firstRunStep in the owner terminal (M1-11b-6)', () => {
   it('after setup, the time limit also ends the settings wait (still set up)', async () => {
     const p = probe(TTY);
     const { deps, calls } = fakeDeps({ stop: 'never', waitMs: 60 });
-    await expect(firstRunStep(p.context, 'default', true, deps)).resolves.toBe(true);
+    await expect(firstRunStep(p.context, 'default', true, PREFIX, deps)).resolves.toBe(true);
     expect(calls.closed).toBe(1);
     expect(p.out).toEqual([FIRST_RUN_TEXT.opened, FIRST_RUN_TEXT.done]);
   });
@@ -176,9 +181,9 @@ describe('firstRunStep run by an agent (M1-11b-6)', () => {
     async (_label, terminal, interactive) => {
       const p = probe(terminal);
       const { deps, calls } = fakeDeps({});
-      await expect(firstRunStep(p.context, 'default', interactive, deps)).resolves.toBe(true);
+      await expect(firstRunStep(p.context, 'default', interactive, PREFIX, deps)).resolves.toBe(true);
       expect(calls).toMatchObject({ start: 0, opened: 0, available: 1 });
-      expect(p.out).toEqual([FIRST_RUN_TEXT.agentRun]);
+      expect(p.out).toEqual([FIRST_RUN_TEXT.agentRun(PREFIX)]);
       expectNoLink(p);
     },
   );
@@ -188,21 +193,64 @@ describe('firstRunStep run by an agent (M1-11b-6)', () => {
       const p = probe(AGENT);
       const { deps } = fakeDeps({ available: available === false ? false : true });
       if (available === 'throws') deps.available = () => Promise.reject(new Error('locked'));
-      await expect(firstRunStep(p.context, 'default', false, deps)).resolves.toBe(false);
+      await expect(firstRunStep(p.context, 'default', false, PREFIX, deps)).resolves.toBe(false);
       expect(p.out).toEqual([]);
     }
   });
 });
 
 describe('FIRST_RUN_TEXT (11 §5)', () => {
+  const texts = (): string[] =>
+    Object.values(FIRST_RUN_TEXT).map((t) => (typeof t === 'function' ? t(PREFIX) : t));
+
   it('uses plain words: no wallet, gas, seed phrase, transaction or chain', () => {
-    for (const text of Object.values(FIRST_RUN_TEXT)) {
+    for (const text of texts()) {
       expect(text).not.toMatch(/wallet|\bgas\b|seed phrase|transaction|\bchain\b|https?:/i);
     }
   });
 
   it('the agent line never asks the agent to open the page', () => {
-    expect(FIRST_RUN_TEXT.agentRun).toContain('agentlink init');
-    expect(FIRST_RUN_TEXT.agentRun).toContain('own terminal');
+    expect(FIRST_RUN_TEXT.agentRun(PREFIX)).toContain('own terminal');
+  });
+
+  it('M1-36e: the agent line names the command as it was started, never a bare `agentlink`', () => {
+    const line = FIRST_RUN_TEXT.agentRun(PREFIX);
+    expect(line).toContain(`\`${PREFIX} init\``);
+    expect(line).toContain(`\`${PREFIX} owner init\``);
+    expect(line.replaceAll(PREFIX, '')).not.toMatch(/\bagentlink /);
+  });
+});
+
+/** Every non-test source file under `dir`. */
+async function sources(dir: string): Promise<string[]> {
+  const out: string[] = [];
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...(await sources(path)));
+    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')) out.push(path);
+  }
+  return out;
+}
+
+describe('the first-run link never reaches an agent (M1-11b-6, G-1)', () => {
+  const src = fileURLToPath(new URL('..', import.meta.url));
+
+  it('no MCP-side module opens the first-run page or imports the init step', async () => {
+    const files = [...(await sources(join(src, 'mcp'))), ...(await sources(join(src, 'tools')))];
+    expect(files.length).toBeGreaterThan(10);
+    const offenders: string[] = [];
+    for (const file of files) {
+      const text = await readFile(file, 'utf8');
+      // Code, not the comments that name the step: a call, an import, or a link to the page.
+      const code = text.replace(/^\s*\/\/.*$/gm, '');
+      if (/openFirstRun|commands\/first-run|['"`]\/first-run\?/.test(code)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('the step never prints, returns or logs a link: the server seam only answers a boolean', async () => {
+    const text = await readFile(join(src, 'commands', 'first-run.ts'), 'utf8');
+    expect(text).toMatch(/openFirstRun\(\): Promise<boolean>;/);
+    expect(text).not.toMatch(/\?t=|https?:\/\//);
   });
 });
