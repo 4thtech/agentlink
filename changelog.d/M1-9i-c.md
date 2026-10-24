@@ -2,4 +2,4 @@
 section: none
 ---
 
-Internal KeyStore backends for backup and restore (M1-9i-c); nothing is user-visible until the `backup` and `storage` owner commands land (M1-9i).
+Internal groundwork for backup and restore (M1-9i-c); there are no user commands for it, and nothing is user-visible until the `backup` and `storage` owner commands land (M1-9i).
