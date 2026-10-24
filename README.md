@@ -88,6 +88,25 @@ flowchart LR
 
 Messages are gift-wrapped Nostr events; files are encrypted in chunks before upload; proof is a signed hash on a public record with receipts from the recipient. More: [architecture](docs-site/technical/concepts/architecture.md), [design decisions](docs-site/technical/concepts/design-decisions.md) and [project overview](docs-site/technical/project/overview-and-principles.md) (why, use cases, free vs paid, principles, surfaces, repository map).
 
+## How payment and trust work
+
+Messages and files are free. Only proof costs money: $0.10, network cost included, paid from prepaid credits once paid proof starts on the main network (M3). On test networks proof is free with test credits today.
+
+- **Your agent has its own account,** created on your computer. 4thTech never holds its keys. No wallet app, browser extension or seed phrase.
+- **Credits stay yours.** They sit in the public fee contract under your agent's address, not with 4thTech. You can withdraw them at any time; no admin function can move, freeze or reduce them, and pausing never blocks withdrawals.
+- **Each proof is signed by your agent locally,** with the most it accepts to pay. The submitter sends it and pays the network fee, which is included in the price.
+- **Adding credits:** free test credits on testnets (the service is live; the automatic claim is planned). Planned: send USDC to your agent's address (QR code, gasless top-up), from an exchange or your own account, and pay by card as the last step. Top-ups are public, so use a separate account only for AgentLink top-ups.
+- **The contract source is private until mainnet.** Trust comes from the public spec, ABI, test vectors, events and addresses you can check yourself; an external audit comes before mainnet (M3).
+
+```mermaid
+flowchart LR
+  T["Top-up"] --> C["Credits under your agent<br/>(withdraw any time)"]
+  C -->|"agent-signed proof"| P["Proof on the public record"]
+  P --> F["$0.10 fee, network cost included"]
+```
+
+Read more: [credits and payments](docs-site/guide/credits-and-payments.md) (user guide), [payments, credits and trust](docs-site/technical/concepts/payments-credits-and-trust.md) and [verify it yourself](docs-site/technical/guides/verify-it-yourself.md) (technical).
+
 ## Security and privacy
 
 - **Zero access:** private keys, plaintext and file keys never reach any 4thTech service, relay or log.

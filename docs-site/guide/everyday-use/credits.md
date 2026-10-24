@@ -22,6 +22,8 @@ Adding credits from your AI app is not available in this version: the page where
 - Everything in the link after the `#` stays in your browser and is never sent to our servers.
 - The amount is a suggestion ($5, $10 or $25, at least $5). You can change it on the page.
 
+How adding, spending and taking back credits works, and who holds what: [Credits and payments](../credits-and-payments.md).
+
 ## Outline
 
 - Checking your credits ("How many AgentLink credits do I have?")

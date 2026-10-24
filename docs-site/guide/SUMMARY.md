@@ -43,6 +43,7 @@
 ## Pricing
 
 * [Pricing](pricing.md)
+* [Credits and payments](credits-and-payments.md)
 
 ## Help
 
