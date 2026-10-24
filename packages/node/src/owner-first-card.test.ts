@@ -310,7 +310,7 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     expect(refused).toEqual({
       code: 'owner_card_failed',
       message:
-        "Your agent's card couldn't be signed, so the owner wasn't saved. Run `agentlink owner init` again.",
+        "Your agent's card couldn't be signed, so the owner wasn't saved. Run `npx -y @4thtech-io/agentlink owner init` again.",
     });
     expect(run.written.some((t) => t.startsWith('Owner set up.'))).toBe(false);
     expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
@@ -435,7 +435,7 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
     expect(await failure(() => ownerInit(alice, card))).toEqual({
       code: 'owner_card_failed',
       message:
-        "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
+        "Owner setup didn't finish. Run `npx -y @4thtech-io/agentlink doctor` in your own terminal to see what is missing.",
     });
     // The card was stored and names this owner, so its key must not be removed.
     expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
@@ -485,7 +485,7 @@ describe('owner-card follow-ups (M1-8h-b; IR-M1-8h-1)', () => {
     expect(await failure(() => ownerInit(alice, card))).toEqual({
       code: 'owner_card_failed',
       message:
-        "Owner setup didn't finish. Run `agentlink doctor` in your own terminal to see what is missing.",
+        "Owner setup didn't finish. Run `npx -y @4thtech-io/agentlink doctor` in your own terminal to see what is missing.",
     });
     expect(alice.keychain.items.get(OWNER_ACCOUNT)).toEqual(other);
     expect(await alice.client.identity.get()).toBeUndefined();

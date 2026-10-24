@@ -11,12 +11,17 @@ import { FilesPage } from './pages/files/index.js';
 import { FirstRunPage } from './pages/first-run/index.js';
 import { ProofsPage } from './pages/proofs/index.js';
 import { RulesPage } from './pages/rules/index.js';
-import { StoragePage } from './pages/storage/index.js';
-import { NotFoundPage } from './states/index.js';
+import { PASSKEYS_LABEL, REDIRECTS } from './nav.js';
+import { NotAvailablePage, NotFoundPage } from './states/index.js';
 
 export interface RouteDef {
   readonly path: string;
   readonly page: ComponentType;
+}
+
+/** Passkeys has no page card yet: a plain stub, replaced when its card lands. */
+function PasskeysPage(): ReactElement {
+  return <NotAvailablePage title={PASSKEYS_LABEL} />;
 }
 
 export const ROUTES: readonly RouteDef[] = [
@@ -24,10 +29,10 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/settings/activity', page: ActivityPage },
   { path: '/settings/contacts', page: ContactsPage },
   { path: '/settings/files', page: FilesPage },
-  { path: '/settings/storage', page: StoragePage },
   { path: '/settings/proofs', page: ProofsPage },
   { path: '/settings/rules', page: RulesPage },
   { path: '/settings/backup', page: BackupPage },
+  { path: '/settings/passkeys', page: PasskeysPage },
   { path: '/settings/advanced', page: AdvancedPage },
 ];
 
@@ -60,7 +65,7 @@ function usePath(): string {
 }
 
 function isRouted(path: string): boolean {
-  return path === SETTINGS || ROUTES.some((r) => r.path === path);
+  return path === SETTINGS || path in REDIRECTS || ROUTES.some((r) => r.path === path);
 }
 
 /** Turn a plain left-click on a link to a routed path of this app into a navigation. */
@@ -85,11 +90,13 @@ export function AppRoutes(): ReactElement {
   }, []);
   useEffect(() => {
     if (path === SETTINGS) navigate(SETTINGS_HOME, true);
+    else if (path in REDIRECTS) navigate(REDIRECTS[path] as string, true);
   }, [path]);
-  const route = ROUTES.find((r) => r.path === path);
+  const shown = path === SETTINGS ? SETTINGS_HOME : (REDIRECTS[path] ?? path);
+  const route = ROUTES.find((r) => r.path === shown);
   const Page = route?.page ?? NotFoundPage;
   return (
-    <Layout path={path === SETTINGS ? SETTINGS_HOME : path}>
+    <Layout path={shown}>
       <Page />
     </Layout>
   );

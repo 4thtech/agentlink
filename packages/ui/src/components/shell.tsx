@@ -24,7 +24,7 @@ function safeHref(href: string | undefined): string {
   return '#';
 }
 
-type Connection = 'connected' | 'offline' | 'paused';
+type Connection = 'connected' | 'offline' | 'paused' | 'checking' | 'disconnected';
 
 export interface AppShellProps {
   os?: 'macos' | 'windows' | 'linux';
@@ -42,6 +42,8 @@ const CONNECTION: Readonly<Record<Connection, string>> = {
   connected: 'Connected',
   offline: "Offline · showing what's saved here",
   paused: 'Paused',
+  checking: 'Checking…',
+  disconnected: 'Not connected',
 };
 
 function Chrome({ os, title }: { os: 'macos' | 'windows' | 'linux'; title: string }): ReactElement {

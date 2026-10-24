@@ -47,6 +47,8 @@ export {
   LIFECYCLE_PREFIX,
   LIFECYCLE_RULE_ID,
   createS3Lifecycle,
+  LIFECYCLE_ABORT_DROPPED_WARNING,
+  type LifecycleApplyResult,
   type LifecycleRuleState,
   type S3Lifecycle,
   type S3LifecycleConfig,

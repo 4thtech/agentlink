@@ -160,6 +160,13 @@ export interface SyncDeps {
       readonly reports: readonly InboundReport[];
     }>;
   };
+  /**
+   * M1-7f-3 (04 §4): answers refresh-link requests and takes the answers. Runs after processing;
+   * never throws.
+   */
+  readonly fileLinks?: {
+    processInbound(reports: readonly InboundReport[]): Promise<unknown>;
+  };
 }
 
 /**
@@ -336,6 +343,7 @@ export class SyncService {
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([contactId, dropped]) => ({ contactId, dropped }));
     const acksSent = await this.#deps.acks.sendFor(processed);
+    await this.#deps.fileLinks?.processInbound(processed);
     const flags = (await this.#deps.proofs?.processInbound(processed))?.reports ?? [];
     const reports = mergeProofReports(processed, flags);
     const newIds = reports
@@ -412,6 +420,7 @@ export class SyncService {
         try {
           const processed = await this.#deps.envelopes.processReceived();
           await this.#deps.acks.sendFor(processed);
+          await this.#deps.fileLinks?.processInbound(processed);
           const flags = (await this.#deps.proofs?.processInbound(processed))?.reports ?? [];
           reports = mergeProofReports(processed, flags);
         } catch {

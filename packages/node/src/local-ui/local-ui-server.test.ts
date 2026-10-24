@@ -442,8 +442,9 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     const res = await send(h.port, '/api/ui/activity', {
       headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
     });
-    expect(res.status).toBe(501);
-    expect(JSON.parse(res.body)).toEqual({ error: 'not_implemented' });
+    // The handler ran: this harness has no agent client, so the activity page (M1-11c-a1) says so.
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'not_set_up' });
     expect((await send(h.port, '/api/ui/nope', { headers: { Cookie: cookie } })).status).toBe(404);
     const wrongMethod = await send(h.port, '/api/ui/activity', {
       method: 'POST',
@@ -738,7 +739,13 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     });
     expect(res.status).toBe(200);
     expect(client).not.toBe(full);
-    expect(Object.keys(client as object).sort()).toEqual(['agentId', 'getProof', 'proofs']);
+    // M1-11c-a1 adds the activity feed read, M1-11c-a4 the proofs read (context.ts).
+    expect(Object.keys(client as object).sort()).toEqual([
+      'agentId',
+      'getProof',
+      'listActivity',
+      'proofs',
+    ]);
     expect(Object.isFrozen(client)).toBe(true);
   });
 });
