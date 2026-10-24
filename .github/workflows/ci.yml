@@ -693,6 +693,10 @@ jobs:
   # are random per run and exist only in this job. No repository secret is used or needed, so a
   # fork pull request runs it too. MinIO's own container log is never printed once the tests start
   # (it would hold request paths). In `ci-gate`'s `needs`.
+  # M1-7f-3: the same MinIO then runs the core's files round trip (packages/core
+  # src/files/minio.integration.test.ts: a 5 MB send and fetch through own storage, and refresh-link
+  # after a presigned URL expired), with the same log canary and no-skip check. A packages/core
+  # change is a full-scope change (tools/ci/select-affected.mjs FULL_PREFIXES), so it runs this job.
   storage-minio:
     name: storage-minio
     needs: detect
@@ -715,8 +719,8 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build the workspace dependencies of @4thtech-io/storage
-        run: pnpm exec turbo run build --filter='@4thtech-io/storage...'
+      - name: Build the workspace dependencies of @4thtech-io/storage and @4thtech-io/core
+        run: pnpm exec turbo run build --filter='@4thtech-io/storage...' --filter='@4thtech-io/core...'
 
       - name: Create the certificate, the credentials and the host entry
         shell: bash
@@ -793,6 +797,45 @@ jobs:
             const bad = t.filter((x) => x.status !== "passed");
             console.log(`integration.test.ts: ${t.length} tests, ${bad.length} not passed`);
             if (t.length < 5 || bad.length > 0) { console.error("::error::the storage integration suite must run 5+ tests, all passed"); process.exit(1); }
+          '
+
+      # M1-7f-3: after the storage suite, which created the bucket.
+      - name: Run the core files round trip against MinIO
+        shell: bash
+        env:
+          AGENTLINK_STORAGE_IT: minio
+          AGENTLINK_STORAGE_IT_ENDPOINT: https://minio.agentlink-ci.test:9000
+          AGENTLINK_STORAGE_IT_BUCKET: agentlink-it
+          AGENTLINK_STORAGE_IT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+          export AGENTLINK_STORAGE_IT_ACCESS_KEY_ID="$MINIO_USER" AGENTLINK_STORAGE_IT_SECRET_ACCESS_KEY="$MINIO_PASS"
+          out="$RUNNER_TEMP/core-files-it.log"
+          report="$RUNNER_TEMP/core-files-it.json"
+          echo "CORE_FILES_IT_REPORT=$report" >> "$GITHUB_ENV"
+          set +e
+          pnpm --filter @4thtech-io/core exec vitest run --project integration --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
+          code=$?
+          set -e
+          # The log canary of the job: the output must hold no URL query string and no credential.
+          for needle in 'X-Amz-' "$MINIO_USER" "$MINIO_PASS"; do
+            if grep -qF -- "$needle" "$out"; then
+              echo "::error::the test output holds a presigned URL part or a credential; it is not printed"
+              exit 1
+            fi
+          done
+          cat "$out"
+          exit "$code"
+
+      - name: Check that the core files round trip ran in full, with no skipped test
+        run: |
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.CORE_FILES_IT_REPORT, "utf8"));
+            const f = r.testResults.filter((x) => /minio\.integration\.test\.ts$/.test(x.name));
+            const t = f.length === 1 ? f[0].assertionResults : [];
+            const bad = t.filter((x) => x.status !== "passed");
+            console.log(`minio.integration.test.ts: ${t.length} tests, ${bad.length} not passed`);
+            if (t.length < 3 || bad.length > 0) { console.error("::error::the core files MinIO suite must run 3+ tests, all passed"); process.exit(1); }
           '
 
   # M1-9c-c (IR-M1-9c-1 F07; D-76, 06 §1): the neutral-platform bundle check. A plain Linux runner

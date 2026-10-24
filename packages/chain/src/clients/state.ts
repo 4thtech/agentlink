@@ -19,7 +19,7 @@ import type { ReadClient } from './read-client.js';
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
 
-/** `getRecord` as the client reads it; `null` only for the Notary's `RecordNotFound` revert. */
+/** `getRecord` as the client reads it; `null` only for the Notary's bare `RecordNotFound()` revert. */
 export interface StoredRecord {
   readonly signer: Hex;
   readonly recordStructHash: Hex;
@@ -157,10 +157,13 @@ export function createChainState(reader: {
       } catch (error) {
         // The deployed Notary reverts `RecordNotFound()` for an unknown ID: that, and only that
         // revert, means "absent". Any other failure stays a failure, so nothing is decided on it.
+        // The revert data must be exactly the 4-byte selector: viem names a no-argument error and
+        // ignores trailing bytes, and those are not RecordNotFound() (M1-4d-h, as verify.ts).
         if (
           error instanceof ChainError &&
           error.code === 'call_reverted' &&
-          error.revertName === 'RecordNotFound'
+          error.revertName === 'RecordNotFound' &&
+          error.revertBare
         ) {
           return null;
         }
