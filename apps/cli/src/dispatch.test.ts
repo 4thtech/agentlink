@@ -98,13 +98,7 @@ describe('--help (06 §8)', () => {
       expect(help).toContain(usage);
     }
     // Later cards, and the file KeyStore (M1-8f, off the M1a path): not listed.
-    for (const absent of [
-      'storage',
-      'backup',
-      'relays',
-      '--keystore',
-      'keystore passphrase',
-    ]) {
+    for (const absent of ['storage', 'backup', 'relays', '--keystore', 'keystore passphrase']) {
       expect(help).not.toContain(absent);
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
