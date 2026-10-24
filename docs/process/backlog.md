@@ -5646,7 +5646,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Each form has a case that the extraction finds; no existing case changes.
 
 #### M1-11b-6 · cli: `init` opens the first-run page and wires owner setup (new, IR-M1-11b-1-1; #426 follow-up)
-- **Status:** backlog (draft PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
+- **Status:** in review (PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, the CLI server start (`localUi.ownerSetup` wiring) and their tests
 - **Depends on:** M1-11b-1, M1-11s-c
 - **Spec:** 06 §7; 08 §1; D-120 (1)
@@ -5655,6 +5655,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Wire `localUi.ownerSetup` in the CLI and make `init` open `/first-run` on the owner's machine (OS opener only; nothing sensitive in tool results).
   - Inherited lint fixes from the draft stack (`eslint-disable` in #424, `router.test.tsx` name in #407) are handled in those PRs.
   - L-1 `init.ts:464` guard and L-2 seam tests from IR-M1-11b-6-1 are in M1-11b-8.
+  - Owner setup is offered only while no owner exists anywhere: no card, no `owner`, `owner-passkey` or `owner-next` item, no file-KeyStore entry, and no other agent folder (an agent added, or restored by M1-9i-c before its owner seed, 04 §2.3.3). The server re-checks on begin and finish.
+  - Run by an agent (no TTY, a harness marker, `--confirm`): no server, no link, one fixed line. Commands are named with the CLI prefix after the M1-36b install offer (M1-36e). The page is served for at most 30 minutes; Ctrl+C stops it.
+  - The first rules (Send folder) on the first-run page are M1-36b-2-b (S2, not in this card).
 - **Acceptance:**
   - Tests first: `init` on a fresh machine opens the first-run page; with an owner present it does not; no secret, code or URL appears in output or logs.
 

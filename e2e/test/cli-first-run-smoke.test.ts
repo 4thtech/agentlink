@@ -27,7 +27,6 @@ import {
   type ApprovalServer,
   type ApprovalServerEvent,
 } from '../../packages/node/dist/approval-server.js';
-import type { KeychainBackend } from '../../packages/node/dist/keychain.js';
 import {
   defaultOwnerFiles,
   ownerSetupAvailableWith,
@@ -39,6 +38,13 @@ const root = mkdtempSync(join(tmpdir(), 'agentlink-m1-11b-6-'));
 const home = join(root, 'home');
 
 /** A keychain stand-in in the temp folder: the OS keychain is never touched. */
+/** The keychain seam (@4thtech-io/node KeychainBackend), structurally. */
+interface KeychainBackend {
+  get(account: string): Promise<Uint8Array | null>;
+  set(account: string, value: Uint8Array): Promise<void>;
+  delete(account: string): Promise<boolean>;
+}
+
 class FileKeychain implements KeychainBackend {
   readonly #file = join(root, 'keychain-stand-in.json');
   #read(): Record<string, string> {

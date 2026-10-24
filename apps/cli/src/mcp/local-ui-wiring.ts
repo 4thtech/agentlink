@@ -4,8 +4,10 @@
 // - The app's files embedded in this build (local-ui-assets.ts) and the agent's core client.
 // - Owner setup on the first-run page (`localUi.ownerSetup`, M1-11s-c) ONLY for a keychain agent and
 //   ONLY while no owner exists anywhere: no card names one, none of the `owner`, `owner-passkey` and
-//   `owner-next` keychain items exists, and no file-KeyStore owner file (`owner.alko`, `owner.alkp`)
-//   exists (IR-M1-11s-c-1 L-6; @4thtech-io/node `ownerSetupAvailable`). Any doubt (a file-KeyStore
+//   `owner-next` keychain items exists, no file-KeyStore owner file (`owner.alko`, `owner.alkp`) or
+//   other file-KeyStore entry exists (IR-M1-11s-c-1 L-6), and no other agent folder exists (an agent
+//   restored from a recovery kit is written before its owner seed, 04 §2.3.3; @4thtech-io/node
+//   `ownerSetupAvailable`). Any doubt (a file-KeyStore
 //   agent, an unreadable config, a failed check) leaves it out, and the setup routes then answer
 //   503 `unavailable`. The server checks again on every begin and finish; this is the first gate.
 // - The default owner files (the real home) are kept: no `ownerFiles` override is passed.

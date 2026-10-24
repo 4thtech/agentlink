@@ -10,11 +10,13 @@
 //   uses the page (setup, then the settings pages), until Ctrl+C or FIRST_RUN_WAIT_MS, and closes
 //   the server and the agent.
 // - No browser could be opened, the server could not start, or the page was closed before setup
-//   finished: the step reports "not handled" and init prints the terminal way (`agentlink owner
-//   init`) as before.
+//   finished: the step reports "not handled" and init prints the terminal way (`owner init`) as
+//   before.
 // - Run by an agent (no TTY, a harness marker, or `--confirm`): no server, no browser, no link.
-//   When owner setup may be offered, one fixed line tells the user to run `agentlink init` in their
-//   own terminal. Handing an agent the session link would let it start setup itself (G-1).
+//   When owner setup may be offered, one fixed line tells the user to run `init` in their own
+//   terminal. Handing an agent the session link would let it start setup itself (G-1).
+// - Commands are named with the prefix init uses (M1-36a `cliPrefix`, after the M1-36b install
+//   offer), never a bare `agentlink` (M1-36e).
 //
 // Threat note (G-1, D-67; 04 §2.5): the server runs in this process, which a shell-capable agent
 // could also start; the TTY and marker checks are UX guards, not a boundary. The first-run setup
@@ -39,8 +41,9 @@ export const FIRST_RUN_TEXT = Object.freeze({
   done: "OK       Approvals on this computer are now protected. The settings page works while this window stays open; press Ctrl+C when you're done.",
   noBrowser: "AgentLink couldn't open your browser for the setup page.",
   notFinished: "The setup page is closed, and setup wasn't finished.",
-  agentRun:
-    "One step left, and you must do it yourself: run `agentlink init` in your own terminal. It opens the AgentLink setup page in your browser, where you protect approvals with a passkey (or run `agentlink owner init` there instead). Don't let your AI open that page or run these for you.",
+  /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
+  agentRun: (prefix: string): string =>
+    `One step left, and you must do it yourself: run \`${prefix} init\` in your own terminal. It opens the AgentLink setup page in your browser, where you protect approvals with a passkey (or run \`${prefix} owner init\` there instead). Don't let your AI open that page or run these for you.`,
 });
 
 /** The running setup page: the approval server and the agent it serves. */
@@ -75,12 +78,13 @@ export async function firstRunStep(
   context: CommandContext,
   name: string,
   interactive: boolean,
+  prefix: string,
   deps: FirstRunDeps = nodeFirstRunDeps(),
 ): Promise<boolean> {
   const { output } = context;
   if (!interactive || !checkOwnerTerminal(context.terminal).ok) {
     const offer = await deps.available(name).catch(() => false);
-    if (offer) output.print(FIRST_RUN_TEXT.agentRun);
+    if (offer) output.print(FIRST_RUN_TEXT.agentRun(prefix));
     return offer;
   }
 

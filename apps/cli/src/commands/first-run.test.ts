@@ -181,7 +181,9 @@ describe('firstRunStep run by an agent (M1-11b-6)', () => {
     async (_label, terminal, interactive) => {
       const p = probe(terminal);
       const { deps, calls } = fakeDeps({});
-      await expect(firstRunStep(p.context, 'default', interactive, PREFIX, deps)).resolves.toBe(true);
+      await expect(firstRunStep(p.context, 'default', interactive, PREFIX, deps)).resolves.toBe(
+        true,
+      );
       expect(calls).toMatchObject({ start: 0, opened: 0, available: 1 });
       expect(p.out).toEqual([FIRST_RUN_TEXT.agentRun(PREFIX)]);
       expectNoLink(p);

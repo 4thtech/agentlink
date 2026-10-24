@@ -49,9 +49,9 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
-import { lstat } from 'node:fs/promises';
+import { lstat, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
@@ -246,11 +246,47 @@ async function entryExists(path: string): Promise<boolean> {
   }
 }
 
+/** The entry names in `dir`; none when it does not exist. Any other error rejects (fail closed). */
+async function entriesOf(dir: string): Promise<readonly string[]> {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === 'ENOENT') return [];
+    throw new NodeKeyStoreError('owner_operation_refused', 'The owner files could not be checked.');
+  }
+}
+
+/**
+ * M1-11b-6 (M1-9i-c restore, 04 §2.3.3 steps 5 and 6; D-78): signs of an owner that has no owner
+ * item yet, in the `.agentlink` folder of `ownerFiles` (`<home>/.agentlink/keystore/owner.alko`):
+ *
+ * - any entry of `agents/` other than `first.name`'s own folder: another agent (added, or restored
+ *   from a recovery kit, whose store holds a card naming its owner; a restore writes the agents
+ *   before the owner seed), or something a restore left there;
+ * - any entry of `keystore/`: an owner file, or another agent's file-KeyStore file or lock (an
+ *   imported agent).
+ *
+ * Folder names only: no file is opened. The CLI's `owner init` text check (owner-on-machine.ts)
+ * reads the same folders.
+ */
+async function otherAgentOrKeystoreEntry(
+  ownerFiles: readonly string[],
+  ownName: string,
+): Promise<boolean> {
+  for (const keystore of new Set(ownerFiles.map((file) => dirname(file)))) {
+    if ((await entriesOf(keystore)).length > 0) return true;
+    const agents = join(dirname(keystore), 'agents');
+    if ((await entriesOf(agents)).some((entry) => entry !== ownName)) return true;
+  }
+  return false;
+}
+
 /**
  * True when no owner key exists for this OS user and agent: `first.identity` has no card, none of
- * the `owner`, `owner-passkey` and `owner-next` keychain items exists, and none of `ownerFiles` (the
- * file-KeyStore owner files, defaultOwnerFiles) exists. Reads ciphertext only and wipes it; never
- * reads a file's content. A keychain, store or file-system error rejects (callers fail closed).
+ * the `owner`, `owner-passkey` and `owner-next` keychain items exists, none of `ownerFiles` (the
+ * file-KeyStore owner files, defaultOwnerFiles) exists, and their `.agentlink` folder holds no other
+ * agent and no file-KeyStore entry (otherAgentOrKeystoreEntry). Reads ciphertext only and wipes it;
+ * never reads a file's content. A keychain, store or file-system error rejects (callers fail closed).
  */
 export async function noOwnerAnywhere(
   keychain: KeychainBackend,
@@ -269,6 +305,7 @@ export async function noOwnerAnywhere(
   for (const path of ownerFiles) {
     if (await entryExists(path)) return false;
   }
+  if (await otherAgentOrKeystoreEntry(ownerFiles, first.name)) return false;
   return true;
 }
 
