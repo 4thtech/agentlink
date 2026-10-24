@@ -25,7 +25,8 @@ function run(body, line, name, extra = []) {
   );
 }
 
-const pending = '## Task ID & summary\nx\n\n## Independent review\nPending (orchestrator).\n\n## Threat note\nN/A\n';
+const pending =
+  '## Task ID & summary\nx\n\n## Independent review\nPending (orchestrator).\n\n## Threat note\nN/A\n';
 
 describe('record-ir.py', () => {
   it('by default replaces "Pending (orchestrator)." with the line and adds no merge line', () => {
