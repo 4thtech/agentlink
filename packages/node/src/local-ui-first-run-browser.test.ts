@@ -96,7 +96,7 @@ function appAssets(): Map<string, Uint8Array> | undefined {
 }
 
 /**
- * axe-core (packages/ui's pinned dev dependency) in the page: WCAG 2.0 and 2.1 A and AA rules. It is
+ * axe-core (this package's pinned dev dependency) in the page: WCAG 2.0 and 2.1 A and AA rules. It is
  * evaluated through the DevTools protocol, so the page's CSP stays as served.
  */
 const AXE_SOURCE = readFileSync(fileURLToPath(import.meta.resolve('axe-core/axe.min.js')), 'utf8');
