@@ -132,6 +132,10 @@ export class MemoryOwnStorage implements StorageAdapter {
   readonly deleted: string[] = [];
   readonly urls: string[] = [];
   alter: 'none' | 'flip' | 'truncate' | 'extend' = 'none';
+  /** Presigned URLs the storage no longer honours (M1-7f-3: a link refused before its expiresAt). */
+  readonly refused = new Set<string>();
+  /** The host of the next presigned URLs (M1-7f-3: a hostile host for the SSRF check). */
+  host = 'storage.example.com';
 
   async put(
     ciphertext: ReadableStream<Uint8Array> | Uint8Array,
@@ -161,7 +165,7 @@ export class MemoryOwnStorage implements StorageAdapter {
   }
 
   presignGet(obj: StoredObject): Promise<string> {
-    const url = `https://storage.example.com/o/${obj.locator}?X-Amz-Signature=${encodeHex(randomBytes(32))}`;
+    const url = `https://${this.host}/o/${obj.locator}?X-Amz-Signature=${encodeHex(randomBytes(32))}`;
     this.urls.push(url);
     return Promise.resolve(url);
   }
@@ -176,7 +180,9 @@ export class MemoryOwnStorage implements StorageAdapter {
   download(url: string): CiphertextSource {
     const key = /\/o\/([0-9a-f]{32})\?/.exec(url)?.[1] ?? '';
     const stored = this.objects.get(key);
+    const refused = this.refused.has(url);
     return async (maxBytes, onChunk) => {
+      if (refused) throw new Error(`403 ${url}`);
       if (stored === undefined) throw new Error('404');
       let bytes = stored.slice();
       if (this.alter === 'flip') bytes[bytes.length - 20] = (bytes[bytes.length - 20] ?? 0) ^ 1;
@@ -326,6 +332,8 @@ export async function deliver(from: FileAgent, to: FileAgent): Promise<void> {
   // The step syncInbox runs after processing (07 §2.1 step 4; M1-7g): a `proof` envelope is
   // checked on-chain and DELIVERED is signed per policy. A no-op without a proofs platform.
   await to.client.proofs.processInbound(reports);
+  // M1-7f-3: refresh-link requests and answers, as syncInbox runs them after processing.
+  await to.client.fileLinks.processInbound(reports);
 }
 
 /** Deterministic bytes of a given length with a recognisable marker at the start. */

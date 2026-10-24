@@ -31,9 +31,10 @@
 //   before verification (an unverified envelope's id is chosen by its sender). Core writes the
 //   `seen` rows in its own transaction (07 §3.2), and its `envelope` rows hold the envelopeHash,
 //   never the envelope id (04 §3.1.1 step 9; IR-M1-7b-1 Q1). The `envelopeSeen` hint below looks
-//   up the envelope id, so it can only find a row written by the optional `markSeen` here (called
-//   only after the handler's processed outcome, with the id only on `verified`; `retry` marks
-//   nothing). It is never a reason to skip. Aligning the hint with core's keying is M1-5e. The same
+//   up the same key, the envelopeHash (`0x` + hex; M1-5e), so it finds core's rows. The hash is
+//   computed from the parsed envelope before its signature is checked, so the hint can be true for
+//   a copy with a bad signature: it is never a reason to skip. The optional `markSeen` writes an
+//   `envelope` row with the hash only on `verified` (`retry` marks nothing). The same
 //   wrap from 3 relays is delivered once, also when the copies arrive at the same time.
 // - Junk (07 §3.2): a wrap that fails to open is not recorded in the seen-set; it is remembered only
 //   in a bounded in-memory cache, keyed by id and signature, so a forged copy of a real wrap's id
@@ -48,6 +49,8 @@
 import {
   KeyStoreError,
   encodeHex,
+  encodeHex0x,
+  envelopeHash,
   randomBytes,
   type Envelope,
   type EnvelopeKeys,
@@ -149,9 +152,9 @@ export interface SyncPersistence {
   /**
    * Optional; the default is to write nothing. Upserts `(kind, id)` with `first_seen_at` after the
    * handler reported the item's processed outcome. Leave it out when core writes `seen` itself (the
-   * intended setup). An `envelope` row written here is keyed on the envelope id, which any sender
-   * may choose (IR-M1-5c-1 L-6): never skip on it. Core's own `envelope` rows hold the envelopeHash
-   * instead (07 §3.2; IR-M1-7b-1 Q1), so the two kinds of row never match (M1-5e aligns them).
+   * intended setup). An `envelope` row written here is keyed on the envelopeHash, as core's own rows
+   * are (07 §3.2; IR-M1-7b-1 Q1; M1-5e), not on the envelope id, which any sender may choose
+   * (IR-M1-5c-1 L-6). Never skip on it.
    * Pruning follows `seenPruneBefore`.
    */
   markSeen?(kind: SeenKind, id: string, firstSeenAt: number): Promise<void>;
@@ -182,10 +185,10 @@ export interface SyncItem {
   /** The own key the wrap was addressed to. */
   readonly recipient: string;
   /**
-   * A hint: `seen` has an `envelope` row equal to this envelope's id, which only the optional
-   * `markSeen` writes (core's rows hold the envelopeHash, 07 §3.2, so with core writing `seen` this
-   * is false). Unverified, so the sender chose the id: core must never skip or drop on it
-   * (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash`.
+   * A hint: `seen` has an `envelope` row equal to this envelope's envelopeHash (`0x` + 64 lowercase
+   * hex), the key core writes (07 §3.2; M1-5e). The hash is computed before the signature is
+   * checked, so a copy with a bad signature can show true: core must never skip or drop on it
+   * (IR-M1-5a-1 L-3). Core step 9 compares `envelopeHash` after the signature passed.
    */
   readonly envelopeSeen: boolean;
 }
@@ -194,8 +197,8 @@ export interface SyncItem {
  * The handler's answer.
  * - `processed`: the item is durably stored or its final outcome recorded. The wrap id is marked seen.
  * - `verified`: as `processed`, and the envelope signature passed (04 §3.1.1 step 4), so the
- *   optional `markSeen` also gets an `envelope` row for its id (core keys its own rows on the
- *   envelopeHash, 07 §3.2).
+ *   optional `markSeen` also gets an `envelope` row for its envelopeHash (as core keys its
+ *   own rows, 07 §3.2).
  * - `retry`: not stored (for example the store was busy). Nothing is marked seen and the relay's
  *   cursor does not move, so the item comes again.
  */
@@ -990,6 +993,14 @@ export class SyncEngine {
             }
             if (phase === 'backlog' && isRecord(event)) {
               const at = event.created_at;
+              // The page position (and with it the saved resume point) follows only gift wraps
+              // addressed to one of our keys: a relay's stray events (other kinds, other
+              // recipients) cannot move it (M1-5e). A wrap that fails to open still counts, so a
+              // flood of junk wraps for us is walked past. The page size counts every event, because
+              // a relay's result cap does.
+              const addressed =
+                event.kind === NOSTR_KIND_GIFT_WRAP &&
+                pickIdentity(event.tags, run.identities) !== undefined;
               if (typeof at === 'number' && pageUntil !== undefined) {
                 if (at > pageUntil) sawNewer = true;
                 else if (at === pageUntil) sawAtUntil = true;
@@ -1003,6 +1014,7 @@ export class SyncEngine {
                 pageCount += 1;
               }
               if (
+                addressed &&
                 typeof at === 'number' &&
                 Number.isSafeInteger(at) &&
                 at >= since &&
@@ -1013,6 +1025,7 @@ export class SyncEngine {
                 pageOldest = at;
               }
               if (
+                addressed &&
                 typeof at === 'number' &&
                 at === pageOldest &&
                 typeof event.id === 'string' &&
@@ -1169,13 +1182,14 @@ export class SyncEngine {
       counters.dropped += 1;
       return 'dropped';
     }
+    const hash = envelopeHashOf(unwrapped.envelope);
     const item: SyncItem = Object.freeze({
       envelope: unwrapped.envelope,
       giftWrapId: unwrapped.giftWrapId,
       giftWrapCreatedAt: unwrapped.giftWrapCreatedAt,
       relay,
       recipient: identity.pubkey,
-      envelopeSeen: await this.safeSeen('envelope', unwrapped.envelope.id),
+      envelopeSeen: hash === undefined ? false : await this.safeSeen('envelope', hash),
     });
     let disposition: SyncDisposition;
     try {
@@ -1193,7 +1207,9 @@ export class SyncEngine {
     if (mark !== undefined && !(run.live && run.stopped)) {
       const at = this.nowSeconds();
       await this.safeMark('wrap', id, at);
-      if (disposition === 'verified') await this.safeMark('envelope', unwrapped.envelope.id, at);
+      if (disposition === 'verified' && hash !== undefined) {
+        await this.safeMark('envelope', hash, at);
+      }
     }
     this.processed.add(id);
     counters.delivered += 1;
@@ -1464,6 +1480,19 @@ function learn(learned: Learned, event: unknown): void {
 }
 
 /** The first own key named by a `p` tag of the wrap. The tags are untrusted: read defensively. */
+/**
+ * The `seen` key of an envelope: its envelopeHash as `0x` + 64 lowercase hex, which is what core
+ * writes (07 §3.2; M1-5e). Computed from the parsed envelope without checking its signature, so it
+ * only ever drives a hint. `undefined` if it cannot be computed.
+ */
+function envelopeHashOf(envelope: Envelope): string | undefined {
+  try {
+    return encodeHex0x(envelopeHash(envelope));
+  } catch {
+    return undefined;
+  }
+}
+
 function pickIdentity(
   tags: unknown,
   identities: readonly SyncIdentity[],
