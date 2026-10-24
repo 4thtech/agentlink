@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { CREDITS_TEXT } from './commands/credits.js';
 import { DOCTOR_PROOF_TEXT, DOCTOR_TEXT } from './commands/doctor.js';
 import { FIRST_RUN_TEXT } from './commands/first-run.js';
+import { UI_TEXT } from './commands/ui.js';
 import { HOOK_TEXT, INIT_TEXT } from './commands/init.js';
 import { CONTACTS_MANAGE_TEXT } from './commands/owner/contacts-manage.js';
 import { POLICY_REVIEW_ROWS, POLICY_TEXT } from './commands/owner/policy.js';
@@ -80,6 +81,7 @@ const TABLES: Readonly<Record<string, unknown>> = {
   OWNER_TEXT,
   TERMS_CARD_TEXT,
   TEXT,
+  UI_TEXT,
   VERIFY_CLI_TEXT,
   VERIFY_CONTENT_TEXT,
   VERIFY_FAILURE_TEXT,

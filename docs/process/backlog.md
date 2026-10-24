@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 330 (M1a 91, M1b 239) |
+| M1 Local beta | 331 (M1a 91, M1b 240) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -5684,6 +5684,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-1 `init.ts:464` guard; L-2 seam tests. Update 06 §7 (proposed, owner confirms at merge).
 - **Acceptance:**
   - Tests: one open per start, none when an owner exists, none in tool output; the fallback command is unchanged; threat note and tests-first evidence (S2).
+
+#### M1-11b-9 · cli: `agentlink ui` opens the local pages on demand (new, 08 §1; PLAN-431 §2.4)
+- **Status:** in review (stacked on PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus · **Security:** S1 (adds one allowlisted opener to `packages/node`, no route and no authority) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/dispatch.ts`, `apps/cli/src/main.ts`, `packages/node/src/approval-server.ts` (`openActivity`), tests, `docs-site/guide/get-started`
+- **Depends on:** M1-11b-6
+- **Spec:** 08 §1; 04 §2.5; 11 §5
+- **Invariants:** I-4
+- **Scope:**
+  - `agentlink ui` in the owner's own interactive terminal: starts the local server and opens the browser (OS opener only) at `/settings/activity`, or at `/first-run` while no owner exists; serves until Ctrl+C or 30 minutes; the one-shot link is never printed or logged.
+  - Run by an agent (no TTY, a harness marker): one fixed line, built with `cliPrefix()`, telling the user to run it themselves; nothing else happens. Not an MCP tool.
+- **Acceptance:**
+  - Tests first: both pages open in a terminal; the agent-run line and nothing else; no link in output; the command is not reachable from a tool; copy passes the vocabulary lint and the bare-prefix scan.
 
 #### M1-11s-c-b · owner setup lows from IR-M1-11s-c (new, IR-M1-11s-c-1/2)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
