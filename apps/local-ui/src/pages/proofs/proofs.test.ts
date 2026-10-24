@@ -13,7 +13,7 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
-import { ProofsPage } from './index.js';
+import { ProofsPage, type ProofsPageProps } from './index.js';
 import { PROOFS_STRINGS, priceLine } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -84,7 +84,7 @@ async function mount(routes: Routes): Promise<Call[]> {
   const s = server(routes);
   const api = createApiClient({ fetch: s.fetch, token: 't' });
   await act(async () => {
-    root.render(h(ProofsPage, { api }));
+    root.render(h<ProofsPageProps>(ProofsPage, { api }));
     await Promise.resolve();
   });
   // Let both reads settle.
