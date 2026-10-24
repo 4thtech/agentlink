@@ -1,11 +1,11 @@
 # The invite page (M1-19, M1-19-b, D-28, D-53): a static site served as Workers static assets, with no
 # Worker script. Deployed only by CI (.github/workflows/deploy-invite.yml, release-and-deployment.md
-# §4.6); never `wrangler deploy` from a workstation. Always pass --env: `staging` (workers.dev) or
-# `production` (the Custom Domain).
+# §4.6); never `wrangler deploy` from a workstation. Always pass --env: `staging` (workers.dev). There
+# is no production environment yet (card M1-19-d: after the trademark check and the domain decision).
 #
 # The headers (CSP, Referrer-Policy and the rest, 08 §4) come from the `_headers` file in the built
 # site (site/_headers), which Cloudflare applies to every asset; the deploy workflow checks them on
-# staging and on production. The CI deploy passes the verified build with `--assets <dir>`, so the
+# staging. The CI deploy passes the verified build with `--assets <dir>`, so the
 # directory below only serves local development (`vite build`, then `wrangler dev`).
 #
 # No secrets, no vars, no bindings: the page makes no request and holds no state (I-2). Logging is off
@@ -14,12 +14,8 @@
 # `html_handling = "drop-trailing-slash"` makes `/i` (the invite link path, 04 §3.6) answer 200 with
 # the page itself; the default would redirect `/i` to `/i/`. The deploy checks for exactly that 200.
 #
-# The production hostname is the one in the invite link (`https://agentlink.4thtech.io/i#...`); it is
-# proposed here and the owner confirms it when he attaches the Custom Domain
-# (release-and-deployment.md §1.1).
-
 # Top level: local development only. The name does not exist on the account, so a deploy without
-# --env fails instead of creating a third Worker.
+# --env fails instead of creating another Worker.
 name = "agentlink-invite-local"
 compatibility_date = "2026-08-01"
 workers_dev = false
@@ -65,29 +61,4 @@ enabled = false
 invocation_logs = false
 
 [env.staging.observability.traces]
-enabled = false
-
-# ---------------------------------------------------------------------------------------------------
-# Production: the Custom Domain only, no workers.dev or preview URLs. Deployed automatically once the
-# staging checks are green and the `production` environment has released it (D-52).
-[env.production]
-name = "agentlink-invite"
-workers_dev = false
-preview_urls = false
-logpush = false
-routes = [{ pattern = "agentlink.4thtech.io", custom_domain = true }]
-
-[env.production.assets]
-directory = "./dist/site"
-html_handling = "drop-trailing-slash"
-not_found_handling = "none"
-
-[env.production.observability]
-enabled = false
-
-[env.production.observability.logs]
-enabled = false
-invocation_logs = false
-
-[env.production.observability.traces]
 enabled = false

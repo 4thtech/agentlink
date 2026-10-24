@@ -49,5 +49,4 @@ jobs:
           set -euo pipefail
           node tools/release/reconcile-deploy.mjs \
             --workflow deploy-submitter.yml \
-            --workflow deploy-drop.yml \
-            --workflow deploy-invite.yml
+            --workflow deploy-drop.yml

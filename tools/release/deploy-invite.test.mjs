@@ -10,7 +10,7 @@ import { commandLines, runScripts } from './workflow-run-steps.mjs';
 
 // M1-19-b: the invite page's deploy workflow (release-and-deployment.md §4.5, §4.6, D-25, D-52).
 // Structure checks on .github/workflows/deploy-invite.yml as text, and the shared blocks (manifest,
-// site check, credential check, rollback, freeze), extracted between their markers and run on
+// site check, credential check), extracted between their markers and run on
 // fixtures, a local HTTP server and fake tools. The same job layout as deploy-drop.yml, which
 // deploy-drop.test.mjs covers in more depth; blocks that are the same text are asserted to be.
 
@@ -93,16 +93,14 @@ describe('deploy-invite.yml structure', () => {
     expect(workflow).toMatch(/\npermissions: \{\}\n/);
   });
 
-  it('has the jobs of the drop pipeline, less the rehearsal', () => {
+  it('has the staging jobs of the drop pipeline and no production job', () => {
     expect(jobNames()).toEqual([
       'ci-green',
       'guard',
       'build',
       'deploy-staging',
       'smoke-staging',
-      'deploy-production',
       'catch-up',
-      'freeze',
     ]);
   });
 
@@ -129,14 +127,12 @@ describe('deploy-invite.yml structure', () => {
     expect(job('guard')).toMatch(/needs: ci-green/);
   });
 
-  it('builds the site once, with no credentials, and deploys that directory to both environments', () => {
+  it('builds the site once, with no credentials, and deploys that directory to staging', () => {
     const build = job('build');
     expect(build).not.toMatch(/environment:|secrets\.|CLOUDFLARE/);
     expect(build).toMatch(/exactly _headers, i\/index\.html, index\.html and invite\.js/);
-    for (const name of ['deploy-staging', 'deploy-production']) {
-      expect(job(name)).toMatch(/--assets "\$RUNNER_TEMP\/invite-site"/);
-      expect(job(name)).toMatch(/name: invite-site/);
-    }
+    expect(job('deploy-staging')).toMatch(/--assets "\$RUNNER_TEMP\/invite-site"/);
+    expect(job('deploy-staging')).toMatch(/name: invite-site/);
   });
 
   it('deploys staging in environment staging, frozen by DEPLOY_FREEZE and re-checked at start', () => {
@@ -149,12 +145,10 @@ describe('deploy-invite.yml structure', () => {
   });
 
   it('skips cleanly while the Cloudflare credentials are missing', () => {
-    for (const name of ['deploy-staging', 'deploy-production']) {
-      const body = job(name);
-      expect(body).toMatch(/CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
-      expect(body).toMatch(/CREDENTIAL-CHECK-BEGIN/);
-      expect(body).toMatch(/id: deploy\n {8}if: steps\.ready\.outputs\.ready == 'true'\n/);
-    }
+    const body = job('deploy-staging');
+    expect(body).toMatch(/CLOUDFLARE_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
+    expect(body).toMatch(/CREDENTIAL-CHECK-BEGIN/);
+    expect(body).toMatch(/id: deploy\n {8}if: steps\.ready\.outputs\.ready == 'true'\n/);
   });
 
   it('runs the staging smoke without credentials, on the same bytes as the build', () => {
@@ -166,63 +160,36 @@ describe('deploy-invite.yml structure', () => {
     expect(smoke).not.toMatch(/CLOUDFLARE/);
   });
 
-  it('deploys production only after a green staging smoke, frozen by DEPLOY_FREEZE, in the production environment', () => {
-    const production = job('deploy-production');
-    expect(production).toMatch(/needs: \[[^\]]*smoke-staging[^\]]*\]/);
-    expect(production).toMatch(/needs\.smoke-staging\.result == 'success'/);
-    expect(production).toMatch(/environment: production\n/);
-    expect(production).toMatch(/vars\.DEPLOY_FREEZE != 'true'/);
-    expect(production).toMatch(/Stop if DEPLOY_FREEZE is set/);
-    expect(production).toMatch(/--env production/);
-    expect(production).toMatch(/group: deploy-invite-production/);
-    // The step name the hourly reconcile looks for (tools/release/reconcile-deploy.mjs).
-    expect(production).toContain('- name: Deploy to production (Custom Domain)\n');
+  it('reads back the logging settings after the deploy', () => {
+    const body = job('deploy-staging');
+    expect(body.indexOf('READBACK-SETTINGS-BEGIN')).toBeGreaterThan(body.indexOf('id: deploy\n'));
+    expect(body.lastIndexOf('/script-settings"')).toBeGreaterThan(body.indexOf('id: deploy\n'));
   });
 
-  it('changes production only while this commit is the head of main, after the head check', () => {
-    const production = job('deploy-production');
-    const head = production.indexOf('id: head\n');
-    const ready = production.indexOf('id: ready');
-    const deploy = production.indexOf('id: deploy\n');
-    expect(head).toBeGreaterThan(-1);
-    expect(head).toBeLessThan(ready);
-    expect(ready).toBeLessThan(deploy);
-    expect(production).toMatch(/id: ready\n {8}if: steps\.head\.outputs\.current == 'true'/);
-    const rollback = production.slice(
-      production.indexOf('- name: Roll back to the recorded version'),
-      production.indexOf('id: rollback\n') + 200,
+  it('is staging only (owner decision 2026-10-24, card M1-19-d): nothing configures or claims a production deploy', () => {
+    expect(workflow).not.toMatch(
+      /deploy-production|environment: production|INVITE_PRODUCTION_ORIGIN/,
     );
-    expect(rollback).not.toMatch(/steps\.head/);
-  });
-
-  it('health-checks production over HTTP with the shared site check, before the settings read-back', () => {
-    const production = job('deploy-production');
-    const health = production.indexOf('id: health\n');
-    expect(production.indexOf('id: deploy\n')).toBeLessThan(health);
-    expect(health).toBeLessThan(production.indexOf('READBACK-SETTINGS-BEGIN'));
-    expect(production.slice(health, production.indexOf('id: settings'))).toMatch(
-      /SITE-CHECK-BEGIN/,
+    expect(workflow).not.toMatch(
+      /--env production|agentlink\.4thtech\.io|deploy-invite-production/,
     );
-  });
-
-  it('reads back the logging settings after each deploy', () => {
-    for (const name of ['deploy-staging', 'deploy-production']) {
-      const body = job(name);
-      expect(body.indexOf('READBACK-SETTINGS-BEGIN')).toBeGreaterThan(body.indexOf('id: deploy\n'));
-      expect(body.lastIndexOf('/script-settings"')).toBeGreaterThan(body.indexOf('id: deploy\n'));
-    }
-  });
-
-  it('sets DEPLOY_FREEZE when production failed after deploying', () => {
-    const freeze = job('freeze');
-    expect(freeze).toMatch(/environment: deploy-freeze/);
-    expect(freeze).toMatch(/GH_TOKEN: \$\{\{ secrets\.DEPLOY_FREEZE_TOKEN \}\}/);
-    expect(freeze).toMatch(/needs\.deploy-production\.outputs\.deployed == 'true'/);
-    expect(freeze).toMatch(/needs\.deploy-production\.result != 'success'/);
+    expect(workflow).not.toMatch(
+      /job: freeze|\n {2}freeze:\n|DEPLOY_FREEZE_TOKEN|environment: deploy-freeze/,
+    );
+    // DEPLOY_FREEZE still halts staging, at the job and again at the start.
+    expect(workflow).toMatch(/vars\.DEPLOY_FREEZE != 'true'/);
+    // The hourly reconcile reads a deploy-production job; it must not list this workflow yet.
+    expect(read('.github/workflows/deploy-reconcile.yml')).not.toContain('deploy-invite.yml');
   });
 
   it('hands a superseded run to the catch-up job for this same workflow', () => {
-    expect(job('catch-up')).toContain('catch-up-deploy.mjs --workflow deploy-invite.yml');
+    const catchUp = job('catch-up');
+    expect(catchUp).toContain('catch-up-deploy.mjs --workflow deploy-invite.yml');
+    expect(catchUp).toMatch(/needs: ci-green\n/);
+    expect(catchUp).toMatch(/needs\.ci-green\.outputs\.result == 'superseded'/);
+    expect(catchUp).toMatch(/needs\.ci-green\.result == 'failure'/);
+    expect(catchUp).toMatch(/permissions:\n {6}actions: write\b[^\n]*\n {6}contents: read\n/);
+    expect(catchUp).not.toMatch(/environment:|secrets\./);
   });
 
   it('never cancels a deploy in flight and never interpolates event data into run scripts', () => {
@@ -251,63 +218,30 @@ describe('deploy-invite.yml structure', () => {
         if (/\bwrangler\s/.test(line)) calls.push(line.trim());
       }
     }
-    expect(calls.length).toBe(5);
+    expect(calls.length).toBe(1);
     for (const call of calls) {
       expect(call, call).toMatch(/pnpm exec wrangler /);
-      expect(call, call).toMatch(/ --env (staging|production) /);
+      expect(call, call).toMatch(/ --env staging /);
       expect(call, call).toContain(' --config wrangler.toml');
     }
     const deploys = calls.filter((c) => / wrangler deploy /.test(c));
-    expect(deploys.length).toBe(2);
+    expect(deploys.length).toBe(1);
     for (const deploy of deploys) expect(deploy).toMatch(/ --assets "\$RUNNER_TEMP\/invite-site" /);
     // Each of those steps runs in apps/invite, where wrangler.toml lives.
-    for (const name of ['deploy-staging', 'deploy-production']) {
-      expect(job(name)).toMatch(/\n {8}working-directory: apps\/invite\n/);
-    }
-  });
-
-  it('gives every production step its own timeout and keeps the job timeout above their sum', () => {
-    const production = job('deploy-production');
-    const steps = production
-      .slice(production.indexOf('\n    steps:\n'))
-      .split(/\n {6}- (?=name: )/)
-      .slice(1);
-    const minutes = (text, indent) =>
-      Number(new RegExp(`\\n {${indent}}timeout-minutes: (\\d+)\\n`).exec(`\n${text}`)?.[1] ?? NaN);
-    expect(steps.length).toBeGreaterThanOrEqual(12);
-    for (const step of steps) expect(minutes(step, 8), step.split('\n')[0]).toBeGreaterThan(0);
-    const total = steps.reduce((sum, step) => sum + minutes(step, 8), 0);
-    expect(minutes(production, 4)).toBeGreaterThan(total);
-    const health = steps.find((step) => step.startsWith('name: Health check\n'));
-    expect(minutes(health ?? '', 8)).toBe(20);
-  });
-
-  it('counts a cancelled or failed deploy step as deployed for the rollback, the record and the freeze', () => {
-    const production = job('deploy-production');
-    const DEPLOYED = `contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome)`;
-    expect(production).toContain(`deployed: \${{ ${DEPLOYED} && 'true' || 'false' }}`);
-    expect(production).toContain(`if: always() && ${DEPLOYED}\n`);
-    expect(production).toContain(`if: (failure() || cancelled()) && ${DEPLOYED}\n`);
-    expect(production).not.toMatch(/steps\.deploy\.outputs\.deployed/);
+    expect(job('deploy-staging')).toMatch(/\n {8}working-directory: apps\/invite\n/);
   });
 });
 
-describe('blocks shared with deploy-drop.yml', () => {
-  it('the head-of-main check is the same text', () => {
-    expect(blocks('HEAD-CHECK').length).toBe(1);
-    expect(blocks('HEAD-CHECK')[0]).toBe(blocks('HEAD-CHECK', dropWorkflow)[0]);
-  });
-});
-
-readbackDiagnosisSuite('deploy-invite.yml', blocks('READBACK-SETTINGS'));
+// Staging only: one read-back block (the drop and the submitter have two).
+readbackDiagnosisSuite('deploy-invite.yml', blocks('READBACK-SETTINGS'), 1);
 
 describe('manifest', () => {
   const copies = blocks('MANIFEST');
 
-  it('is the same block in the build, both deploy jobs and the smoke', () => {
-    expect(copies.length).toBe(4);
+  it('is the same block in the build, the staging deploy and the smoke', () => {
+    expect(copies.length).toBe(3);
     for (const copy of copies) expect(copy).toBe(copies[0]);
-    for (const name of ['build', 'deploy-staging', 'smoke-staging', 'deploy-production']) {
+    for (const name of ['build', 'deploy-staging', 'smoke-staging']) {
       expect(job(name)).toMatch(/MANIFEST-BEGIN/);
     }
   });
@@ -359,9 +293,8 @@ describe('credential check', () => {
     });
   };
 
-  it('is the same block in staging and production', () => {
-    expect(copies.length).toBe(2);
-    expect(copies[1]).toBe(copies[0]);
+  it('appears once, in the staging deploy', () => {
+    expect(copies.length).toBe(1);
   });
 
   it('skips cleanly without credentials', () => {
@@ -475,9 +408,8 @@ describe('site check (what is served equals the build)', () => {
 
   const staged = stageSite();
 
-  it('is the same block in the staging smoke and the production health check', () => {
-    expect(copies.length).toBe(2);
-    expect(copies[1]).toBe(copies[0]);
+  it('appears once, in the staging smoke', () => {
+    expect(copies.length).toBe(1);
   });
 
   it('is healthy when the pages and script equal the build, the headers match and an unknown path is a 404', async () => {
@@ -559,107 +491,6 @@ describe('site check (what is served equals the build)', () => {
   });
 });
 
-describe('production rollback', () => {
-  const copies = blocks('ROLLBACK');
-  const script = copies[0] ?? '';
-  const PREVIOUS = '0123abcd-0000-4000-8000-000000000001';
-  const NEW = 'fedcba98-0000-4000-8000-000000000002';
-  const status = (id) =>
-    JSON.stringify({ versions: id ? [{ version_id: id, percentage: 100 }] : [] });
-
-  /** Fake pnpm: `deployments status` answers `before` until a rollback ran, then `after`. */
-  function tools({ before = NEW, after = PREVIOUS, rollbackExit = 0, health = '200' } = {}) {
-    const marker = join(tempDir('invite-rolled'), 'rolled');
-    return fakeBin({
-      pnpm: [
-        'case " $* " in',
-        `  *" rollback "*) : > '${marker}'; echo 'Rolled back'; exit ${rollbackExit} ;;`,
-        `  *" deployments status "*) if [ -e '${marker}' ]; then echo '${status(after)}'; else echo '${status(before)}'; fi; exit 0 ;;`,
-        'esac',
-        'exit 99',
-      ].join('\n'),
-      curl: `printf '%s' ${JSON.stringify(health)}`,
-      sleep: 'exit 0',
-    });
-  }
-  const exec = (fakes, env = {}) =>
-    run(script, fakes, {
-      PREVIOUS,
-      DEPLOY_OUTCOME: 'success',
-      RUN_ID: '1',
-      ORIGIN: 'https://invite.example.test',
-      CLOUDFLARE_API_TOKEN: 'test-token-value',
-      ...env,
-    });
-
-  it('appears once, in the rollback step', () => {
-    expect(copies.length).toBe(1);
-    const production = job('deploy-production');
-    expect(production.slice(production.indexOf('id: rollback'))).toMatch(/ROLLBACK-BEGIN/);
-  });
-
-  it('rolls back, checks the live version and that the invite path answers 200', () => {
-    const result = exec(tools());
-    expect(result.ok, result.output).toBe(true);
-    expect(result.github).toContain('result=rolled-back');
-  });
-
-  it('has no target on the first deploy and fails so that the freeze runs', () => {
-    const result = exec(tools(), { PREVIOUS: '' });
-    expect(result.ok).toBe(false);
-    expect(result.github).toContain('result=no-target');
-  });
-
-  it('does not roll back when the recorded version is still live', () => {
-    const result = exec(tools({ before: PREVIOUS }));
-    expect(result.ok, result.output).toBe(true);
-    expect(result.github).toContain('result=previous-live');
-  });
-
-  it('fails when the rollback is refused, when the old version is not live afterwards, or when /i is unhealthy', () => {
-    expect(exec(tools({ rollbackExit: 1 })).github).toContain('result=rollback-failed');
-    expect(exec(tools({ after: NEW })).github).toContain('result=rollback-not-live');
-    const unhealthy = exec(tools({ health: '503' }));
-    expect(unhealthy.ok).toBe(false);
-    expect(unhealthy.github).toContain('result=rolled-back-unhealthy');
-  });
-});
-
-describe('freeze', () => {
-  const copies = blocks('FREEZE');
-  const script = copies[0] ?? '';
-  const exec = (ghExit, ghOutput, env = {}) =>
-    run(script, fakeBin({ gh: `echo ${JSON.stringify(ghOutput)} >&2\nexit ${ghExit}` }), {
-      GH_TOKEN: 'test-token-value',
-      REPOSITORY: '4thtech/agentlink',
-      ROLLBACK_RESULT: 'rolled-back',
-      ...env,
-    });
-
-  it('appears once, in the freeze job', () => {
-    expect(copies.length).toBe(1);
-    expect(job('freeze')).toMatch(/FREEZE-BEGIN/);
-  });
-
-  it('sets DEPLOY_FREEZE and fails the run on purpose, with a summary line', () => {
-    const result = exec(0, '');
-    expect(result.ok).toBe(false);
-    expect(result.output).toMatch(/::error::[^\n]*DEPLOY_FREEZE is set/);
-    expect(result.summary).toMatch(/DEPLOY_FREEZE is set/);
-  });
-
-  it('fails loudly, naming the owner fix, when the token cannot set the variable or is missing', () => {
-    const refused = exec(1, 'HTTP 403: Resource not accessible');
-    expect(refused.ok).toBe(false);
-    expect(refused.output).toMatch(/Setting DEPLOY_FREEZE failed[^\n]*Variables: read and write/);
-    expect(refused.summary).toMatch(/DEPLOY_FREEZE is NOT set/);
-    expect(refused.output).not.toContain('test-token-value');
-    const missing = exec(0, '', { GH_TOKEN: '' });
-    expect(missing.ok).toBe(false);
-    expect(missing.output).toMatch(/DEPLOY_FREEZE_TOKEN is not configured/);
-  });
-});
-
 describe('apps/invite/wrangler.toml', () => {
   const toml = read('apps/invite/wrangler.toml');
   const section = (name) => {
@@ -670,25 +501,17 @@ describe('apps/invite/wrangler.toml', () => {
     return next < 0 ? rest : rest.slice(0, next + 1);
   };
 
-  it('has a staging and a production environment with their own Worker names', () => {
+  it('has a staging environment and no production environment (M1-19-d)', () => {
     expect(section('env.staging')).toMatch(/name = "agentlink-invite-staging"/);
     expect(section('env.staging')).toMatch(/workers_dev = true/);
     expect(section('env.staging')).toMatch(/routes = \[\]/);
-    expect(section('env.production')).toMatch(/name = "agentlink-invite"/);
-    expect(section('env.production')).toMatch(/workers_dev = false/);
-    expect(section('env.production')).toMatch(/preview_urls = false/);
-    // The hostname of the invite link (04 §3.6), the one the workflow health-checks.
-    expect(section('env.production')).toContain(
-      'routes = [{ pattern = "agentlink.4thtech.io", custom_domain = true }]',
-    );
-    expect(workflow).toContain('INVITE_PRODUCTION_ORIGIN: https://agentlink.4thtech.io');
-    expect(read('apps/invite/src/prompt.ts')).toContain('https://agentlink.4thtech.io/i#');
+    expect(toml).not.toMatch(/env\.production|custom_domain|agentlink\.4thtech\.io/);
   });
 
   it('serves static assets only: no script, no vars, no bindings, no secrets', () => {
     expect(toml).not.toMatch(/^main\s*=/m);
     expect(toml).not.toMatch(/\[vars\]|\[env\.\w+\.vars\]|\[\[.*\]\]|account_id/);
-    for (const env of ['', 'env.staging.', 'env.production.']) {
+    for (const env of ['', 'env.staging.']) {
       const assets = section(`${env}assets`);
       expect(assets, env).toMatch(/directory = "\.\/dist\/site"/);
       // `/i` must answer 200 itself, not redirect to `/i/` (the invite link path).
@@ -698,13 +521,13 @@ describe('apps/invite/wrangler.toml', () => {
   });
 
   it('keeps logging off in every environment (04 §4, I-7)', () => {
-    for (const env of ['', 'env.staging.', 'env.production.']) {
+    for (const env of ['', 'env.staging.']) {
       expect(section(`${env}observability`), env).toMatch(/enabled = false/);
       expect(section(`${env}observability.logs`), env).toMatch(/enabled = false/);
       expect(section(`${env}observability.logs`), env).toMatch(/invocation_logs = false/);
       expect(section(`${env}observability.traces`), env).toMatch(/enabled = false/);
     }
-    expect(toml.match(/^logpush = false$/gm)?.length).toBe(3);
+    expect(toml.match(/^logpush = false$/gm)?.length).toBe(2);
     expect(toml).not.toMatch(/logpush = true|tail_consumers/);
   });
 

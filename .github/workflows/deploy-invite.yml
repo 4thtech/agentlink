@@ -1,16 +1,16 @@
-# Deploy the invite page (apps/invite, M1-19-b, D-28, D-53): staging on every merge to main that
-# touches the page, production automatically once the staging checks are green (D-25, D-52).
+# Deploy the invite page (apps/invite, M1-19-b, D-28, D-53): STAGING ONLY, on every merge to main
+# that touches the page (D-25, D-52). There is no production deploy of the invite page yet: it waits
+# for the trademark check and the production domain decision (card M1-19-d, owner-only credentials).
 # The page is a static site served as Workers static assets (release-and-deployment.md §4.6) with no
 # Worker script. Configuration: apps/invite/wrangler.toml. Tests of this file:
 # tools/release/deploy-invite.test.mjs (structure, the shared blocks run on fixtures and a local
 # server) and tools/release/deploy-path-triggers.test.mjs (the `paths` filter).
 #
-# This follows deploy-drop.yml job for job (same gates, same freeze, same catch-up and reconcile
-# pattern); where a block is the same it is the same text, and the test says so. What differs:
-# there is no bundle, no Worker secret and no bucket. The build job stages the built site once and
-# hashes it into a manifest (file path and SHA-256 of every file); both environments deploy exactly
-# that directory (`wrangler deploy --assets`), and the checks below compare what the web serves with
-# the same manifest.
+# This follows deploy-drop.yml (same gates, same freeze check, same catch-up pattern); where a block
+# is the same it is the same text, and the test says so. What differs: there is no bundle, no Worker
+# secret and no bucket. The build job stages the built site once and hashes it into a manifest (file
+# path and SHA-256 of every file); staging deploys exactly that directory (`wrangler deploy
+# --assets`), and the smoke test compares what the web serves with the same manifest.
 #
 # Every wrangler call runs in apps/invite and passes `--config wrangler.toml` and `--env` explicitly.
 #
@@ -29,37 +29,25 @@
 #                      path is a 404 (SITE-CHECK block below). The fragment-never-sent and hostile-name
 #                      browser tests run on this same build in CI (e2e/test/invite-page-*.test.ts); the
 #                      byte equality here ties staging to that build.
-#   deploy-production  environment `production`, only after a green staging smoke, and only while this
-#                      commit is still main's head (runs can finish out of order). Records the live
-#                      version (rollback target), deploys to the Custom Domain, runs the same
-#                      SITE-CHECK over HTTP (no repository code runs against production), reads back
-#                      the logging settings, and on any failure, cancellation or step timeout after
-#                      the deploy started rolls back automatically with `wrangler rollback`. Every
-#                      step has its own timeout and the job timeout is above their sum, so a slow
-#                      step fails as a step and the rollback still runs. Writes the deploy record
-#                      draft to the run summary. A new Custom Domain's certificate may take minutes:
-#                      the check waits up to 15 minutes while there is no TLS or connection yet.
-#   freeze             sets DEPLOY_FREEZE when deploy-production failed after deploying; fails loudly,
-#                      naming the owner fix, when its token cannot set the variable.
-#   catch-up           only when this run did not deploy its commit because main moved on (CI
-#                      superseded, or deploy-production found a newer head) or its CI failed (a
-#                      flake): dispatches this workflow on main unless a run for main's head is in
-#                      flight or succeeded (tools/release/catch-up-deploy.mjs). The dispatched run
-#                      passes every gate again for the head commit. deploy-reconcile.yml covers the
-#                      case where no run starts at all.
+#   catch-up           only when this run did not deploy its commit because its CI was superseded by a
+#                      newer push or failed (a flake): dispatches this workflow on main unless a run
+#                      for main's head is in flight or succeeded (tools/release/catch-up-deploy.mjs).
+#                      The dispatched run passes every gate again for the head commit.
+#
+# Not here, on purpose: a production environment, production credentials, a Custom Domain, the
+# automatic rollback and the freeze job. They belong to M1-19-d. deploy-reconcile.yml does not cover
+# this workflow either: it reads the production deploy job of a workflow.
 #
 # SKIPPING VS FAILING: absent credentials skip with a notice; a token the API refuses fails the job.
 #
-# DEPLOY_FREEZE: every deploy job is skipped while the repository variable is 'true' and re-checks it
-# when it starts (after any approval wait). Rollback is remediation and still runs.
+# DEPLOY_FREEZE: deploy-staging is skipped while the repository variable is 'true' and re-checks it
+# when it starts. The invite page never sets it (no production to protect).
 #
 # CREDENTIALS (owner only; never in this file, logs or PR text). Names only; the same names as for
 # deploy-drop.yml, so an account already set up for the drop needs nothing new:
 #   Environment `staging`:    secret CLOUDFLARE_API_TOKEN (staging token), variable CLOUDFLARE_ACCOUNT_ID,
 #                             optional variable INVITE_STAGING_URL (the workers.dev origin, used only
 #                             if Wrangler does not report it).
-#   Environment `production`: secret CLOUDFLARE_API_TOKEN (production token), variable CLOUDFLARE_ACCOUNT_ID.
-#   Environment `deploy-freeze`: secret DEPLOY_FREEZE_TOKEN (exists, OPS-CI-2).
 #
 # Zero access (AGENTS.md): the page holds and receives no secret. No step prints a token; the invite
 # fragment never reaches this workflow (no step requests a URL with one).
@@ -90,9 +78,6 @@ env:
   TURBO_TELEMETRY_DISABLED: "1"
   DO_NOT_TRACK: "1"
   WRANGLER_SEND_METRICS: "false"
-  # The production hostname: the one in the invite link (04 §3.6, release-and-deployment.md §1.1);
-  # also the route in apps/invite/wrangler.toml.
-  INVITE_PRODUCTION_ORIGIN: https://agentlink.4thtech.io
 
 jobs:
   ci-green:
@@ -478,464 +463,15 @@ jobs:
           echo "::error::Staging does not serve the build with the headers of 08 §4."
           exit 1
 
-  deploy-production:
-    name: deploy-production
-    needs: [build, deploy-staging, smoke-staging]
-    if: needs.deploy-staging.outputs.deployed == 'true' && needs.smoke-staging.result == 'success' && vars.DEPLOY_FREEZE != 'true'
-    runs-on: ubuntu-24.04
-    # Every step has its own timeout-minutes and this job timeout stays above their sum (84; tested).
-    # A slow step therefore ends as a failed step and the rollback step still runs with its own
-    # budget; the job-level timeout, which would cancel the job, is never reached first. The health
-    # check alone may wait 20 minutes for a new Custom Domain's certificate.
-    timeout-minutes: 95
-    environment: production
-    concurrency:
-      group: deploy-invite-production
-      cancel-in-progress: false
-    permissions:
-      contents: read
-    outputs:
-      # From the deploy step's outcome, not an output it writes: a step cancelled or timed out
-      # mid-way may never have written one, but its wrangler request may still have landed.
-      deployed: ${{ contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome) && 'true' || 'false' }}
-      rollback: ${{ steps.rollback.outputs.result }}
-      current: ${{ steps.head.outputs.current }}
-    steps:
-      - name: Check out repository
-        timeout-minutes: 5
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      # Re-checked here: the environment may have waited for an approval click.
-      - name: Stop if DEPLOY_FREEZE is set
-        timeout-minutes: 2
-        shell: bash
-        env:
-          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
-        run: |
-          set -euo pipefail
-          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
-            echo "::error::DEPLOY_FREEZE is set; nothing is deployed until the owner clears it."
-            exit 1
-          fi
-
-      - name: Check that this commit is still the head of main
-        id: head
-        timeout-minutes: 2
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          COMMIT: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          # HEAD-CHECK-BEGIN
-          # Runs can finish out of order: only the run for main's current head may change production.
-          head="$(gh api "repos/$REPOSITORY/commits/main" --jq .sha)"
-          if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Could not read the head of main."
-            exit 1
-          fi
-          if [ "$head" != "$COMMIT" ]; then
-            # CHORE-DEPLOY-CATCHUP: not silently green; the catch-up job names the run that deploys.
-            echo "::warning::main has moved on from $COMMIT to $head; this run did not change production. The catch-up job hands it to a run for $head."
-            echo "**Superseded by \`$head\`:** this run did not change production (main moved on from \`$COMMIT\`); see the catch-up job for the run that deploys it." >> "$GITHUB_STEP_SUMMARY"
-            echo "current=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          fi
-          # HEAD-CHECK-END
-
-      - name: Set up Node.js and pnpm
-        timeout-minutes: 15
-        uses: ./.github/actions/setup-node-pnpm
-        with:
-          cache: "false"
-
-      - name: Download the site
-        timeout-minutes: 5
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: invite-site
-          path: ${{ runner.temp }}/invite-site
-
-      - name: Verify the site is the one staging ran
-        timeout-minutes: 2
-        shell: bash
-        env:
-          SITE_DIR: ${{ runner.temp }}/invite-site
-          MANIFEST: ${{ runner.temp }}/invite-site.manifest
-          EXPECTED: ${{ needs.build.outputs.sha256 }}
-        run: |
-          set -euo pipefail
-          # MANIFEST-BEGIN
-          # The SHA-256 of every staged file, and of that list: what is deployed, and what is served.
-          (cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | xargs sha256sum) > "$MANIFEST"
-          sha="$(sha256sum "$MANIFEST" | cut -d' ' -f1)"
-          # MANIFEST-END
-          if [ "$sha" != "$EXPECTED" ]; then
-            echo "::error::The downloaded site is not the one the build job staged."
-            exit 1
-          fi
-
-      - name: Check credentials
-        id: ready
-        if: steps.head.outputs.current == 'true'
-        timeout-minutes: 3
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          DEPLOY_ENV: production
-          WORKER: agentlink-invite
-        run: |
-          set -euo pipefail
-          # CREDENTIAL-CHECK-BEGIN
-          # Absent credentials skip cleanly; a token that does not work fails. The Worker may not exist
-          # yet: the first deploy creates it.
-          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-19-b). Not deployed."
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
-            echo "::error::CLOUDFLARE_ACCOUNT_ID is not a 32-character hex account ID."
-            exit 1
-          fi
-          code="$(curl -sS --proto '=https' --max-time 30 -o /dev/null -w '%{http_code}' \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER/script-settings" || true)"
-          case "$code" in
-            200 | 404) ;;
-            *)
-              echo "::error::Reading the settings of $WORKER failed with HTTP ${code:-none}: the token is invalid, expired or lacks Workers Scripts access."
-              exit 1
-              ;;
-          esac
-          echo "ready=true" >> "$GITHUB_OUTPUT"
-          # CREDENTIAL-CHECK-END
-
-      - name: Record the live version (rollback target)
-        id: previous
-        if: steps.ready.outputs.ready == 'true'
-        timeout-minutes: 5
-        shell: bash
-        working-directory: apps/invite
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          version=""
-          if status="$(pnpm exec wrangler deployments status --env production --config wrangler.toml --json)"; then
-            json="$(printf '%s\n' "$status" | awk 'f || /^\{/ { f = 1; print }')"
-            version="$(jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' <<<"$json" || true)"
-          fi
-          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then
-            version=""
-            echo "::warning::No single live production version recorded; an automatic rollback will not be possible for this deploy (expected on the first deploy)."
-          fi
-          echo "Rollback target: ${version:-none}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      # Once this step has started it counts as deployed (its outcome is success, failure or
-      # cancelled): a deploy that fails, is cancelled or times out half-way may still have gone live,
-      # so the rollback and the freeze run.
-      - name: Deploy to production (Custom Domain)
-        id: deploy
-        if: steps.ready.outputs.ready == 'true'
-        timeout-minutes: 10
-        shell: bash
-        working-directory: apps/invite
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          report="$RUNNER_TEMP/wrangler-production.ndjson"
-          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy --assets "$RUNNER_TEMP/invite-site" --env production --config wrangler.toml
-          version="$(jq -r 'select(.type == "deploy") | .version_id // empty' "$report" | head -n 1)"
-          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
-          echo "Production version ${version:-unknown}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      # HTTP only; no repository code runs against production. The same SITE-CHECK as on staging:
-      # the served pages and script equal the build, the headers of 08 §4 are on them
-      # (release-and-deployment.md §4.6 "Verify"). A new Custom Domain met a TLS handshake failure
-      # for minutes while Cloudflare provisioned the edge certificate (drop, M1-27b-c): no HTTP
-      # answer at all (curl exit 6, 7, 28 or 35) waits up to 15 minutes; a real answer that is not
-      # the healthy one, or any other curl error, fails after 10 attempts.
-      - name: Health check
-        id: health
-        if: steps.ready.outputs.ready == 'true'
-        timeout-minutes: 20
-        shell: bash
-        env:
-          ORIGIN: ${{ env.INVITE_PRODUCTION_ORIGIN }}
-          SITE_DIR: ${{ runner.temp }}/invite-site
-          MANIFEST: ${{ runner.temp }}/invite-site.manifest
-        run: |
-          set -euo pipefail
-          # SITE-CHECK-BEGIN
-          # One pass over the served page. Returns 0 when healthy, 2 when there was no HTTP answer at
-          # all (DNS, connection, timeout or TLS handshake: curl exit 6, 7, 28 or 35) and 1 for anything
-          # else. It prints paths, header names and status codes, never a header value or a body.
-          header_of() { # <file> <lower-case header name>: the first value, or nothing
-            tr -d '\r' < "$1" | awk -v k="$2" '{ i = index($0, ":"); if (i > 0) { n = substr($0, 1, i - 1); gsub(/^[ \t]+|[ \t]+$/, "", n); if (tolower(n) == k) { v = substr($0, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", v); print v; exit } } }'
-          }
-          fetch() { # <path>: sets status and curl_exit; the body and headers land in $RUNNER_TEMP
-            curl_exit=0
-            status="$(curl -sS --proto "${SITE_PROTO:-=https}" --max-time 20 -D "$RUNNER_TEMP/site-headers.txt" -o "$RUNNER_TEMP/site-body.bin" -w '%{http_code}' "$ORIGIN$1")" || curl_exit=$?
-          }
-          site_check() {
-            local entry path asset name wanted_value seen want got
-            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js"; do
-              path="${entry%%|*}"
-              asset="${entry##*|}"
-              fetch "$path"
-              if [ "$curl_exit" -ne 0 ] && ! [[ "$status" =~ ^[1-5][0-9][0-9]$ ]]; then
-                if [[ " 6 7 28 35 " == *" $curl_exit "* ]]; then return 2; fi
-                echo "$path: curl exit $curl_exit"
-                return 1
-              fi
-              if [ "$status" != "200" ]; then
-                echo "$path: HTTP $status, expected 200 (a redirect counts as a failure)"
-                return 1
-              fi
-              for name in content-security-policy referrer-policy x-content-type-options x-frame-options cache-control; do
-                wanted_value="$(header_of "$SITE_DIR/_headers" "$name")"
-                seen="$(header_of "$RUNNER_TEMP/site-headers.txt" "$name")"
-                if [ -z "$wanted_value" ]; then
-                  echo "::error::The _headers file has no $name."
-                  return 1
-                fi
-                if [ "$seen" != "$wanted_value" ]; then
-                  echo "$path: header $name is missing or differs from the _headers file"
-                  return 1
-                fi
-              done
-              want="$(awk -v f="./$asset" '$2 == f { print $1 }' "$MANIFEST")"
-              got="$(sha256sum "$RUNNER_TEMP/site-body.bin" | cut -d' ' -f1)"
-              if [ -z "$want" ] || [ "$got" != "$want" ]; then
-                echo "$path: the served bytes are not the built $asset"
-                return 1
-              fi
-            done
-            fetch "/not-a-page-ce0d1c"
-            if [ "$status" != "404" ]; then
-              echo "An unknown path answered HTTP ${status:-none}, expected 404."
-              return 1
-            fi
-            echo "Healthy: three pages and scripts equal the build, headers match, unknown path 404."
-            return 0
-          }
-          # SITE-CHECK-END
-          answer_limit=10    # attempts with an HTTP answer that is not the healthy one, or another curl error
-          connect_limit=60   # attempts in all (15 s apart)
-          connect_window=900 # seconds without TLS or a connection
-          started=$SECONDS
-          answered=0
-          attempt=0
-          while :; do
-            attempt=$((attempt + 1))
-            rc=0
-            site_check || rc=$?
-            if [ "$rc" -eq 0 ]; then
-              echo "Production is healthy (attempt $attempt)."
-              exit 0
-            fi
-            if [ "$rc" -eq 2 ]; then
-              elapsed=$((SECONDS - started))
-              if [ "$attempt" -ge "$connect_limit" ] || [ "$elapsed" -ge "$connect_window" ]; then
-                echo "::error::The production health check failed: no TLS or connection to $ORIGIN after $attempt attempts ($elapsed s). Check the Custom Domain and its edge certificate in the Cloudflare dashboard."
-                exit 1
-              fi
-              echo "Attempt $attempt: no TLS or connection yet; a new Custom Domain's certificate can take minutes. Retrying in 15 s."
-            else
-              answered=$((answered + 1))
-              if [ "$answered" -ge "$answer_limit" ]; then
-                echo "::error::The production health check failed after $answered attempts with an HTTP answer or a curl error other than 6, 7, 28 or 35."
-                exit 1
-              fi
-              echo "Attempt $attempt did not pass; retrying in 15 s."
-            fi
-            sleep 15
-          done
-
-      - name: Fetch the live Worker settings
-        if: steps.ready.outputs.ready == 'true'
-        timeout-minutes: 3
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
-          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
-          curl -sS --proto '=https' --max-time 30 -H "$auth" \
-            -o "$RUNNER_TEMP/settings.json" "$api/workers/scripts/agentlink-invite/script-settings"
-
-      - name: Read back the logging settings (all off, 04 §4)
-        id: settings
-        if: steps.ready.outputs.ready == 'true'
-        timeout-minutes: 2
-        shell: bash
-        env:
-          SETTINGS_JSON: ${{ runner.temp }}/settings.json
-        run: |
-          set -euo pipefail
-          # READBACK-SETTINGS-BEGIN
-          # Fails closed (IR-OPS-PRIV-1-1). The conditions live in one jq program shared by every copy
-          # of this block in the deploy workflows (see its header): it prints exactly
-          # `logging-settings: ok`, or one line per failed condition with only our own field paths, JSON
-          # types and boolean, number or null values (never the body, strings, URLs, tokens or IDs).
-          # Anything but that one ok line, including a jq error or a body that is not one JSON document,
-          # fails the deploy.
-          program="$GITHUB_WORKSPACE/.github/scripts/worker-logging-settings.jq"
-          if ! report="$(jq -r -f "$program" "$SETTINGS_JSON" 2> /dev/null)"; then
-            report="failed response: not one readable JSON document, or the check could not run"
-          fi
-          if [ "$report" != "logging-settings: ok" ]; then
-            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the invite page (04 §4). Failed conditions follow."
-            printf '%s\n' "$report"
-            exit 1
-          fi
-          echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
-          # READBACK-SETTINGS-END
-
-      # Any failure, cancellation or step timeout after the deploy started rolls back (a cancelled
-      # run still runs this step, and every earlier step ends by its own timeout before the job's).
-      # A second, forced cancellation stops this step too; the freeze job still runs, and the owner
-      # rolls back by hand (release-and-deployment.md §8).
-      # No head-of-main gate here: the production concurrency group serializes runs, so the version
-      # this run deployed is live and must be rolled back even if main moved on.
-      - name: Roll back to the recorded version
-        id: rollback
-        if: (failure() || cancelled()) && contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome)
-        timeout-minutes: 10
-        shell: bash
-        working-directory: apps/invite
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-          PREVIOUS: ${{ steps.previous.outputs.version }}
-          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
-          RUN_ID: ${{ github.run_id }}
-          ORIGIN: ${{ env.INVITE_PRODUCTION_ORIGIN }}
-        run: |
-          set -euo pipefail
-          # ROLLBACK-BEGIN
-          if [ -z "${PREVIOUS:-}" ]; then
-            echo "::error::No recorded rollback target. DEPLOY_FREEZE is set by the freeze job; the owner decides the fix."
-            echo "result=no-target" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          live_version() {
-            pnpm exec wrangler deployments status --env production --config wrangler.toml --json \
-              | awk 'f || /^\{/ { f = 1; print }' \
-              | jq -r '[.versions[]? | select(.percentage == 100) | .version_id][0] // empty' || true
-          }
-          # The previous version serves older files: only that the invite path answers 200.
-          healthy() {
-            for _ in 1 2 3 4 5 6; do
-              health="$(curl -sS --proto "${SITE_PROTO:-=https}" --max-time 15 -o /dev/null -w '%{http_code}' "$ORIGIN/i" || true)"
-              if [ "$health" = "200" ]; then return 0; fi
-              sleep 10
-            done
-            return 1
-          }
-          # A deploy step that was cancelled or timed out had its wrangler killed, but a request it
-          # had already sent can still land. Wait for it before reading the live version.
-          if [ "${DEPLOY_OUTCOME:-}" != "success" ]; then
-            echo "The deploy step ended ${DEPLOY_OUTCOME:-unknown}; waiting 30 s for an interrupted deploy request to settle."
-            sleep 30
-          fi
-          # Nothing to roll back when the recorded version is still the live one (the deploy never
-          # went live). An unreadable status rolls back anyway.
-          if [ "$(live_version)" = "$PREVIOUS" ]; then
-            if healthy; then
-              echo "::warning::Not rolled back: the recorded version $PREVIOUS is still live (this deploy never went live) and /i answers 200. DEPLOY_FREEZE is set by the freeze job."
-              echo "result=previous-live" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "::error::The recorded version $PREVIOUS is still live, but /i does not answer 200."
-            echo "result=previous-live-unhealthy" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          if rolled="$(pnpm exec wrangler rollback "$PREVIOUS" --env production --config wrangler.toml --message "Automatic rollback after a failed post-deploy check (run $RUN_ID)" --yes 2>&1)"; then
-            printf '%s\n' "$rolled"
-          else
-            printf '%s\n' "$rolled"
-            echo "::error::wrangler rollback to $PREVIOUS failed; the new version may still be live. DEPLOY_FREEZE is set by the freeze job; owner action required."
-            echo "result=rollback-failed" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          live="$(live_version)"
-          if [ "$live" != "$PREVIOUS" ]; then
-            echo "::error::After the rollback the live version is ${live:-unknown}, not $PREVIOUS."
-            echo "result=rollback-not-live" >> "$GITHUB_OUTPUT"
-            exit 1
-          fi
-          if healthy; then
-            echo "::warning::Rolled back: $PREVIOUS is live and /i answers 200. DEPLOY_FREEZE is set by the freeze job."
-            echo "result=rolled-back" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "::error::Rolled back: $PREVIOUS is live, but /i does not answer 200."
-          echo "result=rolled-back-unhealthy" >> "$GITHUB_OUTPUT"
-          exit 1
-          # ROLLBACK-END
-
-      - name: Write the deploy record draft
-        if: always() && contains(fromJSON('["success", "failure", "cancelled"]'), steps.deploy.outcome)
-        timeout-minutes: 2
-        shell: bash
-        env:
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          COMMIT: ${{ github.sha }}
-          MANIFEST_SHA256: ${{ needs.build.outputs.sha256 }}
-          VERSION: ${{ steps.deploy.outputs.version }}
-          PREVIOUS: ${{ steps.previous.outputs.version }}
-          STAGING_VERSION: ${{ needs.deploy-staging.outputs.version }}
-          DEPLOY_RESULT: ${{ steps.deploy.outcome }}
-          HEALTH_RESULT: ${{ steps.health.outcome }}
-          SETTINGS_RESULT: ${{ steps.settings.outcome }}
-          ROLLBACK_RESULT: ${{ steps.rollback.outputs.result }}
-        run: |
-          set -euo pipefail
-          {
-            echo "## Deploy record draft (invite page)"
-            echo
-            echo "No secrets here. The orchestrator files the final record in 4thtech/agentlink-ops (release-and-deployment.md §5.2)."
-            echo
-            echo "| Field | Value |"
-            echo "|---|---|"
-            echo "| Artifact | Worker \`agentlink-invite\` (apps/invite), static assets |"
-            echo "| Commit | \`$COMMIT\` |"
-            echo "| Environment | production ($INVITE_PRODUCTION_ORIGIN) |"
-            echo "| Time (UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
-            echo "| Approved | by the \`production\` environment (D-52); see the run |"
-            echo "| Executed by | CI run $RUN_URL |"
-            echo "| Site manifest sha256 | \`$MANIFEST_SHA256\` (the same files as staging version \`${STAGING_VERSION:-unknown}\`) |"
-            echo "| Version deployed | \`${VERSION:-unknown}\` (deploy: $DEPLOY_RESULT) |"
-            echo "| Rollback target | \`${PREVIOUS:-none}\` |"
-            echo "| Health check (files, headers) | ${HEALTH_RESULT:-skipped} |"
-            echo "| Logging read-back | ${SETTINGS_RESULT:-skipped} |"
-            echo "| Rollback | ${ROLLBACK_RESULT:-not needed} |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # A run that did not deploy because main moved on makes sure main's head still gets a run of this
-  # workflow (tools/release/catch-up-deploy.mjs). It only dispatches; the dispatched run deploys
+  # A run that did not deploy because its CI was superseded or failed makes sure main's head still
+  # gets a run of this workflow (tools/release/catch-up-deploy.mjs). It only dispatches; the dispatched run deploys
   # nothing unless the head's own CI is green and every gate passes.
   catch-up:
     name: catch-up
-    needs: [ci-green, deploy-production]
+    needs: ci-green
     if: >-
       always() && github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' &&
-      (needs.ci-green.outputs.result == 'superseded' || needs.ci-green.result == 'failure' ||
-      needs.deploy-production.outputs.current == 'false')
+      (needs.ci-green.outputs.result == 'superseded' || needs.ci-green.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -954,43 +490,3 @@ jobs:
         run: |
           set -euo pipefail
           node tools/release/catch-up-deploy.mjs --workflow deploy-invite.yml
-
-  freeze:
-    name: freeze
-    needs: deploy-production
-    if: >-
-      always() && vars.DEPLOY_FREEZE != 'true' &&
-      needs.deploy-production.outputs.deployed == 'true' && needs.deploy-production.result != 'success'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    environment: deploy-freeze
-    permissions: {}
-    steps:
-      - name: Set DEPLOY_FREEZE
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.DEPLOY_FREEZE_TOKEN }}
-          REPOSITORY: ${{ github.repository }}
-          ROLLBACK_RESULT: ${{ needs.deploy-production.outputs.rollback }}
-        run: |
-          set -euo pipefail
-          # FREEZE-BEGIN
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::DEPLOY_FREEZE_TOKEN is not configured. The orchestrator or the owner sets DEPLOY_FREEZE=true now (release-and-deployment.md §3.1)."
-            echo "- **DEPLOY_FREEZE is NOT set**: DEPLOY_FREEZE_TOKEN is not configured. Set DEPLOY_FREEZE=true now." >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          if ! failure="$(gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY" 2>&1)"; then
-            failure="$(printf '%s' "$failure" | head -n 3 | tr '\n' ' ')"
-            echo "::error::Setting DEPLOY_FREEZE failed (${failure:-no output}); DEPLOY_FREEZE is NOT set. Owner fix: the token behind the secret DEPLOY_FREEZE_TOKEN (environment deploy-freeze) needs Variables: read and write on 4thtech/agentlink. Until then the orchestrator or the owner sets DEPLOY_FREEZE=true by hand (release-and-deployment.md §3.1). Rollback: ${ROLLBACK_RESULT:-none}."
-            {
-              echo "### DEPLOY_FREEZE is NOT set"
-              echo
-              echo "Setting it failed: ${failure:-no output}. Owner fix: the token behind the secret DEPLOY_FREEZE_TOKEN needs Variables: read and write on 4thtech/agentlink. Set DEPLOY_FREEZE=true by hand now. Rollback: ${ROLLBACK_RESULT:-none}."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "::error::The invite page's production deploy failed after deploying. DEPLOY_FREEZE is set; only the owner clears it. Rollback: ${ROLLBACK_RESULT:-none}."
-          echo "DEPLOY_FREEZE is set after a failed production deploy of the invite page (rollback: ${ROLLBACK_RESULT:-none}); only the owner clears it." >> "$GITHUB_STEP_SUMMARY"
-          exit 1
-          # FREEZE-END

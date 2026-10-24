@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 330 (M1a 91, M1b 239) |
+| M1 Local beta | 331 (M1a 91, M1b 240) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -4656,8 +4656,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Spec:** 04 §3.6; 08 §4; D-28, D-53
 - **Invariants:** I-2, I-5
 - **Scope:**
-  - Wire the static invite page deploy to Cloudflare (D-28). No pattern exists yet in `.github/workflows/`; follow the submitter and drop pipelines (staging on merge, smoke test, production on green, health check and rollback, `DEPLOY_FREEZE`).
-  - Owner (IR on #492): settle the invite production hostname before production Cloudflare credentials are set; a DNS conflict would trigger the repo-wide freeze.
+  - Wire the static invite page deploy to Cloudflare (D-28). No pattern exists yet in `.github/workflows/`; follow the submitter and drop pipelines for the staging half only (staging on merge, smoke test, `DEPLOY_FREEZE` halts it). Owner decision 2026-10-24: **staging only**; the production deploy is M1-19-d.
   - The page recomputes `nameHash` from the name it shows and compares it with the payload's; a mismatch shows the invite as damaged and no prompt.
 - **Acceptance:** tests first: a payload whose `nameHash` does not match the shown name yields no prompt; a matching one still yields the template plus canonical link; the deploy workflow passes the workflow checks and the smoke test runs against staging.
 
@@ -4673,6 +4672,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - All M1-19 tests pass unchanged (fragment never sent, hostile-name DOM test, Trusted Types); axe-core zero WCAG 2.1 AA violations; no external URL; owner confirms fidelity.
   - **Deploy (D-25)** block as in M1-19.
+
+#### M1-19-d · Invite page: production deploy (new, split from M1-19-b, owner decision 2026-10-24)
+- **Status:** blocked (trademark check; production domain decision) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/deploy-invite.yml`, apps/invite/wrangler.toml
+- **Depends on:** M1-19-b; the trademark check and the production hostname (owner)
+- **Spec:** 04 §3.6; 08 §4; release-and-deployment.md §1.1, §4.6; D-25, D-52
+- **Invariants:** I-2, I-7
+- **Scope:** add the production half to the invite pipeline: a `production` environment, the `deploy-production` job (only after a green staging smoke and while the commit is main's head), the Cloudflare credentials (owner-only), the Custom Domain, the same site check over HTTP, the logging read-back, automatic rollback, the `freeze` job, `DEPLOY_FREEZE` gating, and `deploy-reconcile.yml` coverage. The pattern is `deploy-drop.yml`.
+- **Acceptance:** the hostname in the invite link matches the Custom Domain; a failed production deploy rolls back and sets `DEPLOY_FREEZE`; tests as for the drop pipeline.
 
 #### M1-33a · Delivery receipts off by default; sender request and recipient opt-in (new, D-109)
 - **Status:** done (4thtech/agentlink#325, merged 2026-10-21) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

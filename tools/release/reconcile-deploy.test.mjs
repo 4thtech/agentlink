@@ -425,17 +425,17 @@ describe('deploy-reconcile.yml', () => {
     expect(wf).toMatch(/GH_TOKEN: \$\{\{ github\.token \}\}/);
   });
 
-  it('reconciles all deploy workflows in one call', () => {
+  it('reconciles both deploy workflows in one call', () => {
     const scripts = runScripts(wf)
       .map((s) => s.script)
       .join('\n');
     expect(scripts).toMatch(
-      /node tools\/release\/reconcile-deploy\.mjs[\s\\]+--workflow deploy-submitter\.yml[\s\\]+--workflow deploy-drop\.yml[\s\\]+--workflow deploy-invite\.yml/,
+      /node tools\/release\/reconcile-deploy\.mjs[\s\\]+--workflow deploy-submitter\.yml[\s\\]+--workflow deploy-drop\.yml/,
     );
   });
 
   it('matches the deploy workflows it reads: dispatchable, the deploy step, the same CI gates', () => {
-    for (const name of ['deploy-submitter.yml', 'deploy-drop.yml', 'deploy-invite.yml']) {
+    for (const name of ['deploy-submitter.yml', 'deploy-drop.yml']) {
       const source = read(name);
       expect(source).toMatch(/\n {2}workflow_dispatch:\n/);
       const prod = source.slice(source.indexOf('\n  deploy-production:\n'));

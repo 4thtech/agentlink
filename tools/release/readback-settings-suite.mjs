@@ -48,14 +48,14 @@ const FIELD =
   '(?:success|result(?:\\.[a-z_]+)*): (?:missing|null|boolean (?:true|false)|number -?[0-9.eE+-]+|string|array of [0-9]+(?:, only "cloudflare": (?:true|false))?|object with [0-9]+ keys|not readable(?: \\(parent is [a-z]+\\))?)';
 const LINE = new RegExp(`^failed [a-z-]+: ${FIELD}(?:; ${FIELD})*$`);
 
-/** The diagnosis tests for the blocks of one workflow (`copies`: its READBACK-SETTINGS blocks). */
-export function readbackDiagnosisSuite(workflowName, copies) {
+/** The diagnosis tests for the blocks of one workflow (`copies`: its READBACK-SETTINGS blocks; one per environment that deploys, two by default). */
+export function readbackDiagnosisSuite(workflowName, copies, expectedCopies = 2) {
   describe(`logging settings read-back diagnosis (${workflowName})`, () => {
     const script = copies[0] ?? '';
     const run = (body) => runReadback(script, body);
 
     it('runs the one shared jq program, with no inline copy of the check', () => {
-      expect(copies.length).toBe(2);
+      expect(copies.length).toBe(expectedCopies);
       for (const copy of copies) {
         expect(copy).toContain(`program="$GITHUB_WORKSPACE/${PROGRAM}"`);
         expect(copy).toContain('jq -r -f "$program" "$SETTINGS_JSON"');
