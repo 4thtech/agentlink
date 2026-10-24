@@ -7,7 +7,7 @@ An optional one-click package of AgentLink for Claude Desktop. The product stays
 | File | Purpose |
 |---|---|
 | `manifest.json` | The manifest template (MCPB format, `manifest_version` 0.3, checked against the schema of `@anthropic-ai/mcpb` 2.1.2). It starts the published CLI as `agentlink mcp` and asks the user for nothing. The release build fills `version` and `compatibility.platforms`. |
-| `4thtech-signing.crt` | The public 4thTech signing certificate (PEM). **Empty until the owner creates the key**; while it is empty, releases ship unsigned bundles. Public material only: never put a key here. |
+| `4thtech-signing.crt` | The public 4thTech signing certificate (PEM). Present (self-signed, valid until 2029-10-22, SHA-256 fingerprint `7A:1C:DE:6D:95:E5:18:C4:79:49:62:12:FD:9A:51:25:FF:01:9A:5D:93:A9:96:3D:B9:98:8F:C5:31:47:64:6E`); releases sign bundles with it when the `DESKTOP_EXT_SIGNING_KEY` secret exists. Public material only: never put a key here. |
 
 ## How a release builds it
 
