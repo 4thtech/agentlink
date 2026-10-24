@@ -21,7 +21,7 @@ import {
   ok,
   type HandlerOutput,
 } from './result.js';
-import { noOwnerCard } from './text.js';
+import { noOwnerCard, noOwnerResult } from './text.js';
 import { untrustedBlock, untrustedText } from './untrusted.js';
 
 /** Fixed text for this tool (I-5: no slot takes the sender's text). */
@@ -87,11 +87,7 @@ export async function fetchFileHandler(
   if (typeof envelopeId !== 'string') return invalidArgument();
   const { client, logger } = context;
   if ((await client.self()) === undefined) {
-    return fail(
-      'needs_setup',
-      noOwnerCard(context.agentName).summary,
-      noOwnerCard(context.agentName).nextStep,
-    );
+    return noOwnerResult(context);
   }
   if (client.files === undefined) return notAvailable();
 

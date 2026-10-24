@@ -2,6 +2,9 @@
 // sheet (strings/) where a key exists; these sentences are the rest. None has a slot: nothing here is
 // ever built from a value (I-5), and every sentence passes the 11 §5.1 vocabulary lint
 // (text.test.ts). Moving them into the copy sheet is M1-9g's (owner of strings/ after M1-9o/p/q).
+import type { ToolContext } from './context.js';
+import { fail, type HandlerOutput } from './result.js';
+
 // 06 §6 local agent name (tools/ may not import the runtime; same pattern as runtime/agent-name.ts).
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 
@@ -10,6 +13,8 @@ const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
  * this is the `npx` form; the runtime passes its own `cliPrefix()` where it knows a global install).
  */
 const DEFAULT_PREFIX = 'npx -y @4thtech-io/agentlink';
+/** The form after a global install (the runtime's `GLOBAL_PREFIX`, M1-36a). */
+const GLOBAL_PREFIX = 'agentlink';
 
 export const TOOL_TEXT = Object.freeze({
   // agentlink_status and the not-set-up server
@@ -93,4 +98,33 @@ export function noOwnerCard(
     ),
     nextStep: TOOL_TEXT.noOwnerCardNextStep,
   };
+}
+
+/**
+ * The no-owner text for a handler's context (M1-36a-b): `owner init` when the runtime knows this
+ * machine has no owner, with the command prefix that works here. The prefix is only ever one of the
+ * two fixed forms, and a failing check counts as unknown (the add-agent step), never `owner init`.
+ */
+export async function noOwnerFor(
+  context: Pick<ToolContext, 'agentName' | 'cliPrefix' | 'ownerExists'>,
+): Promise<{ summary: string; nextStep: string }> {
+  let ownerExists: boolean | undefined;
+  try {
+    ownerExists = await context.ownerExists?.();
+  } catch {
+    ownerExists = undefined;
+  }
+  const prefix = context.cliPrefix === GLOBAL_PREFIX ? GLOBAL_PREFIX : DEFAULT_PREFIX;
+  return noOwnerCard(context.agentName, {
+    prefix,
+    ...(typeof ownerExists === 'boolean' ? { ownerExists } : {}),
+  });
+}
+
+/** The `needs_setup` result for an agent with no owner yet (M1-36a-b): `noOwnerFor` as a result. */
+export async function noOwnerResult(
+  context: Pick<ToolContext, 'agentName' | 'cliPrefix' | 'ownerExists'>,
+): Promise<HandlerOutput> {
+  const text = await noOwnerFor(context);
+  return fail('needs_setup', text.summary, text.nextStep);
 }
