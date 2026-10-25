@@ -254,6 +254,9 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@4thtech-io/local-ui':
+        specifier: workspace:*
+        version: link:../local-ui
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../../packages/log
@@ -306,6 +309,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      wrangler:
+        specifier: 4.149.0
+        version: 4.149.0
 
   apps/local-ui:
     dependencies:
@@ -467,6 +474,9 @@ importers:
       '@types/ws':
         specifier: 8.18.2
         version: 8.18.2
+      axe-core:
+        specifier: 4.14.0
+        version: 4.14.0
 
   packages/occ-v2-abi: {}
 

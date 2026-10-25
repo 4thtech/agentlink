@@ -37,7 +37,7 @@ import { ChainError } from '../clients/errors.js';
 import { DEFAULT_RPC_TIMEOUT_MS } from '../clients/read-client.js';
 import {
   GASLESS_CHAIN_IDS,
-  GASLESS_WINDOW_SECONDS,
+  GASLESS_MAX_WINDOW_SECONDS,
   gaslessToken,
   gaslessValueBounds,
   readAuthorizationUsed,
@@ -339,7 +339,10 @@ export function createDepositRelayChain(
       const validBefore = BigInt(auth.validBefore);
       if (BigInt(auth.validAfter) >= now) return refuse('invalid_window');
       if (validBefore <= now + BigInt(DEPOSIT_AUTH_MIN_REMAINING_SECONDS)) return refuse('expired');
-      if (validBefore > now + BigInt(GASLESS_WINDOW_SECONDS + DEPOSIT_AUTH_CLOCK_SKEW_SECONDS)) {
+      if (
+        validBefore >
+        now + BigInt(GASLESS_MAX_WINDOW_SECONDS + DEPOSIT_AUTH_CLOCK_SKEW_SECONDS)
+      ) {
         return refuse('invalid_window');
       }
 

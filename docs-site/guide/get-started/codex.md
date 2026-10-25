@@ -1,12 +1,18 @@
 # Codex
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The steps below are for the released package.
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** set up AgentLink in Codex (command line, IDE extension, and Codex in the ChatGPT desktop app).
+This page sets up AgentLink in Codex (command line, IDE extension, and Codex in the ChatGPT desktop app). You need Node.js 22.14 or newer (check with `node --version`) and Codex.
 
-You need Node.js 22.14 or newer and Codex.
+## 1. Install it
 
-## 1. Ask Codex to install it
+The quick way is one command in your own terminal:
+
+```bash
+npx -y @4thtech-io/agentlink init
+```
+
+It shows the exact change and asks `y/N`. Or ask Codex to do it:
 
 Paste this into Codex:
 
@@ -14,12 +20,12 @@ Paste this into Codex:
 
 What happens:
 
-1. Codex runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
+1. Codex runs `npx -y @4thtech-io/agentlink init`. It looks for your AI apps on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
 2. Codex shows you the change. For Codex it adds a short `[mcp_servers.agentlink]` section to the end of `~/.codex/config.toml`. Nothing else in the file changes.
 3. If you agree, Codex runs the command again with `--confirm <code>`. The code only works for exactly the change you were shown. A backup of your old file is kept.
 4. Restart Codex.
 
-Prefer to do it yourself? Run `npx -y @4thtech-io/agentlink init` in your own terminal. It shows the same change and asks `y/N`. AgentLink writes this file itself rather than through `codex mcp add`, so you see the exact change first.
+AgentLink writes this file itself instead of using a Codex command, so you see the exact change first.
 
 Check that the package name is exactly `@4thtech-io/agentlink`.
 
@@ -31,11 +37,11 @@ Do this yourself, in a terminal you opened, never through Codex: [Protect your a
 
 Ask Codex: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
-## Keep your AI away from AgentLink's files
+## Optional: keep your AI away from AgentLink's files
 
-Codex runs commands in a sandbox. Its permission profiles (still in beta) can block a folder completely. **This is a guard, not a lock**: read [Protect your approvals](protect-your-approvals.md) for what it can't stop. Codex has no setting to block system keychain commands by name.
+This is extra protection for people who are comfortable editing settings. You can skip it. Codex runs commands in a sandbox. Its permission profiles (still in beta) can block a folder completely. **This is a guard, not a lock**: read [Protect your approvals](protect-your-approvals.md) for what it can't stop. Codex has no setting to block system keychain commands by name.
 
-### Advanced: the settings
+### The settings
 
 In `~/.codex/config.toml`. A permission profile can't be combined with `sandbox_mode`; use one or the other.
 
@@ -62,6 +68,6 @@ Source: [Codex permissions](https://learn.chatgpt.com/docs/permissions).
 
 ## A start-of-session note
 
-The optional start-of-session note (`agentlink init --hook`) is not available for Codex yet. Run `agentlink status --brief` yourself to see the same counts.
+The optional start-of-session note is not available for Codex yet. Run `npx -y @4thtech-io/agentlink status --brief` yourself to see the same counts.
 
 Next: [Pair with someone](pair-with-someone.md)

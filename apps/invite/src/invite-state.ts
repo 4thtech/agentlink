@@ -10,7 +10,13 @@
 //     the short owner fingerprint, and the prompt from the official template plus the canonical link
 //     rebuilt from the checked payload.
 import { INVITE_MAX_PAYLOAD_CHARS, decodeInviteLink, restrictName } from '@4thtech-io/core';
-import { decodeHex0x, formatFingerprint, ownerFingerprint } from '@4thtech-io/crypto';
+import {
+  agentCardNameHash,
+  decodeHex0x,
+  encodeHex0x,
+  formatFingerprint,
+  ownerFingerprint,
+} from '@4thtech-io/crypto';
 import { CANONICAL_PREFIX, buildPrompt, isCanonicalLink } from './prompt.js';
 
 /** The inviter's details. Every value is shown with `textContent` only. */
@@ -47,6 +53,10 @@ export async function evaluateFragment(hash: string, nowSeconds: number): Promis
   try {
     const invite = await decodeInviteLink(payload);
     if (invite.expiresAt <= nowSeconds) return { kind: 'expired' };
+    // The card commits to the name (04 §2.4, §3.6): recompute keccak256 over the name exactly as
+    // received (not the restricted name shown) and compare with the card's `nameHash`. A mismatch
+    // means the name was swapped after the card was made: damaged, and no prompt.
+    if (encodeHex0x(agentCardNameHash(invite.name)) !== invite.card.nameHash) return DAMAGED;
     const inviteUrl = `${CANONICAL_PREFIX}${payload}`;
     if (!isCanonicalLink(inviteUrl)) return DAMAGED;
     const digest = ownerFingerprint(

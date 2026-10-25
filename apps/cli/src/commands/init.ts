@@ -78,6 +78,7 @@ import { GLOBAL_PREFIX, cliPrefix } from '../runtime/cli-prefix.js';
 import { INSTALL_COMMAND, installGlobally, isAgentlinkOnPath } from './global-install.js';
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
 import { copy } from '../tools/strings/index.js';
+import { firstRunStep } from './first-run.js';
 
 /** The Node pieces `init` uses. Tests pass doubles; production uses `nodeInitDeps()`. */
 export interface InitDeps {
@@ -103,6 +104,14 @@ export interface InitDeps {
   readonly agentlinkOnPath?: () => boolean;
   /** Runs the global install (M1-36b, D1); true when it succeeded. Absent: never offered. */
   readonly installGlobal?: () => Promise<boolean>;
+  /** M1-11b-6: the first-run page step (first-run.ts); true when it handled the owner step. */
+  readonly firstRun?: (
+    context: CommandContext,
+    name: string,
+    interactive: boolean,
+    /** The command to name (M1-36a `cliPrefix`, after the install offer). */
+    prefix: string,
+  ) => Promise<boolean>;
 }
 
 export function nodeInitDeps(): InitDeps {
@@ -127,6 +136,8 @@ export function nodeInitDeps(): InitDeps {
     cliPrefix: () => cliPrefix(),
     agentlinkOnPath: () => isAgentlinkOnPath(process.env),
     installGlobal: () => installGlobally(),
+    firstRun: (context, name, interactive, prefix) =>
+      firstRunStep(context, name, interactive, prefix),
   };
 }
 
@@ -171,7 +182,7 @@ export const INIT_TEXT = Object.freeze({
   restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
   // D-78 (06 §7).
   declinedKept:
-    'No app was changed. Your agent identity is kept. To set up one app later, run: {prefix} init --harness <app>',
+    'No app was changed. Your agent identity is kept. To set up one app later, run `{prefix} init --harness <app>`.',
   ownerStepAdd:
     "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',
@@ -593,8 +604,11 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     if (!needIdentity && changes.length === 0) {
       printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
       output.print(INIT_TEXT.nothingToDo);
-      if (interactive) await offerInstall(context, deps);
+      let nowPrefix = startPrefix;
+      if (interactive) nowPrefix = await offerInstall(context, deps);
       else installTip(context, deps);
+      // M1-11b-6: after the install offer (M1-36b), so the step names the command that now works.
+      await deps.firstRun?.(context, name, interactive, nowPrefix);
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
@@ -700,6 +714,13 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       ).filter((n) => n !== name && isAgentName(n));
     } catch {
       // Only the hint depends on it.
+    }
+    // M1-11b-6: with no other agent, the first-run page may take the owner step (first-run.ts).
+    if (
+      others.length === 0 &&
+      (await deps.firstRun?.(context, name, interactive, prefix)) === true
+    ) {
+      return failed ? EXIT_FAILED : EXIT_OK;
     }
     output.print(
       others.length > 0

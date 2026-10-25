@@ -20,6 +20,7 @@ import { isRestrictedAlias, renderContactName, type ContactView } from '@4thtech
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import { OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@4thtech-io/types';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../../dispatch.js';
+import { commandPrefix } from '../../runtime/cli-prefix.js';
 import { terminalOneLine } from '../../terminal/sanitize.js';
 import { removeInvisible } from '../../tools/untrusted.js';
 import { badArguments, chooseAgent, ownerContext, ownerStep } from './common.js';
@@ -31,9 +32,12 @@ const CONTACT_ID = /^0x[0-9a-fA-F]{40}$/;
 
 /** Fixed text (11 §5 vocabulary). Only the name-rule name and a checked alias are ever inserted. */
 export const CONTACTS_MANAGE_TEXT = Object.freeze({
-  badId:
-    'That is not a contact ID. Run `agentlink contacts` to see each contact with its ID, then use the ID.',
-  notFound: 'No contact with that ID. Run `agentlink contacts` to see your contacts.',
+  get badId(): string {
+    return `That is not a contact ID. Run \`${commandPrefix()} contacts\` to see each contact with its ID, then use the ID.`;
+  },
+  get notFound(): string {
+    return `No contact with that ID. Run \`${commandPrefix()} contacts\` to see your contacts.`;
+  },
   badAlias:
     'That name can’t be used. Use letters, numbers, spaces, dots, apostrophes and hyphens, one script, at most 32 characters, and no words such as “verified” or “owner”.',
   aliasTaken: 'Another contact already shows that name. Choose a different one.',

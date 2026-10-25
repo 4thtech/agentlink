@@ -1,5 +1,15 @@
 # @4thtech-io/crypto
 
+## 0.2.0
+
+### Minor Changes
+
+- cb4a63a: Owner approvals, policies and revocations, envelopes, agent cards and proof packs are now checked from the exact text received: text that repeats a field name or spells one with an escape sequence is refused as malformed before the signature is checked (M1-1h-b, D-128). New in `@4thtech-io/crypto`: `parseReceivedJson`, `parseEnvelopeText` and the `plainMemberNames` option of `parseJson`.
+- 3a3837b: `KeyStore.signTransaction` signs one direct-mode transaction with the agent's EVM key, on the launch testnets only: EIP-1559, to the AgentLink Notary, fee vault or an offered fee token, with a direct-mode call (`notarizeDirect`, `notarizeBatch`, `acknowledge`, `acknowledgeBatch`, `deposit`, `withdraw` to the agent's own address, `approve` of the vault), bounded value, calldata, gas and fees. Everything else is refused with `transaction_refused` before any key is read. The keychain KeyStore implements it. `@4thtech-io/chain` adds `keyStoreDirectSigner`, `createDirectMode` (testnets of the KeyStore allowlist only), the typed `buildWithdraw` and `sendWithdraw`, and the ChainError code `signing_refused`.
+- 0ece43e: The recovery kit format `ALKK` v1 (04 §2.3.3, D-115; M1-9i-b): `sealRecoveryKit` and `openRecoveryKit` in `@4thtech-io/crypto/keystore`, `readRecoveryKitHeader` and the kit constants in the main entry, with the `recovery-kit` vector suite. The STREAM body of `ALF1` is now shared with the kit (no change to `ALF1` output).
+- c6aa21f: `credentialDigest` and `credentialDigestOfItem` (04 §2.5.1 `storage.set`; M1-9i-b2) and the `StorageCredential` types in the main entry; `encodeStorageCredentialItem` and `parseStorageCredentialItem` for the `s3:<id>` item (04 §2.2) in `@4thtech-io/crypto/keystore`. The owner-flow control types `KeyExportControl`, `KeyImportControl` and `StorageCredentialControl` (with `DisplayCode`, `RecoveryKitImport` and the `item_exists` KeyStore error code) for the backends of M1-9i-c. The `recovery-kit` vector suite is now version 2 with the `credentialDigest` cases.
+- 9dbaa44: EIP-3009: `verifyTokenDomain(expected, reading)` checks a token's EIP-712 domain as read from chain (EIP-5267 `eip712Domain()`, or `name()`, `version()` and `DOMAIN_SEPARATOR()` recomputed and compared) against the configured chain ID and token address, and refuses a mismatch with the new code `token_domain_mismatch`; `tokenDomainSeparator(domain)` and the pinned `RECEIVE_WITH_AUTHORIZATION_TYPE_HASH` are exported. `parseReceiveWithAuthorization` now refuses an authorization whose `validBefore` is not after `validAfter`. New `eip3009` vector suite.
+
 ## 0.1.2
 
 ### Patch Changes

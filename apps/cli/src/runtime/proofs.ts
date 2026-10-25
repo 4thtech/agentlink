@@ -49,6 +49,7 @@ import type {
   PackSaveOutcome,
   ProofPlatformTools,
 } from '../tools/context.js';
+import { nodeDepositAuthPort } from './deposit-auth.js';
 import { resolveOwnFolder } from './files.js';
 import { isFreeCreditsChain, nodeFreeCreditsPort } from './free-credits.js';
 import { createPackVerifier } from './pack-verifier.js';
@@ -265,7 +266,18 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
   const freeCreditsChain = (chainId: number): boolean => isFreeCreditsChain(chainId, configs);
   const faucet = nodeFreeCreditsPort({ fetchFn, urls, configs });
 
-  const platform: ProofsPlatform = Object.freeze({ kit: chain, chains, selector, faucet });
+  // M3-4b-t-T4-b: the gasless top-up route, on the same fixed submitter URLs. Off by default: it
+  // sends nothing while the chain package's kill switch is off, and only the core's owner-approved
+  // path calls it (never an MCP tool, I-4); the core's `ProofsPlatform.depositAuth` (T4-a).
+  const ports =
+    urls.length === 0 ? {} : { depositAuth: nodeDepositAuthPort({ fetchFn, urls, configs }) };
+  const platform: ProofsPlatform = Object.freeze({
+    kit: chain,
+    chains,
+    selector,
+    faucet,
+    ...ports,
+  });
 
   const tools = Object.freeze<ProofPlatformTools>({
     ...packs,

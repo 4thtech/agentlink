@@ -93,6 +93,7 @@ import type { EnvelopeService, InboundReport } from '../envelopes.js';
 import type { IdentityService } from '../identity.js';
 import { renderContactName } from '../names.js';
 import type { OutboxService } from '../outbox.js';
+import { parseOwnerActionText } from '../owner-action.js';
 import type { OwnerActions } from '../owner-actions.js';
 import {
   evaluate,
@@ -2628,7 +2629,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         return { standingRule: true, policyHash };
       }
       if (approval.signed_decision === null) return null;
-      const signed = signedApprovalDecideSchema.safeParse(parseJson(approval.signed_decision));
+      const signed = signedApprovalDecideSchema.safeParse(
+        parseOwnerActionText(approval.signed_decision),
+      );
       if (!signed.success) return null;
       const action = parseJson(
         await open(
@@ -2639,7 +2642,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           approval.action_json,
         ),
       );
-      return { signed: parseJson(approval.signed_decision), action };
+      return { signed: parseOwnerActionText(approval.signed_decision), action };
     } catch {
       return null;
     }

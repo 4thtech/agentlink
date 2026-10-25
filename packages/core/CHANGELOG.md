@@ -1,5 +1,84 @@
 # @4thtech-io/core
 
+## 0.2.0
+
+### Minor Changes
+
+- b5c51e6: Read-only accessors for the local UI (M1-11r-a): `identity.fingerprints()`, `identity.agentAddress()` and `identity.relays()`; `client.files.resolvedFolders()`; `proofs.list({cursor, limit})`, `proofs.creditsBalance()` and `proofs.requestFaucet(chainId)` (allowlisted testnets only, through the new optional `ProofsPlatform.faucet` port); and `client.activity.list({cursor, limit})`, a newest-first feed of decided approvals, proofs, blocks and the rules in force. Public values only; no new storage. `ProofKit` now also picks `readCreditsAcrossChains` and `isFaucetChain` (pass `@4thtech-io/chain` itself, as before).
+- 27437fc: Owner-operation prepare helpers for the local UI (M1-11r-b, D-118). `OwnerActions.preparePolicyEdit(patch, options)` builds the unsigned `policy.set` body: the complete 06 §3 document from the verified policy (or the defaults) with a typed patch merged over it, at the version above the KeyStore mark and the stored row; it refuses a strict-schema violation, a stale base version and any edit while the policy fails closed, and signs delivery receipts on from an older default as `false` unless the owner keeps them (D-109). `prepareContactCheck`, `prepareContactRename` and `prepareContactRemove` build the unsigned `contact.*` bodies. `buildOwnerActionBody` is the pure, byte-exact builder (JCS; reproduces the owner-action signing vectors). Nothing here signs: the server signs after presence. `ContactBook.currentPairingDigest` recomputes the pairing digest for `contact.check`. Types: `policyPatchSchema` and `PolicyPatch`.
+- be16e36: Storage page reads for the local UI (M1-11r-c): `client.files.dropUsage()` (this agent's drop bytes in the rolling 7 days against the weekly quota, with a within, near or reached level and the reset time) and `client.ownStorage.status()` with `ownStorage.recordTest({ok, code})` (none, ready or broken, the provider and the last test result). New optional `DropConfig.weeklyQuotaBytes` for a staging or self-hosted drop. Numbers, fixed codes and the provider only: never an endpoint, bucket, credential, locator or URL.
+- 8928493: The activity feed (`client.activity.list`) now lists messages and files, sent and received (one entry per message, kind `message` or `file`, with each file's sanitized name, size and whether it was removed), and requests from unknown senders by their sender code. Proof, message, file and blocked-contact entries carry the contact's display name (an owner alias or the restricted name with its identity label, never the raw declared name), and proof, message and file entries carry their cost: free, charged, reserved, not charged or unknown. No payload, URL, file key or locator ever reaches an entry.
+- cf800d0: With delete after receipt turned on, your agent deletes a sent file from storage once the contact's delivery receipt is on record, also after a key change (M1-1g-h).
+- 70e362b: You can ask a contact to confirm delivery of a message with proof, and when a contact asks you, your agent confirms only after you say yes (M1-33d, D-109).
+- ca60f25: When a message network server returns only part of a busy second, your agent now says that some messages may be missing from that check and that it looks again on the next one. Core sync results carry this as an `incomplete` count only (M1-5g).
+- 31957b7: When a contact's owner revokes that agent, your agent now voids every approval still waiting for the owner and every unfinished part of an agreement with that contact, in the same step that records the revocation, and reports what it stopped. Delivery acknowledgements are queued for the delivery pass instead of sent during an inbox sync, a status check no longer counts a contact's acknowledgements as unread once their type is known, and a key store that cannot list the agent's keys no longer makes the whole sync fail (M1-7h-b).
+- 3a08533: Offers and acceptances can now carry proof (M1-9d-3): a firm offer (`agentlink_propose_terms` with `notarize`) and a recorded acceptance (`agentlink_respond_to_terms` `accept` with `notarize`) each need one owner approval that covers the terms and the proof fee, so a proof of agreement can be made and exported through the tools.
+- 6055f38: Counter-offers can now carry proof (M1-9d-5): `agentlink_respond_to_terms` `counter` with `notarize` is a firm offer under one owner approval that covers the new terms and the proof fee, as `agentlink_propose_terms` with `notarize`.
+- 1d10f83: Owner-signed own storage and recovery-kit export (M1-9i-a, D-115). `@4thtech-io/types` adds the `storage.set`, `storage.remove` and `backup.export` owner actions with strict params (L(op) = 600 s), `STORAGE_PROVIDERS`, `BACKUP_KIT_CONTENTS` and `isCanonicalS3Endpoint`. `@4thtech-io/core` applies them (nonce row and the one `own_storage` row in one transaction, then the KeyStore `storage-mark`), adds `ownStorage.load()` (`none`, `ready` or `broken`, re-verified on every load, never by expiry), the `OwnStorageKeys` interface and the `storage-mark` codec, and the `brokenOwnStorageAdapter` stub: a broken own storage makes a stored file send `needs_setup` `storage_broken`, never the drop. Store schema version 5 adds `own_storage`; `@4thtech-io/node` migrates SQLite stores to it.
+
+### Patch Changes
+
+- 0e5fef3: Delete after receipt now applies only to files sent while it was on: turning it on later never deletes files sent earlier, and files sent before this update are kept until they expire (M1-1g-i).
+- cb4a63a: Owner approvals, policies and revocations, envelopes, agent cards and proof packs are now checked from the exact text received: text that repeats a field name or spells one with an escape sequence is refused as malformed before the signature is checked (M1-1h-b, D-128). New in `@4thtech-io/crypto`: `parseReceivedJson`, `parseEnvelopeText` and the `plainMemberNames` option of `parseJson`.
+- 52c8fe8: M1-33a (D-109): delivery receipts are off by default. `@4thtech-io/types`: the 06 §3 default `receipts.autoDelivered` is `false`; a `ContactRule` may carry `receipts: {autoDelivered}` (strict) with or without `proofs`, and needs at least one of the two. `@4thtech-io/core`: an automatic DELIVERED receipt uses the record signer's contact rule when that contact is paired and not blocked or revoked, else the global value; under failing rules none is signed. OPENED, ACCEPTED and REJECTED are unchanged. `@4thtech-io/core` also adds `receiptsOnFromOlderDefault` and `recordReceiptsKept` on `OwnerActions` and the `receiptsKept` client option (a `ReceiptsKeptMark`). `@4thtech-io/node`: the receipts-kept marker as the keychain item `<agentId>:receipts-kept`, on `AgentStore.receiptsKept`. `@4thtech-io/agentlink`: the rules review lists a contact's delivery-receipt rule; a policy signed earlier keeps its value until the owner next signs their rules, which then asks "Keep delivery receipts on?" and turns them off unless the owner types y (a yes is remembered); until then `agentlink doctor` shows the older-default line.
+- bc8d9f3: Proofs (M1-33c, D-109): a Record's `parentRecordId` is zero by default and only ever names a record the chain shows this agent signed; anything else is refused with `PARENT_NOT_OWN` and nothing is signed or charged. A received Record that names another signer's record as its parent is dropped and logged (`proof_parent_mismatch`) and gets no receipt; flagging the contact is pending M1-7g-c.
+- 16f692e: Receipt request follow-ups (M1-33d-b, D-109): `notarize` with `requestReceipt` on an envelope that already had a proof without a request now returns `receiptRequestNotAdded: true`, and `agentlink_notarize` and `agentlink_send` say so in the result and the summary. Two concurrent `acknowledge {type: "delivered"}` calls for one record sign one DELIVERED receipt. An inbox page reads the receipt-request flag of all its items in one read instead of one transaction per item.
+- 320bc9e: Receipts covered by the sender's proof fee (M1-34-b, D-114). The submitter accepts up to 3 receipts for a record the Notary stores (its NOTARIZE fee was charged), whatever the recipient holds: one `getRecord` read per record before simulation; a receipt for an unknown record is `failed` with `RecordNotFound`, a new type over the cap (on-chain plus in flight) with `receipt_limit`, and ACCEPTED against REJECTED in flight with `ConflictingReceipt`. The chain port gains `recordReceipts` and `MAX_RECEIPTS_PER_RECORD`. `createProofSubmitter` never sends a receipt in direct mode unless `directReceipts: true`, so the recipient's own account never pays for it unasked; a receipt no submitter takes is `pending`. `ProofSubmitter.acknowledge` takes an optional per-call `waitMs`. The core posts queued receipts (`postQueuedReceipts`, at most 5 per pass, least recently tried first, 2 s wait each) after each sync pass's new envelopes, the same signed bytes until they land; a receipt the chain refuses for good (`RecordNotFound`, `InvalidSignature`, `NotRecipient`) becomes `receipt_failed` and is not retried.
+- 19c8626: A receipt that the client's chain reads answer `RecordNotFound` for is posted again once, with the same signed bytes, after a fixed 3 s (`RECEIPT_NOT_FOUND_RETRIES`, `RECEIPT_NOT_FOUND_RETRY_MS`) before it becomes `receipt_failed` (M1-34-c), so an RPC that lags behind the record's block does not fail the receipt for good. `ProofsPlatform` takes an optional `sleep` for that delay.
+- 068d989: The outbox pass now returns the transport's notices: which rows cannot reach 2 usable relays, with a fixed reason.
+- f8c4440: Retention at expiry and crypto-shredding (M1-7f-2; 04 §4, D-98). At ingest the core moves each inbound `fileKey` into a sealed receiver `files` row and stores the payload with a placeholder key; `fetchFile` reads the key from that row (a payload stored earlier still uses its own key). New `deleteExpiredFiles()`, also run by `syncInbox`: at `expiresAt` the sender deletes the stored object (the drop with a DELETE signed at the upload epoch) and its `files` row, and the receiver deletes its row. The delete-on-receipt pass now deletes the row instead of marking `deleted_at`.
+- 0f13f71: refresh-link (M1-7f-3; 04 §4, 07 §5.2). New `requestFileLink({envelopeId, fileIndex})` sends a `request` envelope `{kind: "refresh-link", envelopeId, fileIndex}` to the contact that sent a stored file; after each processing pass (`syncInbox`, the live loop) the sender's core answers from its own storage with a `file` envelope carrying the file's entry with a fresh presigned link that never outlives the file's `expiresAt`, and the recipient's core moves that link into its receiver row, so `fetchFile` works again. Only the contact the file was sent to gets an answer; the drop and inline files are not refreshable. `fetchFile` now uses the receiver row's link. The `refresh-link` request body in `@4thtech-io/types` names the file by `fileIndex` instead of `ciphertextSha256` (a request is shown in the inbox, 06 §2.1).
+- 8621ff4: Proofs (M1-7g-c, 04 §3.4): a received `proof` body that does not match the on-chain record (`proof_mismatch`, or `proof_parent_mismatch` for another signer's parent) now flags the contact: the `proof` envelope is stored as refused with that fixed code, and `syncInbox` and the live subscription report it as a flagged refusal. `ProofService.processInbound` returns `{signed, reports}` (`ProofInboundResult`) instead of a number. One contact holds at most `PROOF_PENDING_PER_CONTACT` (32) of the 256 bodies pending a chain read.
+- 4be1e27: Proofs and logging (M1-7g-d): the logger takes an allowlist of fixed codes (`createLogger({ codes })`, `logger.withCodes()`), so a top-level `code` field keeps only listed codes and every other value stays redacted; the proof flow lists its own codes (`PROOF_LOG_CODES`). An approved `confirm` now signs its `ACCEPTED` receipt on the other side's ACCEPT record, once, under the same approval. A contact can hold at most 32 of the 256 `proof` envelopes that wait for their message (`PROOF_AWAITING_PER_CONTACT`); beyond that the envelope is dropped as `proof_unchecked`.
+- e7ac634: M1-7g-f: `respondToTerms` reports the receipt status after the deferred receipt run (`recorded`, `submitted` or `waiting_for_record`); a waiting `proof` envelope whose envelope was refused releases its pool slot.
+- 821ac87: Accepting an invite now checks that the contact being staged is the one the invite names (the card verified in Accept step 1 and shown for approval). Any mismatch is refused as an invalid invite before anything is written.
+- 8565521: Accepting an invite now also checks that the contact being staged has the owner shown for approval and is exactly the card the invite carried (its owner fingerprint and its card hash). A card with the right contact id but another owner, keys or epoch is refused as an invalid invite before anything is written.
+- c6546b9: M3-4b-t-T4-a: an internal core step for the owner-approved gasless top-up (Base Sepolia USDC into the agent's own credits). It requires an owner-signed approval that the owner-action verifier vouches for, records it once before signing, allows at most 5 approved top-ups per agent per hour, $5 to $50, signs with the agent key only and confirms the credit on chain. Not exported and not reachable from any MCP tool; still off while `GASLESS_TOPUP_ENABLED` is false. `ProofsPlatform` gains an optional `depositAuth` port and `ProofKit` the gasless builder functions.
+- Updated dependencies [d70bf37]
+- Updated dependencies [7a67b65]
+- Updated dependencies [5261347]
+- Updated dependencies [9c56860]
+- Updated dependencies [e51e49e]
+- Updated dependencies [113cd50]
+- Updated dependencies [b155084]
+- Updated dependencies [52fd677]
+- Updated dependencies [27437fc]
+- Updated dependencies [cb4a63a]
+- Updated dependencies [52c8fe8]
+- Updated dependencies [de8696b]
+- Updated dependencies [e7aeadf]
+- Updated dependencies [70e362b]
+- Updated dependencies [320bc9e]
+- Updated dependencies [5864ac4]
+- Updated dependencies [7b053cc]
+- Updated dependencies [3a3837b]
+- Updated dependencies [e2a5052]
+- Updated dependencies [9676c15]
+- Updated dependencies [5c19ee0]
+- Updated dependencies [1cd25e4]
+- Updated dependencies [068d989]
+- Updated dependencies [ec598ee]
+- Updated dependencies [d311d76]
+- Updated dependencies [82a60e6]
+- Updated dependencies [607dc70]
+- Updated dependencies [2286724]
+- Updated dependencies [0f13f71]
+- Updated dependencies [4be1e27]
+- Updated dependencies [1d10f83]
+- Updated dependencies [0ece43e]
+- Updated dependencies [c6aa21f]
+- Updated dependencies [529a0f6]
+- Updated dependencies [62e8d42]
+- Updated dependencies [9dbaa44]
+- Updated dependencies [5ffb078]
+- Updated dependencies [d48cc3f]
+  - @4thtech-io/chain@0.2.0
+  - @4thtech-io/log@0.2.0
+  - @4thtech-io/types@0.2.0
+  - @4thtech-io/crypto@0.2.0
+  - @4thtech-io/transport-nostr@0.2.0
+  - @4thtech-io/storage@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes

@@ -125,7 +125,7 @@ describe('the helpers', () => {
 describe('push paths filters cover every repo-local file the workflow runs', () => {
   it('finds the deploy workflows', () => {
     expect(workflows.map((w) => w.name)).toEqual(
-      expect.arrayContaining(['deploy-drop.yml', 'deploy-submitter.yml']),
+      expect.arrayContaining(['deploy-drop.yml', 'deploy-invite.yml', 'deploy-submitter.yml']),
     );
   });
 

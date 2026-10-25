@@ -23,6 +23,7 @@ import {
 } from './proofs-common.js';
 import { exportDisclosure, withDisclosure } from './strings/privacy.js';
 import { fail, internalError, ok, pendingApproval, type HandlerOutput } from './result.js';
+import { NPX_COMMAND } from './cli-command.js';
 
 export const EXPORT_TEXT = Object.freeze({
   saved:
@@ -41,8 +42,7 @@ export const EXPORT_TEXT = Object.freeze({
   folderNextStep:
     'Tell the user their AgentLink proofs folder is missing, hidden or protected. Only they can choose another one.',
   rules: "The owner's rules can't be read right now, so nothing was saved.",
-  rulesNextStep:
-    'Tell the user to run `agentlink doctor` in their own terminal to check their rules.',
+  rulesNextStep: `Tell the user to run \`${NPX_COMMAND} doctor\` in their own terminal to check their rules.`,
   policyDenied: "The owner's rules don't allow sharing the message content, so nothing was saved.",
   policyDeniedNextStep:
     'Call again without includeContentKey to save a proof file without the content.',

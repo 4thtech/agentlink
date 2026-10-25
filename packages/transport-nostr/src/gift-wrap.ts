@@ -26,8 +26,8 @@ import {
   equalBytes,
   isBip340PublicKey,
   nostrEventId,
-  parseEnvelope,
   parseJson,
+  parseEnvelopeText,
   randomBytes,
   verifyNostrEvent,
   type Envelope,
@@ -179,7 +179,7 @@ export async function wrapEnvelope(
   // Parse the text that is sent, so what is sent is what was checked.
   let parsed: Envelope;
   try {
-    parsed = parseEnvelope(parseJson(content, { integersOnly: true }));
+    parsed = parseEnvelopeText(content);
   } catch {
     fail('invalid_envelope', 'gift wrap: the envelope is not a v1 envelope');
   }
@@ -391,7 +391,8 @@ export async function unwrapGiftWrap(
   }
   let envelope: Envelope;
   try {
-    envelope = parseEnvelope(parseJson(content, { integersOnly: true }));
+    // 04 §3.1.1 step 3 on the exact text received (04 §2.5.1 "Received text", D-128).
+    envelope = parseEnvelopeText(content);
   } catch {
     fail('invalid_envelope', 'gift wrap: the rumor content is not a v1 envelope');
   }

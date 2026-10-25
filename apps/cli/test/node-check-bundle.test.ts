@@ -11,9 +11,9 @@
 // Mutated copies of the bundle prove both guards fail when a native import or the main program is
 // moved ahead of the check. Needs the build: CI runs `pnpm build` before `pnpm test`.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -22,7 +22,13 @@ const bundlePath = fileURLToPath(new URL('../dist/agentlink.js', import.meta.url
 const hooks = new URL('./fixtures/module-trace-hooks.mjs', import.meta.url).href;
 const oldNode = new URL('./fixtures/old-node-preload.mjs', import.meta.url).href;
 const work = mkdtempSync(join(tmpdir(), 'agentlink-node-check-bundle-'));
-afterAll(() => rmSync(work, { recursive: true, force: true }));
+// M1-9zc-b: mutated copies sit next to the real bundle so `@napi-rs/keyring` resolves from
+// apps/cli/node_modules and the native import really loads (not ERR_MODULE_NOT_FOUND).
+const mutationDir = join(dirname(bundlePath), `.node-check-mutations-${process.pid}`);
+afterAll(() => {
+  rmSync(work, { recursive: true, force: true });
+  rmSync(mutationDir, { recursive: true, force: true });
+});
 
 /**
  * Native packages: a static import of one is a violation. better-sqlite3 is the one native package
@@ -94,9 +100,10 @@ function runOnOldNode(name: string, file: string): OldNodeRun {
   };
 }
 
-/** A copy of the bundle with `edit` applied, written next to the real one's name in `work`. */
+/** A copy of the bundle with `edit` applied, written in a scratch directory next to `dist/`. */
 function mutated(name: string, edit: (source: string) => string): { file: string; text: string } {
-  const file = join(work, `${name}.mjs`);
+  mkdirSync(mutationDir, { recursive: true });
+  const file = join(mutationDir, `${name}.mjs`);
   const text = edit(bundle);
   writeFileSync(file, text);
   return { file, text };
@@ -130,7 +137,9 @@ describe('Node version check comes before any native module (M1-9zc)', () => {
 
   it('fails when a native import is moved ahead of the check (runtime guard)', () => {
     const { file } = mutated('native-runtime', withNativeImport);
-    expect(nativeLoaded(runOnOldNode('native-runtime', file).loaded)).toBe(true);
+    const run = runOnOldNode('native-runtime', file);
+    expect(run.loaded).not.toMatch(/ERR_MODULE_NOT_FOUND|Cannot find (package|module)/);
+    expect(nativeLoaded(run.loaded)).toBe(true);
   });
 
   it('fails when the main program is moved ahead of the check', () => {
