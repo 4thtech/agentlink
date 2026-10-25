@@ -20,6 +20,9 @@ export const OWNER_TEXT = Object.freeze({
   inviter: (name: string, fingerprint: string): string =>
     `${name === '' ? '' : `${name} · `}owner ${fingerprint} · not in your contacts yet`,
   unknownWhat: 'An action AgentLink does not recognise',
+  // M1-UX-APPROVAL-PAGE: the card's headline. `name` is the sanitized “name” (label) form.
+  connectWith: (name: string): string => `Connect with ${name}`,
+  whatTo: (what: string, name: string): string => `${what} to ${name}`,
   consequence:
     'If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.',
   cannotApprove: "Your AI can't approve this for you.",

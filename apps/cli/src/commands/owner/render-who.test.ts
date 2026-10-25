@@ -103,6 +103,7 @@ describe('approval cards say what a proof or receipt makes public (M1-33b, 11 §
   const facts = {
     who: 'Ana',
     what: 'Record a proof',
+    headline: 'Record a proof',
     cost: '$0.10',
     expires: '12 Oct 2026 14:02 UTC',
     summary: 's',

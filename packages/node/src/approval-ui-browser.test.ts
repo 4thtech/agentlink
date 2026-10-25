@@ -282,7 +282,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     source.add(1, {
       summary: `Send a message · ${XSS} · Free`,
       details: {
-        headline: `Send a message to Denis ${XSS}`,
+        headline: `Send a message ${XSS}`,
         who: `Denis ${XSS}`,
         what: 'Send a message',
         cost: 'Free',
@@ -298,7 +298,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await page.getByText('Waiting for you (1)').waitFor();
     await page.goto(server.approvalUrl(id(1)));
     await card(page, 1).getByText(`Denis ${XSS}`).waitFor();
-    await card(page, 1).getByRole('heading', { name: `Send a message to Denis ${XSS}` }).waitFor();
+    await card(page, 1)
+      .getByRole('heading', { name: `Send a message ${XSS}` })
+      .waitFor();
     for (const view of ['/', `/approve/${id(1)}`]) {
       await page.goto(`${server.origin}${view}`);
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
@@ -511,14 +513,14 @@ describe('the approval page as the owner sees it (M1-UX-APPROVAL-PAGE; Chromium)
     await page.goto(url);
     await card(page, 1).getByRole('heading', { name: HEADLINE }).waitFor();
     const bg = (): Promise<string> =>
-      page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      page.evaluate<string>('getComputedStyle(document.body).backgroundColor');
     // 11 §11 tokens: light canvas #f5f6f7, dark canvas #0b0c0e.
     expect(await bg()).toBe('rgb(245, 246, 247)');
     await page.emulateMedia({ colorScheme: 'dark' });
     expect(await bg()).toBe('rgb(11, 12, 14)');
     // Phone width: no sideways scrolling.
     expect(
-      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth'),
     ).toBe(true);
     // Every request stays on this server.
     expect(requests.length).toBeGreaterThan(0);
