@@ -108,6 +108,14 @@
                   "nameSource": {
                     "type": "string",
                     "enum": ["counterparty", "owner"]
+                  },
+                  "ownerFingerprint": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "shortId": {
+                    "type": "string",
+                    "maxLength": 16
                   }
                 },
                 "required": ["id", "name", "label", "nameSource"],
@@ -163,6 +171,14 @@
                   "nameSource": {
                     "type": "string",
                     "enum": ["counterparty", "owner"]
+                  },
+                  "ownerFingerprint": {
+                    "type": "string",
+                    "maxLength": 32
+                  },
+                  "shortId": {
+                    "type": "string",
+                    "maxLength": 16
                   }
                 },
                 "required": ["id", "name", "label", "nameSource"],
@@ -821,6 +837,14 @@
               "nameSource": {
                 "type": "string",
                 "enum": ["counterparty", "owner"]
+              },
+              "ownerFingerprint": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "shortId": {
+                "type": "string",
+                "maxLength": 16
               }
             },
             "required": ["id", "name", "label", "nameSource"],
@@ -1133,6 +1157,14 @@
               "nameSource": {
                 "type": "string",
                 "enum": ["counterparty", "owner"]
+              },
+              "ownerFingerprint": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "shortId": {
+                "type": "string",
+                "maxLength": 16
               }
             },
             "required": ["id", "name", "label", "nameSource"],
@@ -1642,6 +1674,14 @@
                       "nameSource": {
                         "type": "string",
                         "enum": ["counterparty", "owner"]
+                      },
+                      "ownerFingerprint": {
+                        "type": "string",
+                        "maxLength": 32
+                      },
+                      "shortId": {
+                        "type": "string",
+                        "maxLength": 16
                       }
                     },
                     "required": ["id", "name", "label", "nameSource"],
@@ -1741,6 +1781,14 @@
               "nameSource": {
                 "type": "string",
                 "enum": ["counterparty", "owner"]
+              },
+              "ownerFingerprint": {
+                "type": "string",
+                "maxLength": 32
+              },
+              "shortId": {
+                "type": "string",
+                "maxLength": 16
               }
             },
             "required": ["id", "name", "label", "nameSource"],
