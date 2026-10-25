@@ -198,6 +198,9 @@ const contactRef = obj(
     name: str({ minLength: 1, maxLength: MAX_DISPLAY_NAME_CODE_POINTS }),
     label: oneOf(IDENTITY_LABELS),
     nameSource: oneOf(NAME_SOURCES),
+    // WAVE-030: only where two contacts share a name, and on `AMBIGUOUS_CONTACT` candidates.
+    ownerFingerprint: str({ maxLength: 32 }),
+    shortId: str({ maxLength: 16 }),
   },
   ['id', 'name', 'label', 'nameSource'],
 );

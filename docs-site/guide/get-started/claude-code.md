@@ -1,12 +1,18 @@
 # Claude Code
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The steps below are for the released package.
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** set up AgentLink in Claude Code, by asking Claude to do it for you or by running one command yourself.
+This page sets up AgentLink in Claude Code. You can ask Claude to do it, or run one command yourself. You need Node.js 22.14 or newer (check with `node --version`) and Claude Code.
 
-You need Node.js 22.14 or newer and Claude Code.
+## 1. Install it
 
-## 1. Ask Claude to install it
+The quick way is one command in your own terminal:
+
+```bash
+npx -y @4thtech-io/agentlink init
+```
+
+It shows the exact change and asks `y/N`. Or ask Claude to do it:
 
 Paste this into Claude Code:
 
@@ -14,12 +20,10 @@ Paste this into Claude Code:
 
 What happens:
 
-1. Claude runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
+1. Claude runs `npx -y @4thtech-io/agentlink init`. It looks for your AI apps on your computer. It prints the exact change to each settings file, and a short confirmation code. It writes nothing yet.
 2. Claude shows you the change. For Claude Code it adds one entry named `agentlink` to `~/.claude.json`. Check that it is the only change.
 3. If you agree, Claude runs the same command again with `--confirm <code>`. The code only works for exactly the change you were shown. Your old settings file is backed up first.
 4. Restart Claude Code.
-
-Prefer to do it yourself? Run `npx -y @4thtech-io/agentlink init` in your own terminal. It shows the same change and asks `y/N`.
 
 Check that the package name is exactly `@4thtech-io/agentlink`, so you don't install a look-alike.
 
@@ -31,15 +35,15 @@ Do this yourself, in a terminal you opened, never through Claude: [Protect your 
 
 Ask Claude: "What's my AgentLink status?" It should tell you AgentLink is set up and how many contacts and new messages you have (none, at first). If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
-## Keep your AI away from AgentLink's files
+## Optional: keep your AI away from AgentLink's files
 
-Claude Code lets you stop Claude from reading AgentLink's private folder (`~/.agentlink`), from calling your system keychain through command-line tools, and from editing AgentLink's installed program or the shell files that decide what `agentlink` and `npx` run. **These settings are guards, not a lock.** A program Claude starts can still try to reach those files by another route. See [Protect your approvals](protect-your-approvals.md) for what this means.
+This is extra protection for people who are comfortable editing settings. You can skip it. Claude Code lets you stop Claude from reading AgentLink's private folder (`~/.agentlink`), from calling your system keychain through command-line tools, and from editing AgentLink's installed program or the shell files that decide what `agentlink` and `npx` run. **These settings are guards, not a lock.** A program Claude starts can still try to reach those files by another route. See [Protect your approvals](protect-your-approvals.md) for what this means.
 
 Install AgentLink and finish setup first. Then add the settings.
 
 **Read and Edit rules alone do not stop scripts.** They cover Claude's own file tools and the file commands it recognizes (such as `cat` and `sed`), not a script that opens a file itself. On macOS, Linux and WSL2 the sandbox below closes that gap for shell commands, so turn it on too.
 
-### Advanced: the settings
+### The settings
 
 Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the macOS and Linux version; use the line for your system's keychain tool and ignore the other. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has the Windows paths, the complete list and the global install paths.
 
@@ -115,19 +119,19 @@ Source: [Claude Code permissions](https://code.claude.com/docs/en/permissions).
 
 ## A start-of-session note (optional)
 
-AgentLink can tell Claude Code at the start of each session who has written to you, in a line or two. It only lists counts and contact names; it never includes message text, and it doesn't read, answer or change anything.
+AgentLink can tell Claude Code at the start of each session who has written to you, in a line or two. It only lists counts and contact names. It never includes message text, and it does not read, answer or change anything.
 
 This is off until you ask for it. First install AgentLink on this computer, so the note runs a fixed copy and not whatever `npx` would download at that moment:
 
 ```
 npm install -g @4thtech-io/agentlink
-agentlink init --hook
+npx -y @4thtech-io/agentlink init --hook
 ```
 
 AgentLink shows you the exact change to `~/.claude/settings.json` and writes it only after you confirm. If you ask your AI to run it, it prints the change and a one-time code; you check the change and give the code back. A settings file that isn't valid is left alone.
 
 To turn it off, open `~/.claude/settings.json`, delete the AgentLink item under `SessionStart` (its command ends in `status --brief`) and restart Claude Code. You can instead copy back the backup AgentLink made next to the file, named `settings.json.agentlink-backup-` followed by a number; that also undoes any later change you made to the settings.
 
-To see what the note prints, run `agentlink status --brief` yourself.
+To see what the note prints, run `npx -y @4thtech-io/agentlink status --brief` yourself.
 
 Next: [Pair with someone](pair-with-someone.md)

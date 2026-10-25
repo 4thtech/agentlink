@@ -1,17 +1,31 @@
 # Claude Desktop
 
-> **Status: Available since v0.1.1 through `init --harness claude-desktop`; the one-click extension is planned for v0.2.0 (M1).** This page is still an outline.
+*Applies to AgentLink 0.2.0. Available on macOS and Windows.*
 
-**Purpose:** set up AgentLink in the Claude Desktop app.
+Claude Desktop is the Claude app's chat window. It is a different program from Claude Code and needs its own setup. There are two ways.
 
-## Outline
+## Option 1: one-click download
 
-- Option 1 (v0.2.0): the one-click Claude Desktop extension
-- Option 2 (v0.1.0): ask Claude to install it with the install prompt, then restart Claude Desktop
-- Option 3 (since v0.1.1): `npx -y @4thtech-io/agentlink init --harness claude-desktop` in your own terminal (macOS and Windows)
-- Protecting your approvals (owner code or passphrase, in a terminal you opened yourself; passkey from v0.2.0) and the recovery kit
-- Checking it works: ask "What's my AgentLink status?"
-- From v0.3.0: the [desktop app](../apps/desktop-app.md) can connect Claude Desktop for you
-- Next: [Pair with someone](pair-with-someone.md)
+1. Open the [AgentLink 0.2.0 release page](https://github.com/4thtech/agentlink/releases/tag/v0.2.0).
+2. Download the file for your computer: `agentlink-0.2.0-darwin-arm64.mcpb` (Mac with Apple silicon), `agentlink-0.2.0-darwin-x64.mcpb` (Mac with an Intel chip) or `agentlink-0.2.0-win32-x64.mcpb` (Windows).
+3. Optional but wise: check the download. The release page has a `SHA256SUMS` list. Compare your file's fingerprint with its line. On a Mac, run `shasum -a 256 <file>`. On Windows, run `certutil -hashfile <file> SHA256`.
+4. Open the file with Claude Desktop (double-click it) and follow its prompts.
+5. Protect your approvals in a terminal you opened yourself. See [Protect your approvals](protect-your-approvals.md).
 
-**Filled in at:** M1a (v0.1.0), extension section at M1 (v0.2.0); backlog cards DOCS-M1a and DOCS-M1b.
+4thTech signs these downloads with its own certificate. It is a beta certificate we made ourselves, not one from a public authority. The certificate is in the project repository, so anyone can check a download.
+
+## Option 2: the command line
+
+In your own terminal:
+
+```bash
+npx -y @4thtech-io/agentlink init --agent claude --harness claude-desktop
+```
+
+It shows the exact change to Claude Desktop's settings and asks `y/N`. Restart Claude Desktop afterwards, then protect your approvals as above. Needs Node.js 22.14 or newer.
+
+## Check it works
+
+Ask Claude: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet. If not, run `npx -y @4thtech-io/agentlink doctor` in your terminal.
+
+Next: [Pair with someone](pair-with-someone.md)
