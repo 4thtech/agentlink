@@ -797,6 +797,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** On GitHub Free 30 to 60 runs queue behind 5 runners, mostly the macOS and Windows matrix legs, which ran on every PR push and again in the merge queue. They now run on `merge_group` and `push` to `main` only; docs-only changes skip the heavy jobs. `ci-gate` counts skipped as success, so the four required checks are unchanged.
 - **Acceptance:** nothing that runs in `merge_group` is weakened; no deploy workflow touched; no auto-merge.
 
+#### CHORE-CI-DOCS-FASTLANE · Docs-only fast lane in the merge queue (new, 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 by path (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/review-gate.yml`, `tools/ci/select-affected.mjs` and tests, `docs/process/ci-cd.md`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** CHORE-CI-SPEED-3
+- **Scope:** Owner decisions (Tali, 2026-10-25): (D1) a merge group whose diff holds only docs runs `checks` through the affected-package selector instead of the full suite; any code PR in the group, an unreadable diff or a push to `main` runs the full suite. (Item B) a docs-only push to a feature branch is diffed against its merge base with `main`, so the heavy jobs skip; an unknown base runs everything. (D2) `review-gate` derives `docs-site/**` as S1 (the mirror that M0-25 and the docs-site check card left open), exempting only the generated page `docs-site/technical/project/status-and-roadmap.md`. (D3) spec review classes are unchanged.
+- **Acceptance:** no gate weakened (gitleaks, dependency review, CodeQL, zizmor, pr-hygiene, review-gate, context-budget, changesets, docs-status drift all keep running); no ruleset change, no `paths-ignore`, `ci-gate` unchanged; tests first in `tools/ci/select-affected.test.mjs` and `tools/ci/review-gate.test.mjs`.
+
 #### CHORE-CI-FOLLOWUPS · Main CI never cancelled while pending; openssl hook timeouts in packages/node (new, 2026-10-21)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/security.yml`, `packages/node/src/safe-fetch.test.ts`, `packages/node/src/rpc-fetch.test.ts` (or `packages/node/vitest.config.ts`)
@@ -7148,7 +7155,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Invariants:** —
 - **Scope:**
   - A zero-dependency Node script, run in CI on changes to `docs-site/`: every relative link and anchor resolves; every Markdown file in a space appears in its `SUMMARY.md` exactly once and every entry exists; every page starts with a status hint; the guide uses none of the 11 §5 "Never say" terms outside sections titled "Advanced".
-  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25.
+  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25. The `review-gate.yml` mirror landed in CHORE-CI-DOCS-FASTLANE (owner decision 2026-10-25).
   - Reuse the link checker from M0-24 where it exists; this card adds the `docs-site/` rules.
 - **Acceptance:**
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
