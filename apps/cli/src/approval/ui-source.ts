@@ -12,7 +12,7 @@
 // - the action handed back for signing is that same parsed, frozen object (IR-M1-9j-1 F06).
 // The AI's arguments go to the page as plain name and value strings in their own "From your AI"
 // region; the page renders every value with textContent only (I-5).
-// M1-UX-APPROVAL-PAGE: the card leads with a plain headline (render.ts) and an accept-invite's
+// M1-11a-ux: the card leads with a plain headline (render.ts) and an accept-invite's
 // `inviteUrl` is left out: the link is the capability that opens the invite, and the owner decides on
 // who it connects to (the Who line, from the verified invite card), never on the link itself.
 //
@@ -87,7 +87,7 @@ function disclosureOf(action: JsonObject, facts: CardFacts): string[] {
     : [];
 }
 
-/** Arguments never shown on the page, by tool (M1-UX-APPROVAL-PAGE). */
+/** Arguments never shown on the page, by tool (M1-11a-ux). */
 const HIDDEN_ARGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
   agentlink_accept_invite: ['inviteUrl'],
 });

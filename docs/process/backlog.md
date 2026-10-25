@@ -4363,7 +4363,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 
-#### M1-UX-APPROVAL-PAGE · approval page: styled, a plain summary, a proper owner code field (new, owner test 2026-10-25)
+#### M1-11a-ux · approval page: styled, a plain summary, a proper owner code field (new, owner test 2026-10-25; M1-UX-APPROVAL-PAGE in the follow-ups)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-page.ts`, `packages/node/src/approval-server.ts` (the `/app.css` route and the card view), `apps/cli/src/approval/ui-source.ts`, `apps/cli/src/commands/owner/render.ts` and their tests
 - **Depends on:** M1-11a; interim until M1-11b-2 replaces the page with the `apps/local-ui` approvals

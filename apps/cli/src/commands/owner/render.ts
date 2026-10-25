@@ -54,7 +54,7 @@ export interface CardFacts {
   readonly who: string;
   readonly what: string;
   /**
-   * M1-UX-APPROVAL-PAGE: the card's plain headline, fixed text plus at most the sanitized
+   * M1-11a-ux: the card's plain headline, fixed text plus at most the sanitized
    * “name” (label) form: "Connect with “Ana” (self-declared)", "Send a message to “Ana” (…)", or
    * `what` alone. Never an argument the AI chose (the invite link stays out, I-5).
    */
@@ -130,7 +130,7 @@ async function inviterLabel(
   }
 }
 
-/** M1-UX-APPROVAL-PAGE: the card's plain headline (see CardFacts.headline). */
+/** M1-11a-ux: the card's plain headline (see CardFacts.headline). */
 function headlineOf(tool: unknown, what: string, party: Party): string {
   const name = party.name;
   if (tool === 'agentlink_accept_invite') {

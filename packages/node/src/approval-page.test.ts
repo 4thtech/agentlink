@@ -1,4 +1,4 @@
-// M1-UX-APPROVAL-PAGE: the approval page's stylesheet, the page shell and the card data the server
+// M1-11a-ux: the approval page's stylesheet, the page shell and the card data the server
 // hands the page (08 §1, §4; 11 §5, §6.2.1, §8; 04 §2.5; D-116; I-5).
 //
 // - The stylesheet is served by this server at `/app.css` under the same strict CSP (no inline style,
@@ -100,7 +100,7 @@ function blockAfter(css: string, marker: string): string {
   return css.slice(open + 1, css.indexOf('}', open));
 }
 
-describe('the approval page stylesheet (M1-UX-APPROVAL-PAGE; D-116)', () => {
+describe('the approval page stylesheet (M1-11a-ux; D-116)', () => {
   it('is served at /app.css as text/css under the unchanged strict CSP', async () => {
     const { server } = await start();
     const res = await send(server.port, '/app.css');
@@ -154,7 +154,7 @@ describe('the approval page stylesheet (M1-UX-APPROVAL-PAGE; D-116)', () => {
   });
 });
 
-describe('the page shell (M1-UX-APPROVAL-PAGE)', () => {
+describe('the page shell (M1-11a-ux)', () => {
   it('links its own stylesheet and script only, with no inline style or script', () => {
     const html = pageHtml('abc');
     expect(html).toContain('<link rel="stylesheet" href="/app.css">');
@@ -165,7 +165,7 @@ describe('the page shell (M1-UX-APPROVAL-PAGE)', () => {
   });
 });
 
-describe('what the page is given for an accept-invite request (M1-UX-APPROVAL-PAGE; I-5)', () => {
+describe('what the page is given for an accept-invite request (M1-11a-ux; I-5)', () => {
   const details: ApprovalDetails = {
     headline: 'Connect with “Ana” (self-declared)',
     who: '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet',

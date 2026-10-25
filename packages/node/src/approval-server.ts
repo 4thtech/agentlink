@@ -58,7 +58,7 @@
 //   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
 //   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
-// - M1-UX-APPROVAL-PAGE: `/app.css` is the approval page's fixed stylesheet (approval-page.ts), served
+// - M1-11a-ux: `/app.css` is the approval page's fixed stylesheet (approval-page.ts), served
 //   like `/app.js` under the same headers and CSP. The card view drops the AI argument `inviteUrl`
 //   (the invite's capability link) and carries an optional plain `headline`, checked like every
 //   other card field.
@@ -205,7 +205,7 @@ const MAX_REVIEW_ITEMS = 20;
 const MAX_DETAIL_CHARS = 1024;
 const MAX_VALUE_CHARS = 16_384;
 const MAX_FIELDS = 64;
-/** AI arguments the page never shows (M1-UX-APPROVAL-PAGE): the invite link of an accept-invite. */
+/** AI arguments the page never shows (M1-11a-ux): the invite link of an accept-invite. */
 const HIDDEN_ARGS: ReadonlySet<string> = new Set(['inviteUrl']);
 
 /** The wait in seconds after `failures` rejected presence proofs in a row (0 = no wait). */
@@ -320,7 +320,7 @@ function loadLocalUi(assets: LocalUiAssets | undefined): {
  */
 export interface ApprovalDetails {
   /**
-   * M1-UX-APPROVAL-PAGE: the card's plain headline ("Connect with “Ana” (self-declared)"), fixed
+   * M1-11a-ux: the card's plain headline ("Connect with “Ana” (self-declared)"), fixed
    * text plus at most the contact name under the 06 §2.1 rule; without it the page shows `what`.
    */
   readonly headline?: string;
@@ -664,7 +664,7 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
     if (typeof entry !== 'object' || entry === null) return false;
     const { name, value: text } = entry as Record<string, unknown>;
     if (!isText(name, MAX_DETAIL_CHARS) || !isText(text, MAX_VALUE_CHARS, true)) return false;
-    // M1-UX-APPROVAL-PAGE: an invite link never reaches the page (defence in depth; the CLI's
+    // M1-11a-ux: an invite link never reaches the page (defence in depth; the CLI's
     // source leaves it out already).
     if (HIDDEN_ARGS.has(name)) continue;
     fields.push({ name, value: text });

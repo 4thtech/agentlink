@@ -408,10 +408,10 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
   }, 60_000);
 });
 
-// M1-UX-APPROVAL-PAGE (owner test 2026-10-25): the page was unstyled, printed the raw invite link and
+// M1-11a-ux (owner test 2026-10-25): the page was unstyled, printed the raw invite link and
 // had a tiny owner code box. The card now leads with a plain headline, never shows the invite link,
 // and the owner code field is full width, paste-friendly and can be shown.
-describe('the approval page as the owner sees it (M1-UX-APPROVAL-PAGE; Chromium)', () => {
+describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
   const INVITE =
     'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5LXRoYXQtaXMtcXVpdGUtbG9uZw';
   const WHO = '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet';

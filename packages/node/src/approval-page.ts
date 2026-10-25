@@ -1,7 +1,7 @@
 // M1-8d, M1-11a: the pages of the local approval UI (08 §1; 11 §6.2.1; 02 J4; 04 §2.5, §2.5.2;
 // D-68). The text lives in UI_STRINGS, one place, so M1-11b can map it to the D1 copy keys.
 //
-// M1-UX-APPROVAL-PAGE (owner test 2026-10-25; interim until M1-11b-2 moves approvals to
+// M1-11a-ux (owner test 2026-10-25; interim until M1-11b-2 moves approvals to
 // apps/local-ui): the page is styled from the D1 approval card (docs/design/d1/screens/mobile/
 // approval-card--pending--{light,dark}--360, d1/components/ApprovalCard.md, TextField.md) with the
 // packages/ui tokens (D-116; nothing invented: a test compares every colour with tokens.css). The
@@ -765,7 +765,7 @@ const SCRIPT = String.raw`
 export const APP_JS = `'use strict';\n(function () {\n  var S = ${JSON.stringify(UI_STRINGS)};\n${SCRIPT}})();\n`;
 
 /**
- * The page stylesheet served at `/app.css` (M1-UX-APPROVAL-PAGE; D-116). The colours are the
+ * The page stylesheet served at `/app.css` (M1-11a-ux; D-116). The colours are the
  * packages/ui design tokens (tokens.css, dark first, light under prefers-color-scheme), copied by
  * value because this package does not depend on packages/ui; approval-page.test.ts fails on any
  * difference. Sizes and spacing follow the same tokens and components.css (`.al-approval`,

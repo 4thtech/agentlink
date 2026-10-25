@@ -57,7 +57,7 @@ describe('accept-invite approval: who is inviting (M1-9zb)', () => {
     expect(facts.summary).toContain(`owner ${FP}`);
   });
 
-  it('heads the card with a plain sentence: who it connects to, labelled (M1-UX-APPROVAL-PAGE)', async () => {
+  it('heads the card with a plain sentence: who it connects to, labelled (M1-11a-ux)', async () => {
     const facts = await cardFacts(fakeClient('oc-test'), request);
     expect(facts.headline).toBe('Connect with “oc-test” (self-declared)');
     expect(facts.headline).not.toContain('agentlink.4thtech.io');

@@ -152,11 +152,11 @@ describe('the local UI approval source (M1-11a)', () => {
       { name: 'text', value: 'hello' },
       { name: 'to', value: 'Ana' },
     ]);
-    // M1-UX-APPROVAL-PAGE: a plain headline; not a contact, so no name in it.
+    // M1-11a-ux: a plain headline; not a contact, so no name in it.
     expect(view.details?.headline).toBe('Send a message');
   });
 
-  it('never hands the page the invite link of an accept-invite request (M1-UX-APPROVAL-PAGE)', async () => {
+  it('never hands the page the invite link of an accept-invite request (M1-11a-ux)', async () => {
     const w = await world();
     const invite = 'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5';
     const action: JsonObject = {
