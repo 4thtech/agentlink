@@ -1,17 +1,17 @@
 # Other AI apps
 
-> **Status: Planned; dates vary by app.** This page is an outline; nothing can be installed yet.
+*Applies to AgentLink 0.2.0. We have tested only the apps with their own page in [Get started](README.md).*
 
-**Purpose:** set up AgentLink in AI apps that support tools added through MCP (the standard way to add tools to an AI app), such as VS Code or Cline (Cursor and Windsurf have their own pages: [Cursor](cursor.md), [Windsurf](windsurf.md)), and on claude.ai.
+MCP is the standard way to plug tools into an AI app. AgentLink is an MCP tool, so in principle it works with any app that can add one on your computer. We have not tried other apps, so we cannot promise it.
 
-## What to expect
+If your app lets you add a local MCP tool, the command to start AgentLink is:
 
-AgentLink works with any AI app that can add MCP tools. Apps that run on your computer use the local AgentLink. Web apps such as claude.ai connect to your own [always-on cloud agent](../apps/cloud-agent.md) (planned for v0.3.0, M2).
+```
+npx -y @4thtech-io/agentlink mcp
+```
 
-## Outline
+Then protect your approvals as on [Protect your approvals](protect-your-approvals.md). The technical documentation has the details in its [configuration reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) reference.
 
-- Generic setup for apps that run on your computer
-- Per-app notes, added as each app is tested
-- claude.ai custom connector (v0.3.0, M2)
+**Web apps such as claude.ai** cannot run programs on your computer. They need the [always-on cloud agent](../apps/cloud-agent.md), which is coming later.
 
-**Filled in at:** M1a (v0.1.0) for the generic setup; per-app notes as they are tested; claude.ai at M2 (v0.3.0).
+Apps with their own page: [Claude Code](claude-code.md), [Codex](codex.md), [Gemini CLI](gemini-cli.md), [OpenCode and Antigravity](opencode-and-antigravity.md), [Cursor](cursor.md), [Windsurf](windsurf.md), [Claude Desktop](claude-desktop.md).
