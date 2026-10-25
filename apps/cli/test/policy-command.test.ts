@@ -457,7 +457,7 @@ describe('owner presence and the AI (04 §2.5, §2.8; I-4; 06 §8)', () => {
     ['policy', 'allow-folder', '~/Work'],
     ['policy', 'remove-folder', '~/Work'],
     // M1-36b-2-c: the Send folder for an existing agent.
-    ['policy', 'set-up-send-folder'],
+    ['policy', 'allow-send-folder'],
   ];
 
   it.each(commands)('`%s %s` is refused without an interactive terminal', async (...argv) => {
@@ -820,12 +820,12 @@ describe('no MCP tool reaches the policy (I-4)', () => {
   });
 });
 
-describe('policy set-up-send-folder † (M1-36b-2-c; D-121 D6)', () => {
+describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
   const send = (): string => join(home, 'AgentLink', 'Send');
 
   it('adds only ~/AgentLink/Send (its real path) to the rules in force, with one owner code', async () => {
     const before = await loaded();
-    const result = await run(['policy', 'set-up-send-folder']);
+    const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(0);
     expect(codeEntries).toEqual(['policy.set']);
     expect(summaries[0]).toContain(send());
@@ -843,14 +843,14 @@ describe('policy set-up-send-folder † (M1-36b-2-c; D-121 D6)', () => {
 
   it('keeps folders already allowed and appends the Send folder', async () => {
     expect((await run(['policy', 'allow-folder', join(home, 'Work')])).code).toBe(0);
-    expect((await run(['policy', 'set-up-send-folder'])).code).toBe(0);
+    expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
     expect(await folders()).toEqual([join(home, 'Work'), send()]);
   });
 
   it('a Send folder that holds files is refused before any owner code, and left as it is', async () => {
     mkdirSync(send(), { recursive: true });
     writeFileSync(join(send(), 'private.txt'), 'x');
-    const result = await run(['policy', 'set-up-send-folder']);
+    const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(1);
     expect(codeEntries).toEqual([]);
     expect(result.err.join('\n')).toMatch(/already holds files/);
@@ -862,15 +862,15 @@ describe('policy set-up-send-folder † (M1-36b-2-c; D-121 D6)', () => {
   it('a Send folder that is a link is refused before any owner code', async () => {
     mkdirSync(join(home, 'AgentLink'));
     symlinkSync(join(home, 'Other'), send());
-    const result = await run(['policy', 'set-up-send-folder']);
+    const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(1);
     expect(codeEntries).toEqual([]);
     expect(await version()).toBe(1);
   });
 
   it('running it again changes nothing and asks for no owner code', async () => {
-    expect((await run(['policy', 'set-up-send-folder'])).code).toBe(0);
-    const again = await run(['policy', 'set-up-send-folder']);
+    expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
+    const again = await run(['policy', 'allow-send-folder']);
     expect(again.code).toBe(0);
     expect(again.out.join('\n')).toMatch(/already/);
     expect(codeEntries).toEqual(['policy.set']);
@@ -878,7 +878,7 @@ describe('policy set-up-send-folder † (M1-36b-2-c; D-121 D6)', () => {
 
   it('a wrong owner code changes nothing and leaves no folder behind', async () => {
     ownerPresence = wrongPresence;
-    const result = await run(['policy', 'set-up-send-folder']);
+    const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(1);
     expect(result.err.join('\n')).toMatch(/owner code/i);
     expect(await version()).toBe(1);
@@ -887,7 +887,7 @@ describe('policy set-up-send-folder † (M1-36b-2-c; D-121 D6)', () => {
 
   it('refused while the rules fail closed: nothing created, nothing asked', async () => {
     alice.markBroken = true;
-    const result = await run(['policy', 'set-up-send-folder']);
+    const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(1);
     expect(codeEntries).toEqual([]);
     alice.markBroken = false;
@@ -895,13 +895,13 @@ describe('policy set-up-send-folder † (M1-36b-2-c; D-121 D6)', () => {
   });
 
   it('extra arguments are a usage error', async () => {
-    const result = await run(['policy', 'set-up-send-folder', '/tmp']);
+    const result = await run(['policy', 'allow-send-folder', '/tmp']);
     expect(result.code).toBe(2);
     expect(codeEntries).toEqual([]);
   });
 
   it('end to end: a file put in the Send folder can then be sent', async () => {
-    expect((await run(['policy', 'set-up-send-folder'])).code).toBe(0);
+    expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
     writeFileSync(join(send(), 'hello.txt'), 'hello');
     const file = outgoing(join(send(), 'hello.txt'));
     const sent = await alice.client.sendMessage({

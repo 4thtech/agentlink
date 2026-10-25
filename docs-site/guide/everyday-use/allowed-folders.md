@@ -9,7 +9,7 @@
 - **Nothing is allowed until you allow it.** Your agent can send a file only from a folder you allowed. Until you allow one, a request to send a file stops before anything is read, and your agent tells you what to do.
 - **Only you can change this.** Allowing or removing a folder is part of your rules, signed with your owner code. Your AI can't change your rules, and there is no AI tool for it.
 - **The whole folder, its subfolders, no hidden files.** Allowing a folder allows the files in it and in its subfolders. Hidden files (such as `.env`) and private folders (such as `~/.ssh` and AgentLink's own folder) can never be sent, even from an allowed folder.
-- **The real folder, not a link.** AgentLink stores the folder's real path. A path that goes through a link (a shortcut) is refused, and you are shown the real path to use instead.
+- **The real folder, not a link.** AgentLink stores the folder's real path. A path that goes through a link (a shortcut) is refused, and you are shown the real path to use instead. A path spelled differently from the folder on disk (for example `~/work` for `~/Work`) is not refused: AgentLink shows the exact path and asks `Use <exact path>? (y/N)`. Type `y` to allow that real folder.
 - **Not too wide.** You can't allow your whole computer or your whole home folder. Allow a folder inside it, for example a `~/Documents/Shared` folder you keep for sharing. You can allow up to 32 folders.
 - **No folder that holds a private folder.** A folder that contains a private folder, such as `~/Library` (which holds your passwords in `~/Library/Keychains`), is refused before you're asked for your owner code. AgentLink names the private folder and asks you to choose a narrower folder inside it. This also holds when the private folder is a link to somewhere else, and whatever the upper or lower case. Files inside private folders are also refused each time your agent tries to send them.
 
@@ -17,9 +17,12 @@
 
 In a terminal you opened yourself (not one your AI runs):
 
+1. `agentlink policy allow-send-folder` sets up the `AgentLink/Send` folder in your home folder and allows it, for an agent set up before AgentLink did this on its own (since v0.2.0, setup creates that folder). The folder must be new or empty and a real folder, not a link; nothing else in your rules changes. Then put files you want to send there.
 1. `agentlink policy allow-folder ~/Documents/Shared` allows that folder. AgentLink shows the exact folder, then asks for your owner code.
 2. `agentlink policy show` lists your allowed folders and a few other rules, such as where received files are saved. It doesn't ask for your owner code.
 3. `agentlink policy remove-folder ~/Documents/Shared` stops your agent from sending files from that folder. This works even if you already deleted the folder.
+
+If you installed with `npx`, start each command with `npx -y @4thtech-io/agentlink` instead of `agentlink`. Received files are saved in `~/AgentLink/Inbox`, which AgentLink creates the first time a file arrives.
 
 Type your owner code only at the prompt, never in a shell command or a chat. A wrong code changes nothing; run the command again to retry. Add `--agent <name>` if you have several agents.
 

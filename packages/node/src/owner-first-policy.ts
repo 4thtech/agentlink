@@ -202,7 +202,7 @@ function isFirstPolicyBody(
 }
 
 /** The folder is still the real, empty folder that was checked (re-checked just before signing). */
-async function stillReady(folder: string): Promise<boolean> {
+export async function stillReady(folder: string): Promise<boolean> {
   try {
     const stats = await lstat(folder);
     if (stats.isSymbolicLink() || !stats.isDirectory()) return false;

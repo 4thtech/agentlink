@@ -91,9 +91,13 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+let stores = 0;
+
 async function initAgent(label: string): Promise<Agent> {
   const agentId = await createKeychainAgent(keychain);
-  const store = await openAgentStoreWith('keychain', agentId, join(dir, `${label}.sqlite`), {
+  stores += 1;
+  const file = join(dir, `${label}-${String(stores)}.sqlite`);
+  const store = await openAgentStoreWith('keychain', agentId, file, {
     keychain,
   });
   const keyStore = await openRecordedKeyStore('keychain', agentId, { keychain });
@@ -143,7 +147,10 @@ async function existingAgent(): Promise<{ agent: Agent; owner: OwnerPublicKeys; 
 function ownerSigning(code: () => string) {
   const items: OwnerOperationItem[] = [];
   const lines: string[] = [];
-  const sign = async (owner: OwnerPublicKeys, item: OwnerOperationItem): Promise<OwnerSignature> => {
+  const sign = async (
+    owner: OwnerPublicKeys,
+    item: OwnerOperationItem,
+  ): Promise<OwnerSignature> => {
     items.push(item);
     const store = await KeychainOwnerKeyStore.open(keychain, owner);
     const terminal: OwnerTerminal = {
@@ -168,10 +175,12 @@ function spyActions(
     alter?: (prepared: PreparedPolicyEdit) => PreparedPolicyEdit;
     load?: () => Promise<EffectivePolicy>;
     olderReceipts?: boolean;
-    apply?: (input: object) => Promise<Awaited<ReturnType<SendFolderSetupActions['apply']>>>;
+    apply?: (
+      input: Parameters<SendFolderSetupActions['apply']>[0],
+    ) => Promise<Awaited<ReturnType<SendFolderSetupActions['apply']>>>;
   } = {},
 ) {
-  const applied: object[] = [];
+  const applied: unknown[] = [];
   const real = agent.client.ownerActions;
   const actions: SendFolderSetupActions = {
     loadPolicy: () => (options.load === undefined ? real.loadPolicy() : options.load()),
@@ -534,6 +543,8 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
 
   it('delivery receipts on from an older default: asked once, only then (D-109)', async () => {
     const { agent, owner, code } = await existingAgent();
+    // Signed rules (version 1) that core reports as having receipts on from an older default.
+    await signEdit(agent, owner, code, { proofs: { notarize: 'approval' } });
     let asked = 0;
     const result = await setUpSendFolder({
       agent: agent.agentId,

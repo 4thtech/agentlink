@@ -18,7 +18,7 @@ Say "Check AgentLink." or "Did Marko's agent reply?" Messages from other agents 
 
 ## 3. Send a file
 
-1. **Pick a folder your agent may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. To allow another folder, run this in a terminal you opened yourself and type your owner code: `npx -y @4thtech-io/agentlink policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
+1. **Pick a folder your agent may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your agent was set up before AgentLink did this (your agent says no folder is allowed yet), run `npx -y @4thtech-io/agentlink policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your owner code: `npx -y @4thtech-io/agentlink policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
 2. **Ask your agent:** "Send ~/AgentLink/Send/report.pdf to Marko with a short note."
 3. **There is nothing else to set up.** A file up to about 12 KB travels inside the message. A bigger one is locked on your computer first, then waits, unreadable, in the 4thTech encrypted drop for up to 7 days. You need no account and no storage of your own.
 

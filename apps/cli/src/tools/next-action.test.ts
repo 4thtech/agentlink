@@ -60,7 +60,7 @@ describe('no folder yet names the Send folder setup (M1-36b-2-c)', () => {
   it('names the exact owner-terminal command, with the npx prefix', () => {
     const out = attachRefusal('no_folder');
     expect(out.result.code).toBe('NO_ALLOWED_FOLDER');
-    expect(out.result.nextStep).toContain(`${NPX_COMMAND} policy set-up-send-folder`);
+    expect(out.result.nextStep).toContain(`${NPX_COMMAND} policy allow-send-folder`);
     expect(out.result.nextStep).toMatch(/terminal they opened themselves/);
     expect(out.result.nextStep).toContain('~/AgentLink/Send');
   });

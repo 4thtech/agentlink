@@ -11,7 +11,8 @@ import { NPX_COMMAND } from './cli-command.js';
 
 export const FILE_TEXT = Object.freeze({
   noFolder: 'No folder is allowed for sending files yet, so nothing was sent.',
-  noFolderNextStep: `Tell the user: files can only be sent from a folder they allow. In a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-folder <path>\`, with \`--agent <name>\` if they have more than one agent. Then call again.`,
+  // M1-36b-2-c: the quickest fix is the Send folder; no tool can set it up (I-4), only the user.
+  noFolderNextStep: `Tell the user: files can only be sent from a folder they allow. The quickest way: in a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-send-folder\` and put the file in ~/AgentLink/Send. To allow another folder instead, they run \`${NPX_COMMAND} policy allow-folder <path>\`. Add \`--agent <name>\` to either if they have more than one agent. Then call again.`,
   outsideFolder: "That file isn't in a folder the user allows for sending, so nothing was sent.",
   outsideFolderNextStep: `Ask the user to put the file in a folder they allow for sending, or to allow its folder: in a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-folder <path>\`, with \`--agent <name>\` if they have more than one agent. Then call again.`,
   notAllowed: "That path can't be sent: it must be a full path to a regular, visible file.",

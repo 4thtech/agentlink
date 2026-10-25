@@ -83,7 +83,7 @@ describe('--help (06 §8)', () => {
       // M1-9m-b (D-100).
       'agentlink policy recover [--agent <name>]',
       // M1-36b-2-c.
-      'agentlink policy set-up-send-folder [--agent <name>]',
+      'agentlink policy allow-send-folder [--agent <name>]',
       // M1-9h.
       'agentlink credits [--topup] [--agent <name>]',
       'agentlink verify <proof.json> [--agent <name>]',
