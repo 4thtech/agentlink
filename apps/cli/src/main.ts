@@ -9,6 +9,7 @@ import { acceptHandler } from './commands/accept.js';
 import { createContactsHandler } from './commands/contacts.js';
 import { creditsHandler } from './commands/credits.js';
 import { doctorHandler } from './commands/doctor.js';
+import { uiHandler } from './commands/ui.js';
 import { inviteHandler } from './commands/invite.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
@@ -44,6 +45,8 @@ const dispatch = createDispatcher({
   contacts: createContactsHandler(undefined, contactsManageHandler(nodeOwnerDeps())),
   status: statusHandler,
   doctor: doctorHandler,
+  // M1-11b-9.
+  ui: uiHandler,
   requests: requestsHandler,
   // M1-9h.
   credits: creditsHandler,
