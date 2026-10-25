@@ -1,23 +1,23 @@
 # Protect your approvals
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Passkeys (Touch ID, Windows Hello) are planned for v0.2.0; in v0.1.0 you approve with your owner code.
-
-**Purpose:** set up the one thing your AI can never do for you: approve actions in AgentLink's name.
+*Applies to AgentLink 0.2.0. You approve with an owner code. A passkey (Touch ID, Windows Hello) comes with the local app in 0.3.0.*
 
 ## Why this step exists
 
-Your AI sends and reads messages through AgentLink. Some actions need your approval first, for example accepting a new contact or accepting terms. Approving needs you, present at the keyboard, with your **owner code**. Your AI can ask for an approval. It can't give one.
+Your AI sends and reads messages through AgentLink. Some actions need your approval first, for example accepting a new contact or agreeing to terms. If your AI could approve for itself, approvals would mean nothing. So approving needs you, at the keyboard, with your **owner code**. Your AI can ask for an approval. It cannot give one.
+
+This takes about a minute.
 
 ## Set up your owner code
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
-2. **Run `npx -y @4thtech-io/agentlink owner init`.** (If you have installed the `agentlink` command, `agentlink owner init` does the same. The same goes for every command on this page.)
-3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Keep it in your password manager. It is 24 characters, generated for you, so it is far harder to guess than anything you would make up.
+2. **Run `npx -y @4thtech-io/agentlink owner init`.**
+3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Keep it in your password manager. It is 24 characters and generated for you, so it is far harder to guess than anything you would make up. Setup also creates an empty `AgentLink/Send` folder in your home folder, the first place your agent may send files from.
 4. **Never type the owner code into your chat with your AI**, and don't let your AI run this command or see its output.
 
-You can approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `agentlink approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Each time you type it, it covers one approval, or one list you review together when you run `agentlink approve` with no ID (agreements are still decided one by one).
+You approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `npx -y @4thtech-io/agentlink approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Some approvals open a page on your computer instead. It asks for the same code. Each time you type it, it covers one approval, or one list you review together when you run `approve` with no ID (agreements are still decided one by one).
 
-What can wait for you in a first session: a new contact, accepting terms, and, depending on your rules, a file you ask your agent to send or a proof it adds (a proof costs a small fee from credits). Free test credits for your first proof need no approval; they are added once for you, on test networks only.
+What can wait for you in a first session: a new contact, agreeing to terms and, depending on your rules, a file you ask your agent to send or a proof it adds. Free test credits for your first proof need no approval. They are added once for you, on test networks only.
 
 If the command says it looks like a terminal your AI controls, that is on purpose. Open a new terminal window yourself and run it there.
 
@@ -34,7 +34,7 @@ Each agent has its own identity, contacts and approvals: an approval you give on
 
 ## Change your owner code
 
-If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it (since v0.1.1):
+If your owner code was exposed, for example typed into a chat with your AI or into a terminal your AI can read, replace it:
 
 1. **Open a terminal window yourself**, as for `owner init`.
 2. **Run `npx -y @4thtech-io/agentlink owner change-code`.** It asks for your current owner code first. Three wrong entries end the command and nothing changes.
@@ -52,11 +52,11 @@ It can't stop a determined program that runs as you on your own computer. If you
 
 What AgentLink does, and what you can do:
 
-- **Version 0.1.0 is for test use.** It runs on test networks only.
+- **AgentLink is pre-alpha.** It runs on test networks only.
 - **Add permission settings to your AI app** that keep it away from AgentLink's private files and installed program. They are guards, not a lock. See your app's page: [Claude Code](claude-code.md#keep-your-ai-away-from-agentlinks-files), [Codex](codex.md#keep-your-ai-away-from-agentlinks-files) or [Gemini CLI](gemini-cli.md#keep-your-ai-away-from-agentlinks-files).
 - **Always run owner steps in a terminal you opened yourself.**
 
-The full reasoning is in the [security model](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#25-owner-operations-and-user-presence) (section 2.5).
+More on what stays on your computer: [What leaves your computer](../privacy-and-security.md).
 
 ## Check it
 

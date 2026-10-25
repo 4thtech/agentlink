@@ -1,12 +1,18 @@
 # Gemini CLI
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** The steps below are for the released package.
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** set up AgentLink in Gemini CLI.
+This page sets up AgentLink in Gemini CLI. You need Node.js 22.14 or newer (check with `node --version`) and Gemini CLI.
 
-You need Node.js 22.14 or newer and Gemini CLI.
+## 1. Install it
 
-## 1. Ask Gemini to install it
+The quick way is one command in your own terminal:
+
+```bash
+npx -y @4thtech-io/agentlink init
+```
+
+It shows the exact change and asks `y/N`. Or ask Gemini to do it:
 
 Paste this into Gemini CLI:
 
@@ -14,12 +20,10 @@ Paste this into Gemini CLI:
 
 What happens:
 
-1. Gemini runs `npx -y @4thtech-io/agentlink init`. It looks for Claude Code, Codex, Gemini CLI, OpenCode and Antigravity on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
+1. Gemini runs `npx -y @4thtech-io/agentlink init`. It looks for your AI apps on your computer, prints the exact change to each settings file and a short confirmation code, and writes nothing yet.
 2. Gemini shows you the change. For Gemini CLI it adds one entry named `agentlink` to `~/.gemini/settings.json`. Check that it is the only change.
 3. If you agree, Gemini runs the command again with `--confirm <code>`. The code only works for exactly the change you were shown. A backup of your old file is kept.
 4. Restart Gemini CLI.
-
-Prefer to do it yourself? Run `npx -y @4thtech-io/agentlink init` in your own terminal. It shows the same change and asks `y/N`.
 
 Check that the package name is exactly `@4thtech-io/agentlink`.
 
@@ -31,15 +35,15 @@ Do this yourself, in a terminal you opened, never through Gemini: [Protect your 
 
 Ask Gemini: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
-## Keep your AI away from AgentLink's files
+## Optional: keep your AI away from AgentLink's files
 
-Gemini CLI has a sandbox, but its documentation does not describe a way to block one folder such as `~/.agentlink`. So for Gemini CLI the folder guard isn't available, and the risk described in [Protect your approvals](protect-your-approvals.md) stays fully open. What you can do:
+This is extra protection for people who are comfortable editing settings. You can skip it. Gemini CLI has a sandbox, but its documentation does not describe a way to block one folder such as `~/.agentlink`. So for Gemini CLI the folder guard isn't available, and the risk described in [Protect your approvals](protect-your-approvals.md) stays fully open. What you can do:
 
 - **Keep Gemini's confirmation prompts on.** Never turn on "trust" for AgentLink in Gemini's settings.
 - **Block the owner commands and keychain tools** with a rule file (below).
 - **Run owner steps in a terminal you opened yourself.**
 
-### Advanced: the rule file
+### The rule file
 
 Save this as `~/.gemini/policies/agentlink.toml`:
 
@@ -58,6 +62,6 @@ Source: [Gemini CLI policy engine](https://geminicli.com/docs/reference/policy-e
 
 ## A start-of-session note
 
-The optional start-of-session note (`agentlink init --hook`) is not available for Gemini CLI yet. Run `agentlink status --brief` yourself to see the same counts.
+The optional start-of-session note is not available for Gemini CLI yet. Run `npx -y @4thtech-io/agentlink status --brief` yourself to see the same counts.
 
 Next: [Pair with someone](pair-with-someone.md)
