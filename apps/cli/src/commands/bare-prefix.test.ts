@@ -14,15 +14,17 @@ import { POLICY_TEXT } from './owner/policy.js';
 import { OWNER_TEXT } from './owner/strings.js';
 import { TEXT } from './shared.js';
 import { NO_AGENT_MESSAGE } from '../runtime/open-agent.js';
-import { en } from '../tools/strings/en.js';
+import { en } from '@4thtech-io/mcp-tools/strings/en.js';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
+/** The tool handlers moved to their own package (M2-3t); their texts are still checked here. */
+const TOOLS_SRC = join(SRC, '..', '..', '..', 'packages', 'mcp-tools', 'src');
 
 /** The files of this card (M1-36a-b) and of M1-36e (the rest #506's review found). */
 const FILES = [
   'commands/init.ts',
   'commands/owner/strings.ts',
-  'tools/strings/en.ts',
+  '../../../packages/mcp-tools/src/strings/en.ts',
   'runtime/open-agent.ts',
   'commands/doctor.ts',
   'commands/owner/policy.ts',
@@ -58,7 +60,7 @@ function sourceFiles(dir: string): string[] {
 
 describe('no bare `agentlink` command prefix (M1-36a-b)', () => {
   it('no source file has one in its text (M1-36e)', () => {
-    const files = sourceFiles(SRC);
+    const files = [...sourceFiles(SRC), ...sourceFiles(TOOLS_SRC)];
     expect(files.length).toBeGreaterThan(100);
     const bad = files.flatMap((rel) =>
       codeLines(rel)

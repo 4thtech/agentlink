@@ -22,7 +22,7 @@ import {
   toolsFor,
   type HandlerEnvironment,
   type ToolDefinition,
-} from '../tools/index.js';
+} from '@4thtech-io/mcp-tools';
 import { SERVER_INSTRUCTIONS } from './instructions.js';
 
 /** The server name in `initialize` (06: binary `agentlink`, subcommand `mcp`). */

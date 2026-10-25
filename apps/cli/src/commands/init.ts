@@ -77,7 +77,7 @@ import { checkOwnerTerminal } from '../runtime/guards.js';
 import { GLOBAL_PREFIX, cliPrefix } from '../runtime/cli-prefix.js';
 import { INSTALL_COMMAND, installGlobally, isAgentlinkOnPath } from './global-install.js';
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
-import { copy } from '../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { firstRunStep } from './first-run.js';
 
 /** The Node pieces `init` uses. Tests pass doubles; production uses `nodeInitDeps()`. */

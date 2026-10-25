@@ -44,7 +44,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { agentToolContext } from '../src/mcp/command.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import type { ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '@4thtech-io/mcp-tools';
 
 // --- doubles ----------------------------------------------------------------------------------------
 

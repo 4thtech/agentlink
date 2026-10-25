@@ -114,7 +114,7 @@ interface ApprovalChannel { request(a: ApprovalRequest): Promise<{ approvalId; u
 
 **Channels per packaging (D-73 (3); proposed details, owner confirms at merge).** Local M1a: `LocalApprovalChannel` (`apps/cli`, M1-9k) returns no URL and reports only `pending` or `unknown`, because the owner's own CLI process applies the signed decision through core on the shared store (§4.5, 06 §2.5). Local M1b: the local approval server returns the `127.0.0.1` page URL. Desktop app: the native approval window. Console: the signed object arrives in an `approval` envelope, `status` returns it as `signed` and the core verifies it (`collect`).
 
-**Tool handlers (G-15, D-73 (1)).** The MCP tool handlers are one runtime-agnostic module in `apps/cli/src/tools/` (no Node built-in, Node global or `@4thtech-io/node` import, and no relative import outside the module; 06 §1), which the stdio server uses in M1 and which moves into a shared package for the cloud agent at M2-3b (06 §1).
+**Tool handlers (G-15, D-73 (1)).** The MCP tool handlers are one runtime-agnostic workspace package, `packages/mcp-tools` (`@4thtech-io/mcp-tools`; moved from `apps/cli/src/tools/` at M2-3t) (no Node built-in, Node global or `@4thtech-io/node` import, and no relative import outside the module; 06 §1), which the stdio server uses in M1 and the cloud agent imports from M2-3b (06 §1).
 
 ---
 

@@ -6,7 +6,7 @@
 //
 // M1-9d-1: a second project runs the file tools end to end through the real drop Worker (apps/drop,
 // M1-27a) under Miniflare (workerd), with the test-sized limits of packages/core's `drop-worker`
-// project. Only `test/**/*.worker.test.ts` runs there: the MCP server and the handlers (src/tools,
+// project. Only `test/**/*.worker.test.ts` runs there: the MCP server and the handlers (packages/mcp-tools,
 // runtime-agnostic, 06 §1) over two in-memory cores; nothing from src/runtime or @4thtech-io/node.
 import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';

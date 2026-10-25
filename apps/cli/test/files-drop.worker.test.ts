@@ -14,7 +14,11 @@ import type { FilesPlatform, InboxFolder } from '@4thtech-io/core';
 import type { FetchLike, TempFileHandle, TempFileOps } from '@4thtech-io/storage';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { coreToolClient, type AttachOutcome, type FileOpener } from '../src/tools/context.js';
+import {
+  coreToolClient,
+  type AttachOutcome,
+  type FileOpener,
+} from '@4thtech-io/mcp-tools/context.js';
 import {
   RelayNetwork,
   call,

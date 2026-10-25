@@ -16,7 +16,10 @@ import {
   isFreeCreditsChain,
   nodeFreeCreditsPort,
 } from './free-credits.js';
-import { createFreeCreditsClaimer, memoryFreeCreditsMarker } from '../tools/free-credits.js';
+import {
+  createFreeCreditsClaimer,
+  memoryFreeCreditsMarker,
+} from '@4thtech-io/mcp-tools/free-credits.js';
 
 const AGENT = `0x${'ab'.repeat(20)}`;
 const OTHER = `0x${'cd'.repeat(20)}`;
