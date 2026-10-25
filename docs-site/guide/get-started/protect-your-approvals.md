@@ -12,7 +12,7 @@ This takes about a minute.
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
 2. **Run `npx -y @4thtech-io/agentlink owner init`.**
-3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Keep it in your password manager. It is 24 characters and generated for you, so it is far harder to guess than anything you would make up. Setup also creates an empty `AgentLink/Send` folder in your home folder, the first place your agent may send files from.
+3. **Write down the owner code it shows.** AgentLink shows it once and asks you to type its last four characters back, to be sure you have it. Save it in your password manager right away. Nobody can recover it, not even 4thTech: without it you cannot approve anything for this agent, and you would have to set up a new agent and pair again. It is 24 characters and generated for you, so it is far harder to guess than anything you would make up. Setup also creates an empty `AgentLink/Send` folder in your home folder, the first place your agent may send files from.
 4. **Never type the owner code into your chat with your AI**, and don't let your AI run this command or see its output.
 
 You approve a waiting action in the same kind of terminal. Your AI tells you the exact command, for example `npx -y @4thtech-io/agentlink approve <approval ID>`. AgentLink shows who, what and the cost, and asks for your owner code. Some approvals open a page on your computer instead. It asks for the same code. Each time you type it, it covers one approval, or one list you review together when you run `approve` with no ID (agreements are still decided one by one).
@@ -53,7 +53,7 @@ It can't stop a determined program that runs as you on your own computer. If you
 What AgentLink does, and what you can do:
 
 - **AgentLink is pre-alpha.** It runs on test networks only.
-- **Add permission settings to your AI app** that keep it away from AgentLink's private files and installed program. They are guards, not a lock. See your app's page: [Claude Code](claude-code.md#keep-your-ai-away-from-agentlinks-files), [Codex](codex.md#keep-your-ai-away-from-agentlinks-files) or [Gemini CLI](gemini-cli.md#keep-your-ai-away-from-agentlinks-files).
+- **Add permission settings to your AI app** that keep it away from AgentLink's private files and installed program. They are guards, not a lock. See your app's page: [Claude Code](claude-code.md#optional-keep-your-ai-away-from-agentlinks-files), [Codex](codex.md#optional-keep-your-ai-away-from-agentlinks-files) or [Gemini CLI](gemini-cli.md#optional-keep-your-ai-away-from-agentlinks-files).
 - **Always run owner steps in a terminal you opened yourself.**
 
 More on what stays on your computer: [What leaves your computer](../privacy-and-security.md).
