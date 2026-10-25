@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 332 (M1a 91, M1b 241) |
+| M1 Local beta | 333 (M1a 91, M1b 242) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -5485,6 +5485,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass. Confirmed again by IR-DOCS-FOLLOWUPS-1022B-1 (2026-10-22): this card is the home for that README line.
 - **Acceptance:**
   - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36k · cli: init asks once, shows skips and a summary, and waits for Claude Desktop to quit (new, owner test 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`apps/cli/src/commands/init.ts`; no owner or policy code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-36b
+- **Scope:**
+  - One "Set up AgentLink in all N apps? (y/N)" before the per-app questions; a no falls back to them.
+  - Any answer other than y or yes prints "Skipped <app>."; type-ahead is kept by one shared line reader.
+  - A final summary, one line per app: set up, already set up, skipped or blocked (fixed reason).
+  - Claude Desktop running (pgrep on macOS, tasklist on Windows, no shell): ask the user to quit it first and press Enter; tell them to reopen it after. AgentLink never closes the app.
+  - The `owner add-agent` hint only for an agent without an owner card.
+- **Acceptance:**
+  - Tests cover the all-apps question, the skip line, the summary, the quit wait and the hint; no test weakened.
 
 #### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

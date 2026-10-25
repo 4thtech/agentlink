@@ -69,6 +69,8 @@ interface RunOptions {
   readonly probe?: KeychainProbe;
   readonly answers?: readonly string[];
   readonly platform?: NodeJS.Platform;
+  readonly desktopRunning?: boolean;
+  readonly ownerCard?: boolean;
 }
 
 async function init(argv: readonly string[], options: RunOptions = {}): Promise<Run> {
@@ -89,6 +91,8 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
       return Promise.resolve(answers.shift() ?? '');
     },
     clock: () => NOW,
+    claudeDesktopRunning: () => Promise.resolve(options.desktopRunning === true),
+    hasOwnerCard: () => Promise.resolve(options.ownerCard === true),
     ...(options.platform === undefined ? {} : { platform: options.platform }),
   };
   const dispatch = createDispatcher({ init: createInitHandler(deps) });
@@ -437,34 +441,92 @@ describe('confirmation', () => {
     );
   });
 
-  it('in a terminal, asks per harness and writes only what is confirmed', async () => {
+  it('in a terminal, asks once for all apps, then per app on a no', async () => {
     await mkdir(join(home, '.codex'));
     const env = await geminiOnPath();
-    const run = await init([], { terminal: { ...TTY, env }, answers: ['y', 'n'] });
-    expect(run.asked).toBe(2);
-    expect(run.out).toContain(copy('cli.init.apply'));
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['n', 'y', 'n'] });
+    expect(run.out).toContain(INIT_TEXT.allQuestion.replace('{count}', '2'));
+    expect(run.asked).toBe(3);
     expect(await exists('.codex', 'config.toml')).toBe(true);
     expect(await exists('.gemini', 'settings.json')).toBe(false);
     expect(run.created).toBe(1);
   });
 
+  it('a yes to the all question sets up every app and asks nothing per app', async () => {
+    await mkdir(join(home, '.codex'));
+    const env = await geminiOnPath();
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['y'] });
+    expect(run.asked).toBe(1);
+    expect(await exists('.codex', 'config.toml')).toBe(true);
+    expect(await exists('.gemini', 'settings.json')).toBe(true);
+    expect(run.out).toContain('Codex: set up');
+    expect(run.out).toContain('Gemini CLI: set up');
+  });
+
+  it('any answer other than y or yes prints a Skipped line and the summary says skipped', async () => {
+    await mkdir(join(home, '.codex'));
+    const env = await geminiOnPath();
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['n', 'yep', 'yes'] });
+    expect(run.out).toContain('Skipped Codex.');
+    expect(run.out).not.toContain('Skipped Gemini CLI.');
+    expect(run.out).toContain('Codex: skipped');
+    expect(run.out).toContain('Gemini CLI: set up');
+  });
+
+  it('the summary names already set up and blocked apps', async () => {
+    await mkdir(join(home, '.codex'));
+    const env = await geminiOnPath();
+    await mkdir(join(home, '.gemini'), { recursive: true });
+    await writeFile(join(home, '.gemini', 'settings.json'), '{ not json');
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['y'] });
+    expect(run.out).toContain('Codex: set up');
+    expect(run.out).toMatch(/Gemini CLI: blocked\. /);
+    const again = await init([], { terminal: { ...TTY, env }, answers: [] });
+    expect(again.out).toContain('Codex: already set up');
+  });
+
   it('in a terminal, names the app in front of each question (IR-M1-9a-1 F07)', async () => {
     await mkdir(join(home, '.codex'));
     const env = await geminiOnPath();
-    const run = await init([], { terminal: { ...TTY, env }, answers: ['y', 'n'] });
-    const lines = run.out.split('\n');
-    const questions = lines.flatMap((l, i) => (l === copy('cli.init.apply') ? [i] : []));
-    expect(questions).toHaveLength(2);
-    // M1-36b (UX-B F9): the header, then that app's diff, then its question.
-    const headerAbove = (q: number): string | undefined =>
-      lines
-        .slice(0, q)
-        .reverse()
-        .find((l) => l.startsWith('Changes for '));
-    expect(headerAbove(questions[0] ?? 0)).toBe(copy('cli.init.changesFor', { appName: 'Codex' }));
-    expect(headerAbove(questions[1] ?? 0)).toBe(
-      copy('cli.init.changesFor', { appName: 'Gemini CLI' }),
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['n', 'y', 'n'] });
+    const apply = (appName: string): string => INIT_TEXT.applyApp.replace('{appName}', appName);
+    expect(run.out).toContain(apply('Codex'));
+    expect(run.out).toContain(apply('Gemini CLI'));
+    expect(run.out).toContain(copy('cli.init.changesFor', { appName: 'Codex' }));
+    expect(run.out).toContain(copy('cli.init.changesFor', { appName: 'Gemini CLI' }));
+  });
+
+  it('a single app keeps the diff right above its question', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: TTY, answers: ['y'] });
+    expect(run.out).not.toContain(INIT_TEXT.allQuestion.replace('{count}', '1'));
+    expect(run.out).toContain(copy('cli.init.apply'));
+  });
+
+  it('asks to quit Claude Desktop first when it is running, and says to reopen it', async () => {
+    const parts = ['Library', 'Application Support', 'Claude'];
+    await mkdir(join(home, ...parts), { recursive: true });
+    const run = await init([], {
+      terminal: TTY,
+      platform: 'darwin',
+      desktopRunning: true,
+      answers: ['y', ''],
+    });
+    expect(run.out).toContain(INIT_TEXT.quitDesktopMac);
+    expect(run.out.indexOf(INIT_TEXT.quitDesktopMac)).toBeLessThan(
+      run.out.indexOf(INIT_TEXT.restartDesktop),
     );
+    expect(run.asked).toBe(2);
+    expect(await exists(...parts, 'claude_desktop_config.json')).toBe(true);
+    expect(INIT_TEXT.quitDesktopMac).toContain('Cmd+Q');
+  });
+
+  it('does not ask to quit Claude Desktop when it is not running', async () => {
+    const parts = ['Library', 'Application Support', 'Claude'];
+    await mkdir(join(home, ...parts), { recursive: true });
+    const run = await init([], { terminal: TTY, platform: 'darwin', answers: ['y'] });
+    expect(run.out).not.toContain(INIT_TEXT.quitDesktopMac);
+    expect(run.asked).toBe(1);
   });
 
   it('does not write to ~/.claude.json when CLAUDE_CONFIG_DIR moves Claude Code elsewhere (F05)', async () => {
@@ -955,5 +1017,29 @@ describe('Windsurf: the code binds the path that is written (M1-36g-c)', () => {
     expect(reverse.code).toBe(EXIT_FAILED);
     expect(await exists(...XDG_FILE)).toBe(false);
     expect(await exists(...DEFAULT_FILE)).toBe(false);
+  });
+});
+
+describe('the add-agent hint (WAVE-030)', () => {
+  const hint = (name: string): string => withPrefix(INIT_TEXT.ownerStepAdd).replace('{name}', name);
+
+  async function twoRuns(ownerCard: boolean): Promise<Run> {
+    await init(['--agent', 'work', '--harness', 'none'], { terminal: TTY });
+    await mkdir(join(home, '.codex'));
+    await init(['--agent', 'codex', '--harness', 'codex'], { terminal: TTY, answers: ['y'] });
+    const env = await geminiOnPath();
+    return init(['--agent', 'codex', '--harness', 'gemini-cli'], {
+      terminal: { ...TTY, env },
+      answers: ['y'],
+      ownerCard,
+    });
+  }
+
+  it('is shown for another agent that has no owner card yet', async () => {
+    expect((await twoRuns(false)).out).toContain(hint('codex'));
+  });
+
+  it('is not shown when that agent already has an owner card', async () => {
+    expect((await twoRuns(true)).out).not.toContain('owner add-agent');
   });
 });
