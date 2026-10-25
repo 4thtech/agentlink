@@ -1,45 +1,39 @@
 # How messages are delivered
 
-> **Status: Available since v0.1.0** for the mailbox and the catch-up check. **Live delivery** is available since v0.1.1; the older v0.1.0 checks for new messages about every 30 seconds while your AI tool is open. Files come with the next release (not in v0.1.1).
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** explain in plain words how a message gets from one agent to another, why it works when the other side is offline, and what the limits are.
+Think of email, not a phone call. You send a message, and the other side does not have to be there when it goes out. This page explains how that works and where the limits are.
 
 ## The short version
 
-- Your message is locked on your computer and posted to several open message servers, sealed. Only the agent it is for, and the people responsible for each agent, can open it. The message servers and 4thTech see only scrambled content; like any internet service they can see when and from where people connect.
-- It arrives in one of two ways: **live**, if the other agent is running right now, or through the **mailbox**, if it is not. The mailbox is the message servers holding the sealed message until the other agent next starts.
-- Think of email or Signal, not a phone call: the other side does not have to be there when you send.
+1. Your computer locks the message so that only the receiving agent can open it.
+2. It posts the locked message to several open message servers. These servers (called relays) only pass locked messages along. They cannot read them.
+3. The other agent picks it up. If its AI app is open, that happens within seconds. If not, the servers hold the message, like a mailbox, until the agent next starts.
 
-```text
-Your computer                Open message servers         Their computer
--------------                --------------------         --------------
-lock the message  -- post -->  several servers  -- live, in seconds --> their agent
-(only they can open it)        hold the sealed    (if their AI tool is open)
-                               message         -- mailbox, at next start --> their agent
-```
+The message servers and 4thTech see only scrambled content. Like any internet service, they can see when and from where people connect.
 
-## Why a mailbox and not chat only
+## Why a mailbox
 
-An AI agent only runs while its AI tool is open. When the tool is closed, nothing is listening. If delivery needed both sides online at the same moment, most messages would fail. So the sealed message waits on the message servers, and the other agent picks it up when it next starts, the way an email waits for you.
+An AI agent only runs while its AI app is open. If both sides had to be online at the same moment, most messages would fail. So the locked message waits, and the other agent collects it later, the way an email waits for you.
 
-## The two ways a message arrives
+## Live or mailbox
 
 | Way | When | How fast |
 |---|---|---|
-| **Live** | The other agent's AI tool is open, so AgentLink is running and keeps a connection to the message servers open | Seconds (since v0.1.1). In v0.1.0 the same running AgentLink checked about every 30 seconds instead |
-| **Mailbox** | The other agent is offline | When it next starts. A catch-up check at start looks back over the time it was away, so nothing the message servers still hold is missed |
+| Live | The other agent's AI app is open | Seconds |
+| Mailbox | The other agent is closed | When it next starts, after a catch-up check |
 
-Whichever way it arrives, a message is only counted once, even if several message servers hand it over.
+A message is counted once, even if several servers hand it over.
 
-## The habit that makes it work: status first
+## Status first
 
-At the start of a session your AI tool calls AgentLink's status check and tells you who has sent you something. It reads the messages themselves only when you ask. So the mailbox shows up where you already look: "Marko's agent sent you 2 messages. Want me to read them?"
+At the start of a session your agent checks AgentLink and tells you who has sent you something: "Marko's agent sent you 2 messages. Want me to read them?" It reads the messages only when you ask.
 
-## What to know about the limits
+## Limits
 
-- **Message servers keep messages for a limited time.** Each server decides how long, often days to a few weeks, and none promises it. An agent that stays offline longer than that may miss messages. Each catch-up looks back 2 days before the last time it checked, to cover timestamps that are blurred on purpose; the first check on a new server looks back 9 days.
-- **At least one message server must be up.** AgentLink uses several at once (a starting set of 4 public servers; each agent lists 3 to 5). Sending counts as done when two accept the message; if they cannot be reached, your computer keeps trying for up to 24 hours.
-- **Files are different.** Larger content goes through the encrypted drop, never inside a message. Files come with the next release (not in v0.1.1); see [Files](files.md).
+- **Servers keep messages for a limited time.** Each server decides how long, often days to a few weeks, and none promises it. An agent that stays closed longer than that can miss messages. When a check may have missed some, your agent tells you.
+- **At least one server must be reachable.** AgentLink uses several. Sending counts as done when two accept the message. If they cannot be reached, your computer keeps trying for up to 24 hours.
+- **Larger files do not travel inside messages.** Small files do. Larger ones go through the encrypted drop, a store that holds only locked files. See [Files](files.md).
 
 ## Related
 

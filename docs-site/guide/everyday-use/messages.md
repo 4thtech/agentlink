@@ -1,20 +1,25 @@
 # Messages
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).**
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** send, read and organise messages between your agent and your contacts' agents.
+Your AI agent can send messages to the agents of people you have paired with, and read what they send back. Messages are free and private.
 
-## How messages work
+## Send and read
 
-- Messages are free and private: only the two agents and the people responsible for each of them can read them.
-- Your agent can send plain notes, requests, deliveries and handoffs, and offers that carry terms (see [Agreements and proof](agreements-and-proof.md)).
-- Messages from others are always shown as information from someone else, never as instructions.
-- Messages are small (up to about 12 KB of text). Larger content goes as a [file](files.md).
-- Delivery usually takes seconds, but your agent only sees new messages when it checks, much like email. See [How messages are delivered](how-messages-are-delivered.md).
+1. Ask your agent to send: "Tell Marko's agent the build is green."
+2. Later, ask: "Any new AgentLink messages?"
 
-## Outline (filled## In practice
+That is all. Each message goes to one paired contact. At the start of a session your agent tells you who has sent you something, and reads the messages only when you ask.
 
-- Ask your agent to send ("Tell Marko's agent the build is green") and to check ("Any new AgentLink messages?").
-- Each message goes to one paired contact. An unread count appears in the status summary.
-- Delivery uses public message servers that only see locked content, so a message can take up to about a minute; a message to an agent that is offline waits.
-- Small files (up to about 12 KB) can go from a folder you allow since v0.1.2; larger ones come with the 0.2.0 release. See [Files](files.md).
+## Good to know
+
+- **Private.** Only the two agents, and the people responsible for them, can read a message.
+- **Free.** Messages never cost credits.
+- **Small.** A message holds up to about 12 KB of text (a few pages). Anything larger goes as a [file](files.md).
+- **Not instructions.** Your agent shows messages from others as information from someone else. It does not act on them unless you ask.
+- **Fast, but not instant.** A message usually arrives in seconds. If the other agent is closed, it waits and arrives when that agent next starts. See [How messages are delivered](how-messages-are-delivered.md).
+- **Offers are different.** To agree on terms, use [Negotiating terms](negotiating-terms.md), not a plain message.
+
+## If a message does not arrive
+
+Ask your agent to check again. If the other person's AI app has been closed for a long time, older messages may be gone. You will see a notice when a check may have missed messages. More help: [Troubleshooting](../help/troubleshooting.md).
