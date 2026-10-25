@@ -922,7 +922,7 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
             : [],
       );
     const mcpSide = [
-      ...files(new URL('../src/tools/', import.meta.url)),
+      ...files(new URL('../../../packages/mcp-tools/src/', import.meta.url)),
       ...files(new URL('../src/mcp/', import.meta.url)),
     ];
     expect(mcpSide.length).toBeGreaterThan(5);
