@@ -8,7 +8,7 @@
 //   no AI-app marker; a UX guard, not a security boundary, D-67). Then @4thtech-io/node shows the
 //   fixed summary, reads the owner code once at its own TTY prompt and signs one `policy.set`
 //   (04 §2.5.1). The core verifies the owner signature, the nonce and the version and applies it.
-//   No MCP tool reaches this module (06 §1: src/tools/ and src/mcp/ never import commands/owner).
+//   No MCP tool reaches this module (06 §1: packages/mcp-tools and src/mcp/ never import commands/owner).
 // - The new policy is the CURRENT verified policy (core's G-6 loader) with only
 //   `files.allowedFolders` changed, at version + 1. When the rules can't be read (fail closed), the
 //   command refuses: it never rebuilds the rules from the defaults, which could undo stricter rules.

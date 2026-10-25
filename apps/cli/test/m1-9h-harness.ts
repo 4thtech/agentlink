@@ -5,7 +5,7 @@ import type { CommandHandler, CommandName } from '../src/dispatch.js';
 import { createDispatcher } from '../src/dispatch.js';
 import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import type { ProofPlatformTools } from '../src/tools/context.js';
+import type { ProofPlatformTools } from '@4thtech-io/mcp-tools/context.js';
 
 export const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 export const PIPED_IN_HARNESS: TerminalContext = {
@@ -16,7 +16,7 @@ export const PIPED_IN_HARNESS: TerminalContext = {
 
 export const AGENT_ID = `0x${'1'.repeat(40)}`;
 
-/** 11 §5.1 "never say" list, as the tool-copy lint applies it (src/tools/strings/en.test.ts). */
+/** 11 §5.1 "never say" list, as the tool-copy lint applies it (packages/mcp-tools/src/strings/en.test.ts). */
 export const BANNED: readonly [string, RegExp][] = [
   ['wallet', /\bwallets?\b/i],
   ['address', /\baddress(es)?\b/i],

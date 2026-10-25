@@ -22,6 +22,8 @@ You need **Node.js 22.14 or newer**. To check, open a terminal and run `node --v
    ```
 
    It shows an owner code once. Keep it in your password manager and never type it into a chat with your AI. Why: [Protect your approvals](protect-your-approvals.md).
+
+   Once it is set up, `npx -y @4thtech-io/agentlink ui` (next release) opens your AgentLink pages in your browser, starting with your activity. Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself. Press Ctrl+C when you're done; it stops by itself after 30 minutes.
 3. **Restart your AI app**, then ask it: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet.
 
 If something does not work, run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest.

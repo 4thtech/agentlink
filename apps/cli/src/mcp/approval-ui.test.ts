@@ -30,10 +30,10 @@ import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/type
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import type { OpenedAgent } from '../runtime/index.js';
-import type { TermsTools } from '../tools/context.js';
-import { TOOLS, callTool, type ToolClient, type ToolContext } from '../tools/index.js';
-import { acceptRetryStep } from '../tools/invite-common.js';
-import { APPROVAL_LINK_NOTE } from '../tools/registry.js';
+import type { TermsTools } from '@4thtech-io/mcp-tools/context.js';
+import { TOOLS, callTool, type ToolClient, type ToolContext } from '@4thtech-io/mcp-tools';
+import { acceptRetryStep } from '@4thtech-io/mcp-tools/invite-common.js';
+import { APPROVAL_LINK_NOTE } from '@4thtech-io/mcp-tools/registry.js';
 import {
   BROWSER_OPEN_INTERVAL_MS,
   approvalLinkNextStep,
@@ -80,6 +80,7 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     },
     // M1-11b-6: the first-run link; not used by the approval UI.
     openFirstRun: () => Promise.resolve(true),
+    openActivity: () => Promise.resolve(true),
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);

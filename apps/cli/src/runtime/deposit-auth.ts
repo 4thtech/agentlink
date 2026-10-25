@@ -2,7 +2,7 @@
 // 05 §2.5; 04 §4; I-4, I-7). The core builds and signs the agent's deposit authorization only
 // after a verified owner action (M3-4b-t-T4-a); this port carries it to the 4thTech submitter and
 // maps the answer to a fixed outcome. It is a runtime port, never an MCP tool: nothing in
-// src/tools/ or src/mcp/ reaches it (I-4), and the core does not export the function that calls it.
+// packages/mcp-tools or src/mcp/ reaches it (I-4), and the core does not export the function that calls it.
 //
 // - Where it goes: the submitter URLs of the shipped config only (SUBMITTER_DEFAULT_URLS), never a
 //   URL from a message, a tool argument or an answer. The port is built through

@@ -9,7 +9,7 @@
 //   (and no failover: the limit is honoured), 409 `already_used` is `already_used`, a fixed refusal
 //   code is `refused`, an answer that does not parse on every URL is `unavailable`.
 // - The txHash, the signature, the URL and server text never leave the port, and nothing logs.
-// - No MCP tool reaches the port (I-4): src/tools/ and src/mcp/ never import it.
+// - No MCP tool reaches the port (I-4): packages/mcp-tools/src/ and src/mcp/ never import it.
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -424,7 +424,7 @@ describe('no MCP tool reaches the port (I-4)', () => {
   }
 
   it('no tool in the MCP registry can start a top-up (owner-started only, Tali 2026-10-23)', async () => {
-    const { TOOLS, HANDLERS } = await import('../tools/index.js');
+    const { TOOLS, HANDLERS } = await import('@4thtech-io/mcp-tools');
     const names = TOOLS.map((t) => t.name);
     expect(names.length).toBeGreaterThan(0);
     // Every handler is a registered tool, and none is a top-up, deposit or gasless tool.
@@ -441,7 +441,10 @@ describe('no MCP tool reaches the port (I-4)', () => {
   });
 
   it('src/tools/ and src/mcp/ never import runtime/deposit-auth or name the port', async () => {
-    const dirs = ['tools', 'mcp'].map((d) => path.join(src, d));
+    const dirs = [
+      fileURLToPath(new URL('../../../../packages/mcp-tools/src', import.meta.url)),
+      path.join(src, 'mcp'),
+    ];
     const found: string[] = [];
     for (const dir of dirs) {
       const list = await files(dir);

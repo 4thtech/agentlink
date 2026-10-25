@@ -14,8 +14,8 @@
 //    literal fail too: the bundle is one ESM file whose imports can all be read statically. The
 //    runtime counterpart, which traces the modules the stdio server really loads, is
 //    test/mcp-module-graph.test.ts.
-// 2. src/tools/ for a neutral (Worker) platform (06 §1 runtime-agnostic, IR-M1-9j-1 F04). Vite
-//    bundles src/tools/index.ts with Worker resolve conditions and nothing external; a Node built-in
+// 2. packages/mcp-tools/src/ for a neutral (Worker) platform (06 §1 runtime-agnostic, IR-M1-9j-1 F04). Vite
+//    bundles packages/mcp-tools/src/index.ts with Worker resolve conditions and nothing external; a Node built-in
 //    (`node:` or one Vite resolves to its browser-external stub), `@4thtech-io/node`, the MCP SDK or
 //    a banned package anywhere in its module graph (workspace packages and third-party code
 //    included) fails the check, except the narrow NEUTRAL_EXCEPTIONS.
@@ -254,7 +254,7 @@ export function checkBundleSource(source, dependencies, banned) {
   return { findings, specifiers };
 }
 
-/** The Worker resolve conditions (workerd first), as the cloud agent will bundle src/tools/. */
+/** The Worker resolve conditions (workerd first), as the cloud agent will bundle packages/mcp-tools. */
 const WORKER_CONDITIONS = ['workerd', 'worker', 'browser', 'import', 'module', 'default'];
 /** The id prefix Vite gives a Node built-in in a non-Node build. */
 const BROWSER_EXTERNAL = '__vite-browser-external';
@@ -262,7 +262,7 @@ const BROWSER_EXTERNAL = '__vite-browser-external';
 /**
  * Third-party code that may reach a Node built-in in the neutral bundle: only a DYNAMIC import, only
  * from the named package, only of the named built-in. Each entry is a guarded runtime fallback that
- * a Worker never takes. First-party code (src/tools/ and the workspace packages) has no exception.
+ * a Worker never takes. First-party code (packages/mcp-tools and the workspace packages) has no exception.
  */
 export const NEUTRAL_EXCEPTIONS = [
   // `await import("crypto")` inside try/catch, reached only when `globalThis.crypto` is missing
@@ -340,7 +340,7 @@ export async function checkToolsEntry(entry, banned) {
       rolldownOptions: {
         input: entry,
         platform: 'neutral',
-        // Keep the entry's exports: an app build would tree-shake src/tools/ to nothing, and the
+        // Keep the entry's exports: an app build would tree-shake packages/mcp-tools to nothing, and the
         // output scan below would then see an empty chunk.
         preserveEntrySignatures: 'strict',
         output: { format: 'es', codeSplitting: false },
@@ -363,7 +363,10 @@ async function main() {
   const { values } = parseArgs({
     options: {
       bundle: { type: 'string', default: join(packageDir, 'dist', 'agentlink.js') },
-      'tools-entry': { type: 'string', default: join(packageDir, 'src', 'tools', 'index.ts') },
+      'tools-entry': {
+        type: 'string',
+        default: join(packageDir, '..', '..', 'packages', 'mcp-tools', 'src', 'index.ts'),
+      },
       'skip-bundle': { type: 'boolean', default: false },
       'skip-tools': { type: 'boolean', default: false },
     },
@@ -388,11 +391,11 @@ async function main() {
     findings.push(
       ...toolFindings.map((f) =>
         f.startsWith('output: ')
-          ? `src/tools/ neutral bundle ${f}`
-          : `src/tools/ neutral bundle: ${f}`,
+          ? `packages/mcp-tools neutral bundle ${f}`
+          : `packages/mcp-tools neutral bundle: ${f}`,
       ),
     );
-    if (toolFindings.length === 0) ok.push('bundle-check: src/tools/ neutral bundle ok');
+    if (toolFindings.length === 0) ok.push('bundle-check: packages/mcp-tools neutral bundle ok');
   }
   if (ok.length > 0) process.stdout.write(`${ok.join('\n')}\n`);
   if (findings.length > 0) {

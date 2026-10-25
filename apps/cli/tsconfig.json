@@ -4,7 +4,7 @@
     "rootDir": "src",
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo",
-    // The Node-only CLI (07 §1). src/tools/ stays runtime-agnostic under its own lint rules (06 §1).
+    // The Node-only CLI (07 §1). The tool handlers live in packages/mcp-tools, runtime-agnostic under its own lint rules (06 §1).
     "types": ["node"]
   },
   "include": ["src"],
@@ -15,6 +15,9 @@
     },
     {
       "path": "../../packages/core"
+    },
+    {
+      "path": "../../packages/mcp-tools"
     },
     {
       "path": "../../packages/types"
