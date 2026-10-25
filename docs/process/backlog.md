@@ -919,8 +919,8 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Acceptance:**
   - §4.6 carries that wording and nothing else changes.
 
-#### CHORE-BACKLOG-COUNTS-b · generated card counts go stale when two card-adding PRs queue together (new, owner decision pending)
-- **Status:** backlog (**DECISION NEEDED**) · **Size:** S · **Tier:** Sonnet · **Security:** S1
+#### CHORE-BACKLOG-COUNTS-b · generated card counts go stale when two card-adding PRs queue together (new, superseded by #535)
+- **Status:** done (superseded by #535: counts are no longer committed, option c) · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · `tools/docs-status/`, the merge-queue workflow, `docs/process/backlog.md`
 - **Depends on:** #476
 - **Scope:**
@@ -1142,6 +1142,72 @@ Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved it
   - v1 docs mark Fantom deployments as deprecated and superseded by Sonic.
 - **Acceptance:**
   - Docs updated via the GitBook change-request flow.
+
+#### M0-8c-d · logger: a quote inside a secret's bracket value must not close it early (new, IR-2 on #509)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · packages/log
+- **Depends on:** M0-8c
+- **Scope:**
+  - A value such as `secret=[ab'c]KEY']` (or a Go `%v` form with a quote inside brackets) closes at the first `]`, so part of the secret is left visible where `main` redacted to the end of the line. No known serializer emits this shape.
+  - Inside a secret's bracket value, never let `]` close it before a `'` is balanced.
+- **Acceptance:**
+  - Tests first: the shapes above are fully redacted; existing logger tests unchanged; no test weakened.
+
+#### CHORE-PR-TITLE-REGEX · pr-hygiene: allow multi-letter task-ID suffixes in PR titles (new, from PR title failures, 2026-10-25)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path: CI workflow)
+- **Repo/path:** agentlink · the pr-hygiene title check
+- **Depends on:** —
+- **Scope:**
+  - The title regex needs a word boundary after the milestone number and optional single letter, so IDs such as `M1-9zc-b` fail. Allow multi-letter and chained suffixes in the same format the backlog accepts.
+- **Acceptance:**
+  - Tests first: `M1-9zc-b`, `M1-9i-c-c` and `M3-4b-t-T4-a-c` pass; a title without a task ID still fails.
+
+#### CHORE-CI-DOCS-FASTLANE-b · docs fast lane: stop trimming file names (new, low, follow-up to CHORE-CI-DOCS-FASTLANE)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path: CI workflow)
+- **Repo/path:** agentlink · the CI workflow and its filter
+- **Depends on:** CHORE-CI-DOCS-FASTLANE
+- **Scope:**
+  - The fast-lane filter trims entries, so a root file named `foo.md ` (trailing space) counts as a doc. Stop trimming.
+  - Comment why `filter: ""` is used on non-push checkouts.
+- **Acceptance:**
+  - Tests first: a changed file with a trailing space in its name is not treated as docs-only.
+
+#### DOCS-04-28-WORDING-c · 04: align the KeyStore limit wording in the remaining places (new, low, follow-ups -b and -c of DOCS-04-28-WORDING)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (spec text)
+- **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md
+- **Depends on:** DOCS-04-28-WORDING
+- **Scope:**
+  - The `storage.set` table row (around line 407) still says "item limit"; the recovery-kit per-value cap phrase ("as ALKS", around line 168) reads ambiguously. Align both with the §2.8 total-limit wording. Marked proposed, owner confirms at merge.
+- **Acceptance:**
+  - No remaining "item limit" for the 64 KiB KeyStore limit; the per-value cap reads unambiguously; no meaning change.
+
+#### CHORE-VECTORS-TIMEOUT-RANGE-b · test-vectors: run the timeout check in the runner too (new, low, IR on CHORE-VECTORS-TIMEOUT-RANGE)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
+- **Repo/path:** agentlink · packages/test-vectors (runner)
+- **Depends on:** CHORE-VECTORS-TIMEOUT-RANGE
+- **Scope:**
+  - Call `timeoutMsProblem` in the vector runner as well as in the schema test, so a bad `timeoutMs` fails at run time.
+- **Acceptance:**
+  - Tests first: the runner rejects 0, a negative number, `Infinity`, `NaN` and 120001; shipped suites unchanged.
+
+#### CHORE-DROP-ENTRY-EXPORTS-b · drop: evidence that local `wrangler dev` starts (new, low, IR on CHORE-DROP-ENTRY-EXPORTS)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (apps/drop)
+- **Repo/path:** agentlink · apps/drop
+- **Depends on:** CHORE-DROP-ENTRY-EXPORTS
+- **Scope:**
+  - Add evidence (a smoke step or a recorded run) that `wrangler dev` starts from `apps/drop` after the entry-export change. The staging deploy smoke already covers the deployed Worker.
+- **Acceptance:**
+  - A recorded run or CI step shows local start; no test weakened.
+
+#### DOCS-CONCEPTS-SIMPLE · docs: "How AgentLink works, simply" and glossary entries (new, owner request 2026-10-25)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process or public docs)
+- **Repo/path:** agentlink · docs/ (concepts page), glossary, Curator wiki (projects domain)
+- **Depends on:** —
+- **Scope:**
+  - A plain page, no jargon, covering: the agent card (an ID card the owner signs), the owner code (made once; save it, it cannot be recovered), the owner fingerprint, the safety code, why encryption keeps content private while the card proves who is who, and the Send and Inbox folders (Inbox is created on the first received file; Send for new agents).
+  - Add matching glossary entries. Mirror the page to the Curator wiki (projects domain). Words follow 11 §5.
+- **Acceptance:**
+  - Page and glossary entries merged; docs-lint green; the Curator mirror recorded in the PR.
 
 ---
 
@@ -6013,6 +6079,211 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: one page does one `unknownSenderCodesTx` computation (spy count); a file name with markup renders as text in the #417 view.
 
+#### M1-4d-h · chain: read `RecordNotFound` only as the bare selector in the state client (new, IR-1 on #499)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (packages/chain, used by core) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain `clients/state.ts`
+- **Depends on:** M1-4d-g
+- **Scope:**
+  - `getRecord` matches `RecordNotFound` by name only, without the bare-selector check. A faulty RPC could make the notarize replacement path and the core own-parent check see "absent". Apply `revertBare` there. Doc nit: `state.ts:63` should say "the bare `RecordNotFound()` revert".
+- **Acceptance:**
+  - Tests first: a non-bare `RecordNotFound` revert is not read as absent; the bare selector still is.
+
+#### M1-9i-x · crypto: opaque `hold` parameter on the recovery-kit snapshots request (new, IR-M1-9i-c-3)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (packages/crypto) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto `keystore-api.ts` (around line 313), node tests
+- **Depends on:** M1-9i-c
+- **Scope:**
+  - Declare an optional opaque `hold?: unknown` second parameter on `RecoveryKitExportRequest.snapshots`. Drop the cast in the node test and the internal re-typing in `key-controls.ts` (around lines 194 and 227).
+- **Acceptance:**
+  - Types compile without casts; behaviour unchanged; no test weakened.
+
+#### M1-9i-c-b · node: key-store export and import lows (new, IR-1 on #507)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (packages/node) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (keychain, sqlite, restore tests)
+- **Depends on:** M1-9i-c
+- **Scope:**
+  - Export conformance tests only the keychain double as `itemsOf`; cover the real stores.
+  - Keychain `importAgent` and `importOwner` take no inter-process lock (G-1); add one.
+  - Restoring agents first and the owner second: a failed owner import leaves the agents blocking a later restore. Make the order or the cleanup safe, and record the CLI follow-up for M1-9i.
+  - The async-local held-set can report a spurious `store_busy` for detached promises.
+  - The sqlite `-shm` file is created with the process umask; set its mode.
+  - Tighten the restore test from `toThrow()` back to `toThrow(KeyStoreError)`.
+- **Acceptance:**
+  - Tests first for each item; no test weakened.
+
+#### M1-9i-c-c · node: pass the inter-process lock hold to nested callers (new, IR-2 on #507)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (packages/node) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto `keystore-api.ts`, packages/node sqlite store
+- **Depends on:** M1-9i-x
+- **Scope:**
+  - Expose `LockHold` in `RecoveryKitExportRequest.snapshots` and in the `SqliteStore.withInterProcessLock` function types, so a future nested caller forwards the hold. Without it, the nested call waits 10 s.
+- **Acceptance:**
+  - Tests first: a nested call that forwards the hold does not wait; behaviour otherwise unchanged.
+
+#### M1-1h-b-c · core and chain: parse stored payloads the same way as received ones (new, IR-2 on #515)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/core, packages/chain) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (acks, inbox, inbox-page, outbox, refresh-link), packages/chain `verify/content.ts`
+- **Depends on:** M1-1h-b
+- **Scope:**
+  - Optionally route the stored-payload re-parses through `parseReceivedJson` for uniformity. They are not received boundaries today; this is defence in depth.
+- **Acceptance:**
+  - Behaviour unchanged; one parser path for stored and received text; no test weakened.
+
+#### M1-1h-b-f1 · core: stored-text re-reads use the shared payload parser (new, IR-M1-1h-b-3)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/core) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (inbox, inbox-page, acks, files/received)
+- **Depends on:** M1-1h-b
+- **Scope:**
+  - Align the stored-text re-reads (`inbox.ts` around 174, `inbox-page.ts` around 558, `acks.ts` around 198, `files/received.ts` around 39) on `parsePayloadText` instead of a bare `JSON.parse`. Overlaps M1-1h-b-c; do them together if convenient.
+- **Acceptance:**
+  - Tests first: a stored text with a duplicate key or wrong shape is handled as the shared parser handles it.
+
+#### M1-1h-b-f2 · core: negative tests for approval-shaped text (new, IR-M1-1h-b-3)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (packages/core tests) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core tests
+- **Depends on:** M1-1h-b
+- **Scope:**
+  - Add negative tests: the `type` field with the wrong case, a non-string `type`, and a nested `{type: approval}` inside a text body, which stays free-form text.
+- **Acceptance:**
+  - The tests pass on current behaviour and fail if the parser becomes looser.
+
+#### M1-9f-b · Claude Desktop bundle: signing checks before announcing (new, low, IR-1 on #514)
+- **Status:** backlog · **Size:** S · **Tier:** Owner · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · the signed extension bundle and release notes
+- **Depends on:** M1-9f
+- **Scope:**
+  - Install a signed beta bundle by hand in Claude Desktop on macOS and Windows before announcing signing; the public `mcpb` verifier cannot verify it.
+  - The bundle holds about 18k files and 101 MB; prune later.
+  - The signing key stays in the npm-publish environment; one extra approval click per stable release is accepted.
+- **Acceptance:**
+  - Manual install recorded for both systems; announcement only after that.
+
+#### M1-11b-1-b · local UI first run: PR-body and comment lows (new, low, IR-4 on #426)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli local UI tests, PR template use
+- **Depends on:** M1-11b-1
+- **Scope:**
+  - The PR body should list `package.json` and the lockfile as supply-chain paths.
+  - A test comment near line 99 still says "packages/ui's" axe-core; fix it.
+- **Acceptance:**
+  - Comment fixed; the checklist item is in the next UI PR.
+
+#### M1-19-b-c · invite deploy: guard and staging-order lows (new, IR-M1-19-b-2)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive path: deploy) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/invite deploy tests and workflow
+- **Depends on:** M1-19-b
+- **Scope:**
+  - L1: the guard test (`deploy-invite.test.mjs` around line 169) also checks `wrangler.toml` for `[env.production]` and `custom_domain`.
+  - L2: the staging deploy has no head-of-main check, so an older commit can overwrite a newer one on staging; add it.
+  - M1-19-d must add deploy-reconcile coverage and remove `agentlink.4thtech.io` from `apps/invite/src/prompt.ts` if the domain changes.
+- **Acceptance:**
+  - Tests first for L1 and L2; no test weakened.
+
+#### M1-11b-6-b · cli init: first-run and agent-context lows (new, low, IR-M1-11b-6-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (apps/cli, owner setup path) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli `init` and agent-context
+- **Depends on:** M1-11b-6
+- **Scope:**
+  - L1: the init "nothing to do" branch calls `firstRun` without the `others.length === 0` guard the other branch has.
+  - L2: agent-context `available()` opens the agent store only to pick one line of copy.
+  - L3: the opener's argv briefly exposes the link to other processes of the same user (pre-existing, G-1); note it or avoid it.
+- **Acceptance:**
+  - Tests first for L1; L2 and L3 resolved or recorded with a reason.
+
+#### M1-11b-9-b · cli: wider copy fence test and a clearer not-ready message (new, low, IR-M1-11b-9-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli tests, `tools/strings`
+- **Depends on:** M1-11b-9
+- **Scope:**
+  - L1: make the copy fence test recursive over `tools/strings/` and `apps/cli/src/mcp/**`, except the local-ui-wiring and approval-ui files.
+  - L2: errors from `deps.start` (for example a locked keychain) collapse into the not-ready "run init first" line; show a distinct fixed line.
+- **Acceptance:**
+  - Tests first for both; no test weakened.
+
+#### M1-36a-c-b · cli: keep the npx command with yarn dlx and bunx (new, low, IR-M1-36a-c-1)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (run-mode detection)
+- **Depends on:** M1-36a-c
+- **Scope:**
+  - `yarn dlx` (a `dlx-<pid>` temp dir) and `bunx` may still show the bare `agentlink` name. Add detection for both.
+- **Acceptance:**
+  - Tests first: both launchers produce the full command in hints.
+
+#### M1-SAFETY-CODE-GAP · a way to see and compare the safety code, and honest next-step copy (new, owner test 2026-10-25)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (contacts command), local UI Contacts page, accept_invite copy
+- **Depends on:** M1-11b
+- **Scope:**
+  - `accept_invite` tells the user to compare the safety code in the local app or with `agentlink contacts --verify`, but in 0.2.0 neither exists. For 0.3.0 give a real way to see and compare it (a Contacts page entry or a CLI command) and fix the next-step copy, including the bare `agentlink` name.
+- **Acceptance:**
+  - The copy points only at something that exists; the user can see the safety code for a contact; tests cover the copy and the command or page.
+
+#### M1-UX-ALLOW-FOLDER-CASE · allow-folder: offer the exact on-disk path when the case differs (new, owner test 2026-10-25)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (owner policy path) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli policy allow-folder, `packages/node` folder policy
+- **Depends on:** M1-36b-2
+- **Scope:**
+  - A case-mismatched folder path is refused and the user must retype it. Instead offer the exact on-disk path with a y/N confirm; the policy still binds to the real path.
+- **Acceptance:**
+  - Tests first: a case-mismatched path offers the real path; no is a no-op; the stored path is the real one.
+
+#### M1-CONTACT-LISTS · saved contact lists and one-to-many send (new, owner proposal 2026-10-25)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (send path) · **Phase:** M1b
+- **Repo/path:** agentlink · core, node, apps/cli, local UI
+- **Depends on:** M1-9zg; Contacts page (#429)
+- **Scope:**
+  - Proposed, owner schedules. Saved lists (for example "Project X") and a send that delivers one separate private message to each member; duplicate names prompt for a choice. Target 0.3.0 after the Contacts page. Needs a short spec note first (06, 08).
+- **Acceptance:**
+  - Spec note merged; sending to a list produces one private message per member; approvals and limits apply per message; tests cover it.
+
+#### M1-36k-b · cli init: blocked-app exit code and summary test (new, low, IR-M1-36k-2)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli `init.ts` (around line 814) and tests
+- **Depends on:** M1-36k
+- **Scope:**
+  - A Claude Desktop that is still running and skipped should set a failed exit code. Test the "blocked" summary line.
+- **Acceptance:**
+  - Tests first for the exit code and the summary line.
+
+#### M1-36b-2-d · owner send-folder: re-check after signing, match the Send form, pin the folder (new, IR-M1-36b-2-c-1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli/src/commands/owner-send-folder.ts, packages/node allowed-path
+- **Depends on:** M1-36b-2-c
+- **Scope:**
+  - L1: re-check readiness after signing and before applying (around lines 258-272).
+  - L2: `already_allowed` also matches the `~/AgentLink/Send` form (around line 191).
+  - L3 (S2): pin an allowed folder's real location at allow time, so a later change to a link in that folder cannot widen what is allowed. Add the note to the 04 §4 threat note.
+- **Acceptance:**
+  - Tests first for each item; a folder whose real location changes after allow is refused or re-confirmed; no test weakened.
+
+#### M1-11a-ux-b · approval page: headline and test lows (new, low, IR-M1-11a-ux-1)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli approval page, packages/ui
+- **Depends on:** M1-11a-ux
+- **Scope:**
+  - Restricted names can still read like a sentence in the headline ("Approve now"); de-emphasise them visually.
+  - The node approval-page test relies on the UI-side token test; add its own check.
+- **Acceptance:**
+  - A restricted name cannot read as an instruction; the node test stands alone.
+
+#### M1-11a-ux-c · terminal approve card: no link in the output (new, owner yes 2026-10-25)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli terminal approve card
+- **Depends on:** M1-11a-ux
+- **Scope:**
+  - The terminal `approve` card stops printing the invite link; it shows a plain summary like the page does.
+- **Acceptance:**
+  - Tests first: no link appears in the card output; the summary does.
+
+#### M1-36e-b · node: vocabulary lint for error texts (new, low, from the #512 review)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/node texts) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (`policy-mark`, `store-errors`, `owner-add-agent`)
+- **Depends on:** M1-36e
+- **Scope:**
+  - Extend the vocabulary lint to node error texts and replace the bare `agentlink policy …` strings in `owner-first-policy.ts` with `CLI_COMMAND`.
+- **Acceptance:**
+  - Lint covers the listed files and is green; no bare command names remain in node texts.
+
 ---
 
 ## 4. M2 — Owner console, desktop apps, self-host, design
@@ -6654,6 +6925,15 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message meets the D-125 rule: median < 5 minutes, at least 80% of testers < 5 minutes, no tester > 15 minutes for a cause on our side (counterpart wait excluded; an over-15 caused by us is a bug fixed before the gate passes).
   - Adopter count, the measured median and the share under 5 minutes recorded; issues filed as cards; owner sign-off.
 
+#### M2-GROUP-THREADS · true group conversations (new, owner proposal 2026-10-25)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · spec 04, 06, 08 first; then core and node
+- **Depends on:** M1-CONTACT-LISTS
+- **Scope:**
+  - Proposed, owner schedules. Group conversations with membership, rules for who may add or remove people, history for new members, and per-member encryption. Needs a spec first (08, 06, 04).
+- **Acceptance:**
+  - Spec merged before any code; the owner schedules the build.
+
 ---
 
 ## 5. M3 — Mainnet beta
@@ -7204,6 +7484,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Lows: check the body length before reading it whole (`bodyOf`); a 200 with `failed` or `rate_limited` honours `Retry-After`.
 - **Acceptance:**
   - Tests first: a first URL answering `gasless_unavailable` fails over to the second, and both failing ends `unavailable`; the local pre-send refusal is unchanged; an oversized body is refused before it is read; `Retry-After` on a 200 `rate_limited` is honoured.
+
+#### M3-4b-t-T4-a-c · gasless top-up: refusals list, retry-after, fail-over test (new, low, IR-M3-4b-t-T4-a-3)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (packages/core)
+- **Repo/path:** agentlink · packages/core top-up executor
+- **Depends on:** M3-4b-t-T4-a
+- **Scope:**
+  - Drop or comment `gasless_unavailable` and `unsupported_chain` in `DEPOSIT_AUTH_REFUSALS` (the remote path now fails over; only local pre-checks use them).
+  - Show the remote `rate_limited` retry-after in the top-up result for the UI.
+  - Add a test: a 200 `failed` `gasless_unavailable` with a transaction hash fails over and ends `already_used`.
+- **Acceptance:**
+  - Tests first for each item; no test weakened.
 
 ---
 
