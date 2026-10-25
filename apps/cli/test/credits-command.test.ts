@@ -20,10 +20,10 @@ import {
 } from '../src/commands/doctor.js';
 import { createDeps } from '../src/commands/shared.js';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from '../src/dispatch.js';
-import type { AccountView } from '../src/tools/context.js';
+import type { AccountView } from '@4thtech-io/mcp-tools/context.js';
 import { PAY_PAGE, type PayPageConfig } from '@4thtech-io/chain';
 import { renderQr } from '../src/terminal/qr.js';
-import { copy } from '../src/tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import {
   AGENT_ID,
   PIPED_IN_HARNESS,

@@ -131,7 +131,7 @@ jobs:
               [2, /^apps\/(console|cloud-agent|submitter|drop)\//],
               [2, /^test-vectors\//],
               [2, /^docs\/foundation\/04-security-and-crypto\.md$/],
-              [1, /^packages\/(chain|transport-nostr|storage|types|ui)\//],
+              [1, /^packages\/(chain|transport-nostr|storage|types|ui|mcp-tools)\//],
               [1, /^apps\/(cli|verify|invite)\//],
               [1, /^(e2e|skills)\//],
               [1, /^\.github\//],

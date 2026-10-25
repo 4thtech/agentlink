@@ -44,6 +44,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `packages/chain/**` | S1 | Chain client (content rules raise EIP-712/signing code to S2) |
 | `packages/transport-nostr/**` | S1 | Inbound content |
 | `packages/storage/**` | S1 | Storage credentials, presigned URLs, OAuth tokens, SSRF (the drop adapter's request signing → S2) |
+| `packages/mcp-tools/**` | S1 | MCP tool handlers and surface (moved from `apps/cli/src/tools/`, M2-3t; runtime-agnostic, inbound content wrapped; owner operations → S2) |
 | `packages/types/**` | S1 | Inbound validation schemas (envelope, payload, policy schema changes → S2) |
 | `packages/ui/**` | S1 | Approval and policy UI; runs inside the console origin |
 | `apps/local-ui/**` | S1 | Local owner UI; the browser never signs; presence is enforced server-side (proposed, owner confirms at merge; D-118) |

@@ -123,11 +123,11 @@ function setup(options: Setup = {}) {
 }
 
 describe('verify: registration (06 §8)', () => {
-  it('is in --help with credits; ui is still absent', () => {
+  it('is in --help with credits', () => {
     const help = helpText();
     expect(help).toContain('agentlink verify <proof.json>');
     expect(help).toContain('agentlink credits [--topup]');
-    expect(help).not.toContain('agentlink ui');
+    expect(help).toContain('agentlink ui');
   });
 
   it('takes exactly one path; otherwise a usage error without reading or verifying', async () => {

@@ -6,7 +6,7 @@ import type { AgentLinkClient, CommitmentCard } from '@4thtech-io/core';
 import { termsHash } from '@4thtech-io/crypto';
 import { termsFromInput, type RestrictedName, type Terms } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
-import { copy } from '../../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { PendingRequest } from './pending.js';
 import { cardFacts, cardLines } from './render.js';
 import { TERMS_CARD_TEXT } from './terms-card.js';

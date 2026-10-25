@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { CREDITS_TEXT } from './commands/credits.js';
 import { DOCTOR_PROOF_TEXT, DOCTOR_TEXT } from './commands/doctor.js';
 import { FIRST_RUN_TEXT } from './commands/first-run.js';
+import { UI_TEXT } from './commands/ui.js';
 import { HOOK_TEXT, INIT_TEXT } from './commands/init.js';
 import { CONTACTS_MANAGE_TEXT } from './commands/owner/contacts-manage.js';
 import { POLICY_REVIEW_ROWS, POLICY_TEXT } from './commands/owner/policy.js';
@@ -23,21 +24,21 @@ import { DISPATCH_TEXT, helpText } from './dispatch.js';
 import { HARNESS_MESSAGES } from './harness/errors.js';
 import { RUNTIME_MESSAGES } from './runtime/errors.js';
 import { NO_AGENT_MESSAGE } from './runtime/open-agent.js';
-import { ACK_TEXT } from './tools/acknowledge.js';
-import { EXPORT_TEXT } from './tools/export-proof-pack.js';
-import { FETCH_FILE_TEXT } from './tools/fetch-file.js';
-import { FILE_TEXT } from './tools/files-common.js';
-import { GET_PROOF_TEXT } from './tools/get-proof.js';
-import { INBOX_TEXT } from './tools/inbox.js';
-import { INVITE_TEXT } from './tools/invite-common.js';
-import { PROOF_TEXT } from './tools/proofs-common.js';
-import { TERMS_FREE_CREDITS_TEXT } from './tools/propose-terms.js';
-import { RESULT_TEXT } from './tools/result.js';
-import { SEND_TEXT } from './tools/send.js';
-import { en } from './tools/strings/en.js';
-import { TERMS_TEXT } from './tools/terms-common.js';
-import { TOOL_TEXT } from './tools/text.js';
-import { VERIFY_TEXT } from './tools/verify-proof-pack.js';
+import { ACK_TEXT } from '@4thtech-io/mcp-tools/acknowledge.js';
+import { EXPORT_TEXT } from '@4thtech-io/mcp-tools/export-proof-pack.js';
+import { FETCH_FILE_TEXT } from '@4thtech-io/mcp-tools/fetch-file.js';
+import { FILE_TEXT } from '@4thtech-io/mcp-tools/files-common.js';
+import { GET_PROOF_TEXT } from '@4thtech-io/mcp-tools/get-proof.js';
+import { INBOX_TEXT } from '@4thtech-io/mcp-tools/inbox.js';
+import { INVITE_TEXT } from '@4thtech-io/mcp-tools/invite-common.js';
+import { PROOF_TEXT } from '@4thtech-io/mcp-tools/proofs-common.js';
+import { TERMS_FREE_CREDITS_TEXT } from '@4thtech-io/mcp-tools/propose-terms.js';
+import { RESULT_TEXT } from '@4thtech-io/mcp-tools/result.js';
+import { SEND_TEXT } from '@4thtech-io/mcp-tools/send.js';
+import { en } from '@4thtech-io/mcp-tools/strings/en.js';
+import { TERMS_TEXT } from '@4thtech-io/mcp-tools/terms-common.js';
+import { TOOL_TEXT } from '@4thtech-io/mcp-tools/text.js';
+import { VERIFY_TEXT } from '@4thtech-io/mcp-tools/verify-proof-pack.js';
 import { NEVER_SAY, lintVocabulary, proseOf } from './vocabulary.js';
 
 /** Sample arguments for the text functions: plain words, so they add no banned term. */
@@ -80,6 +81,7 @@ const TABLES: Readonly<Record<string, unknown>> = {
   OWNER_TEXT,
   TERMS_CARD_TEXT,
   TEXT,
+  UI_TEXT,
   VERIFY_CLI_TEXT,
   VERIFY_CONTENT_TEXT,
   VERIFY_FAILURE_TEXT,

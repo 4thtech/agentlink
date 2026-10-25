@@ -238,7 +238,10 @@ describe('the first-run link never reaches an agent (M1-11b-6, G-1)', () => {
   const src = fileURLToPath(new URL('..', import.meta.url));
 
   it('no MCP-side module opens the first-run page or imports the init step', async () => {
-    const files = [...(await sources(join(src, 'mcp'))), ...(await sources(join(src, 'tools')))];
+    const files = [
+      ...(await sources(join(src, 'mcp'))),
+      ...(await sources(join(src, '..', '..', '..', 'packages', 'mcp-tools', 'src'))),
+    ];
     expect(files.length).toBeGreaterThan(10);
     const offenders: string[] = [];
     for (const file of files) {

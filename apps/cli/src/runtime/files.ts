@@ -35,7 +35,7 @@ import {
   type AllowedPathErrorCode,
 } from '@4thtech-io/node';
 import { DROP_DEFAULT_ENDPOINT, type FetchLike, type TempFileOps } from '@4thtech-io/storage';
-import type { AttachOutcome, AttachRefusal, FileOpener } from '../tools/context.js';
+import type { AttachOutcome, AttachRefusal, FileOpener } from '@4thtech-io/mcp-tools/context.js';
 
 const FLAVOR: PathFlavor = process.platform === 'win32' ? 'win32' : 'posix';
 const CHUNK = 64 * 1024;
