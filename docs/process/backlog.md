@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 333 (M1a 91, M1b 242) |
+| M1 Local beta | 335 (M1a 91, M1b 244) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -5119,6 +5119,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
 - **Acceptance:** the test fails when the owner-fingerprint clause is removed (mutation check recorded in the PR) and passes with it; no test weakened.
 
+#### M1-9zg · core: ask which contact when two share a name (new, live finding 2026-10-25)
+- **Status:** in progress · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`tools/contacts.ts`, `list-contacts.ts`, `status.ts`, `registry.ts`, tool-surface snapshots); docs/foundation/06
+- **Depends on:** M1-9za
+- **Spec:** 06 §2 (Contact), §2.1 (list_contacts, status); I-5
+- **Invariants:** I-5
+- **Scope:**
+  - Two contacts that both declare "oc-test" (different owners): a tool called by that name never guesses. `AMBIGUOUS_CONTACT` candidates now carry the owner fingerprint and a short ID next to the name-rule name; the self-declared name is still never read.
+  - `agentlink_list_contacts` and `agentlink_status` show the owner fingerprint next to a duplicated name only.
+  - `accept_invite` nextStep stays neutral until the Contacts page (M1-11c-a2) is merged.
+- **Acceptance:** RED commit; candidates carry fingerprint and short ID; duplicate names show the fingerprint, unique ones do not; tool-surface snapshots updated (owner merge).
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
@@ -5498,6 +5510,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass. Confirmed again by IR-DOCS-FOLLOWUPS-1022B-1 (2026-10-22): this card is the home for that README line.
 - **Acceptance:**
   - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36k · cli: init asks once, shows skips and a summary, and waits for Claude Desktop to quit (new, owner test 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`apps/cli/src/commands/init.ts`; no owner or policy code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-36b
+- **Scope:**
+  - One "Set up AgentLink in all N apps? (y/N)" before the per-app questions; a no falls back to them.
+  - Any answer other than y or yes prints "Skipped <app>."; type-ahead is kept by one shared line reader.
+  - A final summary, one line per app: set up, already set up, skipped or blocked (fixed reason).
+  - Claude Desktop running (pgrep on macOS, tasklist on Windows, no shell): ask the user to quit it first and press Enter; tell them to reopen it after. AgentLink never closes the app.
+  - The `owner add-agent` hint only for an agent without an owner card.
+- **Acceptance:**
+  - Tests cover the all-apps question, the skip line, the summary, the quit wait and the hint; no test weakened.
 
 #### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b

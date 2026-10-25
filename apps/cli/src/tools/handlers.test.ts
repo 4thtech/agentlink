@@ -60,13 +60,19 @@ const display = (name: string, label: ContactDisplayName['label'] = 'self-declar
 function contact(
   id: string,
   shown: ContactDisplayName,
-  over: Partial<{ status: string; pairing: string; checked: boolean; declared: string }> = {},
+  over: Partial<{
+    status: string;
+    pairing: string;
+    checked: boolean;
+    declared: string;
+    fingerprint: string;
+  }> = {},
 ): ContactView {
   return {
     id,
     name: { value: over.declared ?? NAME_CANARY, source: 'counterparty', selfDeclared: true },
     display: shown,
-    ownerFingerprint: { short: '7F3A\u00b719C2', long: 'F'.repeat(64) },
+    ownerFingerprint: { short: over.fingerprint ?? '7F3A\u00b719C2', long: 'F'.repeat(64) },
     status: over.status ?? 'active',
     pairing: over.pairing ?? 'complete',
     safetyCodeChecked: over.checked ?? false,
@@ -258,6 +264,29 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     );
     // Counts and names only: never an envelope or terms ID in the summary (I-5).
     expect(result.structured.summary).not.toContain('EEEE');
+  });
+
+  it('WAVE-030: status shows the owner fingerprint next to duplicate names only', async () => {
+    const client = fakeClient({
+      counts: {
+        inbox: [
+          { contactId: B, unread: 1 },
+          { contactId: A, unread: 1 },
+        ],
+        requests: 0,
+      },
+      contacts: [
+        contact(B, display('oc-test'), { fingerprint: '1111\u00b72222' }),
+        contact(C, display('oc-test'), { fingerprint: '3333\u00b74444' }),
+        contact(A, display('Ana')),
+      ],
+    });
+    const result = await callTool('agentlink_status', {}, context(client));
+    const inbox = result.structured['inbox'] as { contact: Record<string, unknown> }[];
+    expect(inbox[0]!.contact['ownerFingerprint']).toBe('1111\u00b72222');
+    expect(inbox[1]!.contact['ownerFingerprint']).toBeUndefined();
+    expect(result.structured.summary).toContain('(owner 1111\u00b72222)');
+    expect(result.structured.summary).not.toContain('Ana\u201d (self-declared) (owner');
   });
 
   it('M1-22: unread messages come first, then open offers', async () => {
@@ -530,6 +559,20 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
     );
     expect(client.calls).not.toContain('catchUp');
     expect(dump(result).toLowerCase()).not.toContain('safety code');
+  });
+
+  it('WAVE-030: duplicate names show the owner fingerprint in the summary; unique names stay as they were', async () => {
+    const client = fakeClient({
+      contacts: [
+        contact(B, display('oc-test'), { fingerprint: '1111\u00b72222' }),
+        contact(C, display('oc-test'), { fingerprint: '3333\u00b74444' }),
+        contact(A, display('Ana')),
+      ],
+    });
+    const result = await callTool('agentlink_list_contacts', {}, context(client));
+    expect(result.structured.summary).toBe(
+      'You have 3 contacts: \u201coc-test\u201d (self-declared) (owner 1111\u00b72222), \u201coc-test\u201d (self-declared) (owner 3333\u00b74444), \u201cAna\u201d (self-declared).',
+    );
   });
 
   it('ok: no contacts yet', async () => {
@@ -893,9 +936,40 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
     const result = finalizeResult(out.output, []);
     expect(result.structured.code).toBe('AMBIGUOUS_CONTACT');
     expect(result.structured['candidates']).toEqual([
-      { id: B, name: 'Marko', label: 'self-declared', nameSource: 'counterparty' },
-      { id: C, name: 'Marko', label: 'self-declared', nameSource: 'counterparty' },
+      {
+        id: B,
+        name: 'Marko',
+        label: 'self-declared',
+        nameSource: 'counterparty',
+        ownerFingerprint: '7F3A\u00b719C2',
+        shortId: '0xbbbbbbbb',
+      },
+      {
+        id: C,
+        name: 'Marko',
+        label: 'self-declared',
+        nameSource: 'counterparty',
+        ownerFingerprint: '7F3A\u00b719C2',
+        shortId: '0xcccccccc',
+      },
     ]);
+  });
+
+  it('WAVE-030: two contacts that both declare the same name are told apart by owner fingerprint, and the self-declared name is never echoed', () => {
+    const twins = [
+      contact(B, display('oc-test'), { fingerprint: '1111\u00b72222' }),
+      contact(C, display('oc-test'), { fingerprint: '3333\u00b74444' }),
+    ];
+    const out = resolveContact('oc-test', twins);
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    const result = finalizeResult(out.output, []);
+    expect(result.structured.code).toBe('AMBIGUOUS_CONTACT');
+    expect(result.structured['candidates']).toMatchObject([
+      { ownerFingerprint: '1111\u00b72222' },
+      { ownerFingerprint: '3333\u00b74444' },
+    ]);
+    expect(dump(result)).not.toContain('CANARY');
   });
 
   it('not found (and blocked contacts are not offered) without echoing the query', () => {

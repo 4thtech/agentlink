@@ -3,7 +3,7 @@
 // (the core's `display`); no safety code is ever returned (04 §3.6.1).
 import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import { copy, renderCopy } from './strings/index.js';
-import { activeContacts, contactRef, renderRef } from './contacts.js';
+import { activeContacts, refsById, renderRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { ok, type HandlerOutput } from './result.js';
 import { TOOL_TEXT } from './text.js';
@@ -21,8 +21,9 @@ export async function listContactsHandler(
   const views = activeContacts(await context.client.contacts());
   const counts = await context.client.storedCounts();
   const unreadById = new Map(counts.inbox.map((entry) => [entry.contactId, entry.unread] as const));
+  const refs = refsById(views);
   const contacts = views.map((view) => ({
-    ...contactRef(view),
+    ...refs.get(view.id)!,
     ownerFingerprint: view.ownerFingerprint.short,
     pairing: view.pairing,
     safetyCodeChecked: view.safetyCodeChecked,
@@ -30,7 +31,7 @@ export async function listContactsHandler(
     unread: unreadById.get(view.id) ?? 0,
   }));
   context.logger.info('list contacts', { contacts: contacts.length });
-  return ok(contactsSummary(contacts.map(renderRef)), { contacts });
+  return ok(contactsSummary(views.map((view) => renderRef(refs.get(view.id)!))), { contacts });
 }
 
 /** "You have 2 contacts: …" with at most five names; the count alone when names would not fit. */
