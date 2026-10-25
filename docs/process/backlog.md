@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 340 (M1a 91, M1b 249) |
+| M1 Local beta | 341 (M1a 91, M1b 250) |
 | M2 Console, desktop apps, self-host, design | 52 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -3963,7 +3963,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Endpoints per 07 §5.4: `POST /v1/upload` (signature, nonce and time-window check; size cap; weekly quota per drop key; rate limits per drop key and per IP, IPv6 per /64; global cap), a single-use signed PUT target that accepts exactly the declared size and never overwrites a stored object, the signed commit (bytes verified against `ciphertextSha256`, mismatch deletes), a signed GET valid until `expiresAt`, `DELETE` signed by the uploading drop key only, `POST /v1/report` (deletes only that object; no automatic key block), `GET /v1/health` (liveness only).
   - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@4thtech-io/crypto` helpers, with vectors for the URL MAC.
   - Random 128-bit object IDs chosen by the Worker; no file names or metadata on objects; quota and nonce counters in Durable Objects; no accounts.
-  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (proposed 10).
+  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (16, owner-confirmed 23 Oct 2026).
   - Serving only as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for GET.
   - Logging (I-7, 04 §4): aggregate counters only; no request URLs, signed URLs, object IDs, drop keys or upload signatures in any log, metric label or analytics, with or without IPs; request bodies never logged. Production config keeps Workers observability and request logging, Tail Workers and Logpush off for the drop Worker.
   - (IR-D48-1 F10) Close the abuse-control residuals in the spec (04 §4, 07 §5.4, §5.6) before implementing: shared-egress collateral (per-IP and per-/64 limits can block innocent users behind an office or carrier NAT; a per-drop-key allowance keeps them working); the behaviour when the global cap is exhausted (fail closed with a typed, retryable `rate_limited` or `unavailable`, never silent drops); and the per-object download limit (proposed 10) against the recipient set (a file sent to more recipients than the limit must still be fetchable by each of them).
@@ -4035,15 +4035,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 awaits the owner's 10 vs 16; counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
 - **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off.
-  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; download limit per object as in 07 §5.4 (16), owner to confirm 10 vs 16.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off. **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; downloads per object: 16 (owner-confirmed 23 Oct 2026).
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**
   - Buckets and lifecycle rule exist and are read back (with M1-27b); confirmed limits recorded in 07 §5.4 and 12 §2.
@@ -5106,6 +5106,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
 - **Acceptance:** the test fails when the owner-fingerprint clause is removed (mutation check recorded in the PR) and passes with it; no test weakened.
 
+#### M1-9zg · core: ask which contact when two share a name (new, live finding 2026-10-25)
+- **Status:** in progress · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`tools/contacts.ts`, `list-contacts.ts`, `status.ts`, `registry.ts`, tool-surface snapshots); docs/foundation/06
+- **Depends on:** M1-9za
+- **Spec:** 06 §2 (Contact), §2.1 (list_contacts, status); I-5
+- **Invariants:** I-5
+- **Scope:**
+  - Two contacts that both declare "oc-test" (different owners): a tool called by that name never guesses. `AMBIGUOUS_CONTACT` candidates now carry the owner fingerprint and a short ID next to the name-rule name; the self-declared name is still never read.
+  - `agentlink_list_contacts` and `agentlink_status` show the owner fingerprint next to a duplicated name only.
+  - `accept_invite` nextStep stays neutral until the Contacts page (M1-11c-a2) is merged.
+- **Acceptance:** RED commit; candidates carry fingerprint and short ID; duplicate names show the fingerprint, unique ones do not; tool-surface snapshots updated (owner merge).
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
@@ -5993,7 +6005,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 ### 0.3.0 first run and agent-guided setup (new, D-130)
 
-Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026-10-25 (D-130). Already carded elsewhere and not repeated here: `init` asks once and waits for Claude Desktop (M1-36k), same-named contacts (M1-9zg), the styled approval page (M1-UX-APPROVAL-PAGE, interim) and the approval cards with "Approve with Touch ID" and the wide backup-code field (M1-11b-5), the first-run first policy (M1-36b-2-b), PRF only on `get()` (M1-11s-c-c), the Contacts, Files, Rules and Proofs pages (M1-11c-a2, -a3, -a5, -a4) and `agentlink ui` (M1-11b-9).
+Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026-10-25 (D-130). Carded elsewhere and not repeated here: same-named contacts (M1-9zg), the approval cards with "Approve with Touch ID" and the wide backup-code field (M1-11b-5), the first-run first policy (M1-36b-2-b), PRF only on `get()` (M1-11s-c-c), and the Contacts, Files, Rules and Proofs pages (M1-11c-a2, -a3, -a5, -a4). In review, with their cards in their own PRs: `init` asks once and waits for Claude Desktop (M1-36k, #530), the Send folder for existing agents from the terminal and the case-spelling prompt for `policy allow-folder` (M1-36b-2-c, #531), and `agentlink ui` (M1-11b-9, #520).
 
 #### M1-UX-PRF-MATRIX · local UI: platform passkey with PRF, browser matrix and fallback copy (new, D-130 (1))
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 (test harness, detection and fixed copy; no owner signing) · **Phase:** M1b
@@ -6016,11 +6028,11 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Invariants:** I-1, I-4, I-7
 - **Scope:**
   - Order: the folders are shown, then "Use Touch ID" (platform label); one confirmation creates the owner, registers the passkey, signs the card and the first policy (06 §3 defaults, Send allowed), all or nothing; then "Your backup code" once with the save form (`autocomplete="username"` with the fixed label, `autocomplete="new-password"`), a secondary Copy with the clipboard warning, and "I saved it"; then the recovery kit; then Ready.
-  - Create `~/AgentLink/Send`, `Inbox` and `Proofs` (0700) before signing; the policy binds the realpath of the new or empty Send folder.
+  - Create `~/AgentLink/Send`, `Inbox` and `Proofs` (0700) before signing; the policy binds the realpath of the Send folder, which must be a real folder, never a link (at either level), new or empty; anything else is refused before the gesture (the same folder rules as `policy allow-send-folder`, M1-36b-2-c).
   - B-9 path for 0.2.0 owners: enter the owner code once, then register the passkey.
   - Styled from the design (D-116); copy per 11 §5.5 and §6.2.1.
 - **Acceptance:**
-  - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
+  - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a link (at either level) or a non-empty Send folder is refused before the gesture; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
 
 #### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
@@ -6050,24 +6062,13 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 #### M1-UX-SEND-FOLDER-EXISTING · local UI: allow the Send folder for agents created before 0.3.0 (new, D-130 (2), (3))
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (signs `policy.set` from the page) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`, `packages/node/src/local-ui/**` files routes, tests
-- **Depends on:** M1-11c-a3, M1-UX-OPEN-APP
+- **Depends on:** M1-11c-a3, M1-UX-OPEN-APP, M1-36b-2-c (same folder rules, terminal path)
 - **Spec:** 08 §1 (Files banner); 06 §2.3, §3; 04 §2.5
 - **Invariants:** I-4
 - **Scope:**
   - With no allowed folder, the Files page shows "Allow ~/AgentLink/Send for sending files?"; one passkey gesture creates the folder if it is missing (0700) and signs the `policy.set` that adds its realpath. The banner takes no path from the URL, the AI or inbound content.
 - **Acceptance:**
   - Tests first (RED commit): the banner appears only with no allowed folder; one gesture leaves a verified policy with the realpath; a URL parameter cannot change the folder; independent review (S2).
-
-#### M1-UX-ALLOW-FOLDER-CASE · cli: offer the on-disk spelling when an allowed folder differs in case (new, owner test 2026-10-25)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (CLI prompt; the 04 §4 realpath and protected-root checks unchanged) · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/commands/policy*.ts`, tests
-- **Depends on:** M1-9m-b
-- **Spec:** 04 §4; 06 §3, §8
-- **Invariants:** I-4
-- **Scope:**
-  - When `policy allow-folder` gets a path whose case differs from the real on-disk spelling, ask "Did you mean <realpath>? (y/N)" and bind to the realpath on yes; D-99 and the protected-root checks are unchanged.
-- **Acceptance:**
-  - Tests: a case-mismatched path offers the realpath; Enter or no changes nothing; a protected root is still refused; no test weakened.
 
 #### M1-UX-OTHER-COMPUTER · local UI: "This is my other computer" on the new-contact card (new, D-130 (5))
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`apps/local-ui` approval card and the owner-set name in the accept flow) · **Phase:** M1b
@@ -6079,6 +6080,30 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - A choice on the new-contact card that fills "Name this contact" with "My other computer" (editable). A local, owner-set label only: no new owner operation and no crypto; the contact stays a separate owner with its own safety code. One owner on several computers is M2-UX-DEVICE-LINK.
 - **Acceptance:**
   - Tests: the choice sets the owner-set name confirmed with the Accept; nothing else changes; the inbound name stays restricted.
+
+#### M1-UX-APPROVAL-PAGE · local approval page: styled card, plain summary, wide backup-code field (new, owner test 2026-10-25, D-130 (1))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` approval server and page; owner presence surface) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` and its page assets, `apps/cli` approval details, tests
+- **Depends on:** M1-11a, M1-11a-b; interim until M1-11b-2 and M1-11b-5 move approvals into `apps/local-ui`
+- **Spec:** 08 §1, §4 (CSP); 11 §5, §6.2.1, §8 (approval card); D-116
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Style the page from the D1 approval card with the `packages/ui` tokens; light and dark; phone width.
+  - Lead each card with a plain summary built from the parsed stored action (no raw arguments, never the invite link).
+  - The passkey button first; the backup-code field full width, with paste, show and hide, no length limit, and `autocomplete="off"` (Q-130-1).
+- **Acceptance:**
+  - Tests first (RED commit): untrusted values render as text (XSS fixture); no invite link in the page or its API view; the code field's attributes; CSP unchanged; presence, the session link and CSRF unchanged; independent review (S2).
+
+#### DOCS-OWNER-CODE-SAVE · docs: saving the backup code, and quitting Claude Desktop before setup (new, D-130 (1), (7))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (user guidance on an owner secret) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs-site/guide/**`, `knowledge/` where it covers setup
+- **Depends on:** M1-UX-FIRSTRUN-V2 (copy)
+- **Spec:** 11 §5.5 (backup code), §6.1; 06 §7 (Claude Desktop)
+- **Invariants:** I-4
+- **Scope:**
+  - Plain guidance: what the backup code is for, save it in a password manager, never give it to your AI, it can't be recovered (the recovery kit restores everything instead); quit Claude Desktop (Cmd+Q) before setup. States the open Q-130-1 limit honestly: no claim that a saved code is safe from programs that control the screen or browser.
+- **Acceptance:**
+  - Pages pass the vocabulary lint and the docs checks; no claim beyond 04 §2.5.
 
 #### M1-9f-c · Claude Desktop: the signed extension as the recommended path (new, D-130 (7))
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`init` copy and docs; no owner code) · **Phase:** M1b
@@ -7594,7 +7619,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |
 | M1-23 | Run the J9 dogfood with @denisjazbec (install, pair, daily project sync, a J8 negotiation); sign off the M1a gate |
 | M1-24 | Trademark and name check (D-38) with counsel before the production domain (M2-10); start early |
-| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 10 vs 16 open); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
+| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 16 (owner-confirmed 23 Oct 2026)); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
 | M1-GATE, M2-GATE, M3-GATE | Recruit testers; sign off the gate; accept or reject residual risks |
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
