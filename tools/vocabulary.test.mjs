@@ -42,6 +42,12 @@ const ALLOWED = [
       'the compatibility answer says which apps support MCP tools (developer context), and "web address" means a website, not an agent address',
   },
   {
+    page: 'help/glossary.md',
+    terms: ['MCP', 'nostr/relay'],
+    reason:
+      'the glossary defines "MCP" (how AI apps plug in tools) and "Relay" (an open message server) in plain words, so it has to name them',
+  },
+  {
     page: 'get-started/gemini-cli.md',
     terms: ['policy'],
     reason: 'cites the "Gemini CLI policy engine", the name of a third-party feature and its page',

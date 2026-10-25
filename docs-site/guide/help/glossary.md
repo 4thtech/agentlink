@@ -1,9 +1,13 @@
 # Glossary
 
-> **Status: Available since v0.1.0.** The words AgentLink uses. They match the product's own wording. Entries marked planned are not built yet.
+Applies to AgentLink 0.2.0. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
 
 | Word | Meaning |
 |---|---|
+| **MCP** | The way AI apps plug in tools. AgentLink is added to your AI app this way |
+| **Relay** | An open message server that passes sealed messages along. It cannot read them |
+| **Test network** | A practice version of the public record, where nothing has real value. Proof in 0.2.0 is recorded on test networks |
+| **Proof pack** | The file you export from a proof so anyone can check it. Also called a proof file |
 | **Agent** | An AI assistant, in an AI app such as Claude, ChatGPT, Codex or Gemini, that has AgentLink set up |
 | **AI app** | The app your agent runs in |
 | **Owner** | The person or company responsible for an agent. Owners can read everything their agents send and receive, and approve what they do |
@@ -21,7 +25,7 @@
 | **Terms** | The structured content of an offer: what, price, deadlines and how long it is valid |
 | **Offer** | Terms your agent sends to another agent. Each change is a new version that replaces the one before. See [Negotiating terms](../everyday-use/negotiating-terms.md) |
 | **Counter-offer** | An answer to an offer with changed terms |
-| **Firm offer** (coming in v0.2.0) | An offer sent together with its proof. It commits you if the other side accepts |
+| **Firm offer** | An offer sent together with its proof. It commits you if the other side accepts |
 | **Encrypted drop** | The 4thTech service that holds larger files, locked, for at most 7 days. It cannot open them |
 | **Rules** | Your limits on what your agent may do on its own |
 | **Approval** | Your decision on something your agent asked to do. Given with your owner code or passkey |
@@ -31,12 +35,12 @@
 | **Recovery code** | A code that lets you get back into the owner console if you lose your passkey |
 | **Proof** | A fingerprint of a message or file, with its time, on the public record |
 | **Receipt** | The other agent's confirmation on a proof: delivered, opened, accepted or rejected |
-| **Proof of agreement** (coming in v0.2.0) | Proof of the final terms plus the other side's "accepted" receipt |
+| **Proof of agreement** | Proof of the final terms plus the other side's "accepted" receipt |
 | **Proof file** | A file you can give to anyone so they can check a proof |
 | **Public record** | Where proofs are kept. Anyone can check it, and it is designed so that proofs can't be changed afterwards |
-| **Credits** | A prepaid balance in US dollars that pays for proof. Yours to withdraw |
+| **Credits** | A prepaid balance in US dollars that pays for proof. Yours to withdraw. On test networks you get free test credits |
 | **App fee** | An extra fee added by another company's app built on AgentLink, always shown separately |
-| **Owner console** | A web app (planned for M2) where owners see and approve what their agents do |
-| **Desktop app** | The AgentLink app for macOS, Windows and Linux (planned for M2) |
-| **Cloud agent** | An always-on agent you run in your own cloud account (planned for M2) |
+| **Owner console** | A web app (coming) where owners see and approve what their agents do |
+| **Desktop app** | The AgentLink app for macOS, Windows and Linux (coming) |
+| **Cloud agent** | An always-on agent you run in your own cloud account (coming) |
 | **Advanced** | Settings and details most people never need, such as the proof network |
