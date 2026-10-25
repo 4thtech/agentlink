@@ -1,0 +1,492 @@
+# Deploy the invite page (apps/invite, M1-19-b, D-28, D-53): STAGING ONLY, on every merge to main
+# that touches the page (D-25, D-52). There is no production deploy of the invite page yet: it waits
+# for the trademark check and the production domain decision (card M1-19-d, owner-only credentials).
+# The page is a static site served as Workers static assets (release-and-deployment.md §4.6) with no
+# Worker script. Configuration: apps/invite/wrangler.toml. Tests of this file:
+# tools/release/deploy-invite.test.mjs (structure, the shared blocks run on fixtures and a local
+# server) and tools/release/deploy-path-triggers.test.mjs (the `paths` filter).
+#
+# This follows deploy-drop.yml (same gates, same freeze check, same catch-up pattern); where a block
+# is the same it is the same text, and the test says so. What differs: there is no bundle, no Worker
+# secret and no bucket. The build job stages the built site once and hashes it into a manifest (file
+# path and SHA-256 of every file); staging deploys exactly that directory (`wrangler deploy
+# --assets`), and the smoke test compares what the web serves with the same manifest.
+#
+# Every wrangler call runs in apps/invite and passes `--config wrangler.toml` and `--env` explicitly.
+#
+# JOBS
+#   ci-green           waits for this commit's ci.yml and security.yml gates (as release.yml). If
+#                      this commit's CI was cancelled because a newer push to main superseded it, it
+#                      ends green with result=superseded: nothing deploys, and catch-up runs.
+#   guard              main of 4thtech/agentlink only, and only once apps/invite/wrangler.toml exists.
+#   build              builds the site ONCE, stages it, checks that it has exactly the four expected
+#                      files (no source map, no second script) and hashes it. No credentials.
+#   deploy-staging     environment `staging`. Skips cleanly (green, with a notice) while the Cloudflare
+#                      credentials are missing. Deploys to workers.dev, then reads back the logging
+#                      settings.
+#   smoke-staging      no credentials: the served pages and script equal the built files byte for byte,
+#                      the headers of 08 §4 (the `_headers` file) are on every page, and an unknown
+#                      path is a 404 (SITE-CHECK block below). The fragment-never-sent and hostile-name
+#                      browser tests run on this same build in CI (e2e/test/invite-page-*.test.ts); the
+#                      byte equality here ties staging to that build.
+#   catch-up           only when this run did not deploy its commit because its CI was superseded by a
+#                      newer push or failed (a flake): dispatches this workflow on main unless a run
+#                      for main's head is in flight or succeeded (tools/release/catch-up-deploy.mjs).
+#                      The dispatched run passes every gate again for the head commit.
+#
+# Not here, on purpose: a production environment, production credentials, a Custom Domain, the
+# automatic rollback and the freeze job. They belong to M1-19-d. deploy-reconcile.yml does not cover
+# this workflow either: it reads the production deploy job of a workflow.
+#
+# SKIPPING VS FAILING: absent credentials skip with a notice; a token the API refuses fails the job.
+#
+# DEPLOY_FREEZE: deploy-staging is skipped while the repository variable is 'true' and re-checks it
+# when it starts. The invite page never sets it (no production to protect).
+#
+# CREDENTIALS (owner only; never in this file, logs or PR text). Names only; the same names as for
+# deploy-drop.yml, so an account already set up for the drop needs nothing new:
+#   Environment `staging`:    secret CLOUDFLARE_API_TOKEN (staging token), variable CLOUDFLARE_ACCOUNT_ID,
+#                             optional variable INVITE_STAGING_URL (the workers.dev origin, used only
+#                             if Wrangler does not report it).
+#
+# Zero access (AGENTS.md): the page holds and receives no secret. No step prints a token; the invite
+# fragment never reaches this workflow (no step requests a URL with one).
+name: Deploy invite
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/invite/**"
+      - "packages/core/**"
+      - "packages/crypto/**"
+      - "packages/types/**"
+      - "pnpm-lock.yaml"
+      - "package.json"
+      - ".nvmrc"
+      - ".github/actions/setup-node-pnpm/**"
+      # Every repo-local script a step runs (tools/release/deploy-path-triggers.test.mjs).
+      - ".github/scripts/worker-logging-settings.jq"
+      - "tools/release/wait-for-ci.mjs"
+      - "tools/release/catch-up-deploy.mjs"
+      - ".github/workflows/deploy-invite.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  ci-green:
+    name: ci-green
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      result: ${{ steps.wait.outputs.result }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Wait for this commit's CI and require it green
+        id: wait
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/release/wait-for-ci.mjs \
+            --require ci.yml:ci-gate \
+            --require security.yml:security-gate \
+            --timeout-minutes 45 \
+            --interval-seconds 30 \
+            --missing-grace-minutes 10 \
+            --superseded-ok
+
+  guard:
+    name: guard
+    needs: ci-green
+    # A superseded ci-green exits 0 with result=superseded: nothing after it may run.
+    if: github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' && needs.ci-green.outputs.result == 'green'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check that the invite page has a deploy configuration
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f apps/invite/wrangler.toml ] && [ -f apps/invite/site/_headers ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::apps/invite/wrangler.toml not found; nothing to deploy."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: build
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # no credentials in this job: build code never sees a deploy token
+    outputs:
+      sha256: ${{ steps.site.outputs.sha256 }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Build the invite page
+        run: pnpm exec turbo run build --filter='@4thtech-io/invite...'
+
+      # The same site goes to both environments. The page has exactly four files (08 §4: one
+      # first-party script, no source map, no second chunk); anything else fails the build.
+      - name: Stage the site and hash it
+        id: site
+        shell: bash
+        env:
+          SITE_DIR: ${{ runner.temp }}/invite-site
+          MANIFEST: ${{ runner.temp }}/invite-site.manifest
+        run: |
+          set -euo pipefail
+          rm -rf "$SITE_DIR"
+          cp -R apps/invite/dist/site "$SITE_DIR"
+          found="$(cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | tr '\n' ' ')"
+          if [ "$found" != "./_headers ./i/index.html ./index.html ./invite.js " ]; then
+            echo "::error::The built site is not exactly _headers, i/index.html, index.html and invite.js."
+            exit 1
+          fi
+          # MANIFEST-BEGIN
+          # The SHA-256 of every staged file, and of that list: what is deployed, and what is served.
+          (cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | xargs sha256sum) > "$MANIFEST"
+          sha="$(sha256sum "$MANIFEST" | cut -d' ' -f1)"
+          # MANIFEST-END
+          echo "Site manifest sha256 $sha"
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the site
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: invite-site
+          path: ${{ runner.temp }}/invite-site
+          if-no-files-found: error
+          retention-days: 30
+
+  deploy-staging:
+    name: deploy-staging
+    needs: [guard, build]
+    if: needs.guard.outputs.enabled == 'true' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: staging
+    concurrency:
+      group: deploy-invite-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    outputs:
+      deployed: ${{ steps.deploy.outputs.deployed }}
+      url: ${{ steps.deploy.outputs.url }}
+      version: ${{ steps.deploy.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is deployed until the owner clears it."
+            exit 1
+          fi
+
+      # No pnpm store cache in a job that holds secrets (cache poisoning).
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Download the site
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: invite-site
+          path: ${{ runner.temp }}/invite-site
+
+      - name: Verify the site is the one built
+        shell: bash
+        env:
+          SITE_DIR: ${{ runner.temp }}/invite-site
+          MANIFEST: ${{ runner.temp }}/invite-site.manifest
+          EXPECTED: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          # MANIFEST-BEGIN
+          # The SHA-256 of every staged file, and of that list: what is deployed, and what is served.
+          (cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | xargs sha256sum) > "$MANIFEST"
+          sha="$(sha256sum "$MANIFEST" | cut -d' ' -f1)"
+          # MANIFEST-END
+          if [ "$sha" != "$EXPECTED" ]; then
+            echo "::error::The downloaded site is not the one the build job staged."
+            exit 1
+          fi
+
+      - name: Check credentials
+        id: ready
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          DEPLOY_ENV: staging
+          WORKER: agentlink-invite-staging
+        run: |
+          set -euo pipefail
+          # CREDENTIAL-CHECK-BEGIN
+          # Absent credentials skip cleanly; a token that does not work fails. The Worker may not exist
+          # yet: the first deploy creates it.
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, M1-19-b). Not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! [[ "$CLOUDFLARE_ACCOUNT_ID" =~ ^[0-9a-f]{32}$ ]]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is not a 32-character hex account ID."
+            exit 1
+          fi
+          code="$(curl -sS --proto '=https' --max-time 30 -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$WORKER/script-settings" || true)"
+          case "$code" in
+            200 | 404) ;;
+            *)
+              echo "::error::Reading the settings of $WORKER failed with HTTP ${code:-none}: the token is invalid, expired or lacks Workers Scripts access."
+              exit 1
+              ;;
+          esac
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          # CREDENTIAL-CHECK-END
+
+      - name: Deploy to staging (workers.dev)
+        id: deploy
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        working-directory: apps/invite
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          INVITE_STAGING_URL: ${{ vars.INVITE_STAGING_URL }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/wrangler-staging.ndjson"
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+          WRANGLER_OUTPUT_FILE_PATH="$report" pnpm exec wrangler deploy --assets "$RUNNER_TEMP/invite-site" --env staging --config wrangler.toml
+          url="$(jq -r 'select(.type == "deploy") | .targets[]?' "$report" | grep -E '^https://[a-z0-9.-]+\.workers\.dev$' | head -n 1 || true)"
+          if [ -z "$url" ]; then url="${INVITE_STAGING_URL:-}"; fi
+          if ! [[ "$url" =~ ^https://[a-z0-9.-]+$ ]]; then
+            echo "::error::No staging origin: Wrangler reported no workers.dev URL and the variable INVITE_STAGING_URL is not set."
+            exit 1
+          fi
+          version="$(jq -r 'select(.type == "deploy") | .version_id // empty' "$report" | head -n 1)"
+          if ! [[ "$version" =~ ^[0-9a-f-]{36}$ ]]; then version=""; fi
+          echo "Staging origin $url, version ${version:-unknown}"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch the live Worker settings
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          curl -sS --proto '=https' --max-time 30 -H "$auth" \
+            -o "$RUNNER_TEMP/settings.json" "$api/workers/scripts/agentlink-invite-staging/script-settings"
+
+      - name: Read back the logging settings (all off, 04 §4)
+        if: steps.ready.outputs.ready == 'true'
+        shell: bash
+        env:
+          SETTINGS_JSON: ${{ runner.temp }}/settings.json
+        run: |
+          set -euo pipefail
+          # READBACK-SETTINGS-BEGIN
+          # Fails closed (IR-OPS-PRIV-1-1). The conditions live in one jq program shared by every copy
+          # of this block in the deploy workflows (see its header): it prints exactly
+          # `logging-settings: ok`, or one line per failed condition with only our own field paths, JSON
+          # types and boolean, number or null values (never the body, strings, URLs, tokens or IDs).
+          # Anything but that one ok line, including a jq error or a body that is not one JSON document,
+          # fails the deploy.
+          program="$GITHUB_WORKSPACE/.github/scripts/worker-logging-settings.jq"
+          if ! report="$(jq -r -f "$program" "$SETTINGS_JSON" 2> /dev/null)"; then
+            report="failed response: not one readable JSON document, or the check could not run"
+          fi
+          if [ "$report" != "logging-settings: ok" ]; then
+            echo "::error::The live Worker settings are not all off: Logpush, observability, invocation logs, traces, log or trace export and Tail Workers (also streaming) must stay off for the invite page (04 §4). Failed conditions follow."
+            printf '%s\n' "$report"
+            exit 1
+          fi
+          echo "Logging settings read back: Logpush, observability, invocation logs, traces, export destinations and Tail Workers are off."
+          # READBACK-SETTINGS-END
+
+  smoke-staging:
+    name: smoke-staging
+    needs: [build, deploy-staging]
+    if: needs.deploy-staging.outputs.deployed == 'true' && needs.deploy-staging.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read # no credentials: the page is public
+    steps:
+      - name: Download the site
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: invite-site
+          path: ${{ runner.temp }}/invite-site
+
+      # What staging serves is the build: every page and the script equal the built files, and the
+      # headers of 08 §4 are on them. Static files; the check runs without credentials.
+      - name: Served files and headers equal the build
+        shell: bash
+        env:
+          ORIGIN: ${{ needs.deploy-staging.outputs.url }}
+          SITE_DIR: ${{ runner.temp }}/invite-site
+          MANIFEST: ${{ runner.temp }}/invite-site.manifest
+          EXPECTED: ${{ needs.build.outputs.sha256 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ORIGIN:-}" ]; then
+            echo "::error::No staging origin from deploy-staging."
+            exit 1
+          fi
+          # MANIFEST-BEGIN
+          # The SHA-256 of every staged file, and of that list: what is deployed, and what is served.
+          (cd "$SITE_DIR" && find . -type f | LC_ALL=C sort | xargs sha256sum) > "$MANIFEST"
+          sha="$(sha256sum "$MANIFEST" | cut -d' ' -f1)"
+          # MANIFEST-END
+          if [ "$sha" != "$EXPECTED" ]; then
+            echo "::error::The downloaded site is not the one the build job staged."
+            exit 1
+          fi
+          # SITE-CHECK-BEGIN
+          # One pass over the served page. Returns 0 when healthy, 2 when there was no HTTP answer at
+          # all (DNS, connection, timeout or TLS handshake: curl exit 6, 7, 28 or 35) and 1 for anything
+          # else. It prints paths, header names and status codes, never a header value or a body.
+          header_of() { # <file> <lower-case header name>: the first value, or nothing
+            tr -d '\r' < "$1" | awk -v k="$2" '{ i = index($0, ":"); if (i > 0) { n = substr($0, 1, i - 1); gsub(/^[ \t]+|[ \t]+$/, "", n); if (tolower(n) == k) { v = substr($0, i + 1); gsub(/^[ \t]+|[ \t]+$/, "", v); print v; exit } } }'
+          }
+          fetch() { # <path>: sets status and curl_exit; the body and headers land in $RUNNER_TEMP
+            curl_exit=0
+            status="$(curl -sS --proto "${SITE_PROTO:-=https}" --max-time 20 -D "$RUNNER_TEMP/site-headers.txt" -o "$RUNNER_TEMP/site-body.bin" -w '%{http_code}' "$ORIGIN$1")" || curl_exit=$?
+          }
+          site_check() {
+            local entry path asset name wanted_value seen want got
+            for entry in "/|index.html" "/i|i/index.html" "/invite.js|invite.js"; do
+              path="${entry%%|*}"
+              asset="${entry##*|}"
+              fetch "$path"
+              if [ "$curl_exit" -ne 0 ] && ! [[ "$status" =~ ^[1-5][0-9][0-9]$ ]]; then
+                if [[ " 6 7 28 35 " == *" $curl_exit "* ]]; then return 2; fi
+                echo "$path: curl exit $curl_exit"
+                return 1
+              fi
+              if [ "$status" != "200" ]; then
+                echo "$path: HTTP $status, expected 200 (a redirect counts as a failure)"
+                return 1
+              fi
+              for name in content-security-policy referrer-policy x-content-type-options x-frame-options cache-control; do
+                wanted_value="$(header_of "$SITE_DIR/_headers" "$name")"
+                seen="$(header_of "$RUNNER_TEMP/site-headers.txt" "$name")"
+                if [ -z "$wanted_value" ]; then
+                  echo "::error::The _headers file has no $name."
+                  return 1
+                fi
+                if [ "$seen" != "$wanted_value" ]; then
+                  echo "$path: header $name is missing or differs from the _headers file"
+                  return 1
+                fi
+              done
+              want="$(awk -v f="./$asset" '$2 == f { print $1 }' "$MANIFEST")"
+              got="$(sha256sum "$RUNNER_TEMP/site-body.bin" | cut -d' ' -f1)"
+              if [ -z "$want" ] || [ "$got" != "$want" ]; then
+                echo "$path: the served bytes are not the built $asset"
+                return 1
+              fi
+            done
+            fetch "/not-a-page-ce0d1c"
+            if [ "$status" != "404" ]; then
+              echo "An unknown path answered HTTP ${status:-none}, expected 404."
+              return 1
+            fi
+            echo "Healthy: three pages and scripts equal the build, headers match, unknown path 404."
+            return 0
+          }
+          # SITE-CHECK-END
+          for attempt in 1 2 3 4 5 6; do
+            rc=0
+            site_check || rc=$?
+            if [ "$rc" -eq 0 ]; then exit 0; fi
+            echo "Attempt $attempt failed; retrying in 10 s (a new version can take a moment to spread)."
+            sleep 10
+          done
+          echo "::error::Staging does not serve the build with the headers of 08 §4."
+          exit 1
+
+  # A run that did not deploy because its CI was superseded or failed makes sure main's head still
+  # gets a run of this workflow (tools/release/catch-up-deploy.mjs). It only dispatches; the dispatched run deploys
+  # nothing unless the head's own CI is green and every gate passes.
+  catch-up:
+    name: catch-up
+    needs: ci-green
+    if: >-
+      always() && github.repository == '4thtech/agentlink' && github.ref == 'refs/heads/main' &&
+      (needs.ci-green.outputs.result == 'superseded' || needs.ci-green.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # dispatch this workflow on main; the only job that may
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Make sure the head of main gets a deploy run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node tools/release/catch-up-deploy.mjs --workflow deploy-invite.yml

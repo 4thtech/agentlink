@@ -19,7 +19,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { afterAll, describe, expect, it } from 'vitest';
 import { SERVER_INSTRUCTIONS } from '../src/mcp/instructions.js';
 import { toMcpTool } from '../src/mcp/server.js';
-import { TOOLS } from '../src/tools/registry.js';
+import { TOOLS } from '@4thtech-io/mcp-tools/registry.js';
 
 const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 const hooks = new URL('./fixtures/source-resolve-hooks.mjs', import.meta.url).href;

@@ -9,8 +9,8 @@ import {
   WRAPPED_CEK_LENGTH,
   decodeBase64url,
   encodeBase64url,
-  parseEnvelope,
   parseJson,
+  parseEnvelopeText,
   wipe,
   type AgentCard,
   type Envelope,
@@ -48,7 +48,7 @@ export async function openStoredPairingMessage(
   if (typeof envelopeJson !== 'string') throw unavailable();
   let envelope: Envelope;
   try {
-    envelope = parseEnvelope(parseJson(envelopeJson));
+    envelope = parseEnvelopeText(envelopeJson);
   } catch {
     throw unavailable();
   }

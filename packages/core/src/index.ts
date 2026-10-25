@@ -349,6 +349,8 @@ export {
 // Proofs and receipts (M1-7g; 07 §2, §6.2, §8; 06 §2.4). No salt API: salts are drawn by the chain
 // package's Record builder only (04 §5, D-61).
 export type {
+  DepositAuthAnswer,
+  DepositAuthPort,
   FreeCreditsAnswer,
   FreeCreditsPort,
   ProofChain,
@@ -364,7 +366,15 @@ export type {
 } from './proofs/reads.js';
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
 export { PROOF_PRICE_USD_MICROS } from './proofs/price.js';
-export { ActivityService, type ActivityEntry, type ApprovalDecision } from './activity.js';
+export {
+  ActivityService,
+  type ActivityContact,
+  type ActivityCost,
+  type ActivityEntry,
+  type ActivityFile,
+  type ApprovalDecision,
+  type ActivityMessageStatus,
+} from './activity.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
 // M1-11r-c: the Storage page's drop meter (07 §5.4 Limits). Numbers only.
 export {

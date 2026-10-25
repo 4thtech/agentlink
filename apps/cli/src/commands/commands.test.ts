@@ -609,7 +609,7 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_OK);
     const text = result.out.join('\n');
     expect(text).toContain('OK       Agent keys found');
-    expect(text).toContain('OK       1 own relay');
+    expect(text).toContain('OK       Message network: 1 server for this agent');
     expect(text).toContain('OK       Message network reachable');
     expect(text).toContain('OK       This agent can send and sign');
     expect(text).toContain('Not checked in this version');
@@ -628,18 +628,18 @@ describe('doctor (07 §9.4)', () => {
     expect(result.code).toBe(EXIT_FAILED);
     const text = result.out.join('\n');
     expect(text).toContain("Problem  Can't reach the message network");
-    expect(text).toContain('Problem  No own relays');
+    expect(text).toContain('Problem  This agent has no message network servers');
     expect(text).toContain("Problem  This agent can't send or sign right now");
     expect(text).not.toContain('secret detail');
   });
 
-  it('warns when some relays did not answer', async () => {
+  it('warns when part of the message network did not answer', async () => {
     const f = fakeAgent({
       catchUp: () => Promise.resolve({ partial: true, inbox: [], requests: 0 }),
     });
     const result = await harness(f).run(['doctor']);
     expect(result.code).toBe(EXIT_OK);
-    expect(result.out.join('\n')).toContain('Warning  Some relays did not answer');
+    expect(result.out.join('\n')).toContain('Warning  Part of the message network did not answer');
   });
 
   it('explains needs_setup: no agent, and no keychain with its fix', async () => {

@@ -56,6 +56,8 @@ const ENTRIES: ActivityEntry[] = [
     direction: 'sent',
     status: 'announced',
     chainId: 10200,
+    contact: null,
+    cost: { kind: 'free' },
   },
   {
     kind: 'sender_blocked',
@@ -68,6 +70,7 @@ const ENTRIES: ActivityEntry[] = [
     id: `contact_blocked:${CONTACT_ID}`,
     at: 1_760_000_200,
     contactId: CONTACT_ID,
+    contact: { id: CONTACT_ID, display: null },
   },
   { kind: 'rules_changed', id: 'rules_changed:7', at: 1_760_000_100, version: 7 },
 ];
@@ -142,6 +145,8 @@ describe('GET /api/ui/activity (M1-11c-a1)', () => {
       direction,
       status,
       chainId: 1,
+      contact: null,
+      cost: { kind: 'free' },
     };
     const result = await call(contextWith(() => Promise.resolve({ items: [entry] })));
     expect(result.body).toEqual({ items: [{ kind: 'proof', at: 1, direction, state }] });

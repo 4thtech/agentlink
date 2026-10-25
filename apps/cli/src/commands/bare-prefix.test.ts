@@ -2,23 +2,35 @@
 // is not on the user's PATH, so no "run this" text in these files may start with it. Commands are
 // built from the runtime's `cliPrefix()` (M1-36a) or the fixed npx form; comments may still name the
 // commands by their short name.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { CREDITS_TEXT } from './credits.js';
+import { DOCTOR_PROOF_TEXT, DOCTOR_TEXT } from './doctor.js';
 import { HOOK_TEXT, INIT_TEXT } from './init.js';
+import { CONTACTS_MANAGE_TEXT } from './owner/contacts-manage.js';
+import { POLICY_TEXT } from './owner/policy.js';
 import { OWNER_TEXT } from './owner/strings.js';
+import { TEXT } from './shared.js';
 import { NO_AGENT_MESSAGE } from '../runtime/open-agent.js';
-import { en } from '../tools/strings/en.js';
+import { en } from '@4thtech-io/mcp-tools/strings/en.js';
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
+/** The tool handlers moved to their own package (M2-3t); their texts are still checked here. */
+const TOOLS_SRC = join(SRC, '..', '..', '..', 'packages', 'mcp-tools', 'src');
 
-/** The files of this card (M1-36a-b). */
+/** The files of this card (M1-36a-b) and of M1-36e (the rest #506's review found). */
 const FILES = [
   'commands/init.ts',
   'commands/owner/strings.ts',
-  'tools/strings/en.ts',
+  '../../../packages/mcp-tools/src/strings/en.ts',
   'runtime/open-agent.ts',
+  'commands/doctor.ts',
+  'commands/owner/policy.ts',
+  'commands/shared.ts',
+  'commands/credits.ts',
+  'commands/owner/contacts-manage.ts',
 ];
 
 /** A command line that starts with the bare name: in backticks, after "run", or in <code>. */
@@ -37,7 +49,27 @@ const valuesOf = (o: object): string[] =>
     typeof v === 'string' ? [v] : typeof v === 'function' ? [String(v(['work']))] : [],
   );
 
+/** M1-36e: every non-test source file of the CLI, so a new text cannot bring the bare name back. */
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return sourceFiles(path);
+    return path.endsWith('.ts') && !path.endsWith('.test.ts') ? [relative(SRC, path)] : [];
+  });
+}
+
 describe('no bare `agentlink` command prefix (M1-36a-b)', () => {
+  it('no source file has one in its text (M1-36e)', () => {
+    const files = [...sourceFiles(SRC), ...sourceFiles(TOOLS_SRC)];
+    expect(files.length).toBeGreaterThan(100);
+    const bad = files.flatMap((rel) =>
+      codeLines(rel)
+        .filter(({ text }) => BARE.test(text))
+        .map(({ line, text }) => `${rel}:${String(line)}: ${text.trim()}`),
+    );
+    expect(bad).toEqual([]);
+  });
+
   it.each(FILES)('%s has none in its text', (rel) => {
     const bad = codeLines(rel)
       .filter(({ text }) => BARE.test(text))
@@ -50,6 +82,12 @@ describe('no bare `agentlink` command prefix (M1-36a-b)', () => {
       ...valuesOf(INIT_TEXT),
       ...valuesOf(HOOK_TEXT),
       ...valuesOf(OWNER_TEXT),
+      ...valuesOf(DOCTOR_TEXT),
+      ...valuesOf(DOCTOR_PROOF_TEXT),
+      ...valuesOf(POLICY_TEXT),
+      ...valuesOf(TEXT),
+      ...valuesOf(CREDITS_TEXT),
+      ...valuesOf(CONTACTS_MANAGE_TEXT),
       ...Object.values(en),
       NO_AGENT_MESSAGE,
     ];

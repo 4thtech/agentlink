@@ -107,16 +107,16 @@ const CONSOLE_SYNTAX = [
 // include ...CONSOLE_SYNTAX in its own list. tools/console-ban.test.mjs checks every zone.
 
 // --- The runtime-agnostic tool module (06 §1, D-73 (1); M1-9c) ----------------------------------
-// apps/cli/src/tools/ moves unchanged into a shared package for the cloud agent (M2-3b), so it may
-// import no Node built-in, nothing from @4thtech-io/node or the MCP SDK, and nothing outside
-// src/tools/ by a relative path; no dynamic import(), require or Node global. These are guards for
-// portability and hygiene, not a security boundary (06 §1). The block keeps the apps/cli zone's own
+// packages/mcp-tools/src/ (moved unchanged from apps/cli/src/tools/, M2-3t, G-15) is shared with the
+// cloud agent, so it may import no Node built-in, nothing from @4thtech-io/node or the MCP SDK, and
+// nothing outside src/ by a relative path; no dynamic import(), require or Node global. These are guards for
+// portability and hygiene, not a security boundary (06 §1). The block keeps the package zone's own
 // list (ESLint applies only the last matching no-restricted-imports block) and CONSOLE_SYNTAX.
 const TOOLS_MSG =
-  'apps/cli/src/tools/ is runtime-agnostic (06 §1, D-73): no Node built-ins, @4thtech-io/node, MCP SDK or imports from outside src/tools/.';
+  'packages/mcp-tools is runtime-agnostic (06 §1, D-73): no Node built-ins, @4thtech-io/node, MCP SDK or imports from outside src/.';
 
 function toolModuleRestrictions(escapes) {
-  const zone = restrictionsFor('apps/cli');
+  const zone = restrictionsFor('packages/mcp-tools');
   const [, { paths, patterns }] = zone['no-restricted-imports'];
   return {
     ...zone,
@@ -245,14 +245,14 @@ export default tseslint.config(
     ],
     rules: { 'no-restricted-properties': 'off' },
   },
-  // The tool module's fence (above): files directly in src/tools/ may not go up a level, files in
+  // The tool module's fence (above): files directly in src/ may not go up a level, files in
   // its subfolders not two levels.
   {
-    files: [`apps/cli/src/tools/*.${SOURCE}`],
+    files: [`packages/mcp-tools/src/*.${SOURCE}`],
     rules: toolModuleRestrictions(['../*', '../**']),
   },
   {
-    files: [`apps/cli/src/tools/*/**/*.${SOURCE}`],
+    files: [`packages/mcp-tools/src/*/**/*.${SOURCE}`],
     rules: toolModuleRestrictions(['../../*', '../../**']),
   },
   {

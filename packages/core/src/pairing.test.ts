@@ -44,6 +44,18 @@ import {
 import { agentSigner, craft, giftWrapId, type TestAgent } from './testing/envelopes.js';
 import { compress } from './testing/platform.js';
 
+// M1-9zf-b: a switch that makes agentCardJcsHash return one fixed value, so the card-hash clause of
+// the invite binding cannot refuse. Off (a plain pass-through) everywhere except inside the one test.
+const hashPin = vi.hoisted(() => ({ on: false }));
+vi.mock('@4thtech-io/crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@4thtech-io/crypto')>();
+  return {
+    ...actual,
+    agentCardJcsHash: (card: unknown) =>
+      hashPin.on ? new Uint8Array(32).fill(7) : actual.agentCardJcsHash(card),
+  };
+});
+
 const clock = new FakeClock();
 const ownerA = new MemoryOwnerKeyStore(seed(201), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(202), passphrase());
@@ -677,13 +689,18 @@ describe('the invite binds the owner fingerprint and the card hash (M1-9zf; 04 Â
    * stand-in for any path that stages a card with the invite's contact id (agentEvm and agentNostr
    * kept) that is not the card the invite carried. Expects the fixed invite refusal and no writes.
    */
-  async function expectRefused(swap: (card: AgentCard) => AgentCard): Promise<void> {
+  async function expectRefused(
+    swap: (card: AgentCard) => AgentCard,
+    opts: { pinHash?: boolean } = {},
+  ): Promise<void> {
     const invite = await a.client.pairing.createInvite();
     const contacts = b.client.contacts;
     const original = contacts.prepareStage.bind(contacts);
     const spy = vi.spyOn(contacts, 'prepareStage').mockImplementation(async (input) => {
       const prepared = await original(input);
       const card = swap(prepared.staged.card);
+      // Only the comparison after this point sees the pinned hash; the real cards are untouched.
+      hashPin.on = opts.pinHash === true;
       return { ...prepared, staged: { ...prepared.staged, card } };
     });
     try {
@@ -703,6 +720,7 @@ describe('the invite binds the owner fingerprint and the card hash (M1-9zf; 04 Â
       expect(await snapshot(b)).toEqual(before);
       expect(b.lines.join('\n')).not.toContain('pairing started');
     } finally {
+      hashPin.on = false;
       spy.mockRestore();
     }
   }
@@ -716,6 +734,27 @@ describe('the invite binds the owner fingerprint and the card hash (M1-9zf; 04 Â
       ownerNostr: fromC.card.ownerNostr,
       ownerEnc: fromC.card.ownerEnc,
     }));
+  });
+
+  it('refuses, writing nothing, when only the owner fingerprint differs (card hash and contact id match)', async () => {
+    const c = await agent(3, ownerC, 'carol');
+    const fromC = await decodeInviteLink((await c.client.pairing.createInvite()).inviteUrl);
+    expect(ownerFingerprintHex(fromC.card)).not.toBe(
+      ownerFingerprintHex(
+        (await decodeInviteLink((await a.client.pairing.createInvite()).inviteUrl)).card,
+      ),
+    );
+    // The hash is pinned, so the card-hash clause passes; agentEvm and agentNostr are kept, so the
+    // id and key clauses pass. Only the owner-fingerprint clause is left to refuse.
+    await expectRefused(
+      (card) => ({
+        ...card,
+        ownerEvm: fromC.card.ownerEvm,
+        ownerNostr: fromC.card.ownerNostr,
+        ownerEnc: fromC.card.ownerEnc,
+      }),
+      { pinHash: true },
+    );
   });
 
   it('refuses, writing nothing, when the staged card has the contact id and owner but another hash', async () => {

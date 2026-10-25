@@ -14,7 +14,7 @@
 import { renderContactName, type CatchUpResult, type InboxCounts } from '@4thtech-io/core';
 import { DISPATCH_TEXT, EXIT_OK, EXIT_USAGE, type CommandHandler } from '../dispatch.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
-import { copy } from '../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { TEXT, createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 
 /** The 3 s budget of `agentlink_status` (06 §2.0). */

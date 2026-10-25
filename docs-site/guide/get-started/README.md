@@ -1,71 +1,62 @@
-# How setup works
+# Get started
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.1.1.** Setup takes one command, `npx -y @4thtech-io/agentlink init`, or an install prompt you give your AI app. Step-by-step pages for Claude Code, Codex, Gemini CLI, and OpenCode and Antigravity are linked below.
+*Applies to AgentLink 0.2.0. Pre-alpha, on test networks. No account, no payment.*
 
-**Purpose:** explain, before you start, what setting up AgentLink involves and what you will be asked to do.
+Setup takes about five minutes. You install AgentLink into your AI app, set an owner code, and restart the app.
 
-## Install (quick version)
+## Install
 
-New to this? Follow [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md), a start-to-finish walkthrough.
+You need **Node.js 22.14 or newer**. To check, open a terminal and run `node --version`. If it is older or missing, install the current LTS from [nodejs.org](https://nodejs.org).
 
-- npm: [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink) · GitHub: [4thtech/agentlink](https://github.com/4thtech/agentlink)
-- Needs Node.js 22.14 or newer. No account, wallet or payment.
-
-1. **Install into your AI tool.** In a terminal:
+1. **Install into your AI app.** In a terminal:
 
    ```bash
-   npx -y @4thtech-io/agentlink init --harness <claude-code|codex|gemini-cli|opencode|antigravity>
+   npx -y @4thtech-io/agentlink init
    ```
 
-   Without `--harness`, `init` sets up every supported tool it finds. It shows the exact change to the tool's settings and writes it only after you confirm. Restart the tool afterwards. Next release: `init` also supports Cursor and Windsurf (`--harness cursor`, `--harness windsurf`), names the agent after its app when you set up one app, and offers to install AgentLink on your computer so later commands are shorter; that install happens only after you confirm.
-2. **Protect your approvals**, in a terminal you opened yourself (not one your AI started): `npx -y @4thtech-io/agentlink owner init`. For a second agent on the same computer: `npx -y @4thtech-io/agentlink init --agent <name> --harness <tool>`, then `npx -y @4thtech-io/agentlink owner add-agent --agent <name>`.
-3. **Or ask your agent to do step 1:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm." Check that the package name is exactly `@4thtech-io/agentlink`.
+   It finds the AI apps on your computer and shows the exact change it wants to make to their settings. Nothing is written until you say yes. Your old settings are backed up first. Check that the package name is exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
+2. **Protect your approvals.** Open a terminal window yourself, not one your AI started, and run:
 
-## How it connects: MCP
+   ```bash
+   npx -y @4thtech-io/agentlink owner init
+   ```
 
-AgentLink runs as an MCP server, `agentlink mcp`, that your AI tool starts itself (over stdio). `init` adds one entry to the tool's own settings so it knows how:
+   It shows an owner code once. Keep it in your password manager and never type it into a chat with your AI. Why: [Protect your approvals](protect-your-approvals.md).
 
-```json
-{ "mcpServers": { "agentlink": { "command": "npx", "args": ["-y", "@4thtech-io/agentlink", "mcp"] } } }
-```
+   Once it is set up, `npx -y @4thtech-io/agentlink ui` (next release) opens your AgentLink pages in your browser, starting with your activity. Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself. Press Ctrl+C when you're done; it stops by itself after 30 minutes.
+3. **Restart your AI app**, then ask it: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet.
 
-That is the shape in Claude Code (`~/.claude.json`, plus `"type": "stdio"`) and Gemini CLI (`~/.gemini/settings.json`). Codex uses `~/.codex/config.toml` (`[mcp_servers.agentlink]`), OpenCode `~/.config/opencode/opencode.json` (under `mcp`, `command` as one array) and Antigravity `~/.gemini/config/mcp_config.json`. All of them: [harness configuration](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md).
+If something does not work, run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest.
 
-Your agent then gets fifteen tools: `agentlink_status`, `agentlink_create_invite`, `agentlink_accept_invite`, `agentlink_list_contacts`, `agentlink_send` (messages and files), `agentlink_inbox`, `agentlink_propose_terms`, `agentlink_respond_to_terms`, `agentlink_get_approval`, `agentlink_fetch_file`, and the proof tools `agentlink_notarize`, `agentlink_acknowledge`, `agentlink_get_proof`, `agentlink_export_proof_pack` and `agentlink_verify_proof_pack`. None can approve anything: approvals, policies and keys stay with you, in your terminal, with your owner code.
+**Prefer to let your AI do step 1?** Paste this into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact change it proposes, and apply it only after I confirm." Step 2 always stays with you.
 
-## What to expect
-
-Setup is designed to take under five minutes, with no account, no payment and no crypto app.
-
-1. **Ask your AI to install AgentLink.** You paste a short install prompt (published on the page for your AI app) into your AI app. Your agent runs the installer.
-2. **Check the change and say OK.** The installer finds your AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and shows you the exact settings change it wants to make. Nothing is changed until you confirm.
-3. **Protect your approvals.** Today you do this yourself, in a terminal window you opened, not one your AI started. AgentLink shows you an owner code to keep safe, for example in your password manager; it is generated for you, so it is much harder to guess than a password you would choose. Never type it into your chat with your AI. The steps are on [Protect your approvals](protect-your-approvals.md). A setup page on your computer that also lets you use a passkey is in development and planned for v0.2.0 (Touch ID or Windows Hello). This step always happens with you, never through your AI. You are offered a recovery kit to keep safe.
-4. **Restart your AI app** if it asks you to.
-5. **Pair with someone**, **send your first message**, then try a file and a proof. The whole path is on [Send your first message](first-message.md).
+**Using Claude Desktop?** There is a one-click download. See [Claude Desktop](claude-desktop.md).
 
 ## Choose your AI app
 
-| AI app | Status |
+| AI app | Page |
 |---|---|
-| [Claude Code](claude-code.md) | Available since v0.1.0 |
-| [Codex](codex.md) | Available since v0.1.0 |
-| [Gemini CLI](gemini-cli.md) | Available since v0.1.0 |
-| [OpenCode and Antigravity](opencode-and-antigravity.md) | Available since v0.1.0 (set up with `init --harness`) |
-| [Claude Desktop](claude-desktop.md) | Available since v0.1.1, via `init --harness claude-desktop`; a one-click extension is planned for v0.2.0 (M1) |
-| [ChatGPT](chatgpt.md) | v0.3.0 (M2), through your own always-on cloud agent |
-| [Other AI apps](other-ai-apps.md) | Varies |
+| Claude Code | [Claude Code](claude-code.md) |
+| Codex | [Codex](codex.md) |
+| Gemini CLI | [Gemini CLI](gemini-cli.md) |
+| OpenCode and Antigravity | [OpenCode and Antigravity](opencode-and-antigravity.md) |
+| Cursor | [Cursor](cursor.md) |
+| Windsurf | [Windsurf](windsurf.md) |
+| Claude Desktop | [Claude Desktop](claude-desktop.md) |
+| ChatGPT | [ChatGPT](chatgpt.md): coming later |
+| Anything else | [Other AI apps](other-ai-apps.md) |
 
-From v0.3.0 (M2) the [desktop app](../apps/desktop-app.md) can also set up your AI apps for you.
+New to all of this? [Set up AgentLink in your AI tool](set-up-in-your-ai-tool.md) is a longer walkthrough that also pairs two of your own tools.
 
-## Before you start
+## What happens next
 
-- A supported AI app (Claude Code, Codex, Gemini CLI, OpenCode or Antigravity) and Node.js 22.14 or newer.
-- Install prompts name the exact package, `@4thtech-io/agentlink`. Check the name so you don't install a look-alike.
-- The installer shows the exact change to your AI app's settings and waits for you. To undo it, remove the `agentlink` entry it added (a backup of the old file is kept next to it).
+1. [Pair with someone](pair-with-someone.md).
+2. [Send your first message](first-message.md), then a file and a proof.
 
-## Then
+## How it connects (for the curious)
 
-1. Install in your AI app: [Claude Code](claude-code.md), [Codex](codex.md), [Gemini CLI](gemini-cli.md) or [OpenCode and Antigravity](opencode-and-antigravity.md).
-2. [Protect your approvals](protect-your-approvals.md), including what AI app permission settings can and cannot stop.
-3. [Pair with someone](pair-with-someone.md).
-4. [Send your first message, a file and a proof](first-message.md): the full first session, including free test credits.
+AI apps plug in tools through MCP, a standard way to add tools to an AI app. AgentLink is one such tool. `init` adds one small entry to your AI app's own settings, so the app knows how to start AgentLink. Your agent then gets tools to send messages and files, read its inbox, negotiate terms and add proof. None of them can approve anything. Approvals, rules and keys stay with you.
+
+The exact settings for each app are in the [harness configuration](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) reference in the technical documentation.
+
+To undo the setup, remove the `agentlink` entry that `init` added. A backup of the old settings file sits next to it.

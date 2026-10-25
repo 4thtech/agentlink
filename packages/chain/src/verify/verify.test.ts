@@ -702,6 +702,41 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
     }
   });
 
+  // 04 §2.5.1 "Received text" (D-128, M1-1h-b): the pack embeds an envelope, an owner approval and
+  // a card, so its text is parsed with the received-text rule before anything is verified.
+  it('refuses a pack whose text spells a member name with an escape, at the top or nested', async () => {
+    const f = await eoaFixture();
+    const text = JSON.stringify(f.pack);
+    for (const [from, to] of [
+      ['"type":', '"\\u0074ype":'],
+      ['"from":', '"\\u0066rom":'],
+    ] as const) {
+      const candidate = text.replace(from, to);
+      expect(candidate).not.toBe(text);
+      // A plain parser reads exactly the valid pack.
+      expect(JSON.parse(candidate)).toEqual(JSON.parse(text));
+      const { reader } = chainWith(f);
+      expectFailure(await verify(candidate, [reader]), 'malformed_pack');
+    }
+  });
+
+  it('refuses a pack whose text repeats a member name, at the top or nested', async () => {
+    const f = await eoaFixture();
+    const text = JSON.stringify(f.pack);
+    const fromMember = /"from":"[0-9a-f]{64}"/.exec(text)?.[0];
+    expect(fromMember).toBeDefined();
+    for (const [from, to] of [
+      ['"version":1', '"version":1,"version":1'],
+      [fromMember!, `${fromMember!},${fromMember!}`],
+    ] as const) {
+      const candidate = text.replace(from, to);
+      expect(candidate).not.toBe(text);
+      expect(JSON.parse(candidate)).toEqual(JSON.parse(text));
+      const { reader } = chainWith(f);
+      expectFailure(await verify(candidate, [reader]), 'malformed_pack');
+    }
+  });
+
   it('verifies a pack without a disclosed key: the record stands, no content is claimed', async () => {
     const f = await eoaFixture();
     delete f.pack.envelope;

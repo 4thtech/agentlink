@@ -35,6 +35,13 @@ export interface ParseJsonOptions {
    * at most 2^53 - 1 (04 §2.4.1). Default false (RFC 8259 numbers, as JCS needs).
    */
   readonly integersOnly?: boolean;
+  /**
+   * Refuse every object member name written with an escape sequence, at any depth (04 §2.5.1
+   * "Received text", D-128): a `\u` escape such as the one for `a` in `agent`, a short escape such
+   * as `\/`, any backslash. Escapes in string values are unaffected. Default false: RFC 8785 and
+   * generic JSON allow escaped names.
+   */
+  readonly plainMemberNames?: boolean;
 }
 
 const invalidJson = (message: string): CryptoInputError =>
@@ -61,6 +68,7 @@ class Parser {
   constructor(
     private readonly text: string,
     private readonly integersOnly: boolean,
+    private readonly plainMemberNames: boolean,
   ) {}
 
   parseDocument(): JsonValue {
@@ -117,8 +125,13 @@ class Parser {
       if (this.text.charCodeAt(this.index) !== 0x22) {
         throw invalidJson('JSON object keys must be strings');
       }
+      const start = this.index;
       // Compared after unescaping, so "a" and "a" are the same name (RFC 7493 §2.3).
       const key = this.parseString();
+      // On the raw token, not the value (04 §2.5.1, D-128): a name spelled with any escape.
+      if (this.plainMemberNames && this.text.slice(start, this.index).includes('\\')) {
+        throw invalidJson('JSON object member name is written with an escape sequence');
+      }
       if (seen.has(key)) throw invalidJson('JSON object has a duplicate property name');
       seen.add(key);
       this.skipWhitespace();
@@ -247,7 +260,24 @@ export function parseJson(text: string, options?: ParseJsonOptions): JsonValue {
   if (typeof text !== 'string') {
     throw new CryptoInputError('invalid_argument', 'parseJson: text must be a string');
   }
-  return new Parser(text, options?.integersOnly === true).parseDocument();
+  return new Parser(
+    text,
+    options?.integersOnly === true,
+    options?.plainMemberNames === true,
+  ).parseDocument();
+}
+
+/**
+ * The 04 §2.5.1 "Received text" parse (D-128, M1-1h-b) for every owner-signed object and the text
+ * that carries one: a SignedOwnerAction of any op, the envelope (04 §3.1.1 step 3) and the card
+ * JSON form (04 §2.4). It is parseJson with `integersOnly` and `plainMemberNames`: before any schema
+ * or signature check, it refuses a duplicate member name at any depth (RFC 7493 §2.3), a member
+ * name written with any escape, and every number token that is not a protocol integer. Callers
+ * verify the value it returns for the exact text received, never an object another layer parsed,
+ * and never normalise or re-serialise a refused text to make it verify.
+ */
+export function parseReceivedJson(text: string): JsonValue {
+  return parseJson(text, { integersOnly: true, plainMemberNames: true });
 }
 
 // --- canonicalize --------------------------------------------------------------------------------

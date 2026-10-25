@@ -2,7 +2,7 @@
 // 05 §2.5; 04 §4; I-4, I-7). The core builds and signs the agent's deposit authorization only
 // after a verified owner action (M3-4b-t-T4-a); this port carries it to the 4thTech submitter and
 // maps the answer to a fixed outcome. It is a runtime port, never an MCP tool: nothing in
-// src/tools/ or src/mcp/ reaches it (I-4), and the core does not export the function that calls it.
+// packages/mcp-tools or src/mcp/ reaches it (I-4), and the core does not export the function that calls it.
 //
 // - Where it goes: the submitter URLs of the shipped config only (SUBMITTER_DEFAULT_URLS), never a
 //   URL from a message, a tool argument or an answer. The port is built through
@@ -18,16 +18,19 @@
 //     429 rate_limited              -> rate_limited, retryAfter from Retry-After (1 s to 24 h, else
 //                                      1 h); no other submitter is asked, so the limit is honoured
 //     409 / 200 failed already_used -> already_used
-//     501 (route off), 503 (stuck or not configured), other 5xx, 404, unsupported_chain, a network
-//     error, a timeout or an answer that does not parse -> the next URL; none left -> unavailable
+//     501 (route off), 503 (stuck or not configured), other 5xx, 404, unsupported_chain,
+//     gasless_unavailable (that submitter's route is off), a network error, a timeout or an answer
+//     that does not parse -> the next URL; none left -> unavailable
 //     another 4xx or 200 failed     -> refused with the fixed code, or `bad_request` for any other
 // - Nothing logs. No result or error carries the authorization, the signature, a URL, a header or
 //   server text (I-7).
 //
-// T4-b note: the core's port type (`DepositAuthPort` on `ProofsPlatform.depositAuth`) lands with
-// M3-4b-t-T4-a. Until then the shape is declared here; the orchestrator reconciles the two after
-// T4-a merges (one import swap, same fields).
+// The port and answer types are the core's (`DepositAuthPort` on `ProofsPlatform.depositAuth`,
+// M3-4b-t-T4-a).
 import * as chain from '@4thtech-io/chain';
+import type { DepositAuthAnswer, DepositAuthPort } from '@4thtech-io/core';
+
+export type { DepositAuthAnswer, DepositAuthPort };
 
 /** The submitter's gasless top-up path (apps/submitter/src/worker.ts, M3-4b-t-3). */
 export const DEPOSIT_AUTH_PATH = '/v1/deposit-authorization';
@@ -53,29 +56,9 @@ export const DEPOSIT_AUTH_REFUSALS = Object.freeze([
   'simulation_failed',
   'gas_too_high',
   'bad_request',
-] as const);
+] as const satisfies readonly Extract<DepositAuthAnswer, { status: 'refused' }>['code'][]);
 
 export type DepositAuthRefusal = (typeof DEPOSIT_AUTH_REFUSALS)[number];
-
-/**
- * The submitter's answer as the runtime maps it: the outcome only, never a transaction hash, URL
- * or server text. `submitted` is untrusted: the credit is confirmed on chain.
- */
-export type DepositAuthAnswer =
-  | { readonly status: 'submitted' }
-  | {
-      readonly status: 'rate_limited';
-      /** Seconds until another try may succeed. */
-      readonly retryAfter: number;
-    }
-  | { readonly status: 'already_used' }
-  | { readonly status: 'unavailable' }
-  | { readonly status: 'refused'; readonly reason: DepositAuthRefusal };
-
-/** The runtime's call to the submitter's gasless top-up route (core: `ProofsPlatform.depositAuth`). */
-export interface DepositAuthPort {
-  submit(request: chain.DepositAuthorizationRequest): Promise<DepositAuthAnswer>;
-}
 
 export interface DepositAuthPortOptions {
   /** The address-checked fetch (nodeRpcFetch). */
@@ -91,8 +74,8 @@ export interface DepositAuthPortOptions {
 const UNAVAILABLE: DepositAuthAnswer = Object.freeze({ status: 'unavailable' });
 const SUBMITTED: DepositAuthAnswer = Object.freeze({ status: 'submitted' });
 const ALREADY_USED: DepositAuthAnswer = Object.freeze({ status: 'already_used' });
-const refused = (reason: DepositAuthRefusal): DepositAuthAnswer =>
-  Object.freeze({ status: 'refused', reason });
+const refused = (code: DepositAuthRefusal): DepositAuthAnswer =>
+  Object.freeze({ status: 'refused', code });
 const limited = (retryAfter: number): DepositAuthAnswer =>
   Object.freeze({ status: 'rate_limited', retryAfter });
 
@@ -204,7 +187,7 @@ export function nodeDepositAuthPort(options: DepositAuthPortOptions): DepositAut
         const value = await bodyOf(response);
         if (status >= 400) {
           const code = errorOf(value);
-          if (code === 'unsupported_chain') continue;
+          if (code === 'unsupported_chain' || code === 'gasless_unavailable') continue;
           if (code === 'already_used') return ALREADY_USED;
           if (code === 'rate_limited') return limited(retryAfterOf(response));
           if (code === 'unavailable') continue;
@@ -219,7 +202,13 @@ export function nodeDepositAuthPort(options: DepositAuthPortOptions): DepositAut
         if (answer.status === 'submitted') return SUBMITTED;
         if (answer.error === 'already_used') return ALREADY_USED;
         if (answer.error === 'rate_limited') return limited(DEFAULT_RETRY_AFTER);
-        if (answer.error === 'unavailable' || answer.error === 'unsupported_chain') continue;
+        if (
+          answer.error === 'unavailable' ||
+          answer.error === 'unsupported_chain' ||
+          answer.error === 'gasless_unavailable'
+        ) {
+          continue;
+        }
         return refused(refusal(answer.error));
       }
       return UNAVAILABLE;

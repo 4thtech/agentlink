@@ -2,6 +2,8 @@
 // no path, config text or value is interpolated and no underlying error is attached (I-5, I-7).
 // The harness's own name is added by the caller from a fixed table, never from the file.
 
+import { commandPrefix } from '../runtime/cli-prefix.js';
+
 export type HarnessErrorCode =
   /** A link, the wrong file type, another owner, a writable-by-others folder or a realpath escape (04 §4). */
   | 'unsafe_path'
@@ -21,14 +23,16 @@ export type HarnessErrorCode =
 export const HARNESS_MESSAGES: Readonly<Record<HarnessErrorCode, string>> = Object.freeze({
   unsafe_path:
     "{appName}'s settings are in a place AgentLink won't write to: it must be a plain file in your own folder, with no links. Nothing was changed. Add AgentLink to {appName} by hand instead.",
-  malformed:
-    "{appName}'s settings file isn't valid, so AgentLink left it alone. Nothing was changed. Fix or move the file, then run `agentlink init` again.",
+  get malformed(): string {
+    return `{appName}'s settings file isn't valid, so AgentLink left it alone. Nothing was changed. Fix or move the file, then run \`${commandPrefix()} init\` again.`;
+  },
   too_large:
     "{appName}'s settings file is larger than AgentLink will edit, so it was left alone. Nothing was changed. Add AgentLink to {appName} by hand instead; don't move the file.",
   unsupported_format:
     "AgentLink can't change {appName}'s settings file without rewriting parts you wrote. Nothing was changed. Add AgentLink to {appName} by hand instead.",
-  changed:
-    "{appName}'s settings changed while AgentLink was working, so nothing was written. Run `agentlink init` again.",
+  get changed(): string {
+    return `{appName}'s settings changed while AgentLink was working, so nothing was written. Run \`${commandPrefix()} init\` again.`;
+  },
   write_failed: "AgentLink couldn't write {appName}'s settings. Nothing was changed.",
   unsupported_platform:
     "{appName} isn't available on this computer's system, so there is nothing for AgentLink to set up. Nothing was changed.",

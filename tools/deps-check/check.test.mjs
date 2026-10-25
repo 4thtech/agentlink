@@ -382,6 +382,27 @@ describe('bundled workspace packages (policy `bundles`, OPS-REL-1)', () => {
     expect(problems).toEqual([expect.stringContaining('ws')]);
   });
 
+  it('M1-11b-6: an embedded app (policy `embeds`) is not bundled; its runtime deps are skipped', () => {
+    const withApp = {
+      ...cli,
+      devDependencies: { '@4thtech-io/node': 'workspace:*', '@4thtech-io/local-ui': 'workspace:*' },
+    };
+    const all = {
+      ...manifests,
+      '@4thtech-io/local-ui': {
+        name: '@4thtech-io/local-ui',
+        dependencies: { ws: '8.21.0', react: '19.3.1' },
+      },
+    };
+    // Bundled, the app would clash with node's ws and add react to the CLI's runtime.
+    expect(bundledRuntimeOf(withApp, all).problems).toEqual([expect.stringContaining('ws')]);
+    // Embedded (its built files only), it is not traversed.
+    const { runtime, problems } = bundledRuntimeOf(withApp, all, ['@4thtech-io/local-ui']);
+    expect(problems).toEqual([]);
+    expect(runtime.has('react')).toBe(false);
+    expect(runtime.get('ws')).toBe('8.22.0');
+  });
+
   it('accepts a re-declared runtime dependency of a bundled package with the same exact spec', () => {
     const { runtime } = bundledRuntimeOf(cliManifest({}), manifests);
     expect(

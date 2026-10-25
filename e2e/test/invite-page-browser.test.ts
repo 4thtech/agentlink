@@ -319,6 +319,11 @@ describe('states with no prompt', () => {
     await expectState('%3Cimg%20src%3Dx%20onerror%3Dwindow.__pwned%3D1%3E', 'damaged');
     await expectState(await rawPayload(JSON.stringify({ ...BASE_INVITE, v: 2 })), 'damaged');
   });
+  it('shows a damaged invite when the name does not match the card nameHash (M1-19-b)', async () => {
+    // The card is the base card (the hash of its own name); the name was swapped.
+    const link = await futureLink({ name: 'Mallory', card: BASE_INVITE.card });
+    await expectState(payloadOf(link), 'damaged');
+  });
   it('shows the state for an oversized invite', () =>
     expectState('A'.repeat(300_000), 'oversized'));
 });

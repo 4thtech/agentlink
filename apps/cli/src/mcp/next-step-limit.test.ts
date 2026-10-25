@@ -6,11 +6,11 @@ import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { approvalNextStep } from '../approval/next-step.js';
 import { NPX_PREFIX } from '../runtime/cli-prefix.js';
-import type { ToolClient, ToolContext } from '../tools/context.js';
+import type { ToolClient, ToolContext } from '@4thtech-io/mcp-tools/context.js';
 import { PAY_PAGE } from '@4thtech-io/chain';
 import { readdirSync } from 'node:fs';
-import { acceptRetryStep, approvedNeedsIdStep } from '../tools/invite-common.js';
-import { needsCredits } from '../tools/proofs-common.js';
+import { acceptRetryStep, approvedNeedsIdStep } from '@4thtech-io/mcp-tools/invite-common.js';
+import { needsCredits } from '@4thtech-io/mcp-tools/proofs-common.js';
 import {
   RESULT_TEXT,
   finalizeResult,
@@ -18,40 +18,41 @@ import {
   resultIsValid,
   withApprovalLink,
   type HandlerOutput,
-} from '../tools/result.js';
-import { SEND_TEXT } from '../tools/send.js';
-import { en } from '../tools/strings/en.js';
+} from '@4thtech-io/mcp-tools/result.js';
+import { SEND_TEXT } from '@4thtech-io/mcp-tools/send.js';
+import { en } from '@4thtech-io/mcp-tools/strings/en.js';
 import { approvalLinkNextStep } from './approval-ui.js';
-import * as tool_accept_action from '../tools/accept-action.js';
-import * as tool_accept_invite from '../tools/accept-invite.js';
-import * as tool_acknowledge from '../tools/acknowledge.js';
-import * as tool_approval_wait from '../tools/approval-wait.js';
-import * as tool_contacts from '../tools/contacts.js';
-import * as tool_context from '../tools/context.js';
-import * as tool_create_invite from '../tools/create-invite.js';
-import * as tool_export_proof_pack from '../tools/export-proof-pack.js';
-import * as tool_fetch_file from '../tools/fetch-file.js';
-import * as tool_files_common from '../tools/files-common.js';
-import * as tool_free_credits from '../tools/free-credits.js';
-import * as tool_get_approval from '../tools/get-approval.js';
-import * as tool_get_proof from '../tools/get-proof.js';
-import * as tool_inbox from '../tools/inbox.js';
-import * as tool_index from '../tools/index.js';
-import * as tool_input from '../tools/input.js';
-import * as tool_invite_common from '../tools/invite-common.js';
-import * as tool_list_contacts from '../tools/list-contacts.js';
-import * as tool_notarize from '../tools/notarize.js';
-import * as tool_proofs_common from '../tools/proofs-common.js';
-import * as tool_propose_terms from '../tools/propose-terms.js';
-import * as tool_registry from '../tools/registry.js';
-import * as tool_respond_to_terms from '../tools/respond-to-terms.js';
-import * as tool_result from '../tools/result.js';
-import * as tool_send from '../tools/send.js';
-import * as tool_status from '../tools/status.js';
-import * as tool_terms_common from '../tools/terms-common.js';
-import * as tool_text from '../tools/text.js';
-import * as tool_untrusted from '../tools/untrusted.js';
-import * as tool_verify_proof_pack from '../tools/verify-proof-pack.js';
+import * as tool_accept_action from '@4thtech-io/mcp-tools/accept-action.js';
+import * as tool_accept_invite from '@4thtech-io/mcp-tools/accept-invite.js';
+import * as tool_acknowledge from '@4thtech-io/mcp-tools/acknowledge.js';
+import * as tool_approval_wait from '@4thtech-io/mcp-tools/approval-wait.js';
+import * as tool_cli_command from '@4thtech-io/mcp-tools/cli-command.js';
+import * as tool_contacts from '@4thtech-io/mcp-tools/contacts.js';
+import * as tool_context from '@4thtech-io/mcp-tools/context.js';
+import * as tool_create_invite from '@4thtech-io/mcp-tools/create-invite.js';
+import * as tool_export_proof_pack from '@4thtech-io/mcp-tools/export-proof-pack.js';
+import * as tool_fetch_file from '@4thtech-io/mcp-tools/fetch-file.js';
+import * as tool_files_common from '@4thtech-io/mcp-tools/files-common.js';
+import * as tool_free_credits from '@4thtech-io/mcp-tools/free-credits.js';
+import * as tool_get_approval from '@4thtech-io/mcp-tools/get-approval.js';
+import * as tool_get_proof from '@4thtech-io/mcp-tools/get-proof.js';
+import * as tool_inbox from '@4thtech-io/mcp-tools/inbox.js';
+import * as tool_index from '@4thtech-io/mcp-tools';
+import * as tool_input from '@4thtech-io/mcp-tools/input.js';
+import * as tool_invite_common from '@4thtech-io/mcp-tools/invite-common.js';
+import * as tool_list_contacts from '@4thtech-io/mcp-tools/list-contacts.js';
+import * as tool_notarize from '@4thtech-io/mcp-tools/notarize.js';
+import * as tool_proofs_common from '@4thtech-io/mcp-tools/proofs-common.js';
+import * as tool_propose_terms from '@4thtech-io/mcp-tools/propose-terms.js';
+import * as tool_registry from '@4thtech-io/mcp-tools/registry.js';
+import * as tool_respond_to_terms from '@4thtech-io/mcp-tools/respond-to-terms.js';
+import * as tool_result from '@4thtech-io/mcp-tools/result.js';
+import * as tool_send from '@4thtech-io/mcp-tools/send.js';
+import * as tool_status from '@4thtech-io/mcp-tools/status.js';
+import * as tool_terms_common from '@4thtech-io/mcp-tools/terms-common.js';
+import * as tool_text from '@4thtech-io/mcp-tools/text.js';
+import * as tool_untrusted from '@4thtech-io/mcp-tools/untrusted.js';
+import * as tool_verify_proof_pack from '@4thtech-io/mcp-tools/verify-proof-pack.js';
 import * as approval_next_step from '../approval/next-step.js';
 import * as approval_ui from './approval-ui.js';
 
@@ -141,7 +142,7 @@ describe('pending_approval nextStep worst cases stay within 500 code points', ()
 // ---- Discovery: every exported *_TEXT sheet and every nextStep builder -----------------------------
 
 type Exports = Record<string, unknown>;
-const toolsDir = new URL('../tools/', import.meta.url);
+const toolsDir = new URL('../../../../packages/mcp-tools/src/', import.meta.url);
 const sourceFiles = (dir: URL): string[] =>
   readdirSync(dir).filter((f) => f.endsWith('.ts') && !f.includes('.test.'));
 // Explicit list (no dynamic import: boundary rules forbid it). The guard below fails when a tool
@@ -151,6 +152,7 @@ const modules: Record<string, Exports> = {
   '../tools/accept-invite.ts': tool_accept_invite,
   '../tools/acknowledge.ts': tool_acknowledge,
   '../tools/approval-wait.ts': tool_approval_wait,
+  '../tools/cli-command.ts': tool_cli_command,
   '../tools/contacts.ts': tool_contacts,
   '../tools/context.ts': tool_context,
   '../tools/create-invite.ts': tool_create_invite,

@@ -9,7 +9,7 @@
 //   (and no failover: the limit is honoured), 409 `already_used` is `already_used`, a fixed refusal
 //   code is `refused`, an answer that does not parse on every URL is `unavailable`.
 // - The txHash, the signature, the URL and server text never leave the port, and nothing logs.
-// - No MCP tool reaches the port (I-4): src/tools/ and src/mcp/ never import it.
+// - No MCP tool reaches the port (I-4): packages/mcp-tools/src/ and src/mcp/ never import it.
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -151,7 +151,7 @@ describe('nodeDepositAuthPort: what is sent (M3-4b-t-T4-b)', () => {
     const p = nodeDepositAuthPort({ fetchFn, urls: [URL_A] });
     expect(await p.submit(request())).toEqual({
       status: 'refused',
-      reason: 'gasless_unavailable',
+      code: 'gasless_unavailable',
     });
     expect(sent).toEqual([]);
   });
@@ -161,7 +161,7 @@ describe('nodeDepositAuthPort: what is sent (M3-4b-t-T4-b)', () => {
     for (const chainId of [8453, 10200, 100, 1, 0, -1, 1.5]) {
       expect(await p.submit(request({}, chainId))).toEqual({
         status: 'refused',
-        reason: 'unsupported_chain',
+        code: 'unsupported_chain',
       });
     }
     expect(sent).toEqual([]);
@@ -171,11 +171,11 @@ describe('nodeDepositAuthPort: what is sent (M3-4b-t-T4-b)', () => {
     const { port: p, sent } = port(() => json(200, { status: 'submitted', txHash: TX_HASH }));
     expect(await p.submit(request({ to: AGENT }))).toEqual({
       status: 'refused',
-      reason: 'not_vault',
+      code: 'not_vault',
     });
     expect(await p.submit({ ...request(), token: `0x${'cd'.repeat(20)}` as chain.Hex })).toEqual({
       status: 'refused',
-      reason: 'gasless_unavailable',
+      code: 'gasless_unavailable',
     });
     expect(sent).toEqual([]);
   });
@@ -190,7 +190,7 @@ describe('nodeDepositAuthPort: what is sent (M3-4b-t-T4-b)', () => {
       'request',
     ]) {
       const result = await p.submit(bad as never);
-      expect(result).toEqual({ status: 'refused', reason: 'bad_request' });
+      expect(result).toEqual({ status: 'refused', code: 'bad_request' });
     }
     expect(sent).toEqual([]);
   });
@@ -236,7 +236,7 @@ describe('nodeDepositAuthPort: only the shipped URLs, through the checked fetch 
     expect(Object.keys(proofs.tools)).not.toContain('depositAuth');
     // The shipped kill switch is off: nothing is sent, whatever the submitter.
     const submit = platform.depositAuth!.submit as (r: unknown) => Promise<DepositAuthAnswer>;
-    expect(await submit(request())).toEqual({ status: 'refused', reason: 'gasless_unavailable' });
+    expect(await submit(request())).toEqual({ status: 'refused', code: 'gasless_unavailable' });
     expect(sent).toEqual([]);
   });
 
@@ -266,6 +266,17 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
     );
     expect(await p.submit(request())).toEqual({ status: 'submitted' });
     expect(sent).toHaveLength(2);
+  });
+
+  it('gasless_unavailable (route off) on every URL is unavailable, after trying each once', async () => {
+    for (const answer of [
+      () => json(400, { status: 'failed', error: 'gasless_unavailable' }),
+      () => json(200, { status: 'failed', error: 'gasless_unavailable' }),
+    ]) {
+      const { port: p, sent } = port(answer);
+      expect(await p.submit(request())).toEqual({ status: 'unavailable' });
+      expect(sent).toHaveLength(2);
+    }
   });
 
   it('503 on every URL is unavailable', async () => {
@@ -310,7 +321,7 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
       json(200, { status: 'failed', error: 'simulation_failed', txHash: TX_HASH }),
     );
     const result = await p.submit(request());
-    expect(result).toEqual({ status: 'refused', reason: 'simulation_failed' });
+    expect(result).toEqual({ status: 'refused', code: 'simulation_failed' });
     expectClean(result);
     const { port: q } = port(() =>
       json(200, { status: 'failed', error: 'already_used', txHash: TX_HASH }),
@@ -320,7 +331,6 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
 
   it('a 4xx with a fixed code is refused with that code, and stops', async () => {
     for (const code of [
-      'gasless_unavailable',
       'not_vault',
       'below_min_deposit',
       'above_max_top_up',
@@ -330,7 +340,7 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
       'gas_too_high',
     ] as const) {
       const { port: p, sent } = port(() => json(400, { status: 'failed', error: code }));
-      expect(await p.submit(request())).toEqual({ status: 'refused', reason: code });
+      expect(await p.submit(request())).toEqual({ status: 'refused', code });
       expect(sent).toHaveLength(1);
     }
   });
@@ -344,14 +354,16 @@ describe('nodeDepositAuthPort: answers map to fixed outcomes', () => {
     ]) {
       const { port: p } = port(() => json(400, body));
       const result = await p.submit(request());
-      expect(result).toEqual({ status: 'refused', reason: 'bad_request' });
+      expect(result).toEqual({ status: 'refused', code: 'bad_request' });
       expectClean(result);
     }
   });
 
-  it('unsupported_chain or 404 at one submitter fails over to the next', async () => {
+  it('unsupported_chain, gasless_unavailable or 404 at one submitter fails over to the next', async () => {
     for (const first of [
       json(400, { status: 'failed', error: 'unsupported_chain' }),
+      json(400, { status: 'failed', error: 'gasless_unavailable' }),
+      json(200, { status: 'failed', error: 'gasless_unavailable' }),
       new Response('not found', { status: 404 }),
     ]) {
       const { port: p, sent } = port((url) =>
@@ -412,7 +424,7 @@ describe('no MCP tool reaches the port (I-4)', () => {
   }
 
   it('no tool in the MCP registry can start a top-up (owner-started only, Tali 2026-10-23)', async () => {
-    const { TOOLS, HANDLERS } = await import('../tools/index.js');
+    const { TOOLS, HANDLERS } = await import('@4thtech-io/mcp-tools');
     const names = TOOLS.map((t) => t.name);
     expect(names.length).toBeGreaterThan(0);
     // Every handler is a registered tool, and none is a top-up, deposit or gasless tool.
@@ -429,7 +441,10 @@ describe('no MCP tool reaches the port (I-4)', () => {
   });
 
   it('src/tools/ and src/mcp/ never import runtime/deposit-auth or name the port', async () => {
-    const dirs = ['tools', 'mcp'].map((d) => path.join(src, d));
+    const dirs = [
+      fileURLToPath(new URL('../../../../packages/mcp-tools/src', import.meta.url)),
+      path.join(src, 'mcp'),
+    ];
     const found: string[] = [];
     for (const dir of dirs) {
       const list = await files(dir);
