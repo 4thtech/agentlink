@@ -1,5 +1,35 @@
 # @4thtech-io/transport-nostr
 
+## 0.2.0
+
+### Minor Changes
+
+- d311d76: NIP-42 login for several identities on one connection (`RelayPool` `authKeys` takes one `EnvelopeKeys` or a list, one AUTH per identity); the saved page position follows only gift wraps addressed to an own key; the `envelopeSeen` hint and the optional `markSeen('envelope', …)` key on the `envelopeHash` (`0x` + hex), as core's `seen` rows do, instead of the sender-chosen envelope id (M1-5e).
+- 529a0f6: Sync now closes a relay-cap gap when another relay of the pass read that second in full: one bounded `ids` query on the capped relay confirms it holds the wraps it hid (at most 64 ids per gap, 16 queries per pass, 1 s each, inside the pass budget). Gaps it cannot close stay in the sync result as before (M2-19).
+
+### Patch Changes
+
+- cb4a63a: Owner approvals, policies and revocations, envelopes, agent cards and proof packs are now checked from the exact text received: text that repeats a field name or spells one with an escape sequence is refused as malformed before the signature is checked (M1-1h-b, D-128). New in `@4thtech-io/crypto`: `parseReceivedJson`, `parseEnvelopeText` and the `plainMemberNames` option of `parseJson`.
+- 068d989: Relay hardening: the NIP-11 fetch has its own 3 s and 64 KiB bound, so a hanging relay information server no longer makes a working relay time out for a publish. A closed pool reports `pool_closed` instead of `invalid_url`. Relay health shows the origin only. The outbox reports why a row with fewer than 2 usable relays cannot be sent, and spreads its retries with jitter.
+- ec598ee: Sync now reports a second that a relay may hold more messages in than it returns (a gap with the fixed reason `relay_cap`), instead of stepping past it without a word (M1-5d).
+- Updated dependencies [9c56860]
+- Updated dependencies [27437fc]
+- Updated dependencies [cb4a63a]
+- Updated dependencies [52c8fe8]
+- Updated dependencies [de8696b]
+- Updated dependencies [e7aeadf]
+- Updated dependencies [70e362b]
+- Updated dependencies [3a3837b]
+- Updated dependencies [0f13f71]
+- Updated dependencies [4be1e27]
+- Updated dependencies [1d10f83]
+- Updated dependencies [0ece43e]
+- Updated dependencies [c6aa21f]
+- Updated dependencies [9dbaa44]
+  - @4thtech-io/log@0.2.0
+  - @4thtech-io/types@0.2.0
+  - @4thtech-io/crypto@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes

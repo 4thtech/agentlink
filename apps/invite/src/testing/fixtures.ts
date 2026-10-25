@@ -4,7 +4,7 @@
 // check. The page never verifies signatures; it shows a name under the contact-name rule and builds a
 // prompt from the checked payload only.
 import { INVITE_LINK_PREFIX, encodeInviteLink } from '@4thtech-io/core';
-import { encodeBase64url, encodeUtf8 } from '@4thtech-io/crypto';
+import { agentCardNameHash, encodeBase64url, encodeHex0x, encodeUtf8 } from '@4thtech-io/crypto';
 import type { Invite } from '@4thtech-io/types';
 
 export const BASE_INVITE: Invite = {
@@ -44,8 +44,17 @@ export const PREFIX = INVITE_LINK_PREFIX;
 
 /** The invite with some fields changed, as a full canonical link. */
 export async function linkFor(changes: Partial<Invite> = {}): Promise<string> {
-  return encodeInviteLink({ ...BASE_INVITE, ...changes });
+  const invite = { ...BASE_INVITE, ...changes };
+  // M1-19-b: the card commits to the name (`nameHash`), so an invite whose name was changed carries
+  // the hash of that name, as a real inviter's would. Pass `card` to build a mismatch on purpose.
+  if (changes.card === undefined) {
+    invite.card = { ...invite.card, nameHash: nameHashOf(invite.name) };
+  }
+  return encodeInviteLink(invite);
 }
+
+/** `keccak256(utf8(name))` as 0x hex: the card's `nameHash` (04 §2.4). */
+export const nameHashOf = (name: string): string => encodeHex0x(agentCardNameHash(name));
 
 /** An expiry a day from now: the browser tests run on the real clock. */
 export const futureExpiry = (): number => Math.floor(Date.now() / 1000) + 86_400;

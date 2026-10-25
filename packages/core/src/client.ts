@@ -180,7 +180,7 @@ export class AgentLinkClient {
   readonly files: FilesView;
   /** refresh-link (M1-7f-3; 04 §4): requests, and answers after each processing pass. */
   readonly fileLinks: FileLinks;
-  /** The non-message activity feed (M1-11r-a, the local UI): approvals, proofs, blocks, rules. */
+  /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
   readonly #sync: SyncService;
@@ -263,7 +263,7 @@ export class AgentLinkClient {
       },
       files,
     );
-    this.activity = new ActivityService(ctx);
+    this.activity = new ActivityService(ctx, this.contacts);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,
