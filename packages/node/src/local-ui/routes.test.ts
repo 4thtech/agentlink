@@ -127,6 +127,8 @@ describe('route registration (M1-11s-b, I-4)', () => {
 
 describe('the default registry: one stub per page (M1-11s-b)', () => {
   it('registers every page stub as a read route that answers 501 not_implemented', async () => {
+    // A built page's own test covers its routes (proofs: api/proofs.test.ts, M1-11c-a4).
+    const built = new Set(['/api/ui/proofs', '/api/ui/proofs/credits']);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
     const pages = [
@@ -135,7 +137,6 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       'contacts',
       'files',
       'storage',
-      'proofs',
       'rules',
       'backup',
       'advanced',
@@ -143,7 +144,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
     // M1-11s-c: the first-run page's two owner setup routes are covered in owner-setup-route.test.ts.
     const stubs = registry
       .routes()
-      .filter((r) => r.presence !== 'setup' && r.path !== '/api/ui/first-run');
+      .filter(
+        (r) => r.presence !== 'setup' && r.path !== '/api/ui/first-run' && !built.has(r.path),
+      );
     expect(stubs.map((r) => r.path).sort()).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
     for (const route of stubs as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');

@@ -365,6 +365,7 @@ export type {
   ProofListItem,
 } from './proofs/reads.js';
 export { PAGE_DEFAULT_LIMIT, PAGE_MAX_LIMIT, type Page, type PageQuery } from './paging.js';
+export { PROOF_PRICE_USD_MICROS } from './proofs/price.js';
 export {
   ActivityService,
   type ActivityContact,
