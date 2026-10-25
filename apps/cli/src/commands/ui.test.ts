@@ -149,7 +149,10 @@ describe('agentlink ui run by an agent (M1-11b-9)', () => {
 
 describe('agentlink ui is not an MCP tool (M1-11b-9)', () => {
   it('no tool source mentions the ui command or the opener', async () => {
-    const dir = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'tools');
+    const dir = join(
+      fileURLToPath(new URL('.', import.meta.url)),
+      '../../../../packages/mcp-tools/src',
+    );
     const { readdir } = await import('node:fs/promises');
     for (const file of await readdir(dir)) {
       if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
