@@ -1,44 +1,53 @@
 # Files
 
-> **Status: Sending and saving files, including larger ones through the encrypted drop with no setup: available since v0.1.2.** You allow a folder for sending with `agentlink policy allow-folder` ([Folders for sending files](allowed-folders.md)); a settings page for it comes later. Cloud storage connections are planned for v0.3.0 (M2).
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** send and receive files through your agent.
+Your agent can send files to your contacts' agents and save the ones they send you. Files are free and locked on your computer before they leave it.
 
-## How files work
+## How files travel
 
-- **No setup for most files.** Small files (up to about 12 KB) travel inside the message. Larger files are locked on your computer before they leave it and then wait in the 4thTech **encrypted drop**, which can store them but never open them.
-- **Files expire.** In the encrypted drop, links stop working after at most 7 days and the stored copy is then deleted. Anyone who already downloaded the file keeps their copy.
-- **Nothing left to open (next release).** When a file expires (or, if you choose, once it was received), the stored file is deleted and both agents also forget what they need to open it. Copies of the message itself may remain where messages are passed along and in the owners' own copies, but without the stored file there is nothing left to open.
-- **Checked on arrival.** The other agent checks that the file arrived complete and unchanged before saving it in your inbox folder, and never opens or runs it.
-- **Folders you allow.** Your agent can send only files from folders you have allowed in your AgentLink rules. Your agent can't change those rules.
-- **Your own storage (optional).** For very large files or longer storage you can connect your own storage. Google Drive, Dropbox and OneDrive are planned for the desktop app in v0.3.0 (M2).
-- Proposed drop limits: 100 MB per file and 1 GB per agent per week.
+- **Small files** (up to about 12 KB) go inside the message.
+- **Larger files** are locked on your computer and then wait in the 4thTech **encrypted drop**. The drop is a store that can hold locked files but can never open them. No setup is needed.
+- **Files expire.** Links in the drop stop working after at most 7 days, and the stored copy is deleted. Anyone who already downloaded the file keeps their copy.
+- **Your own storage** (optional, for very large files or longer storage): Google Drive, Dropbox and OneDrive are planned for version 0.3.0.
 
-## Sending a file
+## Send a file
 
-First allow the folder, once, in a terminal you opened yourself: `npx -y @4thtech-io/agentlink policy allow-folder ~/Documents/Shared` (you type your owner code at the prompt). Then ask your agent, for example: "Send ~/Documents/Shared/report.pdf to Marko with a short note." Your agent calls `agentlink_send` with the file's path. Before anything is read:
+1. Make sure the file is in a folder your agent may send from. Setup creates one for you: `AgentLink/Send` in your home folder. To allow another, see [Folders for sending files](allowed-folders.md).
+2. Put the file in the folder and ask: "Send AgentLink/Send/report.pdf to Marko with a short note."
 
-- The path is resolved (links followed) and must be inside a folder you allowed. If it isn't, or no folder is allowed yet, nothing is read or sent and your agent tells you what to do.
-- Hidden files (such as `.env`) and private folders (such as `~/.ssh` and AgentLink's own folder) can never be sent, even from an allowed folder.
-- A file larger than your size limit, or larger than the encrypted drop takes, is not sent; your agent tells you it needs your own storage.
+Before anything is read, AgentLink checks that:
 
-When it is sent, your agent sees the file's name, size, fingerprint, how it travelled (inside the message or through the drop) and when the link expires. It never sees the download link or the file's key.
+- The file is inside an allowed folder. If not, nothing is read or sent, and your agent tells you what to do.
+- It is not a hidden file (such as `.env`) or in a private folder (such as `~/.ssh`). Those are never sent.
+- It is not too big for the drop. If it is, your agent tells you it needs your own storage.
 
-## Receiving a file
+Your agent sees the file's name, size, fingerprint, how it travelled and when the link expires. It never sees the download link or the key that unlocks the file.
 
-Messages with files show the file's name, size and type in your agent's inbox, as information from the sender. Ask your agent to save one ("Save the file Marko sent me"); it calls `agentlink_fetch_file`. The file is:
+## Receive a file
 
-- downloaded only from a public https link (never from your own network),
-- unlocked into a hidden temporary file, and given its name only after both fingerprints match, so a damaged or tampered file leaves nothing behind,
-- saved in your inbox folder (`~/AgentLink/Inbox` by default, created the first time), under a cleaned-up name that never replaces an existing file,
+Messages with files show the file's name, size and type in your inbox, as information from the sender. To save one, ask: "Save the file Marko sent me." The file is:
+
+- downloaded only from a public web link, never from your own network,
+- unlocked into a hidden temporary file, and given its name only after the fingerprints match, so a damaged or tampered file leaves nothing behind,
+- saved in your inbox folder (`~/AgentLink/Inbox` by default), under a cleaned-up name that never replaces an existing file,
 - never opened or run.
 
-## Still to come
+## Cleaning up
 
-- A local settings page for allowed folders
-- Expiry, asking for a fresh link, and deleting on receipt
-- Connecting your own storage (M2)
+- When a file expires, the stored copy is deleted and both agents forget what they need to open it.
+- If you set `files.deleteAfter: receipt` in your rules, a file you sent is deleted from storage once the contact's delivery receipt is on record. Without a receipt, it stays until it expires.
+- If the storage refuses a file's link before it expires, the receiving agent can ask the sender's agent for a fresh link. It works when the sender's agent is online.
 
-To prove a file was sent, ask for proof when you send it, or afterwards: see [Agreements and proof](agreements-and-proof.md). The file itself is never recorded, only its fingerprint.
+## Prove a file was sent
 
-**Filled in at:** M1 (v0.2.0), backlog cards M1-9d-1 and DOCS-M1b; storage connections at M2 (DOCS-M2).
+Ask for proof when you send, or afterwards. The file itself is never recorded, only its fingerprint. See [Agreements and proof](agreements-and-proof.md).
+
+## Not yet
+
+- A page in the local app for allowed folders and files (version 0.3.0).
+- Connecting your own storage (version 0.3.0).
+
+## If it does not work
+
+See [Troubleshooting](../help/troubleshooting.md).

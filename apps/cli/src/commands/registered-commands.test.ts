@@ -88,7 +88,7 @@ describe('the instructions in --help (M1-36c)', () => {
 
   it('does not list the commands that do not exist yet', () => {
     const help = helpText();
-    for (const dead of ['--verify', 'policy set', '--keystore', 'agentlink ui']) {
+    for (const dead of ['--verify', 'policy set', '--keystore', 'agentlink backup']) {
       expect(help).not.toContain(dead);
     }
   });
@@ -98,14 +98,16 @@ describe('the instructions in --help (M1-36c)', () => {
       [...text.matchAll(COMMAND_IN_SOURCE)].map((m) => (m[1] ?? '').replace(/\\$/, ''));
     expect(found('run \\`${commandPrefix()} policy show\\` now')).toEqual(['policy show']);
     expect(found('run `{prefix} doctor`')).toEqual(['doctor']);
-    expect(found('`${NPX_COMMAND} ui`').map((c) => problemWith(`agentlink ${c}`))).toEqual([
-      'unknown command "ui"',
+    expect(found('`${NPX_COMMAND} backup`').map((c) => problemWith(`agentlink ${c}`))).toEqual([
+      'unknown command "backup"',
     ]);
     expect(found('`${name} · owner`')).toEqual([]);
   });
 
   it('the checker itself rejects a dead end', () => {
-    expect(problemWith('agentlink ui')).toContain('unknown command');
+    expect(problemWith('agentlink backup')).toContain('unknown command');
+    expect(problemWith('agentlink ui')).toBeUndefined();
+    expect(problemWith('agentlink ui --agent <name>')).toBeUndefined();
     expect(problemWith('agentlink contacts --verify <id>')).toContain('--verify');
     expect(problemWith('agentlink init --keystore file')).toContain('--keystore');
     expect(problemWith('agentlink policy set <key> <value>')).toContain('"set"');

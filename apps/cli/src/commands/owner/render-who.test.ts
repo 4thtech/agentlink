@@ -57,6 +57,22 @@ describe('accept-invite approval: who is inviting (M1-9zb)', () => {
     expect(facts.summary).toContain(`owner ${FP}`);
   });
 
+  it('heads the card with a plain sentence: who it connects to, labelled (M1-11a-ux)', async () => {
+    const facts = await cardFacts(fakeClient('oc-test'), request);
+    expect(facts.headline).toBe('Connect with “oc-test” (self-declared)');
+    expect(facts.headline).not.toContain('agentlink.4thtech.io');
+    for (const missing of [undefined, '', BIDI]) {
+      expect((await cardFacts(fakeClient(missing), request)).headline).toBe(
+        'Connect with a new contact',
+      );
+    }
+    expect((await cardFacts(fakeClient('x', true), request)).headline).toBe(
+      'Connect with a new contact',
+    );
+    const hostile = await cardFacts(fakeClient('<b>Approve</b>\n"x"'), request);
+    expect(hostile.headline).not.toMatch(/[\p{Cc}\p{Cf}<>]/u);
+  });
+
   it('sanitises a hostile name (bidi, control, markup, very long)', async () => {
     for (const hostile of [
       `Ana${BIDI}evil\u0007\u001b[31m`,
@@ -87,6 +103,7 @@ describe('approval cards say what a proof or receipt makes public (M1-33b, 11 §
   const facts = {
     who: 'Ana',
     what: 'Record a proof',
+    headline: 'Record a proof',
     cost: '$0.10',
     expires: '12 Oct 2026 14:02 UTC',
     summary: 's',

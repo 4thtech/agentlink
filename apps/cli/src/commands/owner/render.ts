@@ -41,11 +41,24 @@ const WHAT: Readonly<Record<string, string>> = Object.freeze({
   agentlink_export_proof_pack: 'Export a proof with its document key',
 });
 
+/** Tools whose headline names the contact the action goes to ("Send a message to “Ana” (…)"). */
+const TO_CONTACT: ReadonlySet<string> = new Set([
+  'agentlink_send',
+  'agentlink_propose_terms',
+  'agentlink_acknowledge',
+]);
+
 /** The facts a card shows, all fixed text or sanitized one-line values. */
 export interface CardFacts {
   /** The contact, under the 06 §2.1 name rule, sanitized to one line. */
   readonly who: string;
   readonly what: string;
+  /**
+   * M1-11a-ux: the card's plain headline, fixed text plus at most the sanitized
+   * “name” (label) form: "Connect with “Ana” (self-declared)", "Send a message to “Ana” (…)", or
+   * `what` alone. Never an argument the AI chose (the invite link stays out, I-5).
+   */
+  readonly headline: string;
   /** "$0.10", or "Free". */
   readonly cost: string;
   /** "12 Oct 2026 14:02 UTC". */
@@ -64,22 +77,30 @@ const asObject = (value: JsonValue | undefined): JsonObject | undefined =>
     ? (value as JsonObject)
     : undefined;
 
-/** The contact an action is about, under the 06 §2.1 rule, or a fixed fallback. */
-async function contactLabel(client: AgentLinkClient, action: JsonObject): Promise<string> {
+/**
+ * The contact an action is about: `who` under the 06 §2.1 rule, or a fixed fallback; `name` is the
+ * sanitized “name” (label) form alone when there is one (a contact, or an inviter's usable name).
+ */
+interface Party {
+  readonly who: string;
+  readonly name?: string;
+}
+
+async function contactLabel(client: AgentLinkClient, action: JsonObject): Promise<Party> {
   const context = asObject(action['context']);
   const scope = asObject(context?.['scope']);
   const counterparty = asObject(context?.['counterparty']) ?? asObject(scope?.['counterparty']);
   const agentId = counterparty?.['agentId'];
   if (context !== undefined && 'counterparty' in context && context['counterparty'] === null) {
-    return OWNER_TEXT.noteToSelf;
+    return { who: OWNER_TEXT.noteToSelf };
   }
-  if (typeof agentId !== 'string') return OWNER_TEXT.noContact;
+  if (typeof agentId !== 'string') return { who: OWNER_TEXT.noContact };
   try {
     const contact = await client.contacts.get(agentId);
     const name = terminalOneLine(renderContactName(contact.display));
-    return name === '' ? OWNER_TEXT.notAContact : name;
+    return name === '' ? { who: OWNER_TEXT.notAContact } : { who: name, name };
   } catch {
-    return (await inviterLabel(client, action)) ?? OWNER_TEXT.notAContact;
+    return (await inviterLabel(client, action)) ?? { who: OWNER_TEXT.notAContact };
   }
 }
 
@@ -92,7 +113,7 @@ async function contactLabel(client: AgentLinkClient, action: JsonObject): Promis
 async function inviterLabel(
   client: AgentLinkClient,
   action: JsonObject,
-): Promise<string | undefined> {
+): Promise<Party | undefined> {
   if (action['tool'] !== 'agentlink_accept_invite') return undefined;
   const link = asObject(action['args'])?.['inviteUrl'];
   if (typeof link !== 'string') return undefined;
@@ -102,10 +123,23 @@ async function inviterLabel(
     if (fingerprint === '') return undefined;
     const fallback = `${RESTRICTED_NAME_FALLBACK} ${ownerFingerprint.short}`;
     const name = display.name === fallback ? '' : terminalOneLine(renderContactName(display));
-    return OWNER_TEXT.inviter(name, fingerprint);
+    const who = OWNER_TEXT.inviter(name, fingerprint);
+    return name === '' ? { who } : { who, name };
   } catch {
     return undefined;
   }
+}
+
+/** M1-11a-ux: the card's plain headline (see CardFacts.headline). */
+function headlineOf(tool: unknown, what: string, party: Party): string {
+  const name = party.name;
+  if (tool === 'agentlink_accept_invite') {
+    return name === undefined ? what : terminalOneLine(OWNER_TEXT.connectWith(name));
+  }
+  if (typeof tool === 'string' && TO_CONTACT.has(tool) && name !== undefined) {
+    return terminalOneLine(OWNER_TEXT.whatTo(what, name));
+  }
+  return what;
 }
 
 /** An exact dollar amount, rounded up to whole cents (11 §5.3: never "about"). */
@@ -136,13 +170,15 @@ export async function cardFacts(
 ): Promise<CardFacts> {
   const tool = request.action['tool'];
   const what = (typeof tool === 'string' ? WHAT[tool] : undefined) ?? OWNER_TEXT.unknownWhat;
-  const who = await contactLabel(client, request.action);
+  const party = await contactLabel(client, request.action);
+  const who = party.who;
   const cost = costOf(request.action);
   const summary = terminalOneLine(`${what} · ${who} · ${cost}`);
   const terms = await termsCard(client, request, who);
   return Object.freeze({
     who,
     what,
+    headline: headlineOf(tool, what, party),
     cost,
     expires: expiryOf(request.expiresAt),
     summary,

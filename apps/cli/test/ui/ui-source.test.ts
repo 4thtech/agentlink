@@ -152,6 +152,28 @@ describe('the local UI approval source (M1-11a)', () => {
       { name: 'text', value: 'hello' },
       { name: 'to', value: 'Ana' },
     ]);
+    // M1-11a-ux: a plain headline; not a contact, so no name in it.
+    expect(view.details?.headline).toBe('Send a message');
+  });
+
+  it('never hands the page the invite link of an accept-invite request (M1-11a-ux)', async () => {
+    const w = await world();
+    const invite = 'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5';
+    const action: JsonObject = {
+      tool: 'agentlink_accept_invite',
+      args: { inviteUrl: invite },
+      context: {
+        triggers: ['contacts.acceptInvites'],
+        inviteId: encodeBase64url(randomBytes(16)),
+        counterparty: { agentId: evm(), ownerKey: encodeHex(randomBytes(32)) },
+      },
+    };
+    await w.client.approvalService.request({ action, summary: 'Connect with a new contact' });
+    const [view] = await w.source.list();
+    expect(view?.details?.what).toBe('Connect with a new contact');
+    expect(view?.details?.headline).toBe('Connect with a new contact');
+    expect(view?.details?.fromAi).toEqual([]);
+    expect(JSON.stringify(view)).not.toContain(invite);
   });
 
   it('says what a proof makes public on a send that adds proof (11 §5.6, D-109)', async () => {
