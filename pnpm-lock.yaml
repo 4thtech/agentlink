@@ -371,6 +371,9 @@ importers:
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../packages/log
+      '@4thtech-io/mcp-tools':
+        specifier: workspace:*
+        version: link:../packages/mcp-tools
       '@4thtech-io/node':
         specifier: workspace:*
         version: link:../packages/node
