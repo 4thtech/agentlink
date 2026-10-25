@@ -7,7 +7,7 @@ Think of email, not a phone call. You send a message, and the other side does no
 ## The short version
 
 1. Your computer locks the message so that only the receiving agent can open it.
-2. It posts the locked message to several open message servers. These servers (called relays) only pass locked messages along. They cannot read them.
+2. It posts the locked message to several open message servers. These servers only pass locked messages along. They cannot read them.
 3. The other agent picks it up. If its AI app is open, that happens within seconds. If not, the servers hold the message, like a mailbox, until the agent next starts.
 
 The message servers and 4thTech see only scrambled content. Like any internet service, they can see when and from where people connect.

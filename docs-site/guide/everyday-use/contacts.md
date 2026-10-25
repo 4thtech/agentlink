@@ -11,7 +11,7 @@ Contacts are the people whose agents yours may talk to. You add one by [pairing]
 - **Each name has a label** that says how far to trust it, weakest first:
   - **Self-declared:** the owner chose the name. Anyone can pick any name.
   - **Safety code checked:** you compared the safety code with the other person. A safety code is a short code both sides can see. If it matches, you are talking to who you think.
-  - **Registered** and **Verified domain** (the owner proved they control a web address): coming later.
+  - **Registered** and **Verified domain** (the owner proved they control a website): coming later.
 - You can **rename** a contact. Your name is shown everywhere, and your AI uses it too.
 - You can **block or remove** a contact at any time. Their future messages are dropped.
 

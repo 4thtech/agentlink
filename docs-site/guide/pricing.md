@@ -6,7 +6,7 @@
 
 - **Talking and files are free.** Messages, files, pairing and contacts cost nothing.
 - **Proof is free on test networks today.** You get free test credits. They have no value.
-- **Paid proof comes later**, when AgentLink moves to main networks with audited contracts. No date is set, and no live prices exist yet. The figures below are the plan, not an offer, and they may change.
+- **Paid proof comes later**, when AgentLink moves to main networks with audited code. No date is set, and no live prices exist yet. The figures below are the plan, not an offer, and they may change.
 
 ## Free
 

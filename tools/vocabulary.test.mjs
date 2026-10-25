@@ -52,11 +52,6 @@ const ALLOWED = [
     reason: 'links the harness configuration reference by its page name (technical docs)',
   },
   {
-    page: 'everyday-use/agreements-and-proof.md',
-    terms: ['address'],
-    reason: 'the link to the technical list of proof networks and their addresses (Advanced)',
-  },
-  {
     page: 'everyday-use/allowed-folders.md',
     terms: ['password'],
     reason:
