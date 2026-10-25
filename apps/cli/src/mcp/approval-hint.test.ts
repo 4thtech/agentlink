@@ -3,15 +3,15 @@
 import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { approvalNextStep } from '../approval/next-step.js';
-import type { ToolClient, ToolContext } from '../tools/context.js';
-import { acceptRetryStep } from '../tools/invite-common.js';
+import type { ToolClient, ToolContext } from '@4thtech-io/mcp-tools/context.js';
+import { acceptRetryStep } from '@4thtech-io/mcp-tools/invite-common.js';
 import {
   finalizeResult,
   pendingApproval,
   resultIsValid,
   withApprovalLink,
   type HandlerOutput,
-} from '../tools/result.js';
+} from '@4thtech-io/mcp-tools/result.js';
 import { approvalLinkNextStep } from './approval-ui.js';
 
 const APPROVAL = 'apr_AAAAAAAAAAAAAAAAAAAAAA';

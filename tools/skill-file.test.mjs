@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const skill = readFileSync(join(root, 'skills/agentlink/SKILL.md'), 'utf8');
 
-// 11 §5.1 "Never say" (same list as apps/cli/src/tools/strings/en.test.ts). Tool names, field
+// 11 §5.1 "Never say" (same list as packages/mcp-tools/src/strings/en.test.ts). Tool names, field
 // names and commands in backticks are not prose.
 const BANNED = [
   ['wallet', /\bwallets?\b/i],

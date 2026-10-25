@@ -19,7 +19,7 @@ import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 import { SERVER_INSTRUCTIONS } from '../src/mcp/instructions.js';
 import { toMcpTool } from '../src/mcp/server.js';
-import { ADVANCED_TOOLS, TOOLS } from '../src/tools/registry.js';
+import { ADVANCED_TOOLS, TOOLS } from '@4thtech-io/mcp-tools/registry.js';
 
 const SNAPSHOT = new URL('./fixtures/tool-surface.json', import.meta.url);
 const SPEC = new URL('../../../docs/foundation/06-mcp-server.md', import.meta.url);

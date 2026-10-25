@@ -58,6 +58,10 @@
 //   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
 //   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
+// - M1-11a-ux: `/app.css` is the approval page's fixed stylesheet (approval-page.ts), served
+//   like `/app.js` under the same headers and CSP. The card view drops the AI argument `inviteUrl`
+//   (the invite's capability link) and carries an optional plain `headline`, checked like every
+//   other card field.
 // - M1-11s-b, the local UI shell (D-118): the React app (apps/local-ui) is served from an in-memory
 //   bundle the caller passes in (`localUi.assets`; the CLI embeds it), never from a file path.
 //   Only `index.html` and `assets/<one file name>` with a known type are accepted, checked before the
@@ -93,6 +97,8 @@
 //   does for `/`; the CLI's `init` calls it for a new owner (the CLI's first-run step). G-1: a
 //   same-user process holding a session link can race the human to set up an owner it controls
 //   (owner-setup.ts threat note).
+// - M1-11b-9: `openActivity()` is the same for `/settings/activity`, for `agentlink ui`; a session
+//   link grants viewing and the owner-presence-gated actions only, as for `open()`.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
@@ -124,7 +130,7 @@ import {
   type OwnerSession,
 } from '@4thtech-io/crypto';
 import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
-import { APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
+import { APP_CSS, APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
 import { decideReviewedWith, type ApprovalContext } from './owner-approval.js';
@@ -201,6 +207,8 @@ const MAX_REVIEW_ITEMS = 20;
 const MAX_DETAIL_CHARS = 1024;
 const MAX_VALUE_CHARS = 16_384;
 const MAX_FIELDS = 64;
+/** AI arguments the page never shows (M1-11a-ux): the invite link of an accept-invite. */
+const HIDDEN_ARGS: ReadonlySet<string> = new Set(['inviteUrl']);
 
 /** The wait in seconds after `failures` rejected presence proofs in a row (0 = no wait). */
 export function presenceBackoffSeconds(failures: number): number {
@@ -313,6 +321,11 @@ function loadLocalUi(assets: LocalUiAssets | undefined): {
  * the AI chose, shown in their own marked region; they may hold anything, including markup.
  */
 export interface ApprovalDetails {
+  /**
+   * M1-11a-ux: the card's plain headline ("Connect with “Ana” (self-declared)"), fixed
+   * text plus at most the contact name under the 06 §2.1 rule; without it the page shows `what`.
+   */
+  readonly headline?: string;
   /** The contact, under the 06 §2.1 name rule. */
   readonly who: string;
   readonly what: string;
@@ -528,6 +541,11 @@ export interface ApprovalServer {
    * returned, logged or put in an event. Resolves false when no browser could be started.
    */
   openFirstRun(): Promise<boolean>;
+  /**
+   * M1-11b-9: the same for the settings pages, at `/settings/activity` (`agentlink ui`). A fixed
+   * path; nothing from a caller reaches the link.
+   */
+  openActivity(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   close(): Promise<void>;
@@ -639,16 +657,23 @@ const isText = (value: unknown, max: number, empty = false): value is string =>
 function detailsOf(value: unknown): ApprovalDetails | undefined | false {
   if (value === undefined) return undefined;
   if (typeof value !== 'object' || value === null) return false;
-  const { who, what, cost, expires, rule, fromAi, terms } = value as Record<string, unknown>;
+  const { headline, who, what, cost, expires, rule, fromAi, terms } = value as Record<
+    string,
+    unknown
+  >;
   for (const field of [who, what, cost, expires, rule]) {
     if (!isText(field, MAX_DETAIL_CHARS)) return false;
   }
+  if (headline !== undefined && !isText(headline, MAX_DETAIL_CHARS)) return false;
   if (!Array.isArray(fromAi) || fromAi.length > MAX_FIELDS) return false;
   const fields: { name: string; value: string }[] = [];
   for (const entry of fromAi as unknown[]) {
     if (typeof entry !== 'object' || entry === null) return false;
     const { name, value: text } = entry as Record<string, unknown>;
     if (!isText(name, MAX_DETAIL_CHARS) || !isText(text, MAX_VALUE_CHARS, true)) return false;
+    // M1-11a-ux: an invite link never reaches the page (defence in depth; the CLI's
+    // source leaves it out already).
+    if (HIDDEN_ARGS.has(name)) continue;
     fields.push({ name, value: text });
   }
   let lines: string[] | undefined;
@@ -661,6 +686,7 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
     }
   }
   return {
+    ...(headline === undefined ? {} : { headline: headline as string }),
     who: who as string,
     what: what as string,
     cost: cost as string,
@@ -1753,6 +1779,11 @@ export async function startApprovalServerWith(
       sendText(res, 200, 'text/javascript; charset=utf-8', APP_JS);
       return;
     }
+    if (path === '/app.css') {
+      if (method !== 'GET') return reject(res, 405, 'method');
+      sendText(res, 200, 'text/css; charset=utf-8', APP_CSS);
+      return;
+    }
 
     if (path.startsWith(ASSETS_PREFIX)) {
       if (method !== 'GET') return reject(res, 405, 'method');
@@ -1901,6 +1932,8 @@ export async function startApprovalServerWith(
       return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
     },
     openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
+    openActivity: async () =>
+      opener(`${origin}/settings/activity?t=${mintLink()}`).catch(() => false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
       await notifier(NOTIFICATION).catch(() => false);

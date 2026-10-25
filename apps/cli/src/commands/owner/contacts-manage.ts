@@ -22,7 +22,7 @@ import { OWNER_ACTION_MAX_LIFETIME_SECONDS } from '@4thtech-io/types';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../../dispatch.js';
 import { commandPrefix } from '../../runtime/cli-prefix.js';
 import { terminalOneLine } from '../../terminal/sanitize.js';
-import { removeInvisible } from '../../tools/untrusted.js';
+import { removeInvisible } from '@4thtech-io/mcp-tools/untrusted.js';
 import { badArguments, chooseAgent, ownerContext, ownerStep } from './common.js';
 import type { OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';

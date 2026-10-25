@@ -68,12 +68,13 @@ export type CommandName =
   | 'deny'
   | 'cancel'
   | 'doctor'
+  | 'ui'
   | 'mcp';
 
 const AGENT: Options = { agent: { type: 'string' } };
 
 /**
- * The commands of 06 §8, in its order. M1-9h adds `credits` and `verify`. Not here yet: `ui` and the
+ * The commands of 06 §8, in its order. M1-9h adds `credits` and `verify`. Not here yet: the
  * passkey option of `init` (they wait for the local settings UI), `storage connect`, `backup`,
  * `relays set`, and `init --keystore file` / `keystore passphrase` (they wait for the file KeyStore,
  * M1-8f, off the M1a path, D-73 (4)).
@@ -191,6 +192,9 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     approvalIdAt: [0],
   },
   { name: 'doctor', usage: ['agentlink doctor'], guard: 'none', options: AGENT },
+  // M1-11b-9: opens the local pages in the owner's own terminal; the handler checks the terminal
+  // itself so an agent run gets one fixed line (ui.ts), not the generic guard text.
+  { name: 'ui', usage: ['agentlink ui [--agent <name>]'], guard: 'none', options: AGENT },
   {
     name: 'mcp',
     // M1-36h: `--advanced` serves the Advanced tool surface (the `chain?` override, 06 §2.4).
@@ -265,7 +269,7 @@ const HELP_GROUPS: readonly { readonly title: string; readonly names: readonly C
     title: 'Every day:',
     names: ['status', 'invite', 'accept', 'requests', 'approve', 'deny', 'cancel'],
   },
-  { title: 'More:', names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'mcp'] },
+  { title: 'More:', names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'ui', 'mcp'] },
 ];
 
 /** The `--help` text: exactly the registered commands of 06 §8, grouped. */

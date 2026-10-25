@@ -6,7 +6,7 @@
 // can carry a shell metacharacter, a space, a quote or a newline, or be read as an option.
 //
 // The M1-9g copy catalogue has no M1a entry for this text yet (its `pending_approval.nextStep` is the
-// M1b link version), so the spec's fixed sentences live here. The tool handlers (src/tools/) may not
+// M1b link version), so the spec's fixed sentences live here. The tool handlers (packages/mcp-tools) may not
 // import this module (06 §1); the runtime hands it to them through the handler context (M1-9c).
 import { approvalIdSchema } from '@4thtech-io/types';
 import { DEFAULT_AGENT_NAME, isAgentName } from '../runtime/agent-name.js';

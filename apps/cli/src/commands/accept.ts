@@ -22,7 +22,10 @@ import {
   type CommandContext,
   type CommandHandler,
 } from '../dispatch.js';
-import { acceptInviteAction, acceptInviteApprovalSummary } from '../tools/accept-action.js';
+import {
+  acceptInviteAction,
+  acceptInviteApprovalSummary,
+} from '@4thtech-io/mcp-tools/accept-action.js';
 import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import type { OpenedAgent } from '../runtime/open-agent.js';
 import { terminalOneLine } from '../terminal/sanitize.js';

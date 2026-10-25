@@ -1,16 +1,16 @@
 // The import fence of M1-9i-b2 (04 §2.3.3 "Security properties", I-4: no MCP tool may export keys or
 // add storage credentials): no MCP tool handler reaches KeyExportControl, KeyImportControl or
-// StorageCredentialControl. The tool modules (src/tools/, 06 §1) are what the MCP server calls, and
+// StorageCredentialControl. The tool modules (packages/mcp-tools/src/, 06 §1) are what the MCP server calls, and
 // ToolContext is all they are given, so the fence has two halves:
 //
-// - static: every source file reachable from src/tools/ by relative imports names none of the three
+// - static: every source file reachable from packages/mcp-tools/src/ by relative imports names none of the three
 //   controls and none of their factories (any identifier containing `exportControl`,
 //   `importControl` or `credentialControl`, in any case; the M1-9i-c backends name theirs so), and
 //   imports neither @4thtech-io/node (where the backends live) nor @4thtech-io/crypto/keystore;
 // - type level: no property path of ToolContext reaches a method of the three controls.
 //
 // The ESLint tool-module zone (eslint.config.mjs) already keeps @4thtech-io/node and relative
-// escapes out of src/tools/; this test also covers a type-only reference, which lint allows.
+// escapes out of packages/mcp-tools/src/; this test also covers a type-only reference, which lint allows.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,10 +20,9 @@ import type {
   KeyImportControl,
   StorageCredentialControl,
 } from '@4thtech-io/crypto';
-import type { ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '@4thtech-io/mcp-tools';
 
-const TOOLS_DIR = fileURLToPath(new URL('../src/tools/', import.meta.url));
-const SRC_DIR = fileURLToPath(new URL('../src/', import.meta.url));
+const TOOLS_DIR = fileURLToPath(new URL('../../../packages/mcp-tools/src/', import.meta.url));
 
 /** Any identifier naming one of the controls or a factory of one. */
 const CONTROL_NAME = /(?:export|import|credential)control/i;
@@ -51,7 +50,7 @@ function toolGraph(): Map<string, string> {
     seen.set(file, text);
     for (const match of text.matchAll(RELATIVE)) {
       const target = resolve(dirname(file), match[1]!.replace(/\.js$/, '.ts'));
-      if (target.startsWith(SRC_DIR) && isSource(target)) queue.push(target);
+      if (target.startsWith(TOOLS_DIR) && isSource(target)) queue.push(target);
     }
   }
   return seen;
@@ -112,11 +111,11 @@ describe('no MCP tool handler reaches the owner controls (M1-9i-b2, I-4)', () =>
   const graph = toolGraph();
 
   it('walks every tool module, the registry and the handler table (not vacuous)', () => {
-    const names = [...graph.keys()].map((file) => file.slice(SRC_DIR.length));
-    expect(names).toContain('tools/index.ts');
-    expect(names).toContain('tools/registry.ts');
-    expect(names).toContain('tools/context.ts');
-    expect(names).toContain('tools/send.ts');
+    const names = [...graph.keys()].map((file) => file.slice(TOOLS_DIR.length));
+    expect(names).toContain('index.ts');
+    expect(names).toContain('registry.ts');
+    expect(names).toContain('context.ts');
+    expect(names).toContain('send.ts');
     expect(names.length).toBeGreaterThan(20);
   });
 

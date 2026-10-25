@@ -27,7 +27,7 @@ import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import { readAgentConfig } from '../runtime/index.js';
 import type { TerminalContext } from '../runtime/guards.js';
 import { HARNESSES } from '../harness/index.js';
-import { copy } from '../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { INIT_TEXT, createInitHandler, type InitDeps } from './init.js';
 
 const POSIX = process.platform !== 'win32';

@@ -7,7 +7,7 @@
 //   in Node; the CLI output channel is never used here, src/output.ts).
 // - When the agent is not set up, the server still starts and every tool answers `needs_setup` with
 //   the runtime's fixed copy, so the agent can tell the user what to run.
-// - The handlers get M1-9k's `approvalNextStep` through their context (06 §1: src/tools/ may not
+// - The handlers get M1-9k's `approvalNextStep` through their context (06 §1: packages/mcp-tools may not
 //   import it).
 // - The background loop (M1-9r, loop.ts): when the agent is set up, the server competes for the
 //   agent's publisher lease and, while it holds it, keeps receiving, processing and delivering. On
@@ -41,7 +41,7 @@ import {
 } from '../runtime/index.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
-import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
+import { coreToolClient, type HandlerEnvironment, type ToolContext } from '@4thtech-io/mcp-tools';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
 import { approvalWaitMsFor } from './approval-wait.js';
 import { localUiOptions, logOwnerSetupEvent } from './local-ui-wiring.js';

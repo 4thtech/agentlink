@@ -50,7 +50,7 @@ function checkInjected(name: string, line: string): Run {
   return check(['--bundle', file, '--skip-tools']);
 }
 
-/** A stand-in for src/tools/index.ts with the given source, bundled for the neutral platform. */
+/** A stand-in for packages/mcp-tools/src/index.ts with the given source, bundled for the neutral platform. */
 function checkToolsEntry(name: string, source: string): Run {
   const file = join(work, `${name}.ts`);
   writeFileSync(file, source);
@@ -58,12 +58,12 @@ function checkToolsEntry(name: string, source: string): Run {
 }
 
 describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
-  it('passes on the built bundle and on src/tools/ bundled for the neutral platform', () => {
+  it('passes on the built bundle and on packages/mcp-tools bundled for the neutral platform', () => {
     const run = check([]);
     expect(run.stderr).toBe('');
     expect(run.code).toBe(0);
     expect(run.stdout).toContain('bundle-check: published bundle ok');
-    expect(run.stdout).toContain('bundle-check: src/tools/ neutral bundle ok');
+    expect(run.stdout).toContain('bundle-check: packages/mcp-tools neutral bundle ok');
   }, 120_000);
 
   describe('the published bundle (dist/agentlink.js)', () => {
@@ -210,7 +210,7 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
     );
   });
 
-  describe('src/tools/ bundled for the neutral (Worker) platform (06 §1, IR-M1-9j-1 F04)', () => {
+  describe('packages/mcp-tools bundled for the neutral (Worker) platform (06 §1, IR-M1-9j-1 F04)', () => {
     it.each([
       [
         'node-prefixed',

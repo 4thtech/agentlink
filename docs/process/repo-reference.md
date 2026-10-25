@@ -25,6 +25,7 @@ agentlink/
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
 │  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)
 │  ├─ core/                      # AgentLinkClient, policies, approvals, Store interface (KeyStore types: @4thtech-io/crypto, G-2)
+│  ├─ mcp-tools/                 # runtime-agnostic MCP tool handlers (moved from apps/cli/src/tools/, M2-3t)
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
 ├─ apps/
