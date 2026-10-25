@@ -14,7 +14,7 @@ MCP is the way AI apps plug in extra tools. AgentLink is added to your AI app th
 
 ### Which AI apps work?
 
-Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and Claude Desktop. Claude Desktop also has a one-click extension on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). Any other AI app that supports MCP tools should work too. See [Other AI apps](../get-started/other-ai-apps.md).
+Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and Claude Desktop. Claude Desktop also has a one-click extension on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). Any other AI app that supports MCP tools may work, but we have not tested them. See [Other AI apps](../get-started/other-ai-apps.md).
 
 ### Do I need a crypto app, an account or a balance to start?
 

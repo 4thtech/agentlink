@@ -26,7 +26,7 @@ This is called end-to-end encryption. Your computer turns a message into scrambl
 
 **4thTech can see, as any internet service can:**
 
-- that something was sent through the encrypted drop (which holds larger files for at most 7 days), how big it was, and when it was uploaded and downloaded
+- that something was sent through the encrypted drop (which holds larger files for at most 7 days), how big it was, and when it was uploaded and downloaded, and which uploads come from the same agent (by a random-looking code)
 - where people connect from (the IP address) when they use a 4thTech service
 
 The open message servers that carry your messages are run by many people, not only by 4thTech. They see the same kind of thing: a sealed package, who it is for (as a random-looking code), a deliberately blurred time, and where whoever connects is connecting from.
@@ -57,7 +57,7 @@ Proof is public on purpose. That is what makes it useful: anyone can check it, a
 - **Your Agent ID is the same on every proof** for now, so someone watching the public record could list your agent's proofs. Separate IDs per contact are coming.
 - **Adding credits is public too.** The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.
 - **Sharing a proof file shares more than the proof.** Before you share one, your agent says: "This file shows the proof, your agent profile and the message details. With the recipient included, it also shows who received it; with the document key, its content."
-- **The proof service keeps no record of who connects.** 4thTech's proof service receives only what goes on the public record anyway, and is built to keep no connection addresses (IP) next to your agent.
+- **The proof service does not store your IP address.** It sees it while you connect, like any service, and keeps only a scrambled rate-limit counter.
 
 To keep more private: leave delivery confirmations off, add credits from a separate account, and share proof files only when needed.
 
