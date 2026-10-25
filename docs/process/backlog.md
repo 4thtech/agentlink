@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 332 (M1a 91, M1b 241) |
+| M1 Local beta | 335 (M1a 91, M1b 244) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -796,6 +796,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Depends on:** —
 - **Scope:** On GitHub Free 30 to 60 runs queue behind 5 runners, mostly the macOS and Windows matrix legs, which ran on every PR push and again in the merge queue. They now run on `merge_group` and `push` to `main` only; docs-only changes skip the heavy jobs. `ci-gate` counts skipped as success, so the four required checks are unchanged.
 - **Acceptance:** nothing that runs in `merge_group` is weakened; no deploy workflow touched; no auto-merge.
+
+#### CHORE-CI-DOCS-FASTLANE · Docs-only fast lane in the merge queue (new, 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 by path (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/review-gate.yml`, `tools/ci/select-affected.mjs` and tests, `docs/process/ci-cd.md`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** CHORE-CI-SPEED-3
+- **Scope:** Owner decisions (Tali, 2026-10-25): (D1) a merge group whose diff holds only docs runs `checks` through the affected-package selector instead of the full suite; any code PR in the group, an unreadable diff or a push to `main` runs the full suite. (Item B) a docs-only push to a feature branch is diffed against its merge base with `main`, so the heavy jobs skip; an unknown base runs everything. (D2) `review-gate` derives `docs-site/**` as S1 (the mirror that M0-25 and the docs-site check card left open), exempting only the generated page `docs-site/technical/project/status-and-roadmap.md`. (D3) spec review classes are unchanged.
+- **Acceptance:** no gate weakened (gitleaks, dependency review, CodeQL, zizmor, pr-hygiene, review-gate, context-budget, changesets, docs-status drift all keep running); no ruleset change, no `paths-ignore`, `ci-gate` unchanged; tests first in `tools/ci/select-affected.test.mjs` and `tools/ci/review-gate.test.mjs`.
 
 #### CHORE-CI-FOLLOWUPS · Main CI never cancelled while pending; openssl hook timeouts in packages/node (new, 2026-10-21)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
@@ -3956,7 +3963,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Endpoints per 07 §5.4: `POST /v1/upload` (signature, nonce and time-window check; size cap; weekly quota per drop key; rate limits per drop key and per IP, IPv6 per /64; global cap), a single-use signed PUT target that accepts exactly the declared size and never overwrites a stored object, the signed commit (bytes verified against `ciphertextSha256`, mismatch deletes), a signed GET valid until `expiresAt`, `DELETE` signed by the uploading drop key only, `POST /v1/report` (deletes only that object; no automatic key block), `GET /v1/health` (liveness only).
   - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@4thtech-io/crypto` helpers, with vectors for the URL MAC.
   - Random 128-bit object IDs chosen by the Worker; no file names or metadata on objects; quota and nonce counters in Durable Objects; no accounts.
-  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (proposed 10).
+  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (16, owner-confirmed 23 Oct 2026).
   - Serving only as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for GET.
   - Logging (I-7, 04 §4): aggregate counters only; no request URLs, signed URLs, object IDs, drop keys or upload signatures in any log, metric label or analytics, with or without IPs; request bodies never logged. Production config keeps Workers observability and request logging, Tail Workers and Logpush off for the drop Worker.
   - (IR-D48-1 F10) Close the abuse-control residuals in the spec (04 §4, 07 §5.4, §5.6) before implementing: shared-egress collateral (per-IP and per-/64 limits can block innocent users behind an office or carrier NAT; a per-drop-key allowance keeps them working); the behaviour when the global cap is exhausted (fail closed with a typed, retryable `rate_limited` or `unavailable`, never silent drops); and the per-object download limit (proposed 10) against the recipient set (a file sent to more recipients than the limit must still be fetchable by each of them).
@@ -4028,15 +4035,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 awaits the owner's 10 vs 16; counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
 - **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off.
-  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; download limit per object as in 07 §5.4 (16), owner to confirm 10 vs 16.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off. **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; downloads per object: 16 (owner-confirmed 23 Oct 2026).
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**
   - Buckets and lifecycle rule exist and are read back (with M1-27b); confirmed limits recorded in 07 §5.4 and 12 §2.
@@ -5099,6 +5106,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
 - **Acceptance:** the test fails when the owner-fingerprint clause is removed (mutation check recorded in the PR) and passes with it; no test weakened.
 
+#### M1-9zg · core: ask which contact when two share a name (new, live finding 2026-10-25)
+- **Status:** in progress · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`tools/contacts.ts`, `list-contacts.ts`, `status.ts`, `registry.ts`, tool-surface snapshots); docs/foundation/06
+- **Depends on:** M1-9za
+- **Spec:** 06 §2 (Contact), §2.1 (list_contacts, status); I-5
+- **Invariants:** I-5
+- **Scope:**
+  - Two contacts that both declare "oc-test" (different owners): a tool called by that name never guesses. `AMBIGUOUS_CONTACT` candidates now carry the owner fingerprint and a short ID next to the name-rule name; the self-declared name is still never read.
+  - `agentlink_list_contacts` and `agentlink_status` show the owner fingerprint next to a duplicated name only.
+  - `accept_invite` nextStep stays neutral until the Contacts page (M1-11c-a2) is merged.
+- **Acceptance:** RED commit; candidates carry fingerprint and short ID; duplicate names show the fingerprint, unique ones do not; tool-surface snapshots updated (owner merge).
+
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · docs/foundation/06-mcp-server.md §4
@@ -5370,6 +5389,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - A grep test finds no bare prefix in the listed files; `status` on a fresh machine names the owner step.
 
+#### M1-36a-c · npx run shows the npx command, not the bare name (new, owner report on 0.2.0)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/runtime/cli-prefix.ts`
+- **Depends on:** M1-36a
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - npx puts the package's `.bin` on PATH, so the "is `agentlink` on PATH" check wrongly found the npx copy and printed the bare `agentlink`. A launch from an npx or dlx cache, or by `npm exec`, now always gets the npx form; a real global install is unchanged.
+- **Acceptance:**
+  - Tests simulate the npx launch (cache path, `.bin` on PATH, `npm_command=exec`) and expect the npx form; the global case still gives `agentlink`.
+
 #### M1-36d-b · tool copy lows from IR-M1-36d-1 (new, IR-M1-36d-1)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/tools/next-action.test.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/tools/invite-common.ts`
@@ -5467,6 +5497,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass. Confirmed again by IR-DOCS-FOLLOWUPS-1022B-1 (2026-10-22): this card is the home for that README line.
 - **Acceptance:**
   - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36k · cli: init asks once, shows skips and a summary, and waits for Claude Desktop to quit (new, owner test 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`apps/cli/src/commands/init.ts`; no owner or policy code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-36b
+- **Scope:**
+  - One "Set up AgentLink in all N apps? (y/N)" before the per-app questions; a no falls back to them.
+  - Any answer other than y or yes prints "Skipped <app>."; type-ahead is kept by one shared line reader.
+  - A final summary, one line per app: set up, already set up, skipped or blocked (fixed reason).
+  - Claude Desktop running (pgrep on macOS, tasklist on Windows, no shell): ask the user to quit it first and press Enter; tell them to reopen it after. AgentLink never closes the app.
+  - The `owner add-agent` hint only for an agent without an owner card.
+- **Acceptance:**
+  - Tests cover the all-apps question, the skip line, the summary, the quit wait and the hint; no test weakened.
 
 #### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -7160,7 +7203,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Invariants:** —
 - **Scope:**
   - A zero-dependency Node script, run in CI on changes to `docs-site/`: every relative link and anchor resolves; every Markdown file in a space appears in its `SUMMARY.md` exactly once and every entry exists; every page starts with a status hint; the guide uses none of the 11 §5 "Never say" terms outside sections titled "Advanced".
-  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25.
+  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25. The `review-gate.yml` mirror landed in CHORE-CI-DOCS-FASTLANE (owner decision 2026-10-25).
   - Reuse the link checker from M0-24 where it exists; this card adds the `docs-site/` rules.
 - **Acceptance:**
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
@@ -7455,7 +7498,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |
 | M1-23 | Run the J9 dogfood with @denisjazbec (install, pair, daily project sync, a J8 negotiation); sign off the M1a gate |
 | M1-24 | Trademark and name check (D-38) with counsel before the production domain (M2-10); start early |
-| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 10 vs 16 open); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
+| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 16 (owner-confirmed 23 Oct 2026)); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
 | M1-GATE, M2-GATE, M3-GATE | Recruit testers; sign off the gate; accept or reject residual risks |
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |

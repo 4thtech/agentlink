@@ -17,6 +17,14 @@ export interface ContactRef {
   readonly name: string;
   readonly label: IdentityLabel;
   readonly nameSource: NameSource;
+  /**
+   * WAVE-030: the owner's short fingerprint, set only where two active contacts show the same name
+   * (and always on `AMBIGUOUS_CONTACT` candidates), so the user can tell them apart. Derived from
+   * the verified card, never a self-declared string.
+   */
+  readonly ownerFingerprint?: string;
+  /** WAVE-030: the first ten characters of the contact ID, on candidates only. */
+  readonly shortId?: string;
 }
 
 /** Owner aliases are owner text, shown unrestricted (06 §2.1 rule 1) but kept to one short line. */
@@ -44,11 +52,44 @@ export function displayRef(id: string, display: ContactDisplayName): ContactRef 
 
 /** The name as summaries show it: quoted, then its label, e.g. `“Marko Novak” (self-declared)`. */
 export function renderRef(ref: ContactRef): string {
-  return renderContactName({
+  const name = renderContactName({
     name: ref.name,
     label: ref.label,
     nameSource: ref.nameSource,
   } as ContactDisplayName);
+  return ref.ownerFingerprint === undefined ? name : `${name} (owner ${ref.ownerFingerprint})`;
+}
+
+/** A candidate of `AMBIGUOUS_CONTACT`: the name-rule ref plus owner fingerprint and short ID. */
+export function candidateRef(view: ContactView): ContactRef {
+  return Object.freeze({
+    ...contactRef(view),
+    ownerFingerprint: view.ownerFingerprint.short,
+    shortId: view.id.slice(0, 10),
+  });
+}
+
+/**
+ * Refs by contact ID for `views`, with the owner fingerprint added where another contact shows the
+ * same name (WAVE-030). Compared the way `resolveContact` compares, so a pair that cannot be told
+ * apart by name is exactly a pair that shows its fingerprint.
+ */
+export function refsById(views: readonly ContactView[]): Map<string, ContactRef> {
+  const counts = new Map<string, number>();
+  for (const view of views) {
+    const key = fold(shownName(view.display));
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return new Map(
+    views.map((view) => {
+      const ref = contactRef(view);
+      const dup = (counts.get(fold(shownName(view.display))) ?? 0) > 1;
+      return [
+        view.id,
+        dup ? Object.freeze({ ...ref, ownerFingerprint: view.ownerFingerprint.short }) : ref,
+      ] as const;
+    }),
+  );
 }
 
 /** Contacts the tools offer: active ones (not blocked, revoked or removed). */
@@ -88,7 +129,7 @@ export function resolveContact(query: string, views: readonly ContactView[]): Co
       TOOL_TEXT.contactAmbiguous,
       TOOL_TEXT.contactAmbiguousNextStep,
       'AMBIGUOUS_CONTACT',
-      { candidates: matches.map(contactRef) },
+      { candidates: matches.map(candidateRef) },
     ),
   };
 }

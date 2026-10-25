@@ -24,7 +24,7 @@
 // `openOffers: true`. A failed read counts none (fail closed); its error text is never logged.
 import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import { copy } from './strings/index.js';
-import { activeContacts, contactRef, renderRef, type ContactRef } from './contacts.js';
+import { activeContacts, refsById, renderRef, type ContactRef } from './contacts.js';
 import type { Counts, ToolContext } from './context.js';
 import { topUpUrl } from './proofs-common.js';
 import { ok, type HandlerOutput } from './result.js';
@@ -53,7 +53,7 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
 
   const incomplete = counts.incomplete ?? 0;
   const contacts = activeContacts(await client.contacts());
-  const byId = new Map(contacts.map((view) => [view.id, contactRef(view)] as const));
+  const byId = refsById(contacts);
   const inbox: { contact: ContactRef; unread: number }[] = [];
   let unread = 0;
   for (const entry of counts.inbox) {

@@ -1,20 +1,18 @@
 # Cursor
 
-> **Status: Available with the next release.** The settings come from Cursor's documentation; this has not been tried in the app yet.
+*Applies to AgentLink 0.2.0. The settings come from Cursor's documentation. We have not yet tried this in the app itself.*
 
-**Purpose:** set up AgentLink in Cursor, as its own agent, next to your other AI apps.
+This page sets up AgentLink in Cursor, as its own agent next to your other AI apps. You need Node.js 22.14 or newer (check with `node --version`) and Cursor.
 
-You need Node.js 22.14 or newer and Cursor.
+## 1. Install it
 
-## 1. Create the agent for the app
-
-Run this in your own terminal. It shows the exact change to Cursor's settings file and asks `y/N`; nothing is written before you confirm:
+Run this in your own terminal. It shows the exact change to Cursor's settings file and asks `y/N`. Nothing is written before you confirm:
 
 ```
 npx -y @4thtech-io/agentlink init --agent cursor --harness cursor
 ```
 
-Check that the package name is exactly `@4thtech-io/agentlink`, so you don't install a look-alike. AgentLink adds one entry named `agentlink` to `~/.cursor/mcp.json`, and keeps a backup of your old file. Restart Cursor afterwards.
+Check that the package name is exactly `@4thtech-io/agentlink`, so you do not install a look-alike. AgentLink adds one entry named `agentlink` to `~/.cursor/mcp.json`, and keeps a backup of your old file. Restart Cursor afterwards.
 
 ## 2. Protect your approvals
 
@@ -24,6 +22,6 @@ If this is your first AgentLink agent on this computer, run `npx -y @4thtech-io/
 
 Ask Cursor: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink doctor` in your own terminal.
 
-Agents under one computer user are kept apart inside AgentLink, not by a security boundary. See [Protect your approvals](protect-your-approvals.md).
+Agents on one computer are kept apart inside AgentLink, but they are not locked away from each other. See [Protect your approvals](protect-your-approvals.md).
 
 Next: [Pair with someone](pair-with-someone.md)
