@@ -16,7 +16,7 @@ import {
   STATUS_FILE,
   TARGETS,
   countBacklogCards,
-  renderBacklogCounts,
+  formatBacklogCounts,
   renderReadmeRoadmap,
   renderReadmeStatus,
   renderSiteMilestones,
@@ -259,12 +259,12 @@ describe('the backlog card counts', () => {
     expect(countBacklogCards(sample)).toEqual({ M0: 1, M1a: 1, M1b: 2, M1: 3, M2: 2, M3: 1 });
   });
 
-  it('renders a table with the totals and the phase split', () => {
-    const out = renderBacklogCounts(null, sample);
-    expect(out).toContain('| M1 Local beta | 3 (M1a 1, M1b 2) |');
-    expect(out).toContain('| M0 Foundations | 1 |');
-    expect(out).toContain('| M2 Console, desktop apps, self-host, design | 2 |');
-    expect(out).toContain('| M3 Mainnet beta | 1 |');
+  it('renders a plain-text summary with the totals and the phase split', () => {
+    const out = formatBacklogCounts(countBacklogCards(sample));
+    expect(out).toContain('M0 Foundations: 1');
+    expect(out).toContain('M1 Local beta: 3 (M1a 1, M1b 2)');
+    expect(out).toContain('M2 Console, desktop apps, self-host, design: 2');
+    expect(out).toContain('M3 Mainnet beta: 1');
   });
 
   describe('in a repository copy', () => {
@@ -275,39 +275,35 @@ describe('the backlog card counts', () => {
         mkdirSync(dirname(join(root, file)), { recursive: true });
         cpSync(join(repo, file), join(root, file));
       }
+      mkdirSync(dirname(join(root, BACKLOG)), { recursive: true });
+      cpSync(join(repo, BACKLOG), join(root, BACKLOG));
     });
     afterEach(() => rmSync(root, { recursive: true, force: true }));
     const read = () => readFileSync(join(root, BACKLOG), 'utf8');
 
-    it('is in sync in this repository and is a target', () => {
-      expect(TARGETS.some((t) => t.file === BACKLOG)).toBe(true);
+    it('commits no counts: the backlog is not a generated target and carries no counts block', () => {
+      expect(TARGETS.some((t) => t.file === BACKLOG)).toBe(false);
+      expect(read()).not.toContain('backlog-counts');
       expect(run({ root, check: true }).problems).toEqual([]);
     });
 
-    it('fails the check when a card was added without regenerating, then regenerates', () => {
+    it('does not fail the check when a card is added (no merge-order drift)', () => {
       writeFileSync(
         join(root, BACKLOG),
         `${read()}\n#### M2-999 · added card\n- **Status:** backlog · **Phase:** M2\n`,
       );
-      const { problems } = run({ root, check: true });
-      expect(problems.join('\n')).toContain(BACKLOG);
-      expect(problems.join('\n')).toContain('node tools/docs-status/index.mjs');
-      expect(problems.join('\n')).toContain('never edit the card counts by hand');
-      expect(run({ root }).changed).toEqual([BACKLOG]);
       expect(run({ root, check: true }).problems).toEqual([]);
+      expect(run({ root }).changed).toEqual([]);
     });
 
-    it('fails the check when the counts were edited by hand', () => {
+    it('fails the check when a counts block is committed again', () => {
       writeFileSync(
         join(root, BACKLOG),
-        read().replace(/\| M0 Foundations \| \d+ \|/, '| M0 Foundations | 1 |'),
+        `${read()}\n<!-- backlog-counts:start -->\n| M0 Foundations | 1 |\n<!-- backlog-counts:end -->\n`,
       );
-      expect(run({ root, check: true }).problems.join('\n')).toContain(BACKLOG);
-    });
-
-    it('fails when the markers are missing', () => {
-      writeFileSync(join(root, BACKLOG), read().replace('<!-- backlog-counts:start -->', ''));
-      expect(run({ root, check: true }).problems.join('\n')).toContain('backlog-counts');
+      const problems = run({ root, check: true }).problems.join('\n');
+      expect(problems).toContain(BACKLOG);
+      expect(problems).toContain('--counts');
     });
   });
 });
