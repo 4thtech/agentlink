@@ -2,14 +2,12 @@
 // hands the page (08 §1, §4; 11 §5, §6.2.1, §8; 04 §2.5; D-116; I-5).
 //
 // - The stylesheet is served by this server at `/app.css` under the same strict CSP (no inline style,
-//   no external resource), follows light and dark, and takes its colours from the design tokens of
-//   `packages/ui` (D-116): a drift check compares every colour it sets with tokens.css.
+//   no external resource), follows light and dark, and sets colours only as tokens. That every token
+//   equals the @4thtech-io/ui design tokens (D-116) is checked in that package
+//   (approval-page-tokens.test.ts), so a token change runs it.
 // - The page shell links only same-origin resources and carries no request data.
 // - The invite link of an accept-invite request never reaches the page: it is the capability that
 //   opens the invite, and the owner decides on who it connects to, not on the link.
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { APP_CSS, pageHtml } from './approval-page.js';
 import {
@@ -26,9 +24,6 @@ import {
   type OwnerWorld,
 } from './approval-ui.fixture.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const TOKENS_CSS = readFileSync(join(here, '../../ui/src/tokens/tokens.css'), 'utf8');
 
 /** The CSP every answer carries, pinned: this card changes the page, never the policy. */
 const CSP =
@@ -134,15 +129,10 @@ describe('the approval page stylesheet (M1-11a-ux; D-116)', () => {
     expect(APP_CSS).toContain('color-scheme: light');
   });
 
-  it('takes every colour from the packages/ui design tokens (no invented values)', () => {
-    const uiDark = vars(blockAfter(TOKENS_CSS, ":root,\n[data-theme='dark'] {"));
-    const uiLight = vars(blockAfter(TOKENS_CSS, "[data-theme='light'] {"));
+  it('sets colours only as tokens, the same set in light and dark (no invented values)', () => {
     const dark = vars(blockAfter(APP_CSS, ':root {'));
     const light = vars(blockAfter(APP_CSS, '@media (prefers-color-scheme: light) {\n  :root {'));
     expect(dark.size).toBeGreaterThan(10);
-    expect(light.size).toBeGreaterThan(10);
-    for (const [name, value] of dark) expect(value, `dark ${name}`).toBe(uiDark.get(name));
-    for (const [name, value] of light) expect(value, `light ${name}`).toBe(uiLight.get(name));
     // Light sets every colour dark sets, so nothing leaks from one theme into the other.
     expect([...light.keys()].sort()).toEqual([...dark.keys()].sort());
     // Colours outside the token blocks would be invented values.

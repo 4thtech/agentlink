@@ -1,10 +1,10 @@
 // M1-8d, M1-11a: the pages of the local approval UI (08 §1; 11 §6.2.1; 02 J4; 04 §2.5, §2.5.2;
 // D-68). The text lives in UI_STRINGS, one place, so M1-11b can map it to the D1 copy keys.
 //
-// M1-11a-ux (owner test 2026-10-25; interim until M1-11b-2 moves approvals to
-// apps/local-ui): the page is styled from the D1 approval card (docs/design/d1/screens/mobile/
-// approval-card--pending--{light,dark}--360, d1/components/ApprovalCard.md, TextField.md) with the
-// packages/ui tokens (D-116; nothing invented: a test compares every colour with tokens.css). The
+// M1-11a-ux (owner test 2026-10-25; interim until M1-11b-2 moves approvals to the local UI app):
+// the page is styled from the D1 approval card (the mobile approval-card pending screens, light and
+// dark, 360; the ApprovalCard and TextField component specs) with the @4thtech-io/ui tokens (D-116;
+// nothing invented: a test in that package compares every colour with its tokens.css). The
 // stylesheet is APP_CSS, served at `/app.css` under the same CSP (`style-src 'self'`; no inline
 // style, no external resource, no web font: the token font stack falls back to the system font).
 // The card leads with a plain headline built by the agent's runtime ("Connect with “Ana”
@@ -148,7 +148,7 @@ export function pageHtml(csrf: string): string {
   ].join('\n');
 }
 
-/** The AgentLink mark (packages/ui brand.tsx, 16 px form), inline: markup, not a loaded resource. */
+/** The AgentLink mark (@4thtech-io/ui Mark, 16 px form), inline: markup, not a loaded resource. */
 const MARK =
   '<svg class="al-mark" width="24" height="24" viewBox="0 0 16 16" aria-hidden="true">' +
   '<path class="al-mark-ink" d="M1 1.5H5V3.5H3V12.5H5V14.5H1Z M15 1.5H11V3.5H13V12.5H11V14.5H15Z"/>' +
@@ -766,9 +766,9 @@ export const APP_JS = `'use strict';\n(function () {\n  var S = ${JSON.stringify
 
 /**
  * The page stylesheet served at `/app.css` (M1-11a-ux; D-116). The colours are the
- * packages/ui design tokens (tokens.css, dark first, light under prefers-color-scheme), copied by
- * value because this package does not depend on packages/ui; approval-page.test.ts fails on any
- * difference. Sizes and spacing follow the same tokens and components.css (`.al-approval`,
+ * @4thtech-io/ui design tokens (tokens.css, dark first, light under prefers-color-scheme), copied
+ * by value because this package does not depend on that one; the drift test in @4thtech-io/ui
+ * (approval-page-tokens.test.ts) fails on any difference. Sizes and spacing follow the same tokens and components.css (`.al-approval`,
  * `.al-field`, `.al-btn`, `.al-untrusted`). No url(), no @import, no web font.
  */
 export const APP_CSS = `:root {
