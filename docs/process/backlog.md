@@ -6072,6 +6072,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: add-agent over an existing policy ends in the decided outcome with a plain message; the local-UI first run leaves a signed first policy and the agent can send to the Send folder.
 
+#### M1-36b-2-c · the Send folder for existing agents, and friendlier folder rules (new, owner two-computer test, 2026-10-25)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (`packages/node` owner signing, policy path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/owner-send-folder.ts`, `apps/cli/src/commands/owner/policy.ts`, `apps/cli/src/tools/files-common.ts`
+- **Depends on:** M1-36b-2
+- **Spec:** 04 §2.5, §2.8; 06 §3, §8; D-121 D6
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - `policy allow-send-folder` † for an agent that already has its card: creates or checks `~/AgentLink/Send` (the first-rules folder rules) and signs one `policy.set` that adds only that folder to the rules in force (byte-exact JCS check in node).
+  - `policy allow-folder` with another spelling of a real folder shows the exact path and asks "Use <exact path>? (y/N)"; it still binds to the realpath. Links are still refused.
+  - NO_ALLOWED_FOLDER's nextStep names `policy allow-send-folder` for the owner's own terminal; no MCP path performs the setup (I-4).
+  - The inbox folder (`files.inboxFolder`, `~/AgentLink/Inbox`) is created on first save (CLI runtime `resolveOwnFolder`); documented, no change.
+- **Acceptance:**
+  - Tests first: the rules only gain that one folder; a non-empty folder or a link is refused before any owner code; the NO_ALLOWED_FOLDER copy includes the command; no MCP tool reaches the new code (fence tests); threat note and an independent audit (S2).
+
 #### M1-7f-3-b · files: expiry assertions and refresh-link lows (new, follow-up of IR-1 on #498)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core` files) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (files), test storage doubles

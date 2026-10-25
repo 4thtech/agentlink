@@ -10,7 +10,7 @@ import { COMMANDS, createDispatcher, helpText, type DispatchIO } from '../dispat
 const SUBCOMMANDS: Readonly<Record<string, readonly string[]>> = {
   owner: ['init', 'add-agent', 'change-code'],
   contacts: ['rename', 'remove'],
-  policy: ['show', 'allow-folder', 'remove-folder', 'recover'],
+  policy: ['show', 'allow-folder', 'remove-folder', 'recover', 'allow-send-folder'],
   requests: ['accept', 'ignore', 'block', 'blocked', 'unblock'],
 };
 /** Flags that the dispatcher itself answers. */

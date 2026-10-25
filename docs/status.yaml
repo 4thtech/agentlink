@@ -304,7 +304,7 @@ areas:
       - name: "First agent card at owner setup"
         state: done
         prs: [118, 493]
-        summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h). `owner init` and `owner add-agent` also sign the first rules, a Send folder, in the same owner code entry (M1-36b-2); merged for the next release."
+        summary: "`owner init` signs the agent's first card in the same owner step, so a new agent can pair; the owner key signs only the agent card and the defined owner decisions (M1-8h). `owner init` and `owner add-agent` also sign the first rules, a Send folder, in the same owner code entry (M1-36b-2); merged for the next release. An agent set up before that gets the same Send folder with `policy allow-send-folder`, which adds only that folder to its rules (M1-36b-2-c, in review)."
       - name: "Local approval server"
         state: done
         prs: [207, 225, 247, 256, 267]

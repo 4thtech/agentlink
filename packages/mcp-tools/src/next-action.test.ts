@@ -3,6 +3,7 @@ import { CoreError } from '@4thtech-io/core';
 import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import type { ToolClient, ToolContext } from './context.js';
+import { NPX_COMMAND } from './cli-command.js';
 import { FILE_TEXT, attachRefusal } from './files-common.js';
 import { INVITE_TEXT, inviteFailure } from './invite-common.js';
 import { pendingApproval } from './result.js';
@@ -52,6 +53,16 @@ describe('the folder-not-allowed results name the exact step (F12)', () => {
       expect(out.result.nextStep, reason).toMatch(/terminal/);
     }
     expect(FILE_TEXT.noFolderNextStep).not.toMatch(/AgentLink rules/);
+  });
+});
+
+describe('no folder yet names the Send folder setup (M1-36b-2-c)', () => {
+  it('names the exact owner-terminal command, with the npx prefix', () => {
+    const out = attachRefusal('no_folder');
+    expect(out.result.code).toBe('NO_ALLOWED_FOLDER');
+    expect(out.result.nextStep).toContain(`${NPX_COMMAND} policy allow-send-folder`);
+    expect(out.result.nextStep).toMatch(/terminal they opened themselves/);
+    expect(out.result.nextStep).toContain('~/AgentLink/Send');
   });
 });
 

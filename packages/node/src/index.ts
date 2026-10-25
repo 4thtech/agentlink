@@ -150,3 +150,12 @@ export {
   type AllowedPathErrorCode,
   type AllowedPathOptions,
 } from './allowed-path.js';
+// M1-36b-2-c: the Send folder for an agent that already has its card (`policy allow-send-folder`
+// †). The owner signs through the given owner operation (performOwnerOperation); the folder checks
+// and the byte-exact policy check stay inside.
+export {
+  setUpSendFolder,
+  type SendFolderSetupActions,
+  type SendFolderSetupOptions,
+  type SendFolderSetupResult,
+} from './owner-send-folder.js';

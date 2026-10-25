@@ -151,6 +151,8 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
       'agentlink policy allow-folder <path> [--agent <name>]   †',
       'agentlink policy remove-folder <path> [--agent <name>]   †',
       'agentlink policy recover [--agent <name>]   †',
+      // M1-36b-2-c: the Send folder for an agent set up before its first rules.
+      'agentlink policy allow-send-folder [--agent <name>]   †',
     ],
     guard: 'owner',
     options: AGENT,

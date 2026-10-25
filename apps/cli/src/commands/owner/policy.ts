@@ -1,5 +1,16 @@
-// `agentlink policy show | allow-folder <path> | remove-folder <path> | recover` † (M1-9m, M1-9m-b; 04 §2.5, §4
-// "Allowed folders"; 06 §3 `files.allowedFolders`, §8; 11 §5: the policy is "your rules").
+// `agentlink policy show | allow-folder <path> | remove-folder <path> | recover | allow-send-folder` †
+// (M1-9m, M1-9m-b, M1-36b-2-c; 04 §2.5, §4 "Allowed folders"; 06 §3 `files.allowedFolders`, §8;
+// 11 §5: the policy is "your rules").
+//
+// - `allow-send-folder` (M1-36b-2-c, D-121 D6): the Send folder for an agent that already has its
+//   card (set up before `owner init`/`owner add-agent` signed first rules). @4thtech-io/node's
+//   `setUpSendFolder` creates or checks `~/AgentLink/Send` (real path, 0700, new or empty, no link)
+//   before any owner code and signs one `policy.set` that adds only that folder (byte-exact check),
+//   through the same owner operation as every other policy command.
+// - A folder typed with another spelling of a real folder (case, Unicode form; never a link) is not
+//   refused outright any more (M1-36b-2-c): the exact on-disk path is shown and the owner is asked
+//   "Use <exact path>? (y/N)". Only an explicit `y` continues, and then every check runs again on
+//   that real path, which is what is signed.
 //
 // The owner's folders for sending files. Without one, `agentlink_send` with a path returns
 // `needs_setup` (06 §2.3), so this is what makes sending files usable.
@@ -66,6 +77,7 @@ import {
 import type { Output } from '../../output.js';
 import { commandPrefix } from '../../runtime/cli-prefix.js';
 import { sanitizeTerminalText, terminalOneLine } from '../../terminal/sanitize.js';
+import { setUpSendFolder, type SendFolderSetupResult } from '@4thtech-io/node';
 import {
   badArguments,
   chooseAgent,
@@ -96,7 +108,9 @@ export const POLICY_TEXT = Object.freeze({
   notFolder: "That isn't a folder. Allow the folder that holds the file.",
   dotSegments: 'Use the folder’s path without `.` or `..` in it.',
   spelling: (real: string): string =>
-    `That folder is spelled differently on disk (for example in upper or lower case). Use its exact path: ${real}`,
+    `That folder is spelled differently on disk (for example in upper or lower case). Its exact path is: ${real}`,
+  useExact: (real: string): string => `Use ${real}? (y/N)`,
+  notUsed: 'Nothing was changed.',
   link: (real: string): string =>
     `That path goes through a link. Use the folder's real path instead: ${real}`,
   tooBroad:
@@ -166,6 +180,18 @@ export const POLICY_TEXT = Object.freeze({
   keepReceiptsQuestion:
     'Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off.',
   receiptsTurnOff: 'Delivery receipts turn off.',
+
+  // M1-36b-2-c: allow-send-folder (D-121 D6)
+  sendAllowed: (folder: string): string =>
+    `OK       Your AI can now send files you put in ${folder}. Nothing else in your rules changed.`,
+  sendAlready: (folder: string): string =>
+    `OK       Your AI can already send files you put in ${folder}. Nothing was changed.`,
+  get sendNotEmpty(): string {
+    return `The folder AgentLink/Send in your home folder already holds files, so it was not set up and nothing was changed. Move those files out first, or allow another folder with \`${commandPrefix()} policy allow-folder <path>\`.`;
+  },
+  get sendUnavailable(): string {
+    return `AgentLink couldn't set up the folder AgentLink/Send in your home folder (it must be a real folder, not a link), so nothing was changed. You can allow another folder with \`${commandPrefix()} policy allow-folder <path>\`.`;
+  },
 });
 
 /** The owner's answer about delivery receipts on from an older default (06 §3, D-109). */
@@ -367,7 +393,8 @@ function reviewLines(policy: Policy): readonly string[] | undefined {
 const defaultFlavor = (): PathFlavor => (process.platform === 'win32' ? 'win32' : 'posix');
 
 type Checked =
-  { readonly ok: true; readonly path: string } | { readonly ok: false; readonly message: string };
+  | { readonly ok: true; readonly path: string }
+  | { readonly ok: false; readonly message: string; readonly spelledAs?: string };
 
 const refuse = (message: string): Checked => ({ ok: false, message });
 
@@ -432,9 +459,9 @@ async function checkFolder(typed: string, home: string, flavor: PathFlavor): Pro
     if (sanitizeTerminalText(real) !== real) return refuse(POLICY_TEXT.notShowable);
     // A link somewhere in the path, or only a different spelling of the same folder (a
     // case-insensitive volume, another Unicode form). Either way the real path is what is stored.
-    return refuse(
-      (await hasLink(path, flavor)) ? POLICY_TEXT.link(real) : POLICY_TEXT.spelling(real),
-    );
+    if (await hasLink(path, flavor)) return refuse(POLICY_TEXT.link(real));
+    // Only a spelling: the caller may offer the real path (M1-36b-2-c).
+    return { ok: false, message: POLICY_TEXT.spelling(real), spelledAs: real };
   }
   const homes = [home];
   try {
@@ -697,7 +724,19 @@ async function allowFolder(
   home: string,
   flavor: PathFlavor,
 ): Promise<number> {
-  const checked = await checkFolder(typed, home, flavor);
+  let checked = await checkFolder(typed, home, flavor);
+  if (!checked.ok && checked.spelledAs !== undefined) {
+    // M1-36b-2-c: another spelling of a real folder (never a link). The owner sees the exact path
+    // and confirms it; every check then runs again on that real path, which is what is signed.
+    const real = checked.spelledAs;
+    output.printError(checked.message);
+    const answer = await deps.ask(POLICY_TEXT.useExact(real));
+    if (answer.trim().toLowerCase() !== 'y') {
+      output.printError(POLICY_TEXT.notUsed);
+      return EXIT_FAILED;
+    }
+    checked = await checkFolder(real, home, flavor);
+  }
   if (!checked.ok) {
     output.printError(checked.message);
     return EXIT_FAILED;
@@ -769,6 +808,79 @@ async function removeFolder(
   );
 }
 
+/**
+ * `policy allow-send-folder` † (M1-36b-2-c): `~/AgentLink/Send` for an agent that already has its
+ * card. @4thtech-io/node checks or creates the folder before any owner code and signs one
+ * `policy.set` that adds only that folder, through `deps.signOwnerAction` (the owner code at its TTY
+ * prompt). Delivery receipts on from an older default are asked about first (D-109).
+ */
+async function setUpSend(
+  deps: OwnerCommandDeps,
+  agent: OwnerAgent,
+  output: Output,
+  home: string,
+): Promise<number> {
+  const owner = await ownerContext(agent);
+  if (owner === undefined) {
+    output.printError(OWNER_TEXT.noIdentity);
+    return EXIT_FAILED;
+  }
+  let result: SendFolderSetupResult;
+  try {
+    result = await setUpSendFolder({
+      agent: owner.agent,
+      owner: owner.owner,
+      actions: agent.client.ownerActions,
+      sign: (keys, item) => deps.signOwnerAction(keys, item),
+      keepDeliveryReceipts: async () => {
+        output.print(POLICY_TEXT.receiptsOlderDefault);
+        const answer = await deps.ask(POLICY_TEXT.keepReceiptsQuestion);
+        return answer.trim().toLowerCase() === 'y';
+      },
+      home,
+    });
+  } catch (error) {
+    if (isPresenceRejected(error)) {
+      output.printError(OWNER_TEXT.wrongCode);
+      return EXIT_FAILED;
+    }
+    throw error;
+  }
+  switch (result.status) {
+    case 'allowed':
+      output.print(POLICY_TEXT.sendAllowed(terminalOneLine(result.folder)));
+      return EXIT_OK;
+    case 'already_allowed':
+      output.print(POLICY_TEXT.sendAlready(terminalOneLine(result.folder)));
+      return EXIT_OK;
+    case 'not_confirmed':
+      output.printError(POLICY_TEXT.notConfirmed);
+      return EXIT_FAILED;
+    default:
+      break;
+  }
+  output.printError(sendRefusal(result.reason));
+  return EXIT_FAILED;
+}
+
+/** The fixed line for a Send folder that was not set up (nothing was changed). */
+function sendRefusal(
+  reason: Extract<SendFolderSetupResult, { status: 'not_allowed' }>['reason'],
+): string {
+  switch (reason) {
+    case 'rules_unreadable':
+      return POLICY_TEXT.rulesUnreadable;
+    case 'too_many':
+      return POLICY_TEXT.tooMany;
+    case 'folder_unavailable':
+      return POLICY_TEXT.sendUnavailable;
+    case 'folder_not_empty':
+      return POLICY_TEXT.sendNotEmpty;
+    default:
+      return POLICY_TEXT.failed;
+  }
+}
+
 async function runPolicy(
   deps: OwnerCommandDeps,
   context: CommandContext,
@@ -783,7 +895,7 @@ async function runPolicy(
     return EXIT_FAILED;
   }
   const known =
-    ((sub === 'show' || sub === 'recover') && arg === undefined) ||
+    ((sub === 'show' || sub === 'recover' || sub === 'allow-send-folder') && arg === undefined) ||
     ((sub === 'allow-folder' || sub === 'remove-folder') && arg !== undefined);
   if (!known) return badArguments(output);
 
@@ -795,6 +907,7 @@ async function runPolicy(
   try {
     if (sub === 'show') return await show(agent, output);
     if (sub === 'recover') return await recover(deps, agent, output);
+    if (sub === 'allow-send-folder') return await setUpSend(deps, agent, output, home);
     if (sub === 'allow-folder') {
       return await allowFolder(deps, agent, output, arg as string, home, flavor);
     }
