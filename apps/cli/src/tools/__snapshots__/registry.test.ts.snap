@@ -126,6 +126,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                     ],
                     "type": "string",
                   },
+                  "ownerFingerprint": {
+                    "maxLength": 32,
+                    "type": "string",
+                  },
+                  "shortId": {
+                    "maxLength": 16,
+                    "type": "string",
+                  },
                 },
                 "required": [
                   "id",
@@ -183,6 +191,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                       "counterparty",
                       "owner",
                     ],
+                    "type": "string",
+                  },
+                  "ownerFingerprint": {
+                    "maxLength": 32,
+                    "type": "string",
+                  },
+                  "shortId": {
+                    "maxLength": 16,
                     "type": "string",
                   },
                 },
@@ -778,6 +794,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                 ],
                 "type": "string",
               },
+              "ownerFingerprint": {
+                "maxLength": 32,
+                "type": "string",
+              },
+              "shortId": {
+                "maxLength": 16,
+                "type": "string",
+              },
             },
             "required": [
               "id",
@@ -1178,6 +1202,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                   "counterparty",
                   "owner",
                 ],
+                "type": "string",
+              },
+              "ownerFingerprint": {
+                "maxLength": 32,
+                "type": "string",
+              },
+              "shortId": {
+                "maxLength": 16,
                 "type": "string",
               },
             },
@@ -1783,6 +1815,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                 ],
                 "type": "string",
               },
+              "ownerFingerprint": {
+                "maxLength": 32,
+                "type": "string",
+              },
+              "shortId": {
+                "maxLength": 16,
+                "type": "string",
+              },
             },
             "required": [
               "id",
@@ -1833,6 +1873,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
                           "counterparty",
                           "owner",
                         ],
+                        "type": "string",
+                      },
+                      "ownerFingerprint": {
+                        "maxLength": 32,
+                        "type": "string",
+                      },
+                      "shortId": {
+                        "maxLength": 16,
                         "type": "string",
                       },
                     },
