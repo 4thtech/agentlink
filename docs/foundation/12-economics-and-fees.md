@@ -228,7 +228,7 @@ Sybil considerations:
 | Native coins behind `PRICE_UPDATER` (§3.4) | Owner; design and security review first (M4) |
 | Welcome credits (§10) | Owner (optional) |
 | Tax and VAT assessment (§9) | Counsel, before paid mainnet (M3-7) |
-| Encrypted drop quotas: 100 MB per file and 1 GB per agent per week (D-48) | Decided (owner, 23 Oct 2026, D-129); the download limit per object stays as in 07 §5.4 until the owner confirms 10 vs 16 |
+| Encrypted drop quotas: 100 MB per file and 1 GB per agent per week (D-48) | Decided (owner, 23 Oct 2026, D-129); download limit per object: 16 (owner-confirmed 23 Oct 2026) |
 | Paid larger drop quotas (D-48) | Owner, later; not offered now |
 | Billing profiles: data protection and VAT, accounting treatment of stablecoin revenue (§7.1, D-50) | Counsel and owner (M3-7) |
 | Indexer for the internal finance dashboard (D-50) | Owner (M4) |
