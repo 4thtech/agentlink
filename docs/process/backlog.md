@@ -68,8 +68,8 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 332 (M1a 91, M1b 241) |
-| M2 Console, desktop apps, self-host, design | 49 |
+| M1 Local beta | 340 (M1a 91, M1b 249) |
+| M2 Console, desktop apps, self-host, design | 52 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
 
@@ -5991,6 +5991,106 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: one page does one `unknownSenderCodesTx` computation (spy count); a file name with markup renders as text in the #417 view.
 
+### 0.3.0 first run and agent-guided setup (new, D-130)
+
+Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026-10-25 (D-130). Already carded elsewhere and not repeated here: `init` asks once and waits for Claude Desktop (M1-36k), same-named contacts (M1-9zg), the styled approval page (M1-UX-APPROVAL-PAGE, interim) and the approval cards with "Approve with Touch ID" and the wide backup-code field (M1-11b-5), the first-run first policy (M1-36b-2-b), PRF only on `get()` (M1-11s-c-c), the Contacts, Files, Rules and Proofs pages (M1-11c-a2, -a3, -a5, -a4) and `agentlink ui` (M1-11b-9).
+
+#### M1-UX-PRF-MATRIX · local UI: platform passkey with PRF, browser matrix and fallback copy (new, D-130 (1))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 (test harness, detection and fixed copy; no owner signing) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**` (detection and copy), Playwright tests, `docs/runbooks/` (manual matrix record)
+- **Depends on:** M1-8e, M1-11s-c, M1-11s-c-c
+- **Spec:** 08 §1 (first run v2); 11 §6.2.1; 04 §2.3.1
+- **Invariants:** I-4
+- **Scope:**
+  - Record a browser by OS matrix for a platform passkey with PRF on `http://localhost:<port>`: Safari, Chrome, Edge, Firefox and Arc on macOS; Chrome, Edge and Firefox on Windows. For each: PRF at `create()` or only at `get()`, and how many sensor prompts the first run needs.
+  - The first run detects `prf.enabled` and the platform authenticator; without them it shows the fixed copy naming a browser on this computer that works, or continues with the backup code only. The button label comes from the platform ("Use Touch ID", "Use Windows Hello", "Use a passkey").
+  - The first 0.3.0 task: M1-UX-FIRSTRUN-V2 builds on its result.
+- **Acceptance:**
+  - Playwright with a virtual authenticator covers PRF at create, PRF only at get, and no PRF; a manual run on the owner's two Macs is recorded; copy passes `lintVocabulary`.
+
+#### M1-UX-FIRSTRUN-V2 · local UI: passkey-first first run, backup-code save step, folders in the same gesture (new, D-130 (1), (2))
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (owner setup, first card and first policy signing in `packages/node`; owner code display) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Depends on:** M1-UX-PRF-MATRIX, M1-36b-2-b, M1-11s-c-c, M1-11b-3, M1-11b-7; design D1 `local/first-run--*`, adjustments LF-1, LF-2, B-9
+- **Spec:** 08 §1 (first run v2); 04 §2.5 (one owner flow), §2.2, §2.3.1; 11 §5.5, §6.2.1; 06 §3
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Order: the folders are shown, then "Use Touch ID" (platform label); one confirmation creates the owner, registers the passkey, signs the card and the first policy (06 §3 defaults, Send allowed), all or nothing; then "Your backup code" once with the save form (`autocomplete="username"` with the fixed label, `autocomplete="new-password"`), a secondary Copy with the clipboard warning, and "I saved it"; then the recovery kit; then Ready.
+  - Create `~/AgentLink/Send`, `Inbox` and `Proofs` (0700) before signing; the policy binds the realpath of the new or empty Send folder.
+  - B-9 path for 0.2.0 owners: enter the owner code once, then register the passkey.
+  - Styled from the design (D-116); copy per 11 §5.5 and §6.2.1.
+- **Acceptance:**
+  - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
+
+#### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/commands/init.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/mcp/**`, `packages/node/src/approval-server.ts`, tests
+- **Depends on:** M1-11b-9 (#520), M1-11b-8, M1-11c-a3
+- **Spec:** 04 §2.5 ("What the AI may cause"); 08 §1 ("Opened for the owner by the AI"); 06 §2.3, §2.5, §7
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Agent-run `ui` and agent-run `init --confirm` open the page through the OS opener (absolute path), served by a process that does not hold the agent's command open; one fixed line built with `cliPrefix()`; the SSH or headless fallback names the command.
+  - `agentlink mcp` opens the Files page on `NO_ALLOWED_FOLDER` (never on `OUTSIDE_ALLOWED_FOLDER`), within the 30 s alert limit, and uses the opened-page `nextStep` texts of 06 §2.3 and §2.5.
+  - Opens only after this agent's own tool call, never from background processing of inbound content; no URL parameter carries a path, a name or an amount.
+- **Acceptance:**
+  - Tests first (RED commit): no result, log line or output contains the session link, a token or a code (canary); no open from inbound processing; at most one open per 30 s; Files proposes only the fixed default; no new tool (tool-surface snapshot unchanged); threat note; independent review (S2).
+
+#### M1-UX-AGENT-GUIDE · agent copy: "I opened it, tap here" next steps, server instructions and skill (new, D-130 (3))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (fixed strings, server instructions, skill file) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/strings/**`, `apps/cli/src/mcp/instructions.ts`, `skills/agentlink/SKILL.md`, install prompts (06 §7.1), tests and snapshots
+- **Depends on:** M1-UX-OPEN-APP; M1-36a-c-b (bare-prefix lint)
+- **Spec:** 06 §5 (planned wording), §2.3, §2.5, §7.1; 11 §6.1
+- **Invariants:** I-5
+- **Scope:**
+  - Apply the 06 §5 planned wording and the 11 §6.1 opened-page examples; every command hint uses `CLI_COMMAND`/`cliPrefix()`.
+  - Nothing tells the user to paste a code into chat or to run `approve` in a terminal the AI runs; no string carries a safety code.
+- **Acceptance:**
+  - Snapshot tests for the changed strings and instructions; the vocabulary and bare-prefix lints pass; no test weakened.
+
+#### M1-UX-SEND-FOLDER-EXISTING · local UI: allow the Send folder for agents created before 0.3.0 (new, D-130 (2), (3))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (signs `policy.set` from the page) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`, `packages/node/src/local-ui/**` files routes, tests
+- **Depends on:** M1-11c-a3, M1-UX-OPEN-APP
+- **Spec:** 08 §1 (Files banner); 06 §2.3, §3; 04 §2.5
+- **Invariants:** I-4
+- **Scope:**
+  - With no allowed folder, the Files page shows "Allow ~/AgentLink/Send for sending files?"; one passkey gesture creates the folder if it is missing (0700) and signs the `policy.set` that adds its realpath. The banner takes no path from the URL, the AI or inbound content.
+- **Acceptance:**
+  - Tests first (RED commit): the banner appears only with no allowed folder; one gesture leaves a verified policy with the realpath; a URL parameter cannot change the folder; independent review (S2).
+
+#### M1-UX-ALLOW-FOLDER-CASE · cli: offer the on-disk spelling when an allowed folder differs in case (new, owner test 2026-10-25)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (CLI prompt; the 04 §4 realpath and protected-root checks unchanged) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/policy*.ts`, tests
+- **Depends on:** M1-9m-b
+- **Spec:** 04 §4; 06 §3, §8
+- **Invariants:** I-4
+- **Scope:**
+  - When `policy allow-folder` gets a path whose case differs from the real on-disk spelling, ask "Did you mean <realpath>? (y/N)" and bind to the realpath on yes; D-99 and the protected-root checks are unchanged.
+- **Acceptance:**
+  - Tests: a case-mismatched path offers the realpath; Enter or no changes nothing; a protected root is still refused; no test weakened.
+
+#### M1-UX-OTHER-COMPUTER · local UI: "This is my other computer" on the new-contact card (new, D-130 (5))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`apps/local-ui` approval card and the owner-set name in the accept flow) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/cards/**`, tests
+- **Depends on:** M1-11b-5
+- **Spec:** 11 §6.2.1 (Approvals); 06 §2.1 (contact-name rule)
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - A choice on the new-contact card that fills "Name this contact" with "My other computer" (editable). A local, owner-set label only: no new owner operation and no crypto; the contact stays a separate owner with its own safety code. One owner on several computers is M2-UX-DEVICE-LINK.
+- **Acceptance:**
+  - Tests: the choice sets the owner-set name confirmed with the Accept; nothing else changes; the inbound name stays restricted.
+
+#### M1-9f-c · Claude Desktop: the signed extension as the recommended path (new, D-130 (7))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`init` copy and docs; no owner code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` (Claude Desktop hint), `docs-site/guide/**`, README
+- **Depends on:** M1-9f and its manual install check on macOS and Windows
+- **Spec:** 06 §7 (Claude Desktop); D-91
+- **Invariants:** I-1
+- **Scope:**
+  - After the manual check passes, `init` and the docs name the signed extension first for Claude Desktop; the config entry stays the fallback and is never written while Claude Desktop runs (M1-36k).
+- **Acceptance:**
+  - The manual check is recorded; `init` output and docs name the extension first; copy passes `lintVocabulary`.
+
 ---
 
 ## 4. M2 — Owner console, desktop apps, self-host, design
@@ -6485,6 +6585,39 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Custody on a hardware token or a cloud signing service, never on a workstation disk.
 - **Acceptance:**
   - Certificates issued; custody recorded privately; a test signature from the CI release environment verifies (with M2-11e).
+
+#### M2-UX-REMEMBER-MORE · "Remember for this contact" beyond proofs (new, D-130 (6))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (policy rule fields, owner signing) · **Phase:** M2
+- **Repo/path:** agentlink · `packages/core` (policy), `packages/types`, `apps/local-ui` approval cards; `docs/foundation/06-mcp-server.md` §3
+- **Depends on:** M1-11a-b; a spec PR with its own decision entry
+- **Spec:** 06 §3 (per-contact rules; M2 note)
+- **Invariants:** I-4
+- **Scope:**
+  - Spec first: rule fields for incoming files over the size limit and for receipts from one contact; each "remember" is a `policy.set` under the same gesture as its approval; the AI can never create the rule.
+- **Acceptance:**
+  - Spec merged with a D-entry before code; tests first; independent review (S2).
+
+#### M2-UX-DEVICE-LINK · "Add my other computer" as the same owner (new, D-130 (5))
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (moves the owner seed between machines) · **Phase:** M2
+- **Repo/path:** agentlink · `packages/node`, `apps/local-ui`, console; `docs/foundation/04-security-and-crypto.md` §2.3.3, 08
+- **Depends on:** M1-9i (recovery kit), the M2 console
+- **Spec:** 04 §2.3.3; 08 §1, §2 (spec to write)
+- **Invariants:** I-1, I-4, I-10
+- **Scope:**
+  - Spec first: one owner on two computers, using the recovery-kit format (a QR code between local pages, or through the console); the owner decides the flow.
+- **Acceptance:**
+  - Spec merged with a D-entry and a threat note before code; independent review (S2).
+
+#### M2-UX-NEWCONTACT-ONE-GESTURE · accept, name and safety-code check as one tap (new, UX-v2 plan, D-130)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (combined owner flow) · **Phase:** M2
+- **Repo/path:** agentlink · `apps/local-ui`, `packages/node`; `docs/foundation/04-security-and-crypto.md` §2.5
+- **Depends on:** M1-11c-a2, M1-11b-5
+- **Spec:** 04 §2.5 (one owner flow; to be named), §3.6.1
+- **Invariants:** I-4
+- **Scope:**
+  - Spec first: 04 §2.5 names the pair (accept with the name, then the safety-code check) before any combined flow is built.
+- **Acceptance:**
+  - Spec merged before code; tests first; independent review (S2).
 
 ### Storage connectors (D-49) (new)
 
