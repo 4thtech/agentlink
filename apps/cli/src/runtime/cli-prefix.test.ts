@@ -1,10 +1,21 @@
 import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { cliPrefix, GLOBAL_PREFIX, NPX_PREFIX } from './cli-prefix.js';
 
 describe('cliPrefix (M1-36a)', () => {
+  // The runner itself may be started by `npx`/`pnpm exec`, which sets npm_command=exec.
+  let savedCommand: string | undefined;
+  beforeEach(() => {
+    savedCommand = process.env['npm_command'];
+    delete process.env['npm_command'];
+  });
+  afterEach(() => {
+    if (savedCommand === undefined) delete process.env['npm_command'];
+    else process.env['npm_command'] = savedCommand;
+  });
+
   it('a global install found on PATH gives the bare name', () => {
     expect(
       cliPrefix({
