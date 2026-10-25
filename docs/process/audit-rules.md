@@ -59,7 +59,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `package.json` (root), `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc` (any depth), `.pnpmfile.*` (any depth), `turbo.json`, `.changeset/config.json`, `.gitleaks.toml`, `.gitleaksignore` | S1 | Supply chain, release and secret-scan configuration. `.npmrc`, `.pnpmfile.*`, `pnpm-workspace.yaml` and the root `package.json` can run code or redirect installs and publishing in CI (`--ignore-scripts` does not stop a pnpmfile), including in jobs holding the npm OIDC token |
 | `docs/foundation/04-security-and-crypto.md` | S2 | Invariants |
 | other `docs/foundation/**`, `docs/process/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, `SECURITY.md` | S1 | Specs, agent instructions and harness settings |
-| `docs-site/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirror in `review-gate.yml` pending (owner, M0-25); until then the PR declares S1 |
+| `docs-site/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirrored in `review-gate.yml` (CHORE-CI-DOCS-FASTLANE, owner decision 2026-10-25). The one generated page `docs-site/technical/project/status-and-roadmap.md` is S0: its source `docs/status.yaml` is S0 and `tools/docs-status` fails CI on drift |
 | anything else | S0 | — |
 
 This table is mirrored in two places that MUST change with it in the same PR:
