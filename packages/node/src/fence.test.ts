@@ -61,6 +61,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'probeOsKeychain',
       'resolveAllowedFile',
       'selectKeyStoreBackend',
+      // M1-36b-2-c: the Send folder for an existing agent; the owner signs through the given
+      // owner operation (performOwnerOperation in the CLI), nothing is unlocked here.
+      'setUpSendFolder',
       // M1-8d: the local approval server entry point (no owner-store or opener seam).
       'startApprovalServer',
       'unlockFileKeyStoreAgent',
@@ -118,6 +121,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createFileKeyStoreAgentWith',
       'recordedBackend',
       'secretOpensAnyAgentFile',
+      // M1-36b-2-c: the Send folder internals stay inside.
+      'prepareSendFolder',
+      'signFirstPolicy',
+      'isSendFolderBody',
     ]) {
       expect(names).not.toContain(name);
     }
