@@ -3963,7 +3963,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Endpoints per 07 §5.4: `POST /v1/upload` (signature, nonce and time-window check; size cap; weekly quota per drop key; rate limits per drop key and per IP, IPv6 per /64; global cap), a single-use signed PUT target that accepts exactly the declared size and never overwrites a stored object, the signed commit (bytes verified against `ciphertextSha256`, mismatch deletes), a signed GET valid until `expiresAt`, `DELETE` signed by the uploading drop key only, `POST /v1/report` (deletes only that object; no automatic key block), `GET /v1/health` (liveness only).
   - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@4thtech-io/crypto` helpers, with vectors for the URL MAC.
   - Random 128-bit object IDs chosen by the Worker; no file names or metadata on objects; quota and nonce counters in Durable Objects; no accounts.
-  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (proposed 10).
+  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (16, owner-confirmed 23 Oct 2026).
   - Serving only as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for GET.
   - Logging (I-7, 04 §4): aggregate counters only; no request URLs, signed URLs, object IDs, drop keys or upload signatures in any log, metric label or analytics, with or without IPs; request bodies never logged. Production config keeps Workers observability and request logging, Tail Workers and Logpush off for the drop Worker.
   - (IR-D48-1 F10) Close the abuse-control residuals in the spec (04 §4, 07 §5.4, §5.6) before implementing: shared-egress collateral (per-IP and per-/64 limits can block innocent users behind an office or carrier NAT; a per-drop-key allowance keeps them working); the behaviour when the global cap is exhausted (fail closed with a typed, retryable `rate_limited` or `unavailable`, never silent drops); and the per-object download limit (proposed 10) against the recipient set (a file sent to more recipients than the limit must still be fetchable by each of them).
@@ -4035,15 +4035,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 awaits the owner's 10 vs 16; counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
 - **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off.
-  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; download limit per object as in 07 §5.4 (16), owner to confirm 10 vs 16.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off. **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; downloads per object: 16 (owner-confirmed 23 Oct 2026).
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**
   - Buckets and lifecycle rule exist and are read back (with M1-27b); confirmed limits recorded in 07 §5.4 and 12 §2.
@@ -7461,7 +7461,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |
 | M1-23 | Run the J9 dogfood with @denisjazbec (install, pair, daily project sync, a J8 negotiation); sign off the M1a gate |
 | M1-24 | Trademark and name check (D-38) with counsel before the production domain (M2-10); start early |
-| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 10 vs 16 open); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
+| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 16 (owner-confirmed 23 Oct 2026)); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
 | M1-GATE, M2-GATE, M3-GATE | Recruit testers; sign off the gate; accept or reject residual risks |
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
