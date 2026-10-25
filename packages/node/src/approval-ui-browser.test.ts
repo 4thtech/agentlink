@@ -282,6 +282,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     source.add(1, {
       summary: `Send a message · ${XSS} · Free`,
       details: {
+        headline: `Send a message to Denis ${XSS}`,
         who: `Denis ${XSS}`,
         what: 'Send a message',
         cost: 'Free',
@@ -297,6 +298,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await page.getByText('Waiting for you (1)').waitFor();
     await page.goto(server.approvalUrl(id(1)));
     await card(page, 1).getByText(`Denis ${XSS}`).waitFor();
+    await card(page, 1).getByRole('heading', { name: `Send a message to Denis ${XSS}` }).waitFor();
     for (const view of ['/', `/approve/${id(1)}`]) {
       await page.goto(`${server.origin}${view}`);
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
@@ -402,4 +404,125 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);
     expect(await page.getByRole('button', { name: /^Approve/ }).count()).toBe(0);
   }, 60_000);
+});
+
+// M1-UX-APPROVAL-PAGE (owner test 2026-10-25): the page was unstyled, printed the raw invite link and
+// had a tiny owner code box. The card now leads with a plain headline, never shows the invite link,
+// and the owner code field is full width, paste-friendly and can be shown.
+describe('the approval page as the owner sees it (M1-UX-APPROVAL-PAGE; Chromium)', () => {
+  const INVITE =
+    'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5LXRoYXQtaXMtcXVpdGUtbG9uZw';
+  const WHO = '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet';
+  const HEADLINE = 'Connect with “Ana” (self-declared)';
+  const HINT = 'Paste the owner code AgentLink showed you when you set up';
+  const addInvite = (source: FakeSource): void => {
+    source.add(1, {
+      summary: `Connect with a new contact · ${WHO} · Free`,
+      details: {
+        headline: HEADLINE,
+        who: WHO,
+        what: 'Connect with a new contact',
+        cost: 'Free',
+        expires: '12 Oct 2026 14:02 UTC',
+        rule: 'Your rules ask you to approve every new contact.',
+        fromAi: [{ name: 'inviteUrl', value: INVITE }],
+      },
+    });
+  };
+
+  it('accept invite: a plain headline, the name labelled self-declared, never the invite link', async (ctx) => {
+    needBrowser(() => ctx.skip());
+    const { server, source, link } = await start();
+    const page = await pageWithoutPasskeys();
+    addInvite(source);
+    await page.goto(await link());
+    for (const view of ['/', `/approve/${id(1)}`]) {
+      await page.goto(`${server.origin}${view}`);
+      const box = card(page, 1);
+      await box.getByRole('heading', { name: HEADLINE }).waitFor();
+      await box.getByText(WHO).waitFor();
+      const html = await page.content();
+      expect(html, view).not.toContain(INVITE);
+      expect(html, view).not.toContain('inviteUrl');
+      expect(html, view).not.toContain('agentlink.4thtech.io/i#');
+    }
+  }, 120_000);
+
+  it('the owner code field: full width, no length limit, autocomplete off, show and hide, hint', async (ctx) => {
+    needBrowser(() => ctx.skip());
+    const { server, source, link } = await start();
+    const page = await pageWithoutPasskeys();
+    addInvite(source);
+    await page.goto(await link());
+    await page.goto(server.approvalUrl(id(1)));
+    const box = card(page, 1);
+    await box.getByRole('button', { name: 'Approve', exact: true }).click();
+    const field = page.getByLabel('Owner code or owner passphrase');
+    await field.waitFor();
+    expect(await field.getAttribute('type')).toBe('password');
+    expect(await field.getAttribute('autocomplete')).toBe('off');
+    expect(await field.getAttribute('spellcheck')).toBe('false');
+    expect(await field.getAttribute('autocapitalize')).toBe('off');
+    expect(await field.getAttribute('maxlength')).toBeNull();
+    // The hint is shown and tied to the field.
+    await page.getByText(HINT).waitFor();
+    const describedBy = (await field.getAttribute('aria-describedby')) ?? '';
+    expect(describedBy).not.toBe('');
+    expect(await page.locator(`[id="${describedBy}"]`).textContent()).toBe(HINT);
+    // Long passphrases fit: nothing is clipped.
+    const long = 'correct horse battery staple '.repeat(12);
+    await field.fill(long);
+    expect(await field.inputValue()).toBe(long);
+    // Show and hide.
+    const toggle = page.getByRole('button', { name: 'Show' });
+    expect(await toggle.getAttribute('aria-pressed')).toBe('false');
+    await toggle.click();
+    expect(await field.getAttribute('type')).toBe('text');
+    const hide = page.getByRole('button', { name: 'Hide' });
+    expect(await hide.getAttribute('aria-pressed')).toBe('true');
+    await hide.click();
+    expect(await field.getAttribute('type')).toBe('password');
+    // Full width: the field spans (nearly) the whole card.
+    const fieldBox = await field.boundingBox();
+    const cardBox = await box.boundingBox();
+    if (fieldBox === null || cardBox === null) throw new Error('not laid out');
+    expect(fieldBox.width).toBeGreaterThan(cardBox.width * 0.6);
+    expect(fieldBox.height).toBeGreaterThanOrEqual(40);
+    // Submitting clears the field; a wrong code still decides nothing.
+    await page.getByRole('button', { name: 'Confirm approval' }).click();
+    await box.getByText("That didn't match", { exact: false }).waitFor();
+    expect(source.applied).toEqual([]);
+  }, 120_000);
+
+  it('is styled from its own stylesheet, follows light and dark, and fits a phone', async (ctx) => {
+    needBrowser(() => ctx.skip());
+    if (browser === undefined) throw new Error('unreachable');
+    const { server, source, link } = await start();
+    addInvite(source);
+    const url = await link();
+    const requests: string[] = [];
+    const context = await browser.newContext({
+      viewport: { width: 360, height: 780 },
+      colorScheme: 'light',
+    });
+    contexts.push(context);
+    const page = await context.newPage();
+    page.on('request', (r) => requests.push(r.url()));
+    await page.goto(url);
+    await card(page, 1).getByRole('heading', { name: HEADLINE }).waitFor();
+    const bg = (): Promise<string> =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    // 11 §11 tokens: light canvas #f5f6f7, dark canvas #0b0c0e.
+    expect(await bg()).toBe('rgb(245, 246, 247)');
+    await page.emulateMedia({ colorScheme: 'dark' });
+    expect(await bg()).toBe('rgb(11, 12, 14)');
+    // Phone width: no sideways scrolling.
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    // Every request stays on this server.
+    expect(requests.length).toBeGreaterThan(0);
+    for (const r of requests) expect(new URL(r).origin).toBe(server.origin);
+    expect(requests.some((r) => new URL(r).pathname === '/app.css')).toBe(true);
+  }, 120_000);
 });
