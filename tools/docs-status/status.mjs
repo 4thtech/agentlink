@@ -261,7 +261,8 @@ export function renderKnowledgeMilestones(data) {
 // --- Targets: which file gets which block ----------------------------------------------------------
 
 // --- Backlog card counts ----------------------------------------------------------------------------
-// The counts in docs/process/backlog.md are derived from the card headings, never typed by hand.
+// Card counts are derived from the card headings on demand (`index.mjs --counts`) and are NOT
+// committed: a committed count goes stale whenever another PR merges first (CHORE-BACKLOG-COUNTS-QUEUE).
 // A card is a `#### <ID> · title` heading outside a code fence (so the §1 format example is not
 // one). Not counted: split parents (Status starts with "split into", their parts are counted) and
 // cards whose Phase starts with "later" (not in a milestone). M1 cards split into M1a and M1b by
@@ -299,16 +300,20 @@ export function countBacklogCards(text) {
   return counts;
 }
 
-export function renderBacklogCounts(_data, backlogText) {
-  const c = countBacklogCards(backlogText);
+/** Plain-text summary of the counts, printed on demand by `index.mjs --counts` (never committed). */
+export function formatBacklogCounts(c) {
   return [
-    '| Section | Cards |',
-    '|---|---|',
-    `| M0 Foundations | ${c.M0} |`,
-    `| M1 Local beta | ${c.M1} (M1a ${c.M1a}, M1b ${c.M1b}) |`,
-    `| M2 Console, desktop apps, self-host, design | ${c.M2} |`,
-    `| M3 Mainnet beta | ${c.M3} |`,
+    `M0 Foundations: ${c.M0}`,
+    `M1 Local beta: ${c.M1} (M1a ${c.M1a}, M1b ${c.M1b})`,
+    `M2 Console, desktop apps, self-host, design: ${c.M2}`,
+    `M3 Mainnet beta: ${c.M3}`,
   ].join('\n');
+}
+
+/** Reads the backlog from `root` and returns its counts text, or null when the file is absent. */
+export function backlogCountsText(root) {
+  const text = readIfPresent(join(root, BACKLOG_FILE));
+  return text === null ? null : formatBacklogCounts(countBacklogCards(text));
 }
 
 // --- Targets ---------------------------------------------------------------------------------------
@@ -330,12 +335,6 @@ export const TARGETS = [
       'status-milestones': renderSiteMilestones,
       'status-roadmap-detail': renderSiteRoadmapDetail,
     },
-  },
-  {
-    file: BACKLOG_FILE,
-    handEditHint:
-      'the card counts are generated from the card headings: never edit the card counts by hand',
-    blocks: { 'backlog-counts': renderBacklogCounts },
   },
   {
     file: 'knowledge/agentlink-overview.md',
@@ -408,6 +407,13 @@ export function run({ root, check = false }) {
   const invalid = validateStatus(data);
   if (invalid.length > 0)
     return { problems: invalid.map((p) => `${STATUS_FILE}: ${p}`), changed, skipped };
+
+  const backlog = readIfPresent(join(root, BACKLOG_FILE));
+  if (backlog !== null && /<!-- backlog-counts:(start|end) -->/.test(backlog)) {
+    problems.push(
+      `${BACKLOG_FILE}: card counts are no longer committed (they conflict between pull requests); remove the backlog-counts block and read the counts with: node tools/docs-status/index.mjs --counts`,
+    );
+  }
 
   for (const target of TARGETS) {
     const path = join(root, target.file);

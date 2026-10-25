@@ -5,7 +5,7 @@ PR-sized task cards for AgentLink (OCC v2), derived from `docs/foundation/10-bui
 - **Specs win.** A card restates the spec only to make acceptance testable. Where a card and a spec disagree, the spec wins and the mismatch is a spec gap (§8). Cards never resolve spec gaps by themselves; a gap is resolved through the spec-change process (`development-process.md` §8).
 - **Public file.** This repository is public. Cards contain no secrets, no Safe signer details and no details of unfixed vulnerabilities. Legacy items are referenced only by `OPS-L<n>` and "see private 09 §4". Docs 01 and 09 are private (D-21, D-26); where a card cites them it says "(private)" and restates what the task needs.
 - **Process.** Lifecycle, Definition of Ready/Done, routing and reviews: `development-process.md`. Security classes, reviews, threat notes, milestone audits: `audit-rules.md`. Deploys and releases: `release-and-deployment.md`. CI: `ci-cd.md`. Live coordination: `sync-protocol.md`.
-- **Card counts are generated.** The M0/M1/M2/M3 counts in the Card count section (§1) come from the card headings via `node tools/docs-status/index.mjs`; authors never edit them by hand (`repo-reference.md`).
+- **Card counts are not committed.** Read them with `node tools/docs-status/index.mjs --counts` (`repo-reference.md`); no PR edits a count.
 - **No assignees here.** Who works on what, and live status, is on the `sync` branch board (`board.md`). This file never names an assignee.
 
 Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items and the D-25 continuous-delivery group) · §3 M1 Local beta on testnets (phases M1a and M1b; incl. owner design drops D1–D3) · §4 M2 Owner console, desktop apps, self-host, design · §5 M3 Mainnet beta · §6 M4/M5 epics · §7 Dependency overview · §8 Spec gaps and inconsistencies · §9 Owner actions
@@ -62,16 +62,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 ### Card count
 
-**Never edit the counts below by hand.** The M0, M1 (M1a/M1b), M2 and M3 counts are generated from the card headings by `node tools/docs-status/index.mjs` (`--check`, run by `pnpm lint` and CI, fails when they are stale). A PR that adds, removes or splits a card runs the generator and commits the result; a merge conflict in the block is resolved by rerunning it, never by hand. Counted: every `#### M<n>-…` heading outside a code fence (so not the §1 example), except split parents (Status "split into …", their parts are counted) and cards whose Phase starts with "later". The M1 phase comes from the first word of the card's `**Phase:**` field. The rows after the block are fixed and hand-maintained.
-
-<!-- backlog-counts:start -->
-| Section | Cards |
-|---|---|
-| M0 Foundations | 40 |
-| M1 Local beta | 333 (M1a 91, M1b 242) |
-| M2 Console, desktop apps, self-host, design | 50 |
-| M3 Mainnet beta | 35 |
-<!-- backlog-counts:end -->
+**Counts are not committed.** Almost every PR adds or changes a card, so a stored count went stale whenever another PR merged first (conflicts, merge-queue ejections). Read the current M0, M1 (M1a/M1b), M2 and M3 counts on demand with `node tools/docs-status/index.mjs --counts`. Counted: every `#### M<n>-…` heading outside a code fence (so not the §1 example), except split parents (Status "split into …", their parts are counted) and cards whose Phase starts with "later". The M1 phase comes from the first word of the card's `**Phase:**` field. `--check` fails if a generated counts block is committed again. The rows below are fixed and hand-maintained.
 
 Other sections:
 
@@ -803,6 +794,12 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Depends on:** CHORE-CI-SPEED-3
 - **Scope:** Owner decisions (Tali, 2026-10-25): (D1) a merge group whose diff holds only docs runs `checks` through the affected-package selector instead of the full suite; any code PR in the group, an unreadable diff or a push to `main` runs the full suite. (Item B) a docs-only push to a feature branch is diffed against its merge base with `main`, so the heavy jobs skip; an unknown base runs everything. (D2) `review-gate` derives `docs-site/**` as S1 (the mirror that M0-25 and the docs-site check card left open), exempting only the generated page `docs-site/technical/project/status-and-roadmap.md`. (D3) spec review classes are unchanged.
 - **Acceptance:** no gate weakened (gitleaks, dependency review, CodeQL, zizmor, pr-hygiene, review-gate, context-budget, changesets, docs-status drift all keep running); no ruleset change, no `paths-ignore`, `ci-gate` unchanged; tests first in `tools/ci/select-affected.test.mjs` and `tools/ci/review-gate.test.mjs`.
+
+#### CHORE-BACKLOG-COUNTS-QUEUE · Card counts no longer conflict between PRs (new, 2026-10-25)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`docs/process`)
+- **Repo/path:** agentlink · `tools/docs-status`, `docs/process/backlog.md`, `docs/process/ci-cd.md`, `docs/process/repo-reference.md`
+- **Scope:** The generated card counts in `backlog.md` went stale whenever another PR merged first (DIRTY PRs, merge-queue ejections). The counts are no longer committed; `node tools/docs-status/index.mjs --counts` prints them on demand. `--check` still enforces the README, docs-site and knowledge status blocks from `docs/status.yaml`, and fails if a counts block is committed again.
+- **Acceptance:** adding a card does not fail `--check`; a committed generated counts block fails it; tests first in `tools/docs-status/status.test.mjs`.
 
 #### CHORE-CI-FOLLOWUPS · Main CI never cancelled while pending; openssl hook timeouts in packages/node (new, 2026-10-21)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
@@ -5497,6 +5494,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass. Confirmed again by IR-DOCS-FOLLOWUPS-1022B-1 (2026-10-22): this card is the home for that README line.
 - **Acceptance:**
   - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36k · cli: init asks once, shows skips and a summary, and waits for Claude Desktop to quit (new, owner test 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`apps/cli/src/commands/init.ts`; no owner or policy code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-36b
+- **Scope:**
+  - One "Set up AgentLink in all N apps? (y/N)" before the per-app questions; a no falls back to them.
+  - Any answer other than y or yes prints "Skipped <app>."; type-ahead is kept by one shared line reader.
+  - A final summary, one line per app: set up, already set up, skipped or blocked (fixed reason).
+  - Claude Desktop running (pgrep on macOS, tasklist on Windows, no shell): ask the user to quit it first and press Enter; tell them to reopen it after. AgentLink never closes the app.
+  - The `owner add-agent` hint only for an agent without an owner card.
+- **Acceptance:**
+  - Tests cover the all-apps question, the skip line, the summary, the quit wait and the hint; no test weakened.
 
 #### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
