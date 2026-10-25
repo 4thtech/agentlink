@@ -93,7 +93,7 @@ jobs:
           persist-credentials: false
           # CHORE-CI-DOCS-FASTLANE: a push needs the history to find its merge base with `main`
           # (blobless: commits and trees only, enough for `git diff --name-only`).
-          fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}
+          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
           filter: ${{ github.event_name == 'push' && 'blob:none' || '' }}
 
       - name: Detect skeleton and root scripts

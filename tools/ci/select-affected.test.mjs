@@ -460,7 +460,7 @@ describe('ci.yml wires the docs-only fast lane', () => {
 
   it('a push to a feature branch diffs against its merge base with main', () => {
     expect(yml).toContain('git merge-base HEAD origin/main');
-    expect(yml).toContain("fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}");
+    expect(yml).toContain("fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}");
   });
 
   it('the full suite still runs when the scope is not decided (outputs default to full)', () => {
