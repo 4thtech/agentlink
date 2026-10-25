@@ -4360,6 +4360,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 
+#### M1-11a-ux · approval page: styled, a plain summary, a proper owner code field (new, owner test 2026-10-25; M1-UX-APPROVAL-PAGE in the follow-ups)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts`, `packages/node/src/approval-server.ts` (the `/app.css` route and the card view), `apps/cli/src/approval/ui-source.ts`, `apps/cli/src/commands/owner/render.ts` and their tests
+- **Depends on:** M1-11a; interim until M1-11b-2 replaces the page with the `apps/local-ui` approvals
+- **Spec:** 08 §1, §4; 11 §5, §6.2.1, §8; 04 §2.5; D-116
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Style the approval page from the D1 approval card (`d1/screens/mobile/approval-card--pending--{light,dark}--360`) with the `packages/ui` tokens, served as `/app.css` under the unchanged CSP; light and dark; phone width.
+  - A plain headline instead of raw arguments: accept-invite reads "Connect with “name” (self-declared)" and the invite link never reaches the page; the AI's other arguments stay in their marked region, as text only.
+  - Owner code field: full width, no length limit, show and hide, `autocomplete="off"`, the paste hint. No change to presence, signing, tokens or the CSP.
+- **Acceptance:**
+  - Rendering tests: no invite link in the page or the API view, the headline shown, the field's attributes and toggle, the CSP byte for byte, colours equal to the tokens, no external request, no sideways scroll at 360 px; all M1-11a browser flows pass.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
