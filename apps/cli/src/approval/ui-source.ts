@@ -32,7 +32,7 @@ import {
   type PendingRequest,
 } from '../commands/owner/pending.js';
 import { cardFacts, recipientName, type CardFacts } from '../commands/owner/render.js';
-import { cardDisclosure } from '../tools/strings/privacy.js';
+import { cardDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 
 /** Longest name and value shown for one AI argument (the server refuses longer). */
 const MAX_NAME = 256;

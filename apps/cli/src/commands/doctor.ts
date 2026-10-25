@@ -21,7 +21,7 @@ import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
 import { cliPrefix, commandPrefix } from '../runtime/cli-prefix.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
-import { copy, renderCopy } from '../tools/strings/index.js';
+import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { TEXT, createDeps, fill, fixedErrorText, printAll, type CommandDeps } from './shared.js';
 
 /**

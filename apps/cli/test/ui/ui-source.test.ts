@@ -31,7 +31,7 @@ import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing'
 import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import { createUiApprovalSource } from '../../src/approval/ui-source.js';
-import { copy } from '../../src/tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { OwnerAgent } from '../../src/commands/owner/deps.js';
 
 const T0 = 1_800_000_000;

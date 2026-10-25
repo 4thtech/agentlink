@@ -24,8 +24,8 @@ import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypt
 import { RESTRICTED_NAME_FALLBACK, isUsdAmount, parseUsd } from '@4thtech-io/types';
 import { isApprovalId } from '../../approval/next-step.js';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
-import { formatDate, formatTime, formatUsd } from '../../tools/strings/index.js';
-import { cardDisclosure } from '../../tools/strings/privacy.js';
+import { formatDate, formatTime, formatUsd } from '@4thtech-io/mcp-tools/strings/index.js';
+import { cardDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 import type { PendingRequest } from './pending.js';
 import { OWNER_TEXT } from './strings.js';
 import { termsCard, type TermsCardView } from './terms-card.js';

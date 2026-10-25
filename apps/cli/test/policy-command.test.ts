@@ -70,7 +70,7 @@ import { agentToolContext } from '../src/mcp/command.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import type { ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '@4thtech-io/mcp-tools';
 
 // Each test pairs two agents over the relay double first (real crypto); see contacts-manage.test.ts.
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
@@ -807,7 +807,7 @@ describe('no MCP tool reaches the policy (I-4)', () => {
             : [],
       );
     const mcpSide = [
-      ...files(new URL('../src/tools/', import.meta.url)),
+      ...files(new URL('../../../packages/mcp-tools/src/', import.meta.url)),
       ...files(new URL('../src/mcp/', import.meta.url)),
     ];
     expect(mcpSide.length).toBeGreaterThan(5);

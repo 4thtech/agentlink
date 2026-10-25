@@ -21,7 +21,7 @@ import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { nodeFileOpener, nodeFilesPlatform } from '../src/runtime/files.js';
-import { coreToolClient } from '../src/tools/context.js';
+import { coreToolClient } from '@4thtech-io/mcp-tools/context.js';
 import {
   RelayNetwork,
   call,

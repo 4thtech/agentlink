@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EXIT_OK, EXIT_USAGE, createDispatcher, type DispatchIO } from '../dispatch.js';
 import { readAgentConfig } from '../runtime/index.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { copy } from '../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { isAgentlinkOnPath, INSTALL_ARGS } from './global-install.js';
 import { INIT_TEXT, createInitHandler, type InitDeps } from './init.js';
 

@@ -20,7 +20,7 @@
 import { MAX_APPROVAL_BATCH_ITEMS, type ReviewedApproval } from '@4thtech-io/node';
 import { batchRegions } from '../../terminal/sanitize.js';
 import { cliPrefix } from '../../runtime/cli-prefix.js';
-import { copy } from '../../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';
 import {
   badArguments,

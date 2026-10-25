@@ -260,6 +260,9 @@ importers:
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../../packages/log
+      '@4thtech-io/mcp-tools':
+        specifier: workspace:*
+        version: link:../../packages/mcp-tools
       '@4thtech-io/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -368,6 +371,9 @@ importers:
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../packages/log
+      '@4thtech-io/mcp-tools':
+        specifier: workspace:*
+        version: link:../packages/mcp-tools
       '@4thtech-io/node':
         specifier: workspace:*
         version: link:../packages/node
@@ -443,6 +449,24 @@ importers:
         version: 2.57.4(typescript@6.0.3)(zod@4.6.5)
 
   packages/log: {}
+
+  packages/mcp-tools:
+    dependencies:
+      '@4thtech-io/chain':
+        specifier: workspace:*
+        version: link:../chain
+      '@4thtech-io/core':
+        specifier: workspace:*
+        version: link:../core
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@4thtech-io/log':
+        specifier: workspace:*
+        version: link:../log
+      '@4thtech-io/types':
+        specifier: workspace:*
+        version: link:../types
 
   packages/node:
     dependencies:
