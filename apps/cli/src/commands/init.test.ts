@@ -69,7 +69,7 @@ interface RunOptions {
   readonly probe?: KeychainProbe;
   readonly answers?: readonly string[];
   readonly platform?: NodeJS.Platform;
-  readonly desktopRunning?: boolean;
+  readonly desktopRunning?: boolean | number;
   readonly ownerCard?: boolean;
 }
 
@@ -78,6 +78,7 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
   const err: string[] = [];
   let created = 0;
   let asked = 0;
+  let runningChecks = 0;
   const answers = [...(options.answers ?? [])];
   const deps: InitDeps = {
     home,
@@ -91,7 +92,13 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
       return Promise.resolve(answers.shift() ?? '');
     },
     clock: () => NOW,
-    claudeDesktopRunning: () => Promise.resolve(options.desktopRunning === true),
+    claudeDesktopRunning: () => {
+      if (typeof options.desktopRunning === 'number') {
+        runningChecks += 1;
+        return Promise.resolve(runningChecks <= options.desktopRunning);
+      }
+      return Promise.resolve(options.desktopRunning === true);
+    },
     hasOwnerCard: () => Promise.resolve(options.ownerCard === true),
     ...(options.platform === undefined ? {} : { platform: options.platform }),
   };
@@ -509,7 +516,7 @@ describe('confirmation', () => {
     const run = await init([], {
       terminal: TTY,
       platform: 'darwin',
-      desktopRunning: true,
+      desktopRunning: 1,
       answers: ['y', ''],
     });
     expect(run.out).toContain(INIT_TEXT.quitDesktopMac);
@@ -1041,5 +1048,34 @@ describe('the add-agent hint (WAVE-030)', () => {
 
   it('is not shown when that agent already has an owner card', async () => {
     expect((await twoRuns(true)).out).not.toContain('owner add-agent');
+  });
+});
+
+describe('Claude Desktop still open (WAVE-030 review)', () => {
+  const parts = ['Library', 'Application Support', 'Claude'];
+  const still = (): string => withPrefix(INIT_TEXT.desktopStillOpen);
+
+  it('an agent-run --confirm does not write while Claude Desktop is running', async () => {
+    await mkdir(join(home, ...parts), { recursive: true });
+    const plan = await init(['--harness', 'claude-desktop'], { platform: 'darwin' });
+    const run = await init(['--harness', 'claude-desktop', '--confirm', codeOf(plan)], {
+      platform: 'darwin',
+      desktopRunning: true,
+    });
+    expect(run.err).toContain(still());
+    expect(await exists(...parts, 'claude_desktop_config.json')).toBe(false);
+  });
+
+  it('in a terminal, asks at most three times, then skips without writing', async () => {
+    await mkdir(join(home, ...parts), { recursive: true });
+    const run = await init(['--harness', 'claude-desktop'], {
+      terminal: TTY,
+      platform: 'darwin',
+      desktopRunning: true,
+      answers: ['y', '', '', ''],
+    });
+    expect(run.asked).toBe(4);
+    expect(run.err).toContain(still());
+    expect(await exists(...parts, 'claude_desktop_config.json')).toBe(false);
   });
 });

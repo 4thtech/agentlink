@@ -236,7 +236,9 @@ export const INIT_TEXT = Object.freeze({
     'Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
   // No Claude desktop app on Linux, so it is not named there.
   appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
-  restartDesktop: 'Warning Reopen Claude Desktop now. AgentLink appears under Connectors.',
+  restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
+  desktopStillOpen:
+    'Problem  Claude Desktop is still open, so AgentLink did not change its settings (it rewrites them when it quits). Quit Claude Desktop (Cmd+Q), then run `{prefix} init --harness claude-desktop`.',
   quitDesktopMac: 'Quit Claude Desktop first (Cmd+Q), then press Enter.',
   quitDesktopOther: 'Quit Claude Desktop first (close it completely), then press Enter.',
   allQuestion: 'Set up AgentLink in all {count} apps? (y/N)',
@@ -443,6 +445,7 @@ function printSummary(
     if (plan.status === 'present') line = INIT_TEXT.summaryPresent;
     else if (plan.status === 'conflict') line = INIT_TEXT.summaryConflict;
     else if (plan.status === 'blocked') {
+      // A reason can name the app; withApp below fills it.
       line = INIT_TEXT.summaryBlocked.replace('{reason}', HARNESS_MESSAGES[plan.reason]);
     } else if (failedApps.has(plan.def.id)) {
       line = INIT_TEXT.summaryBlocked.replace('{reason}', failedApps.get(plan.def.id) ?? '');
@@ -794,18 +797,24 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     }
     const applied: string[] = [];
     const failedApps = new Map<string, string>();
-    let desktopAsked = false;
     for (const change of approved) {
-      if (interactive && change.def.appName === DESKTOP_APP_NAME && !desktopAsked) {
-        desktopAsked = true;
+      if (change.def.appName === DESKTOP_APP_NAME) {
         // The app rewrites its settings when it quits, so it must be closed before AgentLink writes.
-        if ((await deps.claudeDesktopRunning?.()) === true) {
+        let running = (await deps.claudeDesktopRunning?.()) === true;
+        for (let asks = 0; running && interactive && asks < 3; asks += 1) {
           output.print(
             (deps.platform ?? process.platform) === 'darwin'
               ? INIT_TEXT.quitDesktopMac
               : INIT_TEXT.quitDesktopOther,
           );
           await deps.readLine();
+          running = (await deps.claudeDesktopRunning?.()) === true;
+        }
+        if (running) {
+          const line = initText(INIT_TEXT.desktopStillOpen, startPrefix);
+          output.printError(line);
+          failedApps.set(change.def.id, line);
+          continue;
         }
       }
       try {
@@ -842,7 +851,6 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     if (interactive) prefix = await offerInstall(context, deps);
     else installTip(context, deps);
     if (declined) output.print(initText(INIT_TEXT.declinedKept, prefix));
-    // A reason can name the app; the summary uses the fixed text for it.
     // D-78: with another agent already on this computer, the owner adds this one to the existing
     // owner instead of a second `owner init`. Names follow the 06 §6 pattern (nothing to sanitize).
     let others: string[] = [];
