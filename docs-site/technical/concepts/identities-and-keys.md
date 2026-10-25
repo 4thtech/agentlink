@@ -45,6 +45,34 @@ Approving or denying, changing policies, adding allowed folders or storage crede
 
 Accepting terms (sending `accept`, signing `ACCEPTED` or `REJECTED`) is an agent action gated by the `commitments` policy, which defaults to owner approval.
 
+## Browser support for approval passkeys
+
+The local approval page on `http://localhost:<port>` (rpId `localhost`) registers a passkey with the WebAuthn PRF extension and uses it to unwrap the owner key (04 §2.5; M1-8e). `localhost` counts as a secure context in Chromium, Safari and Firefox, so WebAuthn works there without HTTPS. PRF is the limiting part: the browser, the operating system and the passkey provider must all support it. This table is research from public sources read on 25 Oct 2026 (MDN, WebKit bug tracker, Firefox release notes and Mozilla bug tracker, a Corbado PRF support survey); vendor release notes did not state it directly, so every cell stays **to test** until checked on a real machine.
+
+| Browser | macOS (Touch ID) | Windows (Hello) |
+|---|---|---|
+| Safari | Yes on Safari 18+ (macOS 15+) with a platform passkey (Apple Passwords / iCloud Keychain). Not yet tested here | n/a |
+| Chrome | Expected with Chrome 132+ when the passkey is in iCloud Keychain; the "Chrome profile" passkey option reportedly returns no PRF. To test | Expected with Chrome 147+ on Windows 11 24H2/25H2 with the Feb 2026 update; 146 and earlier return PRF only when signing in, not at creation. To test |
+| Edge | Chromium rules as Chrome. To test | As Chrome (147+). To test |
+| Firefox | Reported working from Firefox 139. To test | Expected from Firefox 148 (creation backported to 147) with the Feb 2026 Windows update; earlier releases return no PRF for Windows Hello. To test |
+| Brave, Arc (Chromium) | Follow the Chromium version; may differ in which passkey provider they offer. To test | Same. To test |
+
+Passkey provider on top of the browser:
+
+| Provider | PRF |
+|---|---|
+| Apple Passwords (iCloud Keychain), Windows Hello (updated), Google Password Manager | Reported to work |
+| 1Password | Reported to work (Chrome) |
+| Bitwarden | Varies by platform; to test |
+| Chrome profile authenticator, Dashlane, NordPass | Reported to return no PRF |
+| Windows 10, Windows 11 without the Feb 2026 update | No PRF from Windows Hello (a hardware security key can still provide it) |
+
+Playwright coverage today: only Chromium with a virtual authenticator (`packages/node/src/approval-passkey-browser.test.ts`), which proves the page script, not any real Touch ID or Windows Hello. WebKit and Firefox are not tested.
+
+When PRF is missing, the browser either refuses (the page reports "unsupported") or creates a passkey that returns no PRF output. The page then sends an empty value and the server does not wrap the owner key under that passkey. The owner code (`ALKO`) stays the way to approve, so nothing is lost and no key is ever derived from a passkey without PRF.
+
+Sources: MDN, WebAuthn extensions (modified 17 Sep 2026); Mozilla bug 1863819 and Firefox 148 release notes (24 Feb 2026); WebKit bug 311099 (Apr 2026); Corbado, Passkeys and WebAuthn PRF (2026); Chromium Intent to Ship, WebAuthn PRF (Apr 2023).
+
 ## Rotation and recovery
 
 A new key epoch derives new Nostr and encryption keys and a new agent card; old epochs stay derivable, so history stays readable. The recovery kit is an encrypted backup of the seed (`ALKR`, under a generated recovery code; a passkey PRF wrap is `ALKP`) that the user holds; 4thTech stores nothing.

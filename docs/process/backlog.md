@@ -753,6 +753,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** Runs 39144772282 and 39153323893 (the second with the OPS-CI-9 probe, which passed) failed the same way: the gnome-keyring daemon died mid-run without cleanup (stale control socket, "Connection refused"), D-Bus started a fresh `gnome-keyring-daemon --start`, which could not unlock the login keyring (random password) without SystemPrompter, so every keychain call was refused. `tools/ci/with-keyring.sh` now creates a passwordless default ("login") collection in a private folder that any daemon of the session opens without a prompt, runs the daemon in its own session, waits for it to own the Secret Service name, and reports a mid-run daemon death as a `::warning::`. `tools/ci/keyring-restart-check.sh` (keychain job, Linux) kills the daemon and checks the replacement serves the same items with no prompt.
 - **Acceptance:** the restart check fails on the OPS-CI-9 script and passes on the new one; `e2e-deterministic` green on repeated runs; no gate or test weakened.
 
+#### CHORE-UX-PRF-MATRIX · docs: which browsers support Touch ID approvals (PRF) (new, 2026-10-25)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (docs only; asserts security-relevant behaviour)
+- **Repo/path:** agentlink · `docs-site/technical/concepts/identities-and-keys.md`, `docs-site/guide/get-started/protect-your-approvals.md`
+- **Depends on:** M1-8e
+- **Scope:** Research which desktop browsers return a WebAuthn PRF output from a platform passkey on `http://localhost`, add a support table to the technical docs and a plain note to the guide, and recommend which browser the first-run page suggests. Unverified cells say "to test".
+- **Acceptance:** table and note landed; uncertain cells listed for a manual test on real Macs and a Windows machine.
+
 #### CHORE-WIN-RELAY-IO · Windows node-os: packages/node relay-io.test.ts hook timed out in 10000ms (new, flake 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: `packages/node`)
 - **Repo/path:** agentlink · `packages/node/src/relay-io.test.ts`, `packages/node/vitest.config.ts`

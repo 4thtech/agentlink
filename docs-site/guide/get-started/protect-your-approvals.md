@@ -44,6 +44,10 @@ Your owner fingerprint stays the same and your agents keep their cards, so your 
 
 Changing the code doesn't protect copies of the old saved owner key made earlier, for example in a backup, from someone who also has the old code. If you think that happened, set up a new owner and agent.
 
+## Which browser for a passkey (0.3.0)
+
+From 0.3.0 the local page can use a passkey (Touch ID on a Mac, Windows Hello on Windows) instead of typing your owner code. It works best in **Safari on a recent Mac, or an up-to-date Chrome, Edge or Firefox with your system's own passkey** (Apple Passwords on a Mac; Windows Hello on Windows 11 with its latest updates). Some browsers, older Windows versions and a few password managers can't do this. If yours can't, nothing breaks: you'll use your backup code (the owner code) instead. We are still testing each browser and will update this note.
+
 ## What this protects, and what it can't
 
 The owner code stops your AI from approving anything through AgentLink. Without it, the AI can send what your rules allow, and ask you for the rest.
