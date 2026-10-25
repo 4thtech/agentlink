@@ -68,7 +68,7 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 | Section | Cards |
 |---|---|
 | M0 Foundations | 40 |
-| M1 Local beta | 331 (M1a 91, M1b 240) |
+| M1 Local beta | 332 (M1a 91, M1b 241) |
 | M2 Console, desktop apps, self-host, design | 49 |
 | M3 Mainnet beta | 35 |
 <!-- backlog-counts:end -->
@@ -5369,6 +5369,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Wire `ownerExists: false` from callers (status and others) so owner init shows on fresh machines; add a length test for the invalid-name hint branch.
 - **Acceptance:**
   - A grep test finds no bare prefix in the listed files; `status` on a fresh machine names the owner step.
+
+#### M1-36a-c · npx run shows the npx command, not the bare name (new, owner report on 0.2.0)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/runtime/cli-prefix.ts`
+- **Depends on:** M1-36a
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - npx puts the package's `.bin` on PATH, so the "is `agentlink` on PATH" check wrongly found the npx copy and printed the bare `agentlink`. A launch from an npx or dlx cache, or by `npm exec`, now always gets the npx form; a real global install is unchanged.
+- **Acceptance:**
+  - Tests simulate the npx launch (cache path, `.bin` on PATH, `npm_command=exec`) and expect the npx form; the global case still gives `agentlink`.
 
 #### M1-36d-b · tool copy lows from IR-M1-36d-1 (new, IR-M1-36d-1)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
