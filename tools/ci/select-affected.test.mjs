@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HEAVY_JOBS,
   jobOutputs,
+  fastLane,
   loadWorkspace,
   selectAffected,
   turboFilters,
@@ -382,5 +383,87 @@ describe('ci.yml wires the heavy-job selection', () => {
     for (const name of ['checks', ...Object.keys(HEAVY)]) {
       expect(gate, name).toMatch(new RegExp(`QUEUE_REQUIRED:.*\\b${name}\\b`));
     }
+  });
+});
+
+// CHORE-CI-DOCS-FASTLANE (owner decisions 2026-10-25, D1 and plan item B): which events narrow the work
+// for a docs-only change. Anything unknown fails towards running everything.
+describe('fastLane: the docs-only fast lane', () => {
+  const DOC = ['docs/process/ci-cd.md', 'changelog.d/X.md', 'README.md', '.changeset/a-b.md'];
+  const CODE = ['apps/cli/src/index.ts'];
+  const FULL = { codeChanged: true, selector: false };
+  const FEATURE = 'refs/heads/feat/x';
+
+  it('a merge group of docs-only PRs uses the selector and skips the heavy jobs', () => {
+    expect(fastLane({ event: 'merge_group', files: DOC })).toEqual({
+      codeChanged: false,
+      selector: true,
+    });
+  });
+
+  it('a merge group with any code PR runs the full suite', () => {
+    expect(fastLane({ event: 'merge_group', files: [...DOC, ...CODE] })).toEqual(FULL);
+  });
+
+  it('a merge group touching .github or tools runs the full suite', () => {
+    for (const f of ['.github/workflows/ci.yml', 'tools/ci/select-affected.mjs']) {
+      expect(fastLane({ event: 'merge_group', files: [...DOC, f] })).toEqual(FULL);
+    }
+  });
+
+  it('a docs-only push to a feature branch skips the heavy jobs and uses the selector', () => {
+    expect(fastLane({ event: 'push', ref: FEATURE, files: DOC })).toEqual({
+      codeChanged: false,
+      selector: true,
+    });
+  });
+
+  it('a code push to a feature branch runs everything', () => {
+    expect(fastLane({ event: 'push', ref: FEATURE, files: CODE })).toEqual(FULL);
+  });
+
+  it('a push to main always runs the full suite, even for docs', () => {
+    expect(fastLane({ event: 'push', ref: 'refs/heads/main', files: DOC })).toEqual(FULL);
+  });
+
+  it('an unknown base (no file list) or an empty diff runs everything', () => {
+    for (const event of ['merge_group', 'push', 'pull_request']) {
+      expect(fastLane({ event, ref: FEATURE, files: null })).toEqual(FULL);
+      expect(fastLane({ event, ref: FEATURE, files: [] })).toEqual(FULL);
+    }
+  });
+
+  it('an unknown event runs everything', () => {
+    expect(fastLane({ event: 'workflow_dispatch', files: DOC })).toEqual(FULL);
+  });
+
+  it('a pull request keeps using the selector, docs-only or not', () => {
+    expect(fastLane({ event: 'pull_request', files: DOC })).toEqual({
+      codeChanged: false,
+      selector: true,
+    });
+    expect(fastLane({ event: 'pull_request', files: CODE })).toEqual({
+      codeChanged: true,
+      selector: true,
+    });
+  });
+});
+
+describe('ci.yml wires the docs-only fast lane', () => {
+  const yml = readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+  it('the selector step runs when the scope step says so (pull request, docs-only queue group or push)', () => {
+    const at = yml.indexOf('id: affected');
+    const head = yml.slice(at, yml.indexOf('run: |', at));
+    expect(head).toContain("steps.e2e_scope.outputs.use_selector == 'true'");
+  });
+
+  it('a push to a feature branch diffs against its merge base with main', () => {
+    expect(yml).toContain('git merge-base HEAD origin/main');
+    expect(yml).toContain("fetch-depth: ${{ github.event_name == 'push' && 0 || 1 }}");
+  });
+
+  it('the full suite still runs when the scope is not decided (outputs default to full)', () => {
+    expect(yml).toContain("test_scope: ${{ steps.affected.outputs.test_scope || 'full' }}");
   });
 });
