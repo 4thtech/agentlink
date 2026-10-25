@@ -3,7 +3,7 @@
 // `outputSchema` (with Ajv), so each call below is also an output-schema check, in place of an MCP
 // Inspector run.
 import { EventEmitter } from 'node:events';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -13,7 +13,7 @@ import { createLogger } from '@4thtech-io/log';
 import { termsInputSchema, type ContactDisplayName, type RestrictedName } from '@4thtech-io/types';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenAgentResult, OpenedAgent } from '../runtime/index.js';
-import { TOOLS, type ToolClient, type ToolContext } from '../tools/index.js';
+import { TOOLS, type ToolClient, type ToolContext } from '@4thtech-io/mcp-tools';
 import { agentToolContext, createMcpCommand, stdioTransport } from './command.js';
 import { SERVER_INSTRUCTIONS } from './instructions.js';
 import { createMcpServer, SERVER_NAME } from './server.js';
@@ -418,29 +418,4 @@ describe('the TermsInput JSON Schema agrees with the core schema (M1-21, 06 §2.
     // always runs the core schema.
     expect(validate(sample).valid).toBe(accepted);
   });
-});
-
-describe('src/tools stays runtime-agnostic (06 §1; the ESLint fence, checked here on the source too)', () => {
-  const root = new URL('../tools/', import.meta.url);
-  const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter((f) =>
-    f.endsWith('.ts'),
-  );
-
-  it('found the module', () => {
-    expect(files).toContain('registry.ts');
-  });
-
-  for (const file of files) {
-    it(file, () => {
-      const text = readFileSync(new URL(file, root), 'utf8');
-      const depth = file.split('/').length - 1;
-      const specifiers = [...text.matchAll(/\bfrom\s+'([^']+)'/g)].map((m) => m[1]!);
-      for (const spec of specifiers) {
-        expect(spec).not.toMatch(/^node:|^@4thtech-io\/node|^@modelcontextprotocol\//);
-        if (spec.startsWith('.'))
-          expect(spec.split('/').filter((p) => p === '..').length).toBeLessThanOrEqual(depth);
-      }
-      expect(text).not.toMatch(/\bimport\(|\brequire\(|\bprocess\.|\bBuffer\./);
-    });
-  }
 });

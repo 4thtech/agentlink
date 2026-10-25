@@ -4,7 +4,7 @@
 // holds the invite secret: it is printed to the terminal the user asked in and goes nowhere else
 // (never a log line, I-7).
 import { DISPATCH_TEXT, EXIT_OK, EXIT_USAGE, type CommandHandler } from '../dispatch.js';
-import { copy, formatDate } from '../tools/strings/index.js';
+import { copy, formatDate } from '@4thtech-io/mcp-tools/strings/index.js';
 import { TEXT, createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 
 export function createInviteHandler(deps: CommandDeps = createDeps()): CommandHandler {

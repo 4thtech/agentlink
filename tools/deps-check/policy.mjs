@@ -323,6 +323,7 @@ const ALL_PACKAGES = [
   'transport-nostr',
   'storage',
   'core',
+  'mcp-tools',
   'node',
   'ui',
 ];
@@ -414,6 +415,10 @@ export const ZONES = {
       },
     ],
   ),
+  // M2-3t (G-15, D-73 (1)): the runtime-agnostic MCP tool handlers, moved from apps/cli/src/tools/ so
+  // the cloud agent Worker can import them. Core and what core uses; never `node` (the ESLint fence
+  // and bundle-check keep Node built-ins and the MCP SDK out). No runtime dependency of its own.
+  'packages/mcp-tools': entry('@4thtech-io/mcp-tools', ['types', 'log', 'crypto', 'chain', 'core']),
   'packages/ui': entry(
     '@4thtech-io/ui',
     ['types'],

@@ -9,7 +9,7 @@ import { renderContactName } from '@4thtech-io/core';
 import { EXIT_OK, EXIT_USAGE, DISPATCH_TEXT, type CommandHandler } from '../dispatch.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
 import { TEXT, createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
-import { renderCopy } from '../tools/strings/index.js';
+import { renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
 
 export function createContactsHandler(
   deps: CommandDeps = createDeps(),

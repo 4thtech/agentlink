@@ -1,4 +1,4 @@
-// Fixed text of the owner commands (M1-9b) that the M1-9g catalogue (src/tools/strings/en.ts) has no
+// Fixed text of the owner commands (M1-9b) that the M1-9g catalogue (packages/mcp-tools/src/strings/en.ts) has no
 // entry for yet. Every line is fixed: nothing the caller typed and no stored value is ever inserted
 // (I-5), except the local agent names `addAgentUnreadable` lists, which passed isAgentName. The
 // catalogue entries that exist (`cli.approve.*`) are used through `copy()`.

@@ -48,7 +48,7 @@ import type {
   PackReadOutcome,
   PackSaveOutcome,
   ProofPlatformTools,
-} from '../tools/context.js';
+} from '@4thtech-io/mcp-tools/context.js';
 import { nodeDepositAuthPort } from './deposit-auth.js';
 import { resolveOwnFolder } from './files.js';
 import { isFreeCreditsChain, nodeFreeCreditsPort } from './free-credits.js';
