@@ -309,6 +309,10 @@ describe('heavy jobs: which ones a pull request runs', () => {
     expect(running(['packages/storage/src/s3.ts'])).toContain('storage-minio');
   });
 
+  it('a tool-handler change (packages/mcp-tools, M2-3t) runs bundle-check through the CLI', () => {
+    expect(running(['packages/mcp-tools/src/send.ts'])).toContain('bundle-check');
+  });
+
   it('a chain change runs the vectors (the harness imports chain) and the e2e', () => {
     const jobs = running(['packages/chain/src/index.ts']);
     expect(jobs).toContain('vectors');

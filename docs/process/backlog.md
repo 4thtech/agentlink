@@ -3445,7 +3445,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Define `InboundMessage` and `OutboundMessage` in 06 §2.2 (moved here from M1-9c, IR-D48-1 F15f): the fields, which of them are untrusted and wrapped (§4), and that no tool result, summary or error contains a drop, presigned or share URL, a file key or a signed token from inbound content.
   - 03 §4.5 and 06 §2.5: the M1a local approval channel (D-73 (3)): no URL; `nextStep` is `agentlink approve <id>`, run in the owner's own terminal; the owner's CLI process applies the signed object through core on the shared store.
-  - Resolve G-15 as decided (D-73 (1)): handlers in `apps/cli/src/tools/`, runtime-agnostic, extracted to a package at M2-3b. Record the single-active-publisher rule (06 §6).
+  - Resolve G-15 as decided (D-73 (1)): handlers in `apps/cli/src/tools/`, runtime-agnostic, extracted to `packages/mcp-tools` at M2-3t. Record the single-active-publisher rule (06 §6).
 - **Acceptance:** spec-lint and the vocabulary lint pass; the gap register is updated; no change to 04.
 
 #### M1-9k · CLI runtime: open an agent, local approval channel, dispatcher (new, D-73)
@@ -6218,15 +6218,6 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The copy points only at something that exists; the user can see the safety code for a contact; tests cover the copy and the command or page.
 
-#### M1-UX-ALLOW-FOLDER-CASE · allow-folder: offer the exact on-disk path when the case differs (new, owner test 2026-10-25)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (owner policy path) · **Phase:** M1b
-- **Repo/path:** agentlink · apps/cli policy allow-folder, `packages/node` folder policy
-- **Depends on:** M1-36b-2
-- **Scope:**
-  - A case-mismatched folder path is refused and the user must retype it. Instead offer the exact on-disk path with a y/N confirm; the policy still binds to the real path.
-- **Acceptance:**
-  - Tests first: a case-mismatched path offers the real path; no is a no-op; the stored path is the real one.
-
 #### M1-CONTACT-LISTS · saved contact lists and one-to-many send (new, owner proposal 2026-10-25)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (send path) · **Phase:** M1b
 - **Repo/path:** agentlink · core, node, apps/cli, local UI
@@ -6283,6 +6274,119 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Extend the vocabulary lint to node error texts and replace the bare `agentlink policy …` strings in `owner-first-policy.ts` with `CLI_COMMAND`.
 - **Acceptance:**
   - Lint covers the listed files and is green; no bare command names remain in node texts.
+
+### 0.3.0 first run and agent-guided setup (new, D-130)
+
+Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026-10-25 (D-130). Carded elsewhere and not repeated here: same-named contacts (M1-9zg), the approval cards with "Approve with Touch ID" and the wide backup-code field (M1-11b-5), the first-run first policy (M1-36b-2-b), PRF only on `get()` (M1-11s-c-c), and the Contacts, Files, Rules and Proofs pages (M1-11c-a2, -a3, -a5, -a4). In review, with their cards in their own PRs: `init` asks once and waits for Claude Desktop (M1-36k, #530), the Send folder for existing agents from the terminal and the case-spelling prompt for `policy allow-folder` (M1-36b-2-c, #531), and `agentlink ui` (M1-11b-9, #520).
+
+#### M1-UX-PRF-MATRIX · local UI: platform passkey with PRF, browser matrix and fallback copy (new, D-130 (1))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 (test harness, detection and fixed copy; no owner signing) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**` (detection and copy), Playwright tests, `docs/runbooks/` (manual matrix record)
+- **Depends on:** M1-8e, M1-11s-c, M1-11s-c-c
+- **Spec:** 08 §1 (first run v2); 11 §6.2.1; 04 §2.3.1
+- **Invariants:** I-4
+- **Scope:**
+  - Record a browser by OS matrix for a platform passkey with PRF on `http://localhost:<port>`: Safari, Chrome, Edge, Firefox and Arc on macOS; Chrome, Edge and Firefox on Windows. For each: PRF at `create()` or only at `get()`, and how many sensor prompts the first run needs.
+  - The first run detects `prf.enabled` and the platform authenticator; without them it shows the fixed copy naming a browser on this computer that works, or continues with the backup code only. The button label comes from the platform ("Use Touch ID", "Use Windows Hello", "Use a passkey").
+  - The first 0.3.0 task: M1-UX-FIRSTRUN-V2 builds on its result.
+- **Acceptance:**
+  - Playwright with a virtual authenticator covers PRF at create, PRF only at get, and no PRF; a manual run on the owner's two Macs is recorded; copy passes `lintVocabulary`.
+
+#### M1-UX-FIRSTRUN-V2 · local UI: passkey-first first run, backup-code save step, folders in the same gesture (new, D-130 (1), (2))
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (owner setup, first card and first policy signing in `packages/node`; owner code display) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Depends on:** M1-UX-PRF-MATRIX, M1-36b-2-b, M1-11s-c-c, M1-11b-3, M1-11b-7; design D1 `local/first-run--*`, adjustments LF-1, LF-2, B-9
+- **Spec:** 08 §1 (first run v2); 04 §2.5 (one owner flow), §2.2, §2.3.1; 11 §5.5, §6.2.1; 06 §3
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Order: the folders are shown, then "Use Touch ID" (platform label); one confirmation creates the owner, registers the passkey, signs the card and the first policy (06 §3 defaults, Send allowed), all or nothing; then "Your backup code" once with the save form (`autocomplete="username"` with the fixed label, `autocomplete="new-password"`), a secondary Copy with the clipboard warning, and "I saved it"; then the recovery kit; then Ready.
+  - Create `~/AgentLink/Send`, `Inbox` and `Proofs` (0700) before signing; the policy binds the realpath of the Send folder, which must be a real folder, never a link (at either level), new or empty; anything else is refused before the gesture (the same folder rules as `policy allow-send-folder`, M1-36b-2-c).
+  - B-9 path for 0.2.0 owners: enter the owner code once, then register the passkey.
+  - Styled from the design (D-116); copy per 11 §5.5 and §6.2.1.
+- **Acceptance:**
+  - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a link (at either level) or a non-empty Send folder is refused before the gesture; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
+
+#### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/commands/init.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/mcp/**`, `packages/node/src/approval-server.ts`, tests
+- **Depends on:** M1-11b-9 (#520), M1-11b-8, M1-11c-a3
+- **Spec:** 04 §2.5 ("What the AI may cause"); 08 §1 ("Opened for the owner by the AI"); 06 §2.3, §2.5, §7
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Agent-run `ui` and agent-run `init --confirm` open the page through the OS opener (absolute path), served by a process that does not hold the agent's command open; one fixed line built with `cliPrefix()`; the SSH or headless fallback names the command.
+  - `agentlink mcp` opens the Files page on `NO_ALLOWED_FOLDER` (never on `OUTSIDE_ALLOWED_FOLDER`), within the 30 s alert limit, and uses the opened-page `nextStep` texts of 06 §2.3 and §2.5.
+  - Opens only after this agent's own tool call, never from background processing of inbound content; no URL parameter carries a path, a name or an amount.
+- **Acceptance:**
+  - Tests first (RED commit): no result, log line or output contains the session link, a token or a code (canary); no open from inbound processing; at most one open per 30 s; Files proposes only the fixed default; no new tool (tool-surface snapshot unchanged); threat note; independent review (S2).
+
+#### M1-UX-AGENT-GUIDE · agent copy: "I opened it, tap here" next steps, server instructions and skill (new, D-130 (3))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (fixed strings, server instructions, skill file) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/strings/**`, `apps/cli/src/mcp/instructions.ts`, `skills/agentlink/SKILL.md`, install prompts (06 §7.1), tests and snapshots
+- **Depends on:** M1-UX-OPEN-APP; M1-36a-c-b (bare-prefix lint)
+- **Spec:** 06 §5 (planned wording), §2.3, §2.5, §7.1; 11 §6.1
+- **Invariants:** I-5
+- **Scope:**
+  - Apply the 06 §5 planned wording and the 11 §6.1 opened-page examples; every command hint uses `CLI_COMMAND`/`cliPrefix()`.
+  - Nothing tells the user to paste a code into chat or to run `approve` in a terminal the AI runs; no string carries a safety code.
+- **Acceptance:**
+  - Snapshot tests for the changed strings and instructions; the vocabulary and bare-prefix lints pass; no test weakened.
+
+#### M1-UX-SEND-FOLDER-EXISTING · local UI: allow the Send folder for agents created before 0.3.0 (new, D-130 (2), (3))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (signs `policy.set` from the page) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`, `packages/node/src/local-ui/**` files routes, tests
+- **Depends on:** M1-11c-a3, M1-UX-OPEN-APP, M1-36b-2-c (same folder rules, terminal path)
+- **Spec:** 08 §1 (Files banner); 06 §2.3, §3; 04 §2.5
+- **Invariants:** I-4
+- **Scope:**
+  - With no allowed folder, the Files page shows "Allow ~/AgentLink/Send for sending files?"; one passkey gesture creates the folder if it is missing (0700) and signs the `policy.set` that adds its realpath. The banner takes no path from the URL, the AI or inbound content.
+- **Acceptance:**
+  - Tests first (RED commit): the banner appears only with no allowed folder; one gesture leaves a verified policy with the realpath; a URL parameter cannot change the folder; independent review (S2).
+
+#### M1-UX-OTHER-COMPUTER · local UI: "This is my other computer" on the new-contact card (new, D-130 (5))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`apps/local-ui` approval card and the owner-set name in the accept flow) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/cards/**`, tests
+- **Depends on:** M1-11b-5
+- **Spec:** 11 §6.2.1 (Approvals); 06 §2.1 (contact-name rule)
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - A choice on the new-contact card that fills "Name this contact" with "My other computer" (editable). A local, owner-set label only: no new owner operation and no crypto; the contact stays a separate owner with its own safety code. One owner on several computers is M2-UX-DEVICE-LINK.
+- **Acceptance:**
+  - Tests: the choice sets the owner-set name confirmed with the Accept; nothing else changes; the inbound name stays restricted.
+
+#### M1-UX-APPROVAL-PAGE · local approval page: styled card, plain summary, wide backup-code field (new, owner test 2026-10-25, D-130 (1))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` approval server and page; owner presence surface) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` and its page assets, `apps/cli` approval details, tests
+- **Depends on:** M1-11a, M1-11a-b; interim until M1-11b-2 and M1-11b-5 move approvals into `apps/local-ui`
+- **Spec:** 08 §1, §4 (CSP); 11 §5, §6.2.1, §8 (approval card); D-116
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Style the page from the D1 approval card with the `packages/ui` tokens; light and dark; phone width.
+  - Lead each card with a plain summary built from the parsed stored action (no raw arguments, never the invite link).
+  - The passkey button first; the backup-code field full width, with paste, show and hide, no length limit, and `autocomplete="off"` (Q-130-1).
+- **Acceptance:**
+  - Tests first (RED commit): untrusted values render as text (XSS fixture); no invite link in the page or its API view; the code field's attributes; CSP unchanged; presence, the session link and CSRF unchanged; independent review (S2).
+
+#### DOCS-OWNER-CODE-SAVE · docs: saving the backup code, and quitting Claude Desktop before setup (new, D-130 (1), (7))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (user guidance on an owner secret) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs-site/guide/**`, `knowledge/` where it covers setup
+- **Depends on:** M1-UX-FIRSTRUN-V2 (copy)
+- **Spec:** 11 §5.5 (backup code), §6.1; 06 §7 (Claude Desktop)
+- **Invariants:** I-4
+- **Scope:**
+  - Plain guidance: what the backup code is for, save it in a password manager, never give it to your AI, it can't be recovered (the recovery kit restores everything instead); quit Claude Desktop (Cmd+Q) before setup. States the open Q-130-1 limit honestly: no claim that a saved code is safe from programs that control the screen or browser.
+- **Acceptance:**
+  - Pages pass the vocabulary lint and the docs checks; no claim beyond 04 §2.5.
+
+#### M1-9f-c · Claude Desktop: the signed extension as the recommended path (new, D-130 (7))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`init` copy and docs; no owner code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` (Claude Desktop hint), `docs-site/guide/**`, README
+- **Depends on:** M1-9f and its manual install check on macOS and Windows
+- **Spec:** 06 §7 (Claude Desktop); D-91
+- **Invariants:** I-1
+- **Scope:**
+  - After the manual check passes, `init` and the docs name the signed extension first for Claude Desktop; the config entry stays the fallback and is never written while Claude Desktop runs (M1-36k).
+- **Acceptance:**
+  - The manual check is recorded; `init` output and docs name the extension first; copy passes `lintVocabulary`.
 
 ---
 
@@ -6432,6 +6536,19 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - **Deploy (D-25):** staging deploy on merge; smoke test (load, CSP headers, hash check); production automatically once staging smoke is green (D-52); health check with automatic rollback to the previous hash-identical artifacts; deploy record; halted by `DEPLOY_FREEZE`.
 
 ### Cloud agent template (`apps/cloud-agent`)
+
+#### M2-3t · cloud agent: tool handlers into their own package
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (S2 path touch: tool handlers)
+- **Repo/path:** agentlink · packages/mcp-tools (from apps/cli/src/tools), apps/cli, tools/deps-check, eslint.config.mjs
+- **Depends on:** M1-9j (G-15 resolved, D-73 (1))
+- **Spec:** 06 §1 rule 1 and "Extraction"; 03 "Tool handlers (G-15, D-73 (1))"; 07 §1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Pure move (`git mv`, no logic edit): `apps/cli/src/tools/` becomes the workspace package `@4thtech-io/mcp-tools` (`packages/mcp-tools`), so a Worker can import the handlers (M2-3b). `apps/cli` imports it by package name.
+  - Keep the fence (no Node built-in, Node global, MCP SDK or `@4thtech-io/node` import) as ESLint rules scoped to the package, the neutral-platform bundle check on the package entry, and a source test that moved with the package; a deps-check zone, an `audit-rules.md` row (S1), the review-gate class rule, the changesets `fixed` group and the TypeScript references.
+- **Acceptance:**
+  - The tool-surface snapshot and the registry snapshot are byte-identical; the CLI bundle still includes the handlers; the package declares no Node or MCP SDK dependency.
+- **Notes:** the workerd test projects for `crypto`, `transport-nostr`, `chain` and `mcp-tools` named in `PLAN-CLOUD-AGENT.md` are a separate follow-up (M2-3t-w).
 
 #### M2-3a · cloud agent: AgentDO, store, relay sync, Worker KeyStore
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
@@ -6778,6 +6895,39 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Custody on a hardware token or a cloud signing service, never on a workstation disk.
 - **Acceptance:**
   - Certificates issued; custody recorded privately; a test signature from the CI release environment verifies (with M2-11e).
+
+#### M2-UX-REMEMBER-MORE · "Remember for this contact" beyond proofs (new, D-130 (6))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (policy rule fields, owner signing) · **Phase:** M2
+- **Repo/path:** agentlink · `packages/core` (policy), `packages/types`, `apps/local-ui` approval cards; `docs/foundation/06-mcp-server.md` §3
+- **Depends on:** M1-11a-b; a spec PR with its own decision entry
+- **Spec:** 06 §3 (per-contact rules; M2 note)
+- **Invariants:** I-4
+- **Scope:**
+  - Spec first: rule fields for incoming files over the size limit and for receipts from one contact; each "remember" is a `policy.set` under the same gesture as its approval; the AI can never create the rule.
+- **Acceptance:**
+  - Spec merged with a D-entry before code; tests first; independent review (S2).
+
+#### M2-UX-DEVICE-LINK · "Add my other computer" as the same owner (new, D-130 (5))
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (moves the owner seed between machines) · **Phase:** M2
+- **Repo/path:** agentlink · `packages/node`, `apps/local-ui`, console; `docs/foundation/04-security-and-crypto.md` §2.3.3, 08
+- **Depends on:** M1-9i (recovery kit), the M2 console
+- **Spec:** 04 §2.3.3; 08 §1, §2 (spec to write)
+- **Invariants:** I-1, I-4, I-10
+- **Scope:**
+  - Spec first: one owner on two computers, using the recovery-kit format (a QR code between local pages, or through the console); the owner decides the flow.
+- **Acceptance:**
+  - Spec merged with a D-entry and a threat note before code; independent review (S2).
+
+#### M2-UX-NEWCONTACT-ONE-GESTURE · accept, name and safety-code check as one tap (new, UX-v2 plan, D-130)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (combined owner flow) · **Phase:** M2
+- **Repo/path:** agentlink · `apps/local-ui`, `packages/node`; `docs/foundation/04-security-and-crypto.md` §2.5
+- **Depends on:** M1-11c-a2, M1-11b-5
+- **Spec:** 04 §2.5 (one owner flow; to be named), §3.6.1
+- **Invariants:** I-4
+- **Scope:**
+  - Spec first: 04 §2.5 names the pair (accept with the name, then the safety-code check) before any combined flow is built.
+- **Acceptance:**
+  - Spec merged before code; tests first; independent review (S2).
 
 ### Storage connectors (D-49) (new)
 
@@ -7677,7 +7827,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@4thtech-io/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** **RESOLVED (D-86, Tali, in chat, 18 Oct 2026):** fixed mapping in 05 §3.1; control, pairing and owner types are refused for notarization; the recipient checks the kind before signing a receipt. *Was:* 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocked:* M1-7g.
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14; the Workers egress part stays open for M2-3b.
-15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
+15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into `packages/mcp-tools` by M2-3t (done: audit-rules row added). *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
 16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d.
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". **RESOLVED (D-89, Tali, in chat, 2026-10-19, option a):** the flag is off-chain (per-chain config, read by the client and the submitter); the contract keeps no flag but requires an allowed token and `value ≥ minDeposit`, measures its balance before and after `receiveWithAuthorization`, and reverts `DepositMismatch()` unless the increase equals `value` (05 §2.5, §7). Contract work: M1-3c, in the private repo.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.

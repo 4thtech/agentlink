@@ -45,8 +45,8 @@ import { RuntimeError } from './errors.js';
 import { DROP_ORIGIN, nodeFileOpener, nodeFilesPlatform } from './files.js';
 import { fileFreeCreditsMarker } from './free-credits.js';
 import { nodeProofs, type NodeProofs } from './proofs.js';
-import type { FileOpener, ProofPlatformTools } from '../tools/context.js';
-import type { FreeCreditsMarker } from '../tools/free-credits.js';
+import type { FileOpener, ProofPlatformTools } from '@4thtech-io/mcp-tools/context.js';
+import type { FreeCreditsMarker } from '@4thtech-io/mcp-tools/free-credits.js';
 
 /** The Node pieces the runtime is built from. Tests pass doubles; production uses @4thtech-io/node. */
 export interface RuntimeDeps {

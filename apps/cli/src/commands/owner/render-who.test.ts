@@ -3,7 +3,7 @@
 import { restrictName, type AgentLinkClient } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import type { PendingRequest } from './pending.js';
-import { copy } from '../../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { cardFacts, cardLines } from './render.js';
 
 // Built from code points so the source holds no bidi or zero-width character.

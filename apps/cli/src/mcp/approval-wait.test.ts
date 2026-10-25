@@ -7,8 +7,8 @@ import type { ApprovalState, CommitmentCard, RespondToTermsResult } from '@4thte
 import { createLogger } from '@4thtech-io/log';
 import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
-import type { TermsTools } from '../tools/context.js';
-import type { ToolClient, ToolContext } from '../tools/index.js';
+import type { TermsTools } from '@4thtech-io/mcp-tools/context.js';
+import type { ToolClient, ToolContext } from '@4thtech-io/mcp-tools';
 import {
   APPROVAL_WAIT_MAX_MS,
   APPROVAL_WAIT_MS_BY_CLIENT,
