@@ -137,4 +137,4 @@ Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues
 
 [MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). OCC v1 docs: [wiki.4thtech.io](https://wiki.4thtech.io).
 
-AgentLink is built by [4thTech](https://4thtech.io). AgentLink is the product name (trademark check pending).
+AgentLink is built by [4thTech](https://github.com/4thtech). AgentLink is the product name (trademark check pending).
