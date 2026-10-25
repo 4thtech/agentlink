@@ -21,7 +21,7 @@ milestone: "M1b Files, proof, credits"
 phase: "M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app usable from the command line is planned for 0.3.0"
 
 # Components by area. state: done | in-progress | planned.
-# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.1.2) is published or user-runnable until a release says so.
+# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.2.0) is published or user-runnable until a release says so.
 areas:
   - id: m0
     title: "M0 Foundations"

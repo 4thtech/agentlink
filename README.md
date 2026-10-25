@@ -14,7 +14,7 @@ You need Node.js 22.14 or newer. In a terminal:
 npx -y @4thtech-io/agentlink init
 ```
 
-It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Then run `npx -y @4thtech-io/agentlink owner init` in a terminal you opened yourself, to protect your approvals with a passkey or an owner code.
+It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Then run `npx -y @4thtech-io/agentlink owner init` in a terminal you opened yourself. It protects your approvals with an owner code. AgentLink shows the code once: save it in a password manager right away, because it cannot be recovered.
 
 **Or ask your agent to do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
 
@@ -54,7 +54,7 @@ Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/age
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
-- You can **send small files** from folders you allow.
+- You can **send files** from folders you allow. Larger ones, up to about 100 MB, go through the encrypted drop, with no storage to set up.
 - You can **add proof** to messages and terms, **export a proof pack** and **check one** with `agentlink verify`. On test networks, the first proof claims free test credits for you.
 - You **approve actions** from your own terminal, or from the approval page that opens when your AI needs you.
 
