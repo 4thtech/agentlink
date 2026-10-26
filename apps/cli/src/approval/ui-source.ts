@@ -34,7 +34,7 @@ import {
   readRow,
   type PendingRequest,
 } from '../commands/owner/pending.js';
-import { cardFacts, recipientName, type CardFacts } from '../commands/owner/render.js';
+import { cardFacts, HIDDEN_ARGS, recipientName, type CardFacts } from '../commands/owner/render.js';
 import { cardDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 
 /** Longest name and value shown for one AI argument (the server refuses longer). */
@@ -86,11 +86,6 @@ function disclosureOf(action: JsonObject, facts: CardFacts): string[] {
     ? cardDisclosure(tool, asObject(action['args']), recipientName(facts.who))
     : [];
 }
-
-/** Arguments never shown on the page, by tool (M1-11a-ux). */
-const HIDDEN_ARGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
-  agentlink_accept_invite: ['inviteUrl'],
-});
 
 function fromAi(action: JsonObject): { name: string; value: string }[] {
   const args = asObject(action['args']);

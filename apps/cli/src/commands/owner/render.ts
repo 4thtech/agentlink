@@ -72,6 +72,11 @@ export interface CardFacts {
   readonly terms?: TermsCardView | 'problem';
 }
 
+/** Arguments never shown on a card, by tool: a link is a capability, so the owner decides on the summary (M1-11a-ux, -c). */
+export const HIDDEN_ARGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  agentlink_accept_invite: ['inviteUrl'],
+});
+
 const asObject = (value: JsonValue | undefined): JsonObject | undefined =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
     ? (value as JsonObject)
@@ -220,11 +225,19 @@ export function cardLines(request: PendingRequest, facts: CardFacts, index?: num
   const args = asObject(request.action['args']);
   // A firm offer (M1-9d-3): its terms are shown from the stored, bound copy in the terms region, so
   // the agent's `args.terms` is not shown here (04 §3.4.2 "What the owner sees").
+  const toolName = request.action['tool'];
+  const hidden = (typeof toolName === 'string' ? HIDDEN_ARGS[toolName] : undefined) ?? [];
   const shownArgs =
-    terms !== undefined && terms.ownTerms === true && args !== undefined
-      ? Object.fromEntries(Object.entries(args).filter(([key]) => key !== 'terms'))
-      : args;
-  lines.push(...untrustedRegion(FROM_YOUR_AI, fieldValues(shownArgs)));
+    args === undefined
+      ? undefined
+      : Object.fromEntries(
+          Object.entries(args).filter(
+            ([key]) => !hidden.includes(key) && !(terms?.ownTerms === true && key === 'terms'),
+          ),
+        );
+  if (toolName === 'agentlink_accept_invite') lines.push(facts.headline);
+  const shown = fieldValues(shownArgs);
+  if (shown.length > 0 || hidden.length === 0) lines.push(...untrustedRegion(FROM_YOUR_AI, shown));
   if (terms !== undefined) lines.push(...terms.region);
   lines.push(
     `Who:      ${facts.who}`,
