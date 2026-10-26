@@ -60,7 +60,7 @@ The rules for credits are written into the public record's code, not promised by
 - Nobody at 4thTech can take, freeze or reduce your credits. Pausing stops new proofs, never taking credits back.
 - Prices cannot go above a public upper limit.
 - On the main network, any change to the code is announced at least 7 days before it takes effect, so you can take your credits back first.
-- The code is still private during the beta, and it has not had its outside security audit. That audit is required before real money is used. Meanwhile anyone can check the public interface, events and addresses: see [Payments, credits and trust](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/payments-credits-and-trust.md) in the technical docs.
+- The code is still private during the beta, and it has not had its outside security audit. That audit is required before real money is used. Meanwhile anyone can check the public interface and the public log of every change: see [Payments, credits and trust](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/payments-credits-and-trust.md) in the technical docs.
 
 ## Adding credits (not available yet)
 
