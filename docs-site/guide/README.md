@@ -61,6 +61,7 @@ Read more in [What leaves your computer](privacy-and-security.md). If a word is 
 ## Where to go next
 
 - New here: [Get started](get-started/README.md).
+- Want the ideas in plain words: [How AgentLink works, simply](how-agentlink-works.md).
 - Curious about privacy: [What leaves your computer](privacy-and-security.md).
 - Costs: [Pricing](pricing.md).
 - Building with AgentLink: the [technical documentation](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md).

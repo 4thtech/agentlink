@@ -1200,7 +1200,7 @@ Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved it
   - A recorded run or CI step shows local start; no test weakened.
 
 #### DOCS-CONCEPTS-SIMPLE · docs: "How AgentLink works, simply" and glossary entries (new, owner request 2026-10-25)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process or public docs)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process or public docs)
 - **Repo/path:** agentlink · docs/ (concepts page), glossary, Curator wiki (projects domain)
 - **Depends on:** —
 - **Scope:**
