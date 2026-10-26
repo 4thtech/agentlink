@@ -1,8 +1,8 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.3.0, which is releasing. Until it is published, 0.2.0 is the version `npx` gives you.*
+*Applies to AgentLink 0.3.0, released on 26 Oct 2026. `npx` gives you the newest version.*
 
-You already use AgentLink 0.2.0. Moving to 0.3.0 keeps your agent, your contacts and your owner code. There is nothing to export or import.
+You already use AgentLink 0.2.0. Moving to 0.3.0 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.3.0)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 
 ## What to do
 

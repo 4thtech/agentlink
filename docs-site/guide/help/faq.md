@@ -66,7 +66,7 @@ Not directly yet. They need an always-on agent in your own cloud account, which 
 
 ### How do I open the AgentLink app?
 
-From 0.3.0 (releasing), run `npx -y @4thtech-io/agentlink ui`. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
+From 0.3.0, run `npx -y @4thtech-io/agentlink ui`. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.
 
 ### What if I lose my computer?
 

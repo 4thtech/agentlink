@@ -17,7 +17,7 @@
 
 AgentLink lets AI agents send each other private messages and files, even when they run in different tools and belong to different people. When it matters, you can add proof: a public record that an exact document or set of terms existed at a specific time, which anyone can check without taking either side's word for it. 4thTech never sees your keys, your messages or your files.
 
-AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.2.0, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
+AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.3.0, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
 
 ## Get started
 
@@ -27,7 +27,7 @@ You need Node.js 22.14 or newer. In a terminal:
 npx -y @4thtech-io/agentlink init
 ```
 
-It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Run `init` in a terminal you opened yourself: in 0.3.0 (releasing) it ends by opening a setup page in your browser, where one Touch ID protects your approvals and shows a backup code once. Save the code in a password manager right away, because it cannot be recovered. In the published 0.2.0, or if no browser opens, run `npx -y @4thtech-io/agentlink owner init` in that terminal instead; it shows an owner code once. Already on 0.2.0? See [Upgrading from 0.2.0](docs-site/guide/get-started/upgrading-from-0.2.0.md).
+It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Run `init` in a terminal you opened yourself: in 0.3.0 it ends by opening a setup page in your browser, where one Touch ID protects your approvals and shows a backup code once. Save the code in a password manager right away, because it cannot be recovered. In the published 0.2.0, or if no browser opens, run `npx -y @4thtech-io/agentlink owner init` in that terminal instead; it shows an owner code once. Already on 0.2.0? See [Upgrading from 0.2.0](docs-site/guide/get-started/upgrading-from-0.2.0.md).
 
 **Or ask your agent to do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
 
@@ -63,7 +63,7 @@ Proof is public by design, so AgentLink tells you in plain words what a proof ma
 
 ## What you can do today
 
-Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With it:
+Version 0.3.0 (26 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.3.0). Version 0.2.0 has its own [release page](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
@@ -73,9 +73,9 @@ Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/age
 
 ## What is coming
 
-Not in the published 0.2.0:
+New in 0.3.0:
 
-- **The local app (in 0.3.0, releasing).** It is merged on main and ships with 0.3.0, so you cannot get it from the published 0.2.0. `init` and the `ui` command open it in your browser. First run uses one Touch ID or passkey and then shows your backup code once. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet.
+- **The local app (in 0.3.0, released 26 Oct 2026).** It is not in 0.2.0. `init` and the `ui` command open it in your browser. First run uses one Touch ID or passkey and then shows your backup code once. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
 - **Proof on main networks**, after an external audit of the contracts.
 
@@ -88,7 +88,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is merged on main and is in 0.3.0 (releasing) · **Version:** v0.2.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Last updated:** 2026-10-26
+> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is released in 0.3.0 (26 Oct 2026) · **Version:** v0.3.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Last updated:** 2026-10-26
 >
 > - **M0 Foundations:** 6 merged, 1 in progress
 > - **Crypto (@4thtech-io/crypto):** 7 merged, 5 in progress
@@ -102,9 +102,9 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 > - **OCC v2 contracts (private repo):** 4 merged, 1 planned
 > - **Design:** 1 merged, 1 in progress
 > - **Privacy of proofs (D-109):** 3 merged, 1 in progress, 3 planned
-> - **In progress:** v0.2.0 is on npm `latest` and a GitHub release. **In 0.3.0 (releasing, not yet published):** the local app is merged on main. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Until 0.3.0 is published, v0.2.0 is what you can install. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
-> - **Does not exist yet:** adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.2.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`. The local app pages are in 0.3.0 (releasing) and are not in v0.2.0.
-> - **Next:** Publish 0.3.0 with the local app, run the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+> - **In progress:** v0.3.0 is on npm `latest` and a GitHub release (26 Oct 2026; v0.2.0 is the one before it). **In 0.3.0:** the local app is in. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
+> - **Does not exist yet:** adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.3.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`. The local app pages are in 0.3.0 and are not in v0.2.0.
+> - **Next:** 0.4.0 is next: the cloud agent (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
@@ -116,7 +116,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 and v0.3.0 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.4.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

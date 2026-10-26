@@ -37,7 +37,7 @@ While the page is open, your agent waits briefly for your decision. You do not n
 
 ## Coming
 
-In version 0.3.0 (releasing), the local app lets you approve with a passkey such as Touch ID. See [The local app](../local-app/README.md). Until you have 0.3.0, the owner code is how you approve.
+In version 0.3.0, the local app lets you approve with a passkey such as Touch ID. See [The local app](../local-app/README.md). Until you have 0.3.0, the owner code is how you approve.
 
 ## If it does not work
 

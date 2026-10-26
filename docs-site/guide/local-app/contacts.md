@@ -1,6 +1,6 @@
 # Contacts page
 
-*Applies to AgentLink 0.3.0, which is releasing.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
