@@ -105,6 +105,7 @@ function fakeClient(contacts: Contacts = fakeContacts()): LocalUiReadClient {
     proofs: {
       list: () => Promise.reject(new Error('not used')),
       creditsBalance: () => Promise.reject(new Error('not used')),
+      topUp: () => Promise.reject(new Error('not used')),
     },
     contacts,
   };

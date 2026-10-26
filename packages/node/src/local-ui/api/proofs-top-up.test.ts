@@ -77,10 +77,22 @@ function fakeClient(topUp: () => Promise<TopUpView>): LocalUiReadClient {
   return {
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
+    listActivity: () => Promise.reject(new Error('not used')),
+    files: {
+      resolvedFolders: () => Promise.reject(new Error('not used')),
+      preparePolicyEdit: () => Promise.reject(new Error('not used')),
+    },
     proofs: {
       list: () => Promise.resolve({ items: [] }),
       creditsBalance: () => Promise.resolve({ status: 'unavailable' }),
       topUp,
+    },
+    contacts: {
+      list: () => Promise.reject(new Error('not used')),
+      safetyCode: () => Promise.reject(new Error('not used')),
+      prepareCheck: () => Promise.reject(new Error('not used')),
+      prepareRename: () => Promise.reject(new Error('not used')),
+      prepareRemove: () => Promise.reject(new Error('not used')),
     },
   };
 }
@@ -165,7 +177,7 @@ function readRoute(path: string): LocalUiReadRoute {
 
 function ownerRoute(path: string): LocalUiOwnerRoute {
   const found = proofsRoutes.find((r) => r.path === path && r.method === 'POST');
-  if (found === undefined || !found.presence) throw new Error(`no owner route ${path}`);
+  if (found === undefined || found.presence !== true) throw new Error(`no owner route ${path}`);
   return found;
 }
 
@@ -212,7 +224,7 @@ describe('routes (M1-11c-a4c)', () => {
       proofs: {
         list: () => Promise.resolve({ items: [] }),
         creditsBalance: () => Promise.resolve({ status: 'unavailable' }),
-        topUp: () => {
+        receiveOptions: () => {
           asked += 1;
           return Promise.resolve({ status: 'unavailable' });
         },

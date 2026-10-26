@@ -2431,7 +2431,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
    * Where funds can be sent to add credits, and what can be added or withdrawn (M1-11c-a4c; D-123:
    * Chiado only for now). Reads only; `unavailable` without the proofs platform or before init.
    */
-  async topUp(): Promise<TopUpView> {
+  async receiveOptions(): Promise<TopUpView> {
     return readTopUp(this.#platform, await this.#deps.identity.agentAddress());
   }
 

@@ -1,6 +1,6 @@
 // M1-11c-a4c: add credits by QR on Chiado, and withdraw credits (D-122, D-123; 12 §4.1, §4.4;
 // 05 §2.5; 04 §2.5, §2.5.1; 07 §6.2). Written from the card:
-// - `topUp()` names where the agent can be paid: on Chiado (the one top-up chain for now) the agent's
+// - `receiveOptions()` names where the agent can be paid: on Chiado (the one top-up chain for now) the agent's
 //   own address, what that account holds, how much of it can become credits after the gas reserve,
 //   and the credits it can withdraw; on another testnet "coming soon"; a mainnet never appears.
 // - `addReceivedFunds(signed)` turns received xDAI into the agent's own credits with the agent's own
@@ -180,7 +180,7 @@ function expectClean(value: unknown): void {
   expect(JSON.stringify(value)).not.toMatch(FORBIDDEN);
 }
 
-describe('topUp: where to send funds (M1-11c-a4c, D-123)', () => {
+describe('receiveOptions: where to send funds (M1-11c-a4c, D-123)', () => {
   it('the top-up chain is Chiado only, with a gas reserve and a minimum', () => {
     expect(TOP_UP_CHAIN_IDS).toEqual([10200]);
     expect(Object.isFrozen(TOP_UP_CHAIN_IDS)).toBe(true);
@@ -190,7 +190,7 @@ describe('topUp: where to send funds (M1-11c-a4c, D-123)', () => {
 
   it('without a proofs platform: unavailable', async () => {
     const a = await openAgent(clock, 60);
-    expect(await a.client.proofs.topUp()).toEqual({ status: 'unavailable' });
+    expect(await a.client.proofs.receiveOptions()).toEqual({ status: 'unavailable' });
   });
 
   it('Chiado: the agent address, what arrived, what can become credits after the reserve', async () => {
@@ -199,7 +199,7 @@ describe('topUp: where to send funds (M1-11c-a4c, D-123)', () => {
     const a = await openAgent(clock, 61, platformOf(base, chiado));
     chiado.native = 5n * XDAI;
     chiado.credits = 2n * XDAI;
-    const got = await a.client.proofs.topUp();
+    const got = await a.client.proofs.receiveOptions();
     expect(got).toEqual({
       status: 'ok',
       agentId: a.id,
@@ -226,7 +226,7 @@ describe('topUp: where to send funds (M1-11c-a4c, D-123)', () => {
     const chiado = fakeChain(CHIADO);
     const a = await openAgent(clock, 62, platformOf(chiado));
     chiado.native = TOP_UP_MIN_WEI + TOP_UP_GAS_RESERVE_WEI - 1n;
-    const got = await a.client.proofs.topUp();
+    const got = await a.client.proofs.receiveOptions();
     expect(got.status === 'ok' && got.chains[0]).toMatchObject({
       method: 'address',
       addable: { amount: '0', usd: '0' },
@@ -237,7 +237,7 @@ describe('topUp: where to send funds (M1-11c-a4c, D-123)', () => {
     const main = fakeChain(GNOSIS_MAINNET);
     const noDirect = fakeChain(CHIADO, false);
     const a = await openAgent(clock, 63, platformOf(main, noDirect));
-    const got = await a.client.proofs.topUp();
+    const got = await a.client.proofs.receiveOptions();
     expect(got).toEqual({
       status: 'ok',
       agentId: a.id,
@@ -250,7 +250,7 @@ describe('topUp: where to send funds (M1-11c-a4c, D-123)', () => {
     (chiado.chain.state as { nativeBalance: unknown }).nativeBalance = () =>
       Promise.reject(new Error('https://rpc.example/KEY-IN-PATH'));
     const a = await openAgent(clock, 64, platformOf(chiado));
-    const got = await a.client.proofs.topUp();
+    const got = await a.client.proofs.receiveOptions();
     expect(got).toEqual({
       status: 'ok',
       agentId: a.id,

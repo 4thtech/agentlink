@@ -131,7 +131,7 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),
       creditsBalance: () => client.proofs.creditsBalance(),
-      topUp: () => client.proofs.topUp(),
+      topUp: () => client.proofs.receiveOptions(),
     }),
     listActivity: (query) => client.activity.list(query),
   });
