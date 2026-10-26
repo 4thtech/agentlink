@@ -12,6 +12,9 @@
 // - the action handed back for signing is that same parsed, frozen object (IR-M1-9j-1 F06).
 // The AI's arguments go to the page as plain name and value strings in their own "From your AI"
 // region; the page renders every value with textContent only (I-5).
+// M1-11a-ux: the card leads with a plain headline (render.ts) and an accept-invite's
+// `inviteUrl` is left out: the link is the capability that opens the invite, and the owner decides on
+// who it connects to (the Who line, from the verified invite card), never on the link itself.
 //
 // I-4: nothing here decides. `apply` is core's `ownerActions.apply`, which verifies the owner
 // signature and applies the decision in one store transaction.
@@ -32,7 +35,7 @@ import {
   type PendingRequest,
 } from '../commands/owner/pending.js';
 import { cardFacts, recipientName, type CardFacts } from '../commands/owner/render.js';
-import { cardDisclosure } from '../tools/strings/privacy.js';
+import { cardDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 
 /** Longest name and value shown for one AI argument (the server refuses longer). */
 const MAX_NAME = 256;
@@ -84,13 +87,22 @@ function disclosureOf(action: JsonObject, facts: CardFacts): string[] {
     : [];
 }
 
+/** Arguments never shown on the page, by tool (M1-11a-ux). */
+const HIDDEN_ARGS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  agentlink_accept_invite: ['inviteUrl'],
+});
+
 function fromAi(action: JsonObject): { name: string; value: string }[] {
   const args = asObject(action['args']);
   if (args === undefined) return [];
-  return Object.entries(args).map(([name, value]) => ({
-    name: cut(name, MAX_NAME),
-    value: cut(typeof value === 'string' ? value : canonicalize(value), MAX_VALUE),
-  }));
+  const tool = action['tool'];
+  const hidden = (typeof tool === 'string' ? HIDDEN_ARGS[tool] : undefined) ?? [];
+  return Object.entries(args)
+    .filter(([name]) => !hidden.includes(name))
+    .map(([name, value]) => ({
+      name: cut(name, MAX_NAME),
+      value: cut(typeof value === 'string' ? value : canonicalize(value), MAX_VALUE),
+    }));
 }
 
 function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
@@ -105,6 +117,7 @@ function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
           ...terms.after,
         ].slice(0, MAX_TERMS_LINES);
   return {
+    headline: facts.headline,
     who: facts.who,
     what: facts.what,
     cost: facts.cost,

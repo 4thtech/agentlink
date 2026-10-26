@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 7,
+  "version": 8,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, pyhpke 0.6.5, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
@@ -9576,10 +9576,10 @@
       }
     },
     {
-      "id": "verify-json-revoke",
+      "id": "verify-text-revoke",
       "source": "04 \u00a72.5.1: the SignedOwnerAction as JSON text verifies",
       "input": {
-        "op": "verifyJson",
+        "op": "verifyText",
         "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -9592,10 +9592,10 @@
       }
     },
     {
-      "id": "verify-json-reject-issued-at-fraction",
+      "id": "verify-text-reject-issued-at-fraction",
       "source": "04 \u00a72.5.1, 04 \u00a72.4.1: issuedAt spelled 1760000000.0; the signature is valid over the parsed value, so only the token check refuses it",
       "input": {
-        "op": "verifyJson",
+        "op": "verifyText",
         "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000.0,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -9608,10 +9608,10 @@
       }
     },
     {
-      "id": "verify-json-reject-issued-at-exponent",
+      "id": "verify-text-reject-issued-at-exponent",
       "source": "04 \u00a72.5.1, 04 \u00a72.4.1: issuedAt spelled 1.76e9; the signature is valid over the parsed value, so only the token check refuses it",
       "input": {
-        "op": "verifyJson",
+        "op": "verifyText",
         "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1.76e9,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -9624,10 +9624,10 @@
       }
     },
     {
-      "id": "verify-json-reject-v-fraction",
+      "id": "verify-text-reject-v-fraction",
       "source": "04 \u00a72.5.1, 04 \u00a72.4.1: v spelled 1.0; the signature is valid over the parsed value, so only the token check refuses it",
       "input": {
-        "op": "verifyJson",
+        "op": "verifyText",
         "json": "{\"body\":{\"v\":1.0,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -9640,10 +9640,10 @@
       }
     },
     {
-      "id": "verify-json-reject-expires-at-minus-zero",
+      "id": "verify-text-reject-expires-at-minus-zero",
       "source": "04 \u00a72.5.1, 04 \u00a72.4.1: expiresAt spelled -0; the signature is valid over the parsed value, so only the token check refuses it",
       "input": {
-        "op": "verifyJson",
+        "op": "verifyText",
         "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":-0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -9656,11 +9656,187 @@
       }
     },
     {
-      "id": "verify-json-reject-duplicate-op",
+      "id": "verify-text-reject-duplicate-op",
       "source": "04 \u00a72.5.1, 04 \u00a72.4.1: a duplicate `op` key; the signature is valid over the parsed value, so only the token check refuses it",
       "input": {
-        "op": "verifyJson",
+        "op": "verifyText",
         "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-jcs-canonical",
+      "source": "04 \u00a72.5.1 Received text (D-128): the JCS form of the SignedOwnerAction verifies",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":0,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"agent.revoke\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"reason\":\"compromised\"},\"v\":1},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-text-escaped-value",
+      "source": "04 \u00a72.5.1 Received text (D-128): an escape inside a string value (`op`) is unaffected",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"\\u0061gent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-text-escaped-value-nonce",
+      "source": "04 \u00a72.5.1 Received text (D-128): an escape inside a string value (`nonce`) is unaffected",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"\\u002d_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "accept"
+      }
+    },
+    {
+      "id": "verify-text-reject-escaped-agent",
+      "source": "04 \u00a72.5.1 Received text (D-128): `agent` spelled \\u0061gent",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"\\u0061gent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-escaped-sig",
+      "source": "04 \u00a72.5.1 Received text (D-128): `sig` (top level) spelled \\u0073ig",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"\\u0073ig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-escaped-name-upper-hex",
+      "source": "04 \u00a72.5.1 Received text (D-128): `issuedAt` spelled issued\\u0041t",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issued\\u0041t\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-escaped-name-at-depth",
+      "source": "04 \u00a72.5.1 Received text (D-128): a name in `params` spelled re\\u0061son",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"re\\u0061son\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-escaped-name-equals-another",
+      "source": "04 \u00a72.5.1 Received text (D-128): a second `op` spelled \\u006fp (a duplicate only after unescaping)",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"\\u006fp\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-duplicate-at-depth",
+      "source": "04 \u00a72.5.1 Received text (D-128): a duplicate name in `params`",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\",\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-duplicate-sig",
+      "source": "04 \u00a72.5.1 Received text (D-128): a duplicate `sig` with the same value",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\",\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
+        "context": {
+          "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
+          "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",
+          "now": 1760000060
+        }
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "verify-text-reject-duplicate-body",
+      "source": "04 \u00a72.5.1 Received text (D-128): a duplicate `body` with the same value",
+      "input": {
+        "op": "verifyText",
+        "json": "{\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"body\":{\"v\":1,\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"op\":\"agent.revoke\",\"params\":{\"reason\":\"compromised\"},\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"issuedAt\":1760000000,\"expiresAt\":0},\"sig\":\"eeeae1616990a86f96c65f64a0950393e59526b087dcd653d046e8da3ff290d89c78a8f25050c8e8121a8b4a420391bff3190e3a913afc1b39a1f4a8ef63698a\"}",
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
           "ownerNostr": "0x241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0",

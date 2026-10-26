@@ -68,11 +68,12 @@ import {
   type KeychainProbe,
   type ProbeOptions,
 } from './keychain.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 const keychainFailed = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
-    'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+    `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 const identityMissing = (): NodeKeyStoreError =>
@@ -84,7 +85,7 @@ const identityMissing = (): NodeKeyStoreError =>
 const identityMismatch = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'identity_mismatch',
-    "The keychain item for this agent belongs to a different agent. Restore this agent's item from a backup; `agentlink doctor` shows the expected agent ID.",
+    `The keychain item for this agent belongs to a different agent. Restore this agent's item from a backup; \`${CLI_COMMAND} doctor\` shows the expected agent ID.`,
   );
 
 /**
@@ -497,14 +498,14 @@ export function recordedBackend(
     if (backends.file === undefined || !isUnlockedFileAgent(backends.file, agentId)) {
       throw new NodeKeyStoreError(
         'keystore_locked',
-        "The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; `agentlink doctor` shows how.",
+        `The agent's key file is locked. Give AgentLink its unlock code through AGENTLINK_KEYSTORE_PASSPHRASE_FILE, then restart; \`${CLI_COMMAND} doctor\` shows how.`,
       );
     }
     return fileKeychain(backends.file);
   }
   throw new NodeKeyStoreError(
     'backend_unavailable',
-    "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
+    `This agent's recorded key store is not one AgentLink knows. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
   );
 }
 

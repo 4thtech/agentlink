@@ -23,7 +23,7 @@ import {
   type Terms,
 } from '@4thtech-io/types';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
-import { copy, formatDate, formatTime } from '../../tools/strings/index.js';
+import { copy, formatDate, formatTime } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { PendingRequest } from './pending.js';
 
 /** Fixed text of the terms card (11 §6.10, §8). Only a contact name, numbers and our dates go in. */

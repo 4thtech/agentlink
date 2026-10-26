@@ -59,9 +59,9 @@ import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenAgentResult, OpenedAgent } from '../src/runtime/open-agent.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import { agentToolContext } from '../src/mcp/command.js';
-import { acceptInviteAction } from '../src/tools/accept-action.js';
-import { INVITE_TEXT } from '../src/tools/invite-common.js';
-import { callTool, type FinishedResult } from '../src/tools/index.js';
+import { acceptInviteAction } from '@4thtech-io/mcp-tools/accept-action.js';
+import { INVITE_TEXT } from '@4thtech-io/mcp-tools/invite-common.js';
+import { callTool, type FinishedResult } from '@4thtech-io/mcp-tools';
 
 // --- doubles ----------------------------------------------------------------------------------------
 

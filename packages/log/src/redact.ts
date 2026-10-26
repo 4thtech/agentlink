@@ -92,7 +92,13 @@ const SENSITIVE_WHOLE: ReadonlySet<string> = new Set([
 ]);
 
 // Words that make a URL-named field a capability (a presigned or download link): fully redacted.
-const CAPABILITY_URL_WORDS: ReadonlySet<string> = new Set(['signed', 'download', 'downloads']);
+const CAPABILITY_URL_WORDS: ReadonlySet<string> = new Set([
+  'signed',
+  'download',
+  'downloads',
+  'upload',
+  'uploads',
+]);
 
 /** Splits a key into lowercase words: camelCase, PascalCase, snake_case, kebab-case, "X-Amz-Foo", "seed2". */
 function words(key: string): string[] {
@@ -202,6 +208,9 @@ const WHOLE_URL =
 // older browsers. The authority is read like an absolute URL's, so user info is dropped and an
 // IPv6 host is kept. Scheme-less URLs (`host.tld/v2/key`) are an accepted residual risk.
 const PROTOCOL_RELATIVE = /(^|[^\w:/\\])\/\/([^\s/\\?#"'<>`]+)[^\s"'<>`]*/g;
+// The same with JSON-escaped slashes (`\/\/host\/path`), also nested in a string. The drive-letter
+// guard is the same: the character before must not be ':' (that is an absolute URL).
+const ESCAPED_PROTOCOL_RELATIVE = /(^|[^\w:/\\])((?:\\{1,7}\/){2})([^\s/\\?#"'<>`]+)[^\s"'<>`]*/g;
 // Percent-encoded absolute URLs (a redirect target inside a query string), single or double encoded.
 const ENCODED_URL =
   /\b(https?|wss?)(%(?:25)?3A%(?:25)?2F%(?:25)?2F)([A-Za-z0-9.-]{1,253}(?:%(?:25)?3A[0-9]{1,5})?)[^\s"'<>`&]*/gi;
@@ -370,6 +379,17 @@ function quotedValueEnd(text: string, start: number, slashes: number, meter: Met
 }
 
 /**
+ * An apostrophe inside a word of running text ("don't", "it's"): a word character on both sides,
+ * the one before it itself preceded by a word character. Everywhere else (`b'..'`, `='`, `('`,
+ * after a space or a bracket) it opens a string, so a bracket inside the string cannot end the value.
+ */
+function isContraction(text: string, at: number): boolean {
+  return (
+    at >= 2 && /\w/.test(text[at - 1]!) && /\w/.test(text[at - 2]!) && /\w/.test(text[at + 1] ?? '')
+  );
+}
+
+/**
  * An object or array: everything up to the matching bracket, skipping the strings inside it.
  * `level` is the backslash count of the quotes of the JSON it sits in (see isRealQuote). A value
  * that never closes is redacted to the end of the string (fails closed).
@@ -386,7 +406,7 @@ function bracketedValueEnd(text: string, start: number, level: number, meter: Me
       run += 1;
       continue;
     }
-    if (char === '"' || char === "'") {
+    if (char === '"' || (char === "'" && (inString === "'" || !isContraction(text, at)))) {
       if (isRealQuote(run, level)) {
         if (inString === '') inString = char;
         else if (char === inString) inString = '';
@@ -444,12 +464,17 @@ function scanPairs(text: string, meter: Meter): string {
       kind = classifyKey(name);
       kinds.set(name, kind);
     }
-    if (kind === 'none' || kind === 'url') continue;
+    if (kind === 'none') continue;
     const start = match.index + match[0].length;
     const level = /^\\*/.exec(match[2]!)![0].length;
     const { end, open, close } = scanValue(text, start, level, meter);
     if (end === start) continue;
     const bare = text.slice(start + open.length, end - close.length);
+    if (kind === 'url') {
+      // A URL value is reduced by stripUrls; anything else under a URL-named key is replaced.
+      const whole = WHOLE_URL.exec(bare);
+      if (whole !== null && isUrlSeparator(whole[1]!, whole[2]!)) continue;
+    }
     if (kind === 'code' && (isAllowedCode(bare) || isAllowedCode(Number(bare)))) continue;
     out += `${text.slice(copied, start)}${open}${REDACTED}${close}`;
     copied = end;
@@ -545,6 +570,11 @@ export function stripUrls(text: string): string {
       PROTOCOL_RELATIVE,
       (match, before: string, authority: string) =>
         `${before}//${host(authority)}${trailingBackslashes(match)}`,
+    )
+    .replace(
+      ESCAPED_PROTOCOL_RELATIVE,
+      (match, before: string, slashes: string, authority: string) =>
+        `${before}${slashes}${host(authority)}${trailingBackslashes(match)}`,
     )
     .replace(ENCODED_URL, (_match, scheme: string, separator: string, hostname: string) => {
       return `${scheme}${separator}${hostname}`;

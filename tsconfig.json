@@ -9,6 +9,7 @@
     { "path": "packages/transport-nostr" },
     { "path": "packages/storage" },
     { "path": "packages/core" },
+    { "path": "packages/mcp-tools" },
     { "path": "packages/node" },
     { "path": "packages/ui" },
     { "path": "apps/cli" },

@@ -18,7 +18,7 @@ import { assertBytes } from './bytes.js';
 import { decodeBase64url, decodeHex } from './encoding.js';
 import { CryptoInputError } from './errors.js';
 import { TAGS, sha256, taggedHash } from './hash.js';
-import { canonicalizeToBytes } from './jcs.js';
+import { canonicalizeToBytes, parseReceivedJson } from './jcs.js';
 
 /** 04 §3.1: the only envelope version. */
 export const ENVELOPE_VERSION = 1;
@@ -266,6 +266,17 @@ export function parseEnvelope(value: unknown): Envelope {
     aead: readAead(raw.aead),
     sig: readHex(raw.sig, 'sig', 64),
   });
+}
+
+/**
+ * 04 §3.1.1 step 3 on the exact text received (04 §2.5.1 "Received text", D-128, M1-1h-b): the
+ * strict received-text parse (no duplicate member name at any depth, no member name written with an
+ * escape, protocol integer tokens only), then parseEnvelope. Every envelope that arrives or is
+ * reloaded as text goes through this, never through a plain JSON parse. Throws CryptoInputError
+ * (`invalid_json` for the text, `invalid_envelope` for the structure).
+ */
+export function parseEnvelopeText(text: string): Envelope {
+  return parseEnvelope(parseReceivedJson(text));
 }
 
 function hasOwnSig(value: unknown): boolean {

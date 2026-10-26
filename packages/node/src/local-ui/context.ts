@@ -8,10 +8,18 @@
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
 import type {
+  ActivityEntry,
   AgentLinkClient,
+  ContactView,
+  CreditsView,
   OwnerActionOutcome,
+  OwnerSafetyCode,
+  Page,
+  PageQuery,
   PolicyEditOptions,
+  PreparedOwnerAction,
   PreparedPolicyEdit,
+  ProofListItem,
   ResolvedFolders,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
@@ -73,6 +81,28 @@ export interface LocalUiReadClient {
     resolvedFolders(): Promise<ResolvedFolders>;
     preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
   };
+   * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
+   * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
+   * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
+   * gate's one-use `sign`, applied by core, changes anything. No direct block, remove or apply.
+   */
+  readonly contacts: {
+    list(): Promise<readonly ContactView[]>;
+    safetyCode(contactId: string): Promise<OwnerSafetyCode>;
+    prepareCheck(contactId: string): Promise<PreparedOwnerAction>;
+    prepareRename(contactId: string, alias: string): Promise<PreparedOwnerAction>;
+    prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
+  };
+  /**
+   * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
+   * only. Not `requestFaucet` (owner decision D2) and nothing that notarizes.
+   */
+  readonly proofs: {
+    list(query: PageQuery): Promise<Page<ProofListItem>>;
+    creditsBalance(): Promise<CreditsView>;
+  };
+  /** M1-11c-a1: one page of core's activity feed (`ActivityService.list`); store only, no write. */
+  listActivity(query: PageQuery): Promise<Page<ActivityEntry>>;
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -85,6 +115,19 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       preparePolicyEdit: (patch: unknown, options?: PolicyEditOptions) =>
         client.ownerActions.preparePolicyEdit(patch, options),
     }),
+    contacts: Object.freeze({
+      list: () => client.contacts.list(),
+      safetyCode: (contactId: string) => client.pairing.ownerSafetyCode(contactId),
+      prepareCheck: (contactId: string) => client.ownerActions.prepareContactCheck(contactId),
+      prepareRename: (contactId: string, alias: string) =>
+        client.ownerActions.prepareContactRename(contactId, alias),
+      prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
+    }),
+    proofs: Object.freeze({
+      list: (query: PageQuery) => client.proofs.list(query),
+      creditsBalance: () => client.proofs.creditsBalance(),
+    }),
+    listActivity: (query) => client.activity.list(query),
   });
 }
 

@@ -1,43 +1,48 @@
 # Folders for sending files
 
-> **Status: Available since v0.1.2.** The `agentlink policy` command for allowing folders comes together with sending files through your agent ([Files](files.md)). A settings page for the same rules arrives with the local settings page.
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** choose the folders your agent may send files from.
+Your agent can send a file only from a folder you have allowed. This keeps it from sending things you never meant to share.
 
-## How it works
+## The folder you already have
 
-- **Nothing is allowed until you allow it.** Your agent can send a file only from a folder you allowed. Until you allow one, a request to send a file stops before anything is read, and your agent tells you what to do.
-- **Only you can change this.** Allowing or removing a folder is part of your rules, signed with your owner code. Your AI can't change your rules, and there is no AI tool for it.
-- **The whole folder, its subfolders, no hidden files.** Allowing a folder allows the files in it and in its subfolders. Hidden files (such as `.env`) and private folders (such as `~/.ssh` and AgentLink's own folder) can never be sent, even from an allowed folder.
-- **The real folder, not a link.** AgentLink stores the folder's real path. A path that goes through a link (a shortcut) is refused, and you are shown the real path to use instead.
-- **Not too wide.** You can't allow your whole computer or your whole home folder. Allow a folder inside it, for example a `~/Documents/Shared` folder you keep for sharing. You can allow up to 32 folders.
-- **No folder that holds a private folder.** A folder that contains a private folder, such as `~/Library` (which holds your passwords in `~/Library/Keychains`), is refused before you're asked for your owner code. AgentLink names the private folder and asks you to choose a narrower folder inside it. This also holds when the private folder is a link to somewhere else, and whatever the upper or lower case. Files inside private folders are also refused each time your agent tries to send them.
+Owner setup creates an empty folder called `AgentLink/Send` in your home folder and allows it. Put a file there and your agent can send it. Nothing else is allowed until you say so.
 
-## In practice
+If you set up your agent before version 0.3.0, run `npx -y @4thtech-io/agentlink policy allow-send-folder` once to get the same folder. It adds only that folder to your rules and asks for your owner code.
+
+## Allow, check or remove a folder
 
 In a terminal you opened yourself (not one your AI runs):
 
-1. `agentlink policy allow-folder ~/Documents/Shared` allows that folder. AgentLink shows the exact folder, then asks for your owner code.
-2. `agentlink policy show` lists your allowed folders and a few other rules, such as where received files are saved. It doesn't ask for your owner code.
-3. `agentlink policy remove-folder ~/Documents/Shared` stops your agent from sending files from that folder. This works even if you already deleted the folder.
+1. `npx -y @4thtech-io/agentlink policy allow-folder ~/Documents/Shared` allows that folder. AgentLink shows the exact folder, then asks for your owner code.
+2. `npx -y @4thtech-io/agentlink policy show` lists your allowed folders and a few other rules. It does not ask for your owner code.
+3. `npx -y @4thtech-io/agentlink policy remove-folder ~/Documents/Shared` stops your agent from sending from that folder. It works even if you already deleted the folder.
 
-Type your owner code only at the prompt, never in a shell command or a chat. A wrong code changes nothing; run the command again to retry. Add `--agent <name>` if you have several agents.
+Type your owner code only at the prompt, never in a shell command or a chat. A wrong code changes nothing; run the command again. Add `--agent <name>` if you have several agents.
 
-## If your rules can't be used
+Received files are saved in `~/AgentLink/Inbox`, which AgentLink creates the first time a file arrives.
 
-If your saved rules were changed outside AgentLink, or an older copy was put back, AgentLink stops using them and uses its strictest settings: no folder is allowed, and everything that needs your approval asks for it. Your saved rules are kept as they are. `agentlink doctor` tells you when this happens.
+## The rules
 
-To repair them, run `agentlink policy recover` in a terminal you opened yourself:
+- **Only you can change this.** Your AI cannot, and there is no AI tool for it.
+- **The folder and its subfolders** are allowed, but never hidden files (such as `.env`) or private folders (such as `~/.ssh` and AgentLink's own folder).
+- **The real folder, not a shortcut.** A path that goes through a link is refused, and you are shown the real path to use. If you spell a folder differently from how it is on disk (for example `~/work` for `~/Work`), AgentLink shows the exact path and asks `Use <exact path>? (y/N)`. Type `y` to allow it.
+- **Not too wide.** You cannot allow your whole computer or your whole home folder. Allow a folder inside it. You can allow up to 32 folders.
+- **No folder that holds a private folder.** A folder like `~/Library` (which holds your passwords) is refused before you are asked for your owner code. AgentLink names the private folder and asks for a narrower one.
+
+## If your rules cannot be used
+
+If your saved rules were changed outside AgentLink, or an older copy was put back, AgentLink stops using them and falls back to its strictest settings: no folder is allowed, and everything that needs approval asks for it. Your saved rules are kept as they are. `npx -y @4thtech-io/agentlink doctor` tells you when this happens.
+
+To repair them, run `npx -y @4thtech-io/agentlink policy recover` in a terminal you opened yourself:
 
 1. It says what went wrong, and nothing more.
-2. It shows the full rules it would sign: your last rules, if they are still signed by you (for example after an older copy was put back), otherwise AgentLink's starting rules. With the starting rules, allow your folders again afterwards.
+2. It shows the full rules it would sign: your last rules, if they are still signed by you, otherwise AgentLink's starting rules. With the starting rules, allow your folders again afterwards.
 3. It signs them only after you type `y` and then your owner code. Anything else changes nothing.
 
-`agentlink policy recover` does nothing while your rules are in use.
+It does nothing while your rules are in use.
 
-## Still to come
+## Not yet
 
-- Changing other rules from the terminal (`agentlink policy set`), such as the limits for agreements.
-- The local settings page for the same rules.
-
-**Filled in at:** M1 (v0.2.0), backlog cards M1-9m and M1-9m-b.
+- Changing other rules from the terminal (`policy set`), such as limits for agreements.
+- A rules page in the local app (version 0.3.0).

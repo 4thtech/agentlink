@@ -23,7 +23,7 @@ import {
   decodeHex0x,
   encodeHex,
   equalBytes,
-  parseJson,
+  parseReceivedJson,
   sha256,
   taggedHash,
 } from '@4thtech-io/crypto';
@@ -152,9 +152,13 @@ export function ownerActionHash(signed: unknown): string {
   return encodeHex(sha256(canonicalizeToBytes(signed)));
 }
 
-/** Parses wire text strictly: I-JSON, no duplicate keys, integers only (04 §2.4.1). */
+/**
+ * Parses a SignedOwnerAction's text with the 04 §2.5.1 "Received text" parse (D-128, M1-1h-b):
+ * I-JSON, no duplicate member name at any depth, no member name written with an escape, integers
+ * only (04 §2.4.1). Every owner action that arrives or is reloaded as text goes through this.
+ */
 export function parseOwnerActionText(text: string): unknown {
-  return parseJson(text, { integersOnly: true });
+  return parseReceivedJson(text);
 }
 
 const opOf = (input: unknown): string | null => {

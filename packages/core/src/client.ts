@@ -28,6 +28,11 @@ import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
 import { FilesView } from './files/view.js';
+import {
+  FileLinks,
+  type RequestFileLinkInput,
+  type RequestFileLinkResult,
+} from './files/refresh-link.js';
 import { ActivityService } from './activity.js';
 import {
   deleteExpiredFiles,
@@ -173,7 +178,9 @@ export class AgentLinkClient {
   readonly proofs: ProofService;
   /** The allowed folders as the rules name them and as resolved (M1-11r-a, the local UI). Read-only. */
   readonly files: FilesView;
-  /** The non-message activity feed (M1-11r-a, the local UI): approvals, proofs, blocks, rules. */
+  /** refresh-link (M1-7f-3; 04 §4): requests, and answers after each processing pass. */
+  readonly fileLinks: FileLinks;
+  /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
   readonly #sync: SyncService;
@@ -246,7 +253,17 @@ export class AgentLinkClient {
     this.#files = new FileFetcher(ctx, files, () => ownerActions.loadPolicy());
     this.#filesPlatform = files;
     this.files = new FilesView(ctx, files, () => ownerActions.loadPolicy());
-    this.activity = new ActivityService(ctx);
+    this.fileLinks = new FileLinks(
+      ctx,
+      {
+        identity: this.identity,
+        envelopes: this.envelopes,
+        outbox: this.outbox,
+        ownerActions: this.ownerActions,
+      },
+      files,
+    );
+    this.activity = new ActivityService(ctx, this.contacts);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,
@@ -297,6 +314,7 @@ export class AgentLinkClient {
       inbox: this.inbox,
       acks: this.acks,
       proofs: this.proofs,
+      fileLinks: this.fileLinks,
     });
   }
 
@@ -397,6 +415,17 @@ export class AgentLinkClient {
    */
   fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
     return this.#files.fetch(input);
+  }
+
+  /**
+   * Asks the contact that sent a stored file for a fresh link (M1-7f-3; 04 §4 "Delivery", 07 §5.2):
+   * a `request` envelope `{kind: "refresh-link", envelopeId, fileIndex}`. The sender's core answers
+   * when it is online, from its own storage and never past the file's `expiresAt`; the answer
+   * replaces this file's link, so `fetchFile` works again. Refused locally once retention has passed
+   * (`LINK_EXPIRED`) and for an inline file (`NOT_REFRESHABLE`).
+   */
+  requestFileLink(input: RequestFileLinkInput): Promise<RequestFileLinkResult> {
+    return this.fileLinks.request(input);
   }
 
   /**

@@ -30,6 +30,7 @@
 //   this computer: the exact `npm` command is shown and runs only after a `y`. Run by an agent it
 //   never installs and never asks; it prints the command for the user. Declined or failed, npx stays
 //   the fallback, and every command printed here starts with the form that works (M1-36a).
+import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { createInterface } from 'node:readline/promises';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
@@ -43,6 +44,7 @@ import {
   type CommandContext,
   type CommandHandler,
 } from '../dispatch.js';
+import { nodeOwnerDeps } from './owner/deps.js';
 import {
   CONFIG_PATH_HARNESSES,
   HARNESS_MESSAGES,
@@ -77,7 +79,8 @@ import { checkOwnerTerminal } from '../runtime/guards.js';
 import { GLOBAL_PREFIX, cliPrefix } from '../runtime/cli-prefix.js';
 import { INSTALL_COMMAND, installGlobally, isAgentlinkOnPath } from './global-install.js';
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
-import { copy } from '../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
+import { firstRunStep } from './first-run.js';
 
 /** The Node pieces `init` uses. Tests pass doubles; production uses `nodeInitDeps()`. */
 export interface InitDeps {
@@ -97,12 +100,76 @@ export interface InitDeps {
    * temporary or unsafe copy is running (installed-cli.ts).
    */
   readonly installedCli?: () => Promise<string | undefined>;
+  /** Whether the Claude desktop app is running now (no shell). Absent: treated as not running. */
+  readonly claudeDesktopRunning?: () => Promise<boolean>;
+  /** Whether this agent already has a card from an owner. Absent: treated as no card yet. */
+  readonly hasOwnerCard?: (name: string) => Promise<boolean>;
   /** The command that runs AgentLink as it was started (M1-36a `cliPrefix`). */
   readonly cliPrefix?: () => string;
   /** Whether an `agentlink` program is on PATH. Absent: treated as installed (no offer, no tip). */
   readonly agentlinkOnPath?: () => boolean;
   /** Runs the global install (M1-36b, D1); true when it succeeded. Absent: never offered. */
   readonly installGlobal?: () => Promise<boolean>;
+  /** M1-11b-6: the first-run page step (first-run.ts); true when it handled the owner step. */
+  readonly firstRun?: (
+    context: CommandContext,
+    name: string,
+    interactive: boolean,
+    /** The command to name (M1-36a `cliPrefix`, after the install offer). */
+    prefix: string,
+  ) => Promise<boolean>;
+}
+
+/**
+ * One line reader for the whole run: lines typed ahead are kept for the next question instead of
+ * being lost with a reader that closes after each answer. Paused between questions, so the process
+ * can still exit.
+ */
+function sharedLineReader(): () => Promise<string> {
+  const queue: string[] = [];
+  const waiting: ((line: string) => void)[] = [];
+  let rl: ReturnType<typeof createInterface> | undefined;
+  let closed = false;
+  return () =>
+    new Promise<string>((resolve) => {
+      const queued = queue.shift();
+      if (queued !== undefined) return resolve(queued);
+      if (closed) return resolve('');
+      if (rl === undefined) {
+        // No `output`: the question is printed through the CLI's output channel (src/output.ts).
+        const reader = createInterface({ input: process.stdin });
+        rl = reader;
+        reader.on('line', (line) => {
+          const next = waiting.shift();
+          if (next !== undefined) next(line);
+          else queue.push(line);
+          if (waiting.length === 0) reader.pause();
+        });
+        reader.once('close', () => {
+          closed = true;
+          for (const next of waiting.splice(0)) next('');
+        });
+      }
+      waiting.push(resolve);
+      rl.resume();
+    });
+}
+
+/** Runs a fixed program without a shell and tests its output. */
+function runsCheck(command: string, args: readonly string[], match: RegExp): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    execFile(command, [...args], { timeout: 5_000, windowsHide: true }, (error, stdout) => {
+      resolve(error === null && match.test(String(stdout)));
+    });
+  });
+}
+
+function isClaudeDesktopRunning(platform: NodeJS.Platform): Promise<boolean> {
+  if (platform === 'darwin') return runsCheck('pgrep', ['-x', 'Claude'], /\d/);
+  if (platform === 'win32') {
+    return runsCheck('tasklist', ['/FI', 'IMAGENAME eq Claude.exe', '/NH'], /Claude\.exe/i);
+  }
+  return Promise.resolve(false);
 }
 
 export function nodeInitDeps(): InitDeps {
@@ -110,16 +177,15 @@ export function nodeInitDeps(): InitDeps {
     home: homedir(),
     probeKeychain: () => probeOsKeychain(),
     createAgent: () => createOsKeychainAgent(),
-    readLine: async () => {
-      // No `output`: the question is printed through the CLI's output channel (src/output.ts).
-      const rl = createInterface({ input: process.stdin });
+    readLine: sharedLineReader(),
+    claudeDesktopRunning: () => isClaudeDesktopRunning(process.platform),
+    hasOwnerCard: async (name) => {
+      const opened = await nodeOwnerDeps().open(name);
+      if (opened.status !== 'ok') return false;
       try {
-        return await new Promise<string>((resolve) => {
-          rl.once('line', resolve);
-          rl.once('close', () => resolve(''));
-        });
+        return (await opened.agent.client.identity.get()) !== undefined;
       } finally {
-        rl.close();
+        await opened.agent.close();
       }
     },
     clock: () => Math.floor(Date.now() / 1000),
@@ -127,6 +193,8 @@ export function nodeInitDeps(): InitDeps {
     cliPrefix: () => cliPrefix(),
     agentlinkOnPath: () => isAgentlinkOnPath(process.env),
     installGlobal: () => installGlobally(),
+    firstRun: (context, name, interactive, prefix) =>
+      firstRunStep(context, name, interactive, prefix),
   };
 }
 
@@ -135,7 +203,7 @@ export const HOOK_TEXT = Object.freeze({
   intro:
     'This adds a start-of-session note to Claude Code: a line or two saying who has written to you. It runs the AgentLink program installed on this computer. It never reads message text and changes nothing.',
   noInstall:
-    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run `agentlink init --hook` again. Nothing was changed.',
+    'The hook needs AgentLink installed on this computer, and this copy is only running temporarily. Install it with `npm install -g @4thtech-io/agentlink`, then run the same command again. Nothing was changed.',
   notFound: "Problem  AgentLink didn't find Claude Code on this computer. Nothing was changed.",
   present: 'OK       The AgentLink start-of-session note is already set up in Claude Code',
   conflict:
@@ -169,9 +237,23 @@ export const INIT_TEXT = Object.freeze({
   // No Claude desktop app on Linux, so it is not named there.
   appsLinux: 'Claude Code, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf',
   restartDesktop: 'Warning Quit and reopen the Claude app. AgentLink appears under Connectors.',
+  desktopStillOpen:
+    'Problem  Claude Desktop is still open, so AgentLink did not change its settings (it rewrites them when it quits). Quit Claude Desktop (Cmd+Q), then run `{prefix} init --harness claude-desktop`.',
+  quitDesktopMac: 'Quit Claude Desktop first (Cmd+Q), then press Enter.',
+  quitDesktopOther: 'Quit Claude Desktop first (close it completely), then press Enter.',
+  allQuestion: 'Set up AgentLink in all {count} apps? (y/N)',
+  applyApp: 'Apply the changes to {appName}? (y/N)',
+  skipped: 'Skipped {appName}.',
+  summaryTitle: 'Summary:',
+  summarySetUp: '  {appName}: set up',
+  summaryPresent: '  {appName}: already set up',
+  summarySkipped: '  {appName}: skipped',
+  summaryBlocked: '  {appName}: blocked. {reason}',
+  summaryConflict:
+    '  {appName}: blocked. It already has a different entry named agentlink, left as it is.',
   // D-78 (06 §7).
   declinedKept:
-    'No app was changed. Your agent identity is kept. To set up one app later, run: {prefix} init --harness <app>',
+    'No app was changed. Your agent identity is kept. To set up one app later, run `{prefix} init --harness <app>`.',
   ownerStepAdd:
     "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',
@@ -298,6 +380,8 @@ function confirmationCode(
   return `${digest.slice(0, 4)}-${digest.slice(4, 8)}`;
 }
 
+const YES = /^\s*y(es)?\s*$/i;
+
 const withApp = (text: string, appName: string): string => text.replaceAll('{appName}', appName);
 
 function printDiff(output: CommandContext['output'], plan: ChangePlan): void {
@@ -342,6 +426,32 @@ function printPlan(
         output.printError(withApp(HARNESS_MESSAGES[plan.reason], plan.def.appName));
         break;
     }
+  }
+}
+
+/** One line per app: set up, already set up, skipped or blocked (with the fixed reason). */
+function printSummary(
+  output: CommandContext['output'],
+  plans: readonly HarnessPlan[],
+  applied: readonly string[],
+  failedApps: ReadonlyMap<string, string>,
+): void {
+  if (plans.length < 2) return;
+  output.print('');
+  output.print(INIT_TEXT.summaryTitle);
+  for (const plan of plans) {
+    const appName = plan.def.appName;
+    let line: string;
+    if (plan.status === 'present') line = INIT_TEXT.summaryPresent;
+    else if (plan.status === 'conflict') line = INIT_TEXT.summaryConflict;
+    else if (plan.status === 'blocked') {
+      // A reason can name the app; withApp below fills it.
+      line = INIT_TEXT.summaryBlocked.replace('{reason}', HARNESS_MESSAGES[plan.reason]);
+    } else if (failedApps.has(plan.def.id)) {
+      line = INIT_TEXT.summaryBlocked.replace('{reason}', failedApps.get(plan.def.id) ?? '');
+    } else if (applied.includes(appName)) line = INIT_TEXT.summarySetUp;
+    else line = INIT_TEXT.summarySkipped;
+    output.print(withApp(line, appName));
   }
 }
 
@@ -593,8 +703,12 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     if (!needIdentity && changes.length === 0) {
       printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
       output.print(INIT_TEXT.nothingToDo);
-      if (interactive) await offerInstall(context, deps);
+      printSummary(output, plans, [], new Map());
+      let nowPrefix = startPrefix;
+      if (interactive) nowPrefix = await offerInstall(context, deps);
       else installTip(context, deps);
+      // M1-11b-6: after the install offer (M1-36b), so the step names the command that now works.
+      await deps.firstRun?.(context, name, interactive, nowPrefix);
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
@@ -618,13 +732,37 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     let declined = false;
     if (interactive) {
       const yes: ChangePlan[] = [];
-      for (const change of changes) {
-        // UX-B F9: the header and diff once, right above their question.
+      let all = false;
+      if (changes.length > 1) {
+        // Every change is shown once, then one question for all of them (UX: ask once).
+        for (const change of changes) {
+          output.print('');
+          printDiff(output, change);
+        }
         output.print('');
-        printDiff(output, change);
-        output.print(copy('cli.init.apply'));
-        const answer = await deps.readLine();
-        if (/^\s*y(es)?\s*$/i.test(answer)) yes.push(change);
+        output.print(INIT_TEXT.allQuestion.replace('{count}', String(changes.length)));
+        all = YES.test(await deps.readLine());
+      }
+      for (const change of changes) {
+        if (all) {
+          yes.push(change);
+          continue;
+        }
+        let answer: string;
+        if (changes.length > 1) {
+          output.print(withApp(INIT_TEXT.applyApp, change.def.appName));
+          answer = await deps.readLine();
+        } else {
+          // UX-B F9: the header and diff once, right above their question.
+          output.print('');
+          printDiff(output, change);
+          output.print(copy('cli.init.apply'));
+          answer = await deps.readLine();
+        }
+        if (YES.test(answer)) yes.push(change);
+        else {
+          output.print(withApp(INIT_TEXT.skipped, change.def.appName));
+        }
       }
       approved = yes;
       // D-78 (06 §7): declining every app change never removes the identity; it is kept (or created,
@@ -658,7 +796,27 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       output.print(INIT_TEXT.identityDone);
     }
     const applied: string[] = [];
+    const failedApps = new Map<string, string>();
     for (const change of approved) {
+      if (change.def.appName === DESKTOP_APP_NAME) {
+        // The app rewrites its settings when it quits, so it must be closed before AgentLink writes.
+        let running = (await deps.claudeDesktopRunning?.()) === true;
+        for (let asks = 0; running && interactive && asks < 3; asks += 1) {
+          output.print(
+            (deps.platform ?? process.platform) === 'darwin'
+              ? INIT_TEXT.quitDesktopMac
+              : INIT_TEXT.quitDesktopOther,
+          );
+          await deps.readLine();
+          running = (await deps.claudeDesktopRunning?.()) === true;
+        }
+        if (running) {
+          const line = initText(INIT_TEXT.desktopStillOpen, startPrefix);
+          output.printError(line);
+          failedApps.set(change.def.id, line);
+          continue;
+        }
+      }
       try {
         const { backup } = await applyHarness(change, harnessContext);
         output.print(
@@ -673,9 +831,11 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       } catch (error) {
         if (!(error instanceof HarnessError)) throw error;
         output.printError(withApp(HARNESS_MESSAGES[error.code], change.def.appName));
+        failedApps.set(change.def.id, withApp(HARNESS_MESSAGES[error.code], change.def.appName));
         failed = true;
       }
     }
+    printSummary(output, plans, applied, failedApps);
     if (applied.length > 0) {
       output.print(copy('cli.init.done'));
       for (const appName of applied) {
@@ -701,11 +861,21 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     } catch {
       // Only the hint depends on it.
     }
-    output.print(
-      others.length > 0
-        ? initText(INIT_TEXT.ownerStepAdd, prefix).replace('{name}', name)
-        : initText(INIT_TEXT.ownerStep, prefix, name),
-    );
+    // M1-11b-6: with no other agent, the first-run page may take the owner step (first-run.ts).
+    if (
+      others.length === 0 &&
+      (await deps.firstRun?.(context, name, interactive, prefix)) === true
+    ) {
+      return failed ? EXIT_FAILED : EXIT_OK;
+    }
+    if (others.length > 0) {
+      // Only agents without a card need the add-agent step (a new identity never has one).
+      const hasCard =
+        !needIdentity && (await deps.hasOwnerCard?.(name).catch(() => false)) === true;
+      if (!hasCard) output.print(initText(INIT_TEXT.ownerStepAdd, prefix).replace('{name}', name));
+    } else {
+      output.print(initText(INIT_TEXT.ownerStep, prefix, name));
+    }
     return failed ? EXIT_FAILED : EXIT_OK;
   };
 }

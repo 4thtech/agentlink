@@ -6,7 +6,7 @@ import { NodeKeyStoreError, type ApprovalContext } from '@4thtech-io/node';
 import { DISPATCH_TEXT, EXIT_FAILED, EXIT_USAGE, type CommandContext } from '../../dispatch.js';
 import type { Output } from '../../output.js';
 import { isAgentName } from '../../runtime/agent-name.js';
-import { copy } from '../../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { OwnerAgent, OwnerCommandDeps } from './deps.js';
 import { readRow } from './pending.js';
 import { withOwnerPrompts } from './prompts.js';

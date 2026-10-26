@@ -27,13 +27,19 @@ name: CI
 # draft condition; every other job needs `detect` and so skips with it; `stale-precheck` has its own).
 # `ready_for_review` runs the suite when a draft is marked ready, so the required `ci-gate` is reported
 # on drafts (all upstream jobs skipped = pass) and recomputed with the full suite before it can merge.
-# GitHub refuses to merge a draft, and the merge queue (`merge_group`) always runs everything.
+# GitHub refuses to merge a draft. The merge queue (`merge_group`) runs everything, with one exception
+# (CHORE-CI-DOCS-FASTLANE, owner decision 2026-10-25): a group whose diff holds only docs runs `checks`
+# through the affected-package selector and no heavy job; any code PR in the group runs everything. The
+# push to `main` after the merge always runs the full suite. A docs-only push to a feature branch is
+# diffed against its merge base with `main`, so its heavy jobs skip; an unknown base runs everything.
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
   push:
-    branches-ignore: [sync]
+    # The merge queue's own branches (`gh-readonly-queue/**`) are already run as `merge_group`
+    # (CHORE-CI-QUEUE-DEDUPE); a second `push` run of the same commit only saturates the runner pool.
+    branches-ignore: [sync, "gh-readonly-queue/**"]
   merge_group:
 
 permissions: {}
@@ -85,6 +91,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # CHORE-CI-DOCS-FASTLANE: a push needs the history to find its merge base with `main`
+          # (blobless: commits and trees only, enough for `git diff --name-only`).
+          fetch-depth: ${{ github.event_name == 'push' && '0' || '1' }}
+          filter: ${{ github.event_name == 'push' && 'blob:none' || '' }}
 
       - name: Detect skeleton and root scripts
         id: detect
@@ -159,53 +169,77 @@ jobs:
           fi
           out needs_playwright "$needs_playwright"
 
-      # OPS-CI-6: should the deterministic e2e run? Yes for any change outside docs and release
-      # notes, and whenever the diff cannot be computed (fail towards running). The base commit
-      # comes from the event through `env:`, never interpolated into the script.
-      - name: Decide whether the deterministic e2e is needed
+      # OPS-CI-6 and CHORE-CI-DOCS-FASTLANE: which jobs does the change need? The heavy jobs run for any
+      # change outside docs and release notes, and whenever the diff cannot be computed (fail towards
+      # running). Diff base: the pull request base, the merge group base, or for a push to a branch
+      # other than `main` its merge base with `main`; a push to `main` has none (full suite).
+      # `use_selector`: `checks` may run through the affected-package selector. Always on a pull
+      # request; on a merge group or a branch push only when every changed file is a doc
+      # (tools/ci/select-affected.mjs `fastLane`). A change under `.github/` or `tools/` never reaches
+      # that script (decided here), so a change to the script cannot vouch for itself.
+      # The ref and base commits come from the event through `env:`, never interpolated.
+      - name: Decide which jobs the change needs
         id: e2e_scope
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MQ_BASE_SHA: ${{ github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
           relevant=true
+          use_selector=false
+          if [ "$EVENT_NAME" = pull_request ]; then use_selector=true; fi
+          base=""
           case "$EVENT_NAME" in
             pull_request) base="$PR_BASE_SHA" ;;
             merge_group) base="$MQ_BASE_SHA" ;;
-            *) base="" ;;
-          esac
-          if [[ "$base" =~ ^[0-9a-f]{40}$ ]] && git fetch --quiet --no-tags --depth=1 origin "$base" 2> /dev/null; then
-            if files="$(git diff --no-renames --name-only "$base" HEAD 2> /dev/null)"; then
-              if [ -z "$(printf '%s\n' "$files" | grep -Ev '^(docs/|docs-site/|knowledge/|changelog\.d/|\.changeset/[^/]+\.md$|[^/]+\.md$)' || true)" ]; then
-                relevant=false
+            push)
+              if [ "$REF" != refs/heads/main ]; then
+                base="$(git merge-base HEAD origin/main 2> /dev/null || true)"
               fi
+              ;;
+          esac
+          list="$RUNNER_TEMP/changed-files.txt"
+          rm -f "$list"
+          if [[ "$base" =~ ^[0-9a-f]{40}$ ]] \
+            && { git cat-file -e "$base^{commit}" 2> /dev/null || git fetch --quiet --no-tags --depth=1 origin "$base" 2> /dev/null; } \
+            && git diff --no-renames --name-only "$base" HEAD > "$list" 2> /dev/null; then
+            if grep -Eq '^(\.github|tools)/' "$list"; then
+              echo "Everything runs: the change touches .github/ or tools/"
+            elif scope="$(node tools/ci/select-affected.mjs --scope "$EVENT_NAME" "$REF" "$list" 2> /dev/null)" \
+              && [[ "$scope" =~ ^e2e_relevant=(true|false)$'\n'use_selector=(true|false)$ ]]; then
+              relevant="${BASH_REMATCH[1]}"
+              use_selector="${BASH_REMATCH[2]}"
+            else
+              echo "::warning::The fast-lane decision failed; running everything."
             fi
+          else
+            rm -f "$list"
+            echo "Diff base unknown or unreadable: everything runs"
           fi
           echo "e2e_relevant=$relevant" >> "$GITHUB_OUTPUT"
-          # Same rule for every heavy job (CHORE-CI-MATRIX-QUEUE-ONLY): a merge group or pull request
-          # with any file outside the docs set, or an unreadable diff, runs everything.
-          echo "Deterministic e2e needed: $relevant"
+          echo "use_selector=$use_selector" >> "$GITHUB_OUTPUT"
+          echo "Heavy jobs needed: $relevant; affected-package selection: $use_selector"
 
       # CHORE-CI-SPEED-2: a pull request lints, typechecks, builds and tests only the packages it
       # touches, their dependents, and the packages whose tests read a changed doc
       # (tools/ci/select-affected.mjs, rules in docs/process/ci-cd.md "What runs where").
-      # CHORE-CI-SPEED-3: the same step decides which heavy jobs run (run_<job>). The merge
-      # queue and every push run the full suite and never reach the selector. A change under
-      # `.github/` or `tools/` (the selector itself) runs everything before the selector is read.
-      - name: Select the affected packages (pull requests only)
+      # CHORE-CI-SPEED-3: the same step decides which heavy jobs run (run_<job>).
+      # CHORE-CI-DOCS-FASTLANE: it also runs for a docs-only merge group and a docs-only push to a
+      # feature branch (`use_selector` of the step above). Any other merge group and every push to
+      # `main` run the full suite and never reach the selector. A change under `.github/` or `tools/`
+      # (the selector itself) runs everything before the selector is read. The step reads the changed
+      # files the step above wrote; without that list (unknown base) it runs everything.
+      - name: Select the affected packages (pull requests and docs-only changes)
         id: affected
-        if: github.event_name == 'pull_request' && steps.detect.outputs.has_skeleton == 'true'
+        if: steps.e2e_scope.outputs.use_selector == 'true' && steps.detect.outputs.has_skeleton == 'true'
         shell: bash
-        env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           list="$RUNNER_TEMP/changed-files.txt"
-          if [[ "$PR_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] && git fetch --quiet --no-tags --depth=1 origin "$PR_BASE_SHA" 2> /dev/null \
-            && git diff --no-renames --name-only "$PR_BASE_SHA" HEAD > "$list" 2> /dev/null; then
+          if [ -s "$list" ]; then
             if grep -Eq '^(\.github|tools)/' "$list"; then
               echo "test_scope=full" >> "$GITHUB_OUTPUT"
               echo "Full suite: the change touches .github/ or tools/"
@@ -628,11 +662,11 @@ jobs:
         shell: bash
         run: pnpm exec turbo run build --filter='@4thtech-io/node...'
 
-      # M1-8e, M1-11a: the real-browser tests need Playwright's Chromium, which only the `checks`
+      # M1-8e, M1-11a, M1-11b-1: the real-browser tests need Playwright's Chromium, which only the `checks`
       # job installs (and there a missing browser fails the test). They are excluded here only.
       - name: Run the @4thtech-io/node tests
         shell: bash
-        run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts
+        run: pnpm --filter @4thtech-io/node exec vitest run --exclude src/approval-passkey-browser.test.ts --exclude src/approval-ui-browser.test.ts --exclude src/local-ui-first-run-browser.test.ts
 
   # M1-5b-b: the Node relay connector's Docker suite (packages/node/src/relay-docker.test.ts): the
   # pool and the outbox against real relays, strfry and rnostr, pinned by digest in the test file.
@@ -691,6 +725,10 @@ jobs:
   # are random per run and exist only in this job. No repository secret is used or needed, so a
   # fork pull request runs it too. MinIO's own container log is never printed once the tests start
   # (it would hold request paths). In `ci-gate`'s `needs`.
+  # M1-7f-3: the same MinIO then runs the core's files round trip (packages/core
+  # src/files/minio.integration.test.ts: a 5 MB send and fetch through own storage, and refresh-link
+  # after a presigned URL expired), with the same log canary and no-skip check. A packages/core
+  # change is a full-scope change (tools/ci/select-affected.mjs FULL_PREFIXES), so it runs this job.
   storage-minio:
     name: storage-minio
     needs: detect
@@ -713,8 +751,8 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build the workspace dependencies of @4thtech-io/storage
-        run: pnpm exec turbo run build --filter='@4thtech-io/storage...'
+      - name: Build the workspace dependencies of @4thtech-io/storage and @4thtech-io/core
+        run: pnpm exec turbo run build --filter='@4thtech-io/storage...' --filter='@4thtech-io/core...'
 
       - name: Create the certificate, the credentials and the host entry
         shell: bash
@@ -791,6 +829,45 @@ jobs:
             const bad = t.filter((x) => x.status !== "passed");
             console.log(`integration.test.ts: ${t.length} tests, ${bad.length} not passed`);
             if (t.length < 5 || bad.length > 0) { console.error("::error::the storage integration suite must run 5+ tests, all passed"); process.exit(1); }
+          '
+
+      # M1-7f-3: after the storage suite, which created the bucket.
+      - name: Run the core files round trip against MinIO
+        shell: bash
+        env:
+          AGENTLINK_STORAGE_IT: minio
+          AGENTLINK_STORAGE_IT_ENDPOINT: https://minio.agentlink-ci.test:9000
+          AGENTLINK_STORAGE_IT_BUCKET: agentlink-it
+          AGENTLINK_STORAGE_IT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+          export AGENTLINK_STORAGE_IT_ACCESS_KEY_ID="$MINIO_USER" AGENTLINK_STORAGE_IT_SECRET_ACCESS_KEY="$MINIO_PASS"
+          out="$RUNNER_TEMP/core-files-it.log"
+          report="$RUNNER_TEMP/core-files-it.json"
+          echo "CORE_FILES_IT_REPORT=$report" >> "$GITHUB_ENV"
+          set +e
+          pnpm --filter @4thtech-io/core exec vitest run --project integration --reporter=default --reporter=json --outputFile.json="$report" > "$out" 2>&1
+          code=$?
+          set -e
+          # The log canary of the job: the output must hold no URL query string and no credential.
+          for needle in 'X-Amz-' "$MINIO_USER" "$MINIO_PASS"; do
+            if grep -qF -- "$needle" "$out"; then
+              echo "::error::the test output holds a presigned URL part or a credential; it is not printed"
+              exit 1
+            fi
+          done
+          cat "$out"
+          exit "$code"
+
+      - name: Check that the core files round trip ran in full, with no skipped test
+        run: |
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.CORE_FILES_IT_REPORT, "utf8"));
+            const f = r.testResults.filter((x) => /minio\.integration\.test\.ts$/.test(x.name));
+            const t = f.length === 1 ? f[0].assertionResults : [];
+            const bad = t.filter((x) => x.status !== "passed");
+            console.log(`minio.integration.test.ts: ${t.length} tests, ${bad.length} not passed`);
+            if (t.length < 3 || bad.length > 0) { console.error("::error::the core files MinIO suite must run 3+ tests, all passed"); process.exit(1); }
           '
 
   # M1-9c-c (IR-M1-9c-1 F07; D-76, 06 §1): the neutral-platform bundle check. A plain Linux runner

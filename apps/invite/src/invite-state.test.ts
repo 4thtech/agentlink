@@ -10,6 +10,7 @@ import {
   NOW,
   PREFIX,
   linkFor,
+  nameHashOf,
   payloadOf,
   rawPayload,
 } from './testing/fixtures.js';
@@ -116,6 +117,36 @@ describe('evaluateFragment: states with no prompt', () => {
     const bomb = await rawPayload(`{"v":1,"pad":"${'A'.repeat(4_000_000)}"}`);
     expect(bomb.length).toBeLessThan(INVITE_MAX_PAYLOAD_CHARS);
     expect(await evaluateFragment(`#${bomb}`, NOW)).toEqual({ kind: 'damaged' });
+  });
+});
+
+describe('evaluateFragment: the card commits to the name (nameHash, M1-19-b, 04 §3.6)', () => {
+  it('shows a damaged invite, and no prompt, when the name does not match the card nameHash', async () => {
+    // The card is the base card (the hash of "Tali's Claude"); the name is somebody else's.
+    for (const name of ['Mallory', "tali's claude", "Tali's Claude ", 'Ana']) {
+      const payload = payloadOf(await linkFor({ name, card: BASE_INVITE.card }));
+      const view = await evaluateFragment(`#${payload}`, NOW);
+      expect(view, name).toEqual({ kind: 'damaged' });
+    }
+  });
+
+  it('compares the received name, not the restricted one shown', async () => {
+    // A name the page would show differently (markup stripped) must still hash as received.
+    const name = '<b>Ana</b>';
+    const card = { ...BASE_INVITE.card, nameHash: nameHashOf('Ana') };
+    const mismatch = payloadOf(await linkFor({ name, card }));
+    expect(await evaluateFragment(`#${mismatch}`, NOW)).toEqual({ kind: 'damaged' });
+    const matching = payloadOf(await linkFor({ name }));
+    const view = await evaluateFragment(`#${matching}`, NOW);
+    expect(view.kind).toBe('ready');
+    expectSafe(view, matching);
+  });
+
+  it('still shows the template plus the canonical link for a matching name', async () => {
+    const payload = payloadOf(await linkFor({ name: 'Ana' }));
+    const view = await evaluateFragment(`#${payload}`, NOW);
+    expect(view.kind).toBe('ready');
+    expectSafe(view, payload);
   });
 });
 

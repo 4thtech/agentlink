@@ -1,7 +1,15 @@
-// Fixed text of the owner commands (M1-9b) that the M1-9g catalogue (src/tools/strings/en.ts) has no
+// Fixed text of the owner commands (M1-9b) that the M1-9g catalogue (packages/mcp-tools/src/strings/en.ts) has no
 // entry for yet. Every line is fixed: nothing the caller typed and no stored value is ever inserted
 // (I-5), except the local agent names `addAgentUnreadable` lists, which passed isAgentName. The
 // catalogue entries that exist (`cli.approve.*`) are used through `copy()`.
+//
+// M1-36a-b: a command in this text starts with the runtime's `cliPrefix()` (M1-36a), worked out on
+// first use: the bare `agentlink` only after a global install, otherwise the npx form.
+import { cliPrefix } from '../../runtime/cli-prefix.js';
+
+let prefixCache: string | undefined;
+const prefix = (): string => (prefixCache ??= cliPrefix());
+
 export const OWNER_TEXT = Object.freeze({
   // Card facts (11 §5 vocabulary).
   free: 'Free',
@@ -12,6 +20,9 @@ export const OWNER_TEXT = Object.freeze({
   inviter: (name: string, fingerprint: string): string =>
     `${name === '' ? '' : `${name} · `}owner ${fingerprint} · not in your contacts yet`,
   unknownWhat: 'An action AgentLink does not recognise',
+  // M1-11a-ux: the card's headline. `name` is the sanitized “name” (label) form.
+  connectWith: (name: string): string => `Connect with ${name}`,
+  whatTo: (what: string, name: string): string => `${what} to ${name}`,
   consequence:
     'If you approve, your AI can do exactly this, once, before it expires. If you deny, nothing is sent.',
   cannotApprove: "Your AI can't approve this for you.",
@@ -26,14 +37,17 @@ export const OWNER_TEXT = Object.freeze({
     "Problem  These terms don't match what was requested, so they can't be approved. Ask your AI to make the request again.",
   problemListed:
     "Problem  One approval doesn't match what was requested, so it isn't offered. Ask your AI to make the request again.",
-  noIdentity:
-    "This agent isn't fully set up yet, so there is nothing to approve. Run `agentlink doctor` in your own terminal.",
+  get noIdentity(): string {
+    return `This agent isn't fully set up yet, so there is nothing to approve. Run \`${prefix()} doctor\` in your own terminal.`;
+  },
   severalAgents: 'Which agent? Type its number:',
   agentNotChosen: 'No agent was chosen. Nothing was changed.',
 
   // Batch review (04 §2.5.2, D-68).
   nothingDecided: 'Nothing was decided. Everything stays waiting.',
-  moreWaiting: 'More are waiting. Review them next, or each with `agentlink approve <approvalId>`.',
+  get moreWaiting(): string {
+    return `More are waiting. Review them next, or each with \`${prefix()} approve <approvalId>\`.`;
+  },
   dropped: 'No longer waiting, so left out:',
   heldBack: 'Waiting  Held back because another item failed; still waiting for you:',
   noneLeft: 'None of your choices is still waiting. Nothing was changed.',
@@ -47,15 +61,17 @@ export const OWNER_TEXT = Object.freeze({
 
   // Owner add-agent (M1-9t, D-78; 04 §2.8).
   addAgentDone: 'OK       This agent can now pair. Restart the app that runs it.',
-  addAgentUnknown:
-    'AgentLink is not set up for this agent on this machine yet. Run `agentlink init --agent <name>` yourself first, in your own terminal.',
+  get addAgentUnknown(): string {
+    return `AgentLink is not set up for this agent on this machine yet. Run \`${prefix()} init --agent <name>\` yourself first, in your own terminal.`;
+  },
   addAgentHasCard:
     'This agent already has a card from an owner. AgentLink never replaces a card. Nothing was changed.',
   // IR-M1-9x-1 M-2: names only local agent names that passed isAgentName (I-5).
   addAgentUnreadable: (agents: readonly string[]): string =>
-    `AgentLink couldn't read these agents on this computer, so it can't tell which owner they name: ${agents.join(', ')}. Nothing was changed. Run \`agentlink doctor\` in your own terminal, then try again.`,
-  addAgentSeveralOwners:
-    "The agents on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run `agentlink doctor` in your own terminal.",
+    `AgentLink couldn't read these agents on this computer, so it can't tell which owner they name: ${agents.join(', ')}. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal, then try again.`,
+  get addAgentSeveralOwners(): string {
+    return `The agents on this computer name different owners, so AgentLink can't tell which one to use. Nothing was changed. Run \`${prefix()} doctor\` in your own terminal.`;
+  },
 
   // Owner change-code (M1-9z; 04 §2.8 "Changing the owner code").
   changeCodeDone: 'OK       Use your new owner code from now on, for every agent on this computer.',
@@ -70,6 +86,7 @@ export const OWNER_TEXT = Object.freeze({
     "Problem  That owner code didn't work. Nothing was changed. Type only your owner code at the prompt, not a shell command, then run the command again.",
 
   // Owner init.
-  ownerUnknownAgent:
-    'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.',
+  get ownerUnknownAgent(): string {
+    return `AgentLink is not set up for this agent on this machine yet. Run \`${prefix()} init\` yourself, in your own terminal.`;
+  },
 });

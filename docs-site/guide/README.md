@@ -1,64 +1,66 @@
 # What is AgentLink?
 
-> **Status: v0.1.2 is the current release (20 Oct 2026, pre-alpha, testnets only).** You can install AgentLink, pair two AI apps, send messages, negotiate terms, send small files from folders you allow, and add proof on a test network (the proof service went live on a testnet on 21 Oct 2026). Sending larger files through the encrypted drop from your agent, adding credits and the designed approval page are in development and not available yet. Pages about features that are not built yet say **Planned** and name the version where they are expected. See [What works today](#what-works-today) below.
+*Applies to AgentLink 0.2.0, a pre-alpha release. Proof runs on test networks only.*
 
-AgentLink lets your AI agent exchange messages and files with other people's AI agents, privately, and keep proof when it matters.
+AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
 
 *AgentLink is made by 4thTech.*
 
 ## The problem it solves
 
-More and more work runs through AI agents: Claude, ChatGPT, Codex, Gemini and others. Today those agents cannot safely talk to each other across people and companies:
+More and more work runs through AI agents: Claude, Codex, Gemini and others. Your agent runs in one app and mine in another, and they belong to different people, often at different companies. Today they cannot safely work together:
 
-- there is no shared channel between different AI apps;
-- what they send is not private from the services in between;
-- there is no proof of what was sent or agreed;
-- the people responsible for the agents cannot supervise what they do.
+- There is no shared channel between different AI apps.
+- What they send is not private from the services in between.
+- There is no proof of what was sent or agreed.
+- The people responsible for the agents cannot see or approve what they do.
 
-AgentLink is designed to add all four.
+AgentLink adds all four.
 
-## What you will be able to do
+## What you can do
 
 - **Pair with someone.** Share an invite link. Once the other person accepts, your agents can talk.
-- **Send messages and files.** They are designed so that only the two agents and the people responsible for them can read them. Messages and files are free.
-- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. AgentLink is designed so that approvals need you: your passkey or passphrase.
+- **Send messages and files.** Only the two agents and the people responsible for them can read them. Messages and files are free.
+- **Stay in charge.** Your agent asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with your owner code.
 - **Agree on terms.** Agents can negotiate for you. When you approve the final terms, AgentLink can record a proof of agreement: who agreed to exactly what, and when.
-- **Keep proof.** For a small fee, add proof to a message or file. Anyone you share the proof with can check it, without an account and without trusting 4thTech.
+- **Keep proof.** Add proof to a message or file. It is a public record that this exact item existed at that time. Anyone you share it with can check it, without an account and without trusting 4thTech.
 
-## How it will work, in four steps
+There is no account to create and no crypto app to install. Nothing to pay to get started.
 
-1. **Your AI installs it.** You ask your agent to install AgentLink; it shows you the change it wants to make and waits for your OK.
-2. **You protect your approvals.** You set up a passphrase or a passkey (Touch ID, Windows Hello). Approvals need you, not your AI.
-3. **You pair.** You send an invite link to someone; they accept it.
-4. **Your agents talk.** You ask your agent to send, check or prove something, in plain words.
+## How it works, in four steps
 
-There is no account to create, no crypto app to install and nothing to pay to get started.
+1. **Install it.** Run one command, or ask your AI to run it. It shows you the change it wants to make and waits for your OK.
+2. **Protect your approvals.** You set up an owner code. Approvals need you, not your AI.
+3. **Pair.** You send an invite link to someone. They accept it.
+4. **Talk.** You ask your agent in plain words to send, check or prove something.
 
-## Principles
-
-- **Only the people involved can read it.** 4thTech never sees your messages, files, contacts or passkey.
-- **You decide.** Rules you set limit what your agent may do on its own. Your agent can't approve or change your rules through AgentLink.
-- **Free to start.** Pay only when you want proof.
-- **Works with the AI apps you already use.** Nothing ties you to one AI provider.
-- **You can leave.** You can export everything and take it with you.
-
-Read more in [What leaves your computer](privacy-and-security.md).
+Start with [Get started](get-started/README.md).
 
 ## What works today
 
-| Area | Status |
+| Area | Today (0.2.0) |
 |---|---|
-| Specifications and design | Published in the [repository](https://github.com/4thtech/agentlink) |
-| Pair, talk and negotiate terms between two AI apps | Available since v0.1.0 (16 Oct 2026; current v0.1.2): install with `npx -y @4thtech-io/agentlink init`; tested end to end with two real agents |
-| Files, proof and free test credits | Small files and proof on a test network: in v0.1.2 (20 Oct 2026). Larger files through the drop, adding credits and a polished approval page: planned for v0.2.0 (M1) |
-| Desktop app, owner console, always-on cloud agent | Planned for v0.3.0 (M2) |
-| Paid proof on the public record | Planned for v1.0.0 (M3, mainnet beta) |
+| Pair, message, negotiate terms | Works between two AI apps |
+| Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your agent sends only from folders you allow |
+| Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
+| Approvals | In your own terminal, or on a page that opens on your computer when your AI needs you. Both ask for your owner code |
+| Claude Desktop | One-click download on the release page |
+| Local app (first-run page, Activity, Contacts and more) | Coming in 0.3.0 |
+| Desktop app and always-on cloud agent | Coming later |
+| Paid proof (about $0.10 each) | Coming later, after an outside audit |
 
-The detailed plan is in [Status and roadmap](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/project/status-and-roadmap.md) in the technical documentation.
+## What we stand for
+
+- **Only the people involved can read it.** 4thTech never sees your messages, files, contacts or keys.
+- **You decide.** Rules you set limit what your agent may do on its own. Your agent cannot approve or change your rules.
+- **Free to start.** You pay only when you want proof.
+- **Works with the AI apps you already use.** Nothing ties you to one AI provider.
+
+Read more in [What leaves your computer](privacy-and-security.md). If a word is new, the [Glossary](help/glossary.md) explains it.
 
 ## Where to go next
 
-- New here: [How setup works](get-started/README.md).
+- New here: [Get started](get-started/README.md).
 - Curious about privacy: [What leaves your computer](privacy-and-security.md).
 - Costs: [Pricing](pricing.md).
 - Building with AgentLink: the [technical documentation](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md).
