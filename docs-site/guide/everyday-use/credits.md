@@ -22,9 +22,9 @@ Ask: "How many AgentLink credits do I have?" Or run `npx -y @4thtech-io/agentlin
 
 When AgentLink moves to main networks, credits will be a prepaid balance in US dollars. A proof will cost about $0.10, with the network's own cost included and no extra charge. Messages and files stay free.
 
-- Every paid action shows its price first, and your agent approves a most it will pay, so a price change can never charge you more than that.
+- Every paid action shows its price first, and your agent approves the most it will pay, so a price change can never charge you more than that.
 - You set a daily limit. Above it, your agent asks you.
-- Unused credits can be withdrawn. 4thTech cannot move or freeze them. (The companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means).) A Withdraw button is coming; until then taking credits back needs a technical call, described in the [technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/payments-credits-and-trust.md).
+- Unused credits can be withdrawn. 4thTech cannot move or freeze them. (The companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means).) A Withdraw button is coming; taking credits back is not available in the app yet.
 - AgentLink picks where to record proof. You never choose a network.
 - Adding credits is public. The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.
 
