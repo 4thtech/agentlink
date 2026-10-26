@@ -6306,6 +6306,20 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first for each item; a folder whose real location changes after allow is refused or re-confirmed; no test weakened.
 
+#### M1-36b-2-e · owner send-folder: not-moved test and a "not where it was allowed" diagnostic (new, low, IR-M1-36b-2-d-1, #545)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` policy and folder checks) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/allowed-path.ts` and its tests, `policy show` and `doctor` in `apps/cli` and `packages/node`
+- **Depends on:** M1-36b-2-d
+- **Spec:** 04 §2.5, §4 (realpath rules); 06 §3
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - (a) Negative test: an allowed entry that no longer resolves to itself is not reported as `already_allowed`.
+  - (b) `policy show` and `doctor` flag a folder that is "not where it was allowed" (its real location changed since signing), in plain words.
+  - (c) The post-sign re-check in `owner-setup.ts` / `signFirstPolicy` (init, add-agent, first run #542) is carried by M1-UX-FIRSTRUN-V2-b, not here.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); no test weakened; threat note; independent review (S2).
+- **Notes:** Send-time dev/ino pin: no (Fable IR-M1-36b-2-d-1; the signed realpath is the pin).
+
 #### M1-11a-ux-b · approval page: headline and test lows (new, low, IR-M1-11a-ux-1)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli approval page, packages/ui
@@ -6385,6 +6399,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - L-2: `prepareSetupFolders` creates Inbox and Proofs under the parent of the Send folder after the parent check; pin the folder with the M1-36b-2-d helper where it fits.
   - L-3: add a test that the backup code leaves the DOM after "I saved it".
   - L-5: record a manual Mac check that the browser offers to save the code in its password manager ("if offered" is browser-dependent).
+  - Post-sign re-check (from IR-M1-36b-2-d-1, #545): `owner-setup.ts` and `signFirstPolicy` (init, add-agent, first run) re-check the Send folder after signing, using `pinFolder` / `stillPinned` from `allowed-path.ts`.
   - Q-130-1 (the code is readable text and an input value) stays the owner's open question; not decided here.
 - **Acceptance:**
   - Tests first (RED commit): a begin straight after a dropped setup keeps Send and finish succeeds; the code is absent from the DOM after "I saved it"; the manual check is recorded in the PR; threat note; independent review (S2).
