@@ -543,6 +543,8 @@ export interface ApprovalServerInternals {
   readonly newOwnerSeed?: () => { readonly seed: Uint8Array; readonly keys: OwnerPublicKeys };
   /** M1-UX-FIRSTRUN-V2: the computer's host name. Default: node:os hostname. */
   readonly hostname?: () => string;
+  /** M1-UX-FIRSTRUN-V2-b: removes a setup's folders (tests: timing). Default: removeSetupFolders. */
+  readonly removeSetupFolders?: (folders: SetupFolders | undefined) => Promise<void>;
 }
 
 export interface ApprovalServer {
@@ -1515,14 +1517,49 @@ export async function startApprovalServerWith(
     });
   };
 
+  /** M1-UX-FIRSTRUN-V2-b: removes what prepareSetupFolders created (only while empty). */
+  const removeFolders = async (folders: SetupFolders | undefined): Promise<void> => {
+    try {
+      await (internals.removeSetupFolders ?? removeSetupFolders)(folders);
+    } catch {
+      // Never fatal: only empty folders this run created are ever removed.
+    }
+  };
+
+  /**
+   * M1-UX-FIRSTRUN-V2-b (L-1, cross-process): the folders of a setup that never created an owner
+   * here. Once an owner exists anywhere (a terminal `owner init` in another process may have
+   * adopted this Send folder for its first policy), they are left alone; when that check fails,
+   * too (an empty folder left behind is harmless, a removed one could break that policy).
+   */
+  const releaseFolders = async (folders: SetupFolders | undefined): Promise<void> => {
+    if (folders === undefined) return;
+    const setup = options.localUi?.ownerSetup;
+    let ownerElsewhere: boolean;
+    try {
+      ownerElsewhere = setup === undefined || (await ownerExistsAnywhere(setup));
+    } catch {
+      ownerElsewhere = true;
+    }
+    if (!ownerElsewhere) await removeFolders(folders);
+  };
+
+  /**
+   * M1-UX-FIRSTRUN-V2-b (L-1): the removal of dropped setups' folders, in order. `begin` waits for
+   * it before preparing folders, so a new setup never loses its Send folder to an older removal.
+   */
+  let folderRemoval: Promise<void> = Promise.resolve();
+
   /** M1-11s-c: wipes and forgets the held setup, if it is still `which` (default: whatever is held). */
   const dropSetup = (which: PendingSetup | undefined = pendingSetup): void => {
     if (which === undefined || which !== pendingSetup) return;
     pendingSetup = undefined;
     clearTimeout(which.timer);
     wipe(which.seed, which.challenge, which.session);
-    // M1-UX-FIRSTRUN-V2: no policy was signed, so the folders this begin created go again.
-    void removeSetupFolders(which.folders);
+    // M1-UX-FIRSTRUN-V2: no policy was signed, so the folders this begin created go again
+    // (M1-UX-FIRSTRUN-V2-b: queued, and awaited by the next begin and by close).
+    const folders = which.folders;
+    folderRemoval = folderRemoval.then(() => releaseFolders(folders));
   };
 
   /** M1-11s-c: drops a hold that expired or whose session is gone. */
@@ -1599,6 +1636,8 @@ export async function startApprovalServerWith(
     }
     busy = true;
     try {
+      // M1-UX-FIRSTRUN-V2-b (L-1): a dropped setup's folders are gone before new ones are prepared.
+      await folderRemoval;
       let exists: boolean;
       try {
         exists = await ownerExistsAnywhere(setup);
@@ -1621,7 +1660,7 @@ export async function startApprovalServerWith(
       if (firstPolicy !== undefined) {
         folders = await prepareSetupFolders(firstPolicy.home);
         if (folders.send.status !== 'ready') {
-          await removeSetupFolders(folders);
+          await removeFolders(folders);
           finishSetup(res, 409, 'folder_refused', {}, { reason: folders.send.reason });
           return;
         }
@@ -1670,6 +1709,7 @@ export async function startApprovalServerWith(
     }
     if (now() >= held.expiresAt) {
       dropSetup(held);
+      await folderRemoval;
       finishSetup(res, 409, 'expired');
       return;
     }
@@ -1685,12 +1725,21 @@ export async function startApprovalServerWith(
     // M1-UX-FIRSTRUN-V2: the folders stay only when the first policy is (or may be) in force.
     let keepFolders = false;
     let released = false;
+    // M1-UX-FIRSTRUN-V2-b: true once this run's owner exists (completeOwnerSetup returned).
+    let ownerIsOurs = false;
+    /**
+     * Removes the folders this run created (unless kept): directly once the owner is this run's;
+     * before that, only while no owner exists anywhere (releaseFolders, L-1 cross-process).
+     */
+    const release = async (): Promise<void> => {
+      if (keepFolders || released) return;
+      released = true;
+      if (ownerIsOurs) await removeFolders(held.folders);
+      else await releaseFolders(held.folders);
+    };
     /** Answers after the folders this run created are gone (unless kept), so none outlives it. */
     const answer = async (...args: Parameters<typeof finishSetup>): Promise<void> => {
-      if (!keepFolders && !released) {
-        released = true;
-        await removeSetupFolders(held.folders);
-      }
+      await release();
       finishSetup(...args);
     };
     try {
@@ -1746,6 +1795,7 @@ export async function startApprovalServerWith(
         } else await answer(res, 500, 'failed', {}, { reason: 'internal' });
         return;
       }
+      ownerIsOurs = true;
       keepFolders = keepsFolder(result.sendFolder);
       try {
         const fingerprint = ownerFingerprintText(held.keys);
@@ -1771,7 +1821,7 @@ export async function startApprovalServerWith(
     } finally {
       busy = false;
       wipe(held.seed, held.challenge, held.session, registration?.prfOutput);
-      if (!keepFolders && !released) await removeSetupFolders(held.folders);
+      await release();
     }
   }
 
@@ -2022,6 +2072,7 @@ export async function startApprovalServerWith(
     },
     close: async () => {
       dropSetup();
+      await folderRemoval;
       await Promise.all(listeners.map(closeServer));
       emit({ kind: 'closed' });
     },
