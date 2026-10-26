@@ -6699,7 +6699,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - The crypto vectors pass in the workerd project; a test (or a recorded manual check) shows a Node-only import fails the workerd run; the Node suites still pass; no test weakened.
 
 #### M2-3a · cloud agent: AgentDO, store, relay sync, Worker KeyStore
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
+- **Status:** in review · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
 - **Repo/path:** agentlink · apps/cloud-agent
 - **Depends on:** M1-7h, M1-8b (schema), M1-5c, M2-3t-w
 - **Spec:** 08 §3.1, §3.2, §3.4; 03 §3; 06 §6; 07 §3 (cloud-only rows); 04 §2.2; D-131

@@ -178,7 +178,9 @@ export const libraryAllowed = (lib, zone, { test = false } = {}) =>
 export const RESTRICTED_ENTRY_POINTS = [
   {
     group: ['@4thtech-io/crypto/keystore', '@4thtech-io/crypto/keystore/*'],
-    zones: ['packages/node', 'test-vectors'],
+    // M2-3a (03 §3, 04 §2.2 "Self-host Worker"): apps/cloud-agent hosts the Worker KeyStore backend
+    // (AGENT_SEED or the seed sealed under SEED_WRAP_KEY) and the Durable Object store's cipher.
+    zones: ['packages/node', 'test-vectors', 'apps/cloud-agent'],
     via: 'the KeyStore interface (04 §8.1)',
     reason: 'master seeds and secret keys stay inside KeyStore backends (04 §8.1, §2.5)',
   },
@@ -207,7 +209,10 @@ export const RESTRICTED_ENTRY_POINTS = [
     // Worker's Miniflare tests, which sign drop requests with fixed test keys (signDropAuthorization);
     // the Worker itself only verifies and never imports the seam. M1-10c: apps/submitter/test holds
     // the submitter's deploy smoke tests, which sign a Record with a random MemoryKeyStore agent.
-    testDirs: ['apps/cli/test', 'apps/drop/test', 'apps/submitter/test'],
+    // M2-3a: apps/cloud-agent/test holds AgentDO's Miniflare tests, which create the agent's identity
+    // with a test owner (MemoryOwnerKeyStore) and send it messages from a test sender
+    // (MemoryKeyStore); the Worker itself never imports the seam.
+    testDirs: ['apps/cli/test', 'apps/drop/test', 'apps/submitter/test', 'apps/cloud-agent/test'],
     via: 'the public entry points (the test seam is never built)',
     reason:
       'a fixed nonce, IV or ephemeral key, or an in-memory seed holder, must never reach production code (M1-1c, M1-1f, M1-1g)',
