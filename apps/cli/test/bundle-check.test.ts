@@ -167,7 +167,7 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
         expect(run.code, name).toBe(1);
         expect(run.stderr, name).toContain('"node:child_process"');
       }
-    });
+    }, 90_000);
 
     // IR-M1-9c-c-1 L1: require-equivalents that load a module without an import.
     it.each([

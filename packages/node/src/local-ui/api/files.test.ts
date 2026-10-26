@@ -48,7 +48,9 @@ import { createFilesRoutes, filesRoutes } from './files.js';
 const WIN = process.platform === 'win32';
 const FLAVOR = WIN ? 'win32' : 'posix';
 const sepOut = (p: string): string => (WIN ? p.replace(/\//g, '\\') : p);
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'agentlink-m1-11c-a3-')));
+// `.native` like the production `fs.promises.realpath`: on Windows it expands 8.3 short names
+// (RUNNER~1), which the JS `realpathSync` keeps, so the two would name the same folder differently.
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agentlink-m1-11c-a3-')));
 const home = join(root, 'home');
 const docs = join(home, 'Documents');
 const shared = join(docs, 'Shared');
