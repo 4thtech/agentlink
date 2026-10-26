@@ -284,7 +284,20 @@ importers:
     linkDirectory: false
     publishDirectory: dist/package
 
-  apps/cloud-agent: {}
+  apps/cloud-agent:
+    dependencies:
+      '@4thtech-io/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@4thtech-io/log':
+        specifier: workspace:*
+        version: link:../../packages/log
+      '@4thtech-io/transport-nostr':
+        specifier: workspace:*
+        version: link:../../packages/transport-nostr
 
   apps/console: {}
 

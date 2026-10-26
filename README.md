@@ -73,7 +73,7 @@ Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/age
 
 Not in 0.2.0, and not yet something you can use:
 
-- **A usable local app (0.3.0).** The first-run screen and an Activity page are built and included, but the command line does not open them yet. The Proofs and credits, Contacts, Files and Rules pages, and a pay page for adding credits, are still to come.
+- **A usable local app (0.3.0).** The first-run screen and an Activity page are built and included: `init` and the `ui` command open them in your browser, and while there is no owner yet, your AI app opens the setup page once each time it starts AgentLink. The Proofs and credits, Contacts, Files and Rules pages, and a pay page for adding credits, are still to come.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
 - **Proof on main networks**, after an external audit of the contracts.
 
@@ -96,7 +96,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 > - **Chain client (@4thtech-io/chain):** 5 merged
 > - **Core (@4thtech-io/core):** 21 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
-> - **MCP server, CLI and apps:** 5 merged, 6 in progress, 2 planned
+> - **MCP server, CLI and apps:** 5 merged, 7 in progress, 2 planned
 > - **OCC v2 contracts (private repo):** 4 merged, 1 planned
 > - **Design:** 1 merged, 1 in progress
 > - **Privacy of proofs (D-109):** 3 merged, 1 in progress, 3 planned
@@ -137,6 +137,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 - [How AgentLink works, simply](docs-site/guide/how-agentlink-works.md): the ideas in plain words.
 - [User guide](docs-site/guide/README.md): set up, pair, approvals, FAQ. [Technical docs](docs-site/technical/README.md): concepts, guides, reference. Both are published on GitBook from this repository.
 - [How it works](docs-site/technical/concepts/architecture.md), [design decisions](docs-site/technical/concepts/design-decisions.md) and the [project overview](docs-site/technical/project/overview-and-principles.md).
+- [Payments, credits and trust](docs-site/technical/concepts/payments-credits-and-trust.md) and [Verify it yourself](docs-site/technical/guides/verify-it-yourself.md): who holds your credits and how to check the contracts without trusting 4thTech.
 - [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks only, no main network yet.
 - [`knowledge/`](knowledge/README.md) and [`llms.txt`](llms.txt): a compact public knowledge base for AI assistants.
 - [`docs/`](docs/README.md): specifications, decisions and process. [`CHANGELOG.md`](CHANGELOG.md): releases.

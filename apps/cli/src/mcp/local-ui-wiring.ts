@@ -102,6 +102,14 @@ export async function localUiOptions(
   };
 }
 
+/**
+ * True when the first-run page can set up an owner with these options: owner setup is wired (no
+ * owner anywhere, see the header) and this build has the app (otherwise the page is a 404).
+ */
+export function firstRunReady(localUi: LocalUiOptions): boolean {
+  return localUi.ownerSetup !== undefined && localUi.assets?.files.has('index.html') === true;
+}
+
 /** True when the event says the first-run page finished owner setup. */
 export function ownerSetupDone(event: ApprovalServerEvent): boolean {
   return (

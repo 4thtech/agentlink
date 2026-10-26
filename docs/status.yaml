@@ -367,6 +367,9 @@ areas:
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
         summary: "M2. The cloud agent comes first, as 0.4.0 (D-131): an always-on agent in your own Cloudflare account that you use from Claude on the web and in the Claude iPhone and Android apps, with approvals by Face ID or fingerprint. ChatGPT on the web comes later. Planned, not built yet."
+      - name: "Cloud agent core (0.4.0)"
+        state: in-progress
+        summary: "The first part of the cloud agent (M2-3a): one Durable Object per agent in your own Cloudflare account holds the agent's encrypted store (the same schema as on your computer), its keys (from a secret only your account holds) and its inbox, which it fills from your relays about once a minute without keeping a connection open. It does not act on messages by itself. In development: the connection to Claude, sign-in and the setup and approval pages follow, so it cannot be used yet."
       - name: "Adding credits: pay page"
         state: planned
         summary: "Direction set (D-111): one link from the agent opens a separate pay page where credits are added in dollars, crypto first: use crypto you already have (connect your own account, M2-18b) or send from an exchange to the agent's address with a QR code (M2-18c), plus free test credits on testnets. The agent explains the one step, watches for the funds and confirms the credits; users pay every cost. Pay by card comes last, after the legal entity is decided (M2-18a, M3-4c). Decided 21 Oct 2026: messages and files stay free (D-112), the top-up link carries everything after the `#` so it never reaches a server log (D-113), and the sender's proof fee covers up to 3 receipts (D-114). The link in the tools (M1-26-e) is in review and stays off until the pay page exists."

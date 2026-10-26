@@ -9,10 +9,24 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createLogger } from '@4thtech-io/log';
+import type {
+  ApprovalServer,
+  ApprovalServerEvent,
+  ApprovalServerOptions,
+  LocalUiOptions,
+} from '@4thtech-io/node';
 import { describe, expect, it } from 'vitest';
 import type { CommandContext } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { FIRST_RUN_TEXT, firstRunStep, type FirstRunDeps } from './first-run.js';
+import {
+  FIRST_RUN_TEXT,
+  firstRunStep,
+  nodeFirstRunDeps,
+  type FirstRunDeps,
+  type FirstRunSeams,
+} from './first-run.js';
+import type { OwnerAgent } from './owner/deps.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const AGENT: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
@@ -237,25 +251,167 @@ async function sources(dir: string): Promise<string[]> {
 describe('the first-run link never reaches an agent (M1-11b-6, G-1)', () => {
   const src = fileURLToPath(new URL('..', import.meta.url));
 
-  it('no MCP-side module opens the first-run page or imports the init step', async () => {
-    const files = [
-      ...(await sources(join(src, 'mcp'))),
-      ...(await sources(join(src, '..', '..', '..', 'packages', 'mcp-tools', 'src'))),
-    ];
-    expect(files.length).toBeGreaterThan(10);
+  // M1-11b-8: `agentlink mcp` opens the page once per start (06 §7). In the MCP server only the
+  // approval UI's `openSetupPage` calls the server's opener, only the start step calls
+  // `openSetupPage`, and only command.ts runs the start step; no tool or tool handler does.
+  it('no MCP tool opens the first-run page; in the MCP server only the start step does (M1-11b-8)', async () => {
+    const mcp = await sources(join(src, 'mcp'));
+    const tools = await sources(join(src, '..', '..', '..', 'packages', 'mcp-tools', 'src'));
+    expect(tools.length).toBeGreaterThan(10);
+    const allowed: Readonly<Record<string, RegExp>> = {
+      'approval-ui.ts': /\bopenFirstRun\b|\bopenSetupPage\b/,
+      'first-run-on-start.ts': /\bopenSetupPage\b|\bopenFirstRunOnStart\b/,
+      'command.ts': /\bopenFirstRunOnStart\b/,
+    };
     const offenders: string[] = [];
-    for (const file of files) {
+    for (const file of [...mcp, ...tools]) {
       const text = await readFile(file, 'utf8');
       // Code, not the comments that name the step: a call, an import, or a link to the page.
       const code = text.replace(/^\s*\/\/.*$/gm, '');
-      if (/openFirstRun|commands\/first-run|['"`]\/first-run\?/.test(code)) offenders.push(file);
+      if (/commands\/first-run|['"`]\/first-run\?|\?t=/.test(code)) offenders.push(file);
+      const base = mcp.includes(file) ? (file.split(/[\\/]/).pop() ?? '') : '';
+      const own = allowed[base];
+      const left = own === undefined ? code : code.replace(new RegExp(own.source, 'g'), '');
+      if (/\bopenFirstRun\b|\bopenSetupPage\b|\bopenFirstRunOnStart\b/.test(left)) {
+        offenders.push(file);
+      }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('the approval UI passes the opener nothing and gets only a boolean back (M1-11b-8)', async () => {
+    const text = await readFile(join(src, 'mcp', 'approval-ui.ts'), 'utf8');
+    expect(text).toMatch(/openSetupPage\(\): Promise<boolean>;/);
+    expect(text).toMatch(/\.openFirstRun\(\)/);
+    expect(text).not.toMatch(/\.openFirstRun\([^)]/);
   });
 
   it('the step never prints, returns or logs a link: the server seam only answers a boolean', async () => {
     const text = await readFile(join(src, 'commands', 'first-run.ts'), 'utf8');
     expect(text).toMatch(/openFirstRun\(\): Promise<boolean>;/);
     expect(text).not.toMatch(/\?t=|https?:\/\//);
+  });
+});
+
+// ---- IR-M1-11b-6-1 L-2: the production seams of the step (M1-11b-8) ------------------------------
+
+function seamAgent() {
+  const closed = { count: 0 };
+  const agent: OwnerAgent = Object.freeze({
+    name: 'default',
+    client: { agentId: `0x${'a'.repeat(40)}` } as unknown as OwnerAgent['client'],
+    store: {} as OwnerAgent['store'],
+    cipher: {} as OwnerAgent['cipher'],
+    close: () => {
+      closed.count += 1;
+      return Promise.resolve();
+    },
+  });
+  return { agent, closed };
+}
+
+const WIRED = {
+  assets: { files: new Map([['index.html', { body: new Uint8Array(1), type: 'text/html' }]]) },
+  ownerSetup: { firstCard: {} },
+} as unknown as LocalUiOptions;
+const NOT_WIRED = { assets: WIRED.assets } as LocalUiOptions;
+const NO_APP = { ownerSetup: WIRED.ownerSetup } as LocalUiOptions;
+
+function seams(localUi: LocalUiOptions, open: 'ok' | 'needs_setup' = 'ok') {
+  const { agent, closed } = seamAgent();
+  const serverClosed = { count: 0 };
+  const firstRunOpens = { count: 0 };
+  const started: ApprovalServerOptions[] = [];
+  const seam: Partial<FirstRunSeams> = {
+    owner: {
+      open: () =>
+        Promise.resolve(
+          open === 'ok'
+            ? { status: 'ok' as const, agent }
+            : { status: 'needs_setup' as const, message: 'Set up first.' },
+        ),
+    },
+    localUi: () => Promise.resolve(localUi),
+    startServer: (options) => {
+      started.push(options);
+      return Promise.resolve({
+        openFirstRun: () => {
+          firstRunOpens.count += 1;
+          return Promise.resolve(true);
+        },
+        close: () => {
+          serverClosed.count += 1;
+          return Promise.resolve();
+        },
+      } as unknown as ApprovalServer);
+    },
+    logger: createLogger({ sink: () => undefined }),
+  };
+  return { seam, closed, serverClosed, firstRunOpens, started };
+}
+
+describe('nodeFirstRunDeps seams (IR-M1-11b-6-1 L-2)', () => {
+  it('available: true only with owner setup wired and the app in this build; closes the agent', async () => {
+    for (const [localUi, expected] of [
+      [WIRED, true],
+      [NOT_WIRED, false],
+      [NO_APP, false],
+    ] as const) {
+      const s = seams(localUi);
+      await expect(nodeFirstRunDeps(s.seam).available('default')).resolves.toBe(expected);
+      expect(s.closed.count).toBe(1);
+      expect(s.started).toEqual([]);
+    }
+  });
+
+  it('available: false when the agent cannot be opened', async () => {
+    const s = seams(WIRED, 'needs_setup');
+    await expect(nodeFirstRunDeps(s.seam).available('default')).resolves.toBe(false);
+    expect(s.started).toEqual([]);
+  });
+
+  it('start: no server and the agent closed when setup is not wired or the app is missing', async () => {
+    for (const localUi of [NOT_WIRED, NO_APP]) {
+      const s = seams(localUi);
+      await expect(
+        nodeFirstRunDeps(s.seam).start('default', () => undefined),
+      ).resolves.toBeUndefined();
+      expect(s.started).toEqual([]);
+      expect(s.closed.count).toBe(1);
+    }
+  });
+
+  it('start: serves the wired setup; the source never closes the agent; close stops both', async () => {
+    const s = seams(WIRED);
+    let setUp = 0;
+    const server = await nodeFirstRunDeps(s.seam).start('default', () => {
+      setUp += 1;
+    });
+    expect(server).toBeDefined();
+    expect(s.started).toHaveLength(1);
+    const options = s.started[0];
+    expect(options?.localUi).toBe(WIRED);
+    // A finished owner setup reaches onSetUp; other events do not.
+    options?.onEvent?.({ kind: 'listening' });
+    options?.onEvent?.({ kind: 'owner_setup', outcome: 'done' } as ApprovalServerEvent);
+    expect(setUp).toBe(1);
+    await expect(server?.openFirstRun()).resolves.toBe(true);
+    expect(s.firstRunOpens.count).toBe(1);
+    expect(s.closed.count).toBe(0);
+    await server?.close();
+    expect(s.serverClosed.count).toBe(1);
+    expect(s.closed.count).toBe(1);
+  });
+
+  it('start: a server that fails to start closes the agent and rethrows', async () => {
+    const s = seams(WIRED);
+    const seam: Partial<FirstRunSeams> = {
+      ...s.seam,
+      startServer: () => Promise.reject(new Error('EADDRINUSE')),
+    };
+    await expect(nodeFirstRunDeps(seam).start('default', () => undefined)).rejects.toThrow(
+      'EADDRINUSE',
+    );
+    expect(s.closed.count).toBe(1);
   });
 });

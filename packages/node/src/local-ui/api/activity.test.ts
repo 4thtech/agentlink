@@ -253,8 +253,10 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
     expect(Object.keys(view).sort()).toEqual([
       'agentId',
       'contacts',
+      'files',
       'getProof',
       'listActivity',
+      'policy',
       'proofs',
     ]);
     expect(Object.isFrozen(view)).toBe(true);

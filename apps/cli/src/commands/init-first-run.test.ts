@@ -107,6 +107,15 @@ describe('init and the first-run page (M1-11b-6)', () => {
     expect(run.calls).toEqual([{ name: 'default', interactive: true, prefix: NPX }]);
   });
 
+  // IR-M1-11b-6-1 L-1 (M1-11b-8): both ends of init offer the page only with no other agent here.
+  it('a re-run with nothing to change and another agent here does not offer the page', async () => {
+    await init(['--harness', 'none'], TTY, false);
+    await init(['--harness', 'none', '--agent', 'work'], TTY, false);
+    const run = await init(['--harness', 'none'], TTY, false);
+    expect(run.out).toContain(INIT_TEXT.nothingToDo);
+    expect(run.calls).toEqual([]);
+  });
+
   it('M1-36b: the step runs after the install offer and gets the command that now works', async () => {
     const fresh = await init(['--harness', 'none'], TTY, false, { succeeds: true });
     expect(fresh.calls).toEqual([{ name: 'default', interactive: true, prefix: 'agentlink' }]);

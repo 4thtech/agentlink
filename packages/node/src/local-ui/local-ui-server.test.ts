@@ -743,8 +743,10 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     expect(Object.keys(client as object).sort()).toEqual([
       'agentId',
       'contacts',
+      'files',
       'getProof',
       'listActivity',
+      'policy',
       'proofs',
     ]);
     expect(Object.isFrozen(client)).toBe(true);
