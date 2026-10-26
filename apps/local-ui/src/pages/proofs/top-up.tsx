@@ -10,6 +10,7 @@
 //   and where it goes from and to, then the owner code, sent once as the request body to the
 //   server's presence gate. The owner code is never kept after the request or put in a URL.
 // - Withdrawals go to the agent's own account only (the recipient grant is a later card).
+import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { Button, TextField } from '@4thtech-io/ui';
 import { useState, type FormEvent, type ReactElement } from 'react';
 import type { ApiClient, OwnerApiResult } from '../../api/client.js';
@@ -201,6 +202,7 @@ export function ConfirmMove({
       <form className="pf-confirm-form" onSubmit={submit}>
         <TextField
           label={S.ownerCode}
+          hint={EARLIER_OWNER_CODE_HINT}
           type="password"
           autoComplete="off"
           mono

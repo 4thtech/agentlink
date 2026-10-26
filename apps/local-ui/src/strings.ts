@@ -22,3 +22,7 @@ export const PAGE_TITLES = {
   backup: 'Backup',
   advanced: 'Advanced',
 } as const;
+
+/** Shown under every code field: 0.2.0 owners only know the code from the terminal (B-9 not built yet). */
+export const EARLIER_OWNER_CODE_HINT =
+  'Set up before 0.3.0? Use the owner code from `npx -y @4thtech-io/agentlink owner init`.';

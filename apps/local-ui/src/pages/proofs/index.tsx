@@ -132,6 +132,9 @@ function CreditsCard({
       </div>
       {credits.partial ? <p className="al-text-caption al-muted">{S.creditsPartial}</p> : null}
       {credits.test ? <p className="al-text-caption al-muted">{S.testCredits}</p> : null}
+      {credits.test && credits.proofsLeft === 0 ? (
+        <p className="al-text-caption al-muted">{S.firstProofFree}</p>
+      ) : null}
       {/* X-6 until a network takes funds at the agent's address (M1-11c-a4c, D-123). */}
       {actions ?? <p className="al-text-caption al-muted">{S.addCreditsNotAvailable}</p>}
       {/* No free test credits button: the agent claims them once by itself (D-120 (3), M1-36i). */}

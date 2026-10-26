@@ -54,6 +54,15 @@ describe('production build', () => {
     expect(html).toMatch(/<link[^>]+rel="stylesheet"[^>]+href="\/assets\/[^"]+\.css"/);
   });
 
+  it('UX-031-QUICKWINS: makes html, body and #root fill the window', () => {
+    const css = outputs
+      .filter((o) => o.fileName.endsWith('.css'))
+      .map((o) => o.text)
+      .join('\n');
+    expect(css).toMatch(/html,\s*body,\s*#root\s*\{\s*height:\s*100%/);
+    expect(css).toMatch(/min-height:\s*100dvh/);
+  });
+
   it('hashes every asset name and keeps them under assets/', () => {
     const files = outputs.filter((o) => o.fileName !== 'index.html');
     expect(files.length).toBeGreaterThan(2);

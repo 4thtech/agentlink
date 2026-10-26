@@ -964,6 +964,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** `TITLE_RE` accepts `M<n>-<digits><letter>` and `M<n>-GATE` only, so titles such as `M1-UX-FIRSTRUN-V2 ...` are refused. Allow named IDs of the form `M<n>-<UPPERCASE words, digits and hyphens>`. This changes a required check, so it merges only on Tali's "merge".
 - **Acceptance:** titles `M1-UX-FIRSTRUN-V2 ...` and `M1-UX-OPEN-APP ...` pass; a missing ID, `M1-ux-x` and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
 
+#### UX-031-QUICKWINS · local app quick wins for 0.3.1 (new, owner feedback 2026-10-26, plan UX-V3-LOCAL-APP)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (UI strings, styles and icon data only; no node or core change)
+- **Repo/path:** agentlink · `apps/local-ui`, `packages/ui/src/components/icon-data.ts`
+- **Depends on:** —
+- **Scope:** (1) Rules nav icon `sliders-horizontal`, and the other icons whose `line` shapes had no coordinates, get their Lucide geometry. (2) `html`, `body` and `#root` fill the viewport. (3) Proofs and credits: with 0 test credits, one line that free test credits arrive automatically with the first proof (D-120). (4) The local app says "backup code" where it said "owner code" (11 §5.5). (5) Contacts: one-line safety-code explanation (11 §5) and a UI-only hint when two contacts share a name; the fingerprint-based suggestion is a later card (M1-UX3-DUP-CONTACTS).
+- **Acceptance:** tests for each item (every icon shape has attributes; built CSS has the full-height rules; the zero-credit line; no "owner code" in local-ui `strings.ts`; the safety-code line; the duplicate hint on both rows).
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`

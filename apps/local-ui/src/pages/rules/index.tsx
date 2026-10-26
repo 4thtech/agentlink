@@ -22,7 +22,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import { PAGE_TITLES } from '../../strings.js';
+import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
 import {
   RULES_PATH,
   checkDraft,
@@ -603,7 +603,7 @@ function ConfirmStep({
         {confirm.passkey === null ? (
           <TextField
             label={S.codeLabel}
-            hint={S.codeHint}
+            hint={`${S.codeHint} ${EARLIER_OWNER_CODE_HINT}`}
             type="password"
             autoComplete="off"
             mono
