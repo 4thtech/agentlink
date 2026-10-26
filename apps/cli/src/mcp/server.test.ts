@@ -3,7 +3,7 @@
 // `outputSchema` (with Ajv), so each call below is also an output-schema check, in place of an MCP
 // Inspector run.
 import { EventEmitter } from 'node:events';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { PassThrough } from 'node:stream';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -13,7 +13,7 @@ import { createLogger } from '@4thtech-io/log';
 import { termsInputSchema, type ContactDisplayName, type RestrictedName } from '@4thtech-io/types';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpenAgentResult, OpenedAgent } from '../runtime/index.js';
-import { TOOLS, type ToolClient, type ToolContext } from '../tools/index.js';
+import { TOOLS, type ToolClient, type ToolContext } from '@4thtech-io/mcp-tools';
 import { agentToolContext, createMcpCommand, stdioTransport } from './command.js';
 import { SERVER_INSTRUCTIONS } from './instructions.js';
 import { createMcpServer, SERVER_NAME } from './server.js';
@@ -82,8 +82,11 @@ function toolContext(client: ToolClient = toolClient()): ToolContext {
   };
 }
 
-async function connect(env: Parameters<typeof createMcpServer>[0]) {
-  const server = createMcpServer(env, '0.0.0-test');
+async function connect(
+  env: Parameters<typeof createMcpServer>[0],
+  options: Parameters<typeof createMcpServer>[2] = {},
+) {
+  const server = createMcpServer(env, '0.0.0-test', options);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test', version: '0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
@@ -96,6 +99,29 @@ describe('MCP server (stdio binding, 06 §1)', () => {
     expect(client.getServerVersion()).toMatchObject({ name: SERVER_NAME, version: '0.0.0-test' });
     expect(client.getInstructions()).toBe(SERVER_INSTRUCTIONS);
     expect(client.getServerCapabilities()?.tools).toBeDefined();
+  });
+
+  it('M1-36h: tools/list hides the chain override unless the server runs Advanced', async () => {
+    const chainOf = async (advanced: boolean) => {
+      const { client } = await connect(toolContext(), advanced ? { advanced: true } : {});
+      const { tools } = await client.listTools();
+      const notarize = tools.find((t) => t.name === 'agentlink_notarize');
+      return {
+        listed: Object.keys(notarize?.inputSchema.properties ?? {}).includes('chain'),
+        anyChain: tools.some((t) => 'chain' in (t.inputSchema.properties ?? {})),
+        call: await client.callTool({
+          name: 'agentlink_notarize',
+          arguments: { envelopeId: 'Q2xhaW1zQ2xhaW1zQ2xhaQ', chain: 'base-sepolia' },
+        }),
+      };
+    };
+    const plain = await chainOf(false);
+    expect(plain.listed).toBe(false);
+    expect(plain.anyChain).toBe(false);
+    expect(plain.call.structuredContent).toMatchObject({ code: 'INVALID_ARGUMENT' });
+    const advanced = await chainOf(true);
+    expect(advanced.listed).toBe(true);
+    expect(advanced.call.structuredContent).not.toMatchObject({ code: 'INVALID_ARGUMENT' });
   });
 
   it('the instructions are 06 §5 verbatim', () => {
@@ -392,29 +418,4 @@ describe('the TermsInput JSON Schema agrees with the core schema (M1-21, 06 §2.
     // always runs the core schema.
     expect(validate(sample).valid).toBe(accepted);
   });
-});
-
-describe('src/tools stays runtime-agnostic (06 §1; the ESLint fence, checked here on the source too)', () => {
-  const root = new URL('../tools/', import.meta.url);
-  const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter((f) =>
-    f.endsWith('.ts'),
-  );
-
-  it('found the module', () => {
-    expect(files).toContain('registry.ts');
-  });
-
-  for (const file of files) {
-    it(file, () => {
-      const text = readFileSync(new URL(file, root), 'utf8');
-      const depth = file.split('/').length - 1;
-      const specifiers = [...text.matchAll(/\bfrom\s+'([^']+)'/g)].map((m) => m[1]!);
-      for (const spec of specifiers) {
-        expect(spec).not.toMatch(/^node:|^@4thtech-io\/node|^@modelcontextprotocol\//);
-        if (spec.startsWith('.'))
-          expect(spec.split('/').filter((p) => p === '..').length).toBeLessThanOrEqual(depth);
-      }
-      expect(text).not.toMatch(/\bimport\(|\brequire\(|\bprocess\.|\bBuffer\./);
-    });
-  }
 });

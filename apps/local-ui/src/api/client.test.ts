@@ -101,6 +101,25 @@ describe('createApiClient', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('IR-M1-11b-1-1 L-4: refuses dot segments, plain or percent-encoded, before any request', async () => {
+    const fetchMock = vi.fn();
+    const api = createApiClient({ fetch: fetchMock, token: 't' });
+    for (const bad of [
+      '/api/../settings',
+      '/api/ui/../../x',
+      '/api/ui/./x',
+      '/api/ui/..',
+      '/api/ui/%2e%2e/x',
+      '/api/ui/%2E./x',
+      '/api/ui/.%2e?x=1',
+    ]) {
+      await expect(api.get(bad), bad).rejects.toThrow();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue(new Response('{}', { status: 200 }));
+    await expect(api.get('/api/ui/first-run?q=a..b')).resolves.toMatchObject({ kind: 'ok' });
+  });
+
   it('never logs a request or response body', async () => {
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
       vi.spyOn(console, m).mockImplementation(() => undefined),

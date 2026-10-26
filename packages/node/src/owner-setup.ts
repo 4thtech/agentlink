@@ -21,6 +21,17 @@
 // 5. on any failure, remove exactly the items this run stored (passkey first, then the owner item;
 //    an item whose bytes are not this run's is never deleted) and report a fixed error.
 //
+// M1-UX-FIRSTRUN-V2 (D-130 (2); 08 §1 first run v2; 04 §2.5 one owner flow; proposed, owner
+// confirms at merge): when the agent's `firstCard.firstPolicy` is given, the same unlocked owner
+// session also signs the agent's first policy (the 06 §3 defaults with the real `~/AgentLink/Send`
+// allowed, owner-first-policy.ts signFirstPolicy, exactly as `owner init`). The folders are prepared
+// by the caller before the gesture (prepareSetupFolders: Send, then Inbox and Proofs, 0700, never
+// through a link; a Send folder that is a link at either level, not a folder or not empty is
+// refused there, so the setup never starts). If the card is not signed, everything is rolled back
+// as before; if the card is signed but the policy is not applied, the owner and the card are kept
+// (removing the owner would lock the agent out of its card), no policy is in force, and the caller
+// removes the folders this run created (removeSetupFolders).
+//
 // The owner code is returned once to the caller, which sends it to the page for the collapsed
 // "backup way to approve" display and wipes it; it is never logged, put in an event or an error.
 // The seed and the PRF output belong to the caller, which wipes them.
@@ -49,12 +60,18 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
-import { lstat } from 'node:fs/promises';
+import { lstat, mkdir, readdir, rmdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
-import type { KeychainBackend } from './keychain.js';
+import { osKeychain, type KeychainBackend } from './keychain.js';
+import {
+  prepareSendFolder,
+  removeCreated,
+  type SendFolderPlan,
+  type SendFolderResult,
+} from './owner-first-policy.js';
 import { signFirstCardWith, type FirstAgentCard } from './owner-init.js';
 import {
   OWNER_ACCOUNT,
@@ -70,6 +87,7 @@ import {
   removeOwnerPasskeyItemIfOurs,
   storeOwnerPasskeySeed,
 } from './owner-passkey.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 /** How long `begin`'s seed is held for `finish` (proposed, owner confirms at merge): 2 minutes. */
 export const SETUP_HOLD_MS = 120_000;
@@ -245,11 +263,47 @@ async function entryExists(path: string): Promise<boolean> {
   }
 }
 
+/** The entry names in `dir`; none when it does not exist. Any other error rejects (fail closed). */
+async function entriesOf(dir: string): Promise<readonly string[]> {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === 'ENOENT') return [];
+    throw new NodeKeyStoreError('owner_operation_refused', 'The owner files could not be checked.');
+  }
+}
+
+/**
+ * M1-11b-6 (M1-9i-c restore, 04 §2.3.3 steps 5 and 6; D-78): signs of an owner that has no owner
+ * item yet, in the `.agentlink` folder of `ownerFiles` (`<home>/.agentlink/keystore/owner.alko`):
+ *
+ * - any entry of `agents/` other than `first.name`'s own folder: another agent (added, or restored
+ *   from a recovery kit, whose store holds a card naming its owner; a restore writes the agents
+ *   before the owner seed), or something a restore left there;
+ * - any entry of `keystore/`: an owner file, or another agent's file-KeyStore file or lock (an
+ *   imported agent).
+ *
+ * Folder names only: no file is opened. The CLI's `owner init` text check (owner-on-machine.ts)
+ * reads the same folders.
+ */
+async function otherAgentOrKeystoreEntry(
+  ownerFiles: readonly string[],
+  ownName: string,
+): Promise<boolean> {
+  for (const keystore of new Set(ownerFiles.map((file) => dirname(file)))) {
+    if ((await entriesOf(keystore)).length > 0) return true;
+    const agents = join(dirname(keystore), 'agents');
+    if ((await entriesOf(agents)).some((entry) => entry !== ownName)) return true;
+  }
+  return false;
+}
+
 /**
  * True when no owner key exists for this OS user and agent: `first.identity` has no card, none of
- * the `owner`, `owner-passkey` and `owner-next` keychain items exists, and none of `ownerFiles` (the
- * file-KeyStore owner files, defaultOwnerFiles) exists. Reads ciphertext only and wipes it; never
- * reads a file's content. A keychain, store or file-system error rejects (callers fail closed).
+ * the `owner`, `owner-passkey` and `owner-next` keychain items exists, none of `ownerFiles` (the
+ * file-KeyStore owner files, defaultOwnerFiles) exists, and their `.agentlink` folder holds no other
+ * agent and no file-KeyStore entry (otherAgentOrKeystoreEntry). Reads ciphertext only and wipes it;
+ * never reads a file's content. A keychain, store or file-system error rejects (callers fail closed).
  */
 export async function noOwnerAnywhere(
   keychain: KeychainBackend,
@@ -268,7 +322,30 @@ export async function noOwnerAnywhere(
   for (const path of ownerFiles) {
     if (await entryExists(path)) return false;
   }
+  if (await otherAgentOrKeystoreEntry(ownerFiles, first.name)) return false;
   return true;
+}
+
+/**
+ * M1-11b-6: whether owner setup may be offered for `first` (the CLI wires the first-run page's
+ * setup only then): noOwnerAnywhere against `keychain` and `ownerFiles`. Store-only: reads no
+ * secret, unlocks nothing. Any error answers false (fail closed: setup is then never wired).
+ */
+export async function ownerSetupAvailableWith(
+  keychain: KeychainBackend,
+  first: FirstAgentCard,
+  ownerFiles: readonly string[] = defaultOwnerFiles(),
+): Promise<boolean> {
+  try {
+    return await noOwnerAnywhere(keychain, first, KEYCHAIN_CALL_TIMEOUT_MS, ownerFiles);
+  } catch {
+    return false;
+  }
+}
+
+/** The package entry (index.ts): ownerSetupAvailableWith against the OS keychain and real home. */
+export function ownerSetupAvailable(first: FirstAgentCard): Promise<boolean> {
+  return Promise.resolve().then(() => ownerSetupAvailableWith(osKeychain(), first));
 }
 
 export interface OwnerSetupInput {
@@ -282,6 +359,11 @@ export interface OwnerSetupInput {
   readonly prfOutput: Uint8Array;
   /** The agent whose first card this setup signs. */
   readonly firstCard: FirstAgentCard;
+  /**
+   * M1-UX-FIRSTRUN-V2: the ready Send folder (prepareSetupFolders) for the first policy, signed with
+   * the card when `firstCard.firstPolicy` is given too. Omitted: only the card is signed.
+   */
+  readonly sendFolder?: Extract<SendFolderPlan, { status: 'ready' }>;
 }
 
 export interface OwnerSetupOptions {
@@ -308,6 +390,8 @@ export interface OwnerSetupResult {
   readonly ownerCode: Uint8Array;
   /** True when the passkey item was stored too. */
   readonly passkey: boolean;
+  /** M1-UX-FIRSTRUN-V2: the first policy, when a Send folder was given (fixed outcome). */
+  readonly sendFolder?: SendFolderResult;
 }
 
 const ownerExists = (): NodeKeyStoreError =>
@@ -344,7 +428,7 @@ export async function completeOwnerSetup(
   options: OwnerSetupOptions = {},
 ): Promise<OwnerSetupResult> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
-  const { seed, keys, credentialId, prfOutput, firstCard } = input;
+  const { seed, keys, credentialId, prfOutput, firstCard, sendFolder } = input;
   // M1-11s-c-b: the seed must be the owner whose key the page saw as user.id (`keys`), checked
   // before any keychain read or write. Otherwise a PRF-less setup would store an `owner` item for
   // an owner nobody was shown, and an unconfirmed card read-back would keep it.
@@ -398,7 +482,7 @@ export async function completeOwnerSetup(
       if (removal === 'failed') {
         throw new NodeKeyStoreError(
           'keychain_failed',
-          'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+          `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
         );
       }
       if (error instanceof NodeKeyStoreError && error.code === 'owner_exists') throw ownerExists();
@@ -407,14 +491,20 @@ export async function completeOwnerSetup(
       }
       throw setupFailed();
     }
-    const outcome = await signFirstCardWith(keychain, keys, code, firstCard, timeoutMs);
+    const outcome = await signFirstCardWith(keychain, keys, code, firstCard, timeoutMs, sendFolder);
     if (outcome.kind === 'signed') {
       handedOut = true;
+      // A ready folder whose policy was not attempted (no firstPolicy) is reported as not allowed.
+      const policy: SendFolderResult | undefined =
+        sendFolder === undefined
+          ? undefined
+          : (outcome.sendFolder ?? { status: 'not_allowed', reason: 'failed' });
       return Object.freeze({
         card: outcome.card,
         confirmed: true,
         ownerCode: code,
         passkey: withPasskey,
+        ...(policy === undefined ? {} : { sendFolder: policy }),
       });
     }
     if (outcome.kind === 'unknown') {
@@ -427,13 +517,18 @@ export async function completeOwnerSetup(
         confirmed: false,
         ownerCode: code,
         passkey: withPasskey,
+        // Whether the policy applied is unknown too: the folders are kept (never a sendable folder
+        // removed under a policy that may be in force); the page points to `agentlink doctor`.
+        ...(sendFolder === undefined
+          ? {}
+          : { sendFolder: { status: 'not_confirmed', folder: sendFolder.folder } as const }),
       });
     }
     const removal = await rollback();
     if (removal === 'failed') {
       throw new NodeKeyStoreError(
         'keychain_failed',
-        'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
       );
     }
     throw setupFailed();
@@ -441,4 +536,72 @@ export async function completeOwnerSetup(
     if (!handedOut) wipe(code);
     wipe(ownerBlob, passkeyBlob);
   }
+}
+
+/** M1-UX-FIRSTRUN-V2: Inbox and Proofs beside Send (08 §1 first run v2; the 06 §3 defaults). */
+const OTHER_FOLDERS: readonly string[] = Object.freeze(['Inbox', 'Proofs']);
+
+/** M1-UX-FIRSTRUN-V2: the folders `begin` prepared before the gesture. */
+export interface SetupFolders {
+  /** The Send folder for the first policy, checked or created (owner-first-policy.ts). */
+  readonly send: SendFolderPlan;
+  /** Inbox and Proofs folders this run created (removed again unless the policy applies). */
+  readonly created: readonly string[];
+}
+
+/**
+ * M1-UX-FIRSTRUN-V2: prepares the first-run folders under `home` before the gesture: Send by the
+ * first-policy rules (prepareSendFolder: never through a link, a real empty folder, 0700), then,
+ * only when Send is ready, `Inbox` and `Proofs` beside it (0700, created only when missing; an
+ * existing entry, even a link, is left alone and never followed: core checks those folders itself
+ * when it uses them). Never throws; never deletes anything it did not create.
+ */
+export async function prepareSetupFolders(home: string = homedir()): Promise<SetupFolders> {
+  const send = await prepareSendFolder(home);
+  const created: string[] = [];
+  if (send.status !== 'ready') return Object.freeze({ send, created: Object.freeze(created) });
+  const parent = dirname(send.folder);
+  for (const name of OTHER_FOLDERS) {
+    const folder = join(parent, name);
+    try {
+      await lstat(folder);
+      continue;
+    } catch (error) {
+      if ((error as { code?: unknown } | null)?.code !== 'ENOENT') continue;
+    }
+    try {
+      // Not recursive: the parent is the checked folder prepareSendFolder resolved.
+      await mkdir(folder, { mode: 0o700 });
+      created.push(folder);
+    } catch {
+      // Not fatal: core creates and checks the inbox and proofs folders when it uses them.
+    }
+  }
+  return Object.freeze({ send, created: Object.freeze(created) });
+}
+
+/** M1-UX-FIRSTRUN-V2: removes what prepareSetupFolders created (only while empty). Never throws. */
+export async function removeSetupFolders(folders: SetupFolders | undefined): Promise<void> {
+  if (folders === undefined) return;
+  for (const folder of [...folders.created].reverse()) {
+    try {
+      await rmdir(folder);
+    } catch {
+      // Not empty any more, or already gone: never remove anything else.
+    }
+  }
+  await removeCreated(folders.send);
+}
+
+/** The fallback name of this computer for the backup-code save form (11 §5.5). */
+export const UNNAMED_COMPUTER = 'this computer';
+
+/**
+ * M1-UX-FIRSTRUN-V2: the computer's name for the backup-code entry in the owner's password manager
+ * ("AgentLink backup code – <computer name>", 08 §1): the host name without a `.local` suffix, when
+ * it is 1..63 plain characters (letters, digits, space, `.`, `_`, `-`); otherwise "this computer".
+ */
+export function computerNameOf(hostname: string): string {
+  const name = hostname.trim().replace(/\.local$/i, '');
+  return /^[A-Za-z0-9 ._-]{1,63}$/.test(name) ? name : UNNAMED_COMPUTER;
 }

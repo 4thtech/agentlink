@@ -1,0 +1,64 @@
+# The invite page (M1-19, M1-19-b, D-28, D-53): a static site served as Workers static assets, with no
+# Worker script. Deployed only by CI (.github/workflows/deploy-invite.yml, release-and-deployment.md
+# §4.6); never `wrangler deploy` from a workstation. Always pass --env: `staging` (workers.dev). There
+# is no production environment yet (card M1-19-d: after the trademark check and the domain decision).
+#
+# The headers (CSP, Referrer-Policy and the rest, 08 §4) come from the `_headers` file in the built
+# site (site/_headers), which Cloudflare applies to every asset; the deploy workflow checks them on
+# staging. The CI deploy passes the verified build with `--assets <dir>`, so the
+# directory below only serves local development (`vite build`, then `wrangler dev`).
+#
+# No secrets, no vars, no bindings: the page makes no request and holds no state (I-2). Logging is off
+# in every environment (04 §4, I-7) and the workflow reads the live settings back after each deploy.
+#
+# `html_handling = "drop-trailing-slash"` makes `/i` (the invite link path, 04 §3.6) answer 200 with
+# the page itself; the default would redirect `/i` to `/i/`. The deploy checks for exactly that 200.
+#
+# Top level: local development only. The name does not exist on the account, so a deploy without
+# --env fails instead of creating another Worker.
+name = "agentlink-invite-local"
+compatibility_date = "2026-08-01"
+workers_dev = false
+preview_urls = false
+send_metrics = false
+logpush = false
+upload_source_maps = false
+
+[assets]
+directory = "./dist/site"
+html_handling = "drop-trailing-slash"
+not_found_handling = "none"
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+[observability.traces]
+enabled = false
+
+# ---------------------------------------------------------------------------------------------------
+# Staging: workers.dev only, deployed on every merge to main that touches the page.
+[env.staging]
+name = "agentlink-invite-staging"
+workers_dev = true
+preview_urls = false
+logpush = false
+routes = []
+
+[env.staging.assets]
+directory = "./dist/site"
+html_handling = "drop-trailing-slash"
+not_found_handling = "none"
+
+[env.staging.observability]
+enabled = false
+
+[env.staging.observability.logs]
+enabled = false
+invocation_logs = false
+
+[env.staging.observability.traces]
+enabled = false

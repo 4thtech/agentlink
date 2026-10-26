@@ -1,0 +1,161 @@
+// `agentlink ui` (M1-11b-9; 08 §1 "`agentlink ui` opens it manually"; 04 §2.5; 11 §5): opens the
+// local app on demand, in the owner's own interactive terminal.
+//
+// - In that terminal: the agent is opened, the local approval server starts, and the OS browser
+//   opens the one-shot session link at the Activity page, or at the first-run page while no owner
+//   exists (the same owner-setup rule as `init`, local-ui-wiring.ts). The link goes only to the OS
+//   opener (`openActivity` / `openFirstRun`): it is never printed, logged, returned or put in an
+//   event. The command serves until Ctrl+C or UI_WAIT_MS, then closes the server and the agent.
+// - Run by an agent (no TTY, or a harness marker): one fixed line tells the user to run the command
+//   in their own terminal, named with the CLI prefix (M1-36e). No agent is opened, no server starts,
+//   no link exists. Handing an agent the session link would let it use the page (G-1).
+// - Not an MCP tool: no tool returns or opens this page (I-4).
+//
+// Threat note (G-1, D-67; 04 §2.5): the TTY and marker checks are UX guards, not a boundary; a
+// shell-capable agent as the same OS user could start the server itself. This step adds no route and
+// no authority: owner actions on the pages still need the owner's presence (passkey or code) and an
+// owner signature, and first-run setup is the `setupGate` route that re-checks that no owner exists.
+import process from 'node:process';
+import { createLogger, type Logger } from '@4thtech-io/log';
+import { startApprovalServer } from '@4thtech-io/node';
+import { createUiApprovalSource } from '../approval/ui-source.js';
+import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../dispatch.js';
+import { localUiOptions, logOwnerSetupEvent } from '../mcp/local-ui-wiring.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
+import { checkOwnerTerminal } from '../runtime/guards.js';
+import { nodeOwnerDeps } from './owner/deps.js';
+
+/** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
+export const UI_WAIT_MS = 30 * 60_000;
+
+/** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
+export const UI_TEXT = Object.freeze({
+  opened:
+    "Your browser opened your AgentLink activity page. Keep this window open while you use it; press Ctrl+C when you're done.",
+  openedSetup:
+    "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
+  noBrowser: "AgentLink couldn't open your browser.",
+  /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
+  notReady: (prefix: string): string =>
+    `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
+  agentRun: (prefix: string): string =>
+    `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
+});
+
+export type UiPage = 'activity' | 'first-run';
+
+/** The running pages: the approval server and the agent it serves. */
+export interface UiServer {
+  /** Which page `open` goes to: first-run while no owner exists, otherwise Activity. */
+  readonly page: UiPage;
+  /** Opens the browser at a one-shot link to `page`; false when no browser could be started. */
+  open(): Promise<boolean>;
+  /** Stops the server and closes the agent. */
+  close(): Promise<void>;
+}
+
+export interface UiDeps {
+  /** Opens the agent and starts the server; undefined when the agent is not set up here. */
+  start(name: string | undefined): Promise<UiServer | undefined>;
+  /** The longest serve time, in milliseconds. */
+  readonly waitMs: number;
+  /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
+  interrupt(stop: () => void): () => void;
+}
+
+/** The command. Returns the process exit code. */
+export async function uiStep(
+  context: CommandContext,
+  deps: UiDeps = nodeUiDeps(),
+  prefix: string = cliPrefix(),
+): Promise<number> {
+  const { output } = context;
+  if (!checkOwnerTerminal(context.terminal).ok) {
+    output.printError(UI_TEXT.agentRun(prefix));
+    return EXIT_FAILED;
+  }
+  const server = await deps.start(context.parsed.agent).catch(() => undefined);
+  if (server === undefined) {
+    output.printError(UI_TEXT.notReady(prefix));
+    return EXIT_FAILED;
+  }
+  let unsubscribe: (() => void) | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const opened = await server.open().catch(() => false);
+    if (!opened) {
+      output.printError(UI_TEXT.noBrowser);
+      return EXIT_FAILED;
+    }
+    output.print(server.page === 'first-run' ? UI_TEXT.openedSetup : UI_TEXT.opened);
+    const stopped = new Promise<void>((resolve) => {
+      unsubscribe = deps.interrupt(resolve);
+    });
+    const timedOut = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, deps.waitMs);
+    });
+    await Promise.race([stopped, timedOut]);
+    return EXIT_OK;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    unsubscribe?.();
+    await server.close().catch(() => undefined);
+  }
+}
+
+/** The production step: the OS user's home, the OS keychain, the OS browser opener. */
+export function nodeUiDeps(): UiDeps {
+  const owner = nodeOwnerDeps();
+  const logger: Logger = createLogger({ name: 'ui' });
+  return Object.freeze<UiDeps>({
+    start: async (name) => {
+      const opened = await owner.open(name);
+      if (opened.status !== 'ok') return undefined;
+      const { agent } = opened;
+      try {
+        const localUi = await localUiOptions(agent);
+        // No app in this build: the pages would be a 404.
+        if (localUi.assets?.files.has('index.html') !== true) {
+          await agent.close();
+          return undefined;
+        }
+        const page: UiPage = localUi.ownerSetup === undefined ? 'activity' : 'first-run';
+        const source = createUiApprovalSource(
+          // This step owns the agent's lifetime; the source never closes it.
+          { ...agent, close: () => Promise.resolve() },
+          { now: () => Math.floor(Date.now() / 1000) },
+        );
+        const server = await startApprovalServer({
+          source,
+          localUi,
+          // Fixed values only (ApprovalServerEvent, I-7).
+          onEvent: (event) => {
+            logger.debug('approval ui event', { ...event });
+            logOwnerSetupEvent(logger, event);
+          },
+        });
+        return Object.freeze<UiServer>({
+          page,
+          open: () => (page === 'first-run' ? server.openFirstRun() : server.openActivity()),
+          close: async () => {
+            await server.close().catch(() => undefined);
+            await agent.close();
+          },
+        });
+      } catch (error) {
+        await agent.close().catch(() => undefined);
+        throw error;
+      }
+    },
+    waitMs: UI_WAIT_MS,
+    interrupt: (stop) => {
+      process.once('SIGINT', stop);
+      return () => {
+        process.off('SIGINT', stop);
+      };
+    },
+  });
+}
+
+/** The registered handler. */
+export const uiHandler: CommandHandler = (context) => uiStep(context);

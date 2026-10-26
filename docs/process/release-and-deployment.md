@@ -295,7 +295,7 @@ This section and §4.6 are the **contract** for the Cloudflare deploy workflows.
 | Integrity | SRI on all scripts; CSP and security headers per 08 §2.3 and `audit-rules.md` WEB-1…WEB-6; self-hosted fonts. |
 | Origins | Separate origins (§1.1). |
 | Hashes | Published in the GitHub release; the console shows its build hash in Settings. |
-| Deploy | Workers static assets through the Cloudflare deploy workflow: staging automatically on merge (`workers.dev`); production automatically once staging smoke is green (Workers Custom Domains, D-52). |
+| Deploy | Workers static assets through the Cloudflare deploy workflow: staging automatically on merge (`workers.dev`); production automatically once staging smoke is green (Workers Custom Domains, D-52). The invite page deploys through `deploy-invite.yml` (M1-19-b) to **staging only** for now: the built site is hashed once, staging serves exactly those files, and the smoke test compares the served pages and script with the build byte for byte and checks the headers of 08 §4. Its production deploy waits for the trademark check and the production domain decision (card M1-19-d); until then `deploy-reconcile.yml` does not cover it either. |
 | Verify | Served asset hashes equal the release manifest; headers checked; the fragment-never-sent test runs against staging, and the header and hash checks also against production. |
 | Rollback | Automatic in `deploy-production`: back to the previous version, hash-identical. Clients may cache; a service-worker update may be needed. |
 
@@ -309,7 +309,7 @@ The optional 4thTech relay (strfry, 30-day retention, ciphertext only) is not on
 
 ### 4.8 Cloud-agent template
 
-`4thtech/agentlink-cloud-agent` is generated one-way from `apps/cloud-agent` at a release tag, holds no secrets and pins npm versions that have provenance. Users deploy it into **their own** Cloudflare accounts; 4thTech never deploys or accesses user instances and cannot roll them back. A 4thTech-run demo instance, when it exists, deploys like the other Workers (§4.5). DECISION NEEDED (owner): sync mechanism (CI push with a scoped token vs manual PR).
+`4thtech/agentlink-cloud-agent` is generated one-way from `apps/cloud-agent` at a release tag, holds no secrets and pins npm versions that have provenance. Users deploy it into **their own** Cloudflare accounts; 4thTech never deploys or accesses user instances and cannot roll them back. A 4thTech-run demo instance, when it exists, deploys like the other Workers (§4.5). The separate repository and the one-way sync at a release tag are decided (D-131 (7)). *Sync mechanism (proposed, owner confirms at merge; M2-3d):* a release job pushes the tagged tree with a token scoped to the template repository only, in a protected environment that waits for the owner's approval click, as for npm `latest`; a failed staging smoke test of the tagged template restores the previous tag. Button users do not follow upstream by themselves, so the cloud agent shows "update available" (08 §3.5).
 
 ### 4.9 Public docs (GitBook, D-29, D-57)
 
@@ -367,6 +367,7 @@ Secrets MUST NEVER appear in a repository (incl. `sync`), logs, CI output, Curat
 | R2 test bucket token | Storage-adapter integration tests (M1-6) | Bucket-scoped token; location decided with the e2e credentials (`development-process.md` §10); never reachable from PR workflows | Owner | On suspicion |
 | `DEPLOY_FREEZE_TOKEN` | Lets CI set `DEPLOY_FREEZE` (`release.yml` → `freeze`, `deploy-freeze.yml`); creation steps and round-trip test in `ci-cd.md` §8 | Environment secret of `deploy-freeze` (`main` only); can write Actions variables only | Owner | DECISION NEEDED (`ci-cd.md`, owner setup checklist §8): fine-grained token (≤ 90 days) or GitHub App |
 | npm publishing | Releases | None (OIDC trusted publishing, bound to `npm-next` and `npm-publish`) | — | — |
+| `DESKTOP_EXT_SIGNING_KEY` | Signs the optional Claude Desktop extension bundles (M1-9f, D-91): RSA 4096 key, PEM, for the MCPB signature (CMS, SHA-256); public certificate committed at `apps/cli/desktop-extension/4thtech-signing.crt` (beta: self-signed); creation steps in that folder's README | Environment secret of `npm-publish`, read only by the signing step of `release.yml` → `desktop-extension-release`; optional: unset, the bundles ship unsigned with their SHA-256 and attestation | Owner | On suspicion, or before the certificate expires: new key, new certificate committed in the same release window (proposed; owner confirms at merge) |
 | Owner/admin account credentials (GitHub, npm, Cloudflare) | Administration | Password manager + hardware 2FA | Each person | On suspicion |
 | Explorer API keys | Contract verification at mainnet (M3-6) only; no testnet verification (D-11) | Local, at the mainnet session | Owner | Yearly |
 | E2E harness API keys | E2E suite | DECISION NEEDED (`development-process.md` §10) | Owner | — |

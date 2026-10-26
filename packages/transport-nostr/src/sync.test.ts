@@ -8,6 +8,8 @@ import {
   createGiftWrap,
   encodeBase64url,
   encodeHex,
+  encodeHex0x,
+  envelopeHash,
   randomBytes,
   type Envelope,
   type EnvelopeKeys,
@@ -192,6 +194,8 @@ function setup(
     dedupCacheEntries?: number;
     learnedIdsPerRelay?: number;
     auth?: boolean;
+    /** M1-5e: the pool's AUTH keys (one or several identities); implies a pool that may log in. */
+    authKeys?: EnvelopeKeys | readonly EnvelopeKeys[];
   } = {},
 ): Setup {
   const net = shared.net ?? new MockNetwork();
@@ -207,7 +211,11 @@ function setup(
     addressCheck: { resolver: net },
     nip11: net,
     logger,
-    ...(shared.auth === true ? { authKeys: recipient, mayAuthenticate: () => true } : {}),
+    ...(shared.authKeys !== undefined
+      ? { authKeys: shared.authKeys, mayAuthenticate: () => true }
+      : shared.auth === true
+        ? { authKeys: recipient, mayAuthenticate: () => true }
+        : {}),
   });
   const engine = new SyncEngine({
     pool,
@@ -676,18 +684,20 @@ describe('dedup', () => {
     expect(
       s.items.every((i) => i.envelopeSeen === false || i.envelope.from !== attacker.pubkey),
     ).toBe(true);
-    // Only the verified envelope's id is recorded.
-    expect(s.store.has('envelope', real.envelope.id)).toBe(true);
+    // Only the verified envelope's hash is recorded, as core keys it (M1-5e; 07 §3.2).
+    const realHash = encodeHex0x(envelopeHash(real.envelope));
+    expect(s.store.has('envelope', realHash)).toBe(true);
     expect(s.store.marks.filter((m) => m.startsWith('envelope:'))).toEqual([
-      `envelope:${real.envelope.id}`,
+      `envelope:${realHash}`,
     ]);
   });
 
-  it('still delivers a later envelope with an id that is seen, with the seen flag as a hint only', async () => {
+  it('still delivers a later envelope with a seen hash, with the seen flag as a hint only', async () => {
     const s = setup();
     const [relay] = relayUrls('hint', 1) as [string];
     s.net.configure(relay);
-    const real = makeWrap(s.recipient);
+    const sender = referenceKeys();
+    const real = makeWrap(s.recipient, { sender });
     s.net.inject(relay, real.event);
     await s.engine.sync({
       relays: [relay],
@@ -696,10 +706,10 @@ describe('dedup', () => {
     });
     expect(s.items[0]?.envelopeSeen).toBe(false);
 
-    const attacker = referenceKeys();
+    // The same envelope content in another wrap (a different signature does not change the hash).
     const copy = makeWrap(s.recipient, {
-      sender: attacker,
-      envelope: makeEnvelope(attacker.pubkey, { id: real.envelope.id }),
+      sender,
+      envelope: { ...real.envelope, sig: encodeHex(randomBytes(64)) },
       createdAt: NOW - 3 * HOUR,
     });
     s.net.inject(relay, copy.event);
@@ -711,6 +721,33 @@ describe('dedup', () => {
     expect(s.items).toHaveLength(2);
     expect(s.items[1]?.envelopeSeen).toBe(true);
     expect(s.items[1]?.giftWrapId).toBe(copy.event.id);
+  });
+
+  it('matches the envelopeSeen hint to the rows core writes: the envelopeHash, never the sender-chosen id (M1-5e)', async () => {
+    const s = setup();
+    const [relay] = relayUrls('hintcore', 1) as [string];
+    s.net.configure(relay);
+    const real = makeWrap(s.recipient);
+    // Core's row for this envelope: the 0x-prefixed envelopeHash (07 §3.2), written by core itself.
+    s.store.seen.set(`envelope:${encodeHex0x(envelopeHash(real.envelope))}`, NOW - HOUR);
+    s.net.inject(relay, real.event);
+    // An attacker reuses the id with other content: a different hash, so no hint.
+    const attacker = referenceKeys();
+    const sameId = makeWrap(s.recipient, {
+      sender: attacker,
+      envelope: makeEnvelope(attacker.pubkey, { id: real.envelope.id }),
+      createdAt: NOW - 2 * HOUR,
+    });
+    s.net.inject(relay, sameId.event);
+    await s.engine.sync({
+      relays: [relay],
+      identities: identity(s),
+      onEnvelope: s.handler('processed'),
+    });
+    const byWrap = new Map(s.items.map((i) => [i.giftWrapId, i.envelopeSeen]));
+    expect(byWrap.get(real.event.id)).toBe(true);
+    expect(byWrap.get(sameId.event.id)).toBe(false);
+    expect(s.store.marks).not.toContain(`envelope:${real.envelope.id}`);
   });
 
   it("does not let a forged copy of a wrap's id hide the real wrap, in either order", async () => {
@@ -1075,6 +1112,229 @@ describe('NIP-42', () => {
     });
     expect(result.relays[0]).toMatchObject({ status: 'failed', reason: 'auth_failed' });
     expect(s.net.socket(relay)?.authed).toBe(false);
+  });
+});
+
+// --- M1-5e: NIP-42 with several identities -----------------------------------------------------
+
+/** One EnvelopeKeys over two key sets, picking by the epoch of the identity (a stand-in for two epochs). */
+function twoEpochKeys(first: TestKeys, second: TestKeys): EnvelopeKeys {
+  return {
+    ...first,
+    nip44Decrypt: (peer, payload, options) =>
+      (options?.epoch === 1 ? second : first).nip44Decrypt(peer, payload, options),
+  };
+}
+
+describe('NIP-42 with several identities (M1-5e)', () => {
+  const authFrames = (s: Setup, relay: string): NostrEvent[] =>
+    s.net.received
+      .filter((r) => r.relay === relay)
+      .map((r) => JSON.parse(r.frame) as unknown[])
+      .filter((f) => f[0] === 'AUTH')
+      .map((f) => f[1] as NostrEvent);
+
+  it('logs in once per identity on one connection and reads the wraps of both', async () => {
+    const first = referenceKeys();
+    const second = referenceKeys();
+    const s = setup({
+      recipient: first,
+      keys: twoEpochKeys(first, second),
+      authKeys: [first, second],
+    });
+    const [relay] = relayUrls('multiauth', 1) as [string];
+    s.net.configure(relay, { requireAuth: true, servePerKey: true });
+    const a = makeWrap(first);
+    const b = makeWrap(second);
+    s.net.inject(relay, a.event);
+    s.net.inject(relay, b.event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: [{ pubkey: first.pubkey }, { pubkey: second.pubkey, epoch: 1 }],
+      onEnvelope: s.handler(),
+    });
+    expect(result).toMatchObject({ partial: false, delivered: 2 });
+    expect(ids(s).sort()).toEqual([a.event.id, b.event.id].sort());
+    expect([...(s.net.socket(relay)?.authedKeys ?? [])].sort()).toEqual(
+      [first.pubkey, second.pubkey].sort(),
+    );
+    expect(s.net.opens.filter((t) => t.url === relay)).toHaveLength(1); // one connection
+  });
+
+  it('binds each login to its own key, this relay and this connection (no replay across identities)', async () => {
+    const first = referenceKeys();
+    const second = referenceKeys();
+    const s = setup({
+      recipient: first,
+      keys: twoEpochKeys(first, second),
+      authKeys: [first, second],
+    });
+    const [relay] = relayUrls('bindauth', 1) as [string];
+    s.net.configure(relay, { requireAuth: true, servePerKey: true });
+    s.net.inject(relay, makeWrap(first).event);
+    await s.engine.sync({
+      relays: [relay],
+      identities: [{ pubkey: first.pubkey }, { pubkey: second.pubkey, epoch: 1 }],
+      onEnvelope: s.handler(),
+    });
+    const frames = authFrames(s, relay);
+    expect(frames.map((f) => f.pubkey).sort()).toEqual([first.pubkey, second.pubkey].sort());
+    expect(new Set(frames.map((f) => f.id)).size).toBe(2);
+    const challenge = s.net.socket(relay)?.challenge;
+    for (const f of frames) {
+      expect(f.tags).toContainEqual(['relay', relay]);
+      expect(f.tags).toContainEqual(['challenge', challenge]);
+    }
+  });
+
+  it('still reads for the identity that logged in when another cannot sign', async () => {
+    const first = referenceKeys();
+    const second = referenceKeys();
+    const locked: EnvelopeKeys = {
+      ...second,
+      signNostr: () => Promise.reject(new KeyStoreError('owner_locked', 'locked')),
+    };
+    const s = setup({
+      recipient: first,
+      keys: twoEpochKeys(first, second),
+      authKeys: [locked, first],
+    });
+    const [relay] = relayUrls('halfauth', 1) as [string];
+    s.net.configure(relay, { requireAuth: true, servePerKey: true });
+    const a = makeWrap(first);
+    s.net.inject(relay, a.event);
+    s.net.inject(relay, makeWrap(second).event);
+    const result = await s.engine.sync({
+      relays: [relay],
+      identities: [{ pubkey: first.pubkey }, { pubkey: second.pubkey, epoch: 1 }],
+      onEnvelope: s.handler(),
+    });
+    expect(result).toMatchObject({ delivered: 1 });
+    expect(ids(s)).toEqual([a.event.id]);
+    expect([...(s.net.socket(relay)?.authedKeys ?? [])]).toEqual([first.pubkey]);
+  });
+
+  it('does not log in again on a connection that already did, per identity', async () => {
+    const first = referenceKeys();
+    const second = referenceKeys();
+    const s = setup({
+      recipient: first,
+      keys: twoEpochKeys(first, second),
+      authKeys: [first, second],
+    });
+    const [relay] = relayUrls('onceauth', 1) as [string];
+    s.net.configure(relay, { requireAuth: true, servePerKey: true });
+    s.net.inject(relay, makeWrap(first).event);
+    const options = {
+      relays: [relay],
+      identities: [{ pubkey: first.pubkey }, { pubkey: second.pubkey, epoch: 1 }],
+      onEnvelope: s.handler(),
+    };
+    await s.engine.sync(options);
+    await s.engine.sync(options);
+    expect(authFrames(s, relay)).toHaveLength(2);
+  });
+});
+
+// --- M1-5e: first sync after the seen-set was pruned ---------------------------------------------
+
+describe('first sync on a new relay after seen pruning (M1-5e, L-5)', () => {
+  it('may offer a wrap again (9-day window, 7-day retention), and it is stored once', async () => {
+    const s = setup();
+    const [relayA, relayB] = relayUrls('pruned', 2) as [string, string];
+    s.net.configure(relayA);
+    s.net.configure(relayB);
+    const wrap = makeWrap(s.recipient, { createdAt: NOW - HOUR });
+    s.net.inject(relayA, wrap.event);
+    // A stand-in for core step 9: stored envelopes are deduplicated with no time cutoff.
+    const stored = new Map<string, string>();
+    const handler = (item: SyncItem): Promise<SyncDisposition> => {
+      const hash = encodeHex0x(envelopeHash(item.envelope));
+      if (!stored.has(item.envelope.id)) stored.set(item.envelope.id, hash);
+      return Promise.resolve('verified');
+    };
+    await s.engine.sync({ relays: [relayA], identities: identity(s), onEnvelope: handler });
+    expect(stored.size).toBe(1);
+    expect(s.store.has('wrap', wrap.event.id)).toBe(true);
+
+    // 8 days later the row is older than 7 days and may be pruned; relay B has no cursor, so its
+    // first sync reads 9 days back and still finds the wrap (created 8 days and 1 h ago).
+    const later = NOW + 8 * 86_400;
+    vi.setSystemTime(later * 1000);
+    s.store.prune(seenPruneBefore(later, []));
+    expect(s.store.has('wrap', wrap.event.id)).toBe(false);
+    expect(later - (NOW - HOUR)).toBeLessThan(FIRST_SYNC_LOOKBACK_SECONDS);
+    s.net.inject(relayB, wrap.event);
+    const result = await s.restart().engine.sync({
+      relays: [relayB],
+      identities: identity(s),
+      onEnvelope: handler,
+    });
+    expect(result).toMatchObject({ partial: false, delivered: 1 }); // offered again: costs work only
+    expect(stored.size).toBe(1); // and stored once
+  });
+});
+
+// --- M1-5e: page position ------------------------------------------------------------------------
+
+describe('page position (M1-5e)', () => {
+  it('takes the saved page position only from gift wraps addressed to us, not from stray events', async () => {
+    const s = setup();
+    const [relay] = relayUrls('strayresume', 1) as [string];
+    const wraps = Array.from({ length: 14 }, (_, i) =>
+      makeWrap(s.recipient, { createdAt: NOW - (i + 1) * 600 }),
+    );
+    for (const w of wraps) s.net.inject(relay, w.event);
+    // A relay's junk on the first page: an old event of the wrong kind and a wrap for someone else.
+    const old = NOW - 4 * 86_400;
+    const stray = (subId: string, kind: number, tags: string[][]): string =>
+      JSON.stringify([
+        'EVENT',
+        subId,
+        {
+          id: encodeHex(randomBytes(32)),
+          pubkey: encodeHex(randomBytes(32)),
+          created_at: old,
+          kind,
+          tags,
+          content: 'x',
+          sig: encodeHex(randomBytes(64)),
+        },
+      ]);
+    s.net.configure(relay, {
+      maxLimit: 5,
+      extraFrames: (subId) => [
+        stray(subId, 1, []),
+        stray(subId, 1059, [['p', encodeHex(randomBytes(32))]]),
+      ],
+    });
+    let delivered = 0;
+    const first = await within(
+      s.engine.sync({
+        relays: [relay],
+        identities: identity(s),
+        onEnvelope: (item) => {
+          s.items.push(item);
+          delivered += 1;
+          if (delivered === 5) s.net.configure(relay, { maxLimit: 5, silentReq: true });
+          return 'verified';
+        },
+      }),
+      SYNC_BUDGET_MS,
+    );
+    expect(first.partial).toBe(true);
+    // The saved position is the oldest wrap of ours on the pages read, not the stray events' time.
+    expect(s.store.resumes.get(relay)?.until).toBe(NOW - 5 * 600);
+
+    s.net.configure(relay, { maxLimit: 5 });
+    const second = s.restart();
+    const result = await second.engine.sync({
+      relays: [relay],
+      identities: identity(second),
+      onEnvelope: second.handler(),
+    });
+    expect(result).toMatchObject({ partial: false });
+    expect(s.items.length + second.items.length).toBe(14);
   });
 });
 

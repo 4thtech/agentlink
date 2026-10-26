@@ -49,8 +49,8 @@ import { agentToolContext } from '../src/mcp/command.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import type { ToolContext } from '../src/tools/index.js';
-import { TOOLS } from '../src/tools/registry.js';
+import type { ToolContext } from '@4thtech-io/mcp-tools';
+import { TOOLS } from '@4thtech-io/mcp-tools/registry.js';
 
 // Each test pairs three agents over the relay double first (two full pairings with real crypto):
 // on the shared CI runner that setup alone took over 10 s (PR #245 run 39106091704, "Hook timed out

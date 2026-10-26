@@ -10,7 +10,7 @@
     "test:e2e:injection": "vitest run --config prompt-injection/vitest.config.ts deterministic/",
     "test:e2e:live": "vitest run test/live-files-and-proof.test.ts",
     "test:e2e:llm": "vitest run llm/llm-run.test.ts",
-    "test": "vitest run test/canary-scan.test.ts test/harness-parse.test.ts test/inbox-ids.test.ts test/injection-needles.test.ts test/nightly-workflow.test.ts test/rendezvous.test.ts test/invite-page-site.test.ts test/invite-page-browser.test.ts",
+    "test": "vitest run test/canary-scan.test.ts test/cli-first-run-smoke.test.ts test/harness-parse.test.ts test/inbox-ids.test.ts test/injection-needles.test.ts test/nightly-workflow.test.ts test/rendezvous.test.ts test/invite-page-site.test.ts test/invite-page-browser.test.ts",
     "lint": "eslint test llm prompt-injection vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
@@ -20,6 +20,7 @@
     "@4thtech-io/crypto": "workspace:*",
     "@4thtech-io/invite": "workspace:*",
     "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/mcp-tools": "workspace:*",
     "@4thtech-io/node": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@types/node": "22.20.5",

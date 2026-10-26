@@ -54,6 +54,7 @@ import {
   sameOwnerKeys,
   type OwnerItemRemoval,
 } from './owner-keystore.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 export { OWNER_PASSKEY_ACCOUNT };
 /** 08 §1, D-79: the WebAuthn RP ID of the local approval page. */
@@ -103,7 +104,7 @@ const passkeyUnsupported = (): NodeKeyStoreError =>
 const passkeyDamaged = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_mismatch',
-    'The saved passkey copy of your owner key is damaged. Use your owner code; `agentlink doctor` shows what is wrong.',
+    `The saved passkey copy of your owner key is damaged. Use your owner code; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 function u16(value: number): Uint8Array {
@@ -361,7 +362,7 @@ export async function registerOwnerPasskey(
       // Not this run's item (another run's, or none): never deleted.
       throw new NodeKeyStoreError(
         'keychain_failed',
-        'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
       );
     }
     // The stored blob opens with this passkey's PRF output to this owner.
@@ -421,7 +422,7 @@ export async function storeOwnerPasskeySeed(
     if (back === null || !equalBytes(back, blob)) {
       throw new NodeKeyStoreError(
         'keychain_failed',
-        'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
       );
     }
     check = await openPasskeySeed(back, prfOutput, { expectedOwnerNostr: owner.ownerNostr });

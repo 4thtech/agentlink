@@ -11,6 +11,7 @@
       "@4thtech-io/transport-nostr",
       "@4thtech-io/storage",
       "@4thtech-io/core",
+      "@4thtech-io/mcp-tools",
       "@4thtech-io/node",
       "@4thtech-io/ui",
       "@4thtech-io/agentlink"

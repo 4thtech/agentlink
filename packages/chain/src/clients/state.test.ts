@@ -108,6 +108,41 @@ describe('createChainState', () => {
     await expect(state.getRecord(hash32('aa'))).rejects.toBeInstanceOf(ChainError);
   });
 
+  it('getRecord (M1-4d-h): only the bare RecordNotFound() selector reads as absent', async () => {
+    // viem names a no-argument error from its selector and ignores any bytes after it, so a buggy
+    // or malicious RPC could dress another answer up as RecordNotFound. Only the exact 4-byte
+    // selector is the Notary's "absent"; anything else fails, so no replacement is decided on it.
+    const bare = encodeErrorResult({
+      abi: NOTARY_CLIENT_ABI,
+      errorName: 'RecordNotFound' as never,
+    });
+    const errorString = encodeErrorResult({
+      abi: [{ type: 'error', name: 'Error', inputs: [{ name: 'message', type: 'string' }] }],
+      errorName: 'Error',
+      args: ['RecordNotFound'],
+    });
+    let data: string = bare;
+    const { state } = stateWith((req) => {
+      if (req.method !== 'eth_call') throw new Error(`unexpected ${req.method}`);
+      return { error: { code: 3, message: 'execution reverted', data } };
+    });
+    expect(bare).toMatch(/^0x[0-9a-f]{8}$/);
+    for (const at of [undefined, 9n]) expect(await state.getRecord(hash32('aa'), at)).toBeNull();
+    for (const notAbsent of [
+      `${bare}${'00'.repeat(32)}`, // the same selector with extra bytes
+      `${bare}ff`, // the same selector with one trailing byte
+      errorString, // Error(string) whose text is the name
+      '0x', // an empty revert
+    ]) {
+      data = notAbsent;
+      for (const at of [undefined, 9n]) {
+        const read = state.getRecord(hash32('aa'), at);
+        await expect(read).rejects.toBeInstanceOf(ChainError);
+        await expect(read).rejects.toMatchObject({ code: 'call_reverted' });
+      }
+    }
+  });
+
   it('getRecord (M1-4c-d): a zero-signer struct is a bad answer, never "absent"', async () => {
     // The Notary never returns an empty slot: an unknown ID reverts RecordNotFound. A struct with a
     // zero signer comes from a misbehaving RPC or contract, so nothing may be decided on it.

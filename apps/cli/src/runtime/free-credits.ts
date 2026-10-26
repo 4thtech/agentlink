@@ -21,7 +21,10 @@ import path from 'node:path';
 import * as chain from '@4thtech-io/chain';
 import type { FreeCreditsAnswer, FreeCreditsPort } from '@4thtech-io/core';
 import { encodeHex, parseJson, randomBytes } from '@4thtech-io/crypto';
-import type { FreeCreditsChainState, FreeCreditsMarker } from '../tools/free-credits.js';
+import type {
+  FreeCreditsChainState,
+  FreeCreditsMarker,
+} from '@4thtech-io/mcp-tools/free-credits.js';
 
 /** The submitter's free test credits path (apps/submitter/src/worker.ts, M1-10b). */
 export const FREE_CREDITS_PATH = '/v1/faucet';

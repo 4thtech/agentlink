@@ -42,6 +42,7 @@ import {
 } from './owner-keystore.js';
 import { secretLabel } from './owner-operation.js';
 import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 export interface ChangeOwnerCodeOptions {
   /** The recorded backend of the agent the command runs for (07 §9.1). */
@@ -77,14 +78,11 @@ const COPY = {
     'This replaces your owner code with a new one. Your owner fingerprint stays the same, and your agents keep their cards.',
   current: 'First, type your current owner code.',
   wrong: "That owner code wasn't accepted. Check it and try again.",
-  refused:
-    "The owner code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran `agentlink owner init`.",
-  noOwner:
-    "No owner is set up on this computer yet. Run `agentlink owner init` yourself, in your own terminal. Don't let your AI run it or see the code it shows.",
+  refused: `The owner code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran \`${CLI_COMMAND} owner init\`.`,
+  noOwner: `No owner is set up on this computer yet. Run \`${CLI_COMMAND} owner init\` yourself, in your own terminal. Don't let your AI run it or see the code it shows.`,
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't change an owner code for yet. Update AgentLink.",
-  unknownBackend:
-    "This agent's recorded key store is not one AgentLink knows. Check the agent's config with `agentlink doctor`.",
+  unknownBackend: `This agent's recorded key store is not one AgentLink knows. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
   fingerprint: (fingerprint: string): string =>
     `Your owner fingerprint: ${fingerprint}. It doesn't change.`,
   // IR-M1-9z-1 F1: the old code stays the only working code until the replace has succeeded, so the
@@ -94,8 +92,7 @@ const COPY = {
   code: (code: string): string => `Your new owner code: ${code}`,
   retype: 'Type its last four characters to continue:',
   retypeWrong: "That doesn't match. Check the last four characters of your new owner code.",
-  retypeFailed:
-    "The new owner code wasn't confirmed. Nothing was changed: your current owner code still works. Run `agentlink owner change-code` again.",
+  retypeFailed: `The new owner code wasn't confirmed. Nothing was changed: your current owner code still works. Run \`${CLI_COMMAND} owner change-code\` again.`,
   done: (fingerprint: string): string =>
     `Owner code changed. Your old owner code no longer works, so you can now discard it. Your owner fingerprint is still ${fingerprint}.`,
   recoveryKit:
@@ -108,8 +105,7 @@ const COPY = {
     'Your current owner code still works, so the unfinished change was cleaned up. Its new owner code will never work: discard it.',
   completeAsk: (fingerprint: string): string =>
     `That is the new owner code from the unfinished change, for owner ${fingerprint}. Finish that change now, so that this code becomes your owner code? [y/N]`,
-  completeDeclined:
-    'Nothing was changed. Run `agentlink owner change-code` again when you want to finish or clean up the earlier change.',
+  completeDeclined: `Nothing was changed. Run \`${CLI_COMMAND} owner change-code\` again when you want to finish or clean up the earlier change.`,
   completed: (fingerprint: string): string =>
     `Owner code change finished. Use the new owner code from now on; your old owner code no longer works, so you can now discard it. Your owner fingerprint is still ${fingerprint}.`,
 } as const;
@@ -341,7 +337,7 @@ export function changeOwnerCode(options: ChangeOwnerCodeOptions): Promise<Change
     if (typeof options !== 'object' || options === null) {
       throw new NodeKeyStoreError(
         'owner_operation_invalid',
-        'Changing the owner code needs the agent it runs for. Run `agentlink owner change-code`.',
+        `Changing the owner code needs the agent it runs for. Run \`${CLI_COMMAND} owner change-code\`.`,
       );
     }
     assertNoHarnessMarker(options.env ?? process.env);

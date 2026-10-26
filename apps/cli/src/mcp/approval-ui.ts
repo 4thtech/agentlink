@@ -27,7 +27,7 @@
 import type { Logger } from '@4thtech-io/log';
 import type { ApprovalServer } from '@4thtech-io/node';
 import { approveCommand, isApprovalId } from '../approval/next-step.js';
-import type { ApprovalLink } from '../tools/index.js';
+import type { ApprovalLink } from '@4thtech-io/mcp-tools';
 
 /** The shortest time between two browser windows the server opens by itself. */
 export const BROWSER_OPEN_INTERVAL_MS = 30_000;

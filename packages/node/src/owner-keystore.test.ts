@@ -248,7 +248,7 @@ describe('owner init on a keychain machine (04 §2.2, D-67)', () => {
     expect(written.filter((t) => t.startsWith('Your owner code: '))).toHaveLength(1);
     expect(written[codeAt + 1]).toBe('<clear>');
     expect(written.at(-1)).toBe(
-      `Owner set up. Your owner fingerprint: ${result.fingerprint}. Check that \`agentlink doctor\` shows the same one.`,
+      `Owner set up. Your owner fingerprint: ${result.fingerprint}. Check that \`npx -y @4thtech-io/agentlink doctor\` shows the same one.`,
     );
   });
 

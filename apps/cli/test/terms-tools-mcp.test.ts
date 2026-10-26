@@ -8,7 +8,7 @@
 // server over the SDK's in-memory transport and called by the SDK client, which validates every
 // `structuredContent` against the tool's `outputSchema`. The owner signature comes from the crypto
 // test seam (MemoryOwnerKeyStore), standing in for @4thtech-io/node's TTY prompt (M1-8c).
-import { proofDisclosure } from '../src/tools/strings/privacy.js';
+import { proofDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 import {
   AgentLinkClient,
   MemoryStore,

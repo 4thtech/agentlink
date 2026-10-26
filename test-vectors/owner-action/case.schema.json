@@ -273,7 +273,7 @@
           ],
           "properties": {
             "op": {
-              "const": "verifyJson"
+              "const": "verifyText"
             },
             "json": {
               "type": "string"

@@ -5,6 +5,7 @@ PR-sized task cards for AgentLink (OCC v2), derived from `docs/foundation/10-bui
 - **Specs win.** A card restates the spec only to make acceptance testable. Where a card and a spec disagree, the spec wins and the mismatch is a spec gap (§8). Cards never resolve spec gaps by themselves; a gap is resolved through the spec-change process (`development-process.md` §8).
 - **Public file.** This repository is public. Cards contain no secrets, no Safe signer details and no details of unfixed vulnerabilities. Legacy items are referenced only by `OPS-L<n>` and "see private 09 §4". Docs 01 and 09 are private (D-21, D-26); where a card cites them it says "(private)" and restates what the task needs.
 - **Process.** Lifecycle, Definition of Ready/Done, routing and reviews: `development-process.md`. Security classes, reviews, threat notes, milestone audits: `audit-rules.md`. Deploys and releases: `release-and-deployment.md`. CI: `ci-cd.md`. Live coordination: `sync-protocol.md`.
+- **Card counts are not committed.** Read them with `node tools/docs-status/index.mjs --counts` (`repo-reference.md`); no PR edits a count.
 - **No assignees here.** Who works on what, and live status, is on the `sync` branch board (`board.md`). This file never names an assignee.
 
 Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items and the D-25 continuous-delivery group) · §3 M1 Local beta on testnets (phases M1a and M1b; incl. owner design drops D1–D3) · §4 M2 Owner console, desktop apps, self-host, design · §5 M3 Mainnet beta · §6 M4/M5 epics · §7 Dependency overview · §8 Spec gaps and inconsistencies · §9 Owner actions
@@ -61,16 +62,16 @@ Never automated: mainnet contract deploys, contract upgrades and configuration (
 
 ### Card count
 
+**Counts are not committed.** Almost every PR adds or changes a card, so a stored count went stale whenever another PR merged first (conflicts, merge-queue ejections). Read the current M0, M1 (M1a/M1b), M2 and M3 counts on demand with `node tools/docs-status/index.mjs --counts`. Counted: every `#### M<n>-…` heading outside a code fence (so not the §1 example), except split parents (Status "split into …", their parts are counted) and cards whose Phase starts with "later". The M1 phase comes from the first word of the card's `**Phase:**` field. `--check` fails if a generated counts block is committed again. The rows below are fixed and hand-maintained.
+
+Other sections:
+
 | Section | Cards |
 |---|---|
-| M0 Foundations | 40 (recounted from the headings on 2026-10-22; previously stated 37; incl. 7 in the D-25 group; 9 `done (setup)`; 6 follow-ups from CI findings: M0-2h, M0-10d, M0-10e, M0-10f, M0-26, OPS-CI-2) |
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
 | Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
-| M1 Local beta | 305 (M1a 87, M1b 218, recounted from the headings on 2026-10-23 after merging main, excluding the §1 example, M1-4d-e and the split parents M1-11b and M1-11c; 6 cards from the 2026-10-21 and 2026-10-22 reviews (#394) merged in: M1-4c-e, M1-34-c, M1-10a-d, M1-9zc-b, M1-9zd-b and M1-9zf-b (M1b); previously 299 (M1a 87, M1b 212, recounted from the headings on 2026-10-22, excluding the §1 example and M1-4d-e; 14 cards added from the afternoon reviews: M1-11b-6, M1-11b-7, M1-11b-8, M1-11s-c-b, M1-11s-c-c, M1-11c-a2b, M1-11c-a3b, M1-11c-a4d, M1-11c-shared, M1-11s-a-c, M1-11s-a-d, M1-4c-b-b, M1-3c-b-b and M1-35c-c; previously 285 (M1a 87, M1b 198; 8 cards added on 2026-10-22 from the follow-up list and D-122 and D-123: M1-11c-a4c, M1-11r-d, M1-11t, M1-36b-2, M1-36i-b, M1-36i-c, M1-36i-d and M1-10b-e-b (M3-4b-t sits in M3 and is not counted here; M1-3c is existing and now in progress); previously 277 (M1a 87, M1b 190; M1-11s-c added on 2026-10-22 from the M1-11b-1 bootstrap stop; previously 276 (M1a 87, M1b 189; 4 cards added from D-120 and D-121 on 2026-10-22: M1-36j, M1-10b-e, M1-11s-a-b and M1-37b; previously 272 (M1a 87, M1b 185; 17 cards added from the 2026-10-22 UX audits and review follow-ups: M1-36a to M1-36i, M1-36a-b, M1-36d-b, M1-37a, M1-9i-a-b, M1-11s-b-c, M1-11r-a-b, M1-5b-d and M1-3j-d; #380 (M1-10b-d) may land in parallel and, once its card is merged to this file, adds one more, so recount from the headings then; previously 255 (M1a 87, M1b 168; M1-33d-c (M1b) added from IR-M1-33d-b-1 on 2026-10-22; 25 cards added from D-118 on 2026-10-22: M1-11r-c, M1-11s-a, M1-11s-b, M1-11r-a, M1-11r-b, M1-35c-b, M1-35b-b, M1-35b-c, M1-35b-d, M1-11b-1 to M1-11b-5, M1-11c-a1 to M1-11c-a6, M1-11c-a1b, M1-11c-a4b, M1-11c-a5b, M1-11c-b and M1-11c-c, with M1-11b and M1-11c kept as split parents and not counted again; previously 229 (M1a 87, M1b 142; the §1 format example and M1-4d-e are not counted), recounted from the card headings and their Phase lines on 2026-10-22; M1-4d-e is phase "later (not M1)" and not counted; M1-3j-c (M1b) added from M1-3j-b on 2026-10-21; M1-5g and M1-9zf (M1b) added from the 2026-10-21 independent reviews; M1-35a, M1-35b, M1-35c and M1-19-c (M1b) added from D-116 on 2026-10-21; M1-10b-c, M1-4d-g, M1-1g-j, M1-7g-f and M1-19-b (M1b) added from the 2026-10-21 independent reviews; M1-34-b (M1b) added from D-114 on 2026-10-21; M1-7g-d (M1b) split from M1-7g-c on 2026-10-21; M1-33d (M1b) split from M1-33a on 2026-10-20; M1-33a, M1-33b and M1-33c (M1b) added from D-109 on 2026-10-20; M1-1g-e (M1b) added from IR-M1-6c-1 on 2026-10-18; M1-7h-d, M1-6b-b, M1-27b-b, M1-1j-b and M1-11a-b (M1b) added from the 2026-10-18 follow-ups; M1-1i-b (M1b) split from M1-1i on 2026-10-17; M1-9c-c (M1a) added from IR-M1-9c-1 F07 on 2026-10-16; counting the M1-* cards, not DESIGN-D1 and D2; M1-9s (M1b) added from IR-M1-9r-1 L2 on 2026-10-15; M1-21-b, M1-7k-b, M1-9c-b and M1-8h-b (M1b) added on 2026-10-15; M1-7e-3 added on 2026-10-15; M1-1-sc added from IR-M1-7e-2-1 F05 on 2026-10-15; recounted from the cards on 2026-10-15 after the M1-9 decomposition (D-73): M1-7k, M1-9j to M1-9r and M1-1h-d added; M1-7j moves to M1b and M1-9n is M1b; earlier note, recounted on 2026-10-14: M1-8g added from IR-M1-7d-1 F-2; M1-7b-b and M1-5f added from D-71 on 2026-10-15; M1-7e-2 added from D-72 (IR-M1-7e-1 F01) on 2026-10-15; incl. 12 split-off (M1-7c-b split from M1-7c), 7 new cards from D-31…D-41, 4 from D-48, 2 from D-53, 1 from D-54, 1 from IR-D56-1, 1 from D-55 and M1-3h from the M1-3e review, M1-3i as a follow-up to M1-3d, M1-3j from D-63, M1-3k and M1-3m from the AUDIT-FABLE-OCCv2-1 pre-audit, M1-1l and M1-3l from D-66, M1-3n as a follow-up to M1-3e, M1-5b-b, M1-5b-c, M1-8a-d and M1-8b-b as follow-ups to the M1-5b, M1-8a-b and M1-8b reviews, M1-5d and M1-5e as follow-ups to the M1-5c review, and M1-2f for `contact.check` (G-28))))))) |
-| M2 Console, desktop apps, self-host, design | 49 (recounted from the headings on 2026-10-23; previously stated 48 and, before that, 44; incl. M2-19-b from AUDIT-FABLE-M2-19-2; incl. M2-19 from IR-M1-5d-1; M2-17a, M2-17b and M2-17c from D-109; 10 new cards from D-34…D-36, D-41 and 5 from D-49) |
-| M3 Mainnet beta | 24 (recounted from the headings on 2026-10-22; previously stated 23; incl. M3-4b-t pulled forward by D-123 on 2026-10-22; M3-2d from D-71 (1); 2 new cards from D-45…D-47 and 1 from D-50) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -314,7 +315,7 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
   - A quadratic mutant of the scanner turns the L3 test red.
 
 #### M0-8c · Logger hardening, round 2 follow-ups (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8b
 - **Spec:** 04 §1 I-7, §8 rule 4; review IR-M0-8b-1, round 2 (findings R2-L2 and R2-L4, both Low)
@@ -787,12 +788,49 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** On GitHub Free 30 to 60 runs queue behind 5 runners, mostly the macOS and Windows matrix legs, which ran on every PR push and again in the merge queue. They now run on `merge_group` and `push` to `main` only; docs-only changes skip the heavy jobs. `ci-gate` counts skipped as success, so the four required checks are unchanged.
 - **Acceptance:** nothing that runs in `merge_group` is weakened; no deploy workflow touched; no auto-merge.
 
+#### CHORE-CI-DOCS-FASTLANE · Docs-only fast lane in the merge queue (new, 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 by path (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/review-gate.yml`, `tools/ci/select-affected.mjs` and tests, `docs/process/ci-cd.md`, `docs/process/audit-rules.md` §2.2
+- **Depends on:** CHORE-CI-SPEED-3
+- **Scope:** Owner decisions (Tali, 2026-10-25): (D1) a merge group whose diff holds only docs runs `checks` through the affected-package selector instead of the full suite; any code PR in the group, an unreadable diff or a push to `main` runs the full suite. (Item B) a docs-only push to a feature branch is diffed against its merge base with `main`, so the heavy jobs skip; an unknown base runs everything. (D2) `review-gate` derives `docs-site/**` as S1 (the mirror that M0-25 and the docs-site check card left open), exempting only the generated page `docs-site/technical/project/status-and-roadmap.md`. (D3) spec review classes are unchanged.
+- **Acceptance:** no gate weakened (gitleaks, dependency review, CodeQL, zizmor, pr-hygiene, review-gate, context-budget, changesets, docs-status drift all keep running); no ruleset change, no `paths-ignore`, `ci-gate` unchanged; tests first in `tools/ci/select-affected.test.mjs` and `tools/ci/review-gate.test.mjs`.
+
+#### CHORE-BACKLOG-COUNTS-QUEUE · Card counts no longer conflict between PRs (new, 2026-10-25)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`docs/process`)
+- **Repo/path:** agentlink · `tools/docs-status`, `docs/process/backlog.md`, `docs/process/ci-cd.md`, `docs/process/repo-reference.md`
+- **Scope:** The generated card counts in `backlog.md` went stale whenever another PR merged first (DIRTY PRs, merge-queue ejections). The counts are no longer committed; `node tools/docs-status/index.mjs --counts` prints them on demand. `--check` still enforces the README, docs-site and knowledge status blocks from `docs/status.yaml`, and fails if a counts block is committed again.
+- **Acceptance:** adding a card does not fail `--check`; a committed generated counts block fails it; tests first in `tools/docs-status/status.test.mjs`.
+
 #### CHORE-CI-FOLLOWUPS · Main CI never cancelled while pending; openssl hook timeouts in packages/node (new, 2026-10-21)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
 - **Repo/path:** agentlink · `.github/workflows/ci.yml`, `.github/workflows/security.yml`, `packages/node/src/safe-fetch.test.ts`, `packages/node/src/rpc-fetch.test.ts` (or `packages/node/vitest.config.ts`)
 - **Depends on:** CHORE-CI-SUPERSEDED, CHORE-WIN-RELAY-IO
 - **Scope:** (1) GitHub keeps one pending run per concurrency group, so a newer push to `main` cancels an older commit's queued CI run (`cancel-in-progress: false` protects only runs in progress); CHORE-CI-SUPERSEDED handles the effect. Give push runs on `main` a per-commit group (for example including `github.sha`) in `ci.yml` and `security.yml` so no main commit loses its CI; weigh the runner load. (2) `safe-fetch.test.ts` and `rpc-fetch.test.ts` spawn `openssl` in `beforeAll` like `relay-io.test.ts`, under Vitest's 10 s default hook timeout, which the Windows `node-os` runner exceeded once for relay-io. Give them the same measured 60 s hook timeout, or set a package-wide `hookTimeout` in `packages/node/vitest.config.ts` (and name `hookTimeout` in the M0-10e policy, `repo-reference.md`).
 - **Acceptance:** a test on the workflow text shows main push runs use a per-commit group while branch and PR runs still cancel; the hook timeouts land with their measurement; no gate or test weakened; actionlint clean.
+
+#### CHORE-CI-PLAYWRIGHT-2 · "Install Playwright browsers" apt timeouts fail ci-gate (new, 2026-10-22)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/ci.yml`
+- **Depends on:** CHORE-CI-MATRIX-QUEUE-ONLY; start after #438 has merged (same file)
+- **Scope:** The "Install Playwright browsers" step (apt dependencies) timed out and failed `ci-gate` on five PRs between 17:24Z and 17:49Z on 2026-10-22. Cache the browsers and the apt dependencies, and retry the install once, so a slow mirror no longer fails a PR. Medium priority.
+- **Acceptance:** a measured before and after of the step time is recorded in the PR; a cold cache still passes; no gate or test weakened; actionlint clean.
+
+#### CHORE-DEFLAKE-2-b · terms-flow test comment mentions jitter that does not exist (new, IR-CHORE-DEFLAKE-2-1, #446)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 by path (`packages/core`; comment-only, the owner may lower it)
+- **Repo/path:** agentlink · `packages/core/src/terms-flow.test.ts`
+- **Depends on:** CHORE-DEFLAKE-2 (done, #446)
+- **Scope:** The "+40 s" comment in `terms-flow.test.ts` refers to jitter (M1-5b-c) that is not in `src`. Correct the comment to what the code does; no behaviour change.
+- **Acceptance:** the comment matches the code; the test is unchanged otherwise.
+
+#### CHORE-DEPLOY-RECONCILE · Deploys cannot be lost when main moves or a head's CI flakes (new, IR-CHORE-DEPLOY-CATCHUP-1, #447)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/deploy-submitter.yml`, `.github/workflows/deploy-drop.yml`, `tools/release/**`, `tools/release/check-changesets.test.mjs`
+- **Depends on:** CHORE-CI-SUPERSEDED; the catch-up itself (CHORE-DEPLOY-CATCHUP) is addressed by #447 (open) and is not carded again
+- **Scope:** What #447 leaves open:
+  - A scheduled reconcile that deploys the newest green head when a head's CI flaked and the later merges did not touch the deploy paths, so production never updated.
+  - `deploy-production` ends green without deploying when main moved during the run (run 39905205426); with a busy queue production may never update. Make the skip visible (not green) and make the catch-up deploy the newest green head.
+  - `check-changesets.test.mjs` fails 3 of 15 locally on main (environmental): find the cause and make it pass.
+- **Acceptance:** RED tests first; a flaked head followed by non-deploy-path merges still deploys within the schedule interval; a skipped production deploy is visible in the run result; nothing deploys without its own green CI, smoke, the production environment, `DEPLOY_FREEZE` and the head check; actionlint clean; no gate or test weakened.
 
 #### CHORE-DEPLOY-PATH-TRIGGERS · Deploy workflows start when a script they run changes (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge")
@@ -822,7 +860,7 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - `node tools/docs-status/index.mjs --check` passes; nothing claims the gasless route is on.
 
 #### DOCS-G21-b · "median" vs "every tester": align the M2 gate and 02 with D-124 (new, IR-M1-GATE-a-2, #461)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Status:** done (4thtech/agentlink#470, merged 2026-10-23; D-124, D-125) · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
 - **Repo/path:** agentlink · `docs/process/backlog.md` (M2-GATE acceptance), `docs/foundation/02-product-spec.md` (line 240)
 - **Depends on:** M1-GATE-a (#461)
 - **Spec:** 02 (success metrics); G-21
@@ -830,6 +868,65 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
   - M2-GATE acceptance says "(median)" but its scope says "every tester"; 02 says "Median < 5 minutes". Align both with D-124 or state the M2 rule explicitly. The owner decides which.
 - **Acceptance:**
   - One rule, worded the same in the M2-GATE card, 02 and the gate runbook; the owner confirmed it.
+
+#### DOCS-06-TOPUP · 06 §2.4: paid tools return `topUpUrl` and `agentAddress`, not `url` (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (spec wording; proposed, owner confirms at merge)
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-server.md` (§2.4)
+- **Depends on:** none (implemented by PR #482)
+- **Spec:** 06 §2.4
+- **Scope:**
+  - §2.4 says paid tools return `url`. Reword so every paid tool's `needs_credits` result carries `topUpUrl` and `agentAddress` (check each paid tool's result shape in the code first).
+- **Acceptance:**
+  - 06 §2.4 names `topUpUrl` and `agentAddress` for all paid tools and no longer says `url`; `node tools/docs-status/index.mjs --check` passes.
+
+#### CONTRACTS-PARITY-b · contract parity: live-RPC retry and the eip712 suites (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (contracts parity check)
+- **Repo/path:** occ-v2-contracts (private) · the vector parity check
+- **Depends on:** none
+- **Spec:** 04 §3; shared vectors
+- **Invariants:** I-1
+- **Scope:**
+  - Retry the live-RPC reads in the parity check with a bounded backoff so one flaky call does not fail the run.
+  - Include the eip712 suites in vector parity.
+- **Acceptance:**
+  - A test shows a transient RPC failure is retried and a persistent one still fails; the eip712 suites run in parity and a deliberately changed vector fails it.
+
+#### DOCS-RUNBOOKS-1023-b · ci-cd.md and RB-11 match the merge queue and CI changes (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`docs/process/**`; docs only)
+- **Repo/path:** agentlink · `docs/process/ci-cd.md`, `docs/runbooks/` (RB-11)
+- **Depends on:** the CI PRs #477, #478 and #480 merged
+- **Scope:**
+  - Update `ci-cd.md`: merge queue build concurrency 5, merge 5, HEADGREEN; the auto-retry (#477); the heavy-job map (#478); the Playwright budget (#480); D-126.
+  - Reword RB-11 to match.
+- **Acceptance:**
+  - Each value matches the workflow files and the merged PRs (checked by grep); `node tools/docs-status/index.mjs --check` passes.
+
+#### DOCS-RUNBOOKS-1023-c · submitter-deploy.md step 30 names a check step 14 does not make (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (docs only)
+- **Repo/path:** agentlink · `docs/runbooks/submitter-deploy.md`
+- **Depends on:** #479 merged
+- **Scope:**
+  - Step 30 says step 14's name check lists `SUBMITTER_DEPOSIT_GAS_KEY_84532`; step 14 does not. Reword step 30 so it is true.
+- **Acceptance:**
+  - Step 30 and step 14 agree; no other step changes.
+
+#### PROC-MECH-MERGE-IR-b · audit-rules §4.6 wording: the orchestrator records the `IR-` line (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (wording only; if the file is classed S1 by path, S1)
+- **Repo/path:** agentlink · `docs/process/audit-rules.md` (§4.6)
+- **Depends on:** #475 merged
+- **Scope:**
+  - Reword to "*Orchestrator wording:* it records `IR-…`".
+- **Acceptance:**
+  - §4.6 carries that wording and nothing else changes.
+
+#### CHORE-BACKLOG-COUNTS-b · generated card counts go stale when two card-adding PRs queue together (new, superseded by #535)
+- **Status:** done (superseded by #535: counts are no longer committed, option c) · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `tools/docs-status/`, the merge-queue workflow, `docs/process/backlog.md`
+- **Depends on:** #476
+- **Scope:**
+  - Two PRs that add cards and queue together each pass the count check alone; the second goes stale in the merge group. The owner picks one: (a) skip the count check in `merge_group`; (b) a bot regenerates the counts after merge; (c) move the counts to a generated page so the backlog holds none.
+- **Acceptance:**
+  - The chosen option is implemented; two card-adding PRs queued together both merge without a manual recount, and the check still fails when counts are wrong on a pull request.
 
 #### CHORE-SUBMITTER-WRANGLER-DEV · Local `wrangler dev` for the submitter fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the submitter)
@@ -840,14 +937,14 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - Review note (IR #338 L1/L2/L3, 2026-10-21): done in the same PR: the submitter port reads "absent" only for revert data that is exactly the `RecordNotFound()` selector; the misplaced `revertName` doc comment moved back; the verifier maps a `RecordNotFound()` revert to `record_not_found` (any other revert stays `chain_unavailable`).
 
 #### CHORE-VECTORS-TIMEOUT-RANGE · test-vectors: assert a suite's `timeoutMs` is within (0, 120000] (new, IR-CHORE-VECTORS-KDF-TIMEOUT-1)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
 - **Repo/path:** agentlink · packages/test-vectors (suite schema test)
 - **Depends on:** CHORE-VECTORS-KDF-TIMEOUT
 - **Scope:** Vitest treats a timeout of 0 or less, or `Infinity`, as no timeout. Add a check that every suite's `timeoutMs` is a finite number greater than 0 and at most 120000. Source: IR-CHORE-VECTORS-KDF-TIMEOUT-1.
 - **Acceptance:** the check fails for 0, a negative number, `Infinity`, `NaN` and 120001, and passes for the shipped suites; no vector changes.
 
 #### DOCS-04-28-WORDING · 04 §2.8: "64 KiB KeyStore item limit" means the total across all items (new, IR-M1-9i-b2-2)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
+- **Status:** in review · **Size:** XS · **Tier:** Opus (spec, S1) · **Security:** S1
 - **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md §2.8
 - **Depends on:** —
 - **Scope:** in 04 §2.8, state that the "64 KiB KeyStore item limit" is the total across all items, not a per-item limit. Source: IR-M1-9i-b2-2.
@@ -860,8 +957,15 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** `TITLE_RE` accepts `M1-9z`-style IDs with one trailing letter, so a title starting `M1-9ze` is refused. Allow up to two trailing letters (`[a-z]{0,2}`) in `M[0-9]+-<n>` IDs. Owner decision; this changes a required check, so it merges only on Tali's "merge".
 - **Acceptance:** titles `M1-9ze ...` and `M1-1g-j ...` pass; `M1-9zzz`, a missing ID and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
 
+#### CHORE-PR-HYGIENE-UX-IDS · pr-hygiene `TITLE_RE` refuses task IDs like `M1-UX-*` (new, 26 Oct reviews)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`
+- **Depends on:** CHORE-PR-HYGIENE-ID-REGEX (same line; do together)
+- **Scope:** `TITLE_RE` accepts `M<n>-<digits><letter>` and `M<n>-GATE` only, so titles such as `M1-UX-FIRSTRUN-V2 ...` are refused. Allow named IDs of the form `M<n>-<UPPERCASE words, digits and hyphens>`. This changes a required check, so it merges only on Tali's "merge".
+- **Acceptance:** titles `M1-UX-FIRSTRUN-V2 ...` and `M1-UX-OPEN-APP ...` pass; a missing ID, `M1-ux-x` and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`
 - **Depends on:** —
 - **Scope:** The same entry-export problem as CHORE-SUBMITTER-WRANGLER-DEV (#342): `apps/drop/src/index.ts` exports `DEFAULTS`, `readConfig`, `ipBucket`, `METRICS`, `packageName` and types next to the Worker handler and the `DropState` Durable Object, and local `wrangler dev` breaks on non-handler exports. Keep only the handler and the Durable Object class on the entry module; move the shared constants and helpers behind a separate module that tests and other code import directly.
@@ -1046,6 +1150,72 @@ Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved it
 - **Acceptance:**
   - Docs updated via the GitBook change-request flow.
 
+#### M0-8c-d · logger: a quote inside a secret's bracket value must not close it early (new, IR-2 on #509)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · packages/log
+- **Depends on:** M0-8c
+- **Scope:**
+  - A value such as `secret=[ab'c]KEY']` (or a Go `%v` form with a quote inside brackets) closes at the first `]`, so part of the secret is left visible where `main` redacted to the end of the line. No known serializer emits this shape.
+  - Inside a secret's bracket value, never let `]` close it before a `'` is balanced.
+- **Acceptance:**
+  - Tests first: the shapes above are fully redacted; existing logger tests unchanged; no test weakened.
+
+#### CHORE-PR-TITLE-REGEX · pr-hygiene: allow multi-letter task-ID suffixes in PR titles (new, from PR title failures, 2026-10-25)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path: CI workflow)
+- **Repo/path:** agentlink · the pr-hygiene title check
+- **Depends on:** —
+- **Scope:**
+  - The title regex needs a word boundary after the milestone number and optional single letter, so IDs such as `M1-9zc-b` fail. Allow multi-letter and chained suffixes in the same format the backlog accepts.
+- **Acceptance:**
+  - Tests first: `M1-9zc-b`, `M1-9i-c-c` and `M3-4b-t-T4-a-c` pass; a title without a task ID still fails.
+
+#### CHORE-CI-DOCS-FASTLANE-b · docs fast lane: stop trimming file names (new, low, follow-up to CHORE-CI-DOCS-FASTLANE)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path: CI workflow)
+- **Repo/path:** agentlink · the CI workflow and its filter
+- **Depends on:** CHORE-CI-DOCS-FASTLANE
+- **Scope:**
+  - The fast-lane filter trims entries, so a root file named `foo.md ` (trailing space) counts as a doc. Stop trimming.
+  - Comment why `filter: ""` is used on non-push checkouts.
+- **Acceptance:**
+  - Tests first: a changed file with a trailing space in its name is not treated as docs-only.
+
+#### DOCS-04-28-WORDING-c · 04: align the KeyStore limit wording in the remaining places (new, low, follow-ups -b and -c of DOCS-04-28-WORDING)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (spec text)
+- **Repo/path:** agentlink · docs/foundation/04-security-and-crypto.md
+- **Depends on:** DOCS-04-28-WORDING
+- **Scope:**
+  - The `storage.set` table row (around line 407) still says "item limit"; the recovery-kit per-value cap phrase ("as ALKS", around line 168) reads ambiguously. Align both with the §2.8 total-limit wording. Marked proposed, owner confirms at merge.
+- **Acceptance:**
+  - No remaining "item limit" for the 64 KiB KeyStore limit; the per-value cap reads unambiguously; no meaning change.
+
+#### CHORE-VECTORS-TIMEOUT-RANGE-b · test-vectors: run the timeout check in the runner too (new, low, IR on CHORE-VECTORS-TIMEOUT-RANGE)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (test vectors)
+- **Repo/path:** agentlink · packages/test-vectors (runner)
+- **Depends on:** CHORE-VECTORS-TIMEOUT-RANGE
+- **Scope:**
+  - Call `timeoutMsProblem` in the vector runner as well as in the schema test, so a bad `timeoutMs` fails at run time.
+- **Acceptance:**
+  - Tests first: the runner rejects 0, a negative number, `Infinity`, `NaN` and 120001; shipped suites unchanged.
+
+#### CHORE-DROP-ENTRY-EXPORTS-b · drop: evidence that local `wrangler dev` starts (new, low, IR on CHORE-DROP-ENTRY-EXPORTS)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (apps/drop)
+- **Repo/path:** agentlink · apps/drop
+- **Depends on:** CHORE-DROP-ENTRY-EXPORTS
+- **Scope:**
+  - Add evidence (a smoke step or a recorded run) that `wrangler dev` starts from `apps/drop` after the entry-export change. The staging deploy smoke already covers the deployed Worker.
+- **Acceptance:**
+  - A recorded run or CI step shows local start; no test weakened.
+
+#### DOCS-CONCEPTS-SIMPLE · docs: "How AgentLink works, simply" and glossary entries (new, owner request 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process or public docs)
+- **Repo/path:** agentlink · docs/ (concepts page), glossary, Curator wiki (projects domain)
+- **Depends on:** —
+- **Scope:**
+  - A plain page, no jargon, covering: the agent card (an ID card the owner signs), the owner code (made once; save it, it cannot be recovered), the owner fingerprint, the safety code, why encryption keeps content private while the card proves who is who, and the Send and Inbox folders (Inbox is created on the first received file; Send for new agents).
+  - Add matching glossary entries. Mirror the page to the Curator wiki (projects domain). Words follow 11 §5.
+- **Acceptance:**
+  - Page and glossary entries merged; docs-lint green; the Curator mirror recorded in the PR.
+
 ---
 
 ## 3. M1 — Local beta on testnets
@@ -1154,13 +1324,13 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Narrow gitleaks allowlist (fingerprints, owner-reviewed) for deliberate test keys; no directory-wide allowlist.
 
 #### M1-1h-b · Raw-text vectors for signed JSON objects (new, split from M1-1h, IR-M1-1h-1 F3)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
+- **Status:** backlog (spec decided: D-128, 04 §2.5.1; implementation and vectors open) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
 - **Repo/path:** agentlink · test-vectors/, tools/vectors/
-- **Depends on:** M1-1h; a spec decision in 04 §2.5.1 (below)
+- **Depends on:** M1-1h; 04 §2.5.1 "Received text" (D-128, decided)
 - **Spec:** 04 §2.5.1, §2.4.1; RFC 7493; RFC 8785 §3.1
 - **Invariants:** I-4, I-8
 - **Scope:**
-  - 04 §2.4.1 (#22) already refuses non-canonical integer tokens (`1.0`, `1e3`, `-0`) on the token text; M1-1h vectors that rule (`encodings` `parseInteger`, `eip712` `agentCardJson`). Still open: decide in 04 §2.5.1 that a `SignedOwnerAction` and an envelope are verified from their received JSON text, with duplicate keys and escaped key spellings refused there.
+  - 04 §2.4.1 (#22) already refuses non-canonical integer tokens (`1.0`, `1e3`, `-0`) on the token text; M1-1h vectors that rule (`encodings` `parseInteger`, `eip712` `agentCardJson`). Decided (D-128): 04 §2.5.1 "Received text" verifies every owner-signed object (`SignedOwnerAction`, its carrier envelope, the card JSON form) from the received text, refusing duplicate member names and escaped member-name spellings (`malformed`) before the signature check. Implement it in the parsers.
   - Then add `verifyText` vectors (input: the raw text) for `owner-action` and the envelope, with one rejection per form.
 - **Acceptance:**
   - The spec line lands first. Vectors come from the M1-1h generators, and the suites stay pending until their modules land.
@@ -2115,7 +2285,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first: a zero-signer struct is not absent; `replacementAllowed` refuses on it (record and receipt); `readInclusion`, `notarize` and `acknowledge` fail with a ChainError and send nothing; `RecordNotFound` still means absent.
 
 #### M1-4c-e · chain: verify.ts treats a zero signer as not found, aligned with `bad_answer` (new, IR-M1-4c-d-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
+- **Status:** in review (M1-4d-g PR) · **Size:** S · **Tier:** Sonnet · **Security:** S1 (the chain client) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`verify.ts`)
 - **Depends on:** M1-4c-d
 - **Scope:** `verify.ts` treats a zero-signer record as not found. The verdict is failed and therefore safe, but a zero signer is a malformed answer: align it with `bad_answer`, as the chain-state `getRecord` does after M1-4c-d. Source: IR-M1-4c-d-1.
@@ -2143,7 +2313,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** tests first (RED commit): an update without the signatures from an older peer is still accepted and a forged one is dropped; a signer for an earlier epoch signs only for retained epochs, never a future one; a lost compare-and-set is reported, not ignored.
 
 #### M1-4d-g · chain: verifier reads `RecordNotFound` only as the bare selector (new, IR-CHORE-CHAIN-SUBMITTER-1)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/chain (`src/verify`, `src/clients/errors.ts`)
 - **Depends on:** M1-4d
 - **Spec:** 05 (record lookup); 07 §8
@@ -2244,7 +2414,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Independent S2 review.
 
 #### M1-34-c · submitter: a lagging client RPC that reports `RecordNotFound` retries the receipt once (new, IR-M1-34-b-2)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/submitter, packages/core (receipt path)
 - **Depends on:** M1-34-b
 - **Scope:** when a client RPC lags and reports `RecordNotFound` for a record that exists, the receipt must not fail for good. Retry once after a fixed delay before the receipt becomes `receipt_failed`. Source: IR-M1-34-b-2.
@@ -2355,7 +2525,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - If a mitigation is built: a fake relay that caps results and holds more than the cap of events in one second; every wrap addressed to the agent is delivered at least once across the relays of its list, or the pass reports the second as incomplete (a fixed reason, no relay text). Existing M1-5c tests stay green; no test is weakened.
 
 #### M1-5e · transport-nostr: sync follow-ups (NIP-42 identities, first-sync retention, page position, envelope hint) (new, IR-M1-5c-1 L-4, L-5, Low; IR-M1-7b-1 Q1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · packages/transport-nostr (and the core/node `SyncPersistence` if the hint changes)
 - **Depends on:** M1-5c, M1-7b
 - **Spec:** 07 §3.2 (`seen` retention, `envelope` rows hold the `envelopeHash`), §4.2 (Sync, NIP-42), §4.3 (9-day first sync); 04 §3.1.1 step 9, §3.5
@@ -2457,6 +2627,29 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L5: handle uploads orphaned when the create or complete response is lost (abort or reclaim).
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
+
+#### M1-6b-c · storage: lifecycle read-back compares rule content, not only IDs (new, IR-M1-6b-b-1, #440)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/storage/src/lifecycle.ts`
+- **Depends on:** M1-6b-b
+- **Spec:** 07 §5.2
+- **Invariants:** I-2, I-3
+- **Scope:**
+  - The lifecycle read-back (around `lifecycle.ts` line 190) matches rules by ID only. If another writer changes a rule's content in the race window, our write overwrites it silently.
+  - Compare content (not only the ID) and detect or retry on a difference, as M1-6b-b L3 intends.
+- **Acceptance:**
+  - A test where a rule with the same ID but different content appears between read and write is detected, not overwritten; rules this code did not write stay untouched.
+
+#### M1-6b-d · storage: warn when a provider drops the abort-incomplete-multipart lifecycle element on read-back (new, follow-up of M1-6b-c, #457)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/storage (lifecycle read-back)
+- **Depends on:** M1-6b-c (#457); implemented by PR #485
+- **Spec:** 07 §5.2, §5.4
+- **Invariants:** I-3
+- **Scope:**
+  - Some providers accept the abort-incomplete-multipart element on write and omit it on read-back. Warn (never fail) when it is missing on read-back, without logging any URL or credential.
+- **Acceptance:**
+  - A test: a read-back without the element yields the warning and the rule still counts as applied; a read-back with it yields none.
 
 #### M1-6c · storage: drop adapter and storage selection (new, D-48)
 - **Status:** done (4thtech/agentlink#268, merged 2026-10-18) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -2770,7 +2963,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Decided in IR-M1-7f-1:** `fetchFile` under a fail-closed policy stays `rejected POLICY_DENIED`; a duplicate upload after a crash between upload and the store transaction is the residual 07 §3.3 already names (the orphan expires).
 
 #### M1-7f-3 · core: files refresh-link, MinIO round trip and the rest of M1-7f-2 (split from M1-7f-2)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (refresh-link request and answer, the refreshed link in the receiver row, the 5 MB MinIO round trip in CI's `storage-minio` job; the receiver's receipt trigger, the legacy-key backfill, the expiry cursor, sent copies, D-53 re-hash, `SentFile` name and hash and the drop expiry test against the Worker stay open on this card) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (files, client), packages/types if the `refresh-link` answer needs a body schema
 - **Depends on:** M1-7f-2
 - **Spec:** 04 §4 (delivery, retention and crypto-shredding); 07 §3, §5.4; 06 §2.3; D-18, D-48, D-53, D-98
@@ -2854,7 +3047,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first: an unlisted code is not logged; `confirm` produces a signed `ACCEPTED` receipt; one contact cannot take more than its share of the waiting pool; if the stored flag is added, a mismatch sets it and no MCP tool clears it (I-4).
 
 #### M1-7g-e · core: stored per-contact proof flag (new, split from M1-7g-d; owner decides)
-- **Status:** backlog (owner decides whether to build it) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** won't do (M1; D-127: the refused row already flags the contact and no tool can clear it, 04 §3.4, I-4; reopen only if the console needs a fast lookup) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (proofs, inbox), packages/node (store schema)
 - **Depends on:** M1-7g-c
 - **Spec:** 04 §3.4; 07 §3.2
@@ -3259,7 +3452,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Define `InboundMessage` and `OutboundMessage` in 06 §2.2 (moved here from M1-9c, IR-D48-1 F15f): the fields, which of them are untrusted and wrapped (§4), and that no tool result, summary or error contains a drop, presigned or share URL, a file key or a signed token from inbound content.
   - 03 §4.5 and 06 §2.5: the M1a local approval channel (D-73 (3)): no URL; `nextStep` is `agentlink approve <id>`, run in the owner's own terminal; the owner's CLI process applies the signed object through core on the shared store.
-  - Resolve G-15 as decided (D-73 (1)): handlers in `apps/cli/src/tools/`, runtime-agnostic, extracted to a package at M2-3b. Record the single-active-publisher rule (06 §6).
+  - Resolve G-15 as decided (D-73 (1)): handlers in `apps/cli/src/tools/`, runtime-agnostic, extracted to `packages/mcp-tools` at M2-3t. Record the single-active-publisher rule (06 §6).
 - **Acceptance:** spec-lint and the vocabulary lint pass; the gap register is updated; no change to 04.
 
 #### M1-9k · CLI runtime: open an agent, local approval channel, dispatcher (new, D-73)
@@ -3423,7 +3616,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** `credentialDigest` vectors in the `recovery-kit` suite (salt, Unicode and JCS escaping cases); no raw seed crosses the control interfaces (type test); the controls are reachable from no MCP tool handler (import fence); tests first (`RED (expected):` commit).
 
 #### M1-9i-c · node: KeyStore export, import and storage credential items (new, split from M1-9i)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review (PR "M1-9i-c node: KeyStore export, import and restore") · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node/src/\*\*
 - **Depends on:** M1-9i-b (kit format), M1-9i-b2 (the three controls)
 - **Spec:** 04 §2.2 (`s3:<id>`), §2.3.3 (restore order and refusals), §2.8 (`owner-next`, write protocol); 07 §9.1
@@ -3648,7 +3841,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Adding a fixture tool `set_policy` or an argument `privateKey` fails the check when run locally (local demonstration, output in PR; not pushed); so do a fixture tool without the `agentlink_` prefix and a fixture write tool marked `readOnlyHint: true` (local demonstrations); the SDK client conformance test passes for every tool.
 
 #### M1-9f · Claude Desktop one-click extension bundle
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in-review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli/desktop-extension
 - **Depends on:** M1-9c, M1-16; build, signing and distribution decided (D-91, `release-and-deployment.md` §2)
 - **Spec:** 02 F-01; 06 §7
@@ -3840,7 +4033,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Endpoints per 07 §5.4: `POST /v1/upload` (signature, nonce and time-window check; size cap; weekly quota per drop key; rate limits per drop key and per IP, IPv6 per /64; global cap), a single-use signed PUT target that accepts exactly the declared size and never overwrites a stored object, the signed commit (bytes verified against `ciphertextSha256`, mismatch deletes), a signed GET valid until `expiresAt`, `DELETE` signed by the uploading drop key only, `POST /v1/report` (deletes only that object; no automatic key block), `GET /v1/health` (liveness only).
   - Signature format fixed (proposed: a NIP-98-style event in the `Authorization` header, signed with the agent's drop key, 04 §2.1, 07 §5.4), domain-separated from envelopes, records and receipts, with test vectors in Node, browser and Workers. URL MACs, SHA-256 and random IDs come from `@4thtech-io/crypto` helpers, with vectors for the URL MAC.
   - Random 128-bit object IDs chosen by the Worker; no file names or metadata on objects; quota and nonce counters in Durable Objects; no accounts.
-  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (proposed 10).
+  - Hard 7-day expiry: GET refused after `expiresAt`, R2 lifecycle rule (M1-28) as the backstop; per-object download limit (16, owner-confirmed 23 Oct 2026).
   - Serving only as `application/octet-stream` with `Content-Disposition: attachment`, `nosniff`, a sandboxing CSP and CORS for GET.
   - Logging (I-7, 04 §4): aggregate counters only; no request URLs, signed URLs, object IDs, drop keys or upload signatures in any log, metric label or analytics, with or without IPs; request bodies never logged. Production config keeps Workers observability and request logging, Tail Workers and Logpush off for the drop Worker.
   - (IR-D48-1 F10) Close the abuse-control residuals in the spec (04 §4, 07 §5.4, §5.6) before implementing: shared-egress collateral (per-IP and per-/64 limits can block innocent users behind an office or carrier NAT; a per-drop-key allowance keeps them working); the behaviour when the global cap is exhausted (fail closed with a typed, retryable `rate_limited` or `unavailable`, never silent drops); and the per-object download limit (proposed 10) against the recipient set (a file sent to more recipients than the limit must still be fetchable by each of them).
@@ -3898,16 +4091,29 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The docs list exactly the codes the workflow treats as the long window; a case shows an unrelated error does not match the rollback refusal.
 
+#### M1-27b-e · drop: staging round trip, `cpu_ms` and stale ci-cd row (new, follow-up to M1-27b-b; #444)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/ci.yml` (actionlint), `.github/workflows/deploy-drop.yml`, `docs/process/ci-cd.md`
+- **Depends on:** M1-27b-b (workflow edits start after #436 and #438 land)
+- **Spec:** `release-and-deployment.md` §4.5, §8
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Make `actionlint` a required check once #436 and #438 have landed.
+  - Run a 100 MB round trip against the staging drop to confirm `cpu_ms: 5000` is enough (medium priority; do this before M1-27b-b is closed).
+  - Fix the stale deploy-drop row in `ci-cd.md` after #444.
+- **Acceptance:**
+  - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
+
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
 - **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **DECISION NEEDED (owner):** terms of service and takedown process.
-  - Confirm the proposed limits: 100 MB per file, 1 GB per drop key per week, 10 downloads per object.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off. **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; downloads per object: 16 (owner-confirmed 23 Oct 2026).
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**
   - Buckets and lifecycle rule exist and are read back (with M1-27b); confirmed limits recorded in 07 §5.4 and 12 §2.
@@ -3999,7 +4205,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests-first: the version bump, rejection of a stale version, and byte-exact bodies against vectors where a vector exists; an unsigned body is never accepted by the core without an owner signature. Threat note and tests-first evidence (S2).
 
 #### M1-11r-c · core dropUsage and own-storage status (new, D-118)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (new module and `src/index.ts` export)
 - **Depends on:** M1-9i-a (shares own-storage), M1-11r-b (both write `packages/core/src/index.ts`)
 - **Spec:** 06 §8; 07; 08 §1; D-48, D-115, D-118
@@ -4171,7 +4377,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-11b-1 · local UI: first run and shared states (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `e2e/test/local-ui-first-run.test.ts`, its `changelog.d/` fragment and changeset
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/states/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/first-run.ts` and its test, `packages/node/src/local-ui-first-run-browser.test.ts`, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1, M1-11s-c
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
 - **Invariants:** I-4, I-5
@@ -4227,6 +4433,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 
+#### M1-11a-ux · approval page: styled, a plain summary, a proper owner code field (new, owner test 2026-10-25; M1-UX-APPROVAL-PAGE in the follow-ups)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts`, `packages/node/src/approval-server.ts` (the `/app.css` route and the card view), `apps/cli/src/approval/ui-source.ts`, `apps/cli/src/commands/owner/render.ts` and their tests
+- **Depends on:** M1-11a; interim until M1-11b-2 replaces the page with the `apps/local-ui` approvals
+- **Spec:** 08 §1, §4; 11 §5, §6.2.1, §8; 04 §2.5; D-116
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Style the approval page from the D1 approval card (`d1/screens/mobile/approval-card--pending--{light,dark}--360`) with the `packages/ui` tokens, served as `/app.css` under the unchanged CSP; light and dark; phone width.
+  - A plain headline instead of raw arguments: accept-invite reads "Connect with “name” (self-declared)" and the invite link never reaches the page; the AI's other arguments stay in their marked region, as text only.
+  - Owner code field: full width, no length limit, show and hide, `autocomplete="off"`, the paste hint. No change to presence, signing, tokens or the CSP.
+- **Acceptance:**
+  - Rendering tests: no invite link in the page or the API view, the headline shown, the field's attributes and toggle, the CSP byte for byte, colours equal to the tokens, no external request, no sideways scroll at 360 px; all M1-11a browser flows pass.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
@@ -4253,7 +4472,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - axe-core zero WCAG 2.1 AA violations; keyboard tests; XSS fixtures render inert in every component; no `style=` attribute in rendered output; owner confirms visual match.
 
 #### M1-35b-b · ui: components, brief B-2 (new, D-118)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet; Opus for any S2 component · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` and tests; appends exports to `src/index.ts` and `components.css`
 - **Depends on:** M1-35b, M1-35c-b; design brief B-2 (`docs/design/adjustments.md`)
 - **Spec:** 11 §8, §9, §11; 08 §4; D-116, D-118
@@ -4521,13 +4740,13 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split:** the deploy work moved to M1-19-b (the page itself shipped in #348); the Deploy (D-25) bullet above is carried out there.
 
 #### M1-19-b · Invite page: deploy pipeline and `nameHash` check (new, #348)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
 - **Repo/path:** agentlink · apps/invite, `.github/workflows/` (invite deploy)
 - **Depends on:** M1-19
 - **Spec:** 04 §3.6; 08 §4; D-28, D-53
 - **Invariants:** I-2, I-5
 - **Scope:**
-  - Wire the static invite page deploy to Cloudflare (D-28). No pattern exists yet in `.github/workflows/`; follow the submitter and drop pipelines (staging on merge, smoke test, production on green, health check and rollback, `DEPLOY_FREEZE`).
+  - Wire the static invite page deploy to Cloudflare (D-28). No pattern exists yet in `.github/workflows/`; follow the submitter and drop pipelines for the staging half only (staging on merge, smoke test, `DEPLOY_FREEZE` halts it). Owner decision 2026-10-24: **staging only**; the production deploy is M1-19-d.
   - The page recomputes `nameHash` from the name it shows and compares it with the payload's; a mismatch shows the invite as damaged and no prompt.
 - **Acceptance:** tests first: a payload whose `nameHash` does not match the shown name yields no prompt; a matching one still yields the template plus canonical link; the deploy workflow passes the workflow checks and the smoke test runs against staging.
 
@@ -4543,6 +4762,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - All M1-19 tests pass unchanged (fragment never sent, hostile-name DOM test, Trusted Types); axe-core zero WCAG 2.1 AA violations; no external URL; owner confirms fidelity.
   - **Deploy (D-25)** block as in M1-19.
+
+#### M1-19-d · Invite page: production deploy (new, split from M1-19-b, owner decision 2026-10-24)
+- **Status:** blocked (trademark check; production domain decision) · **Size:** S · **Tier:** Opus · **Security:** S2 (`.github/**`; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/deploy-invite.yml`, apps/invite/wrangler.toml
+- **Depends on:** M1-19-b; the trademark check and the production hostname (owner)
+- **Spec:** 04 §3.6; 08 §4; release-and-deployment.md §1.1, §4.6; D-25, D-52
+- **Invariants:** I-2, I-7
+- **Scope:** add the production half to the invite pipeline: a `production` environment, the `deploy-production` job (only after a green staging smoke and while the commit is main's head), the Cloudflare credentials (owner-only), the Custom Domain, the same site check over HTTP, the logging read-back, automatic rollback, the `freeze` job, `DEPLOY_FREEZE` gating, and `deploy-reconcile.yml` coverage. The pattern is `deploy-drop.yml`.
+- **Acceptance:** the hostname in the invite link matches the Custom Domain; a failed production deploy rolls back and sets `DEPLOY_FREEZE`; tests as for the drop pipeline.
 
 #### M1-33a · Delivery receipts off by default; sender request and recipient opt-in (new, D-109)
 - **Status:** done (4thtech/agentlink#325, merged 2026-10-21) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -4917,7 +5145,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** the test fails when a native import is moved ahead of the check; existing tests unchanged.
 
 #### M1-9zc-b · cli: the runtime-guard mutation copies sit next to `dist/` (new, IR-M1-9zc-1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli (bundle test)
 - **Depends on:** M1-9zc
 - **Scope:** the M1-9zc mutation copies of the bundle are written outside `dist/`, so a moved native import fails with `ERR_MODULE_NOT_FOUND` instead of a real `.node` load. Write the copies next to `dist/` so relative resolution works and the test catches an actual native module load before the Node version check. Source: IR-M1-9zc-1.
@@ -4955,11 +5183,23 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:** RED commit; a test with a matching contact id but a different owner fingerprint or card hash is refused and writes nothing; the matching case passes; no test is weakened.
 
 #### M1-9zf-b · core: a test that isolates the owner-fingerprint clause of invite binding (new, IR-M1-9zf-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
+- **Status:** in review (test only) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/core (pairing tests)
 - **Depends on:** M1-9zf
 - **Scope:** the M1-9zf tests change the owner fingerprint and the card hash together, so neither clause is proven alone. Add a test where only the owner fingerprint differs (card hash and contact id match) and it is refused with no state change. Source: IR-M1-9zf-1.
 - **Acceptance:** the test fails when the owner-fingerprint clause is removed (mutation check recorded in the PR) and passes with it; no test weakened.
+
+#### M1-9zg · core: ask which contact when two share a name (new, live finding 2026-10-25)
+- **Status:** in progress · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (`tools/contacts.ts`, `list-contacts.ts`, `status.ts`, `registry.ts`, tool-surface snapshots); docs/foundation/06
+- **Depends on:** M1-9za
+- **Spec:** 06 §2 (Contact), §2.1 (list_contacts, status); I-5
+- **Invariants:** I-5
+- **Scope:**
+  - Two contacts that both declare "oc-test" (different owners): a tool called by that name never guesses. `AMBIGUOUS_CONTACT` candidates now carry the owner fingerprint and a short ID next to the name-rule name; the self-declared name is still never read.
+  - `agentlink_list_contacts` and `agentlink_status` show the owner fingerprint next to a duplicated name only.
+  - `accept_invite` nextStep stays neutral until the Contacts page (M1-11c-a2) is merged.
+- **Acceptance:** RED commit; candidates carry fingerprint and short ID; duplicate names show the fingerprint, unique ones do not; tool-surface snapshots updated (owner merge).
 
 #### M1-9v · spec: 06 §4 names opening-tag escaping (new, IR-M1-22-L15-1)
 - **Status:** done (4thtech/agentlink#196) · **Size:** S · **Tier:** Opus (spec, S1) · **Security:** S1 · **Phase:** M1b
@@ -4985,7 +5225,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Search results and the go/no-go recorded privately; the name confirmed or changed in the decision log before M2-10 is decided.
 
 #### M1-25 · Agent-assisted install: install prompts per harness (D-39) (new)
-- **Status:** in progress (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; the negotiation, glossary and FAQ pages remain) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
+- **Status:** in review (post-release pass for v0.1.0 done: status hints, get-started pages incl. OpenCode and Antigravity, everyday-use and troubleshooting pages; negotiation page, glossary and FAQ updates in this PR; `SKILL.md` already complete) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/guide/get-started/, skills/agentlink/SKILL.md, apps/cli (`init`)
 - **Depends on:** M1-9a, M1-12a, M1-12b, M1-16
 - **Spec:** D-39, D-53; 06 §7, §7.1 (install prompts, install-and-accept prompt); 02 F-01, F-09, J1, J7; 04 §2.5; 11 §5
@@ -5141,7 +5381,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Each tool result with a pending step carries one next action; vocabulary lint passes.
 
 #### M1-36e · agent UX: vocabulary lint everywhere, fix terminal leaks (UX-E) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (touches `packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (touches `packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · new `apps/cli/src/vocabulary.ts` and `vocabulary.test.ts`, `packages/node/src/approval-page.test.ts`, docs-site lint in `tools/`
 - **Depends on:** M1-36a, M1-36c, M1-36d
 - **Spec:** 11 §5
@@ -5174,8 +5414,31 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Writer tests per target (diff shown, nothing written before confirm); an Opus reviewer audits the writer.
 
+#### M1-36g-b · init: Cursor and Windsurf in the apps lists (new, #441)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
+- **Depends on:** M1-36g
+- **Spec:** 06 §5; 08
+- **Invariants:** I-4
+- **Scope:**
+  - The `appsAll` and `appsLinux` strings in `init.ts` do not list Cursor and Windsurf after #422 and #431; add them.
+- **Acceptance:**
+  - A test pins the strings for each platform; no write behaviour changes.
+
+#### M1-36g-c · init: confirmation code binds the path actually used for Windsurf (new, IR-M1-36g-2, #441; owner #422/#431)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
+- **Depends on:** M1-36g
+- **Spec:** 06 §5; 08
+- **Invariants:** I-4
+- **Scope:**
+  - `init.ts` hashes `displayPath` without the environment, so the confirmation code binds the default Windsurf path and not the XDG one that is written when the environment selects it.
+  - Hash the resolved path (environment applied) so the code a user confirms names the file that is written.
+- **Acceptance:**
+  - A test with and without the XDG environment shows the code differs and matches the path written; nothing is written before the confirmation.
+
 #### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/mcp/instructions.ts`, `docs/foundation/06-mcp-server.md` §2 and §5, `apps/cli/src/tools/registry.ts`, `test/fixtures/tool-surface.json`
 - **Depends on:** M1-36a
 - **Spec:** 06 §2, §5; 11 §6.1
@@ -5198,7 +5461,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Mainnet is unaffected; faucet rate limits and caps hold; no secret reaches the faucet; threat note and tests-first evidence (S2).
 
 #### M1-36a-b · remaining bare `agentlink` prefixes; owner init on fresh machines (new, IR-M1-36a-1 scope low)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, doctor strings (`tools/strings/en.ts`), `packages/node/src/approval-page.ts`, the owner-init redirect message, owner `strings.ts:65`
 - **Depends on:** M1-36a, M1-36b, M1-36d
 - **Spec:** 06 §2.5; 11 §5
@@ -5208,6 +5471,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Wire `ownerExists: false` from callers (status and others) so owner init shows on fresh machines; add a length test for the invalid-name hint branch.
 - **Acceptance:**
   - A grep test finds no bare prefix in the listed files; `status` on a fresh machine names the owner step.
+
+#### M1-36a-c · npx run shows the npx command, not the bare name (new, owner report on 0.2.0)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/runtime/cli-prefix.ts`
+- **Depends on:** M1-36a
+- **Spec:** 06 §2.5; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - npx puts the package's `.bin` on PATH, so the "is `agentlink` on PATH" check wrongly found the npx copy and printed the bare `agentlink`. A launch from an npx or dlx cache, or by `npm exec`, now always gets the npx form; a real global install is unchanged.
+- **Acceptance:**
+  - Tests simulate the npx launch (cache path, `.bin` on PATH, `npm_command=exec`) and expect the npx form; the global case still gives `agentlink`.
 
 #### M1-36d-b · tool copy lows from IR-M1-36d-1 (new, IR-M1-36d-1)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -5220,6 +5494,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - L-3 (pre-existing): `accept_invite` loses the approval link for agent names above about 21 characters (511 code points); shorten the copy or raise the budget per 06.
 - **Acceptance:**
   - The restored assertion passes; a long agent name still carries the approval link.
+
+#### M1-36d-c · accept_invite: nextStep stays inside the 500-code-point limit (new, IR-M1-36d-b-2, #442)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/invite-common.ts`, `apps/cli/src/tools/next-action.test.ts`
+- **Depends on:** M1-36d-b
+- **Spec:** 06 §2.5
+- **Invariants:** I-5
+- **Scope:**
+  - The pending `accept_invite` nextStep is 498 of 500 code points in the worst case, so any added wording crosses the limit. Shorten the copy, or add a guard test that fails with a clear message when the worst case exceeds the budget.
+- **Acceptance:**
+  - A worst-case test (longest allowed agent name) pins the length at or under the limit and keeps the approval link.
 
 #### M1-37a · app UX P0 copy and flow fixes (first run, approvals, invite landing) (new, UX audit, app, 2026-10-22, section 12 "orchestrator can just do")
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` is S1 by path) · **Phase:** M1b
@@ -5295,6 +5580,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `README.md:104` "Chiado live, smoke test pending" is stale (the live smoke passed on 21 Oct 2026); reword the Chiado line as "chosen automatically once deployed and funded"; the backlog's "used by default" wording is cosmetic. Part of the next docs pass. Confirmed again by IR-DOCS-FOLLOWUPS-1022B-1 (2026-10-22): this card is the home for that README line.
 - **Acceptance:**
   - README Status and Roadmap match the smoke result; `docs-status --check` passes.
+
+#### M1-36k · cli: init asks once, shows skips and a summary, and waits for Claude Desktop to quit (new, owner test 2026-10-25)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`apps/cli/src/commands/init.ts`; no owner or policy code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-36b
+- **Scope:**
+  - One "Set up AgentLink in all N apps? (y/N)" before the per-app questions; a no falls back to them.
+  - Any answer other than y or yes prints "Skipped <app>."; type-ahead is kept by one shared line reader.
+  - A final summary, one line per app: set up, already set up, skipped or blocked (fixed reason).
+  - Claude Desktop running (pgrep on macOS, tasklist on Windows, no shell): ask the user to quit it first and press Enter; tell them to reopen it after. AgentLink never closes the app.
+  - The `owner add-agent` hint only for an agent without an owner card.
+- **Acceptance:**
+  - Tests cover the all-apps question, the skip line, the summary, the quit wait and the hint; no test weakened.
 
 #### M1-36j · agent UX: wait for an open approval inside the tool call (D4) (new, D-121 D4)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -5382,7 +5680,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Playwright flow for both controls; withdraw requires presence (enforced centrally); the QR and copy pass `lintVocabulary` outside Advanced; no secret or URL is logged; threat note, tests-first evidence and a Fable audit (S2).
 
 #### M1-11r-d · core: activity entries carry contact name, cost, file and message events (new, M1-11c-a1 build)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` ActivityService and its tests
 - **Depends on:** M1-11r-a
 - **Spec:** 08 §1; 11 §6.2; D-118
@@ -5404,7 +5702,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Two pages use the harness; axe-core reports zero WCAG 2.1 AA violations on both.
 
 #### M1-36b-2 · owner init and add-agent sign a first policy (D6 part 2) (new, D-121 D6, #422 stop)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node` initOwner and addAgent, `packages/node/src/owner-init.ts`, specs 04 §2.5 and 06 §3, §7
 - **Depends on:** M1-36b (#422), M1-11r-b (#415)
 - **Spec:** 04 §2.5; 06 §3, §7; D-121
@@ -5460,8 +5758,29 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests for the null-faucet reading and the same-block second claim.
 
+#### M1-10b-e-c · pool workflow header and top-up hint (new, IR-M1-10b-e-b-1, #439)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` is a sensitive path; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/submitter-pool.yml`
+- **Depends on:** M1-10b-e-b
+- **Spec:** 07 §5
+- **Invariants:** I-4
+- **Scope:**
+  - The header of `submitter-pool.yml` names only "low or paused"; it should also name the other alert reasons.
+  - The "Top up the wallet" hint is misleading when the reason is "faucet off"; give each reason its own hint, in plain words that follow 11 §5 where the text reaches a user.
+- **Acceptance:**
+  - A test on the workflow text or the pool script shows each alert reason carries a matching header line and hint; actionlint clean; no gate weakened.
+
+#### M1-10b-e-c-b · submitter-pool test: URL extraction catches more forms (new, follow-up of M1-10b-e-c, PR #456)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only) · **Phase:** M1b
+- **Repo/path:** agentlink · the submitter-pool test
+- **Depends on:** M1-10b-e-b, M1-10b-e-c (PR #456)
+- **Scope:**
+  - Make the test's URL extraction also catch a scheme followed by a quote or a space, uppercase schemes and protocol-relative `//host`.
+- **Acceptance:**
+  - Each form has a case that the extraction finds; no existing case changes.
+
 #### M1-11b-6 · cli: `init` opens the first-run page and wires owner setup (new, IR-M1-11b-1-1; #426 follow-up)
-- **Status:** backlog (draft PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
+- **Status:** in review (PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner setup wiring) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, the CLI server start (`localUi.ownerSetup` wiring) and their tests
 - **Depends on:** M1-11b-1, M1-11s-c
 - **Spec:** 06 §7; 08 §1; D-120 (1)
@@ -5470,6 +5789,9 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Wire `localUi.ownerSetup` in the CLI and make `init` open `/first-run` on the owner's machine (OS opener only; nothing sensitive in tool results).
   - Inherited lint fixes from the draft stack (`eslint-disable` in #424, `router.test.tsx` name in #407) are handled in those PRs.
   - L-1 `init.ts:464` guard and L-2 seam tests from IR-M1-11b-6-1 are in M1-11b-8.
+  - Owner setup is offered only while no owner exists anywhere: no card, no `owner`, `owner-passkey` or `owner-next` item, no file-KeyStore entry, and no other agent folder (an agent added, or restored by M1-9i-c before its owner seed, 04 §2.3.3). The server re-checks on begin and finish.
+  - Run by an agent (no TTY, a harness marker, `--confirm`): no server, no link, one fixed line. Commands are named with the CLI prefix after the M1-36b install offer (M1-36e). The page is served for at most 30 minutes; Ctrl+C stops it.
+  - The first rules (Send folder) on the first-run page are M1-36b-2-b (S2, not in this card).
 - **Acceptance:**
   - Tests first: `init` on a fresh machine opens the first-run page; with an owner present it does not; no secret, code or URL appears in output or logs.
 
@@ -5497,6 +5819,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests: one open per start, none when an owner exists, none in tool output; the fallback command is unchanged; threat note and tests-first evidence (S2).
 
+#### M1-11b-9 · cli: `agentlink ui` opens the local pages on demand (new, 08 §1; PLAN-431 §2.4)
+- **Status:** in review (stacked on PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus · **Security:** S1 (adds one allowlisted opener to `packages/node`, no route and no authority) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/dispatch.ts`, `apps/cli/src/main.ts`, `packages/node/src/approval-server.ts` (`openActivity`), tests, `docs-site/guide/get-started`
+- **Depends on:** M1-11b-6
+- **Spec:** 08 §1; 04 §2.5; 11 §5
+- **Invariants:** I-4
+- **Scope:**
+  - `agentlink ui` in the owner's own interactive terminal: starts the local server and opens the browser (OS opener only) at `/settings/activity`, or at `/first-run` while no owner exists; serves until Ctrl+C or 30 minutes; the one-shot link is never printed or logged.
+  - Run by an agent (no TTY, a harness marker): one fixed line, built with `cliPrefix()`, telling the user to run it themselves; nothing else happens. Not an MCP tool.
+- **Acceptance:**
+  - Tests first: both pages open in a terminal; the agent-run line and nothing else; no link in output; the command is not reachable from a tool; copy passes the vocabulary lint and the bare-prefix scan.
+
 #### M1-11s-c-b · owner setup lows from IR-M1-11s-c (new, IR-M1-11s-c-1/2)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/owner-passkey.ts`, `packages/node/src/local-ui/**` setup route, `docs/foundation/04-security-and-crypto.md` §2.2
@@ -5521,6 +5855,17 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: a PRF-on-get authenticator completes setup with two gestures; a lost finish response lets the owner code be shown again inside the window and not after; the pending seed still expires and is wiped; threat note and Fable audit.
 
+#### M1-11s-c-e · owner setup canary: more forms of the secret bytes (new, IR-M1-11s-c-b-1, #443)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/owner-setup-canary.test.ts`
+- **Depends on:** M1-11s-c-b
+- **Spec:** 04 §2.2
+- **Invariants:** I-1
+- **Scope:**
+  - The `forms()` helper at about line 78 of `owner-setup-canary.test.ts` should also produce the `JSON.stringify(Uint8Array)` form and the `util.inspect` forms, so the canary catches a secret logged in those shapes.
+- **Acceptance:**
+  - The canary test fails when a secret is emitted in either added form (shown with a deliberate leak in a scratch run); no test weakened.
+
 #### M1-11c-a2b · local UI Contacts: a protective route kind for the mismatch block (new, IR-M1-11c-a2-1, option A)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/route-types.ts`, `packages/node/src/local-ui/api/contacts.ts`, tests
@@ -5531,6 +5876,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - The "They don't match" block is a protective action: give it its own route kind that blocks without owner presence (it only reduces trust) and is still rate-limited and audited, instead of using a presence-gated route.
 - **Acceptance:**
   - Tests: the block works without presence and cannot unblock, verify or loosen anything; the presence-gated routes are unchanged.
+
+#### M1-11c-a2-c · local UI Contacts: "backup code" wording and a UI test sweep (new, low, IR-M1-11c-a2-3, #429)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (strings and UI tests only; no `packages/node` change) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/strings.ts` and its tests, `e2e/test/local-ui-contacts.test.ts`
+- **Depends on:** M1-11c-a2
+- **Spec:** 11 §5 (backup code), §6.2; 08 §1
+- **Invariants:** I-4
+- **Scope:**
+  - The Contacts strings (`presenceIntro`, `useCode`, `ownerCode`, `presenceRejected`, `presenceRequired`) say "owner code"; 11 §5 says "backup code". Align them.
+  - The Contacts page lacks the Playwright flow, the axe-core run and the `lintVocabulary` pass that the sibling pages have; add them.
+  - Not here: the "They don't match" block is M1-11c-a2b.
+- **Acceptance:**
+  - No "owner code" in default Contacts text; the vocabulary lint, axe-core (zero WCAG 2.1 AA violations) and a Playwright flow cover the page; no test weakened.
 
 #### M1-11c-a3b · local UI Files: folder-access approval card (new, IR-M1-11c-a3-1 Q2)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (core approval kind) · **Phase:** M1b
@@ -5616,6 +5974,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - A run with a missing label fails with an error annotation; the secret is not available to other steps (if scoped).
 
+#### M1-3c-d · contracts repo: vector-parity job covers the eip3009 vectors (new, IR-M3-4b-t-T1-1, #448; cross-repo)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (contract CI) · **Phase:** M1b
+- **Repo/path:** `occ-v2-contracts` (private; cross-repo card: the work and its PR live there) · vector-parity job
+- **Depends on:** M1-3c; M3-4b-t
+- **Spec:** 07 §7
+- **Invariants:** I-6
+- **Scope:**
+  - Add the eip3009 vectors to the vector-parity job: the typehash equals the vector; the `auth-usdc-base-sepolia` digest is recomputed under the USDC domain separator; `ecrecover` of each `sign-*` vector returns its `from`.
+  - Pin the vectors commit the job uses.
+- **Acceptance:**
+  - The job fails when a vector, typehash or digest differs; the vectors commit is pinned; nothing weakened.
+
 #### M1-35c-c · vocabulary lint: more banned words; app pages use `lintVocabulary` (new, IR-M1-35c-b-1 low)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui` (`NEVER_SAY`, `lintVocabulary`), `apps/local-ui` page tests
@@ -5659,6 +6029,474 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Timing needs no network telemetry (08 §2.3).
   - Filled logs go to the private audit store, never to this repository.
   - Card counts are recounted after #449 lands (this PR does not touch the count rows).
+
+#### DOCS-06-TOPUP-b · 06 §2.4 with-link `nextStep` shape shows the disclosure sentence (new, follow-up of DOCS-06-TOPUP (#482))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation; proposed, owner confirms at merge) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/06-mcp-and-agent-interface.md` §2.4
+- **Depends on:** DOCS-06-TOPUP
+- **Scope:**
+  - The with-link `nextStep` shape in 06 §2.4 omits the `topUpDisclosure()` sentence that the code adds. Add it to the shape so spec and tool output agree.
+- **Acceptance:**
+  - The §2.4 example for the with-link case includes the `topUpDisclosure()` sentence, and a grep of 06 finds no other shape that omits it.
+
+#### PROC-ORCH-PLAYBOOK-b · orchestrator playbook lows (new, follow-up of IR-2 on #488)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/process; `.github` untouched; the script is a process tool) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/runbooks/merge-and-release.md`, `docs/runbooks/ci-red.md`, the orchestrator playbook, the `record-ir.py` helper
+- **Depends on:** PROC-ORCH-PLAYBOOK
+- **Scope:**
+  - `docs/runbooks/merge-and-release.md:34` and `docs/runbooks/ci-red.md:67` still say `--auto --squash`; align it with the merge-queue wording the playbook uses.
+  - Playbook: change "where the owner asked for one" to "where §1.1/§8 require one".
+  - `record-ir.py` with a trailing `--owner-merge` and no value ends in a traceback; it should print a usage error and exit 2.
+- **Acceptance:**
+  - A test (or fixture run) of `record-ir.py --owner-merge` with no value exits 2 with a usage message and no traceback.
+  - A grep finds no `--auto --squash` in the runbooks, and the playbook wording reads as above.
+
+#### CHORE-CI-QUEUE-DEDUPE-b · comment and doc text about which job scans secrets on merge-queue runs (new, follow-up of IR-1 on #491)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** sensitive (`.github/**`; owner "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/secret-scan-branches.yml`, `docs/process/ci-cd.md`
+- **Depends on:** CHORE-CI-QUEUE-DEDUPE (#491); fold into DOCS-RUNBOOKS-1023-b (in #483) where it fits
+- **Scope:**
+  - The comment in `secret-scan-branches.yml` and the #491 threat note say `security.yml` `merge_group` scans secrets. It does not (line 103 skips it); say which job does.
+  - `ci-cd.md:9` push-trigger text must also exclude `gh-readonly-queue/**`.
+- **Acceptance:**
+  - The comment and the doc line match the workflow files; the workflow checks pass; no trigger or step changes.
+
+#### M1-6b-d-b · abort-incomplete lifecycle: empty element, and status wording (new, follow-up of IR-1 on #485)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (storage) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/storage` (lifecycle read), `README.md` status text
+- **Depends on:** M1-6b-d
+- **Scope:**
+  - An empty `<AbortIncompleteMultipartUpload></AbortIncompleteMultipartUpload>` element reads as the rule being kept. It must read as dropped.
+  - README and status text say "gasless top-up"; the word "gas" is technical status text. Consider "credits top-up without fees" (11 §5).
+- **Acceptance:**
+  - Tests first: a lifecycle document with the empty element is reported as the rule dropped; a document with a day count still reads as kept.
+  - The docs vocabulary check passes; the status wording is reviewed against 11 §5 (change it only if the owner agrees).
+
+#### M1-34-c-b · receipt retry: acknowledge no longer blocks on a lagging RPC (new, follow-up of IR-1 on #489)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter, `packages/core` receipt path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/submitter`, `packages/core`, the `agentlink_acknowledge` tool
+- **Depends on:** M1-34-c
+- **Scope:**
+  - The acknowledge tool waits about 3 s when the RPC lags. Return at once with the receipt pending and let the retry finish in the background, or document the wait in the tool summary.
+  - The window where a direct post and the sync post both send is idempotent, but the retry sleep widens it. Add a test that two posts in that window end in one stored receipt.
+- **Acceptance:**
+  - Tests first: acknowledge against a lagging RPC returns within the tool budget; a direct post plus a sync post yield exactly one receipt; no test weakened.
+
+#### M1-36b-2-b · add-agent with an existing signed policy, and first rules in the local UI (new, follow-up of IR-1 on #493)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/core`, `packages/node`, owner signing) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core`, `packages/node`, `apps/local-ui` (first-run owner setup)
+- **Depends on:** M1-36b-2
+- **Scope:**
+  - Add a test for add-agent when a signed policy already exists: core refuses with `stale_version` and node reports `failed`. Decide whether node should re-read the version and retry once, or report a plain message.
+  - The local-UI first-run owner setup still signs no first policy. Make it sign the same first rules (Send folder) as `init` does, in the same owner-code entry.
+- **Acceptance:**
+  - Tests first: add-agent over an existing policy ends in the decided outcome with a plain message; the local-UI first run leaves a signed first policy and the agent can send to the Send folder.
+
+#### M1-36b-2-c · the Send folder for existing agents, and friendlier folder rules (new, owner two-computer test, 2026-10-25)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (`packages/node` owner signing, policy path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/owner-send-folder.ts`, `apps/cli/src/commands/owner/policy.ts`, `apps/cli/src/tools/files-common.ts`
+- **Depends on:** M1-36b-2
+- **Spec:** 04 §2.5, §2.8; 06 §3, §8; D-121 D6
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - `policy allow-send-folder` † for an agent that already has its card: creates or checks `~/AgentLink/Send` (the first-rules folder rules) and signs one `policy.set` that adds only that folder to the rules in force (byte-exact JCS check in node).
+  - `policy allow-folder` with another spelling of a real folder shows the exact path and asks "Use <exact path>? (y/N)"; it still binds to the realpath. Links are still refused.
+  - NO_ALLOWED_FOLDER's nextStep names `policy allow-send-folder` for the owner's own terminal; no MCP path performs the setup (I-4).
+  - The inbox folder (`files.inboxFolder`, `~/AgentLink/Inbox`) is created on first save (CLI runtime `resolveOwnFolder`); documented, no change.
+- **Acceptance:**
+  - Tests first: the rules only gain that one folder; a non-empty folder or a link is refused before any owner code; the NO_ALLOWED_FOLDER copy includes the command; no MCP tool reaches the new code (fence tests); threat note and an independent audit (S2).
+
+#### M1-7f-3-b · files: expiry assertions and refresh-link lows (new, follow-up of IR-1 on #498)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core` files) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (files), test storage doubles
+- **Depends on:** M1-7f-3
+- **Scope:**
+  - `MemoryOwnStorage.presignGet` ignores its expiry. Add a deadline assertion in the double and a test that uses it.
+  - Refresh-link on a drop entry returns `NOT_REFRESHABLE` locally, without a call.
+  - `#take` checks that the original state is `ok` before it takes.
+  - The rest of M1-7f-3 stays open as listed in #498: receipt trigger, old-key backfill, expiry cursor, sent copies, D-53 re-hash, SentFile name and hash, and the drop expiry test against the Worker. Keep those on M1-7f-3.
+- **Acceptance:**
+  - Tests first: a presigned URL past its deadline is refused by the double; a drop entry refresh returns `NOT_REFRESHABLE` with no network call; `#take` on a non-ok entry does not take.
+
+#### M1-35b-b-c · approvals review: the local UI implements `onPrune` (new, follow-up of IR-2 on #500)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (policy and approval UI) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui`
+- **Depends on:** M1-35b-b, M1-11b-4
+- **Scope:**
+  - The components call `onPrune` when a card goes away. The local UI caller must implement it so a returning card shows nothing selected; otherwise the old pick reappears, visibly.
+- **Acceptance:**
+  - Test: select an option on a card, let the card go and come back; nothing is selected.
+
+#### M1-11r-d-b · activity read API lows (new, follow-up of IR-1 on #503)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`packages/core` read API) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (activity), M1-11r-d consumers
+- **Depends on:** M1-11r-d
+- **Scope:**
+  - Compute `unknownSenderCodesTx` once per page, not per row.
+  - Remove the dead `delivery ?? queued` fallback.
+  - The consumer in #417 must render file names as data (escaped text), never as markup.
+- **Acceptance:**
+  - Tests first: one page does one `unknownSenderCodesTx` computation (spy count); a file name with markup renders as text in the #417 view.
+
+#### M1-4d-h · chain: read `RecordNotFound` only as the bare selector in the state client (new, IR-1 on #499)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (packages/chain, used by core) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/chain `clients/state.ts`
+- **Depends on:** M1-4d-g
+- **Scope:**
+  - `getRecord` matches `RecordNotFound` by name only, without the bare-selector check. A faulty RPC could make the notarize replacement path and the core own-parent check see "absent". Apply `revertBare` there. Doc nit: `state.ts:63` should say "the bare `RecordNotFound()` revert".
+- **Acceptance:**
+  - Tests first: a non-bare `RecordNotFound` revert is not read as absent; the bare selector still is.
+
+#### M1-9i-x · crypto: opaque `hold` parameter on the recovery-kit snapshots request (new, IR-M1-9i-c-3)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (packages/crypto) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto `keystore-api.ts` (around line 313), node tests
+- **Depends on:** M1-9i-c
+- **Scope:**
+  - Declare an optional opaque `hold?: unknown` second parameter on `RecoveryKitExportRequest.snapshots`. Drop the cast in the node test and the internal re-typing in `key-controls.ts` (around lines 194 and 227).
+- **Acceptance:**
+  - Types compile without casts; behaviour unchanged; no test weakened.
+
+#### M1-9i-c-b · node: key-store export and import lows (new, IR-1 on #507)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (packages/node) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (keychain, sqlite, restore tests)
+- **Depends on:** M1-9i-c
+- **Scope:**
+  - Export conformance tests only the keychain double as `itemsOf`; cover the real stores.
+  - Keychain `importAgent` and `importOwner` take no inter-process lock (G-1); add one.
+  - Restoring agents first and the owner second: a failed owner import leaves the agents blocking a later restore. Make the order or the cleanup safe, and record the CLI follow-up for M1-9i.
+  - The async-local held-set can report a spurious `store_busy` for detached promises.
+  - The sqlite `-shm` file is created with the process umask; set its mode.
+  - Tighten the restore test from `toThrow()` back to `toThrow(KeyStoreError)`.
+- **Acceptance:**
+  - Tests first for each item; no test weakened.
+
+#### M1-9i-c-c · node: pass the inter-process lock hold to nested callers (new, IR-2 on #507)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (packages/node) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/crypto `keystore-api.ts`, packages/node sqlite store
+- **Depends on:** M1-9i-x
+- **Scope:**
+  - Expose `LockHold` in `RecoveryKitExportRequest.snapshots` and in the `SqliteStore.withInterProcessLock` function types, so a future nested caller forwards the hold. Without it, the nested call waits 10 s.
+- **Acceptance:**
+  - Tests first: a nested call that forwards the hold does not wait; behaviour otherwise unchanged.
+
+#### M1-1h-b-c · core and chain: parse stored payloads the same way as received ones (new, IR-2 on #515)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/core, packages/chain) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (acks, inbox, inbox-page, outbox, refresh-link), packages/chain `verify/content.ts`
+- **Depends on:** M1-1h-b
+- **Scope:**
+  - Optionally route the stored-payload re-parses through `parseReceivedJson` for uniformity. They are not received boundaries today; this is defence in depth.
+- **Acceptance:**
+  - Behaviour unchanged; one parser path for stored and received text; no test weakened.
+
+#### M1-1h-b-f1 · core: stored-text re-reads use the shared payload parser (new, IR-M1-1h-b-3)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/core) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core (inbox, inbox-page, acks, files/received)
+- **Depends on:** M1-1h-b
+- **Scope:**
+  - Align the stored-text re-reads (`inbox.ts` around 174, `inbox-page.ts` around 558, `acks.ts` around 198, `files/received.ts` around 39) on `parsePayloadText` instead of a bare `JSON.parse`. Overlaps M1-1h-b-c; do them together if convenient.
+- **Acceptance:**
+  - Tests first: a stored text with a duplicate key or wrong shape is handled as the shared parser handles it.
+
+#### M1-1h-b-f2 · core: negative tests for approval-shaped text (new, IR-M1-1h-b-3)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (packages/core tests) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/core tests
+- **Depends on:** M1-1h-b
+- **Scope:**
+  - Add negative tests: the `type` field with the wrong case, a non-string `type`, and a nested `{type: approval}` inside a text body, which stays free-form text.
+- **Acceptance:**
+  - The tests pass on current behaviour and fail if the parser becomes looser.
+
+#### M1-9f-b · Claude Desktop bundle: signing checks before announcing (new, low, IR-1 on #514)
+- **Status:** backlog · **Size:** S · **Tier:** Owner · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · the signed extension bundle and release notes
+- **Depends on:** M1-9f
+- **Scope:**
+  - Install a signed beta bundle by hand in Claude Desktop on macOS and Windows before announcing signing; the public `mcpb` verifier cannot verify it.
+  - The bundle holds about 18k files and 101 MB; prune later.
+  - The signing key stays in the npm-publish environment; one extra approval click per stable release is accepted.
+- **Acceptance:**
+  - Manual install recorded for both systems; announcement only after that.
+
+#### M1-11b-1-b · local UI first run: PR-body and comment lows (new, low, IR-4 on #426)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli local UI tests, PR template use
+- **Depends on:** M1-11b-1
+- **Scope:**
+  - The PR body should list `package.json` and the lockfile as supply-chain paths.
+  - A test comment near line 99 still says "packages/ui's" axe-core; fix it.
+- **Acceptance:**
+  - Comment fixed; the checklist item is in the next UI PR.
+
+#### M1-19-b-c · invite deploy: guard and staging-order lows (new, IR-M1-19-b-2)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (sensitive path: deploy) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/invite deploy tests and workflow
+- **Depends on:** M1-19-b
+- **Scope:**
+  - L1: the guard test (`deploy-invite.test.mjs` around line 169) also checks `wrangler.toml` for `[env.production]` and `custom_domain`.
+  - L2: the staging deploy has no head-of-main check, so an older commit can overwrite a newer one on staging; add it.
+  - M1-19-d must add deploy-reconcile coverage and remove `agentlink.4thtech.io` from `apps/invite/src/prompt.ts` if the domain changes.
+- **Acceptance:**
+  - Tests first for L1 and L2; no test weakened.
+
+#### M1-11b-6-b · cli init: first-run and agent-context lows (new, low, IR-M1-11b-6-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (apps/cli, owner setup path) · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli `init` and agent-context
+- **Depends on:** M1-11b-6
+- **Scope:**
+  - L1: the init "nothing to do" branch calls `firstRun` without the `others.length === 0` guard the other branch has.
+  - L2: agent-context `available()` opens the agent store only to pick one line of copy.
+  - L3: the opener's argv briefly exposes the link to other processes of the same user (pre-existing, G-1); note it or avoid it.
+- **Acceptance:**
+  - Tests first for L1; L2 and L3 resolved or recorded with a reason.
+
+#### M1-11b-9-b · cli: wider copy fence test and a clearer not-ready message (new, low, IR-M1-11b-9-1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli tests, `tools/strings`
+- **Depends on:** M1-11b-9
+- **Scope:**
+  - L1: make the copy fence test recursive over `tools/strings/` and `apps/cli/src/mcp/**`, except the local-ui-wiring and approval-ui files.
+  - L2: errors from `deps.start` (for example a locked keychain) collapse into the not-ready "run init first" line; show a distinct fixed line.
+- **Acceptance:**
+  - Tests first for both; no test weakened.
+
+#### M1-36a-c-b · cli: keep the npx command with yarn dlx and bunx (new, low, IR-M1-36a-c-1)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (run-mode detection)
+- **Depends on:** M1-36a-c
+- **Scope:**
+  - `yarn dlx` (a `dlx-<pid>` temp dir) and `bunx` may still show the bare `agentlink` name. Add detection for both.
+- **Acceptance:**
+  - Tests first: both launchers produce the full command in hints.
+
+#### M1-SAFETY-CODE-GAP · a way to see and compare the safety code, and honest next-step copy (new, owner test 2026-10-25)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli (contacts command), local UI Contacts page, accept_invite copy
+- **Depends on:** M1-11b
+- **Scope:**
+  - `accept_invite` tells the user to compare the safety code in the local app or with `agentlink contacts --verify`, but in 0.2.0 neither exists. For 0.3.0 give a real way to see and compare it (a Contacts page entry or a CLI command) and fix the next-step copy, including the bare `agentlink` name.
+- **Acceptance:**
+  - The copy points only at something that exists; the user can see the safety code for a contact; tests cover the copy and the command or page.
+
+#### M1-CONTACT-LISTS · saved contact lists and one-to-many send (new, owner proposal 2026-10-25)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (send path) · **Phase:** M1b
+- **Repo/path:** agentlink · core, node, apps/cli, local UI
+- **Depends on:** M1-9zg; Contacts page (#429)
+- **Scope:**
+  - Proposed, owner schedules. Saved lists (for example "Project X") and a send that delivers one separate private message to each member; duplicate names prompt for a choice. Target 0.3.0 after the Contacts page. Needs a short spec note first (06, 08).
+- **Acceptance:**
+  - Spec note merged; sending to a list produces one private message per member; approvals and limits apply per message; tests cover it.
+
+#### M1-36k-b · cli init: blocked-app exit code and summary test (new, low, IR-M1-36k-2)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli `init.ts` (around line 814) and tests
+- **Depends on:** M1-36k
+- **Scope:**
+  - A Claude Desktop that is still running and skipped should set a failed exit code. Test the "blocked" summary line.
+- **Acceptance:**
+  - Tests first for the exit code and the summary line.
+
+#### M1-36b-2-d · owner send-folder: re-check after signing, match the Send form, pin the folder (new, IR-M1-36b-2-c-1)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node/src/owner-send-folder.ts, packages/node/src/allowed-path.ts
+- **Depends on:** M1-36b-2-c
+- **Scope:**
+  - L1: re-check readiness after signing and before applying (around lines 258-272).
+  - L2: `already_allowed` also matches the `~/AgentLink/Send` form (around line 191).
+  - L3 (S2): pin an allowed folder's real location at allow time, so a later change to a link in that folder cannot widen what is allowed. Add the note to the 04 §4 threat note.
+- **Acceptance:**
+  - Tests first for each item; a folder whose real location changes after allow is refused or re-confirmed; no test weakened.
+
+#### M1-36b-2-e · owner send-folder: not-moved test and a "not where it was allowed" diagnostic (new, low, IR-M1-36b-2-d-1, #545)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` policy and folder checks) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/allowed-path.ts` and its tests, `policy show` and `doctor` in `apps/cli` and `packages/node`
+- **Depends on:** M1-36b-2-d
+- **Spec:** 04 §2.5, §4 (realpath rules); 06 §3
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - (a) Negative test: an allowed entry that no longer resolves to itself is not reported as `already_allowed`.
+  - (b) `policy show` and `doctor` flag a folder that is "not where it was allowed" (its real location changed since signing), in plain words.
+  - (c) The post-sign re-check in `owner-setup.ts` / `signFirstPolicy` (init, add-agent, first run #542) is carried by M1-UX-FIRSTRUN-V2-b, not here.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); no test weakened; threat note; independent review (S2).
+- **Notes:** Send-time dev/ino pin: no (Fable IR-M1-36b-2-d-1; the signed realpath is the pin).
+
+#### M1-11a-ux-b · approval page: headline and test lows (new, low, IR-M1-11a-ux-1)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli approval page, packages/ui
+- **Depends on:** M1-11a-ux
+- **Scope:**
+  - Restricted names can still read like a sentence in the headline ("Approve now"); de-emphasise them visually.
+  - The node approval-page test relies on the UI-side token test; add its own check.
+- **Acceptance:**
+  - A restricted name cannot read as an instruction; the node test stands alone.
+
+#### M1-11a-ux-c · terminal approve card: no link in the output (new, owner yes 2026-10-25)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli terminal approve card
+- **Depends on:** M1-11a-ux
+- **Scope:**
+  - The terminal `approve` card stops printing the invite link; it shows a plain summary like the page does.
+- **Acceptance:**
+  - Tests first: no link appears in the card output; the summary does.
+
+#### M1-11a-ux-d · terminal approve card: test for the parsed-invite success path (new, low, IR-M1-11a-ux-c-1, #544)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli terminal approve card tests
+- **Depends on:** M1-11a-ux-c
+- **Scope:**
+  - Add a test for the parsed-invite success path: the card shows the inviter name and the owner fingerprint, and no link.
+- **Acceptance:**
+  - The test passes on main code and fails if the link is printed or the name or fingerprint is missing; no test weakened.
+
+#### M1-36e-b · node: vocabulary lint for error texts (new, low, from the #512 review)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/node texts) · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node (`policy-mark`, `store-errors`, `owner-add-agent`)
+- **Depends on:** M1-36e
+- **Scope:**
+  - Extend the vocabulary lint to node error texts and replace the bare `agentlink policy …` strings in `owner-first-policy.ts` with `CLI_COMMAND`.
+- **Acceptance:**
+  - Lint covers the listed files and is green; no bare command names remain in node texts.
+
+### 0.3.0 first run and agent-guided setup (new, D-130)
+
+Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026-10-25 (D-130). Carded elsewhere and not repeated here: same-named contacts (M1-9zg), the approval cards with "Approve with Touch ID" and the wide backup-code field (M1-11b-5), the first-run first policy (M1-36b-2-b), PRF only on `get()` (M1-11s-c-c), and the Contacts, Files, Rules and Proofs pages (M1-11c-a2, -a3, -a5, -a4). In review, with their cards in their own PRs: `init` asks once and waits for Claude Desktop (M1-36k, #530), the Send folder for existing agents from the terminal and the case-spelling prompt for `policy allow-folder` (M1-36b-2-c, #531), and `agentlink ui` (M1-11b-9, #520).
+
+#### M1-UX-PRF-MATRIX · local UI: platform passkey with PRF, browser matrix and fallback copy (new, D-130 (1))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1 (test harness, detection and fixed copy; no owner signing) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**` (detection and copy), Playwright tests, `docs/runbooks/` (manual matrix record)
+- **Depends on:** M1-8e, M1-11s-c, M1-11s-c-c
+- **Spec:** 08 §1 (first run v2); 11 §6.2.1; 04 §2.3.1
+- **Invariants:** I-4
+- **Scope:**
+  - Record a browser by OS matrix for a platform passkey with PRF on `http://localhost:<port>`: Safari, Chrome, Edge, Firefox and Arc on macOS; Chrome, Edge and Firefox on Windows. For each: PRF at `create()` or only at `get()`, and how many sensor prompts the first run needs.
+  - The first run detects `prf.enabled` and the platform authenticator; without them it shows the fixed copy naming a browser on this computer that works, or continues with the backup code only. The button label comes from the platform ("Use Touch ID", "Use Windows Hello", "Use a passkey").
+  - The first 0.3.0 task: M1-UX-FIRSTRUN-V2 builds on its result.
+- **Acceptance:**
+  - Playwright with a virtual authenticator covers PRF at create, PRF only at get, and no PRF; a manual run on the owner's two Macs is recorded; copy passes `lintVocabulary`.
+
+#### M1-UX-FIRSTRUN-V2 · local UI: passkey-first first run, backup-code save step, folders in the same gesture (new, D-130 (1), (2))
+- **Status:** in review · **Size:** L · **Tier:** Opus · **Security:** S2 (owner setup, first card and first policy signing in `packages/node`; owner code display) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Depends on:** M1-UX-PRF-MATRIX, M1-36b-2-b, M1-11s-c-c, M1-11b-3, M1-11b-7; design D1 `local/first-run--*`, adjustments LF-1, LF-2, B-9
+- **Spec:** 08 §1 (first run v2); 04 §2.5 (one owner flow), §2.2, §2.3.1; 11 §5.5, §6.2.1; 06 §3
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Order: the folders are shown, then "Use Touch ID" (platform label); one confirmation creates the owner, registers the passkey, signs the card and the first policy (06 §3 defaults, Send allowed), all or nothing; then "Your backup code" once with the save form (`autocomplete="username"` with the fixed label, `autocomplete="new-password"`), a secondary Copy with the clipboard warning, and "I saved it"; then the recovery kit; then Ready.
+  - Create `~/AgentLink/Send`, `Inbox` and `Proofs` (0700) before signing; the policy binds the realpath of the Send folder, which must be a real folder, never a link (at either level), new or empty; anything else is refused before the gesture (the same folder rules as `policy allow-send-folder`, M1-36b-2-c).
+  - B-9 path for 0.2.0 owners: enter the owner code once, then register the passkey.
+  - Styled from the design (D-116); copy per 11 §5.5 and §6.2.1.
+- **Acceptance:**
+  - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a link (at either level) or a non-empty Send folder is refused before the gesture; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-b · first run: setup folder race, folder pinning and test lows (new, low, IR-M1-UX-FIRSTRUN-V2-1, #542)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/owner-setup.ts`, `apps/local-ui/src/pages/first-run/**` tests
+- **Depends on:** M1-UX-FIRSTRUN-V2; M1-36b-2-d (folder pinning helper)
+- **Spec:** 04 §2.5, G-1 (accepted residual); 08 §1 (first run v2)
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - L-1: `dropSetup` starts `removeSetupFolders` without awaiting it. A new begin right after can see Send ready, then lose it, and finish reports `not_allowed`. The same happens across processes with a terminal `owner init`. Await the removal in `dropSetup` and the sweep, or make begin wait for a pending removal. Effect is UX only (the policy is never widened).
+  - L-2: `prepareSetupFolders` creates Inbox and Proofs under the parent of the Send folder after the parent check; pin the folder with the M1-36b-2-d helper where it fits.
+  - L-3: add a test that the backup code leaves the DOM after "I saved it".
+  - L-5: record a manual Mac check that the browser offers to save the code in its password manager ("if offered" is browser-dependent).
+  - Post-sign re-check (from IR-M1-36b-2-d-1, #545): `owner-setup.ts` and `signFirstPolicy` (init, add-agent, first run) re-check the Send folder after signing, using `pinFolder` / `stillPinned` from `allowed-path.ts`.
+  - Q-130-1 (the code is readable text and an input value) stays the owner's open question; not decided here.
+- **Acceptance:**
+  - Tests first (RED commit): a begin straight after a dropped setup keeps Send and finish succeeds; the code is absent from the DOM after "I saved it"; the manual check is recorded in the PR; threat note; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-c · first run: 0.2.0 owners enter the backup code once, then add a passkey (new, B-9, left out of #542)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner setup for an existing owner in `packages/node`) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Depends on:** M1-UX-FIRSTRUN-V2
+- **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2; 11 §5.5, §6.2.1
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - The B-9 path of M1-UX-FIRSTRUN-V2 that #542 did not deliver: an owner created by 0.2.0 enters the backup code once, then registers the platform passkey (one Touch ID). Never creates a second owner.
+  - Not here: the second touch for passkeys that give PRF only on `get()` (M1-11s-c-c) and the recovery kit step (M1-11b-3).
+- **Acceptance:**
+  - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
+
+#### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/commands/init.ts`, `apps/cli/src/tools/files-common.ts`, `apps/cli/src/mcp/**`, `packages/node/src/approval-server.ts`, tests
+- **Depends on:** M1-11b-9 (#520), M1-11b-8, M1-11c-a3
+- **Spec:** 04 §2.5 ("What the AI may cause"); 08 §1 ("Opened for the owner by the AI"); 06 §2.3, §2.5, §7
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Agent-run `ui` and agent-run `init --confirm` open the page through the OS opener (absolute path), served by a process that does not hold the agent's command open; one fixed line built with `cliPrefix()`; the SSH or headless fallback names the command.
+  - `agentlink mcp` opens the Files page on `NO_ALLOWED_FOLDER` (never on `OUTSIDE_ALLOWED_FOLDER`), within the 30 s alert limit, and uses the opened-page `nextStep` texts of 06 §2.3 and §2.5.
+  - Opens only after this agent's own tool call, never from background processing of inbound content; no URL parameter carries a path, a name or an amount.
+- **Acceptance:**
+  - Tests first (RED commit): no result, log line or output contains the session link, a token or a code (canary); no open from inbound processing; at most one open per 30 s; Files proposes only the fixed default; no new tool (tool-surface snapshot unchanged); threat note; independent review (S2).
+
+#### M1-UX-AGENT-GUIDE · agent copy: "I opened it, tap here" next steps, server instructions and skill (new, D-130 (3))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (fixed strings, server instructions, skill file) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/tools/strings/**`, `apps/cli/src/mcp/instructions.ts`, `skills/agentlink/SKILL.md`, install prompts (06 §7.1), tests and snapshots
+- **Depends on:** M1-UX-OPEN-APP; M1-36a-c-b (bare-prefix lint)
+- **Spec:** 06 §5 (planned wording), §2.3, §2.5, §7.1; 11 §6.1
+- **Invariants:** I-5
+- **Scope:**
+  - Apply the 06 §5 planned wording and the 11 §6.1 opened-page examples; every command hint uses `CLI_COMMAND`/`cliPrefix()`.
+  - Nothing tells the user to paste a code into chat or to run `approve` in a terminal the AI runs; no string carries a safety code.
+- **Acceptance:**
+  - Snapshot tests for the changed strings and instructions; the vocabulary and bare-prefix lints pass; no test weakened.
+
+#### M1-UX-SEND-FOLDER-EXISTING · local UI: allow the Send folder for agents created before 0.3.0 (new, D-130 (2), (3))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (signs `policy.set` from the page) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`, `packages/node/src/local-ui/**` files routes, tests
+- **Depends on:** M1-11c-a3, M1-UX-OPEN-APP, M1-36b-2-c (same folder rules, terminal path)
+- **Spec:** 08 §1 (Files banner); 06 §2.3, §3; 04 §2.5
+- **Invariants:** I-4
+- **Scope:**
+  - With no allowed folder, the Files page shows "Allow ~/AgentLink/Send for sending files?"; one passkey gesture creates the folder if it is missing (0700) and signs the `policy.set` that adds its realpath. The banner takes no path from the URL, the AI or inbound content.
+- **Acceptance:**
+  - Tests first (RED commit): the banner appears only with no allowed folder; one gesture leaves a verified policy with the realpath; a URL parameter cannot change the folder; independent review (S2).
+
+#### M1-UX-OTHER-COMPUTER · local UI: "This is my other computer" on the new-contact card (new, D-130 (5))
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`apps/local-ui` approval card and the owner-set name in the accept flow) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/cards/**`, tests
+- **Depends on:** M1-11b-5
+- **Spec:** 11 §6.2.1 (Approvals); 06 §2.1 (contact-name rule)
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - A choice on the new-contact card that fills "Name this contact" with "My other computer" (editable). A local, owner-set label only: no new owner operation and no crypto; the contact stays a separate owner with its own safety code. One owner on several computers is M2-UX-DEVICE-LINK.
+- **Acceptance:**
+  - Tests: the choice sets the owner-set name confirmed with the Accept; nothing else changes; the inbound name stays restricted.
+
+#### M1-UX-APPROVAL-PAGE · local approval page: styled card, plain summary, wide backup-code field (new, owner test 2026-10-25, D-130 (1))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` approval server and page; owner presence surface) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` and its page assets, `apps/cli` approval details, tests
+- **Depends on:** M1-11a, M1-11a-b; interim until M1-11b-2 and M1-11b-5 move approvals into `apps/local-ui`
+- **Spec:** 08 §1, §4 (CSP); 11 §5, §6.2.1, §8 (approval card); D-116
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Style the page from the D1 approval card with the `packages/ui` tokens; light and dark; phone width.
+  - Lead each card with a plain summary built from the parsed stored action (no raw arguments, never the invite link).
+  - The passkey button first; the backup-code field full width, with paste, show and hide, no length limit, and `autocomplete="off"` (Q-130-1).
+- **Acceptance:**
+  - Tests first (RED commit): untrusted values render as text (XSS fixture); no invite link in the page or its API view; the code field's attributes; CSP unchanged; presence, the session link and CSRF unchanged; independent review (S2).
+
+#### DOCS-OWNER-CODE-SAVE · docs: saving the backup code, and quitting Claude Desktop before setup (new, D-130 (1), (7))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (user guidance on an owner secret) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs-site/guide/**`, `knowledge/` where it covers setup
+- **Depends on:** M1-UX-FIRSTRUN-V2 (copy)
+- **Spec:** 11 §5.5 (backup code), §6.1; 06 §7 (Claude Desktop)
+- **Invariants:** I-4
+- **Scope:**
+  - Plain guidance: what the backup code is for, save it in a password manager, never give it to your AI, it can't be recovered (the recovery kit restores everything instead); quit Claude Desktop (Cmd+Q) before setup. States the open Q-130-1 limit honestly: no claim that a saved code is safe from programs that control the screen or browser.
+- **Acceptance:**
+  - Pages pass the vocabulary lint and the docs checks; no claim beyond 04 §2.5.
+
+#### M1-9f-c · Claude Desktop: the signed extension as the recommended path (new, D-130 (7))
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (`init` copy and docs; no owner code) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` (Claude Desktop hint), `docs-site/guide/**`, README
+- **Depends on:** M1-9f and its manual install check on macOS and Windows
+- **Spec:** 06 §7 (Claude Desktop); D-91
+- **Invariants:** I-1
+- **Scope:**
+  - After the manual check passes, `init` and the docs name the signed extension first for Claude Desktop; the config entry stays the fallback and is never written while Claude Desktop runs (M1-36k).
+- **Acceptance:**
+  - The manual check is recorded; `init` output and docs name the extension first; copy passes `lintVocabulary`.
 
 ---
 
@@ -5809,64 +6647,214 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 
 ### Cloud agent template (`apps/cloud-agent`)
 
-#### M2-3a · cloud agent: AgentDO, store, relay sync, Worker KeyStore
-- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
-- **Repo/path:** agentlink · apps/cloud-agent
-- **Depends on:** M1-7h, M1-8b (schema), M1-5c
-- **Spec:** 08 §3.1, §3.2, §3.4; 03 §3; 06 §6
-- **Invariants:** I-1, I-2, I-3
+**0.4.0 slice (D-131).** The cloud agent ships first, as 0.4.0, for Claude on the web and in the Claude iOS and Android apps; ChatGPT web follows later. Two chains meet at M2-3c: **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c** and **CLOUD-SPEC → M2-3f-1 → M2-3c**; then **M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → release 0.4.0**. Fable audits: M2-3a, M2-3f-1, M2-3f-2, M2-3c, M2-3d and AUDIT-CLOUD, plus M2-3i for `cloud update` (keys, owner presence, OAuth and the D-131 (11) crypto exception); Opus review for the others. The console chain (M2-2*) is not on this path.
+
+#### CLOUD-SPEC · cloud agent spec for 0.4.0 (D-131)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (by path: 04)
+- **Repo/path:** agentlink · docs/foundation (00, 03, 04, 06, 07, 08, 10), docs/process (backlog, versioning, release-and-deployment §4.8, audit-rules CR-1), docs/runbooks/add-dependency.md, docs/status.yaml
+- **Depends on:** CLOUD-0 spikes (done, 25 Oct 2026); owner decisions of 25 Oct 2026
+- **Spec:** D-131
+- **Invariants:** I-1 to I-10 (no change; the narrow crypto exception is recorded in 04 §8)
 - **Scope:**
-  - SQLite-backed Durable Object with the local schema; alarm sync every 60 s (configurable) plus WebSocket subscriptions while active.
-  - `KeyStore` from the `AGENT_SEED` secret, or from DO storage wrapped with `SEED_WRAP_KEY`; R2 binding as storage; autonomous actions off by default.
+  - D-131; the cloud owner on the Worker's own origin (04 §2.5), the `connector.*` ops and threat rows (04 §2.5.1, §7), the OAuth library exception (04 §8); 08 §3 rewrite; 06 §2.3, §2.5, §7, §8; 03; 07 §1, §3; 10 M2-3; the cards above and below; G-14 and the cloud part of G-16 resolved; self-host moves to 0.4.0.
 - **Acceptance:**
-  - Miniflare tests: alarm sync picks up a message; restart is idempotent; the seed never appears in logs or unwrapped in DO storage.
+  - Independent review; the owner confirms the proposed details at merge.
+
+#### M2-3t · cloud agent: tool handlers into their own package
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (S2 path touch: tool handlers)
+- **Repo/path:** agentlink · packages/mcp-tools (from apps/cli/src/tools), apps/cli, tools/deps-check, eslint.config.mjs
+- **Depends on:** M1-9j (G-15 resolved, D-73 (1))
+- **Spec:** 06 §1 rule 1 and "Extraction"; 03 "Tool handlers (G-15, D-73 (1))"; 07 §1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Pure move (`git mv`, no logic edit): `apps/cli/src/tools/` becomes the workspace package `@4thtech-io/mcp-tools` (`packages/mcp-tools`), so a Worker can import the handlers (M2-3b). `apps/cli` imports it by package name.
+  - Keep the fence (no Node built-in, Node global, MCP SDK or `@4thtech-io/node` import) as ESLint rules scoped to the package, the neutral-platform bundle check on the package entry, and a source test that moved with the package; a deps-check zone, an `audit-rules.md` row (S1), the review-gate class rule, the changesets `fixed` group and the TypeScript references.
+- **Acceptance:**
+  - The tool-surface snapshot and the registry snapshot are byte-identical; the CLI bundle still includes the handlers; the package declares no Node or MCP SDK dependency.
+- **Notes:** the workerd test projects for `crypto`, `transport-nostr`, `chain` and `mcp-tools` named in `PLAN-CLOUD-AGENT.md` are the follow-up card M2-3t-w.
+
+#### M2-3t-w · cloud agent: workerd test projects for the shared packages
+- **Status:** done (4thtech/agentlink#539, merged 2026-10-26) · **Size:** S · **Tier:** Sonnet · **Security:** S2 by path (`packages/crypto/**`; tests and test config only, no source change)
+- **Repo/path:** agentlink · packages/crypto, packages/transport-nostr, packages/chain, packages/mcp-tools (vitest.config.ts and `src/workerd-smoke.workerd.test.ts`), docs/process/repo-reference.md
+- **Depends on:** M2-3t
+- **Spec:** 07 §1 (every shared package runs in Node, browsers and Workers); `PLAN-CLOUD-AGENT.md` §3 (M2-3t row); D-131
+- **Invariants:** I-5
+- **Scope:**
+  - A second Vitest project `workerd` per package (`@cloudflare/vitest-plugin`, already a root devDependency: no new dependency) that runs `src/**/*.workerd.test.ts` in the Workers runtime, without `nodejs_compat`. The Node project excludes those files. `pnpm test` runs both through the existing `test` job: no workflow change.
+  - Smoke tests per package through its public API: crypto (hash, HKDF, JCS, AEAD round trip, envelope sign and verify with the in-memory KeyStore), transport-nostr (gift wrap and unwrap), chain (record id, address check), mcp-tools (registry equals the frozen tool surface; `callTool` answers `needs_setup`). Each asserts the runtime is workerd.
+- **Acceptance:**
+  - All four smoke suites pass in workerd; the same package's Node suites still pass; a project that falls back to Node fails its runtime assertion.
+- **Notes:** feeds M2-3a (conformance and Worker KeyStore) and M2-3b. Not covered here: Argon2id (must never run in the Worker, CLOUD-SPIKES S-3), `@4thtech-io/crypto/keystore` file KeyStore, relay WebSockets (M2-3a).
+
+#### M2-3t-w-b · cloud agent: workerd acceptance left out of M2-3t-w (new, #541 keeper merge)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 by path (`packages/crypto/**`; tests and test config only, no source change)
+- **Repo/path:** agentlink · packages/crypto (workerd test project, test vectors), docs/process/repo-reference.md
+- **Depends on:** M2-3t-w
+- **Spec:** 07 §1; `PLAN-CLOUD-AGENT.md` §3 (M2-3t-w row); D-131
+- **Invariants:** I-5
+- **Scope:**
+  - The M2-3t-w acceptance that #539 did not cover: the crypto test vectors run and pass in workerd, and a deliberate Node-only import makes the run fail.
+  - Restore the note line on the M2-3t card that points to M2-3t-w (lost in #539; harmless).
+- **Acceptance:**
+  - The crypto vectors pass in the workerd project; a test (or a recorded manual check) shows a Node-only import fails the workerd run; the Node suites still pass; no test weakened.
+
+#### M2-3a · cloud agent: AgentDO, store, relay sync, Worker KeyStore
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
+- **Repo/path:** agentlink · apps/cloud-agent
+- **Depends on:** M1-7h, M1-8b (schema), M1-5c, M2-3t-w
+- **Spec:** 08 §3.1, §3.2, §3.4; 03 §3; 06 §6; 07 §3 (cloud-only rows); 04 §2.2; D-131
+- **Invariants:** I-1, I-2, I-3, I-7
+- **Scope:**
+  - One SQLite-backed Durable Object per deployment (`idFromName("agent")`, the single publisher) with the local schema plus the cloud-only rows (07 §3); every write in `transactionSync`.
+  - Alarm-only relay sync every 60 s (configurable): re-arm first, idempotent, per-relay cursor with a 48 h cold-start look-back, at most 5 relay sockets per run, end-of-stored-events timeout (D-131 (f), spike S-5). No always-open relay socket.
+  - Worker `KeyStore` from the `AGENT_SEED` secret, or from DO storage sealed under `SEED_WRAP_KEY` through `@4thtech-io/crypto`; R2 binding as storage; where the policy-version mark lives; autonomous actions off.
+- **Acceptance:**
+  - Miniflare tests: alarm sync picks up a message; a thrown alarm still re-arms; restart is idempotent; the seed never appears in logs or unwrapped in DO storage; the sealed-column vectors pass against the DO store.
+  - On a test account: a 24 h alarm loop with its missed-alarm count, and the behaviour after a redeploy, recorded in the PR.
 
 #### M2-3b · cloud agent: remote MCP over streamable HTTP
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · apps/cloud-agent
-- **Depends on:** M2-3a, M1-9d; gaps G-14, G-15 resolved
-- **Spec:** 06 §1 rule 1; 08 §3.1; 04 §4
+- **Depends on:** M2-3a, M2-3t; gap G-15 resolved; M2-3h for `agentlink_fetch_file`
+- **Spec:** 06 §1 rule 1, §2.3, §2.5 (cloud link); 08 §3.1; D-131 (10)
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Cloudflare Agents SDK `McpAgent` (API verified at build time) wrapping the shared tool handlers; identical names, schemas and annotations (06 §2.0); `agentlink_fetch_file` semantics and SSRF handling in Workers per G-14.
+  - A stateless MCP handler (the MCP SDK's web-standard streamable HTTP transport, the same SDK major as the stdio server; not `McpAgent`) in front of `AgentDO`, calling the shared tool handlers; identical names, schemas and annotations (06 §2.0); `/mcp` served directly, no redirects.
+  - The cloud approval channel and its `/approve/<id>` URL (06 §2.5); the `agentlink_send` with `path` refusal `CLOUD_FILES_NOT_YET` (06 §2.3).
 - **Acceptance:**
   - Tool-surface snapshot identical to the local server (CI); MCP Inspector over HTTP passes; status-value tests re-run against the Worker.
 
-#### M2-3c · cloud agent: OAuth with owner proof
+#### M2-3h · cloud agent: files in R2 and SSRF in Workers (G-14)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
-- **Repo/path:** agentlink · apps/cloud-agent, apps/cli (`agentlink cloud login`)
-- **Depends on:** M2-3b, M2-2e; gap G-16 resolved
-- **Spec:** 08 §3.3; 02 F-71
-- **Invariants:** I-4
+- **Repo/path:** agentlink · apps/cloud-agent
+- **Depends on:** M2-3a; CLOUD-SPEC (G-14 resolved in 06 §2.3)
+- **Spec:** 06 §2.3 "Files on the cloud agent"; 04 §4; D-131 (g)
+- **Invariants:** I-2, I-7
 - **Scope:**
-  - `workers-oauth-provider` with PKCE; the authorise page requires owner proof: a console-signed challenge, or a one-time access code from `agentlink cloud login`; tokens scoped to this agent and revocable from the console.
+  - Cloud `agentlink_fetch_file`: decrypt in the Worker, check both hashes, store in the user's R2 under a random key, return a 15-minute link on the Worker's own host; delete after 7 days.
+  - Workers SSRF rules (https only, raw-string, IP-literal and host-name checks per URL and redirect, at most 2 redirects, byte cap, timeouts); no VPC or Tunnel binding in the template.
 - **Acceptance:**
-  - Authorisation without owner proof fails; a replayed challenge fails; the access code is single-use and short-lived; a revoked token is rejected.
+  - Tests: a private, loopback or IP-literal URL is refused; an expired link answers 404; the link and the file name never appear in a log (secret-canary test).
+
+#### M2-3f-1 · cloud agent: owner setup on the Worker origin
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
+- **Repo/path:** agentlink · apps/cloud-agent (owner pages), packages/ui
+- **Depends on:** CLOUD-SPEC, M2-3a
+- **Spec:** 08 §3.2; 04 §2.2, §2.3.1, §2.3.2, §2.5 "Cloud owner presence"; 11 §5; design `docs/design/d2/screens/cloud/` (D-116); D-131 (1), (2), (a)–(c)
+- **Invariants:** I-1, I-4, I-7, I-10
+- **Scope:**
+  - `/setup`: setup code check (single use, closed once an owner exists); one passkey gesture creates the owner seed in the browser, wraps it (`ALKP`), signs the first card and first rules, shows the recovery code once with a save step (`ALKR`); the Worker stores only public keys, signed objects and blobs.
+  - A runtime-agnostic owner-page bundle reusing the M1-8e and M1-11 browser code, styled from the D2 cloud screens; RP ID = exact host; CSP and SRI; recovery-code fallback where PRF is missing (including a passkey created without PRF that returns PRF at the next sign-in); "Open in Safari / Chrome" where WebAuthn is missing.
+- **Acceptance:**
+  - Playwright with a virtual authenticator: setup succeeds once; a second setup, a wrong code and a replayed code fail; the Worker never receives the owner seed (request capture); the PRF-missing path works with the recovery code.
+
+#### M2-3f-2 · cloud agent: approval and status pages
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
+- **Repo/path:** agentlink · apps/cloud-agent (owner pages)
+- **Depends on:** M2-3f-1, M2-3b
+- **Spec:** 06 §2.5 (cloud link); 08 §3.3 step 5, §3.5; 04 §2.5, §2.5.1; D-131
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - `/approve/<id>`: the approval card rendered from the stored action (as on the local page), one owner flow per gesture; the signed object handed to `AgentDO` for the core to verify.
+  - `/status`: agent online, version and "update available", connected apps with remove (`connector.revoke`), recovery kit download (`ALKK`, after a gesture).
+- **Acceptance:**
+  - Browser tests: approve and deny round trips; a tampered action is refused by the core; inbound text on the card stays inside the untrusted container.
+
+#### M2-3c · cloud agent: OAuth with the owner's passkey
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
+- **Repo/path:** agentlink · apps/cloud-agent, tools/deps-check (zone for the OAuth library)
+- **Depends on:** M2-3b, M2-3f-1
+- **Spec:** 08 §3.3; 04 §2.5.1 (`connector.authorize`, `connector.revoke`), §7, §8 rule 1; 02 F-71; D-131 (6), (11)
+- **Invariants:** I-4, I-7, I-8
+- **Scope:**
+  - `@cloudflare/workers-oauth-provider` at an exact version at least two weeks old, allowed by deps-check in `apps/cloud-agent` only; PKCE S256, dynamic registration and CIMD; `resource` pinned at deploy time; the `iss` response parameter.
+  - The sign-in page signs `connector.authorize`; the per-request grant check in `AgentDO` (fail closed, revokes the library's grant too); scope checked by our handler; the library's signed-JWT and enterprise grant paths and its "remember approval" cookie off, with a test.
+  - The AGENTS.md crypto allowlist line follows in its own sensitive-path PR (owner "merge").
+- **Acceptance:**
+  - Sign-in without the owner's gesture fails; a revoked grant fails at its next request, including with the previous refresh token; a wrong PKCE verifier and a replayed code fail; tokens and grant data never appear in a log; the disabled features are refused.
+- **Notes:** the console-signed challenge and `agentlink cloud login` come later with the console (08 §3.3 step 6).
 
 #### M2-3d · cloud agent: deploy paths and template repository
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
-- **Repo/path:** agentlink · apps/cloud-agent, apps/cli (`agentlink cloud deploy`); template repo `4thtech/agentlink-cloud-agent`
-- **Depends on:** M2-3a, M2-3c; DECISION NEEDED: template sync mechanism (`release-and-deployment.md` §4.8)
-- **Spec:** 08 §3.2; 02 J6; `release-and-deployment.md` §4.8
-- **Invariants:** I-1, I-3
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable (seed and setup claim)
+- **Repo/path:** agentlink · apps/cloud-agent, apps/cli (`agentlink cloud deploy`); template repo `4thtech/agentlink-cloud-agent`; docs-site guide page (setup-code generator)
+- **Depends on:** M2-3a, M2-3f-1, M2-3c; template repository decided (D-131 (7)); sync mechanism in `release-and-deployment.md` §4.8 (proposed)
+- **Spec:** 08 §3.2, §3.5; 06 §8; 02 J6; `release-and-deployment.md` §4.8; D-131 (3), (9)
+- **Invariants:** I-1, I-3, I-7
 - **Scope:**
-  - `agentlink cloud deploy`: seed generated locally, `wrangler secret put AGENT_SEED` into the user's account, deploy.
-  - Deploy-to-Cloudflare button: `/setup` protected by a one-time setup code; seed generated in the Worker and stored in DO wrapped with `SEED_WRAP_KEY`.
-  - Owner pairs the agent (owner-signed card). One-way template sync at a release tag; template pins provenance-carrying npm versions and holds no secrets.
+  - `agentlink cloud deploy` (certified first): Cloudflare sign-in through Wrangler, seed generated locally, `wrangler secret put AGENT_SEED`, deploy, logs-off check, setup link with the code after `#`.
+  - Deploy-to-Cloudflare button: the guide page generates `SETUP_CODE` and `SEED_WRAP_KEY` in the browser (no request carries them); the guide says a free GitHub or GitLab account is needed.
+  - Wrangler config with logs, traces, Tail, Logpush and preview URLs off; one-way template sync at a release tag; pinned provenance npm versions; MIT licence (G-41); no secrets.
 - **Acceptance:**
-  - Both paths deploy into a test Cloudflare account and complete J6; `/setup` is unusable after first use; captured traffic from the CLI path sends the seed to no 4thTech system.
+  - Both paths deploy into a test Cloudflare account and complete J6; `/setup` is unusable after first use; captured traffic from both paths sends the seed, the codes and the Cloudflare token to no 4thTech system.
   - **Deploy (D-25):** template publication only from a release tag, after the owner's approval click; a staging test deployment of the tagged template passes a smoke test (status, send, check inbox) first; a failed check restores the previous template tag; deploy record; halted by `DEPLOY_FREEZE`. 4thTech never deploys into users' accounts.
 
-#### M2-3e · harness connector validation (ChatGPT developer mode, claude.ai)
+#### M2-3i · cloud agent: updates, limits, cost and leaving
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable (`cloud update` uses the user's deploy credentials, 04 §2.5)
+- **Repo/path:** agentlink · apps/cloud-agent, apps/cli (`agentlink cloud update`)
+- **Depends on:** M2-3b, M2-3f-2, M2-3d
+- **Spec:** 08 §3.5; 06 §8; I-10; D-131 (4), (9)
+- **Invariants:** I-7, I-10
+- **Scope:**
+  - Version check against the latest release tag (nothing about the agent sent) and the "update available" line in `agentlink_status` and `/status`; `agentlink cloud update`.
+  - Per-IP limits on `/mcp` and the OAuth endpoints; the expected monthly cost; uninstall steps.
+  - After `cloud deploy` and `cloud update`, the CLI tells the user to run `wrangler logout` or use a token scoped to this Worker (04 §2.5).
+- **Acceptance:**
+  - An older deployed version shows the notice; the version request carries no agent data (capture); a flood hits the limits, not the bill.
+
+#### M2-3g · cloud agent: phone-friendly copy and "my other computer"
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
-- **Repo/path:** agentlink · docs-site/guide/apps/cloud-agent.md, docs-site/technical/guides/self-host-cloud-agent.md
-- **Depends on:** M2-3c
-- **Spec:** 10 M2-3; 06 §7; 02 J6
+- **Repo/path:** agentlink · packages/mcp-tools (fixed strings), apps/cloud-agent
+- **Depends on:** M2-3b; the 0.3.0 label work (M1-UX-OTHER-COMPUTER)
+- **Spec:** 06 §2.5 (cloud link); 11 §5; D-130 (5); D-131 (1)
+- **Invariants:** I-5
+- **Scope:**
+  - The phone-first approval `nextStep` and the other cloud strings in 11 §5 vocabulary; the accept card's "This is my other computer" label on cloud and desktop.
+- **Acceptance:**
+  - The vocabulary test passes on the new strings; the label is local only (no signed or sent field).
+
+#### M2-3j · cloud agent: test harness and staging deploy
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path)
+- **Repo/path:** agentlink · apps/cloud-agent (tests), e2e/, .github/workflows
+- **Depends on:** M2-3a (start); grows with each card
+- **Spec:** 08 §3; `ci-cd.md`; D-131
 - **Invariants:** —
 - **Scope:**
-  - Connect a ChatGPT developer-mode connector and a claude.ai custom connector to a deployed Worker; document steps and plan requirements.
+  - Workers test suites, Playwright with a virtual authenticator for the owner pages, MCP-over-HTTP end-to-end tests, and a CI deploy of the tagged template into a 4thTech test account with a smoke test (status, send, inbox, approve).
 - **Acceptance:**
-  - Both connectors complete `agentlink_status` → `agentlink_send` → `agentlink_inbox` (transcripts in PR); docs updated.
+  - The smoke test runs on every release tag and blocks template publication when red.
+
+#### M2-3e · Claude connector validation on the web and phones
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · docs-site/guide/apps/cloud-agent.md, docs-site/technical/guides/self-host-cloud-agent.md
+- **Depends on:** M2-3c, M2-3d, M2-3f-2
+- **Spec:** 10 M2-3; 06 §7; 02 J6; D-131 (5)
+- **Invariants:** —
+- **Scope:**
+  - Add a claude.ai custom connector to a deployed Worker on the web, then use it in the Claude iOS (18.4 or later) and Android apps; check the Free plan's one-connector limit; record how tool-result links open on each phone and whether the passkey works there. ChatGPT web is a later card.
+- **Acceptance:**
+  - From a phone: `agentlink_status` → `agentlink_send` → `agentlink_inbox` → an approval round trip with Face ID or a fingerprint (transcripts in the PR); docs updated.
+
+#### AUDIT-CLOUD · independent audit of the 0.4.0 cloud slice
+- **Status:** backlog · **Size:** M · **Tier:** Fable · **Security:** S2
+- **Repo/path:** agentlink-ops (private report); agentlink · apps/cloud-agent (read only)
+- **Depends on:** M2-3a, M2-3b, M2-3c, M2-3d, M2-3f-1, M2-3f-2, M2-3h, M2-3i
+- **Spec:** 04 (the cloud rows, §7, §8 rule 1); 08 §3; D-131
+- **Invariants:** I-1 to I-10
+- **Scope:**
+  - Audit the slice against 04 and the D-131 threat rows, including the OAuth library's crypto use, the owner pages (web checklist: CSP, SRI, RP ID, cookies), the setup claim and logging.
+- **Acceptance:**
+  - A report with no open Critical or High finding; it is the release gate for 0.4.0.
+
+#### DOCS-CLOUD · guide: use AgentLink from your phone
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (docs-site)
+- **Repo/path:** agentlink · docs-site/guide, docs-site/technical, README.md, docs/status.yaml
+- **Depends on:** M2-3e
+- **Spec:** 08 §3; 11 §5; D-131
+- **Invariants:** —
+- **Scope:**
+  - Guide "Use AgentLink from your phone" (deploy, add to Claude, daily use, approvals, cost, recovery, removal, "your agent runs in your own Cloudflare account"); the cloud-agent and Claude pages; ChatGPT marked later; the technical self-host guide; README Status and Roadmap; changelog; X post.
+- **Acceptance:**
+  - An external tester follows the guide end to end from a phone.
 
 ### Registry and verified badge
 
@@ -6155,6 +7143,39 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Acceptance:**
   - Certificates issued; custody recorded privately; a test signature from the CI release environment verifies (with M2-11e).
 
+#### M2-UX-REMEMBER-MORE · "Remember for this contact" beyond proofs (new, D-130 (6))
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (policy rule fields, owner signing) · **Phase:** M2
+- **Repo/path:** agentlink · `packages/core` (policy), `packages/types`, `apps/local-ui` approval cards; `docs/foundation/06-mcp-server.md` §3
+- **Depends on:** M1-11a-b; a spec PR with its own decision entry
+- **Spec:** 06 §3 (per-contact rules; M2 note)
+- **Invariants:** I-4
+- **Scope:**
+  - Spec first: rule fields for incoming files over the size limit and for receipts from one contact; each "remember" is a `policy.set` under the same gesture as its approval; the AI can never create the rule.
+- **Acceptance:**
+  - Spec merged with a D-entry before code; tests first; independent review (S2).
+
+#### M2-UX-DEVICE-LINK · "Add my other computer" as the same owner (new, D-130 (5))
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (moves the owner seed between machines) · **Phase:** M2
+- **Repo/path:** agentlink · `packages/node`, `apps/local-ui`, console; `docs/foundation/04-security-and-crypto.md` §2.3.3, 08
+- **Depends on:** M1-9i (recovery kit), the M2 console
+- **Spec:** 04 §2.3.3; 08 §1, §2 (spec to write)
+- **Invariants:** I-1, I-4, I-10
+- **Scope:**
+  - Spec first: one owner on two computers, using the recovery-kit format (a QR code between local pages, or through the console); the owner decides the flow.
+- **Acceptance:**
+  - Spec merged with a D-entry and a threat note before code; independent review (S2).
+
+#### M2-UX-NEWCONTACT-ONE-GESTURE · accept, name and safety-code check as one tap (new, UX-v2 plan, D-130)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (combined owner flow) · **Phase:** M2
+- **Repo/path:** agentlink · `apps/local-ui`, `packages/node`; `docs/foundation/04-security-and-crypto.md` §2.5
+- **Depends on:** M1-11c-a2, M1-11b-5
+- **Spec:** 04 §2.5 (one owner flow; to be named), §3.6.1
+- **Invariants:** I-4
+- **Scope:**
+  - Spec first: 04 §2.5 names the pair (accept with the name, then the safety-code check) before any combined flow is built.
+- **Acceptance:**
+  - Spec merged before code; tests first; independent review (S2).
+
 ### Storage connectors (D-49) (new)
 
 #### M2-15a · storage: connector framework (OAuth with PKCE, keychain tokens, share links) (new, D-49)
@@ -6300,6 +7321,15 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - README Status and roadmap updated to the state at this point; README never claims unimplemented features.
   - UX (D-39…D-41): no wallet, browser extension, gas or chain choice appears anywhere in the J1–J9 default flows (CLI, desktop apps, console, browser counterparty); install → first message meets the D-125 rule: median < 5 minutes, at least 80% of testers < 5 minutes, no tester > 15 minutes for a cause on our side (counterpart wait excluded; an over-15 caused by us is a bug fixed before the gate passes).
   - Adopter count, the measured median and the share under 5 minutes recorded; issues filed as cards; owner sign-off.
+
+#### M2-GROUP-THREADS · true group conversations (new, owner proposal 2026-10-25)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · spec 04, 06, 08 first; then core and node
+- **Depends on:** M1-CONTACT-LISTS
+- **Scope:**
+  - Proposed, owner schedules. Group conversations with membership, rules for who may add or remove people, history for new members, and per-member encryption. Needs a spec first (08, 06, 04).
+- **Acceptance:**
+  - Spec merged before any code; the owner schedules the build.
 
 ---
 
@@ -6452,7 +7482,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - Same checks as M3-4b, run on a testnet: vault address pinned, token domain read from chain, replay and below-minimum rejected; threat note and tests-first evidence (S2).
 #### M3-4b-t-T2-b · gasless window bound: builder and relay agree (new, IR-M3-4b-t-T2-1, #451)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Opus build, Fable audit · **Security:** S2 (EIP-3009 typed data) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain` (gasless builder, relay checks)
 - **Depends on:** M3-4b-t
 - **Spec:** 07 §7; D-123
@@ -6462,8 +7492,19 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - A test shows the builder refuses a window the relay would refuse; the constant has one definition; no check weakened.
 
+#### M3-4b-t-T2-c · submitter precheckDepositAuthorization: window-boundary tests (new, 2026-10-23 review)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (tests only; `apps/submitter/**` is S2 if code changes) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/submitter` (`precheckDepositAuthorization`)
+- **Depends on:** M3-4b-t-T2-b (#481); implemented by PR #484
+- **Spec:** 07 §7
+- **Invariants:** I-3
+- **Scope:**
+  - Give `precheckDepositAuthorization` its own tests at the window boundary: a validity window of 900 plus 120 seconds is accepted and one second more is refused.
+- **Acceptance:**
+  - Both boundary cases are tests in the submitter's own suite.
+
 #### M3-4b-t-S0-b · stale "until M1-3c" comments in packages/chain (new, IR-M3-4b-t-S0-1, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Haiku · **Security:** S1 (comments only; `packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/calls.ts` (line 5), `clients/state.ts` (line 9), `fees/deposit.ts` (line 13)
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**
@@ -6472,7 +7513,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - A diff of comments only; no remaining "until M1-3c" in `packages/chain/src`.
 
 #### M3-4b-t-S0-c · registry-level test: gaslessToken refuses while the kill switch is off (new, IR-M3-4b-t-S0-2, #453)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/chain/**`) · **Phase:** M3 (pulled forward by D-123)
 - **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and its test
 - **Depends on:** M3-4b-t-0 (#453)
 - **Scope:**
@@ -6492,6 +7533,56 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Refund the quota when the process crashes mid-send.
 - **Acceptance:**
   - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+
+#### M3-4b-t-T4-a · gasless top-up: core executor `runGaslessTopUp` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (signs; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `packages/core/src/proofs/gasless-topup.ts` and test; additive hunk in `packages/core/src/proofs/platform.ts`
+- **Depends on:** M3-4b-t-T2-b (#481)
+- **Spec:** 04 §2.5.1; 07 §7
+- **Invariants:** I-1, I-3, I-4, I-7
+- **Scope:**
+  - An internal function `runGaslessTopUp(deps, {chainId, token, amount})`, run only after the caller verified an owner action: kill switch, chain and token gate, local rate limit (5 requests per agent per hour, counted from persistent applied-nonce rows), build and sign with the agent KeyStore (never the owner key), post through a `DepositAuthPort`, poll `creditsOf` for the rise. Fixed outcome words. Not exported from `packages/core/src/index.ts`.
+  - Owner decisions of 2026-10-23: owner approves each top-up; $5 minimum and $50 cap on testnet; normal deposit fee; the submitter pays the network cost; 15-minute window.
+- **Acceptance:** tests first (`RED (expected): M3-4b-t-T4-a …`): agent key only signs and the owner signer has 0 calls; the real registry (flag false) gives `refused:not_available` with 0 signs; chain and token gate; $4.99 and $50.01 refused, $5 and $50 signed with the exact value; window at most 900 s; the 6th call in an hour is `rate_limited` and survives a restart; `submitted` without a `creditsOf` rise is `pending`; no txHash, signature, nonce, address or URL in results or logs; no export from the core index; concurrent calls are serialised. Full threat note.
+
+#### M3-4b-t-T4-b · gasless top-up: runtime deposit-auth port (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · new `apps/cli/src/runtime/deposit-auth.ts` and test; two-line hook in `apps/cli/src/runtime/proofs.ts`
+- **Depends on:** M3-4b-t-T4-a (port type)
+- **Spec:** 07 §7
+- **Invariants:** I-3, I-7
+- **Scope:**
+  - Build the `DepositAuthPort` from `createDepositAuthClient` with the shipped submitter URLs only; map answers to fixed words (`submitted`, `rate_limited`, `already_used`, `unavailable`, `refused:<code>`); strip the txHash. Wire into `nodeProofs`.
+- **Acceptance:** tests first: an override URL failing `checkRpcUrl` is refused; 501 on all URLs is `unavailable`, 429 is `rate_limited`, 409 `already_used` is `already_used`, an unparsable answer is `unavailable`; the txHash never reaches core; the bundle check (proofs off) carries no deposit-auth code.
+
+#### M3-4b-t-T4-c · gasless top-up: `credits.deposit` gasless branch (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner action; money path) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/core/src/proofs/credits-move.ts` and test, `packages/node/src/local-ui/api/proofs.ts` and `proofs-top-up.test.ts`, `docs/foundation/04` §2.5.1, `07` §7, changeset, `changelog.d/`
+- **Depends on:** M3-4b-t-T4-a, M3-4b-t-T4-b, draft PR #435 (stack on it or on main after it merges)
+- **Spec:** 04 §2.5, §2.5.1; 07 §7
+- **Invariants:** I-3, I-4
+- **Scope:**
+  - `credits.deposit` for Base Sepolia (84532) USDC goes to `runGaslessTopUp` after the object checks and after the nonce is recorded; `readTopUp` gains `method: 'gasless'` (addable clipped to $5..$50 and the balance) and stays `coming_soon` while the kit refuses. The node API accepts 84532/USDC behind presence. 04 §2.5.1 row extended and one line in 07 §7 (proposed, owner confirms at merge).
+- **Acceptance:** tests first: the nonce is recorded before signing (order spy); a replay gives 0 signs; an object signed by the agent key, an unknown key, another agent, or with expiry over 600 s or expired is refused with 0 signs and no nonce row; the amount comes only from the signed object; `coming_soon` while the flag is false; the API refuses without a presence session and returns no txHash; the Chiado tests from #435 pass unchanged.
+
+#### M3-4b-t-T4-d · gasless top-up: local UI method (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus audit · **Security:** S2 (money path UI, D-116 styling) · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/{top-up.tsx,strings.ts,data.ts,proofs.test.ts}`, `apps/local-ui/src/api/client.ts`, new `e2e/test/local-ui-gasless-topup.test.ts`
+- **Depends on:** M3-4b-t-T4-c, draft PR #435
+- **Spec:** 11 §5, §6.7; `docs/design/README.md`
+- **Scope:**
+  - "Add credits" for the Base Sepolia USDC method: the received amount, a picker within $5..$50, a confirm step behind presence, then pending, done and limited states, in plain words per 11 §5 (no wallet, gas, transaction, hashes or chain names in the default UI).
+- **Acceptance:** Playwright: received, pick $20, confirm with presence, pending, done; under $5 the button is disabled; above $50 the amount clamps with a note; the 6th try in an hour shows the limit copy; `lintVocabulary` and axe pass; the style matches the D-116 screens.
+
+#### M3-4b-t-T4-e · gasless top-up: switch on `GASLESS_TOPUP_ENABLED` (new, D-123, T4 plan 2026-10-23)
+- **Status:** backlog (**needs the owner's go-ahead** before the flip) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner "merge") · **Phase:** M3 (pulled forward by D-123)
+- **Repo/path:** agentlink · `packages/chain/src/clients/registry.ts` and tests, `README.md`, docs-site, `knowledge/`
+- **Depends on:** M3-4b-t-T4-c, M3-4b-t-T4-d, M3-4b-t-T3-c, and Tali enabling the staging submitter variables and smoke-testing them
+- **Spec:** 07 §7; D-123
+- **Invariants:** I-3
+- **Scope:**
+  - Set `GASLESS_TOPUP_ENABLED = true`; keep the kill-switch test (S0-c) proving the refusal by injecting the flag; update the funding-detection and `pick` tests for Base Sepolia. README Status, the docs-site credits guide and `knowledge/` updated; X post.
+- **Acceptance:** with the flag true the real registry composes `eip3009` for Base Sepolia USDC only and Chiado is unchanged; the S0-c test still fails if the flag check is removed; no test weakened.
 
 #### M3-5 · Submitter on mainnet: operations, monitoring, alerts
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
@@ -6774,11 +7865,33 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Invariants:** —
 - **Scope:**
   - A zero-dependency Node script, run in CI on changes to `docs-site/`: every relative link and anchor resolves; every Markdown file in a space appears in its `SUMMARY.md` exactly once and every entry exists; every page starts with a status hint; the guide uses none of the 11 §5 "Never say" terms outside sections titled "Advanced".
-  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25.
+  - Mirror `docs-site/**` = S1 (`audit-rules.md` §2.2, D-57) in `review-gate.yml`; this `.github` part is the owner's, together with M0-25. The `review-gate.yml` mirror landed in CHORE-CI-DOCS-FASTLANE (owner decision 2026-10-25).
   - Reuse the link checker from M0-24 where it exists; this card adds the `docs-site/` rules.
 - **Acceptance:**
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
   - A fixture PR touching only `docs-site/` is derived as S1 by `review-gate`.
+
+#### M3-4b-t-T4-ab-reconcile · gasless top-up: reconcile the core step and the CLI port (new, follow-up of IR-1 on #494 and #490)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core`, `apps/cli`) · **Phase:** M3
+- **Repo/path:** agentlink · `packages/core` (T4-a step), `apps/cli` (T4-b port)
+- **Depends on:** M3-4b-t-T4-a (#494), M3-4b-t-T4-b (#490); starts after both merge
+- **Scope:**
+  - Use the core `DepositAuthPort` type in the CLI instead of the local copy.
+  - A remote `gasless_unavailable` fails over to the next URL, then ends `unavailable`. A local pre-send refusal stays `refused` with `gasless_unavailable`.
+  - Lows: check the body length before reading it whole (`bodyOf`); a 200 with `failed` or `rate_limited` honours `Retry-After`.
+- **Acceptance:**
+  - Tests first: a first URL answering `gasless_unavailable` fails over to the second, and both failing ends `unavailable`; the local pre-send refusal is unchanged; an oversized body is refused before it is read; `Retry-After` on a 200 `rate_limited` is honoured.
+
+#### M3-4b-t-T4-a-c · gasless top-up: refusals list, retry-after, fail-over test (new, low, IR-M3-4b-t-T4-a-3)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (packages/core)
+- **Repo/path:** agentlink · packages/core top-up executor
+- **Depends on:** M3-4b-t-T4-a
+- **Scope:**
+  - Drop or comment `gasless_unavailable` and `unsupported_chain` in `DEPOSIT_AUTH_REFUSALS` (the remote path now fails over; only local pre-checks use them).
+  - Show the remote `rate_limited` retry-after in the top-up result for the UI.
+  - Add a test: a 200 `failed` `gasless_unavailable` with a transaction hash fails over and ends `already_used`.
+- **Acceptance:**
+  - Tests first for each item; no test weakened.
 
 ---
 
@@ -6889,12 +8002,12 @@ Sizes are effort, not calendar time. The M1a path has thirteen sequential M1 car
 | **C — M1a weeks 2–4** | Core: M1-7a → M1-7b → M1-7c → M1-7h → M1-7j; M1-7d → {M1-7e, M1-20} → M1-32 · Transport: M1-5a → M1-5b → M1-5c · Node: M1-8a → {M1-8b, M1-8c}; M1-8f in parallel, off the critical path · CLI: M1-9a → M1-9b · MCP: M1-9c → {M1-9e, M1-9g (after DESIGN-D1), M1-12a, M1-13b} · Install: M1-12b → M1-25 → M1-19 (invite page with prompt); M1-29 · E2E: M1-13a → M1-22 → **M1-23 (M1a gate)** · Spec follow-up: M1-30 (after D-53 merges) · M1b in parallel: M1-1d, M1-1j, M1-1k, M1-3c, M1-3e, M1-3f, M1-6a |
 | **D — M1b weeks 4–6** | Chain: M1-4a → {M1-4b → M1-26, M1-4d}, M1-3g → M1-4c · Storage: M1-6b → M1-6c · Drop: M1-27a → M1-27b · Core: M1-7f, M1-7i, M1-7g · Owner presence: M1-8d → M1-8e → M1-11a → M1-11c → M1-11b (after DESIGN-D1) · Submitter: M1-10a → M1-10b → M1-10c · CLI: M1-9h, M1-9i · Owner: M2-14 enrolment and M2-16 OAuth registrations start |
 | **E — M1b weeks 6–7** | M1-9d, M1-9f, M1-12c, M1-12d, M1-13c, M1-13d → M1-GATE |
-| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f → {M2-18b, M2-18c, M2-18d}, M2-2h · Top-up (D-111, crypto first): M1-26-d → M1-26-e; card last: D-15 → M2-18a → M3-4c · Cloud: M2-3a → M2-3b → M2-3c → {M2-3d, M2-3e}, M2-2g · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
+| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f → {M2-18b, M2-18c, M2-18d}, M2-2h · Top-up (D-111, crypto first): M1-26-d → M1-26-e; card last: D-15 → M2-18a → M3-4c · Cloud (0.4.0 first, D-131): M2-3t → M2-3t-w → M2-3a → {M2-3b, M2-3h, M2-3f-1} → M2-3c (after M2-3b and M2-3f-1) → M2-3d → M2-3e → AUDIT-CLOUD, with M2-3f-2, M2-3g, M2-3i, M2-3j alongside and DOCS-CLOUD after M2-3e; M2-2g later (0.4.x) · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
 | **M3** | M3-12 and M3-2a first · Audits: M3-1a, M3-1b · Governance: M3-2b → M3-2c → {M3-3, M3-4a, M3-5, M3-6} · M3-4b · M3-7, M3-8, M3-9 · M3-14, M3-15, M3-16 (after M3-3) · M3-10 → M3-11 → M3-GATE |
 
 ### 7.3 M2 critical path
 
-**DESIGN-D2 → M2-1a → M2-1b → M2-2a → M2-2b → M2-2d → M2-2e → M2-3c → M2-3d → M2-GATE**, with M2-10 (console domain) before external testers. The M2 critical path starts from DESIGN-D2: if D2 arrives late, M2 slips by the same amount. Non-UI work (M2-3a, M2-4a, M2-7, M2-9, M2-11a) can start before D2.
+**DESIGN-D2 → M2-1a → M2-1b → M2-2a → M2-2b → M2-2d → M2-2e → M2-GATE**; the cloud agent no longer waits for the console (D-131): its own path is **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → 0.4.0**, joined at M2-3c by **CLOUD-SPEC → M2-3f-1**, with M2-10 (console domain) before external testers. The M2 critical path starts from DESIGN-D2: if D2 arrives late, M2 slips by the same amount. Non-UI work (M2-3a, M2-4a, M2-7, M2-9, M2-11a) can start before D2.
 
 Desktop chain (D-36, D-41): M2-11a → M2-11b → M2-11g (after M2-2e) → M2-GATE, with the M2-14 certificates needed before M2-11e. The desktop apps add substantial scope to the build plan's 4–6 weeks for M2; M2-11a re-checks the estimate.
 
@@ -6960,9 +8073,9 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 11. **G-11 (L) Logger package missing from the package map.** RESOLVED by M0-8: `@4thtech-io/log` (zero dependencies) is in the 07 §1 package map and `repo-reference.md`. *Was:* 04 §8.4 vs 07 §1. *Blocked:* M0-8.
 12. **G-12 (M) JCS and invite compression.** RESOLVED. *JCS:* by M1-1a (4thtech/agentlink#27): in-repo RFC 8785 code checked against the RFC vectors (`packages/crypto/src/jcs.ts`), the alternative proposed here, so no dependency was added. *Compression:* by 4thtech/agentlink#70 (D-69; the encoding decided by Tali in chat, 2026-10-14; the decoder rules proposed, owner confirms at merge), in 04 §3.6: raw DEFLATE (RFC 1951) with no zlib header or checksum, through the platform `CompressionStream("deflate-raw")` and `DecompressionStream("deflate-raw")`. Proposed with it (revised after review IR-D-69-1): the whole input bounded before URL parsing (the canonical prefix plus at most 21 846 characters of strict base64url, or the bare payload); inflation in bounded slices with a running count, capped at 16 384 bytes before any parse, with an orderly shutdown; the stream must end exactly at the end of the input (malformed, truncated and trailing-byte streams refused in every runtime, the codec detecting trailing input itself where the platform does not); fatal UTF-8 with the BOM kept, I-JSON and the strict schema before use; the encoder checks both limits; compressed bytes never hashed or signed; one codec in `@4thtech-io/core` (M1-7c). The proof-pack link is not covered (G-52). *Was:* 04 §3.1, §3.6; `AGENTS.md` dependency allowlist. No JCS implementation was allowlisted although `envelopeHash` depends on it; "deflate" did not say raw DEFLATE or zlib. *Proposed:* approve a vetted RFC 8785 implementation (or in-repo code with RFC vectors); specify `deflate-raw` via `CompressionStream`. *Blocked:* M1-1a (done), M1-7c.
 13. **G-13 (L) Record kind ↔ payload type.** **RESOLVED (D-86, Tali, in chat, 18 Oct 2026):** fixed mapping in 05 §3.1; control, pairing and owner types are refused for notarization; the recipient checks the kind before signing a receipt. *Was:* 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocked:* M1-7g.
-14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14; the Workers egress part stays open for M2-3b.
-15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into a shared package at M2-3b; no new package or audit-rules path row before then. *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
-16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d.
+14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14. **Resolved in spec by CLOUD-SPEC (D-131 (g); proposed, owner confirms at merge):** 06 §2.3 "Files on the cloud agent"; built in M2-3h.
+15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into `packages/mcp-tools` by M2-3t (done: audit-rules row added). *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
+16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d. **Cloud part resolved by CLOUD-SPEC (D-131; proposed, owner confirms at merge):** `agentlink cloud deploy` and `cloud update` are in 06 §8; the 0.4.0 OAuth sign-in uses the owner's passkey on the Worker's page, so `cloud login` and the owner-link protocol stay with the console (M2-2c) and no longer block M2-3c or M2-3d.
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". **RESOLVED (D-89, Tali, in chat, 2026-10-19, option a):** the flag is off-chain (per-chain config, read by the client and the submitter); the contract keeps no flag but requires an allowed token and `value ≥ minDeposit`, measures its balance before and after `receiveWithAuthorization`, and reverts `DepositMismatch()` unless the increase equals `value` (05 §2.5, §7). Contract work: M1-3c, in the private repo.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
@@ -7058,13 +8171,13 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | M1-18 | **DECISION NEEDED:** `agentlink-ops` pipeline; host the optional relay |
 | M1-23 | Run the J9 dogfood with @denisjazbec (install, pair, daily project sync, a J8 negotiation); sign off the M1a gate |
 | M1-24 | Trademark and name check (D-38) with counsel before the production domain (M2-10); start early |
-| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; confirm the drop limits; engage counsel on the hosting terms; **DECISION NEEDED:** terms of service and takedown process |
+| M1-28 | (D-48) Create the drop's R2 buckets with a 7-day lifecycle rule and the `drop.` hostname; drop limits confirmed (D-129; download limit 16 (owner-confirmed 23 Oct 2026)); engage counsel on the hosting terms (brief in agentlink-ops); internal testers only until sign-off |
 | M1-GATE, M2-GATE, M3-GATE | Recruit testers; sign off the gate; accept or reject residual risks |
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
 | DESIGN-D3 | Deliver D3 (launch brand, marketing site for the production domain) before M3 public launch |
-| M2-3d | Create `4thtech/agentlink-cloud-agent`; **DECISION NEEDED:** template sync mechanism |
-| M2-3e | Provide paid ChatGPT and claude.ai plans for connector tests |
+| M2-3d | Create `4thtech/agentlink-cloud-agent` (decided, D-131 (7)); confirm the proposed sync mechanism (`release-and-deployment.md` §4.8) |
+| M2-3e | Provide a Claude plan (Pro; also try Free), an iPhone on iOS 18.4 or later and an Android phone with Google Password Manager, and a Cloudflare test account (Free, then Paid) for connector tests (D-131: Claude only for 0.4.0, no ChatGPT seat now) |
 | M2-10 | **DECISION NEEDED:** production console domain (TBD; choose and register) before external testers |
 | M2-11a | Approve the desktop framework decision after its security review |
 | M2-16, M2-15b–M2-15d | (D-49) Register the OAuth clients with Google, Dropbox and Microsoft under a 4thTech organisation account and pass provider reviews; **DECISION NEEDED:** per provider, sender-side revocation where no expiring link exists, and OneDrive's scope (G-45) |

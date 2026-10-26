@@ -1,6 +1,6 @@
 // The 11 §5.1 vocabulary lint for the invite page copy and prompt (test code only).
 
-// 11 §5.1 "Never say" (as in apps/cli/src/tools/strings/en.test.ts). Command literals in backticks
+// 11 §5.1 "Never say" (as in packages/mcp-tools/src/strings/en.test.ts). Command literals in backticks
 // are not prose.
 export const BANNED: readonly [string, RegExp][] = [
   ['wallet', /\bwallets?\b/i],

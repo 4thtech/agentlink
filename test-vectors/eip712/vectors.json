@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "eip712",
-  "version": 1,
+  "version": 2,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
@@ -1209,6 +1209,61 @@
       "input": {
         "op": "agentCardJson",
         "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 9007199254740991.4, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-escaped-value",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1, 04 \u00a72.5.1 Received text (D-128): an escape inside a string value is unaffected and hashes like the card",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"\\u0030x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "digest": "7abb5ab9667f7ee4d86adea395f4feea44a34df00a0937ac623fb3502642a711"
+      }
+    },
+    {
+      "id": "card-json-reject-escaped-version",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1, 04 \u00a72.5.1 Received text (D-128): `version` spelled \\u0076ersion (first member); rejected on the text, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"\\u0076ersion\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-escaped-key-epoch",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1, 04 \u00a72.5.1 Received text (D-128): `keyEpoch` spelled keyEpoc\\u0068 (last member); rejected on the text, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoc\\u0068\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-escaped-name-upper-hex",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1, 04 \u00a72.5.1 Received text (D-128): `issuedAt` spelled issued\\u0041t; rejected on the text, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issued\\u0041t\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0}"
+      },
+      "expected": {
+        "outcome": "reject"
+      }
+    },
+    {
+      "id": "card-json-reject-escaped-name-equals-another",
+      "source": "04 \u00a72.4 card JSON form, \u00a72.4.1, 04 \u00a72.5.1 Received text (D-128): a second `keyEpoch` spelled \\u006beyEpoch (a duplicate only after unescaping); rejected on the text, never normalised",
+      "input": {
+        "op": "agentCardJson",
+        "json": "{\"version\": 1, \"agentEvm\": \"0x18d675d5e86616dd150eb7f5bf5d91f3493a6094\", \"agentNostr\": \"0xf68917cec79aeb0b70a1d9f6e4416ed4b7b7a0acd800813a17c810130cb9b369\", \"agentEnc\": \"0x2aba325a155faa7f9bd9882dd91814cab80833832342d70d23a9cebb0784271c\", \"ownerEvm\": \"0x974fdeb6d126f79e6c89dd2442aa52d934df8499\", \"ownerNostr\": \"0x917490ad6f66af56e32df0e1ca3bce0bcbd4d0a33eb952d7515cede6e2f7c055\", \"ownerEnc\": \"0x360bc8a58437d71de69a609e59a29fe243e25dc446fe96c8696cb85fd675aa34\", \"nameHash\": \"0x67ebd76b640a9aac1f827bcbf2ce42191c0c44966942631ce4037418afddf160\", \"relaysHash\": \"0xe779ed544022f1030efcd6271710c06dfe6cd4aab2a2f0eb169566f8cf90092f\", \"issuedAt\": 1760000000, \"expiresAt\": 1791536000, \"keyEpoch\": 0, \"\\u006beyEpoch\": 0}"
       },
       "expected": {
         "outcome": "reject"

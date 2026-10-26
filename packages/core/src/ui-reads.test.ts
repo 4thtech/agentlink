@@ -554,6 +554,8 @@ describe('ActivityService.list (M1-11r-a)', () => {
           expect(keysOf(item)).toEqual([
             'at',
             'chainId',
+            'contact',
+            'cost',
             'direction',
             'id',
             'kind',
@@ -566,7 +568,7 @@ describe('ActivityService.list (M1-11r-a)', () => {
           expect(item.senderCode).toMatch(/^[0-9A-F]{4}·[0-9A-F]{4}$/);
           break;
         case 'contact_blocked':
-          expect(keysOf(item)).toEqual(['at', 'contactId', 'id', 'kind']);
+          expect(keysOf(item)).toEqual(['at', 'contact', 'contactId', 'id', 'kind']);
           expect(item.contactId).toBe(b.id);
           break;
         case 'rules_changed':

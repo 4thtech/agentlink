@@ -58,6 +58,10 @@
 //   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
 //   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
+// - M1-11a-ux: `/app.css` is the approval page's fixed stylesheet (approval-page.ts), served
+//   like `/app.js` under the same headers and CSP. The card view drops the AI argument `inviteUrl`
+//   (the invite's capability link) and carries an optional plain `headline`, checked like every
+//   other card field.
 // - M1-11s-b, the local UI shell (D-118): the React app (apps/local-ui) is served from an in-memory
 //   bundle the caller passes in (`localUi.assets`; the CLI embeds it), never from a file path.
 //   Only `index.html` and `assets/<one file name>` with a known type are accepted, checked before the
@@ -88,14 +92,28 @@
 //   creation response and completes the setup all or nothing (owner-setup.ts): the owner code, the
 //   passkey and the agent's first card. The owner code goes to the page once and is never in an
 //   event. The held seed is wiped on finish (whatever the outcome), on expiry, when its session is
-//   dropped and when the server closes. G-1: a same-user process holding a session link can race the
-//   human to set up an owner it controls (owner-setup.ts threat note).
+//   dropped and when the server closes.
+// - M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 08 §1 first run v2; proposed, owner confirms at merge): when
+//   the setup's `firstCard.firstPolicy` is wired, `begin` first prepares the folders (Send, Inbox,
+//   Proofs; owner-setup.ts prepareSetupFolders) and answers 409 `folder_refused` (reason
+//   `folder_not_empty` or `folder_unavailable`) before any seed exists when Send is a link at either
+//   level, not a folder or not empty. `finish` signs the card and the first policy with the same
+//   gesture and answers the fixed `sendFolder` outcome (`allowed`, `not_confirmed`, `not_allowed`;
+//   never the path) and the computer's name for the backup-code save form. The folders this run
+//   created are removed whenever the policy is not in force (failure, expiry, drop, close).
+// - M1-11b-6: `openFirstRun()` opens the first-run page with a one-shot session link, as `open()`
+//   does for `/`; the CLI's `init` calls it for a new owner (the CLI's first-run step). G-1: a
+//   same-user process holding a session link can race the human to set up an owner it controls
+//   (owner-setup.ts threat note).
+// - M1-11b-9: `openActivity()` is the same for `/settings/activity`, for `agentlink ui`; a session
+//   link grants viewing and the owner-presence-gated actions only, as for `open()`.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
 // by port, so another local server the owner's browser visits could receive the session cookie; it
 // grants viewing only. The opener's argv briefly holds the session link (approval-os.ts).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
 import type { OwnerActionOutcome } from '@4thtech-io/core';
 import {
@@ -121,7 +139,7 @@ import {
   type OwnerSession,
 } from '@4thtech-io/crypto';
 import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
-import { APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
+import { APP_CSS, APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
 import { decideReviewedWith, type ApprovalContext } from './owner-approval.js';
@@ -132,10 +150,15 @@ import {
   SETUP_HOLD_MS,
   checkSetupRegistration,
   completeOwnerSetup,
+  computerNameOf,
   noOwnerAnywhere,
   parseSetupRegistration,
+  prepareSetupFolders,
+  removeSetupFolders,
+  type SetupFolders,
   type SetupRegistration,
 } from './owner-setup.js';
+import { keepsFolder } from './owner-first-policy.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
@@ -198,6 +221,8 @@ const MAX_REVIEW_ITEMS = 20;
 const MAX_DETAIL_CHARS = 1024;
 const MAX_VALUE_CHARS = 16_384;
 const MAX_FIELDS = 64;
+/** AI arguments the page never shows (M1-11a-ux): the invite link of an accept-invite. */
+const HIDDEN_ARGS: ReadonlySet<string> = new Set(['inviteUrl']);
 
 /** The wait in seconds after `failures` rejected presence proofs in a row (0 = no wait). */
 export function presenceBackoffSeconds(failures: number): number {
@@ -310,6 +335,11 @@ function loadLocalUi(assets: LocalUiAssets | undefined): {
  * the AI chose, shown in their own marked region; they may hold anything, including markup.
  */
 export interface ApprovalDetails {
+  /**
+   * M1-11a-ux: the card's plain headline ("Connect with “Ana” (self-declared)"), fixed
+   * text plus at most the contact name under the 06 §2.1 rule; without it the page shows `what`.
+   */
+  readonly headline?: string;
   /** The contact, under the 06 §2.1 name rule. */
   readonly who: string;
   readonly what: string;
@@ -445,6 +475,8 @@ export type ApprovalServerEvent =
         | 'presence_rejected'
         /** IR-M1-11s-c-1 M-1: the owner was kept and its code handed out, the card unconfirmed. */
         | 'done_unconfirmed'
+        /** M1-UX-FIRSTRUN-V2: the Send folder can't be used; nothing began (reason says why). */
+        | 'folder_refused'
         | 'failed';
       /** IR-M1-11s-c-1 L-4: with `failed`, which kind of failure (a fixed code). */
       readonly reason?: OwnerSetupFailure;
@@ -453,8 +485,13 @@ export type ApprovalServerEvent =
        * 11 §5.2), so the CLI can show it outside the browser for comparing with `agentlink doctor`.
        */
       readonly fingerprint?: string;
+      /** M1-UX-FIRSTRUN-V2: with `done`, the first policy's fixed outcome (never the path). */
+      readonly sendFolder?: SetupSendFolder;
     }
   | { readonly kind: 'closed' };
+
+/** M1-UX-FIRSTRUN-V2: what happened to the first policy's Send folder (fixed codes). */
+export type SetupSendFolder = 'allowed' | 'not_confirmed' | 'not_allowed';
 
 /**
  * IR-M1-11s-c-1 L-4: why an owner setup step failed. `rolled_back`: nothing of this setup was kept,
@@ -462,7 +499,15 @@ export type ApprovalServerEvent =
  * `check_failed`: whether an owner exists could not be checked (nothing was written). `internal`:
  * anything else (nothing is known to be kept).
  */
-export type OwnerSetupFailure = 'rolled_back' | 'keychain' | 'check_failed' | 'internal';
+export type OwnerSetupFailure =
+  | 'rolled_back'
+  | 'keychain'
+  | 'check_failed'
+  | 'internal'
+  /** M1-UX-FIRSTRUN-V2, with `folder_refused`: Send already holds something. */
+  | 'folder_not_empty'
+  /** M1-UX-FIRSTRUN-V2, with `folder_refused`: Send is a link (either level) or not a folder. */
+  | 'folder_unavailable';
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
@@ -496,6 +541,8 @@ export interface ApprovalServerInternals {
   readonly ownerKdf?: Argon2idParams;
   /** M1-11s-c: the owner seed source for setup. Default: newOwnerSeed (@4thtech-io/crypto). */
   readonly newOwnerSeed?: () => { readonly seed: Uint8Array; readonly keys: OwnerPublicKeys };
+  /** M1-UX-FIRSTRUN-V2: the computer's host name. Default: node:os hostname. */
+  readonly hostname?: () => string;
 }
 
 export interface ApprovalServer {
@@ -519,6 +566,17 @@ export interface ApprovalServer {
    * be started.
    */
   open(approvalId?: string): Promise<boolean>;
+  /**
+   * M1-11b-6: opens the owner's browser at a new one-shot session link to the first-run page
+   * (`/first-run?t=…`), the same link rules as `open()`: handed only to the OS opener, never
+   * returned, logged or put in an event. Resolves false when no browser could be started.
+   */
+  openFirstRun(): Promise<boolean>;
+  /**
+   * M1-11b-9: the same for the settings pages, at `/settings/activity` (`agentlink ui`). A fixed
+   * path; nothing from a caller reaches the link.
+   */
+  openActivity(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   close(): Promise<void>;
@@ -539,6 +597,8 @@ interface PendingSetup {
   readonly session: Uint8Array;
   readonly expiresAt: number;
   readonly timer: ReturnType<typeof setTimeout>;
+  /** M1-UX-FIRSTRUN-V2: the folders begin prepared (removed unless the first policy applies). */
+  readonly folders?: SetupFolders;
 }
 
 /** The default listen: one `server.listen`, rejecting with the socket error. */
@@ -630,16 +690,23 @@ const isText = (value: unknown, max: number, empty = false): value is string =>
 function detailsOf(value: unknown): ApprovalDetails | undefined | false {
   if (value === undefined) return undefined;
   if (typeof value !== 'object' || value === null) return false;
-  const { who, what, cost, expires, rule, fromAi, terms } = value as Record<string, unknown>;
+  const { headline, who, what, cost, expires, rule, fromAi, terms } = value as Record<
+    string,
+    unknown
+  >;
   for (const field of [who, what, cost, expires, rule]) {
     if (!isText(field, MAX_DETAIL_CHARS)) return false;
   }
+  if (headline !== undefined && !isText(headline, MAX_DETAIL_CHARS)) return false;
   if (!Array.isArray(fromAi) || fromAi.length > MAX_FIELDS) return false;
   const fields: { name: string; value: string }[] = [];
   for (const entry of fromAi as unknown[]) {
     if (typeof entry !== 'object' || entry === null) return false;
     const { name, value: text } = entry as Record<string, unknown>;
     if (!isText(name, MAX_DETAIL_CHARS) || !isText(text, MAX_VALUE_CHARS, true)) return false;
+    // M1-11a-ux: an invite link never reaches the page (defence in depth; the CLI's
+    // source leaves it out already).
+    if (HIDDEN_ARGS.has(name)) continue;
     fields.push({ name, value: text });
   }
   let lines: string[] | undefined;
@@ -652,6 +719,7 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
     }
   }
   return {
+    ...(headline === undefined ? {} : { headline: headline as string }),
     who: who as string,
     what: what as string,
     cost: cost as string,
@@ -1432,7 +1500,11 @@ export async function startApprovalServerWith(
     status: number,
     outcome: OwnerSetupOutcome,
     extra: Record<string, unknown> = {},
-    fixed: { readonly reason?: OwnerSetupFailure; readonly fingerprint?: string } = {},
+    fixed: {
+      readonly reason?: OwnerSetupFailure;
+      readonly fingerprint?: string;
+      readonly sendFolder?: SetupSendFolder;
+    } = {},
   ): void => {
     // Fixed values only in the event: never the owner code or anything from the request.
     emit({ kind: 'owner_setup', outcome, ...fixed });
@@ -1449,6 +1521,8 @@ export async function startApprovalServerWith(
     pendingSetup = undefined;
     clearTimeout(which.timer);
     wipe(which.seed, which.challenge, which.session);
+    // M1-UX-FIRSTRUN-V2: no policy was signed, so the folders this begin created go again.
+    void removeSetupFolders(which.folders);
   };
 
   /** M1-11s-c: drops a hold that expired or whose session is gone. */
@@ -1457,6 +1531,15 @@ export async function startApprovalServerWith(
     if (held === undefined) return;
     if (now() >= held.expiresAt || !sessions.some((s) => equalBytes(s, held.session))) {
       dropSetup(held);
+    }
+  };
+
+  /** M1-UX-FIRSTRUN-V2: the host name for the save form; never throws. */
+  const safeHostname = (): string => {
+    try {
+      return (internals.hostname ?? osHostname)();
+    } catch {
+      return '';
     }
   };
 
@@ -1532,6 +1615,17 @@ export async function startApprovalServerWith(
         finishSetup(res, 409, 'not_pending');
         return;
       }
+      // M1-UX-FIRSTRUN-V2: the folders, before the gesture and before any seed exists.
+      const { firstPolicy } = setup.firstCard;
+      let folders: SetupFolders | undefined;
+      if (firstPolicy !== undefined) {
+        folders = await prepareSetupFolders(firstPolicy.home);
+        if (folders.send.status !== 'ready') {
+          await removeSetupFolders(folders);
+          finishSetup(res, 409, 'folder_refused', {}, { reason: folders.send.reason });
+          return;
+        }
+      }
       const { seed, keys } = (internals.newOwnerSeed ?? newOwnerSeed)();
       const challenge = randomBytes(32);
       const held: PendingSetup = {
@@ -1541,6 +1635,7 @@ export async function startApprovalServerWith(
         session: (sessions[sessionAt] as Uint8Array).slice(),
         expiresAt: now() + SETUP_HOLD_MS,
         timer: setTimeout(() => dropSetup(held), SETUP_HOLD_MS),
+        ...(folders === undefined ? {} : { folders }),
       };
       held.timer.unref();
       pendingSetup = held;
@@ -1587,28 +1682,39 @@ export async function startApprovalServerWith(
     clearTimeout(held.timer);
     busy = true;
     let registration: SetupRegistration | undefined;
+    // M1-UX-FIRSTRUN-V2: the folders stay only when the first policy is (or may be) in force.
+    let keepFolders = false;
+    let released = false;
+    /** Answers after the folders this run created are gone (unless kept), so none outlives it. */
+    const answer = async (...args: Parameters<typeof finishSetup>): Promise<void> => {
+      if (!keepFolders && !released) {
+        released = true;
+        await removeSetupFolders(held.folders);
+      }
+      finishSetup(...args);
+    };
     try {
       try {
         registration = parseSetupRegistration(body);
       } catch {
-        finishSetup(res, 403, 'presence_required');
+        await answer(res, 403, 'presence_required');
         return;
       }
       try {
         checkSetupRegistration(registration, { challenge: held.challenge, origin });
       } catch {
-        finishSetup(res, 403, 'presence_rejected');
+        await answer(res, 403, 'presence_rejected');
         return;
       }
       let exists: boolean;
       try {
         exists = await ownerExistsAnywhere(setup);
       } catch {
-        finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
+        await answer(res, 500, 'failed', {}, { reason: 'check_failed' });
         return;
       }
       if (exists) {
-        finishSetup(res, 409, 'owner_exists');
+        await answer(res, 409, 'owner_exists');
         return;
       }
       let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
@@ -1621,6 +1727,7 @@ export async function startApprovalServerWith(
             credentialId: registration.credentialId,
             prfOutput: registration.prfOutput,
             firstCard: setup.firstCard,
+            ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
           {
             ...(internals.ownerKdf === undefined ? {} : { kdf: internals.ownerKdf }),
@@ -1629,26 +1736,34 @@ export async function startApprovalServerWith(
         );
       } catch (error) {
         const code = error instanceof NodeKeyStoreError ? error.code : undefined;
-        if (code === 'owner_exists') finishSetup(res, 409, 'owner_exists');
+        if (code === 'owner_exists') await answer(res, 409, 'owner_exists');
         else if (code === 'owner_card_failed') {
-          finishSetup(res, 500, 'failed', {}, { reason: 'rolled_back' });
+          await answer(res, 500, 'failed', {}, { reason: 'rolled_back' });
         } else if (code === 'keychain_failed') {
-          finishSetup(res, 500, 'failed', {}, { reason: 'keychain' });
+          await answer(res, 500, 'failed', {}, { reason: 'keychain' });
         } else if (code === 'owner_operation_refused') {
-          finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
-        } else finishSetup(res, 500, 'failed', {}, { reason: 'internal' });
+          await answer(res, 500, 'failed', {}, { reason: 'check_failed' });
+        } else await answer(res, 500, 'failed', {}, { reason: 'internal' });
         return;
       }
+      keepFolders = keepsFolder(result.sendFolder);
       try {
         const fingerprint = ownerFingerprintText(held.keys);
-        // The owner code goes to the page once, for the collapsed backup display; never an event.
+        const sendFolder: SetupSendFolder | undefined = result.sendFolder?.status;
+        // The owner code goes to the page once, for the backup-code step; never an event.
         // IR-M1-11s-c-1 M-1: also when the card is unconfirmed, since the owner was kept.
-        finishSetup(
+        await answer(
           res,
           200,
           result.confirmed ? 'done' : 'done_unconfirmed',
-          { passkey: result.passkey, ownerCode: grouped(result.ownerCode), fingerprint },
-          { fingerprint },
+          {
+            passkey: result.passkey,
+            ownerCode: grouped(result.ownerCode),
+            fingerprint,
+            computerName: computerNameOf(safeHostname()),
+            ...(sendFolder === undefined ? {} : { sendFolder }),
+          },
+          { fingerprint, ...(sendFolder === undefined ? {} : { sendFolder }) },
         );
       } finally {
         wipe(result.ownerCode);
@@ -1656,6 +1771,7 @@ export async function startApprovalServerWith(
     } finally {
       busy = false;
       wipe(held.seed, held.challenge, held.session, registration?.prfOutput);
+      if (!keepFolders && !released) await removeSetupFolders(held.folders);
     }
   }
 
@@ -1742,6 +1858,11 @@ export async function startApprovalServerWith(
     if (path === '/app.js') {
       if (method !== 'GET') return reject(res, 405, 'method');
       sendText(res, 200, 'text/javascript; charset=utf-8', APP_JS);
+      return;
+    }
+    if (path === '/app.css') {
+      if (method !== 'GET') return reject(res, 405, 'method');
+      sendText(res, 200, 'text/css; charset=utf-8', APP_CSS);
       return;
     }
 
@@ -1891,6 +2012,9 @@ export async function startApprovalServerWith(
       const path = approvalId === undefined ? '/' : new URL(approvalUrl(approvalId)).pathname;
       return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
     },
+    openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
+    openActivity: async () =>
+      opener(`${origin}/settings/activity?t=${mintLink()}`).catch(() => false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
       await notifier(NOTIFICATION).catch(() => false);

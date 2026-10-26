@@ -22,7 +22,7 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 - `doctor` also checks the proof network (next release, M1-9h): how many of the shipped networks answer a block read, as a count only
 - `ui` (local approval and settings UI; not available yet), and the passkey option and recovery-kit offer of `init` (not available yet)
 - `storage connect`, `backup` (v0.2.0)
-- `cloud deploy`, `cloud login` (v0.3.0)
+- `cloud deploy`, `cloud update` (planned for v0.4.0, D-131); `cloud login` later, with the console
 - `doctor` (diagnostics)
 - Exit codes and machine-readable output
 

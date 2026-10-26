@@ -4,7 +4,7 @@
 Add a third-party package only when it earns its place, at an exact, aged version, with no install scripts sneaking in, and inside the import zones that keep crypto in `@4thtech-io/crypto`.
 
 ## When to use
-Any new runtime or dev dependency, or a new major version. Routine updates come from Renovate. Not for the crypto allowlist (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`): adding to it changes 04 and needs a decision-log entry and the owner's approval.
+Any new runtime or dev dependency, or a new major version. Routine updates come from Renovate. Not for the crypto allowlist (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`; `@cloudflare/workers-oauth-provider` in `apps/cloud-agent` only, D-131): adding to it changes 04 and needs a decision-log entry and the owner's approval.
 
 ## Who runs it
 The builder, only when the brief grants the dependency ("Dependencies: name@version: justification"); otherwise it stops with `STATUS: escalate`. The orchestrator checks it in the verification protocol (`development-process.md` §5, step 3). Sonnet or above; S2 packages need Opus.

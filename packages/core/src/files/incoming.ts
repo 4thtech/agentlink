@@ -4,7 +4,8 @@
 // - the size is checked against `files.maxReceiveSizeMB` before anything is fetched, and the
 //   download is capped at its exact ALF1 length (decryptDownload counts too);
 // - a `url` passes the raw-string SSRF check here (checkFetchUrl) and is fetched only through the
-//   platform's SSRF-safe download (04 §4); it is a secret and never logged (I-7);
+//   platform's SSRF-safe download (04 §4); it is a secret and never logged (I-7). The URL is the
+//   receiver row's, which a refresh-link answer can replace (M1-7f-3, refresh-link.ts);
 // - an inline ciphertext is checked against `ciphertextSha256` before any decryption;
 // - plaintext goes only to a quarantine file in the inbox folder (D-84) and is renamed to its final
 //   name only after the final chunk and both hashes verified; on any failure it is removed;
@@ -172,12 +173,20 @@ export class FileFetcher {
     // key is gone and the file can no longer be opened. A payload stored before M1-7f-2 still
     // carries its key and has no row; that key is used as it is.
     let fileKeyText: string;
+    // The link (M1-7f-3): the receiver row's, which a refresh-link answer may have replaced, and its
+    // expiry, which is never later than the entry's (04 §4); the entry's for a payload without a row.
+    let url = entry.url;
+    let expiresAt = entry.expiresAt;
     if (keyRow !== undefined) {
       // The row was written from this entry at ingest; anything else is not this file's key.
       if (keyRow.sha256 !== entry.ciphertextSha256) {
         return { status: 'rejected', code: 'INTEGRITY_FAILED' };
       }
       fileKeyText = await open(ctx, 'files', 'file_key', [envelopeId, index], keyRow.file_key);
+      if (entry.inline === null && keyRow.url !== null) {
+        url = await open(ctx, 'files', 'url', [envelopeId, index], keyRow.url);
+        expiresAt = Math.min(expiresAt, keyRow.expires_at);
+      }
     } else if (entry.fileKey === SHREDDED_FILE_KEY) {
       return { status: 'rejected', code: 'LINK_EXPIRED' };
     } else {
@@ -200,8 +209,10 @@ export class FileFetcher {
       }
       source = ok(bytes);
     } else {
-      const url = entry.url as string;
-      if (nowOf(ctx) >= entry.expiresAt) return { status: 'rejected', code: 'LINK_EXPIRED' };
+      if (url === null || nowOf(ctx) >= expiresAt) {
+        return { status: 'rejected', code: 'LINK_EXPIRED' };
+      }
+      // A refreshed link is checked here exactly like the first one (04 §4).
       if (!checkFetchUrl(url).ok) return { status: 'rejected', code: 'URL_REFUSED' };
       try {
         source = platform.download(url);

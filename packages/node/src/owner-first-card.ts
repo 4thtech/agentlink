@@ -18,7 +18,13 @@ import {
   type OwnerSession,
   type TypedData,
 } from '@4thtech-io/crypto';
-import type { IdentityView, InitIdentityInput } from '@4thtech-io/core';
+import type {
+  IdentityView,
+  InitIdentityInput,
+  OwnerActionOutcome,
+  PolicyEditOptions,
+  PreparedPolicyEdit,
+} from '@4thtech-io/core';
 import { allowedTypedData, ownerOperationRefused } from './owner-allowlist.js';
 
 /** What `owner init` needs of core's IdentityService (`client.identity`). */
@@ -39,6 +45,26 @@ export interface FirstAgentCard {
   readonly relays: readonly string[];
   /** The agent's core IdentityService. */
   readonly identity: FirstCardIdentity;
+  /**
+   * M1-36b-2 (D-121 D6): the agent's first rules, signed after the card in the same owner-code entry
+   * (owner-first-policy.ts). Omitted: only the card is signed.
+   */
+  readonly firstPolicy?: FirstPolicy;
+}
+
+/** What the first rules need of core's OwnerActions (`client.ownerActions`). */
+export interface FirstPolicyActions {
+  /** Builds the unsigned `policy.set` (M1-11r-b); signs and grants nothing. */
+  preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
+  /** Verifies and applies one SignedOwnerAction (owner signature, nonce, version). */
+  apply(input: object): Promise<OwnerActionOutcome>;
+}
+
+/** M1-36b-2: the first rules: the 06 §3 defaults plus the empty `~/AgentLink/Send` folder. */
+export interface FirstPolicy {
+  readonly actions: FirstPolicyActions;
+  /** The home folder the Send folder is created in; default the OS user's (tests only). */
+  readonly home?: string;
 }
 
 /**

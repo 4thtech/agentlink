@@ -91,6 +91,8 @@ export default defineConfig({
       },
       workerProject('drop', ['test/drop.test.ts'], testBindings),
       // M1-27b: the same smoke steps as the deploy workflow, against the Worker under Miniflare.
+      // CHORE-DROP-ENTRY-EXPORTS: the entry module exports only what the Worker runtime expects.
+      workerProject('drop-entry', ['test/entry.test.ts'], testBindings),
       workerProject('drop-smoke', ['test/smoke.test.ts'], testBindings),
       workerProject('drop-global-cap', ['test/global-cap.test.ts'], {
         ...testBindings,

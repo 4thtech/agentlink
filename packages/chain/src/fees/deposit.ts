@@ -10,9 +10,9 @@
 // each confirmed by its receipt on-chain before the next, and after the deposit clears the chain
 // selector's cache and selects again once (IR-M1-26-1), so the newly funded chain is picked.
 //
-// The gasless EIP-3009 top-up (`depositWithAuthorization`) is not live (D-89, M1-3c): it is not in
+// The gasless EIP-3009 top-up (`depositWithAuthorization`) is gated (D-89, M3-4b-t-0): it is not in
 // the client ABI and is never built or called here. `checkGaslessTopUp` is the client-side gate for
-// it: the token must carry the shipped `eip3009` flag (off until the vault accepts the call), and
+// it: the token must carry the shipped `eip3009` flag (off while the GASLESS_TOPUP_ENABLED kill switch is off), and
 // the amount must reach the vault's `minDeposit(token)` (05 §2.2, 12 §4.1).
 import { decodeFunctionData, encodeFunctionData, erc20Abi } from 'viem';
 import type { Address, ChainConfig, FeeTokenSymbol } from '../config/index.js';
