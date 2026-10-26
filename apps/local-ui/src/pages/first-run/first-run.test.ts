@@ -13,7 +13,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RECOVERY_KIT_LATER_KEY, recoveryKitPending } from '../../states/index.js';
 import { FirstRunPage, setupMessage, type FirstRunPageProps } from './index.js';
-import { encodeRegistration, type PasskeyResult } from './passkey.js';
+import { encodeRegistration } from './passkey.js';
 import {
   BEGIN_PATH,
   FINISH_PATH,
@@ -26,6 +26,7 @@ import {
   type SetupProblem,
   type StatusResult,
 } from './setup-api.js';
+import { lintVocabulary } from '@4thtech-io/ui';
 import { FIRST_RUN, SETUP_MESSAGES } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -146,7 +147,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
   it('starts on step 1 with the LF-1 body, one primary action and the LF-3 list', async () => {
     await mount(fakeApi());
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.protectTitle);
-    expect(text()).toContain(FIRST_RUN.protectBody);
+    expect(text()).toContain(FIRST_RUN.protectBody('your passkey'));
     expect(text()).toContain(FIRST_RUN.stepOf(1));
     expect(text()).toContain(FIRST_RUN.untilBody);
     expect(text()).toContain(FIRST_RUN.desktopTip);
@@ -338,8 +339,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
   });
 
   it('the backup code sits in a real save form; Copy is secondary with the clipboard warning', async () => {
-    await mount(fakeApi());
-    await click(FIRST_RUN.usePasskey);
+    await mount(fakeApi(), undefined, true, { platform: 'mac' });
+    await click(FIRST_RUN.useTouchId);
     const form = host.querySelector('form');
     expect(form).not.toBeNull();
     const user = form?.querySelector<HTMLInputElement>('input[autocomplete="username"]');
@@ -459,11 +460,44 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     // Anything unexpected is never shown: an odd name becomes "this computer", no outcome is "none".
     answers[FINISH_PATH] = {
       status: 200,
-      body: { status: 'done', passkey: true, ownerCode: CODE, fingerprint: FP, computerName: '<b>' },
+      body: {
+        status: 'done',
+        passkey: true,
+        ownerCode: CODE,
+        fingerprint: FP,
+        computerName: '<b>',
+      },
     };
     expect(await api.finish(new Uint8Array(1))).toEqual(
       done({ sendFolder: 'none', computerName: 'this computer' }),
     );
+  });
+});
+
+describe('M1-UX-FIRSTRUN-V2: the first-run copy passes lintVocabulary (11 §5.1)', () => {
+  it('every string, filled in for each platform', () => {
+    const texts: string[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === 'string') texts.push(value);
+      else if (typeof value === 'function') {
+        for (const [sensor, browser] of [
+          ['Touch ID', 'Safari'],
+          ['Windows Hello', 'Chrome or Edge'],
+          ['your passkey', 'Chrome'],
+        ]) {
+          texts.push(String((value as (a: string, b: string) => string)(sensor, browser)));
+        }
+      } else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
+    };
+    walk(FIRST_RUN);
+    walk(SETUP_MESSAGES);
+    for (const t of texts) {
+      // 11 §5.5 names the action "Save in my password manager": the browser's tool, never the code.
+      // Only that phrase is excused; the code is never called a password.
+      const managerOnly = /password manager/i.test(t) && !/password\b(?! manager)/i.test(t);
+      const found = lintVocabulary(t, managerOnly ? { allow: ['password'] } : {});
+      expect([t, found]).toEqual([t, []]);
+    }
   });
 });
 

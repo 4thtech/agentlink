@@ -1,20 +1,57 @@
 // First-run copy (d1 Local-firstrun with the DESIGN-ADJ-1 (a) fixes LF-1 and LF-3; UX audit 1b, 1c,
 // 1d; D-120). Plain words only (11 §5): no key, hash, wallet, gas, chain or transaction in the default
 // view. The owner fingerprint is an identity value (11 §5.2) and is shown once setup is done.
+//
+// M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 11 §5.5, §6.2.1; copy proposed, owner confirms at merge): the
+// passkey-first flow, Protect approvals (with the folders) → Your backup code (save form, "I saved
+// it") → Recovery kit → Ready. The button names the platform. The backup code is never "password".
 
-export const STEPS = ['Protect approvals', 'Recovery kit', 'Ready'] as const;
+export const STEPS = ['Protect approvals', 'Backup code', 'Recovery kit', 'Ready'] as const;
+
+/** The platform the page runs on, for the button and the browser hint (11 §6.2.1). */
+export type Platform = 'mac' | 'windows' | 'other';
+
+/** What the platform calls its sensor, in copy. */
+export const SENSOR: Readonly<Record<Platform, string>> = {
+  mac: 'Touch ID',
+  windows: 'Windows Hello',
+  other: 'your passkey',
+};
+
+/** A browser on this platform that gives AgentLink a passkey it can use (docs PRF matrix, #536). */
+export const WORKING_BROWSER: Readonly<Record<Platform, string>> = {
+  mac: 'Safari',
+  windows: 'Chrome or Edge',
+  other: 'Chrome',
+};
 
 export const FIRST_RUN = {
   stepOf: (n: number): string => `Step ${String(n)} of ${String(STEPS.length)}`,
   loading: 'Checking this computer…',
 
   protectTitle: 'Protect your approvals',
-  // LF-1 (11 §6.2.1, D-67, D-68).
-  protectBody:
-    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey, owner code or owner passphrase, and only after you click Approve. Never give them to your AI.',
-  createPasskey: 'Create a passkey',
+  // 11 §6.2.1 (D-130 (1); D-67, D-68): the copy must not claim more.
+  protectBody: (sensor: string): string =>
+    `Approvals need you: each approval, or each list of approvals you review together, asks for ${sensor} (or your backup code), and only after you click Approve. Never give your backup code to your AI.`,
+  // 11 §6.2.1: the folders setup creates, shown before the gesture.
+  foldersTitle: 'Your folders',
+  folders: [
+    ['Send from', '~/AgentLink/Send'],
+    ['Receive into', '~/AgentLink/Inbox'],
+    ['Proofs in', '~/AgentLink/Proofs'],
+  ] as const,
+  foldersNote:
+    'One confirmation protects approvals, sets up this agent and lets your AI send files you put in the Send folder. Changing folders is optional, later in Files.',
+  // The button names the platform (08 §1 first run v2).
+  useTouchId: 'Use Touch ID',
+  useWindowsHello: 'Use Windows Hello',
+  usePasskey: 'Use a passkey',
   passkeyNote:
-    'Your browser shows its own passkey dialog (Touch ID, Windows Hello or your phone). AgentLink never draws that dialog.',
+    'Your browser shows its own dialog for Touch ID, Windows Hello or your passkey. AgentLink never draws that dialog.',
+  // M1-UX-PRF-MATRIX copy (11 §6.2.1): no passkey AgentLink can use in this browser.
+  noPrf: (sensor: string, browser: string): string =>
+    `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a backup code only.`,
+  backupOnly: 'Continue with a backup code only',
   // UX audit 1b: one neutral line instead of the amber box.
   desktopTip: 'Tip: the desktop app (coming soon) protects approvals more strongly.',
   waiting: 'Waiting for your passkey…',
@@ -23,23 +60,37 @@ export const FIRST_RUN = {
   untilBody:
     'Your agent can send and receive messages, but anything that needs you waits here: new contacts, proofs your rules ask about, folder access, document keys and accepting terms.',
 
-  doneTitle: 'Approvals are protected',
-  doneBody: 'Your passkey now protects approvals on this computer.',
+  // 11 §5.5 "Backup code at first run" (D-130 (1)).
+  backupTitle: 'Your backup code',
+  doneBody: 'Approvals on this computer are protected.',
   doneNoPasskeyBody:
-    "Your browser made a passkey, but it can't protect approvals here. Use this owner code to approve instead.",
+    "This browser can't protect approvals with a passkey here, so this backup code is how you approve on this computer.",
+  backupBody: (sensor: string): string =>
+    `This opens your approvals if ${sensor} isn't available. Never give it to your AI.`,
+  backupLost:
+    "Lost it? You can't get this code back. Your recovery kit restores everything instead.",
+  saveToManager: 'Save in my password manager',
+  saveAsked: 'If your browser or password manager offered to save it, accept there.',
+  savedAs: 'Saved as',
+  savedAsLabel: (computer: string): string => `AgentLink backup code – ${computer}`,
+  clipboardWarning: 'Other apps can read your clipboard.',
+  savedIt: 'I saved it',
+  // The first policy's outcome (D-130 (2)).
+  sendAllowed:
+    'Your AI can send files you put in ~/AgentLink/Send. Nothing else on this computer can be sent.',
+  sendNotAllowed:
+    "AgentLink couldn't allow your Send folder, so your AI can't send files yet. You can allow a folder later in Files.",
+  sendNotConfirmed:
+    "Your Send folder was set up, but AgentLink couldn't confirm it. Run `agentlink doctor` in your own terminal.",
   fingerprintLabel: 'Your owner fingerprint',
   fingerprintNote: 'Run `agentlink doctor` in your own terminal: it shows the same fingerprint.',
-  // D-120 (1): the owner code is the backup, collapsed by default.
-  backupSummary: 'Backup way to approve',
-  backupLabel: 'Owner code',
-  backupExplain:
-    'If your passkey is ever gone, this code approves instead. Keep it in your password manager. Never give it to your AI. It is shown only now.',
+  backupLabel: 'Backup code',
+  shownOnce: 'Shown once',
   copy: 'Copy',
   copied: 'Copied',
   // 08 §1 `done_unconfirmed`.
   unconfirmed: "Setup finished, but we couldn't confirm one step. Your agent may need a restart.",
   unconfirmedTitle: 'Almost there.',
-  continue: 'Continue',
 
   kitTitle: 'Save your recovery kit',
   kitBody:
@@ -85,8 +136,13 @@ export const SETUP_MESSAGES = {
   unavailable:
     "Setup can't run from this page right now. Ask your AI to open AgentLink again, or run `agentlink owner init` in your own terminal.",
   rolled_back: "Setup didn't finish, so nothing was kept. Start again.",
+  // M1-UX-FIRSTRUN-V2: the Send folder was refused before the gesture (nothing began).
+  folder_not_empty:
+    'The folder AgentLink/Send in your home folder already holds files. Move them out, then try again. Nothing changed.',
+  folder_unavailable:
+    "AgentLink couldn't use the folder AgentLink/Send in your home folder: it must be a plain folder, not a link or a file. Fix it, then try again. Nothing changed.",
   keychain:
-    "Your computer's password store refused the request. Unlock it, then run `agentlink doctor` in your own terminal.",
+    "Your computer's keychain refused the request. Unlock it, then run `agentlink doctor` in your own terminal.",
   check_failed:
     "We couldn't check this computer's setup. Run `agentlink doctor` in your own terminal.",
   internal: "Setup didn't finish. Run `agentlink doctor` in your own terminal.",

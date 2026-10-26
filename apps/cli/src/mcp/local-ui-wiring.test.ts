@@ -56,9 +56,7 @@ describe('localUiOptions (M1-11b-6)', () => {
     expect(options.ownerSetup?.firstCard.firstPolicy?.actions).toBe(ownerActions);
     expect(options.ownerSetup?.firstCard.firstPolicy).not.toHaveProperty('home');
     // The check ran on the card the setup would sign.
-    expect(d.checked).toEqual([
-      { agent: AGENT_ID, name: 'work', relays: RELAYS, identity },
-    ]);
+    expect(d.checked).toEqual([{ agent: AGENT_ID, name: 'work', relays: RELAYS, identity }]);
     // The default owner files (the real home) are kept: no override is passed.
     expect(options.ownerSetup).not.toHaveProperty('ownerFiles');
   });

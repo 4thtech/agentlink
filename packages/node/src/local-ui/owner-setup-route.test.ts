@@ -1169,7 +1169,11 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
 
   async function runSetup(
     agent: Agent,
-    options: { firstCard?: FirstAgentCard; prf?: boolean; internals?: ApprovalServerInternals } = {},
+    options: {
+      firstCard?: FirstAgentCard;
+      prf?: boolean;
+      internals?: ApprovalServerInternals;
+    } = {},
   ): Promise<{ h: Harness; s: Session; begun: BeginBody; res: Response; done: DoneBody }> {
     const h = await harness(agent, {
       firstCard: options.firstCard ?? withPolicy(agent),
@@ -1322,8 +1326,7 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
         actions: {
           preparePolicyEdit: (patch, opts) =>
             agent.client.ownerActions.preparePolicyEdit(patch, opts),
-          apply: () =>
-            Promise.resolve({ status: 'refused', reason: 'bad_signature' } as never),
+          apply: () => Promise.resolve({ status: 'refused', reason: 'bad_signature' } as never),
         },
         home: home(),
       },

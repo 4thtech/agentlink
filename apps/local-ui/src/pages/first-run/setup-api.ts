@@ -14,6 +14,10 @@ const CSRF_HEADER = 'X-AgentLink-CSRF';
 
 /** A failure the page explains in plain words (strings.ts SETUP_MESSAGES). */
 export type SetupProblem =
+  /** M1-UX-FIRSTRUN-V2: begin refused the Send folder (it holds files); nothing began. */
+  | 'folder_not_empty'
+  /** M1-UX-FIRSTRUN-V2: begin refused the Send folder (a link or not a folder); nothing began. */
+  | 'folder_unavailable'
   | 'expired'
   | 'not_pending'
   | 'busy'
@@ -50,6 +54,15 @@ export interface CreationValues {
 
 export type SetupState = 'missing' | 'set_up' | 'unknown';
 
+/**
+ * M1-UX-FIRSTRUN-V2: the first policy's Send folder after finish: `allowed`, `not_confirmed`,
+ * `not_allowed`, or `none` when the server signed no first policy (or said nothing known).
+ */
+export type SendFolderOutcome = 'allowed' | 'not_confirmed' | 'not_allowed' | 'none';
+
+/** The fallback computer name for the save form (owner-setup.ts UNNAMED_COMPUTER). */
+export const UNNAMED_COMPUTER = 'this computer';
+
 export type StatusResult = { readonly kind: 'ok'; readonly owner: SetupState } | SetupError;
 
 export type BeginResult =
@@ -67,9 +80,18 @@ export type FinishResult =
       /** The backup owner code, grouped; shown on this page only, never stored or logged. */
       readonly ownerCode: string;
       readonly fingerprint: string;
+      /** M1-UX-FIRSTRUN-V2: what happened to the Send folder (a fixed code). */
+      readonly sendFolder: SendFolderOutcome;
+      /** M1-UX-FIRSTRUN-V2: the computer's name for the save form's username field. */
+      readonly computerName: string;
     }
   | { readonly kind: 'owner_exists' }
   | SetupError;
+
+const SEND_OUTCOMES: ReadonlySet<string> = new Set(['allowed', 'not_confirmed', 'not_allowed']);
+const FOLDER_REASONS: ReadonlySet<string> = new Set(['folder_not_empty', 'folder_unavailable']);
+/** The same plain-name rule as the server (owner-setup.ts computerNameOf). */
+const COMPUTER_NAME = /^[A-Za-z0-9 ._-]{1,63}$/;
 
 const PROBLEMS: ReadonlySet<string> = new Set<SetupProblem>([
   'expired',
@@ -121,6 +143,16 @@ const str = (value: unknown): string | undefined => (typeof value === 'string' ?
 /** A non-2xx or unknown answer as a fixed problem (never the body's text). */
 function problemOf(answer: Answer): SetupError {
   const status = str(answer.json?.['status']);
+  if (status === 'folder_refused') {
+    const reason = str(answer.json?.['reason']);
+    return {
+      kind: 'error',
+      problem:
+        reason !== undefined && FOLDER_REASONS.has(reason)
+          ? (reason as SetupProblem)
+          : 'folder_unavailable',
+    };
+  }
   if (status === 'failed') {
     const reason = str(answer.json?.['reason']);
     return {
@@ -253,7 +285,18 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
           // The setup may have happened; the page sends the owner to `agentlink doctor`.
           return { kind: 'error', problem: 'unknown' };
         }
-        return { kind: 'done', confirmed: status === 'done', passkey, ownerCode, fingerprint };
+        const send = str(answer.json?.['sendFolder']);
+        const name = str(answer.json?.['computerName']);
+        return {
+          kind: 'done',
+          confirmed: status === 'done',
+          passkey,
+          ownerCode,
+          fingerprint,
+          sendFolder:
+            send !== undefined && SEND_OUTCOMES.has(send) ? (send as SendFolderOutcome) : 'none',
+          computerName: name !== undefined && COMPUTER_NAME.test(name) ? name : UNNAMED_COMPUTER,
+        };
       }
       return problemOf(answer);
     },
