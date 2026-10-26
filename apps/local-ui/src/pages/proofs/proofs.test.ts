@@ -133,7 +133,9 @@ describe('ProofsPage', () => {
       [TOP_UP]: NO_TOP_UP,
     });
     const card = host.querySelector('section[aria-label="Credits"]');
-    expect(card?.textContent).toContain('Free test credits arrive automatically with your first proof.');
+    expect(card?.textContent).toContain(
+      'Free test credits arrive automatically with your first proof.',
+    );
   });
 
   it('UX-031-QUICKWINS: the first-proof line is absent once there are credits', async () => {

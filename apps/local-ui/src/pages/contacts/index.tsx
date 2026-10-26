@@ -143,6 +143,18 @@ function StateChip({ contact }: { contact: ContactRow }): ReactElement | null {
   return null;
 }
 
+/** Shown names that more than one contact has, so each of those rows can say so (UI-only hint). */
+function duplicateNames(contacts: readonly ContactRow[]): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const dupes = new Set<string>();
+  for (const c of contacts) {
+    const n = shownName(c).trim().toLowerCase();
+    if (seen.has(n)) dupes.add(n);
+    seen.add(n);
+  }
+  return dupes;
+}
+
 function ContactList({
   contacts,
   selected,
@@ -152,6 +164,7 @@ function ContactList({
   selected: string | undefined;
   onSelect: (ref: string) => void;
 }): ReactElement {
+  const dupes = duplicateNames(contacts);
   return (
     <ul className="ct-list" aria-label={S.listLabel}>
       {contacts.map((c) => (
@@ -169,6 +182,9 @@ function ContactList({
               <span className="al-contact-name">
                 <ContactName {...nameInput(c)} label={labelKind(c)} showLabel />
               </span>
+              {dupes.has(shownName(c).trim().toLowerCase()) ? (
+                <span className="al-text-caption al-muted ct-same-name">{S.sameName}</span>
+              ) : null}
             </span>
             <span className="al-contact-side">
               <StateChip contact={c} />
@@ -305,6 +321,7 @@ function SafetyCodeBlock({
         <span className="al-text-label">{S.safetyCode}</span>
       </div>
       <p className="al-text-body">{nudge(shownName(contact))}</p>
+      <p className="al-text-body-sm al-muted">{S.safetyExplain}</p>
       <div
         className="al-sc-code al-text-code-lg"
         role="img"

@@ -82,3 +82,6 @@
 .ct-error {
   color: var(--al-color-status-danger-fg);
 }
+.ct-same-name {
+  display: block;
+}
