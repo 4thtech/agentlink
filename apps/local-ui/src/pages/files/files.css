@@ -1,0 +1,75 @@
+/* Files (d1 Local-files): the folders panel. Design tokens only; no inline styles (CSP). The panel
+   keeps the design's side-card width on a wide window and fills a narrow one. */
+.fl-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-6);
+}
+.fl-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-inline-size: calc(var(--al-layout-max-content) / 2);
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.fl-panel > h2,
+.fl-panel > p,
+.fl-confirm h2,
+.fl-confirm p {
+  margin: 0;
+}
+.fl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.fl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.fl-row-main {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+.fl-enter,
+.fl-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.fl-folder {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  overflow-wrap: anywhere;
+}
+.fl-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  margin: 0;
+  padding: var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+}
+.fl-warnings legend {
+  padding: 0 var(--al-space-2);
+}
+.fl-warnings .al-check {
+  align-items: flex-start;
+}
+.fl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+}
