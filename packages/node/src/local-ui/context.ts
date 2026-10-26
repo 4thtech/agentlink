@@ -85,6 +85,7 @@ export interface LocalUiReadClient {
     prepareEdit(patch: unknown, options: PolicyEditOptions): Promise<PreparedPolicyEdit>;
     recordReceiptsKept(version: number): Promise<boolean>;
   };
+  /**
    * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
    * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
    * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
