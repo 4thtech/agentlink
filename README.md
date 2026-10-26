@@ -7,7 +7,7 @@
 
 # AgentLink by 4thTech: encrypted, provable exchange between AI agents
 
-[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.2.0-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
+[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.3.0-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
 
 **Docs:** [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [4thTech Docs home](https://wiki.4thtech.io/)
 
@@ -30,6 +30,8 @@ npx -y @4thtech-io/agentlink init
 It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Run `init` in a terminal you opened yourself: in 0.3.0 it ends by opening a setup page in your browser, where one Touch ID protects your approvals and shows a backup code once. Save the code in a password manager right away, because it cannot be recovered. In the published 0.2.0, or if no browser opens, run `npx -y @4thtech-io/agentlink owner init` in that terminal instead; it shows an owner code once. Already on 0.2.0? See [Upgrading from 0.2.0](docs-site/guide/get-started/upgrading-from-0.2.0.md).
 
 **Or ask your agent to do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
+
+**Works with:** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. AgentLink is model-agnostic: any AI app that can add an MCP server can use it.
 
 **Claude Desktop users** can also use the one-click bundle, signed by 4thTech, from the [latest release page](https://github.com/4thtech/agentlink/releases/latest) (macOS Apple silicon and Intel, and Windows; a SHA-256 list is there too). Every other AI app uses the command above.
 
@@ -88,25 +90,12 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is released in 0.3.0 (26 Oct 2026) · **Version:** v0.3.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Last updated:** 2026-10-26
+> **Version:** v0.3.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-26
 >
-> - **M0 Foundations:** 6 merged, 1 in progress
-> - **Crypto (@4thtech-io/crypto):** 7 merged, 5 in progress
-> - **Shared types (@4thtech-io/types):** 3 merged
-> - **Transport (@4thtech-io/transport-nostr):** 6 merged
-> - **Storage (@4thtech-io/storage):** 3 merged, 1 in progress
-> - **Chain client (@4thtech-io/chain):** 5 merged
-> - **Core (@4thtech-io/core):** 21 merged
-> - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
-> - **MCP server, CLI and apps:** 6 merged, 6 in progress, 2 planned
-> - **OCC v2 contracts (private repo):** 4 merged, 1 planned
-> - **Design:** 1 merged, 1 in progress
-> - **Privacy of proofs (D-109):** 3 merged, 1 in progress, 3 planned
-> - **In progress:** v0.3.0 is on npm `latest` and a GitHub release (26 Oct 2026; v0.2.0 is the one before it). **In 0.3.0:** the local app is in. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
-> - **Does not exist yet:** adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.3.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`. The local app pages are in 0.3.0 and are not in v0.2.0.
+> - **Components:** 74 merged, 15 in progress, 7 planned
 > - **Next:** 0.4.0 is next: the cloud agent (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
-> Every component, with its pull requests, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
+> Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
 
 ## Roadmap
@@ -150,7 +139,7 @@ Logos (SVG and PNG), social images and the colour palette are in [`brand/`](bran
 
 ## Contributing
 
-Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues). To help build, see [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md) if you are (or run) an agent. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues). Need help? See [SUPPORT.md](SUPPORT.md). To help build, see [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md) if you are (or run) an agent. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 
