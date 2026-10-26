@@ -370,7 +370,10 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
       body: {
         error: 'folder_refused',
         reason: 'contains_protected',
-        protectedFolder: sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')),
+        // Windows paths are parsed case-folded (path-guard), so the folder is named in lower case there.
+        protectedFolder: WIN
+          ? sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')).toLowerCase()
+          : ['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/'),
       },
     });
     expect(fake.patches).toEqual([]);
