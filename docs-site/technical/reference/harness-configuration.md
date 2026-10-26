@@ -386,7 +386,7 @@ The M1 release runs on test networks only, and this is an accepted, documented r
 
 - The one-click Claude Desktop extension bundle (v0.2.0)
 - Cursor, VS Code, Windsurf, Cline (as tested)
-- Remote harnesses (ChatGPT developer mode, claude.ai custom connectors) through the self-hosted cloud agent (v0.3.0)
+- Claude custom connectors (claude.ai and the Claude iOS and Android apps) through the self-hosted cloud agent (planned for v0.4.0, D-131); ChatGPT web developer mode later
 - Optional session-start hooks
 
 **Filled in at:** M1a (v0.1.0) by M1-12b; extended at M1 and M2 (DOCS-M1b, DOCS-M2).

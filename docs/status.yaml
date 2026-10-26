@@ -366,7 +366,7 @@ areas:
         summary: "The submitter Worker records signed proofs on the agent's behalf, resubmits items apart after a shared failure and repairs nonce gaps (M1-10a, M1-10a-b). It is live in production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta: Base Sepolia, health ok), deployed through its CI pipeline with owner approval: staging, a smoke test that sends nothing, production with automatic rollback and the deploy freeze (M1-10c). Proofs work end to end on the testnet. Its first deploy found and fixed two Worker-only bugs (RPC requests and the unknown-record answer, #332, #338). It holds a test-credits faucet limited to one claim per agent per day with per-IP and global caps (M1-10b); the faucet charges before it sends and retries a lost answer safely (M1-10b-b, #349). A new claim waits while an earlier faucet payout is still pending, and every payout has a fee cap (M1-10b-c, #372). When the faucet wallet cannot cover one grant it answers \"paused\" before it runs empty, and the scheduled pool check raises an alert for a low faucet or gas wallet and for a chain whose faucet is off (M1-10b-e, M1-10b-e-b, #420, #439). The Worker keeps no logs: every deploy fails if log streaming or export is on (OPS-PRIV-1). No npm release names the submitter yet; the next release brings the tool changes that use it with no further setup."
       - name: "Owner console, desktop apps, cloud agent"
         state: planned
-        summary: "M2."
+        summary: "M2. The cloud agent comes first, as 0.4.0 (D-131): an always-on agent in your own Cloudflare account that you use from Claude on the web and in the Claude iPhone and Android apps, with approvals by Face ID or fingerprint. ChatGPT on the web comes later. Planned, not built yet."
       - name: "Adding credits: pay page"
         state: planned
         summary: "Direction set (D-111): one link from the agent opens a separate pay page where credits are added in dollars, crypto first: use crypto you already have (connect your own account, M2-18b) or send from an exchange to the agent's address with a QR code (M2-18c), plus free test credits on testnets. The agent explains the one step, watches for the funds and confirms the credits; users pay every cost. Pay by card comes last, after the legal entity is decided (M2-18a, M3-4c). Decided 21 Oct 2026: messages and files stay free (D-112), the top-up link carries everything after the `#` so it never reaches a server log (D-113), and the sender's proof fee covers up to 3 receipts (D-114). The link in the tools (M1-26-e) is in review and stays off until the pay page exists."
@@ -489,7 +489,7 @@ roadmap:
   - id: "M2"
     name: "Owner console, desktop apps, self-host, design"
     state: planned
-    version: "0.3.0"
+    version: "0.4.0 (cloud agent first) and later"
     duration: "~4–6+ weeks"
     outcome: "Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109)"
     gate: "20 to 50 external early adopters on testnets; install to first message in under 5 minutes."
