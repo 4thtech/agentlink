@@ -58,6 +58,10 @@
 //   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
 //   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
+// - M1-11a-ux: `/app.css` is the approval page's fixed stylesheet (approval-page.ts), served
+//   like `/app.js` under the same headers and CSP. The card view drops the AI argument `inviteUrl`
+//   (the invite's capability link) and carries an optional plain `headline`, checked like every
+//   other card field.
 // - M1-11s-b, the local UI shell (D-118): the React app (apps/local-ui) is served from an in-memory
 //   bundle the caller passes in (`localUi.assets`; the CLI embeds it), never from a file path.
 //   Only `index.html` and `assets/<one file name>` with a known type are accepted, checked before the
@@ -76,12 +80,40 @@
 //   The handler gets a read-only client view and a one-use `sign` bound to that session (the
 //   allowlist and one gesture, D-68); the session closes and the store locks when it returns, and a
 //   presence route that signed nothing is answered 409 `refused`.
+// - M1-11s-c, owner setup on the first-run page (D-120 (1); proposed, owner confirms at merge): the
+//   two `presence: 'setup'` routes (begin, finish) are run by `setupGate`, never by `ownerGate`
+//   (which is unchanged). After the same session, CSRF, Origin, fetch-metadata and octet-stream
+//   checks, the gate answers 429 while the wrong-code backoff is in force, and 409 `owner_exists`
+//   unless no owner exists anywhere (no card names one; no `owner`, `owner-passkey` or `owner-next`
+//   item). `begin` (empty body) creates the owner seed and holds it in memory for SETUP_HOLD_MS,
+//   bound to that session; one setup at a time (a second begin is 409 `busy`). It returns only public
+//   WebAuthn creation values: user.id = the owner's x-only Nostr key, a random challenge, the PRF
+//   salt, RP ID `localhost`. `finish` takes the hold (single-use, the bound session only), checks the
+//   creation response and completes the setup all or nothing (owner-setup.ts): the owner code, the
+//   passkey and the agent's first card. The owner code goes to the page once and is never in an
+//   event. The held seed is wiped on finish (whatever the outcome), on expiry, when its session is
+//   dropped and when the server closes.
+// - M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 08 §1 first run v2; proposed, owner confirms at merge): when
+//   the setup's `firstCard.firstPolicy` is wired, `begin` first prepares the folders (Send, Inbox,
+//   Proofs; owner-setup.ts prepareSetupFolders) and answers 409 `folder_refused` (reason
+//   `folder_not_empty` or `folder_unavailable`) before any seed exists when Send is a link at either
+//   level, not a folder or not empty. `finish` signs the card and the first policy with the same
+//   gesture and answers the fixed `sendFolder` outcome (`allowed`, `not_confirmed`, `not_allowed`;
+//   never the path) and the computer's name for the backup-code save form. The folders this run
+//   created are removed whenever the policy is not in force (failure, expiry, drop, close).
+// - M1-11b-6: `openFirstRun()` opens the first-run page with a one-shot session link, as `open()`
+//   does for `/`; the CLI's `init` calls it for a new owner (the CLI's first-run step). G-1: a
+//   same-user process holding a session link can race the human to set up an owner it controls
+//   (owner-setup.ts threat note).
+// - M1-11b-9: `openActivity()` is the same for `/settings/activity`, for `agentlink ui`; a session
+//   link grants viewing and the owner-presence-gated actions only, as for `open()`.
 //
 // Out of scope and accepted (G-1, D-67; 04 §2.5): a same-user process that reads memory, modifies the
 // installed package, or serves a look-alike page on another localhost port. Cookies are not isolated
 // by port, so another local server the owner's browser visits could receive the session cookie; it
 // grants viewing only. The opener's argv briefly holds the session link (approval-os.ts).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
 import type { OwnerActionOutcome } from '@4thtech-io/core';
 import {
@@ -99,6 +131,7 @@ import {
   ownerPrfSalt,
   parseJson,
   wipe,
+  type Argon2idParams,
   type JsonObject,
   type JsonValue,
   type OwnerPresence,
@@ -106,11 +139,26 @@ import {
   type OwnerSession,
 } from '@4thtech-io/crypto';
 import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
-import { APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
+import { APP_CSS, APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
 import { decideReviewedWith, type ApprovalContext } from './owner-approval.js';
-import { KeychainOwnerKeyStore } from './owner-keystore.js';
+import { grouped } from './owner-init.js';
+import { KeychainOwnerKeyStore, newOwnerSeed, ownerFingerprintText } from './owner-keystore.js';
+import {
+  MAX_SETUP_REGISTRATION_BYTES,
+  SETUP_HOLD_MS,
+  checkSetupRegistration,
+  completeOwnerSetup,
+  computerNameOf,
+  noOwnerAnywhere,
+  parseSetupRegistration,
+  prepareSetupFolders,
+  removeSetupFolders,
+  type SetupFolders,
+  type SetupRegistration,
+} from './owner-setup.js';
+import { keepsFolder } from './owner-first-policy.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
@@ -126,8 +174,13 @@ import {
   type LocalUiAssets,
   type LocalUiContext,
   type LocalUiOptions,
+  type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
-import type { LocalUiOwnerOperation, LocalUiResult } from './local-ui/route-types.js';
+import type {
+  LocalUiOwnerOperation,
+  LocalUiResult,
+  LocalUiSetupStep,
+} from './local-ui/route-types.js';
 import {
   LOCAL_UI_API_PREFIX,
   LocalUiRouteRegistry,
@@ -169,6 +222,8 @@ const MAX_REVIEW_ITEMS = 20;
 const MAX_DETAIL_CHARS = 1024;
 const MAX_VALUE_CHARS = 16_384;
 const MAX_FIELDS = 64;
+/** AI arguments the page never shows (M1-11a-ux): the invite link of an accept-invite. */
+const HIDDEN_ARGS: ReadonlySet<string> = new Set(['inviteUrl']);
 
 /** The wait in seconds after `failures` rejected presence proofs in a row (0 = no wait). */
 export function presenceBackoffSeconds(failures: number): number {
@@ -208,6 +263,8 @@ const CSRF_META = /<meta\s+name="agentlink-csrf"\s+content="([^"]*)"\s*\/?>/gi;
 const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 /** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts. */
 const MAX_INPUT_CHARS = 8192;
+/** M1-11s-c: the setup routes report an expired hold themselves (no sweep before them). */
+const SETUP_PATH_PREFIX = '/api/ui/first-run/';
 
 interface ServedAsset {
   readonly body: Uint8Array;
@@ -279,6 +336,11 @@ function loadLocalUi(assets: LocalUiAssets | undefined): {
  * the AI chose, shown in their own marked region; they may hold anything, including markup.
  */
 export interface ApprovalDetails {
+  /**
+   * M1-11a-ux: the card's plain headline ("Connect with “Ana” (self-declared)"), fixed
+   * text plus at most the contact name under the 06 §2.1 rule; without it the page shows `what`.
+   */
+  readonly headline?: string;
   /** The contact, under the 06 §2.1 name rule. */
   readonly who: string;
   readonly what: string;
@@ -397,7 +459,56 @@ export type ApprovalServerEvent =
         | 'refused'
         | 'failed';
     }
+  /** M1-11s-c: the outcome of an owner setup step (never the owner code, a key or a value). */
+  | {
+      readonly kind: 'owner_setup';
+      readonly outcome:
+        | 'ready'
+        | 'done'
+        | 'invalid'
+        | 'wait'
+        | 'unavailable'
+        | 'busy'
+        | 'owner_exists'
+        | 'not_pending'
+        | 'expired'
+        | 'presence_required'
+        | 'presence_rejected'
+        /** IR-M1-11s-c-1 M-1: the owner was kept and its code handed out, the card unconfirmed. */
+        | 'done_unconfirmed'
+        /** M1-UX-FIRSTRUN-V2: the Send folder can't be used; nothing began (reason says why). */
+        | 'folder_refused'
+        | 'failed';
+      /** IR-M1-11s-c-1 L-4: with `failed`, which kind of failure (a fixed code). */
+      readonly reason?: OwnerSetupFailure;
+      /**
+       * IR-M1-11s-c-1 L-2: with `done` and `done_unconfirmed`, the new owner's fingerprint (public,
+       * 11 §5.2), so the CLI can show it outside the browser for comparing with `agentlink doctor`.
+       */
+      readonly fingerprint?: string;
+      /** M1-UX-FIRSTRUN-V2: with `done`, the first policy's fixed outcome (never the path). */
+      readonly sendFolder?: SetupSendFolder;
+    }
   | { readonly kind: 'closed' };
+
+/** M1-UX-FIRSTRUN-V2: what happened to the first policy's Send folder (fixed codes). */
+export type SetupSendFolder = 'allowed' | 'not_confirmed' | 'not_allowed';
+
+/**
+ * IR-M1-11s-c-1 L-4: why an owner setup step failed. `rolled_back`: nothing of this setup was kept,
+ * start again. `keychain`: the keychain refused, setup items may remain (`agentlink doctor`).
+ * `check_failed`: whether an owner exists could not be checked (nothing was written). `internal`:
+ * anything else (nothing is known to be kept).
+ */
+export type OwnerSetupFailure =
+  | 'rolled_back'
+  | 'keychain'
+  | 'check_failed'
+  | 'internal'
+  /** M1-UX-FIRSTRUN-V2, with `folder_refused`: Send already holds something. */
+  | 'folder_not_empty'
+  /** M1-UX-FIRSTRUN-V2, with `folder_refused`: Send is a link (either level) or not a folder. */
+  | 'folder_unavailable';
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
@@ -427,6 +538,14 @@ export interface ApprovalServerInternals {
   readonly now?: () => number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
   readonly routes?: LocalUiRouteRegistry;
+  /** M1-11s-c: Argon2id parameters for the new owner code's wrap. Default: the keystore defaults. */
+  readonly ownerKdf?: Argon2idParams;
+  /** M1-11s-c: the owner seed source for setup. Default: newOwnerSeed (@4thtech-io/crypto). */
+  readonly newOwnerSeed?: () => { readonly seed: Uint8Array; readonly keys: OwnerPublicKeys };
+  /** M1-UX-FIRSTRUN-V2: the computer's host name. Default: node:os hostname. */
+  readonly hostname?: () => string;
+  /** M1-UX-FIRSTRUN-V2-b: removes a setup's folders (tests: timing). Default: removeSetupFolders. */
+  readonly removeSetupFolders?: (folders: SetupFolders | undefined) => Promise<void>;
 }
 
 export interface ApprovalServer {
@@ -450,6 +569,17 @@ export interface ApprovalServer {
    * be started.
    */
   open(approvalId?: string): Promise<boolean>;
+  /**
+   * M1-11b-6: opens the owner's browser at a new one-shot session link to the first-run page
+   * (`/first-run?t=…`), the same link rules as `open()`: handed only to the OS opener, never
+   * returned, logged or put in an event. Resolves false when no browser could be started.
+   */
+  openFirstRun(): Promise<boolean>;
+  /**
+   * M1-11b-9: the same for the settings pages, at `/settings/activity` (`agentlink ui`). A fixed
+   * path; nothing from a caller reaches the link.
+   */
+  openActivity(): Promise<boolean>;
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   close(): Promise<void>;
@@ -459,6 +589,20 @@ type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outco
 type PasskeyOutcome = Extract<ApprovalServerEvent, { kind: 'passkey' }>['outcome'];
 type RejectReason = Extract<ApprovalServerEvent, { kind: 'rejected' }>['reason'];
 type OwnerOperationOutcome = Extract<ApprovalServerEvent, { kind: 'owner_operation' }>['outcome'];
+type OwnerSetupOutcome = Extract<ApprovalServerEvent, { kind: 'owner_setup' }>['outcome'];
+
+/** M1-11s-c: the owner seed `begin` holds for `finish`, in memory only. */
+interface PendingSetup {
+  readonly seed: Uint8Array;
+  readonly keys: OwnerPublicKeys;
+  readonly challenge: Uint8Array;
+  /** The session (cookie value) it is bound to. */
+  readonly session: Uint8Array;
+  readonly expiresAt: number;
+  readonly timer: ReturnType<typeof setTimeout>;
+  /** M1-UX-FIRSTRUN-V2: the folders begin prepared (removed unless the first policy applies). */
+  readonly folders?: SetupFolders;
+}
 
 /** The default listen: one `server.listen`, rejecting with the socket error. */
 function listenOnce(server: Server, options: ApprovalListenOptions): Promise<void> {
@@ -549,16 +693,23 @@ const isText = (value: unknown, max: number, empty = false): value is string =>
 function detailsOf(value: unknown): ApprovalDetails | undefined | false {
   if (value === undefined) return undefined;
   if (typeof value !== 'object' || value === null) return false;
-  const { who, what, cost, expires, rule, fromAi, terms } = value as Record<string, unknown>;
+  const { headline, who, what, cost, expires, rule, fromAi, terms } = value as Record<
+    string,
+    unknown
+  >;
   for (const field of [who, what, cost, expires, rule]) {
     if (!isText(field, MAX_DETAIL_CHARS)) return false;
   }
+  if (headline !== undefined && !isText(headline, MAX_DETAIL_CHARS)) return false;
   if (!Array.isArray(fromAi) || fromAi.length > MAX_FIELDS) return false;
   const fields: { name: string; value: string }[] = [];
   for (const entry of fromAi as unknown[]) {
     if (typeof entry !== 'object' || entry === null) return false;
     const { name, value: text } = entry as Record<string, unknown>;
     if (!isText(name, MAX_DETAIL_CHARS) || !isText(text, MAX_VALUE_CHARS, true)) return false;
+    // M1-11a-ux: an invite link never reaches the page (defence in depth; the CLI's
+    // source leaves it out already).
+    if (HIDDEN_ARGS.has(name)) continue;
     fields.push({ name, value: text });
   }
   let lines: string[] | undefined;
@@ -571,6 +722,7 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
     }
   }
   return {
+    ...(headline === undefined ? {} : { headline: headline as string }),
     who: who as string,
     what: what as string,
     cost: cost as string,
@@ -673,6 +825,8 @@ export async function startApprovalServerWith(
   /** Rejected presence proofs in a row, and when the wait they caused ends (ms). */
   let failures = 0;
   let waitUntil = 0;
+  /** M1-11s-c: the one owner setup in progress, if any. */
+  let pendingSetup: PendingSetup | undefined;
   const uiContext: LocalUiContext = Object.freeze<LocalUiContext>({
     // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
     client:
@@ -1348,6 +1502,334 @@ export async function startApprovalServerWith(
     }
   };
 
+  const finishSetup = (
+    res: ServerResponse,
+    status: number,
+    outcome: OwnerSetupOutcome,
+    extra: Record<string, unknown> = {},
+    fixed: {
+      readonly reason?: OwnerSetupFailure;
+      readonly fingerprint?: string;
+      readonly sendFolder?: SetupSendFolder;
+    } = {},
+  ): void => {
+    // Fixed values only in the event: never the owner code or anything from the request.
+    emit({ kind: 'owner_setup', outcome, ...fixed });
+    sendJson(res, status, {
+      status: outcome,
+      ...(fixed.reason === undefined ? {} : { reason: fixed.reason }),
+      ...extra,
+    });
+  };
+
+  /** M1-UX-FIRSTRUN-V2-b: removes what prepareSetupFolders created (only while empty). */
+  const removeFolders = async (folders: SetupFolders | undefined): Promise<void> => {
+    try {
+      await (internals.removeSetupFolders ?? removeSetupFolders)(folders);
+    } catch {
+      // Never fatal: only empty folders this run created are ever removed.
+    }
+  };
+
+  /**
+   * M1-UX-FIRSTRUN-V2-b (L-1, cross-process): the folders of a setup that never created an owner
+   * here. Once an owner exists anywhere (a terminal `owner init` in another process may have
+   * adopted this Send folder for its first policy), they are left alone; when that check fails,
+   * too (an empty folder left behind is harmless, a removed one could break that policy).
+   */
+  const releaseFolders = async (folders: SetupFolders | undefined): Promise<void> => {
+    if (folders === undefined) return;
+    const setup = options.localUi?.ownerSetup;
+    let ownerElsewhere: boolean;
+    try {
+      ownerElsewhere = setup === undefined || (await ownerExistsAnywhere(setup));
+    } catch {
+      ownerElsewhere = true;
+    }
+    if (!ownerElsewhere) await removeFolders(folders);
+  };
+
+  /**
+   * M1-UX-FIRSTRUN-V2-b (L-1): the removal of dropped setups' folders, in order. `begin` waits for
+   * it before preparing folders, so a new setup never loses its Send folder to an older removal.
+   */
+  let folderRemoval: Promise<void> = Promise.resolve();
+
+  /** M1-11s-c: wipes and forgets the held setup, if it is still `which` (default: whatever is held). */
+  const dropSetup = (which: PendingSetup | undefined = pendingSetup): void => {
+    if (which === undefined || which !== pendingSetup) return;
+    pendingSetup = undefined;
+    clearTimeout(which.timer);
+    wipe(which.seed, which.challenge, which.session);
+    // M1-UX-FIRSTRUN-V2: no policy was signed, so the folders this begin created go again
+    // (M1-UX-FIRSTRUN-V2-b: queued, and awaited by the next begin and by close).
+    const folders = which.folders;
+    folderRemoval = folderRemoval.then(() => releaseFolders(folders));
+  };
+
+  /** M1-11s-c: drops a hold that expired or whose session is gone. */
+  const sweepSetup = (): void => {
+    const held = pendingSetup;
+    if (held === undefined) return;
+    if (now() >= held.expiresAt || !sessions.some((s) => equalBytes(s, held.session))) {
+      dropSetup(held);
+    }
+  };
+
+  /** M1-UX-FIRSTRUN-V2: the host name for the save form; never throws. */
+  const safeHostname = (): string => {
+    try {
+      return (internals.hostname ?? osHostname)();
+    } catch {
+      return '';
+    }
+  };
+
+  /** M1-11s-c: true when an owner exists anywhere (card or any owner item). Rejects on errors. */
+  const ownerExistsAnywhere = async (setup: LocalUiOwnerSetupOption): Promise<boolean> =>
+    (await source.context()) !== undefined ||
+    !(await noOwnerAnywhere(keychainOf(), setup.firstCard, undefined, setup.ownerFiles));
+
+  /**
+   * M1-11s-c: the setup gate for the two `presence: 'setup'` routes (never ownerGate). The caller
+   * checked the session, CSRF, Origin, fetch metadata and the octet-stream type.
+   */
+  async function setupGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    step: LocalUiSetupStep,
+    cookie: string,
+  ): Promise<void> {
+    const wait = waitSeconds();
+    if (wait > 0) {
+      req.resume();
+      res.setHeader('Retry-After', String(wait));
+      finishSetup(res, 429, 'wait', { retryAfter: wait });
+      return;
+    }
+    const setup = options.localUi?.ownerSetup;
+    if (setup === undefined) {
+      req.resume();
+      finishSetup(res, 503, 'unavailable');
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_SETUP_REGISTRATION_BYTES);
+    if (body === undefined) return;
+    try {
+      if (step === 'begin') await setupBegin(res, body, cookie, setup);
+      else await setupFinish(res, body, cookie, setup);
+    } finally {
+      wipe(body);
+    }
+  }
+
+  async function setupBegin(
+    res: ServerResponse,
+    body: Uint8Array,
+    cookie: string,
+    setup: LocalUiOwnerSetupOption,
+  ): Promise<void> {
+    if (body.length !== 0) {
+      finishSetup(res, 400, 'invalid');
+      return;
+    }
+    sweepSetup();
+    // Fail closed: one setup at a time, from any session, and never during an owner operation.
+    if (pendingSetup !== undefined || busy) {
+      finishSetup(res, 409, 'busy');
+      return;
+    }
+    busy = true;
+    try {
+      // M1-UX-FIRSTRUN-V2-b (L-1): a dropped setup's folders are gone before new ones are prepared.
+      await folderRemoval;
+      let exists: boolean;
+      try {
+        exists = await ownerExistsAnywhere(setup);
+      } catch {
+        finishSetup(res, 500, 'failed', {}, { reason: 'check_failed' });
+        return;
+      }
+      if (exists) {
+        finishSetup(res, 409, 'owner_exists');
+        return;
+      }
+      const sessionAt = matchIndex(cookie, sessions);
+      if (sessionAt < 0) {
+        finishSetup(res, 409, 'not_pending');
+        return;
+      }
+      // M1-UX-FIRSTRUN-V2: the folders, before the gesture and before any seed exists.
+      const { firstPolicy } = setup.firstCard;
+      let folders: SetupFolders | undefined;
+      if (firstPolicy !== undefined) {
+        folders = await prepareSetupFolders(firstPolicy.home);
+        if (folders.send.status !== 'ready') {
+          await removeFolders(folders);
+          finishSetup(res, 409, 'folder_refused', {}, { reason: folders.send.reason });
+          return;
+        }
+      }
+      const { seed, keys } = (internals.newOwnerSeed ?? newOwnerSeed)();
+      const challenge = randomBytes(32);
+      const held: PendingSetup = {
+        seed,
+        keys,
+        challenge,
+        session: (sessions[sessionAt] as Uint8Array).slice(),
+        expiresAt: now() + SETUP_HOLD_MS,
+        timer: setTimeout(() => dropSetup(held), SETUP_HOLD_MS),
+        ...(folders === undefined ? {} : { folders }),
+      };
+      held.timer.unref();
+      pendingSetup = held;
+      finishSetup(res, 200, 'ready', {
+        expiresInMs: SETUP_HOLD_MS,
+        fingerprint: ownerFingerprintText(keys),
+        publicKey: {
+          rpId: PASSKEY_RP_ID,
+          rpName: 'AgentLink',
+          userId: encodeBase64url(keys.ownerNostr),
+          userName: 'AgentLink owner',
+          challenge: encodeBase64url(challenge),
+          prfSalt: encodeBase64url(ownerPrfSalt()),
+        },
+      });
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function setupFinish(
+    res: ServerResponse,
+    body: Uint8Array,
+    cookie: string,
+    setup: LocalUiOwnerSetupOption,
+  ): Promise<void> {
+    const held = pendingSetup;
+    // Bound to its session: another session neither finishes nor consumes it.
+    if (held === undefined || !matches(cookie, held.session)) {
+      finishSetup(res, 409, 'not_pending');
+      return;
+    }
+    if (now() >= held.expiresAt) {
+      dropSetup(held);
+      await folderRemoval;
+      finishSetup(res, 409, 'expired');
+      return;
+    }
+    if (busy) {
+      finishSetup(res, 409, 'busy');
+      return;
+    }
+    // Single-use: taken before any await; wiped whatever happens below.
+    pendingSetup = undefined;
+    clearTimeout(held.timer);
+    busy = true;
+    let registration: SetupRegistration | undefined;
+    // M1-UX-FIRSTRUN-V2: the folders stay only when the first policy is (or may be) in force.
+    let keepFolders = false;
+    let released = false;
+    // M1-UX-FIRSTRUN-V2-b: true once this run's owner exists (completeOwnerSetup returned).
+    let ownerIsOurs = false;
+    /**
+     * Removes the folders this run created (unless kept): directly once the owner is this run's;
+     * before that, only while no owner exists anywhere (releaseFolders, L-1 cross-process).
+     */
+    const release = async (): Promise<void> => {
+      if (keepFolders || released) return;
+      released = true;
+      if (ownerIsOurs) await removeFolders(held.folders);
+      else await releaseFolders(held.folders);
+    };
+    /** Answers after the folders this run created are gone (unless kept), so none outlives it. */
+    const answer = async (...args: Parameters<typeof finishSetup>): Promise<void> => {
+      await release();
+      finishSetup(...args);
+    };
+    try {
+      try {
+        registration = parseSetupRegistration(body);
+      } catch {
+        await answer(res, 403, 'presence_required');
+        return;
+      }
+      try {
+        checkSetupRegistration(registration, { challenge: held.challenge, origin });
+      } catch {
+        await answer(res, 403, 'presence_rejected');
+        return;
+      }
+      let exists: boolean;
+      try {
+        exists = await ownerExistsAnywhere(setup);
+      } catch {
+        await answer(res, 500, 'failed', {}, { reason: 'check_failed' });
+        return;
+      }
+      if (exists) {
+        await answer(res, 409, 'owner_exists');
+        return;
+      }
+      let result: Awaited<ReturnType<typeof completeOwnerSetup>>;
+      try {
+        result = await completeOwnerSetup(
+          keychainOf(),
+          {
+            seed: held.seed,
+            keys: held.keys,
+            credentialId: registration.credentialId,
+            prfOutput: registration.prfOutput,
+            firstCard: setup.firstCard,
+            ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
+          },
+          {
+            ...(internals.ownerKdf === undefined ? {} : { kdf: internals.ownerKdf }),
+            ...(setup.ownerFiles === undefined ? {} : { ownerFiles: setup.ownerFiles }),
+          },
+        );
+      } catch (error) {
+        const code = error instanceof NodeKeyStoreError ? error.code : undefined;
+        if (code === 'owner_exists') await answer(res, 409, 'owner_exists');
+        else if (code === 'owner_card_failed') {
+          await answer(res, 500, 'failed', {}, { reason: 'rolled_back' });
+        } else if (code === 'keychain_failed') {
+          await answer(res, 500, 'failed', {}, { reason: 'keychain' });
+        } else if (code === 'owner_operation_refused') {
+          await answer(res, 500, 'failed', {}, { reason: 'check_failed' });
+        } else await answer(res, 500, 'failed', {}, { reason: 'internal' });
+        return;
+      }
+      ownerIsOurs = true;
+      keepFolders = keepsFolder(result.sendFolder);
+      try {
+        const fingerprint = ownerFingerprintText(held.keys);
+        const sendFolder: SetupSendFolder | undefined = result.sendFolder?.status;
+        // The owner code goes to the page once, for the backup-code step; never an event.
+        // IR-M1-11s-c-1 M-1: also when the card is unconfirmed, since the owner was kept.
+        await answer(
+          res,
+          200,
+          result.confirmed ? 'done' : 'done_unconfirmed',
+          {
+            passkey: result.passkey,
+            ownerCode: grouped(result.ownerCode),
+            fingerprint,
+            computerName: computerNameOf(safeHostname()),
+            ...(sendFolder === undefined ? {} : { sendFolder }),
+          },
+          { fingerprint, ...(sendFolder === undefined ? {} : { sendFolder }) },
+        );
+      } finally {
+        wipe(result.ownerCode);
+      }
+    } finally {
+      busy = false;
+      wipe(held.seed, held.challenge, held.session, registration?.prfOutput);
+      await release();
+    }
+  }
+
   /** M1-11s-b: one /api/ui/ request (route registry, session, CSRF, presence gate). */
   async function handleUi(
     req: IncomingMessage,
@@ -1369,7 +1851,8 @@ export async function startApprovalServerWith(
       req.resume();
       reject(res, status, reason);
     };
-    if (matchIndex(cookieToken(req), sessions) < 0) return fail(401, 'token');
+    const cookie = cookieToken(req);
+    if (matchIndex(cookie, sessions) < 0) return fail(401, 'token');
     if (!fetchSiteOk(req)) return fail(403, 'fetch_site');
     const { route, params } = found;
     if (route.presence && originHeader === undefined) return fail(403, 'origin');
@@ -1381,6 +1864,11 @@ export async function startApprovalServerWith(
     }
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return fail(415, 'content_type');
+    if (route.presence === 'setup') {
+      // M1-11s-c: owner setup has its own gate; ownerGate never runs it.
+      await setupGate(req, res, route.step, cookie as string);
+      return;
+    }
     const input = operationInput(req);
     if (input === 'invalid') {
       req.resume();
@@ -1420,10 +1908,16 @@ export async function startApprovalServerWith(
     const url = new URL(raw, origin);
     const path = url.pathname;
     const method = req.method ?? 'GET';
+    if (!path.startsWith(SETUP_PATH_PREFIX)) sweepSetup();
 
     if (path === '/app.js') {
       if (method !== 'GET') return reject(res, 405, 'method');
       sendText(res, 200, 'text/javascript; charset=utf-8', APP_JS);
+      return;
+    }
+    if (path === '/app.css') {
+      if (method !== 'GET') return reject(res, 405, 'method');
+      sendText(res, 200, 'text/css; charset=utf-8', APP_CSS);
       return;
     }
 
@@ -1573,12 +2067,17 @@ export async function startApprovalServerWith(
       const path = approvalId === undefined ? '/' : new URL(approvalUrl(approvalId)).pathname;
       return opener(`${origin}${path}?t=${mintLink()}`).catch(() => false);
     },
+    openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
+    openActivity: async () =>
+      opener(`${origin}/settings/activity?t=${mintLink()}`).catch(() => false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
       await notifier(NOTIFICATION).catch(() => false);
       return url;
     },
     close: async () => {
+      dropSetup();
+      await folderRemoval;
       await Promise.all(listeners.map(closeServer));
       emit({ kind: 'closed' });
     },

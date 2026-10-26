@@ -413,6 +413,50 @@ describe('04 §3.1.1 step 6: the payload passes its strict schema', () => {
       ]);
     }
   });
+
+  it('D-128 scope: a free-form JSON body keeps generic I-JSON (escaped names, non-integer numbers)', async () => {
+    // 04 §2.5.1 "Received text" covers owner-signed objects and the text that carries one. A
+    // `text` body is free-form user JSON (02 F-22): a key such as `say "hi"` can only be written
+    // with an escape, and a number such as 1.5 is valid. Neither may be dropped.
+    const { a, b } = await world();
+    const payloadBytes = encodeUtf8(
+      JSON.stringify({
+        type: 'text',
+        body: { 'say "hi"': 'x', price: 1.5, '</untrusted_content>': 'tag' },
+        replyTo: null,
+        files: [],
+      }),
+    );
+    const env = await craft({
+      signer: await agentSigner(b.keyStore),
+      entries: await standardEntries(a, b),
+      payloadBytes,
+      createdAt: clock.t,
+    });
+    expect(await deliver(a, env)).toEqual([
+      { envelopeId: env.id, outcome: 'ok', contactId: b.id, flagged: false },
+    ]);
+  });
+
+  it('D-128: an owner-signed carrier payload with an escaped member name is dropped', async () => {
+    const { a, b } = await world();
+    const texts = [
+      // `type` spelled with an escape, claiming a carrier type.
+      '{"\\u0074ype":"approval","body":{},"replyTo":null,"files":[]}',
+      '{"type":"policy","b\\u006fdy":{},"replyTo":null,"files":[]}',
+    ];
+    for (const text of texts) {
+      const env = await craft({
+        signer: await agentSigner(b.keyStore),
+        entries: await standardEntries(a, b),
+        payloadBytes: encodeUtf8(text),
+        createdAt: clock.t,
+      });
+      expect(await deliver(a, env)).toEqual([
+        { envelopeId: env.id, outcome: 'dropped', reason: 'payload_invalid', flagged: false },
+      ]);
+    }
+  });
 });
 
 // --- Step 7 ----------------------------------------------------------------------------------------

@@ -260,6 +260,64 @@ export function renderKnowledgeMilestones(data) {
 
 // --- Targets: which file gets which block ----------------------------------------------------------
 
+// --- Backlog card counts ----------------------------------------------------------------------------
+// Card counts are derived from the card headings on demand (`index.mjs --counts`) and are NOT
+// committed: a committed count goes stale whenever another PR merges first (CHORE-BACKLOG-COUNTS-QUEUE).
+// A card is a `#### <ID> · title` heading outside a code fence (so the §1 format example is not
+// one). Not counted: split parents (Status starts with "split into", their parts are counted) and
+// cards whose Phase starts with "later" (not in a milestone). M1 cards split into M1a and M1b by
+// the first word of their `**Phase:**` field.
+
+const BACKLOG_FILE = 'docs/process/backlog.md';
+
+/** Counts cards per section: { M0, M1a, M1b, M1, M2, M3 } (M1 is M1a + M1b + M1 cards with no phase). */
+export function countBacklogCards(text) {
+  const lines = text.split('\n');
+  const counts = { M0: 0, M1a: 0, M1b: 0, M1: 0, M2: 0, M3: 0 };
+  let fenced = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].startsWith('```')) fenced = !fenced;
+    if (fenced) continue;
+    const heading = /^#### (M[0-3])-\S+/.exec(lines[i]);
+    if (!heading) continue;
+    let status = '';
+    let phase = '';
+    for (let j = i + 1; j < lines.length && !lines[j].startsWith('#'); j += 1) {
+      status = status || (/\*\*Status:\*\*\s*(.*)$/.exec(lines[j])?.[1] ?? '');
+      phase = phase || (/\*\*Phase:\*\*\s*(.*)$/.exec(lines[j])?.[1] ?? '');
+      if (status && phase) break;
+    }
+    if (/^split into/i.test(status) || /^later/i.test(phase)) continue;
+    const section = heading[1];
+    if (section === 'M1') {
+      const word = /^M1([ab])\b/.exec(phase);
+      if (word) counts[`M1${word[1]}`] += 1;
+      counts.M1 += 1;
+    } else {
+      counts[section] += 1;
+    }
+  }
+  return counts;
+}
+
+/** Plain-text summary of the counts, printed on demand by `index.mjs --counts` (never committed). */
+export function formatBacklogCounts(c) {
+  return [
+    `M0 Foundations: ${c.M0}`,
+    `M1 Local beta: ${c.M1} (M1a ${c.M1a}, M1b ${c.M1b})`,
+    `M2 Console, desktop apps, self-host, design: ${c.M2}`,
+    `M3 Mainnet beta: ${c.M3}`,
+  ].join('\n');
+}
+
+/** Reads the backlog from `root` and returns its counts text, or null when the file is absent. */
+export function backlogCountsText(root) {
+  const text = readIfPresent(join(root, BACKLOG_FILE));
+  return text === null ? null : formatBacklogCounts(countBacklogCards(text));
+}
+
+// --- Targets ---------------------------------------------------------------------------------------
+
 /**
  * `optional` targets (the knowledge overview) are skipped when the
  * file is absent or carries none of the markers; once a file has the markers they are enforced.
@@ -350,6 +408,13 @@ export function run({ root, check = false }) {
   if (invalid.length > 0)
     return { problems: invalid.map((p) => `${STATUS_FILE}: ${p}`), changed, skipped };
 
+  const backlog = readIfPresent(join(root, BACKLOG_FILE));
+  if (backlog !== null && /<!-- backlog-counts:(start|end) -->/.test(backlog)) {
+    problems.push(
+      `${BACKLOG_FILE}: card counts are no longer committed (they conflict between pull requests); remove the backlog-counts block and read the counts with: node tools/docs-status/index.mjs --counts`,
+    );
+  }
+
   for (const target of TARGETS) {
     const path = join(root, target.file);
     const original = readIfPresent(path);
@@ -361,7 +426,7 @@ export function run({ root, check = false }) {
     let text = original;
     let applied = 0;
     for (const [name, render] of Object.entries(target.blocks)) {
-      const result = replaceBlock(text, name, render(data));
+      const result = replaceBlock(text, name, render(data, original));
       if (result.missing) {
         if (target.optional) skipped.push(`${target.file} has no ${name} markers; skipped`);
         else
@@ -383,7 +448,9 @@ export function run({ root, check = false }) {
       changed.push(target.file);
       if (check) {
         problems.push(
-          `${target.file} is out of date with ${STATUS_FILE}; run: node tools/docs-status/index.mjs`,
+          target.handEditHint
+            ? `${target.file} is out of date (${target.handEditHint}); run: node tools/docs-status/index.mjs`
+            : `${target.file} is out of date with ${STATUS_FILE}; run: node tools/docs-status/index.mjs`,
         );
       } else {
         writeFileSync(path, text);

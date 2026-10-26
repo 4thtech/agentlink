@@ -28,11 +28,12 @@ import {
 } from '@4thtech-io/node';
 import type { ContactDisplayName, RestrictedName, Terms } from '@4thtech-io/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import type { OpenedAgent } from '../runtime/index.js';
-import type { TermsTools } from '../tools/context.js';
-import { TOOLS, callTool, type ToolClient, type ToolContext } from '../tools/index.js';
-import { acceptRetryStep } from '../tools/invite-common.js';
-import { APPROVAL_LINK_NOTE } from '../tools/registry.js';
+import type { TermsTools } from '@4thtech-io/mcp-tools/context.js';
+import { TOOLS, callTool, type ToolClient, type ToolContext } from '@4thtech-io/mcp-tools';
+import { acceptRetryStep } from '@4thtech-io/mcp-tools/invite-common.js';
+import { APPROVAL_LINK_NOTE } from '@4thtech-io/mcp-tools/registry.js';
 import {
   BROWSER_OPEN_INTERVAL_MS,
   approvalLinkNextStep,
@@ -77,6 +78,9 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
       opened.push(id);
       return Promise.resolve(true);
     },
+    // M1-11b-6: the first-run link; not used by the approval UI.
+    openFirstRun: () => Promise.resolve(true),
+    openActivity: () => Promise.resolve(true),
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);
@@ -248,17 +252,35 @@ describe('the owner’s browser opens with the one-shot link, not the agent', ()
   });
 });
 
+describe('the link nextStep command prefix (M1-36a)', () => {
+  it('says "in your terminal" and stays within 500 characters for the longest agent name', () => {
+    const url = `http://localhost:47321/approve/${APPROVAL}`;
+    const npx = 'npx -y @4thtech-io/agentlink';
+    const text = approvalLinkNextStep(APPROVAL, url, `a${'b'.repeat(31)}`, npx);
+    expect(text).toContain(' or in your terminal run ');
+    expect(Array.from(text).length).toBeLessThanOrEqual(500);
+  });
+
+  it('prints the npx form when given it, never a bare name that is not on PATH', () => {
+    const url = `http://localhost:47321/approve/${APPROVAL}`;
+    const npx = 'npx -y @4thtech-io/agentlink';
+    expect(approvalLinkNextStep(APPROVAL, url, 'work', npx)).toContain(
+      `\`${npx} approve ${APPROVAL} --agent work\``,
+    );
+  });
+});
+
 describe('the nextStep with the link (06 §2.5; 11 §6.10)', () => {
   it('names the link, keeps the CLI command and tells the agent never to open or fetch it', () => {
     const url = `http://localhost:47321/approve/${APPROVAL}`;
     const text = approvalLinkNextStep(APPROVAL, url, 'default');
     expect(text).toContain(url);
-    expect(text).toContain(`agentlink approve ${APPROVAL}`);
+    expect(text).toContain(`${cliPrefix()} approve ${APPROVAL}`);
     expect(text).toMatch(NEVER_FETCH);
     expect(text).toContain("Your AI can't approve this for you.");
     expect(text).toContain('call the same tool again with approvalId');
     expect(approvalLinkNextStep(APPROVAL, url, 'work')).toContain(
-      `agentlink approve ${APPROVAL} --agent work`,
+      `${cliPrefix()} approve ${APPROVAL} --agent work`,
     );
     for (const word of [/\bwallet/i, /\bgas\b/i, /seed phrase/i, /transaction/i]) {
       expect(text).not.toMatch(word);
@@ -354,7 +376,7 @@ describe('pending_approval carries the approval url (M1-11a-b)', () => {
     expect(result.structured.approvalId).toBe(APPROVAL);
     expect(result.structured.url).toBe(`http://localhost:47321/approve/${APPROVAL}`);
     expect(result.structured.nextStep).toContain(`http://localhost:47321/approve/${APPROVAL}`);
-    expect(result.structured.nextStep).toContain(`agentlink approve ${APPROVAL}`);
+    expect(result.structured.nextStep).toContain(`${cliPrefix()} approve ${APPROVAL}`);
     expect(result.structured.nextStep).toMatch(NEVER_FETCH);
     expect(result.text).toContain(result.structured.url as string);
     expect(result.text).toMatch(NEVER_FETCH);
@@ -365,7 +387,7 @@ describe('pending_approval carries the approval url (M1-11a-b)', () => {
     const result = await respond(contextWith(undefined));
     expect(result.structured.status).toBe('pending_approval');
     expect(result.structured.url).toBeUndefined();
-    expect(result.structured.nextStep).toContain(`agentlink approve ${APPROVAL}`);
+    expect(result.structured.nextStep).toContain(`${cliPrefix()} approve ${APPROVAL}`);
   });
 
   it('a link outside the local UI origin never reaches the result (origin pin)', async () => {
@@ -381,7 +403,7 @@ describe('pending_approval carries the approval url (M1-11a-b)', () => {
     const result = await respond(context);
     expect(JSON.stringify(result)).not.toContain('evil.example');
     expect(result.structured.status).toBe('pending_approval');
-    expect(result.structured.nextStep).toContain(`agentlink approve ${APPROVAL}`);
+    expect(result.structured.nextStep).toContain(`${cliPrefix()} approve ${APPROVAL}`);
   });
 
   it('a failing link provider leaves the M1a result', async () => {
@@ -519,6 +541,7 @@ describe('agentlink mcp starts and stops the approval UI with the server', () =>
       const created = createApprovalUi({ start, agentName: opened.name, logger: silent });
       return {
         link: created.link,
+        openSetupPage: created.openSetupPage,
         get running() {
           return created.running;
         },

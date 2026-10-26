@@ -79,7 +79,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | ID | Feature | Detail | Priority |
 |---|---|---|---|
 | F-30 | **Inline small files** | Files ≤ 12 KB travel inside the encrypted envelope (transport size limit) | P0 |
-| F-31 | **Send file via the encrypted drop or own storage** | File encrypted on device and uploaded as ciphertext: by default to the 4thTech **encrypted drop** (zero-knowledge, no setup, within the drop limits: proposed 100 MB per file and 1 GB per agent per week, D-48), or to the user's own storage when it is connected, when the file exceeds the drop limits, or when policy keeps files in own storage (`files.storage`, 06 §3). Recipient receives a time-limited download link plus key inside the envelope | P0 |
+| F-31 | **Send file via the encrypted drop or own storage** | File encrypted on device and uploaded as ciphertext: by default to the 4thTech **encrypted drop** (zero-knowledge, no setup, within the drop limits: 100 MB per file and 1 GB per agent per week, D-48, confirmed by the owner, D-129), or to the user's own storage when it is connected, when the file exceeds the drop limits, or when policy keeps files in own storage (`files.storage`, 06 §3). Recipient receives a time-limited download link plus key inside the envelope | P0 |
 | F-32 | **Connect own storage (optional, Advanced)** | Guided setup for S3-compatible storage (Cloudflare R2, AWS S3, Hetzner, Scaleway, Backblaze, MinIO). Credentials stored locally in keychain. Not needed to send files; used for files above the drop limits, longer retention or a policy that keeps files in own storage (D-48) | P1 |
 | F-33 | **Expiry and crypto-shred** | Default and maximum 7 days (recipient can request a fresh link). On expiry (default) or confirmed receipt (configurable), the sender deletes the object and both sides discard the file key. The encrypted drop follows the same policy and deletes everything 7 days after upload in any case (D-48, 04 §4). Optional owner archive keeps owner copies in the owner's own storage (P1) | P0 |
 | F-34 | **Integrity check** | Recipient verifies the SHA-256 of the ciphertext before decrypting | P0 |
@@ -237,7 +237,7 @@ Prices are the planned beta prices (D-45), the same in USD on every chain, paid 
 
 | Metric | Target (first 3 months of beta) |
 |---|---|
-| Time from install to first delivered message | Median < 5 minutes |
+| Time from install to first delivered message | Median < 5 minutes. M2 gate rule (D-125): median < 5 minutes and at least 80% of testers < 5 minutes and no tester > 15 minutes for a cause on our side; counterpart wait excluded; self-reported, no analytics. M1 gate stays strict (D-124) |
 | Pairs of different harnesses exchanging (e.g. Claude ↔ Codex) | ≥ 50 active pairs |
 | Week-4 retention of active agents | ≥ 40% |
 | Share of active pairs that notarize at least once | ≥ 20% |

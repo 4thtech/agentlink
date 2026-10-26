@@ -403,9 +403,10 @@ describe('IR-M1-1b-1 M-1: the restricted @4thtech-io/crypto/keystore subpath', (
   const ruleFor = (zone) =>
     violationFor(zone, '@4thtech-io/crypto/keystore', `${zone}/src/a.ts`) ?? '';
 
-  it('applies in every zone except packages/node, even where @4thtech-io/crypto is allowed', () => {
+  // M2-3a (03 §3, 04 §2.2 "Self-host Worker"): apps/cloud-agent hosts the Worker KeyStore backend.
+  it('applies in every zone except the KeyStore backends (packages/node, apps/cloud-agent)', () => {
     const exempt = Object.keys(ZONES).filter((zone) => !RESTRICTED.test(ruleFor(zone)));
-    expect(exempt).toEqual(['packages/node']);
+    expect(exempt).toEqual(['packages/node', 'apps/cloud-agent']);
     expect(
       violationFor('packages/core', '@4thtech-io/crypto', 'packages/core/src/a.ts'),
     ).toBeNull();

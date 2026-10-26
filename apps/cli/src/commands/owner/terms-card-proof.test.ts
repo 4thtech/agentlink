@@ -6,7 +6,7 @@ import type { AgentLinkClient, CommitmentCard } from '@4thtech-io/core';
 import { termsHash } from '@4thtech-io/crypto';
 import { termsFromInput, type RestrictedName, type Terms } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
-import { copy } from '../../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { PendingRequest } from './pending.js';
 import { cardFacts, cardLines } from './render.js';
 import { TERMS_CARD_TEXT } from './terms-card.js';
@@ -150,6 +150,53 @@ describe('a firm offer with proof: the commitment card (M1-9d-3; 04 §3.4.2, 11 
   it('is a problem (never offered) when the stored terms do not hash to the signed scope', async () => {
     const other = stored('another subject');
     const bad = { ...action, context: { ...action.context, terms: other } };
+    const facts = await cardFacts(
+      client(cardOf(terms, scope, ['offer_envelope', 'offer_record'])),
+      request(bad),
+    );
+    expect(facts.terms).toBe('problem');
+  });
+});
+
+describe('a recorded counter-offer: respond_to_terms with scope offer (M1-9d-5; 04 §3.4.2)', () => {
+  const terms = stored('STORED-SUBJECT counter');
+  const scope = scopeOf(terms, 'offer');
+  const action = {
+    tool: 'agentlink_respond_to_terms',
+    args: {
+      envelopeId: ENVELOPE,
+      decision: 'counter',
+      terms: {
+        subject: 'ARGS-ONLY text the owner must not be shown as the terms',
+        deliverables: [{ description: 'ARGS-ONLY item', by: 'me' }],
+      },
+      notarize: true,
+    },
+    context: { triggers: ['commitments.accept'], scope, terms, fee: FEE },
+  };
+
+  it('is the firm-offer card: the bound terms (not args.terms), the commitment line and the cost', async () => {
+    const req = request(action);
+    const facts = await cardFacts(
+      client(cardOf(terms, scope, ['offer_envelope', 'offer_record'])),
+      req,
+    );
+    expect(facts.terms).not.toBe('problem');
+    expect(facts.terms).toBeDefined();
+    const lines = cardLines(req, facts);
+    expect(lines.join('\n')).not.toContain('ARGS-ONLY');
+    expect(lines).toContain('| Subject: STORED-SUBJECT counter');
+    expect(lines).toContain(TERMS_CARD_TEXT.ownTermsHeader);
+    expect(
+      lines.some((l) => l.startsWith(`Sending a firm offer with proof to ${WHO}, version 1`)),
+    ).toBe(true);
+    expect(lines).toContain(TERMS_CARD_TEXT.commitsOffer(WHO));
+    expect(lines).toContain(TERMS_CARD_TEXT.doesOffer);
+    expect(lines).toContain('Cost:     $0.10');
+  });
+
+  it('a scope offer under any other respond decision is a problem (never offered)', async () => {
+    const bad = { ...action, args: { envelopeId: ENVELOPE, decision: 'accept', notarize: true } };
     const facts = await cardFacts(
       client(cardOf(terms, scope, ['offer_envelope', 'offer_record'])),
       request(bad),

@@ -31,10 +31,22 @@ function fakeClient(
   return {
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
+    listActivity: () => Promise.reject(new Error('not used')),
+    files: {
+      resolvedFolders: () => Promise.reject(new Error('not used')),
+      preparePolicyEdit: () => Promise.reject(new Error('not used')),
+    },
     proofs: {
       list,
       creditsBalance: credits,
       topUp: () => Promise.resolve({ status: 'unavailable' }),
+    },
+    contacts: {
+      list: () => Promise.reject(new Error('not used')),
+      safetyCode: () => Promise.reject(new Error('not used')),
+      prepareCheck: () => Promise.reject(new Error('not used')),
+      prepareRename: () => Promise.reject(new Error('not used')),
+      prepareRemove: () => Promise.reject(new Error('not used')),
     },
   };
 }
@@ -416,9 +428,16 @@ describe('the read-only client view (context.ts)', () => {
       },
     };
     const view = readOnlyClient(full as never);
-    expect(Object.keys(view).sort()).toEqual(['agentId', 'getProof', 'proofs']);
-    // M1-11c-a4c adds the top-up read (proofs-top-up.test.ts); still nothing that moves funds.
+    expect(Object.keys(view).sort()).toEqual([
+      'agentId',
+      'contacts',
+      'files',
+      'getProof',
+      'listActivity',
+      'proofs',
+    ]);
     expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list', 'topUp']);
+    // M1-11c-a4c adds the top-up read (proofs-top-up.test.ts); still nothing that moves funds.
     expect(view.proofs).not.toBe(full.proofs);
     expect(Object.isFrozen(view.proofs)).toBe(true);
     await view.proofs.list({ limit: 3 });

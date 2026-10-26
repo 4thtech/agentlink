@@ -2129,6 +2129,77 @@ describe('the sender asks for a delivery receipt (06 §2.4 requestReceipt, 04 §
   });
 });
 
+describe('M1-33d-b: a request on an envelope already notarized is reported as not added', () => {
+  it('the result says the request was not added, and the proof is the stored one', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const first = (await a.client.notarize({ envelopeId })) as { recordId: string };
+    const again = await a.client.notarize({ envelopeId, requestReceipt: true });
+    expect(again).toMatchObject({
+      status: 'ok',
+      recordId: first.recordId,
+      receiptRequestNotAdded: true,
+    });
+    expect(again).not.toHaveProperty('receiptRequested');
+    const bodies = await proofBodiesSent(a);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).not.toHaveProperty('receiptRequest');
+  });
+
+  it('a submitted (not yet landed) proof without a request reports it too', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    chain.censor = true;
+    expect((await a.client.notarize({ envelopeId })).status).toBe('submitted');
+    const again = await a.client.notarize({ envelopeId, requestReceipt: true });
+    expect(again).toMatchObject({ status: 'submitted', receiptRequestNotAdded: true });
+    expect(again).not.toHaveProperty('receiptRequested');
+  });
+
+  it('never on a request that was kept, nor on a call that did not ask', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const asked = await sendText(a, b);
+    const kept = await a.client.notarize({ envelopeId: asked, requestReceipt: true });
+    expect(kept).toMatchObject({ status: 'ok', receiptRequested: true });
+    expect(kept).not.toHaveProperty('receiptRequestNotAdded');
+    const repeat = await a.client.notarize({ envelopeId: asked, requestReceipt: true });
+    expect(repeat).toMatchObject({ status: 'ok', receiptRequested: true });
+    expect(repeat).not.toHaveProperty('receiptRequestNotAdded');
+    const plain = await sendText(a, b);
+    await a.client.notarize({ envelopeId: plain });
+    const plainAgain = await a.client.notarize({ envelopeId: plain });
+    expect(plainAgain).not.toHaveProperty('receiptRequestNotAdded');
+  });
+});
+
+describe('M1-33d-b: concurrent acknowledge delivered signs at most one DELIVERED (I-6)', () => {
+  it('two concurrent calls for the same record sign, store and submit exactly one receipt', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    const proof = (await a.client.notarize({ envelopeId, requestReceipt: true })) as {
+      recordId: string;
+    };
+    await deliver(a, b);
+    const signs = vi.spyOn(b.keyStore, 'sign712');
+    const [one, two] = await Promise.all([
+      b.client.acknowledge({ envelopeId, type: 'delivered' }),
+      b.client.acknowledge({ envelopeId, type: 'delivered' }),
+    ]);
+    for (const r of [one, two]) {
+      expect(r).toMatchObject({ status: 'ok', recordId: proof.recordId, receipt: 'DELIVERED' });
+    }
+    expect(signs).toHaveBeenCalledTimes(1);
+    signs.mockRestore();
+    expect(await receipts(b)).toEqual([
+      expect.objectContaining({ record_id: proof.recordId, type: 1, signer: b.id }),
+    ]);
+    expect((await proofRows(b)).filter((r) => r.record_id === `${proof.recordId}:1`)).toHaveLength(
+      1,
+    );
+    expect(chain.calls.acknowledge).toBe(1);
+  });
+});
+
 describe('the recipient: a receipt request alone never signs anything (D-109, I-4, I-6)', () => {
   it('default rules: nothing is signed, and the inbox item says the sender asked', async () => {
     const { a, b } = await twoAgents({ defaults: true });

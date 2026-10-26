@@ -6,11 +6,11 @@
 
 ## How `agentlink init` configures a harness
 
-`npx -y @4thtech-io/agentlink init` detects Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Antigravity, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `claude-desktop`, `codex`, `gemini-cli`, `opencode`, `antigravity`) proposes that one app only (`claude-desktop` and the stricter Gemini CLI detection are available since v0.1.1), and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`npx -y @4thtech-io/agentlink init` detects Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor and Windsurf, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `claude-desktop`, `codex`, `gemini-cli`, `opencode`, `antigravity`, `cursor`, `windsurf`) proposes that one app only (`claude-desktop` and the stricter Gemini CLI detection are available since v0.1.1), and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
 
 An existing `agentlink` entry that differs is left alone. Existing config is backed up before it is changed. `init` never writes an owner secret.
 
-`--config <path>` names the config file for OpenCode or Antigravity when it is not in the default place. The folder must exist and is resolved with `realpath`; the file must be a `.json` file and not a link, never under `~/.agentlink`, `~/.ssh` or the keychain folders. It is written like every other config: as a diff you confirm, through a temporary file renamed over the old one, with a backup. These checks stop accidents and misdirected paths; they can't stop a program running as you from swapping a folder in between ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`--config <path>` names the config file for OpenCode, Antigravity or Windsurf when it is not in the default place. The folder must exist and is resolved with `realpath`; the file must be a `.json` file and not a link, never under `~/.agentlink`, `~/.ssh` or the keychain folders. It is written like every other config: as a diff you confirm, through a temporary file renamed over the old one, with a backup. These checks stop accidents and misdirected paths; they can't stop a program running as you from swapping a folder in between ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
 
 ### Several agents on one computer
 
@@ -132,6 +132,41 @@ Global config, `~/.gemini/config/mcp_config.json` (not the Gemini CLI file `~/.g
 ```
 
 Sources: [Antigravity MCP](https://antigravity.google/docs/mcp) (checked 2026-10-16: global `~/.gemini/config/mcp_config.json`, `mcpServers` with `command` and `args`). Documentation-verified; not yet tried in the app.
+
+### Cursor
+
+Global config, `~/.cursor/mcp.json`. `init --harness cursor` writes it after you confirm the diff.
+
+```json
+{
+  "mcpServers": {
+    "agentlink": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"]
+    }
+  }
+}
+```
+
+Sources: [Cursor MCP](https://cursor.com/docs/context/mcp) (checked 2026-10-22: global `~/.cursor/mcp.json`, `mcpServers` with `type`, `command`, `args`). Documentation-verified; not yet tried in the app.
+
+### Windsurf
+
+Cascade's config, `~/.config/devin/mcp_config.json` on macOS and Linux, `%AppData%/devin/mcp_config.json` on Windows (`~/AppData/Roaming/devin/mcp_config.json`). If `XDG_CONFIG_HOME` (macOS, Linux) or `APPDATA` (Windows) is set to an absolute path inside your home folder, `init` uses `devin/mcp_config.json` there, as Windsurf does; an empty or relative value is ignored, and one outside your home folder is refused. Older installs keep `~/.codeium/windsurf/mcp_config.json`: `init` still detects them, and `init --harness windsurf --config <that path>` writes there.
+
+```json
+{
+  "mcpServers": {
+    "agentlink": {
+      "command": "npx",
+      "args": ["-y", "@4thtech-io/agentlink", "mcp"]
+    }
+  }
+}
+```
+
+Sources: [Windsurf MCP](https://docs.devin.ai/windsurf/plugins/cascade/mcp) (checked 2026-10-22: `mcpServers` with `command` and `args`; the docs name two files and say to use the one "Open MCP config file" opens for your install). Documentation-verified; not yet tried in the app.
 
 ## Optional SessionStart hook
 
@@ -351,7 +386,7 @@ The M1 release runs on test networks only, and this is an accepted, documented r
 
 - The one-click Claude Desktop extension bundle (v0.2.0)
 - Cursor, VS Code, Windsurf, Cline (as tested)
-- Remote harnesses (ChatGPT developer mode, claude.ai custom connectors) through the self-hosted cloud agent (v0.3.0)
+- Claude custom connectors (claude.ai and the Claude iOS and Android apps) through the self-hosted cloud agent (planned for v0.4.0, D-131); ChatGPT web developer mode later
 - Optional session-start hooks
 
 **Filled in at:** M1a (v0.1.0) by M1-12b; extended at M1 and M2 (DOCS-M1b, DOCS-M2).

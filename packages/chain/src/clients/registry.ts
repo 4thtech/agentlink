@@ -19,6 +19,15 @@ import { checkRpcUrl } from './rpc-url.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
+/**
+ * Kill switch for the gasless EIP-3009 top-up (M3-4b-t-0). The Base Sepolia vault accepts
+ * `depositWithAuthorization` from v0.1.0-testnet.4, but nothing executes a top-up until M3-4b-t-4
+ * (owner-approved flow through the submitter). While false, no fee token is composed `eip3009`, so
+ * funding detection, `pick`, `checkGaslessTopUp` and the authorization builder all stay off. Only
+ * M3-4b-t-4 flips it, in a reviewed PR; there is no runtime override.
+ */
+export const GASLESS_TOPUP_ENABLED = false as boolean;
+
 function fail(code: string, message: string): never {
   throw new ChainConfigError(code, message);
 }
@@ -45,9 +54,10 @@ function composeTokens(network: ChainNetwork, contracts: OccV2Contracts): FeeTok
         `chain ${chain}: ${t.symbol} differs between the release and the entry`,
       );
     }
-    // EIP-3009 is offered only where the token supports it AND the deployed vault accepts it; the
-    // vault refuses depositWithAuthorization until M1-3c (AUDIT-FABLE-OCC19-1 M-1).
-    const eip3009 = t.eip3009 === true && contracts.depositWithAuthorization;
+    // EIP-3009 is offered only where the token supports it AND the deployed vault accepts it
+    // (AUDIT-FABLE-OCC19-1 M-1; Base Sepolia from v0.1.0-testnet.4), AND the kill switch is on.
+    const eip3009 =
+      GASLESS_TOPUP_ENABLED && t.eip3009 === true && contracts.depositWithAuthorization;
     return Object.freeze({
       ...t,
       eip3009,

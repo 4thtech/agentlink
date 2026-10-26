@@ -6,10 +6,11 @@
 // can carry a shell metacharacter, a space, a quote or a newline, or be read as an option.
 //
 // The M1-9g copy catalogue has no M1a entry for this text yet (its `pending_approval.nextStep` is the
-// M1b link version), so the spec's fixed sentences live here. The tool handlers (src/tools/) may not
+// M1b link version), so the spec's fixed sentences live here. The tool handlers (packages/mcp-tools) may not
 // import this module (06 §1); the runtime hands it to them through the handler context (M1-9c).
 import { approvalIdSchema } from '@4thtech-io/types';
 import { DEFAULT_AGENT_NAME, isAgentName } from '../runtime/agent-name.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import { RuntimeError } from '../runtime/errors.js';
 
 /** `apr_` + 16 bytes as unpadded base64url: 22 characters of `[A-Za-z0-9_-]`. */
@@ -32,14 +33,16 @@ export function isApprovalId(value: unknown): value is string {
 /**
  * The shell command the owner runs (06 §2.5 step 2). `agentName` is the agent this server serves;
  * for the default agent (or none) the command has no `--agent`. A name that fails the pattern is
- * never inserted: the command then has no `--agent` and `needsAgentHint` is true.
+ * never inserted: the command then has no `--agent` and `needsAgentHint` is true. `prefix` is the
+ * command that works on this machine (`cliPrefix()`; M1-36a), never a bare name that may not be on PATH.
  */
 export function approveCommand(
   approvalId: string,
   agentName?: string,
+  prefix: string = cliPrefix(),
 ): { command: string; needsAgentHint: boolean } {
   if (!isApprovalId(approvalId)) throw new RuntimeError('approval_id_invalid');
-  const base = `agentlink approve ${approvalId}`;
+  const base = `${prefix} approve ${approvalId}`;
   if (agentName === undefined || agentName === DEFAULT_AGENT_NAME) {
     return { command: base, needsAgentHint: false };
   }
@@ -48,7 +51,7 @@ export function approveCommand(
 }
 
 /** The whole `nextStep` text of a `pending_approval` result in M1a (06 §2.5 step 2). */
-export function approvalNextStep(approvalId: string, agentName?: string): string {
-  const { command, needsAgentHint } = approveCommand(approvalId, agentName);
+export function approvalNextStep(approvalId: string, agentName?: string, prefix?: string): string {
+  const { command, needsAgentHint } = approveCommand(approvalId, agentName, prefix);
   return `${LEAD}\`${command}\`.${needsAgentHint ? ADD_AGENT : ''}${TAIL}`;
 }

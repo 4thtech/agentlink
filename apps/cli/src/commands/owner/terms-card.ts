@@ -23,7 +23,7 @@ import {
   type Terms,
 } from '@4thtech-io/types';
 import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/sanitize.js';
-import { copy, formatDate, formatTime } from '../../tools/strings/index.js';
+import { copy, formatDate, formatTime } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { PendingRequest } from './pending.js';
 
 /** Fixed text of the terms card (11 §6.10, §8). Only a contact name, numbers and our dates go in. */
@@ -186,8 +186,15 @@ export async function termsCard(
   const parsed = commitmentApprovalActionSchema.safeParse(request.action);
   if (!parsed.success || parsed.data.tool !== tool) return 'problem';
   const { scope, terms } = parsed.data.context;
-  // A firm offer is only ever `propose_terms` with scope `offer` (04 §3.4.2).
-  if ((tool === 'agentlink_propose_terms') !== (scope.decision === 'offer')) return 'problem';
+  // A firm offer is `propose_terms` with scope `offer`, or a `respond_to_terms` `counter` with
+  // `notarize` (M1-9d-5); propose has no other scope, and `offer` goes with no other answer.
+  if (tool === 'agentlink_propose_terms' && scope.decision !== 'offer') return 'problem';
+  if (
+    parsed.data.tool === 'agentlink_respond_to_terms' &&
+    (scope.decision === 'offer') !== (parsed.data.args.decision === 'counter')
+  ) {
+    return 'problem';
+  }
   let hashed: string;
   try {
     hashed = termsHash(terms);

@@ -420,13 +420,11 @@ export const minimalProofPack = () => ({
 /** ProofStatus (06 §2.4) for a confirmed record. */
 export const proofStatus = () => ({
   status: 'ok',
-  chain: 'base',
+  advanced: { chain: 'base' },
   recordId: B32,
   txHash: hex0x(32, '7e'),
   fee: { token: FEE_TOKEN, amount: '100000', usd: '0.1', protocolUsd: '0.1', integratorUsd: '0' },
   receipts: [{ type: 'DELIVERED', at: '2026-10-14T12:00:00Z' }],
-  explorerUrl: `https://basescan.org/tx/${hex0x(32, '7e')}`,
-  verifyUrl: `https://verify.agentlink.example/r/${B32}`,
 });
 
 /** The 06 §2.5 `pending_approval` example with its placeholders filled. */
@@ -562,7 +560,7 @@ const payloadOf = (type: string, body: unknown, files: unknown[] = []) => ({
 /** One valid payload per type, in PAYLOAD_TYPES order (04 §3.4). */
 export const payloads = (): Record<string, Record<string, unknown>> => ({
   text: payloadOf('text', 'Hello from Tali’s agent ✓ — 你好', [fileEntryInline()]),
-  request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, ciphertextSha256: SHA }),
+  request: payloadOf('request', { kind: 'refresh-link', envelopeId: ID16, fileIndex: 0 }),
   offer: payloadOf('offer', { terms: firstTerms(), termsHash: SHA, note: null }),
   accept: payloadOf('accept', { terms: firstTerms(), termsHash: SHA, note: null }),
   reject: payloadOf('reject', { terms: firstTerms(), termsHash: SHA, note: 'too expensive' }),

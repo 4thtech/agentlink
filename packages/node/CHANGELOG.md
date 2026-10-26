@@ -1,5 +1,66 @@
 # @4thtech-io/node
 
+## 0.2.0
+
+### Minor Changes
+
+- 66d6279: The local web app's Activity page (M1-11c-a1): `GET /api/ui/activity` returns one page of the activity feed (approvals decided, including those approved by your rules, proofs, blocked senders and contacts, rules updated) through the read-only client view, with only the display fields each kind needs, and the page shows it newest first with "Show more", an empty state and clear loading and error states.
+- 342d345: The local approval server can serve the local web app (D-118): an in-memory bundle of its built files under `/assets/`, its page at `/first-run` and `/settings`, and a `/api/ui/` route registry in which every change needs owner presence, checked centrally before the route runs. `/` and `/approve/<id>` keep the approval page. The CLI embeds the app's build when present.
+- 76ad5c5: The local approval server can set up the owner from the first-run page (M1-11s-c, D-120 (1)): two setup routes, behind their own setup gate and only while no owner exists anywhere, create the owner key with one passkey gesture, a backup owner code shown once, and the agent's first card, all or nothing. The owner seed is held in memory for at most two minutes between the two steps, for one session, and wiped after. When an owner is set up from the page, the CLI logs a fixed line with the owner fingerprint to compare with `agentlink doctor`.
+- eacf0bc: `agentlink owner init` and `agentlink owner add-agent` now also allow an empty `AgentLink/Send` folder in your home folder for sending files, in the same owner code entry as the agent's card. Nothing else changes in your rules.
+- 8095c0c: M1-8f (D-54, 04 §2.8): the passphrase-locked file KeyStore for headless machines, opt-in only. `createFileKeyStoreAgent` creates an agent in `~/.agentlink/keystore/<agentId>.alks` only when the OS keychain probe fails, from an interactive terminal with no AI-app marker set, with a generated unlock code by default. `unlockFileKeyStoreAgent` reads the unlock secret from `AGENTLINK_KEYSTORE_PASSPHRASE_FILE`, then `AGENTLINK_KEYSTORE_PASSPHRASE` (both removed from the environment), then an optional prompt, and keeps only the derived key in memory. `changeFileKeyStorePassphrase` re-wraps the file under a new secret. `openAgentKeyStore` and `openAgentStore` take the unlocked handle as `fileAgent` for the recorded backend `file`. The policy-version mark and the receipts-kept marker are `ALKS` entries written with the 04 §2.8 write protocol. Nothing changes for keychain agents.
+
+### Patch Changes
+
+- 55d5b9d: The local app's first-run page (M1-11b-1, D-120): protect approvals with one passkey, see your owner fingerprint and a backup owner code (collapsed), put the recovery kit off with "Later", and go back to your AI with a prompt to copy. A new read route, `GET /api/ui/first-run`, says only whether approvals are protected yet. The shared page states (link expired, AgentLink not running, setup unfinished, recovery kit reminder, network, empty, loading and error) follow the d1 design. The page is included but not yet opened or connected by the CLI, so it is usable from the next release (M1-11b-6).
+- 458c32c: Owner setup on the first-run page refuses, before anything is read or written, a held seed that is not the owner the page was shown (M1-11s-c-b). Tests: the setup canary now covers the seed and the PRF output in every encoding, using a canary seed that is never a real seed.
+- 0e5fef3: Delete after receipt now applies only to files sent while it was on: turning it on later never deletes files sent earlier, and files sent before this update are kept until they expire (M1-1g-i).
+- 52c8fe8: M1-33a (D-109): delivery receipts are off by default. `@4thtech-io/types`: the 06 §3 default `receipts.autoDelivered` is `false`; a `ContactRule` may carry `receipts: {autoDelivered}` (strict) with or without `proofs`, and needs at least one of the two. `@4thtech-io/core`: an automatic DELIVERED receipt uses the record signer's contact rule when that contact is paired and not blocked or revoked, else the global value; under failing rules none is signed. OPENED, ACCEPTED and REJECTED are unchanged. `@4thtech-io/core` also adds `receiptsOnFromOlderDefault` and `recordReceiptsKept` on `OwnerActions` and the `receiptsKept` client option (a `ReceiptsKeptMark`). `@4thtech-io/node`: the receipts-kept marker as the keychain item `<agentId>:receipts-kept`, on `AgentStore.receiptsKept`. `@4thtech-io/agentlink`: the rules review lists a contact's delivery-receipt rule; a policy signed earlier keeps its value until the owner next signs their rules, which then asks "Keep delivery receipts on?" and turns them off unless the owner types y (a yes is remembered); until then `agentlink doctor` shows the older-default line.
+- 76b7e47: M1-36a-b: every "run this" line in `init`, `doctor`, the owner commands, the not-set-up message, the approval page and the owner setup steps now starts with a command that works on your computer: `agentlink` only after a global install, otherwise `npx -y @4thtech-io/agentlink`. The approval page no longer points to `agentlink ui`, which does not exist; it names `approve` instead. When your AI checks AgentLink on a computer that has no owner yet, it now tells you to run `owner init` instead of `owner add-agent`.
+- 40e73bb: M1-36e: the last "run this" lines that still started with the bare `agentlink` (`doctor`, `policy`, `requests`, `credits`, `contacts`, the not-set-up and error messages, the tool hints for your AI, and the key, keychain, add-agent and change-code messages) now start with a command that works on your computer: `agentlink` only after a global install, otherwise `npx -y @4thtech-io/agentlink`. `doctor` and `status` say "message network" instead of "relays". A vocabulary check now keeps terminal text, tool hints, the approval page and the user guide free of technical words such as wallet, gas, transaction and chain.
+- 3a3837b: `KeyStore.signTransaction` signs one direct-mode transaction with the agent's EVM key, on the launch testnets only: EIP-1559, to the AgentLink Notary, fee vault or an offered fee token, with a direct-mode call (`notarizeDirect`, `notarizeBatch`, `acknowledge`, `acknowledgeBatch`, `deposit`, `withdraw` to the agent's own address, `approve` of the vault), bounded value, calldata, gas and fees. Everything else is refused with `transaction_refused` before any key is read. The keychain KeyStore implements it. `@4thtech-io/chain` adds `keyStoreDirectSigner`, `createDirectMode` (testnets of the KeyStore allowlist only), the typed `buildWithdraw` and `sendWithdraw`, and the ChainError code `signing_refused`.
+- f8c4440: The SQLite agent store opens with `secure_delete = ON` (M1-7f-2; 04 §4 crypto-shredding), so deleted rows, sealed file keys among them, are zeroed on disk. `SqliteStore.readSetting` also reads `secure_delete`.
+- 1d10f83: Owner-signed own storage and recovery-kit export (M1-9i-a, D-115). `@4thtech-io/types` adds the `storage.set`, `storage.remove` and `backup.export` owner actions with strict params (L(op) = 600 s), `STORAGE_PROVIDERS`, `BACKUP_KIT_CONTENTS` and `isCanonicalS3Endpoint`. `@4thtech-io/core` applies them (nonce row and the one `own_storage` row in one transaction, then the KeyStore `storage-mark`), adds `ownStorage.load()` (`none`, `ready` or `broken`, re-verified on every load, never by expiry), the `OwnStorageKeys` interface and the `storage-mark` codec, and the `brokenOwnStorageAdapter` stub: a broken own storage makes a stored file send `needs_setup` `storage_broken`, never the drop. Store schema version 5 adds `own_storage`; `@4thtech-io/node` migrates SQLite stores to it.
+- 25d121c: Groundwork for backup and restore, with no user commands yet (M1-9i-c): the keychain and file backends implement the recovery-kit export and import controls and the storage credential control, with the restore quarantine and its snapshot checks, the own-storage items on the agent store, and a refusal of a nested inter-process lock in the same flow. Not reachable from the package entry yet; the CLI owner commands wire them (M1-9i).
+- Updated dependencies [b5c51e6]
+- Updated dependencies [27437fc]
+- Updated dependencies [be16e36]
+- Updated dependencies [8928493]
+- Updated dependencies [cf800d0]
+- Updated dependencies [0e5fef3]
+- Updated dependencies [cb4a63a]
+- Updated dependencies [52c8fe8]
+- Updated dependencies [bc8d9f3]
+- Updated dependencies [16f692e]
+- Updated dependencies [70e362b]
+- Updated dependencies [320bc9e]
+- Updated dependencies [19c8626]
+- Updated dependencies [3a3837b]
+- Updated dependencies [068d989]
+- Updated dependencies [068d989]
+- Updated dependencies [ec598ee]
+- Updated dependencies [d311d76]
+- Updated dependencies [ca60f25]
+- Updated dependencies [f8c4440]
+- Updated dependencies [0f13f71]
+- Updated dependencies [8621ff4]
+- Updated dependencies [4be1e27]
+- Updated dependencies [e7ac634]
+- Updated dependencies [31957b7]
+- Updated dependencies [3a08533]
+- Updated dependencies [6055f38]
+- Updated dependencies [1d10f83]
+- Updated dependencies [0ece43e]
+- Updated dependencies [c6aa21f]
+- Updated dependencies [821ac87]
+- Updated dependencies [8565521]
+- Updated dependencies [529a0f6]
+- Updated dependencies [9dbaa44]
+- Updated dependencies [c6546b9]
+  - @4thtech-io/core@0.2.0
+  - @4thtech-io/crypto@0.2.0
+  - @4thtech-io/transport-nostr@0.2.0
+
 ## 0.1.2
 
 ### Patch Changes

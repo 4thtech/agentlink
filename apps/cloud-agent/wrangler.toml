@@ -1,0 +1,54 @@
+# The AgentLink cloud agent (08 §3; D-131): a Worker and one SQLite-backed Durable Object in the
+# user's OWN Cloudflare account. 4thTech never deploys this config and never receives a secret, a
+# token or a log from it. The deploy paths (`agentlink cloud deploy`, the Deploy to Cloudflare
+# button; M2-3d) start from this file; the public template repository is generated from it (M2-3d).
+#
+# Secrets, set in the user's account only, never here (08 §3.2):
+#   AGENT_SEED      desktop deploy path: 32 random bytes as 64 lowercase hex, generated on the user's
+#                   computer (`wrangler secret put AGENT_SEED`)
+#   SEED_WRAP_KEY   Deploy-button path: 32 random bytes as base64url, generated in the browser by the
+#                   guide page; the Worker then generates the agent seed and stores it sealed under it
+#   SETUP_CODE      the one-time setup code (M2-3f-1)
+# Exactly one of AGENT_SEED and SEED_WRAP_KEY: with both, the agent refuses to start.
+#
+# Logging (I-7, 08 §3.1 Logs): observability, invocation logs, traces and Logpush are off, and no Tail
+# Worker is configured; test/config.test.ts asserts it and the deploy check of M2-3d refuses a config
+# that turns one on. Preview URLs are off (the passkey belongs to the exact Worker host, 04 §2.5).
+#
+# Durable Object migrations are forward-only: a release that adds one is marked in its PR.
+
+name = "agentlink"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+workers_dev = true
+preview_urls = false
+send_metrics = false
+logpush = false
+upload_source_maps = false
+
+[observability]
+enabled = false
+
+[observability.logs]
+enabled = false
+invocation_logs = false
+
+[observability.traces]
+enabled = false
+
+[vars]
+# D-131 (f): relay sync every 60 s (30 to 3600).
+SYNC_INTERVAL_SECONDS = "60"
+
+[[durable_objects.bindings]]
+name = "AGENT"
+class_name = "AgentDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AgentDO"]
+
+# The user's bucket for received files (08 §3.1 Storage; used from M2-3h).
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "agentlink-files"

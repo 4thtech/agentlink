@@ -11,7 +11,9 @@ AgentLink follows SemVer 2.0. During the beta, all public packages (the CLI and 
 | M0 Foundations | 0.0.x | Specs, process and CI; no packages |
 | M1a | 0.1.0 | First npm release: pair and talk |
 | M1 gate | 0.2.0 | Local beta on testnets |
-| M2 | 0.3.0 | Console, desktop apps, self-host |
+| Usable local app | 0.3.0 | The local app served by the CLI |
+| M2, cloud agent first | 0.4.0 | The self-hosted cloud agent, Claude on the web and phones (D-131) |
+| M2, rest | later 0.x.0 | Console, desktop apps and the other M2 work |
 | M3 mainnet beta | 1.0.0 | First strict SemVer promise |
 
 Before 1.0.0 a minor version may contain breaking changes; each is marked **BREAKING** in the changelog. Prereleases go to the npm `next` tag; only milestone versions and their patches reach `latest`.

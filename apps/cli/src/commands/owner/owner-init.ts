@@ -54,6 +54,9 @@ async function initOne(deps: OwnerCommandDeps, context: CommandContext): Promise
         name: agent.name,
         relays: deps.cardRelays(),
         identity: agent.client.identity,
+        // M1-36b-2 (D-121 D6): the first rules (the empty ~/AgentLink/Send folder), signed by node
+        // in this same owner-code entry; node checks what core prepares before it signs.
+        firstPolicy: { actions: agent.client.ownerActions },
       },
     });
   } finally {
@@ -177,6 +180,8 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
         name: again.agent.name,
         relays: deps.cardRelays(),
         identity: again.agent.client.identity,
+        // M1-36b-2 (D-121 D6): the first rules, signed in this same owner-code entry.
+        firstPolicy: { actions: again.agent.client.ownerActions },
       },
     });
   } finally {
@@ -221,7 +226,7 @@ async function changeCodeOne(deps: OwnerCommandDeps, context: CommandContext): P
 
 export function ownerHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
-    ownerStep(context, () => {
+    ownerStep(context, deps, (deps) => {
       const { positionals } = context.parsed;
       if (positionals.length === 1 && positionals[0] === 'init') return initOne(deps, context);
       if (positionals.length === 1 && positionals[0] === 'add-agent') {

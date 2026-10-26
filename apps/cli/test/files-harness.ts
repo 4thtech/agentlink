@@ -36,7 +36,7 @@ import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createMcpServer } from '../src/mcp/server.js';
-import type { ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '@4thtech-io/mcp-tools';
 
 const PREFIX = 'test-sealed:';
 

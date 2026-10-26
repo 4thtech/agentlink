@@ -23,6 +23,7 @@ import {
   ownerActionSigningParts,
   verifyOwnerAction,
   verifyOwnerActionText,
+  verifyStoredOwnerAction,
   type ApprovalRequestView,
   type OwnerActionCheckContext,
 } from './owner-action.js';
@@ -80,6 +81,7 @@ function body(op: OwnerActionOp, params: JsonObject, over: JsonObject = {}): Jso
 }
 
 const sign = (b: JsonObject): Promise<Signed> => signWith(owner, b);
+const REVOKE_SIGNED = await sign(body('agent.revoke', { reason: 'compromised' }));
 const decideParams = (r: ApprovalRequestView, decision = 'approve'): JsonObject => ({
   approvalId: r.approvalId,
   actionDigest: r.actionDigest,
@@ -172,6 +174,44 @@ describe('binding and signature (04 §2.5.1)', () => {
     const fraction = text.replace(`"issuedAt":${NOW}`, `"issuedAt":${NOW}.0`);
     expect(refused(verifyOwnerActionText(fraction, context())).reason).toBe('malformed');
     expect(refused(verifyOwnerActionText('{', context())).reason).toBe('malformed');
+  });
+
+  // M1-1h-b (D-128, 04 §2.5.1 "Received text"): the parsed value of each refused text is the signed
+  // object, so the signature would verify; only the text check refuses it.
+  describe('received text (M1-1h-b)', () => {
+    const signed = REVOKE_SIGNED;
+    const text = JSON.stringify(signed);
+
+    it.each([
+      ['an escaped `agent`', '"agent":', '"\\u0061gent":'],
+      ['an escaped name at depth (params)', '"reason":', '"re\\u0061son":'],
+      ['an escaped `sig`', '"sig":', '"\\u0073ig":'],
+      [
+        'an escaped name equal to another name',
+        '"op":"agent.revoke"',
+        '"op":"agent.revoke","\\u006fp":"agent.revoke"',
+      ],
+      [
+        'a duplicate name at depth (params)',
+        '"reason":"compromised"',
+        '"reason":"compromised","reason":"compromised"',
+      ],
+      ['a duplicate `sig`', '"sig":', `"sig":"${signed.sig}","sig":`],
+    ])('refuses %s as malformed, live and stored', (_, from, to) => {
+      const candidate = text.replace(from, to);
+      expect(candidate).not.toBe(text);
+      expect(refused(verifyOwnerActionText(candidate, context())).reason).toBe('malformed');
+      expect(
+        verifyStoredOwnerAction(candidate, { agent: AGENT, ownerNostr: `0x${OWNER}` }),
+      ).toEqual({ ok: false, reason: 'malformed' });
+    });
+
+    it('accepts an escape inside a string value, and the JCS form', () => {
+      const escaped = text.replace('"op":"agent.revoke"', '"op":"\\u0061gent.revoke"');
+      expect(escaped).not.toBe(text);
+      expect(verifyOwnerActionText(escaped, context()).ok).toBe(true);
+      expect(verifyOwnerActionText(canonicalize(signed), context()).ok).toBe(true);
+    });
   });
 });
 

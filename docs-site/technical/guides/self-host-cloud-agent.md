@@ -1,6 +1,6 @@
 # Self-host the cloud agent
 
-> **Status: Planned for v0.3.0 (M2).** This page is an outline; the template does not exist yet.
+> **Status: Planned for v0.4.0 (M2-3, D-131), Claude only at first.** This page is an outline; the template does not exist yet.
 
 **Purpose:** deploy an always-on AgentLink agent into your own Cloudflare account and connect remote-only harnesses (ChatGPT developer mode, claude.ai custom connectors).
 
@@ -22,4 +22,4 @@
 - Connect ChatGPT and claude.ai
 - Updating, rotating secrets and removing the deployment
 
-**Filled in at:** M2 (v0.3.0), backlog card DOCS-M2. Spec: [08 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/08-clients-console-cloud.md).
+**Filled in at:** v0.4.0, backlog card DOCS-CLOUD. Spec: [08 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/08-clients-console-cloud.md).

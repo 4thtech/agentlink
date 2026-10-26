@@ -8,7 +8,7 @@
 // server over the SDK's in-memory transport and called by the SDK client, which validates every
 // `structuredContent` against the tool's `outputSchema`. The owner signature comes from the crypto
 // test seam (MemoryOwnerKeyStore), standing in for @4thtech-io/node's TTY prompt (M1-8c).
-import { proofDisclosure } from '../src/tools/strings/privacy.js';
+import { proofDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 import {
   AgentLinkClient,
   MemoryStore,
@@ -455,7 +455,9 @@ describe('a two-agent negotiation over MCP: propose → counter → accept with 
     });
     expect(asked.structured).toMatchObject({ status: 'pending_approval', decision: 'accept' });
     const approvalId = asked.structured['approvalId'] as string;
-    expect(asked.structured['nextStep']).toBe(approvalNextStep(approvalId, 'alice'));
+    expect(asked.structured['nextStep']).toBe(
+      `${approvalNextStep(approvalId, 'alice')} To check the decision, call agentlink_get_approval.`,
+    );
     expect(asked.structured['summary']).toBe(
       `Accepting “Bob” (self-declared)'s terms (version 2) commits you. One approval covers your acceptance and its proof. ${proofDisclosure('“Bob” (self-declared)')}`,
     );

@@ -40,6 +40,7 @@ The builder, at the tier on the card. The orchestrator checks the result in the 
    ```bash
    pnpm lint && pnpm typecheck && pnpm test
    ```
+   On a pull request CI tests only the packages the change touches, their dependents and `@4thtech-io/tools`; the merge queue then runs the full suite on the merge with `main`. A test you broke in a package the selector did not name therefore fails only in the queue. Run the changed packages and their dependents before handing back: `pnpm --filter '...<package>' test` ([RB-08](ci-red.md)).
 
 ## Verify
 - Each AC in the report points to a test name and a command result.

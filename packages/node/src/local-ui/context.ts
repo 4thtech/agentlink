@@ -8,17 +8,25 @@
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
 import type {
+  ActivityEntry,
   AgentLinkClient,
+  ContactView,
   CreditsMoveResult,
   CreditsView,
   OwnerActionOutcome,
+  OwnerSafetyCode,
   Page,
   PageQuery,
+  PolicyEditOptions,
+  PreparedOwnerAction,
+  PreparedPolicyEdit,
   ProofListItem,
+  ResolvedFolders,
   TopUpView,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
+import type { FirstAgentCard } from '../owner-first-card.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -35,6 +43,23 @@ export interface LocalUiOptions {
   readonly assets?: LocalUiAssets;
   /** The agent's core client; absent when the agent is not set up. */
   readonly client?: AgentLinkClient;
+  /**
+   * M1-11s-c: owner setup on the first-run page (D-120 (1)), for a keychain agent that has no owner
+   * yet: the agent whose first card the setup signs. Held by the server only, never by a handler or
+   * LocalUiContext. Absent: the setup routes answer 503 `unavailable`.
+   */
+  readonly ownerSetup?: LocalUiOwnerSetup;
+}
+
+/** M1-11s-c: what owner setup needs from the caller (the CLI). Keychain machines only. */
+export interface LocalUiOwnerSetup {
+  /** The agent whose first card the new owner signs (owner-first-card.ts). */
+  readonly firstCard: FirstAgentCard;
+  /**
+   * IR-M1-11s-c-1 L-6: the file-KeyStore owner files whose presence refuses setup. Default:
+   * `~/.agentlink/keystore/owner.alko` and `owner.alkp` (owner-setup.ts defaultOwnerFiles).
+   */
+  readonly ownerFiles?: readonly string[];
 }
 
 /**
@@ -49,6 +74,29 @@ export interface LocalUiReadClient {
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
   /**
+   * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
+   * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
+   * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
+   * `recordReceiptsKept`, nothing else of `ownerActions`.
+   */
+  readonly files: {
+    resolvedFolders(): Promise<ResolvedFolders>;
+    preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
+  };
+  /**
+   * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
+   * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
+   * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
+   * gate's one-use `sign`, applied by core, changes anything. No direct block, remove or apply.
+   */
+  readonly contacts: {
+    list(): Promise<readonly ContactView[]>;
+    safetyCode(contactId: string): Promise<OwnerSafetyCode>;
+    prepareCheck(contactId: string): Promise<PreparedOwnerAction>;
+    prepareRename(contactId: string, alias: string): Promise<PreparedOwnerAction>;
+    prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
+  };
+  /**
    * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
    * only. Not `requestFaucet` (owner decision D2) and nothing that notarizes.
    */
@@ -58,6 +106,8 @@ export interface LocalUiReadClient {
     /** M1-11c-a4c: where funds can be sent to add credits, and what can move (reads only). */
     topUp(): Promise<TopUpView>;
   };
+  /** M1-11c-a1: one page of core's activity feed (`ActivityService.list`); store only, no write. */
+  listActivity(query: PageQuery): Promise<Page<ActivityEntry>>;
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -65,11 +115,25 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    files: Object.freeze({
+      resolvedFolders: () => client.files.resolvedFolders(),
+      preparePolicyEdit: (patch: unknown, options?: PolicyEditOptions) =>
+        client.ownerActions.preparePolicyEdit(patch, options),
+    }),
+    contacts: Object.freeze({
+      list: () => client.contacts.list(),
+      safetyCode: (contactId: string) => client.pairing.ownerSafetyCode(contactId),
+      prepareCheck: (contactId: string) => client.ownerActions.prepareContactCheck(contactId),
+      prepareRename: (contactId: string, alias: string) =>
+        client.ownerActions.prepareContactRename(contactId, alias),
+      prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
+    }),
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),
       creditsBalance: () => client.proofs.creditsBalance(),
       topUp: () => client.proofs.topUp(),
     }),
+    listActivity: (query) => client.activity.list(query),
   });
 }
 

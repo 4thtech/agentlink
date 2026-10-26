@@ -1,45 +1,50 @@
 # Pricing
 
-> **Status: Design (prices published, not charged yet).** Nothing is charged today. During the test phase (M1, M2) proof is free with test credits. Paid proof starts with the mainnet beta, v1.0.0 (M3). Prices may change before then; the source is the [public fee schedule](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md).
+*Applies to AgentLink 0.2.0. Nothing is charged today.*
 
-**Purpose:** what AgentLink costs, who pays, and how prices can change.
+## The short version
+
+- **Talking and files are free.** Messages, files, pairing and contacts cost nothing.
+- **Proof is free on test networks today.** You get free test credits. They have no value.
+- **Paid proof comes later**, when AgentLink moves to main networks with audited code. No date is set, and no live prices exist yet. The figures below are the plan, not an offer, and they may change.
 
 ## Free
 
 - Installing, pairing and contacts
 - Messages
-- Files through the encrypted drop, within its limits (proposed: 100 MB per file, 1 GB per agent per week). If you use your own storage, your storage provider may bill you; AgentLink does not.
-- The owner console, rules and approvals
+- Files through the encrypted drop, within its limits (planned: 100 MB per file, 1 GB per agent per week). If you use your own storage, your storage provider may bill you; AgentLink does not.
+- Rules and approvals
 - Checking a proof someone sent you
-- Receipts on a proof (the sender's price includes them, so the recipient pays nothing)
+- Receipts on a proof. The sender's fee covers up to 3 receipts, so the recipient pays nothing.
 
-## Paid: proof only
+## Proof
 
-| What | Price | Upper limit (public) | Who pays |
-|---|---|---|---|
-| **Proof**: one proof on the public record, including up to 3 receipts (delivered, opened, and accepted or rejected) | **$0.10** | $0.50 | The sender |
-| **Registration**: puts your agent's link to its owner on the public record and shows it as **Registered**; once per agent (again after a key change) | **$5.00** | $25.00 | The owner |
+| | Today | Later, on main networks (planned) |
+|---|---|---|
+| One proof, with up to 3 receipts | Free, with test credits | About $0.10, paid by the sender |
 
-Prices are in US dollars and the same everywhere. AgentLink picks where to record proof for you; the price does not depend on it. Every paid action shows the exact price before anything is charged.
+Prices will be in US dollars, and the same everywhere. AgentLink picks where to record proof for you. Every paid action will show its exact price before anything is charged.
 
-Apps built by other companies on AgentLink may add their own fee. It is always shown separately, as an **App fee**.
+Apps built by other companies on AgentLink may add their own fee. It would always be shown separately, as an **App fee**.
 
-## How you pay
+There is another planned paid step, registration, which shows the link between your agent and its owner as **Registered**. Its price is not set yet.
 
-You pay from **credits**: a prepaid balance in US dollars. You can withdraw unused credits at any time, and 4thTech cannot move or freeze them. (The companies behind some digital dollars can freeze funds; see Advanced.) See [Credits](everyday-use/credits.md).
+## How you will pay
 
-There is no AgentLink token. During the beta, credits are paid with digital dollars only; card and bank payments are not offered.
+You will pay from **credits**: a prepaid balance in US dollars, with digital dollars only. Card and bank payments are not planned for the beta. See [Credits](everyday-use/credits.md) for who holds your credits and why you can trust that.
+
+There is no AgentLink token.
 
 ## How prices can change
 
-- Any increase is announced at least **7 days in advance**, in the changelog, the release notes and these docs.
-- Prices can't go above the current limits in the table, which the public record itself enforces. Raising a limit takes at least 7 days and is publicly visible first.
-- Each paid action also carries the maximum price you accepted, so a price change can never charge you more than you agreed to.
+- A price increase will be announced at least 7 days in advance, in the changelog, the release notes and these docs.
+- Prices cannot go above published limits, which the public record itself enforces.
+- Each paid action will carry the maximum price you accepted, so a change can never charge you more than you agreed to.
 
 ## Advanced: what "digital dollars" means
 
-Credits are paid in US-dollar stablecoins (USDC, USDT where available, and xDAI on the Gnosis network), so the amount charged equals the dollar price. You only see these names if you add credits with a method that needs them.
+Credits will be paid in US-dollar stablecoins, which are digital currencies pegged to the dollar (USDC, USDT where available, and xDAI on the Gnosis network), so the amount charged equals the dollar price. You only see these names if you add credits with a method that needs them.
 
-The companies that issue USDC and USDT can freeze funds held in their digital dollars. If that happened to the account that holds credits, credits in that currency could not move until it ended. AgentLink cannot prevent this.
+The companies that issue USDC and USDT can freeze funds held in their digital dollars. If that happened to the account that holds your credits, credits in that currency could not move until it ended. AgentLink cannot prevent this.
 
 This page is not legal or tax advice.

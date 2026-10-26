@@ -35,6 +35,11 @@
 //   forgotten transaction still in some node's mempool leaves a gap that blocks later sends
 //   (IR-M1-10a-1 M-2, M1-10a-b). If that read fails, the given-up nonce is used again. A send never
 //   takes a nonce that a transaction still in flight holds: it skips to the next free one.
+// - A held item keeps retrying until its own deadline (`Expired`) or its intake deadline, whichever
+//   comes first: `maxHeldSeconds` after the queue first took it (M1-10a-c). Past the intake
+//   deadline it is `failed` with `unavailable`, so a signer-chosen deadline far ahead cannot keep it
+//   in the queue for good. Asking again while it is in flight does not extend it; an item stored
+//   without an intake time (an earlier version) counts from its last update.
 // - Nonces are serialised per chain: the engine holds one lock per state object.
 // - Receipts (D-114; 12 §2): the sender's proof fee covers up to MAX_RECEIPTS_PER_RECORD receipts
 //   of a record, whatever the recipient holds (receipts carry no fee, 05 §3.3, and nothing here
@@ -70,6 +75,8 @@ export interface EngineSettings {
   readonly stuckAfterSeconds: number;
   /** Fee-raised replacements per transaction before it counts as dropped. */
   readonly maxReplacements: number;
+  /** How long after intake a held item keeps retrying before it is `failed` (M1-10a-c). */
+  readonly maxHeldSeconds: number;
 }
 
 export interface EngineHooks {
@@ -92,6 +99,11 @@ export interface ItemState {
   /** On-chain reverts of transactions that carried this item (one resubmission allowed). */
   reverts: number;
   updatedAt: number;
+  /**
+   * Unix seconds when the queue took the item; the start of its intake deadline (M1-10a-c).
+   * Absent on items stored by an earlier version: those count from `updatedAt`.
+   */
+  readonly intakeAt?: number;
 }
 
 export interface TxState {
@@ -484,6 +496,7 @@ export function submitItems(
         gas,
         reverts: 0,
         updatedAt: now,
+        intakeAt: now,
       };
       setItem(state, entry);
       if (!held) toSend.push(entry);
@@ -713,6 +726,11 @@ export function pollQueue(
     for (const e of held) {
       if (e.item.deadline < now) {
         update(state, e, 'failed', now, { error: 'Expired' });
+        continue;
+      }
+      if ((e.intakeAt ?? e.updatedAt) + settings.maxHeldSeconds < now) {
+        // The intake deadline (M1-10a-c): the queue stops retrying it; the client may post it again.
+        update(state, e, 'failed', now, { txHash: null, error: 'unavailable' });
         continue;
       }
       let sim;

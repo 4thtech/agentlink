@@ -72,15 +72,12 @@ const recordState = (signer: Hex) =>
   } as never);
 
 describe('createChainState', () => {
-  it('getRecord: null for an empty slot, the stored state otherwise, at the given block', async () => {
-    let signer = filled('00');
+  it('getRecord: the stored state, at the given block', async () => {
     const { state, seen } = stateWith((req) => {
-      if (req.method === 'eth_call') return { result: recordState(signer) };
+      if (req.method === 'eth_call') return { result: recordState(filled('22')) };
       if (req.method === 'eth_chainId') return { result: `0x${config.chainId.toString(16)}` };
       throw new Error(`unexpected ${req.method}`);
     });
-    expect(await state.getRecord(hash32('aa'))).toBeNull();
-    signer = filled('22');
     const got = await state.getRecord(hash32('aa'), 0x42n);
     expect(got).toEqual({
       signer: filled('22'),
@@ -109,6 +106,55 @@ describe('createChainState', () => {
     // Any other revert is not "absent": it fails, so nothing is decided from it.
     error = 'EnforcedPause';
     await expect(state.getRecord(hash32('aa'))).rejects.toBeInstanceOf(ChainError);
+  });
+
+  it('getRecord (M1-4d-h): only the bare RecordNotFound() selector reads as absent', async () => {
+    // viem names a no-argument error from its selector and ignores any bytes after it, so a buggy
+    // or malicious RPC could dress another answer up as RecordNotFound. Only the exact 4-byte
+    // selector is the Notary's "absent"; anything else fails, so no replacement is decided on it.
+    const bare = encodeErrorResult({
+      abi: NOTARY_CLIENT_ABI,
+      errorName: 'RecordNotFound' as never,
+    });
+    const errorString = encodeErrorResult({
+      abi: [{ type: 'error', name: 'Error', inputs: [{ name: 'message', type: 'string' }] }],
+      errorName: 'Error',
+      args: ['RecordNotFound'],
+    });
+    let data: string = bare;
+    const { state } = stateWith((req) => {
+      if (req.method !== 'eth_call') throw new Error(`unexpected ${req.method}`);
+      return { error: { code: 3, message: 'execution reverted', data } };
+    });
+    expect(bare).toMatch(/^0x[0-9a-f]{8}$/);
+    for (const at of [undefined, 9n]) expect(await state.getRecord(hash32('aa'), at)).toBeNull();
+    for (const notAbsent of [
+      `${bare}${'00'.repeat(32)}`, // the same selector with extra bytes
+      `${bare}ff`, // the same selector with one trailing byte
+      errorString, // Error(string) whose text is the name
+      '0x', // an empty revert
+    ]) {
+      data = notAbsent;
+      for (const at of [undefined, 9n]) {
+        const read = state.getRecord(hash32('aa'), at);
+        await expect(read).rejects.toBeInstanceOf(ChainError);
+        await expect(read).rejects.toMatchObject({ code: 'call_reverted' });
+      }
+    }
+  });
+
+  it('getRecord (M1-4c-d): a zero-signer struct is a bad answer, never "absent"', async () => {
+    // The Notary never returns an empty slot: an unknown ID reverts RecordNotFound. A struct with a
+    // zero signer comes from a misbehaving RPC or contract, so nothing may be decided on it.
+    const { state } = stateWith((req) => {
+      if (req.method === 'eth_call') return { result: recordState(filled('00')) };
+      throw new Error(`unexpected ${req.method}`);
+    });
+    for (const at of [undefined, 9n]) {
+      const read = state.getRecord(hash32('aa'), at);
+      await expect(read).rejects.toBeInstanceOf(ChainError);
+      await expect(read).rejects.toMatchObject({ code: 'bad_answer' });
+    }
   });
 
   it('block: reads the finalized tag and a number', async () => {

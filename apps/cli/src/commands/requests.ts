@@ -27,7 +27,7 @@ import {
   copy,
   renderCopy,
   unknownSenderLabel,
-} from '../tools/strings/index.js';
+} from '@4thtech-io/mcp-tools/strings/index.js';
 import { batchRegions, untrustedRegion } from '../terminal/sanitize.js';
 import { TEXT, createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 

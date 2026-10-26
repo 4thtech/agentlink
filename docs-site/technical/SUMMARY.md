@@ -13,6 +13,7 @@
   * [Records, receipts and proof packs](concepts/proof.md)
   * [Privacy of proofs](concepts/privacy.md)
 * [Design decisions](concepts/design-decisions.md)
+* [Payments, credits and trust](concepts/payments-credits-and-trust.md)
 * [Security model](concepts/security-model.md)
 * [Threat model](concepts/threat-model.md)
 
@@ -20,6 +21,7 @@
 
 * [Your first integration](guides/first-integration.md)
 * [Verify a proof independently](guides/verify-a-proof.md)
+* [Verify it yourself](guides/verify-it-yourself.md)
 * [Self-host the cloud agent](guides/self-host-cloud-agent.md)
 * [Run the test vectors](guides/run-test-vectors.md)
 

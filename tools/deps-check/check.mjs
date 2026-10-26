@@ -5,8 +5,9 @@
 // all slip past ESLint. This scan cannot be switched off from inside the code it checks, and it runs
 // in `pnpm lint` (turbo task `check`), therefore in `ci-gate`.
 //
-// Scope: every package under packages/* and apps/* (the same scope as the ESLint zones). tools/,
-// e2e/ and test-vectors/ are not scanned; the vectors task (M0-9) owns test-vectors/.
+// Scope: every package under packages/* and apps/* (the same scope as the ESLint zones), plus e2e/
+// (FULL_SCAN_ZONES: source checks in full, no manifest check; M1-1g-c) and test-vectors/ (crypto.subtle
+// only; the vectors task M0-9 owns it). tools/ is not scanned.
 // Files: every file the repository tracks (or would track: not ignored) under those packages, at any
 // depth. Nothing is skipped by directory name, so `src/dist/` or `src/.claude/` cannot hide code.
 //
@@ -36,10 +37,12 @@ import ts from 'typescript';
 import {
   LIBRARIES,
   LOADER_MEMBERS,
+  FULL_SCAN_ZONES,
   SUBTLE_ONLY_ZONES,
   SUBTLE_ZONES,
   ZONES,
   allowedManifestNames,
+  relativeEscapeAllowed,
   isRetiredScope,
   isSubtleExempt,
   layerMessage,
@@ -113,11 +116,14 @@ export function specProblem(spec) {
  * field), transitively: what a bundle of them must still install (OPS-REL-1). `manifests` maps
  * workspace package names to their parsed package.json. Returns { runtime: Map name -> spec,
  * problems } where a problem is one dependency declared with two different specs. Pure.
+ * M1-11b-6: `embedded` names workspace packages whose built files are embedded (policy `embeds`,
+ * apps/local-ui), not bundled: they are not traversed, and their (browser) dependencies are not
+ * part of the bundle's runtime.
  */
-export function bundledRuntimeOf(manifest, manifests) {
+export function bundledRuntimeOf(manifest, manifests, embedded = []) {
   const runtime = new Map();
   const problems = [];
-  const seen = new Set();
+  const seen = new Set(embedded);
   const queue = [];
   const enqueueWorkspace = (pkg, fields) => {
     for (const field of fields) {
@@ -320,7 +326,8 @@ export function checkSource(zone, file, text, root) {
     if (specifier.startsWith('.')) {
       const target = resolve(dirname(file), specifier);
       const rel = relative(zoneDir, target);
-      if (rel.startsWith('..') || isAbsolute(rel)) {
+      const repoTarget = relative(root, target).split('\\').join('/');
+      if ((rel.startsWith('..') || isAbsolute(rel)) && !relativeEscapeAllowed(zone, repoTarget)) {
         report(
           node,
           `relative import "${specifier}" leaves ${zone}; import another package by its name`,
@@ -598,9 +605,9 @@ export function runChecks(root) {
   const graph = {};
   let files = 0;
   const zones = workspaceZones(root);
-  const subtleDirs = SUBTLE_ONLY_ZONES.map((zone) => join(root, zone)).filter((dir) =>
-    existsSync(dir),
-  );
+  const subtleDirs = [...SUBTLE_ONLY_ZONES, ...FULL_SCAN_ZONES]
+    .map((zone) => join(root, zone))
+    .filter((dir) => existsSync(dir));
   const listings = listSourceFilesIn(root, [...zones.map(({ dir }) => dir), ...subtleDirs]);
 
   // First pass: every manifest, so a bundling zone can see the packages it bundles (OPS-REL-1).
@@ -627,7 +634,8 @@ export function runChecks(root) {
     if (manifest) {
       let bundledRuntime = new Map();
       if (ZONES[zone]?.bundles === true) {
-        const bundled = bundledRuntimeOf(manifest, byName);
+        const embedded = (ZONES[zone].embeds ?? []).map((app) => ZONES[app].name);
+        const bundled = bundledRuntimeOf(manifest, byName, embedded);
         problems.push(...bundled.problems);
         bundledRuntime = bundled.runtime;
       }
@@ -658,7 +666,7 @@ export function runChecks(root) {
     }
   }
 
-  for (const zone of SUBTLE_ONLY_ZONES) {
+  for (const zone of [...SUBTLE_ONLY_ZONES, ...FULL_SCAN_ZONES]) {
     const dir = join(root, zone);
     if (!existsSync(dir)) continue;
     const listed = listings.get(dir);

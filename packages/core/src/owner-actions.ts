@@ -11,6 +11,9 @@
 //   pairing digest from the stored pair; `agent.revoke` is applied by M1-7h. `contact.rename` and
 //   `contact.remove` (M1-9za) change one stored contact: the owner alias (06 §2.1 rule 1), or the
 //   07 §3 tombstone. The nonce row is their audit record; nothing is sent to the contact.
+//   `storage.set` and `storage.remove` (M1-9i-a, D-115) replace or delete the one `own_storage` row
+//   with the nonce row in one transaction, then set the KeyStore `storage-mark`; `backup.export`
+//   records its nonce row only (the audit record of a recovery kit export).
 // - loadPolicy(): the G-6 loader. The stored `policy.set` is re-verified on every load and its
 //   version must equal the KeyStore high-water mark; the defaults are used only while the mark is 0
 //   and no row exists. Anything else fails closed (policy-engine.ts).
@@ -21,9 +24,12 @@
 // owner key, takes no presence and has no path that decides, widens or creates an approval or a
 // policy without one. Refusals are returned to the surface that delivered the object (the CLI or
 // the local UI shows them; the console path is M1-7e/M1-7h) and logged as fixed codes (I-5, I-7).
-import { canonicalize, parseJson } from '@4thtech-io/crypto';
+import { canonicalize, decodeHex0x, encodeHex, parseJson } from '@4thtech-io/crypto';
 import {
   approvalIdSchema,
+  contactRenameParamsSchema,
+  evmAddress,
+  policyPatchSchema,
   policySchema,
   signedOwnerActionSchema,
   type OwnerActionOp,
@@ -35,6 +41,7 @@ import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
 import { isRestrictedAlias } from './names.js';
+import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
 import {
   computeActionDigest,
   ownerActionHash,
@@ -47,6 +54,19 @@ import {
   type OwnerActionRefusal,
   type OwnerActionVerdict,
 } from './owner-action.js';
+import {
+  PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+  buildOwnerActionBody,
+  mergePolicyPatch,
+  newOwnerActionNonce,
+  policyEditWarnings,
+  type OwnerActionBodyInput,
+  type PolicyEditOptions,
+  type PreparableOp,
+  type PreparedOwnerAction,
+  type PreparedPolicyEdit,
+  type PrepareRefusal,
+} from './owner-prepare.js';
 import {
   POLICY_DEFAULTS_EFFECTIVE,
   type EffectivePolicy,
@@ -86,6 +106,11 @@ export type OwnerActionOutcome =
       /** policy.set: the applied version and whether the KeyStore mark was raised to it. */
       readonly policyVersion?: number;
       readonly markRaised?: boolean;
+      /**
+       * storage.set and storage.remove (M1-9i-a): whether `storage-mark` was set to the new active
+       * id (or null) and read back. False: own storage reads `broken` until the owner connects again.
+       */
+      readonly storageMarkSet?: boolean;
     }
   | {
       readonly status: 'refused';
@@ -220,6 +245,7 @@ export class OwnerActions {
   readonly #contacts: ContactBook;
   readonly #mark: PolicyVersionMark | undefined;
   readonly #receiptsKept: ReceiptsKeptMark | undefined;
+  readonly #ownStorageKeys: OwnStorageKeys | undefined;
 
   constructor(
     ctx: CoreContext,
@@ -227,12 +253,14 @@ export class OwnerActions {
     contacts: ContactBook,
     mark?: PolicyVersionMark,
     receiptsKept?: ReceiptsKeptMark,
+    ownStorageKeys?: OwnStorageKeys,
   ) {
     this.#ctx = ctx;
     this.#identity = identity;
     this.#contacts = contacts;
     this.#mark = mark;
     this.#receiptsKept = receiptsKept;
+    this.#ownStorageKeys = ownStorageKeys;
   }
 
   /** The own agent and its card's owner key, or why owner actions cannot apply. */
@@ -289,6 +317,11 @@ export class OwnerActions {
       case 'contact.rename':
       case 'contact.remove':
         return this.#applyContactChange(value, base);
+      case 'storage.set':
+      case 'storage.remove':
+        return this.#applyStorage(text, value, base);
+      case 'backup.export':
+        return this.#applyBackupExport(value, base);
       case 'credits.deposit':
       case 'credits.withdraw':
       case 'agent.revoke': {
@@ -389,6 +422,116 @@ export class OwnerActions {
         { status: 'removed', updated_at: now },
       );
       return { status: 'applied', op };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `storage.set` and `storage.remove` (M1-9i-a, D-115; 04 §2.5.1; 07 §3.4). The object checks and
+   * the nonce first (L(op) = 600 s). `storage.set` then needs the KeyStore item `s3:<id>` with the
+   * signed credentialDigest (compared in constant time); `storage.remove` needs `id` to be the stored
+   * row's. In one store transaction the nonce is checked again and recorded, and the row is replaced
+   * (the sealed signed object, verbatim) or deleted. After the commit `storage-mark` is set to the
+   * new `id` (or null) and read back; the store always commits first, as for `policies`. A refusal
+   * writes nothing. The KeyStore item `s3:<id>` itself is written and deleted by the owner surface
+   * through StorageCredentialControl, never here, and no credential reaches the core (I-7).
+   */
+  async #applyStorage(
+    text: string,
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const keys = this.#ownStorageKeys;
+    if (keys === undefined) {
+      return this.#report(refused(shaped.body.op, 'storage_keys_unavailable'));
+    }
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'storage.set' && body.op !== 'storage.remove') {
+      return this.#report(refused(body.op, 'malformed'));
+    }
+    const op = body.op;
+    const id = body.params.id;
+    const now = base.now;
+
+    let sealed: Sealed | undefined;
+    if (body.op === 'storage.set') {
+      let digest: string | null;
+      try {
+        digest = await keys.credentialDigest(id);
+      } catch {
+        return this.#report(refused(op, 'storage_keys_unavailable'));
+      }
+      if (digest === null) return this.#report(refused(op, 'credential_missing'));
+      if (!credentialDigestsEqual(digest, body.params.credentialDigest)) {
+        return this.#report(refused(op, 'credential_mismatch'));
+      }
+      sealed = await seal(this.#ctx, 'own_storage', 'signed_json', [id], text);
+    }
+
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused(op, 'nonce_used');
+      }
+      if (sealed !== undefined) {
+        tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+        // One own storage per agent in M1: a newer storage.set replaces the row.
+        tx.delete('own_storage', {});
+        tx.insert('own_storage', { id, signed_json: sealed, applied_at: now });
+        return { status: 'applied', op };
+      }
+      const row = tx.select('own_storage')[0];
+      if (row === undefined || row.id !== id) return refused(op, 'storage_not_active');
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      tx.delete('own_storage', { id });
+      return { status: 'applied', op };
+    });
+    if (outcome.status === 'refused') return this.#report(outcome);
+
+    const active = op === 'storage.set' ? id : null;
+    let storageMarkSet: boolean;
+    try {
+      await keys.writeMark(active);
+      const back = await readStorageMark(keys);
+      storageMarkSet = typeof back !== 'string' && back.active === active;
+    } catch {
+      storageMarkSet = false;
+    }
+    if (!storageMarkSet) {
+      // Fixed text only: no id, endpoint or bucket (I-7). Own storage now reads `broken`.
+      this.#ctx.log.warn('storage mark not set', { op });
+    }
+    return { status: 'applied', op, storageMarkSet };
+  }
+
+  /**
+   * `backup.export` (M1-9i-a, D-115; 04 §2.3.3, §2.5.1): the object checks and the nonce, then the
+   * nonce row alone, in one store transaction. That row (op, action hash, applied time) is the audit
+   * record of the export; the CLI asks the export control to seal the kit only after this applied.
+   */
+  async #applyBackupExport(
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'backup.export') {
+      return this.#report(refused(signed.body.op, 'malformed'));
+    }
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
+        return refused('backup.export', 'nonce_used');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      return { status: 'applied', op: 'backup.export' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
   }
@@ -798,6 +941,181 @@ export class OwnerActions {
       return { status: 'fail_closed', problem, nextVersion, stored: verified };
     }
     return { status: 'fail_closed', problem, nextVersion };
+  }
+
+  // --- Prepare helpers for owner surfaces (M1-11r-b, D-118) ---------------------------------------
+  //
+  // Each builds the unsigned body the local UI server shows, signs after the owner's presence
+  // (M1-11s-b) and passes to apply(). They sign nothing, write nothing and grant nothing (I-4); the
+  // op's rule is checked here only so the owner is not asked to sign what apply() would refuse, and
+  // apply() checks it again. Refusals are fixed codes (I-5, I-7). No MCP tool calls them.
+
+  /** The agent and its card's owner key as `owner` spells it, or why nothing can be prepared. */
+  async #signer(): Promise<
+    { readonly agent: string; readonly owner: string } | { readonly refusal: PrepareRefusal }
+  > {
+    const self = await this.#self();
+    if ('refusal' in self) return { refusal: self.refusal };
+    return { agent: self.agent, owner: encodeHex(decodeHex0x(self.ownerNostr, { length: 32 })) };
+  }
+
+  #build<O extends PreparableOp>(
+    signer: { readonly agent: string; readonly owner: string },
+    op: O,
+    params: OwnerActionBodyInput<O>['params'],
+  ): Extract<PreparedOwnerAction, { status: 'prepared' }> {
+    const issuedAt = nowOf(this.#ctx);
+    const { body, jcs } = buildOwnerActionBody<O>({
+      ...signer,
+      op,
+      params,
+      nonce: newOwnerActionNonce(),
+      issuedAt,
+      expiresAt: issuedAt + PREPARED_OWNER_ACTION_LIFETIME_SECONDS,
+    });
+    return { status: 'prepared', op, body, jcs };
+  }
+
+  /**
+   * The unsigned `policy.set` for an edit on the Rules or Files page (04 §2.5.1; 06 §3): the complete
+   * document, built from the verified policy in force (or the 06 §3 defaults while none was ever
+   * applied) with `patch` merged over it, at version max(KeyStore mark, stored row) + 1.
+   *
+   * Refused, building nothing, when: the patch is not a strict PolicyPatch or the merged document is
+   * not a valid policy (`patch_invalid`: every 06 §3 bound holds, `allowKeyDisclosure` is never
+   * `allow`, lists stay sorted and unique, nothing is normalised); the policy fails closed or its
+   * mark is unreadable (`policy_not_valid`: no value is ever taken from an invalid policy, and the
+   * way back is `policy recover`, D-100); `options.baseVersion` is not the version in force
+   * (`stale_version`). Delivery receipts on from an older default (D-109) are signed `false` unless
+   * `options.keepDeliveryReceipts` is `true` (a patch value is never the answer). Every loosening is
+   * returned as a stable warning code the server makes the owner acknowledge. Two bodies prepared from one
+   * base sign one version: apply() takes the first and refuses the second (`version_not_newer`).
+   */
+  async preparePolicyEdit(
+    patch: unknown,
+    options: PolicyEditOptions = {},
+  ): Promise<PreparedPolicyEdit> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'policy.set', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    const parsedPatch = policyPatchSchema.safeParse(patch);
+    if (!parsedPatch.success) return refuse('patch_invalid');
+
+    const inspected = await this.#inspectPolicy();
+    const { effective } = inspected;
+    if (
+      effective.mode === 'fail_closed' ||
+      inspected.mark === undefined ||
+      inspected.rowVersion === undefined
+    ) {
+      return refuse('policy_not_valid');
+    }
+    const baseVersion = effective.mode === 'signed' ? effective.version : 0;
+    if (options.baseVersion !== undefined && options.baseVersion !== baseVersion) {
+      return refuse('stale_version');
+    }
+    const version = Math.max(inspected.mark, inspected.rowVersion) + 1;
+    if (!Number.isSafeInteger(version)) return refuse('policy_not_valid');
+
+    const base = policySchema.parse(effective.policy);
+    const merged = mergePolicyPatch(base, parsedPatch.data);
+    const askKeepDeliveryReceipts =
+      effective.mode === 'signed' &&
+      (await this.receiptsOnFromOlderDefault({ policy: base, version: baseVersion }));
+    let keepDeliveryReceipts = false;
+    if (askKeepDeliveryReceipts) {
+      // D-109: only the owner's explicit answer keeps them. A patch value (a form re-submitting the
+      // receipts section as shown) is never that answer (IR-M1-11r-b-1 L1).
+      keepDeliveryReceipts = options.keepDeliveryReceipts === true;
+      merged.receipts.autoDelivered = keepDeliveryReceipts;
+    }
+    const policy = policySchema.safeParse(merged);
+    if (!policy.success) return refuse('patch_invalid');
+
+    const built = this.#build(signer, 'policy.set', { version, policy: policy.data });
+    return {
+      ...built,
+      version,
+      baseVersion,
+      askKeepDeliveryReceipts,
+      keepDeliveryReceipts,
+      warnings: policyEditWarnings(base, policy.data),
+    };
+  }
+
+  /**
+   * The unsigned `contact.check` for "They match" (04 §2.5.1, §3.6.1): `pairingDigest` is recomputed
+   * now from the stored signed `handshake` and `handshake-ack`, as apply() recomputes it.
+   */
+  async prepareContactCheck(contactId: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'contact.check', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const found = await this.#contacts.currentPairingDigest(contactId);
+    if (found.status === 'unknown') return refuse('contact_unknown');
+    if (found.status === 'unavailable') return refuse('pairing_unavailable');
+    return this.#build(signer, 'contact.check', {
+      contact: contactId,
+      pairingDigest: found.pairingDigest,
+    });
+  }
+
+  /**
+   * The unsigned `contact.rename` (04 §2.5.1; 06 §2.1 rule 1): the alias must already be its own
+   * restricted form and must not be another active contact's shown name (NFKC, case folded); the
+   * contact must be stored and not removed. The same rules apply() checks.
+   */
+  async prepareContactRename(contactId: string, alias: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'contact.rename', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('contacts', { contact_id: contactId }),
+    );
+    if (row === undefined || row.status === 'removed') return refuse('contact_unknown');
+    if (
+      !contactRenameParamsSchema.safeParse({ contact: contactId, alias }).success ||
+      !isRestrictedAlias(alias)
+    ) {
+      return refuse('alias_invalid');
+    }
+    const wanted = foldName(alias);
+    const others = (await this.#contacts.list()).filter(
+      (c) => c.id !== contactId && c.status === 'active',
+    );
+    if (others.some((c) => foldName(c.display.name) === wanted)) return refuse('alias_taken');
+    return this.#build(signer, 'contact.rename', { contact: contactId, alias });
+  }
+
+  /**
+   * The unsigned `contact.remove` (04 §2.5.1; 07 §3): refused for an unknown or removed contact and
+   * for a revoked one (removing never changes `revoked`), as apply() refuses them.
+   */
+  async prepareContactRemove(contactId: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'contact.remove', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const state = await this.#ctx.store.transaction((tx) => {
+      const row = tx.get('contacts', { contact_id: contactId });
+      if (row === undefined || row.status === 'removed') return 'unknown' as const;
+      if (
+        row.status === 'revoked' ||
+        tx.get('revoked_agents', { agent_evm: contactId }) !== undefined
+      ) {
+        return 'revoked' as const;
+      }
+      return 'ok' as const;
+    });
+    if (state === 'unknown') return refuse('contact_unknown');
+    if (state === 'revoked') return refuse('contact_revoked');
+    return this.#build(signer, 'contact.remove', { contact: contactId });
   }
 
   /**

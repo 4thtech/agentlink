@@ -32,8 +32,8 @@ import { DISPATCH_TEXT, EXIT_FAILED, EXIT_USAGE, type CommandHandler } from '../
 import { createPackVerifier } from '../runtime/pack-verifier.js';
 import { nodeProofPacks } from '../runtime/proofs.js';
 import { terminalOneLine, untrustedRegion } from '../terminal/sanitize.js';
-import type { PackFolders, PackReadOutcome } from '../tools/context.js';
-import { formatDate, formatTime } from '../tools/strings/index.js';
+import type { PackFolders, PackReadOutcome } from '@4thtech-io/mcp-tools/context.js';
+import { formatDate, formatTime } from '@4thtech-io/mcp-tools/strings/index.js';
 import { createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 
 /** Exit codes of `agentlink verify` (proposed, owner confirms at merge). */

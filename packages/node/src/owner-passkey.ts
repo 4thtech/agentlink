@@ -52,7 +52,9 @@ import {
   ownerMissing,
   readOwnerItem,
   sameOwnerKeys,
+  type OwnerItemRemoval,
 } from './owner-keystore.js';
+import { CLI_COMMAND } from './cli-command.js';
 
 export { OWNER_PASSKEY_ACCOUNT };
 /** 08 §1, D-79: the WebAuthn RP ID of the local approval page. */
@@ -102,7 +104,7 @@ const passkeyUnsupported = (): NodeKeyStoreError =>
 const passkeyDamaged = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_mismatch',
-    'The saved passkey copy of your owner key is damaged. Use your owner code; `agentlink doctor` shows what is wrong.',
+    `The saved passkey copy of your owner key is damaged. Use your owner code; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
   );
 
 function u16(value: number): Uint8Array {
@@ -360,7 +362,7 @@ export async function registerOwnerPasskey(
       // Not this run's item (another run's, or none): never deleted.
       throw new NodeKeyStoreError(
         'keychain_failed',
-        'The system keychain refused the request. Unlock it and try again; `agentlink doctor` shows what is wrong.',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
       );
     }
     // The stored blob opens with this passkey's PRF output to this owner.
@@ -368,4 +370,90 @@ export async function registerOwnerPasskey(
   } finally {
     wipe(ownerSecret, prf, alko, seed, back, check);
   }
+}
+
+export interface StoreOwnerPasskeySeedOptions {
+  readonly timeoutMs?: number;
+  /** Called with the sealed `ALKP` blob (ciphertext) before it is written, for a rollback. */
+  readonly sealed?: (blob: Uint8Array) => void;
+}
+
+/**
+ * M1-11s-c (owner setup on the first-run page; proposed, owner confirms at merge): stores `seed`,
+ * which must derive `owner`, as the `owner-passkey` item (`ALKP` v1 under the passkey's 32-byte PRF
+ * output, for `credentialId`), never overwriting one (`owner_passkey_exists`). The stored value is
+ * read back, compared and opened once with the same PRF output to this owner; a read-back that
+ * differs is not this run's item and is left alone (`keychain_failed`). Returns the stored blob
+ * (ciphertext) for removeOwnerPasskeyItemIfOurs. `seed` and `prfOutput` are not modified; the caller
+ * wipes them.
+ */
+export async function storeOwnerPasskeySeed(
+  keychain: KeychainBackend,
+  seed: Uint8Array,
+  owner: OwnerPublicKeys,
+  prfOutput: Uint8Array,
+  credentialId: Uint8Array,
+  options: StoreOwnerPasskeySeedOptions = {},
+): Promise<Uint8Array> {
+  const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
+  if (!(prfOutput instanceof Uint8Array) || prfOutput.length !== PRF_LENGTH) {
+    throw passkeyUnsupported();
+  }
+  if (
+    !(credentialId instanceof Uint8Array) ||
+    credentialId.length < 1 ||
+    credentialId.length > MAX_CREDENTIAL_ID ||
+    !sameOwnerKeys(seed, owner)
+  ) {
+    throw presenceRejected();
+  }
+  const existing = await readOwnerPasskeyItem(keychain, timeoutMs);
+  if (existing !== null) {
+    wipe(existing);
+    throw passkeyExists();
+  }
+  const blob = await sealPasskeySeed(prfOutput, seed, credentialId);
+  let back: Uint8Array | null = null;
+  let check: Uint8Array | undefined;
+  try {
+    options.sealed?.(blob);
+    await guarded(() => keychain.set(OWNER_PASSKEY_ACCOUNT, blob), timeoutMs);
+    back = await readOwnerPasskeyItem(keychain, timeoutMs);
+    if (back === null || !equalBytes(back, blob)) {
+      throw new NodeKeyStoreError(
+        'keychain_failed',
+        `The system keychain refused the request. Unlock it and try again; \`${CLI_COMMAND} doctor\` shows what is wrong.`,
+      );
+    }
+    check = await openPasskeySeed(back, prfOutput, { expectedOwnerNostr: owner.ownerNostr });
+    return blob;
+  } finally {
+    wipe(back, check);
+  }
+}
+
+/**
+ * M1-11s-c: removes the `owner-passkey` item only while it is still exactly `blob`, the item this run
+ * stored (as removeOwnerItemIfOurs does for `owner`). The read and the delete are not atomic in the
+ * OS keychain API (the same residual).
+ */
+export async function removeOwnerPasskeyItemIfOurs(
+  keychain: KeychainBackend,
+  blob: Uint8Array,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<OwnerItemRemoval> {
+  let current: Uint8Array | null;
+  try {
+    current = await readOwnerPasskeyItem(keychain, timeoutMs);
+  } catch {
+    return 'failed';
+  }
+  if (current === null) return 'absent';
+  const ours = equalBytes(current, blob);
+  wipe(current);
+  if (!ours) return 'other';
+  const removed = await guarded(() => keychain.delete(OWNER_PASSKEY_ACCOUNT), timeoutMs).catch(
+    () => false,
+  );
+  return removed ? 'removed' : 'failed';
 }

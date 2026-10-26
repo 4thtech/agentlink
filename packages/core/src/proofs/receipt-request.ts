@@ -30,11 +30,22 @@ export function senderRequestedTx(tx: StoreTx, envelopeId: string): boolean {
 }
 
 /**
- * True when a contact's checked record of this received envelope carries the sender's request and
- * this agent has signed no DELIVERED receipt for it (06 §2.2 `receiptRequested`).
+ * The envelopes among `envelopeIds` for which a contact's checked record of the received envelope
+ * carries the sender's request and this agent has signed no DELIVERED receipt for it (06 §2.2
+ * `receiptRequested`). One select of the received records and one of their DELIVERED receipts, so
+ * an inbox page reads it once, not once per item (M1-33d-b).
  */
-export function receiptRequestedTx(tx: StoreTx, envelopeId: string): boolean {
-  for (const row of tx.select('proofs', { envelope_id: envelopeId, status: 'received' })) {
+export function receiptRequestedSetTx(
+  tx: StoreTx,
+  envelopeIds: readonly string[],
+): ReadonlySet<string> {
+  const out = new Set<string>();
+  if (envelopeIds.length === 0) return out;
+  const asking: { readonly recordId: string; readonly envelopeId: string }[] = [];
+  for (const row of tx.select('proofs', {
+    envelope_id: { in: [...envelopeIds] },
+    status: 'received',
+  })) {
     let item: unknown;
     try {
       item = parseJson(row.record_json);
@@ -42,8 +53,16 @@ export function receiptRequestedTx(tx: StoreTx, envelopeId: string): boolean {
       continue;
     }
     if ((item as { receiptRequest?: unknown } | null)?.receiptRequest !== 'delivered') continue;
-    if (tx.get('receipts', { record_id: row.record_id, type: DELIVERED }) !== undefined) continue;
-    return true;
+    asking.push({ recordId: row.record_id, envelopeId: row.envelope_id });
   }
-  return false;
+  if (asking.length === 0) return out;
+  const signed = new Set(
+    tx
+      .select('receipts', { record_id: { in: asking.map((r) => r.recordId) }, type: DELIVERED })
+      .map((r) => r.record_id),
+  );
+  for (const { recordId, envelopeId } of asking) {
+    if (!signed.has(recordId)) out.add(envelopeId);
+  }
+  return out;
 }

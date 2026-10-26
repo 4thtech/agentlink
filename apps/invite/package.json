@@ -1,8 +1,8 @@
 {
   "name": "@4thtech-io/invite",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "description": "Invite landing page.",
+  "description": "Invite host: static how-to-install page that reads the invite in the browser (08 §4, D-53).",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -10,7 +10,10 @@
     "url": "git+https://github.com/4thtech/agentlink.git",
     "directory": "apps/invite"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./src/interpreted-parsers.ts",
+    "./src/main.ts"
+  ],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -24,9 +27,18 @@
     "!dist/tsconfig.tsbuildinfo"
   ],
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && vite build",
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@4thtech-io/core": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*",
+    "@4thtech-io/types": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
   }
 }

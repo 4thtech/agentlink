@@ -19,7 +19,7 @@ import type { ReadClient } from './read-client.js';
 
 const ZERO_ADDRESS = `0x${'0'.repeat(40)}`;
 
-/** `getRecord` as the client reads it; `null` for an empty slot. */
+/** `getRecord` as the client reads it; `null` only for the Notary's bare `RecordNotFound()` revert. */
 export interface StoredRecord {
   readonly signer: Hex;
   readonly recordStructHash: Hex;
@@ -59,7 +59,10 @@ export interface FeeLevels {
 /** What the paid path reads from one chain. Rejections are ChainErrors. */
 export interface ChainState {
   readonly config: ChainConfig;
-  /** `getRecord` at `blockNumber` (default: latest). */
+  /**
+   * `getRecord` at `blockNumber` (default: latest): `null` only for a `RecordNotFound` revert; a
+   * zero-signer struct is ChainError `bad_answer` (fail closed, M1-4c-d).
+   */
   getRecord(recordId: Hex, blockNumber?: bigint): Promise<StoredRecord | null>;
   block(tag: 'latest' | 'finalized' | bigint): Promise<BlockInfo>;
   /** A transaction's receipt status; `pending` while there is no receipt. */
@@ -154,16 +157,24 @@ export function createChainState(reader: {
       } catch (error) {
         // The deployed Notary reverts `RecordNotFound()` for an unknown ID: that, and only that
         // revert, means "absent". Any other failure stays a failure, so nothing is decided on it.
+        // The revert data must be exactly the 4-byte selector: viem names a no-argument error and
+        // ignores trailing bytes, and those are not RecordNotFound() (M1-4d-h, as verify.ts).
         if (
           error instanceof ChainError &&
           error.code === 'call_reverted' &&
-          error.revertName === 'RecordNotFound'
+          error.revertName === 'RecordNotFound' &&
+          error.revertBare
         ) {
           return null;
         }
         throw error;
       }
-      if (raw.signer.toLowerCase() === ZERO_ADDRESS) return null;
+      // The Notary never answers with an empty slot (an unknown ID reverts, above). A struct with a
+      // zero signer is a misbehaving RPC or contract: a bad answer, never "absent", so no
+      // replacement is signed and nothing is sent on it (M1-4c-d; 04 §5).
+      if (raw.signer.toLowerCase() === ZERO_ADDRESS) {
+        throw new ChainError('bad_answer');
+      }
       return Object.freeze({
         signer: raw.signer.toLowerCase() as Hex,
         recordStructHash: raw.recordStructHash.toLowerCase() as Hex,

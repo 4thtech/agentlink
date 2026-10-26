@@ -44,8 +44,10 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `packages/chain/**` | S1 | Chain client (content rules raise EIP-712/signing code to S2) |
 | `packages/transport-nostr/**` | S1 | Inbound content |
 | `packages/storage/**` | S1 | Storage credentials, presigned URLs, OAuth tokens, SSRF (the drop adapter's request signing → S2) |
+| `packages/mcp-tools/**` | S1 | MCP tool handlers and surface (moved from `apps/cli/src/tools/`, M2-3t; runtime-agnostic, inbound content wrapped; owner operations → S2) |
 | `packages/types/**` | S1 | Inbound validation schemas (envelope, payload, policy schema changes → S2) |
 | `packages/ui/**` | S1 | Approval and policy UI; runs inside the console origin |
+| `apps/local-ui/**` | S1 | Local owner UI; the browser never signs; presence is enforced server-side (proposed, owner confirms at merge; D-118) |
 | `apps/cli/**` | S1 | MCP tool surface, files, inbound content (owner operations → S2) |
 | `apps/console/**` | S2 | Generates and holds the owner seed; signs approvals and policies |
 | `apps/cloud-agent/**` | S2 | Generates and holds agent seeds; OAuth owner proof |
@@ -58,7 +60,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `package.json` (root), `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc` (any depth), `.pnpmfile.*` (any depth), `turbo.json`, `.changeset/config.json`, `.gitleaks.toml`, `.gitleaksignore` | S1 | Supply chain, release and secret-scan configuration. `.npmrc`, `.pnpmfile.*`, `pnpm-workspace.yaml` and the root `package.json` can run code or redirect installs and publishing in CI (`--ignore-scripts` does not stop a pnpmfile), including in jobs holding the npm OIDC token |
 | `docs/foundation/04-security-and-crypto.md` | S2 | Invariants |
 | other `docs/foundation/**`, `docs/process/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, `SECURITY.md` | S1 | Specs, agent instructions and harness settings |
-| `docs-site/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirror in `review-gate.yml` pending (owner, M0-25); until then the PR declares S1 |
+| `docs-site/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirrored in `review-gate.yml` (CHORE-CI-DOCS-FASTLANE, owner decision 2026-10-25). The one generated page `docs-site/technical/project/status-and-roadmap.md` is S0: its source `docs/status.yaml` is S0 and `tools/docs-status` fails CI on drift |
 | anything else | S0 | — |
 
 This table is mirrored in two places that MUST change with it in the same PR:
@@ -203,12 +205,22 @@ Full reports MAY contain unfixed vulnerability details, so they are stored priva
 
 ---
 
+### 4.6 Moved head: mechanical merge of `origin/main` (D-126)
+
+When an approved PR's head moves **only** by a mechanical merge of `origin/main`, the fresh review may be a lightweight automated verification by a fresh-context worker (any model, for example Haiku) instead of a full session. It checks exactly three facts and nothing else:
+
+1. `git show --remerge-diff <merge sha>` is empty (no hand conflict resolution).
+2. The PR's own diff against `main` is byte-identical to the previously approved head's diff.
+3. Required CI is green on the new head.
+
+It records the result as follows (*Orchestrator wording:*) `IR-<TASK-ID>-<n>: PASS (mechanical) at <full sha>`; `review-gate` (c) accepts the `(mechanical)` marker unchanged. Any non-empty remerge-diff, any change to the PR's own diff, or any S2 conflict resolution still needs a full independent review (Opus; Fable for keys, crypto, money or contracts, §4.1).
+
 ## 5. Area checklists
 
 Reviewers apply every checklist the diff touches. Item IDs are stable; new items are appended.
 
 **Crypto (CR)**: 04 §2–§4, §8
-- CR-1 No primitive calls outside `@4thtech-io/crypto`; only allowlisted libraries (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`); no custom primitives (I-8).
+- CR-1 No primitive calls outside `@4thtech-io/crypto`; only allowlisted libraries (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`, and `@cloudflare/workers-oauth-provider` in `apps/cloud-agent` only, under the narrow exception of D-131 (11), 04 §8); no custom primitives (I-8).
 - CR-2 HKDF derivation exactly per 04 §2.1 (salt `agentlink-v1`; info `label‖0x00‖u32be(epoch)‖u8(counter)`; L=32); secp256k1 rejection loop; EVM label always epoch 0.
 - CR-3 X25519 clamping left to the library.
 - CR-4 `envelopeHash = sha256(JCS(envelope without sig))` (RFC 8785); AEAD AD = `sha256(JCS({v,id,thread,from,createdAt,recipients}))`.

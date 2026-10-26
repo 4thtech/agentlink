@@ -22,12 +22,16 @@
 //   has no session (another browser, or a stale link), and tells the agent never to open or fetch
 //   the link itself.
 //
+// - M1-11b-8 (06 §7): `openSetupPage` opens the first-run page once for the life of the UI, when
+//   the started server has owner setup wired (`firstRunWired`); the start step of `agentlink mcp`
+//   (first-run-on-start.ts) is its only caller, never a tool. The same opener and link rules apply.
+//
 // Accepted (G-1, D-67; 04 §2.5): a same-user process can read the opener's argv for the one-shot
 // link and get a view-only session; it still cannot approve without owner presence.
 import type { Logger } from '@4thtech-io/log';
 import type { ApprovalServer } from '@4thtech-io/node';
 import { approveCommand, isApprovalId } from '../approval/next-step.js';
-import type { ApprovalLink } from '../tools/index.js';
+import type { ApprovalLink } from '@4thtech-io/mcp-tools';
 
 /** The shortest time between two browser windows the server opens by itself. */
 export const BROWSER_OPEN_INTERVAL_MS = 30_000;
@@ -37,8 +41,9 @@ const MAX_ANNOUNCED = 256;
 const UI_ORIGIN = /^http:\/\/localhost:([1-9][0-9]{0,4})$/;
 
 const NEVER_FETCH = 'Never open or fetch this link yourself. ';
-const LEAD = 'Tell the user: Approval needed. Approve here: ';
-const OR_CLI = ' or in your own terminal run ';
+// M1-36a: shortened so the longer `npx` command still fits the 500-character limit (06 §2.5).
+const LEAD = 'Tell the user: Approve here: ';
+const OR_CLI = ' or in your terminal run ';
 const ADD_AGENT = " If you have more than one agent, add --agent with this agent's name.";
 const TAIL =
   " Your AI can't approve this for you. After they approve, call the same tool again with approvalId.";
@@ -48,14 +53,26 @@ const TAIL =
  * the caller (the ID by approveCommand, the url by createApprovalUi); the agent name is inserted
  * only after approveCommand checks it again (06 §2.5 step 2).
  */
-export function approvalLinkNextStep(approvalId: string, url: string, agentName?: string): string {
-  const { command, needsAgentHint } = approveCommand(approvalId, agentName);
+export function approvalLinkNextStep(
+  approvalId: string,
+  url: string,
+  agentName?: string,
+  prefix?: string,
+): string {
+  const { command, needsAgentHint } = approveCommand(approvalId, agentName, prefix);
   return `${NEVER_FETCH}${LEAD}${url}${OR_CLI}\`${command}\`.${needsAgentHint ? ADD_AGENT : ''}${TAIL}`;
 }
 
 export interface ApprovalUi {
   /** The link for one request; starts the server on first use. Undefined: no link (M1a result). */
   link(approvalId: string): Promise<ApprovalLink | undefined>;
+  /**
+   * M1-11b-8: starts the server (if needed) and opens the owner's browser at the first-run page,
+   * at most once for the life of this UI, and only when `firstRunWired` says the started server
+   * has owner setup wired. The one-shot link goes only to the OS opener (`openFirstRun`); this
+   * answers only whether a browser was opened. Never throws.
+   */
+  openSetupPage(): Promise<boolean>;
   /** True while a server is running. */
   readonly running: boolean;
   /** Stops the server (if one started) and gives no link afterwards. Idempotent. */
@@ -70,6 +87,11 @@ export interface ApprovalUiOptions {
   readonly logger: Logger;
   /** Milliseconds. Default Date.now. */
   readonly nowMs?: () => number;
+  /**
+   * M1-11b-8: whether the server `start` gave has owner setup wired (no owner anywhere, the app
+   * in this build). Read after the server started. Absent: the setup page is never opened.
+   */
+  readonly firstRunWired?: () => boolean;
 }
 
 /** The link for `approvalId` on `server`, or undefined when anything is off (fail closed). */
@@ -101,6 +123,8 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
   let lastOpen: Promise<boolean> | undefined;
   let browserOpened = false;
   let openerFailed = false;
+  /** M1-11b-8: the setup page is opened at most once for the life of this UI. */
+  let setupPageTried = false;
   const announced = new Set<string>();
 
   const ensure = (): Promise<ApprovalServer | undefined> => {
@@ -174,6 +198,22 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
       }
       if (link === undefined) return undefined;
       return (await announce(running, approvalId)) && !closed ? link : undefined;
+    },
+    openSetupPage: async () => {
+      if (closed || setupPageTried || options.firstRunWired === undefined) return false;
+      setupPageTried = true;
+      try {
+        const running = await ensure();
+        if (running === undefined || closed || options.firstRunWired() !== true) return false;
+        const opened = (await running.openFirstRun().catch(() => false)) === true;
+        // The browser now holds a session for the approval links too; with no browser, later
+        // requests raise the OS notification instead (as in `announce`).
+        if (opened) browserOpened = true;
+        else openerFailed = true;
+        return opened && !closed;
+      } catch {
+        return false;
+      }
     },
     get running() {
       return server !== undefined && !closed;

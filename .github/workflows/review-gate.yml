@@ -131,7 +131,7 @@ jobs:
               [2, /^apps\/(console|cloud-agent|submitter|drop)\//],
               [2, /^test-vectors\//],
               [2, /^docs\/foundation\/04-security-and-crypto\.md$/],
-              [1, /^packages\/(chain|transport-nostr|storage|types|ui)\//],
+              [1, /^packages\/(chain|transport-nostr|storage|types|ui|mcp-tools)\//],
               [1, /^apps\/(cli|verify|invite)\//],
               [1, /^(e2e|skills)\//],
               [1, /^\.github\//],
@@ -143,6 +143,10 @@ jobs:
               [1, /^(\.gitleaks\.toml|\.gitleaksignore|\.changeset\/config\.json)$/],
               [1, /^docs\/(foundation|process)\//],
               [1, /^(AGENTS|CLAUDE|SECURITY)\.md$/],
+              // Public docs, published on merge (D-57). Owner decision 2026-10-25 (CHORE-CI-DOCS-FASTLANE):
+              // the one generated page is exempt; its source docs/status.yaml is S0 and tools/docs-status
+              // fails CI on any drift between the two.
+              [1, /^docs-site\/(?!technical\/project\/status-and-roadmap\.md$)/],
             ];
             const classify = (path) =>
               RULES.reduce((highest, [cls, re]) => (re.test(path) ? Math.max(highest, cls) : highest), 0);

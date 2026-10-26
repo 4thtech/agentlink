@@ -9,13 +9,19 @@ import * as lib from '../src/lib.js';
 describe('the Worker entry module', () => {
   it('exports exactly the handler and the Durable Object classes', () => {
     expect(Object.keys(entry).sort()).toEqual([
+      'SubmitterDepositRelay',
       'SubmitterFaucet',
       'SubmitterLimits',
       'SubmitterQueue',
       'default',
     ]);
     expect(typeof entry.default.fetch).toBe('function');
-    for (const cls of [entry.SubmitterQueue, entry.SubmitterLimits, entry.SubmitterFaucet]) {
+    for (const cls of [
+      entry.SubmitterQueue,
+      entry.SubmitterLimits,
+      entry.SubmitterFaucet,
+      entry.SubmitterDepositRelay,
+    ]) {
       expect(typeof cls).toBe('function');
     }
   });

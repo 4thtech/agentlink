@@ -93,6 +93,7 @@ import type { EnvelopeService, InboundReport } from '../envelopes.js';
 import type { IdentityService } from '../identity.js';
 import { renderContactName } from '../names.js';
 import type { OutboxService } from '../outbox.js';
+import { parseOwnerActionText } from '../owner-action.js';
 import type { OwnerActions } from '../owner-actions.js';
 import {
   evaluate,
@@ -149,6 +150,19 @@ export const QUEUED_RECEIPT_WAIT_MS = 2_000;
  * on-chain, the signature or the recipient commitment is wrong. `Expired` is not here: 04 §5 may
  * allow a replacement.
  */
+/**
+ * A receipt the client's chain reads answer `RecordNotFound` for is posted again this many times,
+ * after RECEIPT_NOT_FOUND_RETRY_MS, before it becomes `receipt_failed` (M1-34-c): a client RPC that
+ * lags behind the block holding the record must not fail the receipt for good. Fixed, so a record
+ * that never existed costs one extra post per receipt, once.
+ */
+export const RECEIPT_NOT_FOUND_RETRIES = 1;
+/** The fixed delay before that retry (M1-34-c): a few blocks on the supported chains. */
+export const RECEIPT_NOT_FOUND_RETRY_MS = 3_000;
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 const TERMINAL_RECEIPT_ERRORS: ReadonlySet<string> = new Set([
   'RecordNotFound',
   'InvalidSignature',
@@ -348,6 +362,12 @@ interface RecordedFields {
   readonly fee: ProofFee;
   /** Present (true) only when this proof's envelope asks the recipient for a delivery receipt. */
   readonly receiptRequested?: true;
+  /**
+   * Present (true) only when the call asked for a delivery receipt (`requestReceipt`) and the
+   * envelope already had a proof without one, so no request was added (M1-33d-b): the agent must
+   * not tell its user it asked.
+   */
+  readonly receiptRequestNotAdded?: true;
 }
 
 export type NotarizeResult =
@@ -516,8 +536,11 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #deps: ProofServiceDeps;
   readonly #platform: ProofsPlatform | undefined;
   readonly #selector: Selector | undefined;
+  readonly #sleep: (ms: number) => Promise<void>;
   /** Queued receipt ID -> the pass that last tried it (in memory; M1-34-b). */
   readonly #receiptTries = new Map<string, number>();
+  /** The receipt signing in progress, by receipt item ID (M1-33d-b: one signature, I-6). */
+  readonly #signing = new Map<string, Promise<AcknowledgeResult>>();
   #receiptPass = 0;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
@@ -525,6 +548,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     this.#log = ctx.log.withCodes(PROOF_LOG_CODES);
     this.#deps = deps;
     this.#platform = platform;
+    this.#sleep = platform?.sleep ?? defaultSleep;
     this.#selector =
       platform === undefined
         ? undefined
@@ -538,11 +562,15 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const result = await this.#notarize(input);
     if (result.status !== 'ok' && result.status !== 'submitted') return result;
     // Says "asked" only when the stored marker is there: a request on an envelope already notarized
-    // without one is not claimed (M1-33d).
+    // without one is not claimed (M1-33d), and is reported as not added (M1-33d-b).
     const asked = await this.#ctx.store.transaction((tx) =>
       senderRequestedTx(tx, input.envelopeId),
     );
-    return asked ? Object.freeze({ ...result, receiptRequested: true as const }) : result;
+    if (asked) return Object.freeze({ ...result, receiptRequested: true as const });
+    if (input.requestReceipt === true) {
+      return Object.freeze({ ...result, receiptRequestNotAdded: true as const });
+    }
+    return result;
   }
 
   async #notarize(input: NotarizeInput): Promise<NotarizeResult> {
@@ -1948,6 +1976,28 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     type: ReceiptTypeName,
     claim?: (tx: StoreTx, itemJson: string) => boolean,
   ): Promise<AcknowledgeResult> {
+    // M1-33d-b (I-6): concurrent calls for one record and type (two `acknowledge {delivered}` at
+    // once) run one after the other, so the second finds the stored receipt and signs nothing. The
+    // store transaction below still keeps one per record and type across processes.
+    const id = receiptItemId(row.record_id, RECEIPT_CODE[type]);
+    for (let running = this.#signing.get(id); running !== undefined;) {
+      await running.catch(() => undefined);
+      running = this.#signing.get(id);
+    }
+    const work = this.#signReceiptOnce(row, type, claim);
+    this.#signing.set(id, work);
+    try {
+      return await work;
+    } finally {
+      if (this.#signing.get(id) === work) this.#signing.delete(id);
+    }
+  }
+
+  async #signReceiptOnce(
+    row: Row<'proofs'>,
+    type: ReceiptTypeName,
+    claim?: (tx: StoreTx, itemJson: string) => boolean,
+  ): Promise<AcknowledgeResult> {
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
     const code = RECEIPT_CODE[type];
@@ -2041,12 +2091,25 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   ): Promise<ProofOutcome['status'] | 'error' | 'terminal'> {
     const chain = this.#chain(stored.chain_id);
     if (chain === undefined) return 'error';
+    const item = parseJson(stored.record_json) as never;
+    const call = waitMs === undefined ? undefined : { waitMs };
     let outcome: ProofOutcome;
     try {
-      outcome = await chain.submitter.acknowledge(
-        parseJson(stored.record_json) as never,
-        waitMs === undefined ? undefined : { waitMs },
-      );
+      outcome = await chain.submitter.acknowledge(item, call);
+      // M1-34-c: a client RPC that lags behind the block holding the record answers
+      // `RecordNotFound` for a record that exists. The same signed item is posted again, a fixed
+      // RECEIPT_NOT_FOUND_RETRIES times after RECEIPT_NOT_FOUND_RETRY_MS, before it counts as
+      // refused for good. Nothing is signed again; a receipt carries no fee (05 §3.3).
+      for (
+        let retry = 0;
+        retry < RECEIPT_NOT_FOUND_RETRIES &&
+        outcome.status === 'failed' &&
+        outcome.error === 'RecordNotFound';
+        retry += 1
+      ) {
+        await this.#sleep(RECEIPT_NOT_FOUND_RETRY_MS);
+        outcome = await chain.submitter.acknowledge(item, call);
+      }
     } catch {
       this.#log.warn('receipt submit failed', { code: 'submit_error' });
       return 'error';
@@ -2609,7 +2672,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         return { standingRule: true, policyHash };
       }
       if (approval.signed_decision === null) return null;
-      const signed = signedApprovalDecideSchema.safeParse(parseJson(approval.signed_decision));
+      const signed = signedApprovalDecideSchema.safeParse(
+        parseOwnerActionText(approval.signed_decision),
+      );
       if (!signed.success) return null;
       const action = parseJson(
         await open(
@@ -2620,7 +2685,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           approval.action_json,
         ),
       );
-      return { signed: parseJson(approval.signed_decision), action };
+      return { signed: parseOwnerActionText(approval.signed_decision), action };
     } catch {
       return null;
     }

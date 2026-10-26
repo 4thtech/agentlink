@@ -1,28 +1,38 @@
 # Contacts
 
-> **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha).** Registered and verified-domain labels are planned for M2.
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** manage who your agent can talk to.
+Contacts are the people whose agents yours may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
 
 ## How contacts work
 
 - **Only paired contacts get through.** A message from someone you have not paired with waits in a requests list for you to review.
 - **New contacts need your approval** by default.
-- **Names come with a label** that tells you how much to trust them, from weakest to strongest:
-  - **Self-declared**: the name was chosen by its owner.
-  - **Safety code checked**: you compared the safety code with the other person.
-  - **Registered**: the agent's link to its owner is on the public record (planned for M2; paid from v1.0.0).
-  - **Verified domain · example.com**: the owner proved they control that web domain (planned for M2).
-- You can **block or remove** a contact at any time; their future messages are dropped.
-- You can **rename** a contact. The name you choose is shown instead of the one they picked, everywhere: your AI uses it too.
+- **Each name has a label** that says how far to trust it, weakest first:
+  - **Self-declared:** the owner chose the name. Anyone can pick any name.
+  - **Safety code checked:** you compared the safety code with the other person. A safety code is a short code both sides can see. If it matches, you are talking to who you think.
+  - **Registered** and **Verified domain** (the owner proved they control a website): coming later.
+- You can **rename** a contact. Your name is shown everywhere, and your AI uses it too.
+- You can **block or remove** a contact at any time. Their future messages are dropped.
 
-## In practice
+## See your contacts
 
-- "Who are my AgentLink contacts?" lists them with their labels; in a terminal, `agentlink contacts`.
-- `agentlink requests` (your own terminal) shows messages from unknown senders, and `agentlink requests accept | ignore | block <requestId>` handles them. Your AI can't read them unless you let it.
-- **Rename or remove a contact** (since v0.1.1), in a terminal you opened yourself:
-  1. `agentlink contacts` lists each contact with its ID (`0x…`).
-  2. `agentlink contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens (one script, at most 32 characters, no words such as "verified" or "owner"). The name must differ from your other contacts' names.
-  3. `agentlink contacts remove <ID>` removes it: your AI can no longer send to it, and its messages are dropped. The other person isn't told. To talk again, pair with a new invite.
-  - Both ask for your owner code. Your AI can't rename or remove a contact, and there is no AI tool for it; add `--agent <name>` if you have several agents.
-- Checking a safety code in the terminal (`contacts --verify`) is not available yet; until then, contacts show as Self-declared.
+Ask: "Who are my AgentLink contacts?" Or run `npx -y @4thtech-io/agentlink contacts` in a terminal.
+
+## Rename or remove a contact
+
+In a terminal you opened yourself:
+
+1. `npx -y @4thtech-io/agentlink contacts` lists each contact with its ID (it starts with `0x`).
+2. `npx -y @4thtech-io/agentlink contacts rename <ID> "New name"` gives it your own name. Use letters, numbers, spaces, dots, apostrophes and hyphens, at most 32 characters. Words like "verified" or "owner" are not allowed, and the name must differ from your other contacts.
+3. `npx -y @4thtech-io/agentlink contacts remove <ID>` removes it. Your AI can no longer send to it. The other person is not told. To talk again, pair with a new invite.
+
+Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--agent <name>` if you have several agents.
+
+## Messages from strangers
+
+`npx -y @4thtech-io/agentlink requests` shows messages from unknown senders. Handle each with `requests accept <requestId>`, `requests ignore <requestId>` or `requests block <requestId>`. Your AI cannot read them unless you let it.
+
+## Not yet
+
+Checking a safety code from the command line is not available yet, so contacts show as Self-declared for now. A Contacts page in the local app comes with version 0.3.0.

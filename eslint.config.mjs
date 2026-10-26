@@ -8,11 +8,11 @@ import {
   ENTRY_TEST_DIRS,
   LIBRARIES,
   NODE_MSG,
-  NODE_ZONES,
   RESTRICTED_ENTRY_POINTS,
   WORKSPACE_NAMES,
   ZONES,
   allowedWorkspaceNames,
+  nodeBuiltinsAllowed,
   entryTestNames,
   layerMessage,
   libraryAllowed,
@@ -34,7 +34,7 @@ const SOURCE = '{ts,tsx,mts,cts}';
 // types, cross-package relative paths and `crypto.subtle` by the local boundaries/no-bypass rule.
 
 function restrictionsFor(zone, { test = false, testDir = null } = {}) {
-  const nodeAllowed = NODE_ZONES.includes(zone);
+  const nodeAllowed = nodeBuiltinsAllowed(zone);
   const paths = nodeAllowed
     ? ['crypto', 'node:crypto'].map((name) => ({ name, message: CRYPTO_MSG }))
     : BUILTINS.map((name) => ({ name, message: NODE_MSG }));
@@ -107,16 +107,16 @@ const CONSOLE_SYNTAX = [
 // include ...CONSOLE_SYNTAX in its own list. tools/console-ban.test.mjs checks every zone.
 
 // --- The runtime-agnostic tool module (06 §1, D-73 (1); M1-9c) ----------------------------------
-// apps/cli/src/tools/ moves unchanged into a shared package for the cloud agent (M2-3b), so it may
-// import no Node built-in, nothing from @4thtech-io/node or the MCP SDK, and nothing outside
-// src/tools/ by a relative path; no dynamic import(), require or Node global. These are guards for
-// portability and hygiene, not a security boundary (06 §1). The block keeps the apps/cli zone's own
+// packages/mcp-tools/src/ (moved unchanged from apps/cli/src/tools/, M2-3t, G-15) is shared with the
+// cloud agent, so it may import no Node built-in, nothing from @4thtech-io/node or the MCP SDK, and
+// nothing outside src/ by a relative path; no dynamic import(), require or Node global. These are guards for
+// portability and hygiene, not a security boundary (06 §1). The block keeps the package zone's own
 // list (ESLint applies only the last matching no-restricted-imports block) and CONSOLE_SYNTAX.
 const TOOLS_MSG =
-  'apps/cli/src/tools/ is runtime-agnostic (06 §1, D-73): no Node built-ins, @4thtech-io/node, MCP SDK or imports from outside src/tools/.';
+  'packages/mcp-tools is runtime-agnostic (06 §1, D-73): no Node built-ins, @4thtech-io/node, MCP SDK or imports from outside src/.';
 
 function toolModuleRestrictions(escapes) {
-  const zone = restrictionsFor('apps/cli');
+  const zone = restrictionsFor('packages/mcp-tools');
   const [, { paths, patterns }] = zone['no-restricted-imports'];
   return {
     ...zone,
@@ -181,6 +181,19 @@ export default tseslint.config(
       'no-implied-eval': 'error',
     },
   },
+  // e2e/ (M1-1g-c): never built, may use the test seam, but its suites touch real crypto paths.
+  // Same libraries, /keystore, Node crypto, crypto.subtle, deep-import and scope rules as any zone;
+  // Node built-ins allowed except crypto; every workspace package importable by name.
+  {
+    files: [`e2e/**/*.${SOURCE}`],
+    plugins: { boundaries },
+    rules: {
+      ...restrictionsFor('e2e'),
+      'no-eval': 'error',
+      'no-new-func': 'error',
+      'no-implied-eval': 'error',
+    },
+  },
   ...Object.keys(ZONES).map((zone) => ({
     files: [`${zone}/**/*.${SOURCE}`],
     rules: restrictionsFor(zone),
@@ -232,14 +245,14 @@ export default tseslint.config(
     ],
     rules: { 'no-restricted-properties': 'off' },
   },
-  // The tool module's fence (above): files directly in src/tools/ may not go up a level, files in
+  // The tool module's fence (above): files directly in src/ may not go up a level, files in
   // its subfolders not two levels.
   {
-    files: [`apps/cli/src/tools/*.${SOURCE}`],
+    files: [`packages/mcp-tools/src/*.${SOURCE}`],
     rules: toolModuleRestrictions(['../*', '../**']),
   },
   {
-    files: [`apps/cli/src/tools/*/**/*.${SOURCE}`],
+    files: [`packages/mcp-tools/src/*/**/*.${SOURCE}`],
     rules: toolModuleRestrictions(['../../*', '../../**']),
   },
   {

@@ -254,9 +254,15 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@4thtech-io/local-ui':
+        specifier: workspace:*
+        version: link:../local-ui
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../../packages/log
+      '@4thtech-io/mcp-tools':
+        specifier: workspace:*
+        version: link:../../packages/mcp-tools
       '@4thtech-io/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -278,7 +284,20 @@ importers:
     linkDirectory: false
     publishDirectory: dist/package
 
-  apps/cloud-agent: {}
+  apps/cloud-agent:
+    dependencies:
+      '@4thtech-io/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@4thtech-io/log':
+        specifier: workspace:*
+        version: link:../../packages/log
+      '@4thtech-io/transport-nostr':
+        specifier: workspace:*
+        version: link:../../packages/transport-nostr
 
   apps/console: {}
 
@@ -292,7 +311,24 @@ importers:
         specifier: 4.149.0
         version: 4.149.0
 
-  apps/invite: {}
+  apps/invite:
+    dependencies:
+      '@4thtech-io/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
+      '@4thtech-io/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      wrangler:
+        specifier: 4.149.0
+        version: 4.149.0
 
   apps/local-ui:
     dependencies:
@@ -345,9 +381,15 @@ importers:
       '@4thtech-io/crypto':
         specifier: workspace:*
         version: link:../packages/crypto
+      '@4thtech-io/invite':
+        specifier: workspace:*
+        version: link:../apps/invite
       '@4thtech-io/log':
         specifier: workspace:*
         version: link:../packages/log
+      '@4thtech-io/mcp-tools':
+        specifier: workspace:*
+        version: link:../packages/mcp-tools
       '@4thtech-io/node':
         specifier: workspace:*
         version: link:../packages/node
@@ -357,6 +399,12 @@ importers:
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
+      playwright:
+        specifier: 1.64.0
+        version: 1.64.0
+      vite:
+        specifier: 8.3.4
+        version: 8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1)
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@22.20.5)(@vitest/browser-playwright@4.1.11)(jsdom@29.1.1(@noble/hashes@2.4.0))(vite@8.3.4(@types/node@22.20.5)(esbuild@0.28.2)(yaml@2.9.1))
@@ -418,6 +466,24 @@ importers:
 
   packages/log: {}
 
+  packages/mcp-tools:
+    dependencies:
+      '@4thtech-io/chain':
+        specifier: workspace:*
+        version: link:../chain
+      '@4thtech-io/core':
+        specifier: workspace:*
+        version: link:../core
+      '@4thtech-io/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@4thtech-io/log':
+        specifier: workspace:*
+        version: link:../log
+      '@4thtech-io/types':
+        specifier: workspace:*
+        version: link:../types
+
   packages/node:
     dependencies:
       '@4thtech-io/core':
@@ -448,6 +514,9 @@ importers:
       '@types/ws':
         specifier: 8.18.2
         version: 8.18.2
+      axe-core:
+        specifier: 4.14.0
+        version: 4.14.0
 
   packages/occ-v2-abi: {}
 

@@ -9,15 +9,20 @@ import {
   APPROVAL_BATCH_MAX_ITEMS,
   APPROVAL_BATCH_MIN_ITEMS,
   APPROVAL_DECISIONS,
+  BACKUP_KIT_CONTENTS,
+  BACKUP_KIT_ID_BYTES,
   BYTE_LENGTHS,
   PROTOCOL_VERSION,
   REVOKE_REASONS,
+  STORAGE_ID_BYTES,
+  STORAGE_PROVIDERS,
 } from './constants.js';
 import {
   approvalIdSchema,
   base64url,
   bip340SigHex,
   evmAddress,
+  hexBytes,
   isStrictlyAscending,
   nostrPubkeyHex,
   sha256Hex,
@@ -112,6 +117,81 @@ export const contactRenameParamsSchema = z.strictObject({
 /** `contact.remove` params (04 §2.5.1; 07 §3 `removed`; 02 F-14; M1-9za). */
 export const contactRemoveParamsSchema = z.strictObject({
   contact: evmAddress,
+});
+
+// --- own storage and the recovery kit (M1-9i-a, D-115) --------------------------------------------
+
+const MAX_ENDPOINT_LENGTH = 256;
+const ENDPOINT_RE = /^https:\/\/([^/:]+)(?::([1-9][0-9]{0,4}))?$/;
+const LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const NUMERIC_LABEL_RE = /^(?:[0-9]+|0x[0-9a-f]*)$/;
+const LAST_LABEL_RE = /^(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/;
+const DENIED_SUFFIXES = ['localhost', 'localdomain', 'local', 'internal', 'home.arpa'];
+
+/**
+ * True only for an S3 endpoint in its one canonical form: exactly what the S3 adapter's endpoint
+ * check (`validateS3Endpoint`, @4thtech-io/storage, the 04 §4 relay-URL grammar adapted to https)
+ * returns: `https://host[:port]`, no trailing slash, path, user info, `%` or `\`, a lower-case DNS
+ * name of at least two labels (no IP literal, numeric label or local name), a port in 1..65535
+ * without a leading zero. Anything the adapter would refuse or rewrite is false, never normalised.
+ * Kept in step with the adapter by a cross-check test in @4thtech-io/core (own-storage.test.ts).
+ */
+export function isCanonicalS3Endpoint(endpoint: unknown): endpoint is string {
+  if (typeof endpoint !== 'string' || endpoint.length > MAX_ENDPOINT_LENGTH) return false;
+  if (!/^[\x21-\x7e]+$/.test(endpoint) || /[%\\]/.test(endpoint)) return false;
+  const match = ENDPOINT_RE.exec(endpoint);
+  if (match === null) return false;
+  const host = match[1] ?? '';
+  const port = match[2];
+  if (host.length > 253 || host.endsWith('.')) return false;
+  const labels = host.split('.');
+  if (labels.length < 2) return false;
+  for (const label of labels) {
+    if (!LABEL_RE.test(label) || NUMERIC_LABEL_RE.test(label)) return false;
+  }
+  if (!LAST_LABEL_RE.test(labels[labels.length - 1] ?? '')) return false;
+  for (const suffix of DENIED_SUFFIXES) {
+    if (host === suffix || host.endsWith(`.${suffix}`)) return false;
+  }
+  return port === undefined || Number(port) <= 65_535;
+}
+
+/** `storage.set` / `storage.remove` `id`: 8 bytes as 16 lowercase hex; it names `s3:<id>` (04 §2.2). */
+export const storageIdSchema = hexBytes(STORAGE_ID_BYTES);
+
+/**
+ * `storage.set` params (04 §2.5.1; 07 §5.2; M1-9i-a, D-115). Exactly `{id, provider, endpoint,
+ * bucket, region, credentialDigest}`, each in its one form: `endpoint` is the S3 adapter's
+ * canonical output (isCanonicalS3Endpoint); `bucket` is the S3 bucket rule the adapter applies
+ * (3 to 63 of `[a-z0-9.-]`, starting and ending with a letter or digit, no `..`); `region` 1 to 32 of
+ * `[a-z0-9-]`; `credentialDigest` 64 lowercase hex. No credential is ever a param (I-7): the signed
+ * object is stored and may be shown. That `s3:<id>` exists with this digest is the core's rule.
+ */
+export const storageSetParamsSchema = z.strictObject({
+  id: storageIdSchema,
+  provider: z.enum(STORAGE_PROVIDERS),
+  endpoint: z.string().refine(isCanonicalS3Endpoint, 'endpoint must be https://host[:port]'),
+  bucket: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'bucket must follow the S3 bucket rule')
+    .refine((bucket) => !bucket.includes('..'), 'bucket must not contain ".."'),
+  region: z.string().regex(/^[a-z0-9-]{1,32}$/, 'region must be 1 to 32 of [a-z0-9-]'),
+  credentialDigest: sha256Hex,
+});
+
+/** `storage.remove` params (04 §2.5.1): the active `storage.set` `id`; the core checks it is active. */
+export const storageRemoveParamsSchema = z.strictObject({
+  id: storageIdSchema,
+});
+
+/**
+ * `backup.export` params (04 §2.5.1, §2.3.3; D-115 A): `kitId` 16 bytes as base64url without
+ * padding (also the kit manifest's `kitId`), `contents` `"full"` or `"identity"`. One action per
+ * included agent; its nonce row is the audit record (07 §3.4).
+ */
+export const backupExportParamsSchema = z.strictObject({
+  kitId: base64url(BACKUP_KIT_ID_BYTES),
+  contents: z.enum(BACKUP_KIT_CONTENTS),
 });
 
 /**
@@ -245,6 +325,36 @@ export const contactRemoveActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/** Connects the agent's own S3-compatible storage (M1-9i-a, D-115). Own machine only: no envelope. */
+export const storageSetActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('storage.set'),
+    params: storageSetParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
+/** Disconnects the active own storage (M1-9i-a). Own machine only: no envelope. */
+export const storageRemoveActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('storage.remove'),
+    params: storageRemoveParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
+/** Authorises one agent's part of a recovery kit export (M1-9i-a). Own machine only: no envelope. */
+export const backupExportActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('backup.export'),
+    params: backupExportParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** Turns funds the agent's account holds into its credits (M1-11c-a4c). Applied only on its machine. */
 export const creditsDepositActionSchema = z
   .strictObject({
@@ -286,6 +396,9 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   contactCheckActionSchema,
   contactRenameActionSchema,
   contactRemoveActionSchema,
+  storageSetActionSchema,
+  storageRemoveActionSchema,
+  backupExportActionSchema,
   creditsDepositActionSchema,
   creditsWithdrawActionSchema,
   agentRevokeActionSchema,
@@ -303,6 +416,8 @@ export const signedPolicySetSchema = signedOf(policySetActionSchema);
 export const signedAgentRevokeSchema = signedOf(agentRevokeActionSchema);
 /** What `contacts.safety_check` stores (07 §3), re-verified on every load (04 §2.5.1, §3.6.1). */
 export const signedContactCheckSchema = signedOf(contactCheckActionSchema);
+/** What `own_storage.signed_json` stores (07 §3.4), re-verified on every load (04 §2.5.1). */
+export const signedStorageSetSchema = signedOf(storageSetActionSchema);
 /**
  * What an `approval` envelope carries: `approval.decide`, `approval.decideBatch` or `approval.cancel`
  * (04 §3.4.1; D-55, D-68). Any other op is dropped.
@@ -323,6 +438,11 @@ export type AgentRevokeParams = z.infer<typeof agentRevokeParamsSchema>;
 export type ContactCheckParams = z.infer<typeof contactCheckParamsSchema>;
 export type ContactRenameParams = z.infer<typeof contactRenameParamsSchema>;
 export type ContactRemoveParams = z.infer<typeof contactRemoveParamsSchema>;
+export type StorageSetParams = z.infer<typeof storageSetParamsSchema>;
+export type StorageRemoveParams = z.infer<typeof storageRemoveParamsSchema>;
+export type BackupExportParams = z.infer<typeof backupExportParamsSchema>;
+export type StorageSetAction = z.infer<typeof storageSetActionSchema>;
+export type SignedStorageSet = z.infer<typeof signedStorageSetSchema>;
 export type CreditsDepositParams = z.infer<typeof creditsDepositParamsSchema>;
 export type CreditsWithdrawParams = z.infer<typeof creditsWithdrawParamsSchema>;
 export type ApprovalDecideAction = z.infer<typeof approvalDecideActionSchema>;

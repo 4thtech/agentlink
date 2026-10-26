@@ -70,7 +70,7 @@ import { agentToolContext } from '../src/mcp/command.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import type { ToolContext } from '../src/tools/index.js';
+import type { ToolContext } from '@4thtech-io/mcp-tools';
 
 // Each test pairs two agents over the relay double first (real crypto); see contacts-manage.test.ts.
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
@@ -456,6 +456,8 @@ describe('owner presence and the AI (04 §2.5, §2.8; I-4; 06 §8)', () => {
     ['policy', 'show'],
     ['policy', 'allow-folder', '~/Work'],
     ['policy', 'remove-folder', '~/Work'],
+    // M1-36b-2-c: the Send folder for an existing agent.
+    ['policy', 'allow-send-folder'],
   ];
 
   it.each(commands)('`%s %s` is refused without an interactive terminal', async (...argv) => {
@@ -614,6 +616,55 @@ describe('policy allow-folder <path> †', () => {
     expect(codeEntries).toEqual([]);
   });
 
+  it('a different spelling (case): asks "Use <exact path>? (y/N)"; y allows the real path (M1-36b-2-c)', async (ctx) => {
+    let caseInsensitive = false;
+    try {
+      caseInsensitive = statSync(join(home, 'WORK')).isDirectory();
+    } catch {
+      // A case-sensitive volume: the other spelling doesn't exist.
+    }
+    if (!caseInsensitive) {
+      ctx.skip();
+      return;
+    }
+    answers = ['y'];
+    const result = await run(['policy', 'allow-folder', join(home, 'WORK')]);
+    expect(result.code).toBe(0);
+    expect(asked).toEqual([`Use ${join(home, 'Work')}? (y/N)`]);
+    // Bound to the realpath, never the typed spelling.
+    expect(await folders()).toEqual([join(home, 'Work')]);
+    expect(summaries[0]).toContain(join(home, 'Work'));
+    expect(codeEntries).toEqual(['policy.set']);
+  });
+
+  it('a different spelling (case): anything but y changes nothing and asks for no owner code', async (ctx) => {
+    let caseInsensitive = false;
+    try {
+      caseInsensitive = statSync(join(home, 'WORK')).isDirectory();
+    } catch {
+      // A case-sensitive volume: the other spelling doesn't exist.
+    }
+    if (!caseInsensitive) {
+      ctx.skip();
+      return;
+    }
+    answers = ['n'];
+    const result = await run(['policy', 'allow-folder', join(home, 'WORK')]);
+    expect(result.code).toBe(1);
+    expect(asked).toHaveLength(1);
+    expect(result.err.join('\n')).toMatch(/Nothing was changed/);
+    expect(codeEntries).toEqual([]);
+    expect(await folders()).toEqual([]);
+  });
+
+  it('a link is still refused, never asked about (only a spelling is offered)', async () => {
+    answers = ['y'];
+    const result = await run(['policy', 'allow-folder', join(home, 'WorkLink')]);
+    expect(result.code).toBe(1);
+    expect(asked).toEqual([]);
+    expect(codeEntries).toEqual([]);
+  });
+
   it('a symbolic link is refused with the folder’s real path to use instead', async () => {
     const result = await run(['policy', 'allow-folder', join(home, 'WorkLink')]);
     expect(result.code).toBe(1);
@@ -756,7 +807,7 @@ describe('no MCP tool reaches the policy (I-4)', () => {
             : [],
       );
     const mcpSide = [
-      ...files(new URL('../src/tools/', import.meta.url)),
+      ...files(new URL('../../../packages/mcp-tools/src/', import.meta.url)),
       ...files(new URL('../src/mcp/', import.meta.url)),
     ];
     expect(mcpSide.length).toBeGreaterThan(5);
@@ -765,6 +816,118 @@ describe('no MCP tool reaches the policy (I-4)', () => {
       // An import (static or dynamic) of an owner command, or code that names the op.
       expect(text).not.toMatch(/(from|import\()\s*['"][^'"]*commands\/owner/);
       expect(text).not.toMatch(/['"]policy\.set['"]/);
+    }
+  });
+});
+
+describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
+  const send = (): string => join(home, 'AgentLink', 'Send');
+
+  it('adds only ~/AgentLink/Send (its real path) to the rules in force, with one owner code', async () => {
+    const before = await loaded();
+    const result = await run(['policy', 'allow-send-folder']);
+    expect(result.code).toBe(0);
+    expect(codeEntries).toEqual(['policy.set']);
+    expect(summaries[0]).toContain(send());
+    expect(await folders()).toEqual([send()]);
+    expect(await version()).toBe(2);
+    const after = await loaded();
+    if (before.mode === 'fail_closed' || after.mode === 'fail_closed') throw new Error('closed');
+    expect({ ...after.policy, files: { ...after.policy.files, allowedFolders: [] } }).toEqual(
+      before.policy,
+    );
+    expect(result.out.join('\n')).toContain(send());
+    expect(readdirSync(send())).toEqual([]);
+    if (process.platform !== 'win32') expect(statSync(send()).mode & 0o777).toBe(0o700);
+  });
+
+  it('keeps folders already allowed and appends the Send folder', async () => {
+    expect((await run(['policy', 'allow-folder', join(home, 'Work')])).code).toBe(0);
+    expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
+    expect(await folders()).toEqual([join(home, 'Work'), send()]);
+  });
+
+  it('a Send folder that holds files is refused before any owner code, and left as it is', async () => {
+    mkdirSync(send(), { recursive: true });
+    writeFileSync(join(send(), 'private.txt'), 'x');
+    const result = await run(['policy', 'allow-send-folder']);
+    expect(result.code).toBe(1);
+    expect(codeEntries).toEqual([]);
+    expect(result.err.join('\n')).toMatch(/already holds files/);
+    expect(result.err.join('\n')).toContain('policy allow-folder');
+    expect(readdirSync(send())).toEqual(['private.txt']);
+    expect(await version()).toBe(1);
+  });
+
+  it('a Send folder that is a link is refused before any owner code', async () => {
+    mkdirSync(join(home, 'AgentLink'));
+    symlinkSync(join(home, 'Other'), send());
+    const result = await run(['policy', 'allow-send-folder']);
+    expect(result.code).toBe(1);
+    expect(codeEntries).toEqual([]);
+    expect(await version()).toBe(1);
+  });
+
+  it('running it again changes nothing and asks for no owner code', async () => {
+    expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
+    const again = await run(['policy', 'allow-send-folder']);
+    expect(again.code).toBe(0);
+    expect(again.out.join('\n')).toMatch(/already/);
+    expect(codeEntries).toEqual(['policy.set']);
+  });
+
+  it('a wrong owner code changes nothing and leaves no folder behind', async () => {
+    ownerPresence = wrongPresence;
+    const result = await run(['policy', 'allow-send-folder']);
+    expect(result.code).toBe(1);
+    expect(result.err.join('\n')).toMatch(/owner code/i);
+    expect(await version()).toBe(1);
+    expect(() => statSync(join(home, 'AgentLink'))).toThrow();
+  });
+
+  it('refused while the rules fail closed: nothing created, nothing asked', async () => {
+    alice.markBroken = true;
+    const result = await run(['policy', 'allow-send-folder']);
+    expect(result.code).toBe(1);
+    expect(codeEntries).toEqual([]);
+    alice.markBroken = false;
+    expect(() => statSync(join(home, 'AgentLink'))).toThrow();
+  });
+
+  it('extra arguments are a usage error', async () => {
+    const result = await run(['policy', 'allow-send-folder', '/tmp']);
+    expect(result.code).toBe(2);
+    expect(codeEntries).toEqual([]);
+  });
+
+  it('end to end: a file put in the Send folder can then be sent', async () => {
+    expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
+    writeFileSync(join(send(), 'hello.txt'), 'hello');
+    const file = outgoing(join(send(), 'hello.txt'));
+    const sent = await alice.client.sendMessage({
+      to: bob.client.agentId,
+      text: 'a file',
+      files: [file.file],
+    });
+    expect(sent.status).toBe('ok');
+  });
+
+  it('no MCP-side file calls the Send folder setup (I-4)', () => {
+    const files = (dir: URL): URL[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? files(new URL(`${e.name}/`, dir))
+          : e.name.endsWith('.ts') && !e.name.endsWith('.test.ts')
+            ? [new URL(e.name, dir)]
+            : [],
+      );
+    const mcpSide = [
+      ...files(new URL('../../../packages/mcp-tools/src/', import.meta.url)),
+      ...files(new URL('../src/mcp/', import.meta.url)),
+    ];
+    expect(mcpSide.length).toBeGreaterThan(5);
+    for (const file of mcpSide) {
+      expect(readFileSync(file, 'utf8')).not.toMatch(/setUpSendFolder|SendFolderSetup/);
     }
   });
 });

@@ -51,10 +51,14 @@ export const MAX_RELAYS_PER_WRAP = 32;
 export const MIN_ACKS = 2;
 /** The NIP-11 document is read only up to this size. */
 export const NIP11_MAX_BYTES = 65_536;
+/** 07 §4.2 (M1-5b-c): the NIP-11 wait has its own bound, inside the 10 s connect budget. */
+export const NIP11_TIMEOUT_MS = 3_000;
 const NIP11_TTL_MS = 60 * 60 * 1000;
 const NIP11_FAILURE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
 const MAX_CHALLENGE_LENGTH = 256;
+/** M1-5e: identities the pool logs in with on one connection (own keys at several epochs or surfaces). */
+export const MAX_AUTH_IDENTITIES = 8;
 const HEX_32 = /^[0-9a-f]{64}$/;
 const RELAY_PARTS = /^wss:\/\/([a-z0-9.-]+)(?::([0-9]+))?(?:\/.*)?$/;
 
@@ -70,7 +74,9 @@ export type RelayFailure =
   | 'rejected'
   | 'ok_timeout'
   | 'auth_failed'
-  | 'closed';
+  | 'closed'
+  /** The pool itself was closed (not a bad URL, not a dropped connection). */
+  | 'pool_closed';
 
 /** The outcome for one relay. */
 export interface RelayPublishResult {
@@ -132,8 +138,16 @@ export interface RelayPoolOptions {
    * Signs NIP-42 AUTH (kind 22242): the agent's KeyStore, or an OwnerSession on owner surfaces.
    * Without it, a relay that demands AUTH is skipped. AUTH is signed only when a relay asks for it,
    * so a relay that does not need it never learns the key.
+   *
+   * Several identities (M1-5e, 07 §4.2): pass one EnvelopeKeys per identity (at most
+   * MAX_AUTH_IDENTITIES). The pool sends one AUTH per identity on the same connection, each a
+   * separate event signed by its own key over the relay URL and the connection's challenge, and
+   * keeps no more than one login per identity and challenge. An identity that cannot sign (a locked
+   * session) is skipped; the pool logs in if at least one identity did. A KeyStore signs only with
+   * its current key epoch, so an older epoch's key cannot log in (it is read only where the relay
+   * serves it without AUTH).
    */
-  readonly authKeys?: EnvelopeKeys;
+  readonly authKeys?: EnvelopeKeys | readonly EnvelopeKeys[];
   /**
    * True for a relay where this pool may log in with `authKeys`. Deny by default (07 §4.3: the owner
    * key never logs in on a relay that is only in a contact's list): with no hook, no login is ever
@@ -164,6 +178,8 @@ interface Connection {
   challenge: string | undefined;
   challengeWaiters: ((challenge: string | undefined) => void)[];
   authenticatedChallenge: string | undefined;
+  /** M1-5e: the indexes of `authKeys` that logged in for `authenticatedChallenge`. */
+  authenticatedKeys: Set<number>;
   onOpen: (() => void) | undefined;
   onEarlyClose: (() => void) | undefined;
 }
@@ -201,6 +217,13 @@ function readMaxMessageLength(doc: unknown): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
+/** `wss://host[:port]` of a relay URL: what health output and the activity feed may show. */
+function relayOrigin(url: string): string {
+  const m = RELAY_PARTS.exec(url);
+  if (m === null) return 'wss://invalid';
+  return m[2] === undefined ? `wss://${m[1] as string}` : `wss://${m[1] as string}:${m[2]}`;
+}
+
 /** Splits a validated relay URL into host and port without a URL parser (04 §4). */
 function relayParts(url: string): { host: string; port: number } | undefined {
   const m = RELAY_PARTS.exec(url);
@@ -212,7 +235,7 @@ export class RelayPool {
   private readonly connector: RelayConnector;
   private readonly addressCheck: AddressCheck;
   private readonly nip11: Nip11Fetcher | undefined;
-  private readonly authKeys: EnvelopeKeys | undefined;
+  private readonly authKeys: readonly EnvelopeKeys[];
   private readonly mayAuthenticate: (relayUrl: string) => boolean;
   private readonly logger: Logger | undefined;
   private readonly now: () => number;
@@ -228,7 +251,13 @@ export class RelayPool {
     this.connector = options.connector;
     this.addressCheck = options.addressCheck;
     this.nip11 = options.nip11;
-    this.authKeys = options.authKeys;
+    this.authKeys = (
+      options.authKeys === undefined
+        ? []
+        : Array.isArray(options.authKeys)
+          ? options.authKeys
+          : [options.authKeys]
+    ).slice(0, MAX_AUTH_IDENTITIES) as readonly EnvelopeKeys[];
     this.mayAuthenticate = options.mayAuthenticate ?? (() => false);
     this.logger = options.logger;
     this.now = options.now ?? (() => Date.now());
@@ -257,7 +286,7 @@ export class RelayPool {
   /** Per-relay health for every relay seen so far. */
   relayHealth(): readonly RelayHealth[] {
     return [...this.health.entries()].map(([relay, h]) => ({
-      relay,
+      relay: relayOrigin(relay), // origin only: no path or query (07 §4.3, the logger's URL rule)
       connected: this.conns.get(relay)?.state === 'open',
       successes: h.successes,
       failures: h.failures,
@@ -299,9 +328,8 @@ export class RelayPool {
    * bound, 10 s connect budget. Returns the link, or the fixed reason it is not available.
    */
   async connect(relay: string): Promise<RelayLink | RelayFailure> {
-    if (this.closed || !isAllowedRelayUrl(relay) || relayParts(relay) === undefined) {
-      return this.closed ? 'closed' : 'invalid_url';
-    }
+    if (this.closed) return 'pool_closed';
+    if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'invalid_url';
     const conn = this.acquire(relay);
     if (typeof conn === 'string') return conn;
     conn.inflight += 1;
@@ -370,9 +398,8 @@ export class RelayPool {
     frameBytes: number,
     relay: string,
   ): Promise<'ok' | RelayFailure> {
-    if (this.closed || !isAllowedRelayUrl(relay) || relayParts(relay) === undefined) {
-      return 'invalid_url';
-    }
+    if (this.closed) return 'pool_closed';
+    if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'invalid_url';
     if (this.tooLarge(relay, frameBytes)) return 'too_large';
     const conn = this.acquire(relay);
     if (typeof conn === 'string') return conn;
@@ -436,29 +463,37 @@ export class RelayPool {
 
   /** Logs in with a challenge-signed kind 22242 event (NIP-42), signed through EnvelopeKeys.signNostr. */
   private async authenticate(conn: Connection): Promise<boolean> {
-    const keys = this.authKeys;
-    if (keys === undefined || !this.mayAuthenticate(conn.url)) return false;
+    if (this.authKeys.length === 0 || !this.mayAuthenticate(conn.url)) return false;
     const challenge = conn.challenge ?? (await this.waitForChallenge(conn));
     if (challenge === undefined) return false;
-    if (conn.authenticatedChallenge === challenge) return true;
-    let signed: NostrEvent;
-    try {
-      signed = await keys.signNostr({
-        kind: NOSTR_KIND_AUTH,
-        created_at: Math.floor(this.now() / 1000),
-        tags: [
-          ['relay', conn.url],
-          ['challenge', challenge],
-        ],
-        content: '',
-      });
-    } catch {
-      return false; // a locked or expired OwnerSession, for example
+    if (conn.authenticatedChallenge !== challenge) {
+      conn.authenticatedChallenge = challenge;
+      conn.authenticatedKeys = new Set();
     }
-    const outcome = await this.request(conn, signed.id, JSON.stringify(['AUTH', signed]));
-    if (outcome !== 'ok') return false;
-    conn.authenticatedChallenge = challenge;
-    return true;
+    // One AUTH per identity, in turn, on this connection. Each event carries this relay and this
+    // challenge, so none can be replayed on another relay or connection, and the pubkey the relay
+    // sees is the identity that signed it (M1-5e).
+    for (const [index, keys] of this.authKeys.entries()) {
+      if (conn.authenticatedKeys.has(index)) continue;
+      if (conn.state !== 'open' || conn.challenge !== challenge) break;
+      let signed: NostrEvent;
+      try {
+        signed = await keys.signNostr({
+          kind: NOSTR_KIND_AUTH,
+          created_at: Math.floor(this.now() / 1000),
+          tags: [
+            ['relay', conn.url],
+            ['challenge', challenge],
+          ],
+          content: '',
+        });
+      } catch {
+        continue; // a locked or expired OwnerSession, for example: the other identities still log in
+      }
+      const outcome = await this.request(conn, signed.id, JSON.stringify(['AUTH', signed]));
+      if (outcome === 'ok' && conn.challenge === challenge) conn.authenticatedKeys.add(index);
+    }
+    return conn.authenticatedKeys.size > 0;
   }
 
   private waitForChallenge(conn: Connection): Promise<string | undefined> {
@@ -504,6 +539,7 @@ export class RelayPool {
       challenge: undefined,
       challengeWaiters: [],
       authenticatedChallenge: undefined,
+      authenticatedKeys: new Set(),
       onOpen: undefined,
       onEarlyClose: undefined,
     };
@@ -587,7 +623,7 @@ export class RelayPool {
     }
     let limit: number | undefined;
     try {
-      const body = await fetcher.fetch(target);
+      const body = await this.boundedFetch(fetcher, target);
       if (typeof body === 'string' && utf8Length(body, NIP11_MAX_BYTES) <= NIP11_MAX_BYTES) {
         const value = readMaxMessageLength(parseJson(body));
         if (value !== undefined) limit = value;
@@ -598,6 +634,26 @@ export class RelayPool {
     if (this.limits.size >= MAX_CACHE_ENTRIES)
       this.limits.delete(this.limits.keys().next().value as string);
     this.limits.set(target.url, { limit, at: this.now() });
+  }
+
+  /**
+   * The NIP-11 fetch, bounded in time: after NIP11_TIMEOUT_MS the wait ends with no document, so a
+   * hanging HTTP server cannot make a working relay miss the publish's connect budget. A late answer
+   * is ignored. The size bound is passed on and checked again on the result.
+   */
+  private boundedFetch(fetcher: Nip11Fetcher, target: RelayTarget): Promise<string | undefined> {
+    return new Promise((resolve) => {
+      const timer = this.timers.setTimeout(() => resolve(undefined), NIP11_TIMEOUT_MS);
+      const done = (body: string | undefined): void => {
+        this.timers.clearTimeout(timer);
+        resolve(body);
+      };
+      try {
+        fetcher.fetch(target, { maxBytes: NIP11_MAX_BYTES }).then(done, () => done(undefined));
+      } catch {
+        done(undefined);
+      }
+    });
   }
 
   private touch(conn: Connection): void {

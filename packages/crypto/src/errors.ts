@@ -51,7 +51,12 @@ export type CryptoInputErrorCode =
    * M1-4c-b: a transaction KeyStore.signTransaction does not sign (07 §6.2 direct mode). The message
    * is one of TRANSACTION_REFUSED's fixed sentences, which name the rule, never the input.
    */
-  | 'transaction_refused';
+  | 'transaction_refused'
+  /**
+   * M3-4b-t-1: a token's EIP-712 domain as read from chain does not match the configured chain and
+   * token, or does not reproduce the token's own DOMAIN_SEPARATOR(); nothing may be signed under it.
+   */
+  | 'token_domain_mismatch';
 
 /**
  * The one error type @4thtech-io/crypto throws for input it refuses.

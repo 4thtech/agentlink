@@ -1,10 +1,17 @@
 // Rate counters and aggregate metrics of the submitter (07 §7; 04 §7 gas griefing; M1-10a). One
-// class, three kinds of instance, each named by the Worker:
+// class, several kinds of instance, each named by the Worker:
 //   `i:<HMAC of the IP bucket>`        items per IP (IPv6 /64) per hour, every item counted (FA-3);
+//                                      `r:`, `f:` and `g:<HMAC>` count reads, faucet and top-up
+//                                      requests per IP the same way;
 //   `s:<chainId>:<signer address>`     new items per signer per hour (items already on-chain are not
 //                                      counted: anyone can replay a signer's public items);
+//   `d:<chainId>:<agent address>`      gasless top-ups sent per agent per hour (M3-4b-t-3; only
+//                                      authorizations that passed the relay checks count, and a
+//                                      send that fails gives its count back, M3-4b-t-T3-b);
+//   `dg`                               top-up requests that reach the relay per hour, across every
+//                                      IP, agent and chain (M3-4b-t-T3-b);
 //   `metrics`                          the aggregate counters, a fixed set of names.
-// No raw IP, signature or record is stored, and an IP is never stored next to a signer. Counter
+// No raw IP, signature or record is stored, and an IP is never stored next to a signer or agent. Counter
 // instances delete their own storage after their window (alarm).
 import { DurableObject } from 'cloudflare:workers';
 
@@ -16,6 +23,11 @@ export const METRICS = [
   'request_health',
   'request_faucet',
   'faucet_credited',
+  'faucet_paused',
+  'request_deposit_auth',
+  'deposit_auth_submitted',
+  'deposit_auth_refused',
+  'deposit_relay_stuck',
   'item_submitted',
   'item_held',
   'item_skipped',
@@ -56,6 +68,17 @@ export class SubmitterLimits extends DurableObject {
     // Forget the counter once its window is over.
     await this.ctx.storage.setAlarm(((index + 1) * windowSeconds + 60) * 1000);
     return { ok: true, retryAfter: 0 };
+  }
+
+  /**
+   * Gives back `count` taken in the current window of `windowSeconds` (a take whose action did not
+   * happen); never below zero, and nothing once that window is over.
+   */
+  async give(count: number, windowSeconds: number, now: number): Promise<void> {
+    const index = Math.floor(now / windowSeconds);
+    const stored = await this.ctx.storage.get<Window>('w');
+    if (!stored || stored[0] !== index) return;
+    await this.ctx.storage.put('w', [index, Math.max(0, stored[1] - count)] satisfies Window);
   }
 
   /** Adds to the aggregate counters (the `metrics` instance only). */
