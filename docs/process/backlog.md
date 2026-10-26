@@ -6579,7 +6579,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 **0.4.0 slice (D-131).** The cloud agent ships first, as 0.4.0, for Claude on the web and in the Claude iOS and Android apps; ChatGPT web follows later. Two chains meet at M2-3c: **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c** and **CLOUD-SPEC → M2-3f-1 → M2-3c**; then **M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → release 0.4.0**. Fable audits: M2-3a, M2-3f-1, M2-3f-2, M2-3c, M2-3d and AUDIT-CLOUD (keys, owner presence, OAuth and the D-131 (11) crypto exception); Opus review for the others. The console chain (M2-2*) is not on this path.
 
 #### CLOUD-SPEC · cloud agent spec for 0.4.0 (D-131)
-- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S1
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (by path: 04)
 - **Repo/path:** agentlink · docs/foundation (00, 03, 04, 06, 07, 08, 10), docs/process (backlog, versioning, release-and-deployment §4.8, audit-rules CR-1), docs/runbooks/add-dependency.md, docs/status.yaml
 - **Depends on:** CLOUD-0 spikes (done, 25 Oct 2026); owner decisions of 25 Oct 2026
 - **Spec:** D-131
