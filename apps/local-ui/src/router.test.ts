@@ -50,6 +50,7 @@ describe('routes', () => {
   const BUILT: ReadonlySet<string> = new Set([
     '/settings/activity',
     '/settings/contacts',
+    '/settings/files',
     '/settings/proofs',
   ]);
   const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');

@@ -16,8 +16,11 @@ import type {
   OwnerSafetyCode,
   Page,
   PageQuery,
+  PolicyEditOptions,
   PreparedOwnerAction,
+  PreparedPolicyEdit,
   ProofListItem,
+  ResolvedFolders,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
@@ -69,6 +72,16 @@ export interface LocalUiReadClient {
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
   /**
+   * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
+   * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
+   * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
+   * `recordReceiptsKept`, nothing else of `ownerActions`.
+   */
+  readonly files: {
+    resolvedFolders(): Promise<ResolvedFolders>;
+    preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
+  };
+  /**
    * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
    * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
    * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
@@ -98,6 +111,11 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    files: Object.freeze({
+      resolvedFolders: () => client.files.resolvedFolders(),
+      preparePolicyEdit: (patch: unknown, options?: PolicyEditOptions) =>
+        client.ownerActions.preparePolicyEdit(patch, options),
+    }),
     contacts: Object.freeze({
       list: () => client.contacts.list(),
       safetyCode: (contactId: string) => client.pairing.ownerSafetyCode(contactId),
