@@ -47,7 +47,11 @@ describe('routes', () => {
 
   // Built pages test their own content (pages/<page>/*.test.tsx).
   // M1-11b-1: /first-run is a real page now (pages/first-run/first-run.test.ts).
-  const BUILT: ReadonlySet<string> = new Set(['/settings/activity', '/settings/contacts', '/settings/proofs']);
+  const BUILT: ReadonlySet<string> = new Set([
+    '/settings/activity',
+    '/settings/contacts',
+    '/settings/proofs',
+  ]);
   const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');
   it.each(STUBS)('%s renders its page inside the layout', (path, title) => {
     mountAt(path);

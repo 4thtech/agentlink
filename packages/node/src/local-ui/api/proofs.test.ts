@@ -415,7 +415,13 @@ describe('the read-only client view (context.ts)', () => {
       },
     };
     const view = readOnlyClient(full as never);
-    expect(Object.keys(view).sort()).toEqual(['agentId', 'contacts', 'getProof', 'listActivity', 'proofs']);
+    expect(Object.keys(view).sort()).toEqual([
+      'agentId',
+      'contacts',
+      'getProof',
+      'listActivity',
+      'proofs',
+    ]);
     expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list']);
     expect(view.proofs).not.toBe(full.proofs);
     expect(Object.isFrozen(view.proofs)).toBe(true);
