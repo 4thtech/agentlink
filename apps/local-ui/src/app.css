@@ -1,0 +1,13 @@
+/* The app fills the window: no empty band under the shell (UX-031-QUICKWINS). The shell itself is
+   height: 100% (components.css); these make its parents full height. */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  min-height: 100dvh;
+}
+#root {
+  min-height: 100dvh;
+}

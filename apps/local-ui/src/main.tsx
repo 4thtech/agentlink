@@ -1,6 +1,7 @@
 // Entry point. Styles come from the design system as files (CSP style-src 'self').
 import '@4thtech-io/ui/tokens.css';
 import '@4thtech-io/ui/components.css';
+import './app.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppRoutes } from './router.js';

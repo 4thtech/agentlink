@@ -71,7 +71,7 @@ Other sections:
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
+| Design adjustment (D-116) | 2 (DESIGN-ADJ-1, an audit card, not a drop, added on 2026-10-21; DESIGN-B11, a design brief, added on 2026-10-26) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -964,6 +964,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** `TITLE_RE` accepts `M<n>-<digits><letter>` and `M<n>-GATE` only, so titles such as `M1-UX-FIRSTRUN-V2 ...` are refused. Allow named IDs of the form `M<n>-<UPPERCASE words, digits and hyphens>`. This changes a required check, so it merges only on Tali's "merge".
 - **Acceptance:** titles `M1-UX-FIRSTRUN-V2 ...` and `M1-UX-OPEN-APP ...` pass; a missing ID, `M1-ux-x` and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
 
+#### UX-031-QUICKWINS · local app quick wins for 0.3.1 (new, owner feedback 2026-10-26, plan UX-V3-LOCAL-APP)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (UI strings, styles and icon data only; no node or core change)
+- **Repo/path:** agentlink · `apps/local-ui`, `packages/ui/src/components/icon-data.ts`
+- **Depends on:** —
+- **Scope:** (1) Rules nav icon `sliders-horizontal`, and the other icons whose `line` shapes had no coordinates, get their Lucide geometry. (2) `html`, `body` and `#root` fill the viewport. (3) Proofs and credits: with 0 test credits, one line that free test credits arrive automatically with the first proof (D-120). (4) The local app says "backup code" where it said "owner code" (11 §5.5). (5) Contacts: one-line safety-code explanation (11 §5) and a UI-only hint when two contacts share a name; the fingerprint-based suggestion is a later card (M1-UX3-DUP-CONTACTS).
+- **Acceptance:** tests for each item (every icon shape has attributes; built CSS has the full-height rules; the zero-credit line; no "owner code" in local-ui `strings.ts`; the safety-code line; the duplicate hint on both rows).
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`
@@ -1271,6 +1278,17 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Say whether the tokens are affected (default: not; M1-35a proceeds).
 - **Acceptance:**
   - `docs/design/adjustments.md` covers every row of the screen index; each item names its screen, the spec or decision it follows, (a) or (b), and the card that fixes it; the known copy issues (Pay network name, raw `0x…` record IDs, `strings.en.json`) are included; the owner has seen the (b) briefs.
+
+#### DESIGN-B11 · Design brief B-11: a state-of-the-art local app (new)
+- **Status:** in review (brief written; the owner takes it to Claude Design) · **Size:** S · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/design/b11-local-app.md` (new), links from `docs/design/README.md` and `docs/design/adjustments.md`
+- **Depends on:** DESIGN-ADJ-1
+- **Spec:** `docs/design/README.md` (D-116), 11 §2.8, §5, §11.6; owner feedback on the 0.3.0 local app and owner decisions of 2026-10-26
+- **Invariants:** —
+- **Scope:**
+  - Brief for the owner: Home with live tiles, the global "Under the hood" switch, state-indicator vocabulary, motion spec (no new library, reduced motion), every screen and state to design, and which D1/D2 screens can be reused.
+- **Acceptance:**
+  - The owner has taken the brief to Claude Design; approved screens are recorded in `docs/design/README.md` before any build card styles Home, Files Received, Add contact, the presence prompt or the motion layer.
 
 #### DESIGN-D3 · Design drop D3: launch brand
 - **Status:** backlog · **Size:** — · **Tier:** Owner · **Security:** S0
@@ -6488,6 +6506,19 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - The passkey button first; the backup-code field full width, with paste, show and hide, no length limit, and `autocomplete="off"` (Q-130-1).
 - **Acceptance:**
   - Tests first (RED commit): untrusted values render as text (XSS fixture); no invite link in the page or its API view; the code field's attributes; CSP unchanged; presence, the session link and CSRF unchanged; independent review (S2).
+
+#### M1-UX-MULTI-AGENT · cli: list the agents in init and ui, explain a different entry (new, owner test 2026-10-26, 0.3.1)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (fixed text and a numbered pick; no new authority) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, `ui.ts`, `agent-choice.ts`, `apps/cli/src/harness/conflict.ts`, tests
+- **Depends on:** M1-36b
+- **Spec:** 06 §6, §7; 11 §5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - `init` on a computer with more than one agent lists the agent names (valid local names only); in the owner's own terminal it asks for a number, otherwise it keeps the fixed message plus the list.
+  - `ui` without `--agent` tells "no agent" from "more than one agent": it lists the names and offers the same pick (or names `ui --agent <name>`); the only agent is used without asking.
+  - `init` explains an existing different `agentlink` entry (another agent name, or another way of starting AgentLink) and how to replace it by hand; no value from the file other than a valid agent name is shown.
+- **Acceptance:**
+  - Tests first (RED commit); names are listed in both commands; a bad pick starts nothing; run by an AI nothing is asked; no URL, token or command text from the file is printed.
 
 #### DOCS-OWNER-CODE-SAVE · docs: saving the backup code, and quitting Claude Desktop before setup (new, D-130 (1), (7))
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (user guidance on an owner secret) · **Phase:** M1b

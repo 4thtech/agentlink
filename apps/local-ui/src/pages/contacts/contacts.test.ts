@@ -241,6 +241,13 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     expect(button(S.skip)).toBeDefined();
   });
 
+  it('UX-031-QUICKWINS: explains the safety code in one line', async () => {
+    await mount(routes());
+    expect(text()).toContain(
+      'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
+    );
+  });
+
   it('Skip hides the nudge and keeps the label Self-declared; it can come back', async () => {
     const calls = await mount(routes());
     await click(S.skip);
@@ -377,5 +384,28 @@ describe('the page markup', () => {
       [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
     });
     expect(host.querySelector('[style]')).toBeNull();
+  });
+});
+
+describe('ContactsPage: duplicate names (UX-031-QUICKWINS)', () => {
+  const SAME = 'Another contact has the same name.';
+
+  it('hints on both rows when two contacts show the same name', async () => {
+    await mount({
+      [LIST]: {
+        status: 'ok',
+        contacts: [
+          { ...ana, name: 'oc-test' },
+          { ...ana, ref: MARKO, name: 'oc-test', since: 1_759_536_000 },
+        ],
+      },
+    });
+    expect(host.querySelectorAll('.ct-row').length).toBe(2);
+    expect(host.querySelector('.ct-list')?.textContent?.split(SAME).length).toBe(3);
+  });
+
+  it('shows no hint when names differ', async () => {
+    await mount({ [LIST]: { status: 'ok', contacts: [marko, ana] } });
+    expect(text()).not.toContain(SAME);
   });
 });
