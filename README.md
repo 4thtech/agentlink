@@ -60,9 +60,9 @@ Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/age
 
 ## What is coming
 
-Not in 0.2.0, and not yet something you can use:
+Not in the published 0.2.0:
 
-- **A usable local app (0.3.0).** The first-run screen and an Activity page are built and included: `init` and the `ui` command open them in your browser, and while there is no owner yet, your AI app opens the setup page once each time it starts AgentLink. The Proofs and credits, Contacts, Files and Rules pages, and a pay page for adding credits, are still to come.
+- **The local app (in 0.3.0, releasing).** It is merged on main and ships with 0.3.0, so you cannot get it from the published 0.2.0. `init` and the `ui` command open it in your browser. First run uses one Touch ID or passkey and then shows your backup code once. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Adding credits from the page is not available yet.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
 - **Proof on main networks**, after an external audit of the contracts.
 
@@ -75,7 +75,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app usable from the command line is planned for 0.3.0 · **Version:** v0.2.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Last updated:** 2026-10-25
+> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is merged on main and is in 0.3.0 (releasing) · **Version:** v0.2.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Last updated:** 2026-10-26
 >
 > - **M0 Foundations:** 6 merged, 1 in progress
 > - **Crypto (@4thtech-io/crypto):** 7 merged, 5 in progress
@@ -85,13 +85,13 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 > - **Chain client (@4thtech-io/chain):** 5 merged
 > - **Core (@4thtech-io/core):** 21 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
-> - **MCP server, CLI and apps:** 5 merged, 7 in progress, 2 planned
+> - **MCP server, CLI and apps:** 6 merged, 6 in progress, 2 planned
 > - **OCC v2 contracts (private repo):** 4 merged, 1 planned
 > - **Design:** 1 merged, 1 in progress
 > - **Privacy of proofs (D-109):** 3 merged, 1 in progress, 3 planned
-> - **In progress:** v0.2.0 is on npm `latest` and a GitHub release. It adds setup for Cursor and Windsurf with `init`, free test credits on a first proof, receipts covered by the sender's proof fee, delivery receipts off by default with plain notices on what a proof makes public, offers and accepts recorded with proof under one approval, Gnosis Chiado chosen automatically next to Base Sepolia, stricter checks on owner-signed messages, a fresh link for an expired stored file, and one-click Claude Desktop bundles signed by 4thTech. The first-run screen and the Activity page of the local app are in the package but the command line does not open them yet. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
-> - **Does not exist yet:** the local app served by the command line (0.3.0), the Proofs and credits, Contacts, Files and Rules pages, the pay page for adding credits, backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.2.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`.
-> - **Next:** Ship 0.3.0 with a usable local app (`agentlink ui`, Activity, Proofs and credits, Contacts, Files, Rules), run the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+> - **In progress:** v0.2.0 is on npm `latest` and a GitHub release. **In 0.3.0 (releasing, not yet published):** the local app is merged on main. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Until 0.3.0 is published, v0.2.0 is what you can install. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
+> - **Does not exist yet:** adding credits from the local app (a pay page by QR code on the test network and a Withdraw button under Advanced are in review, not merged), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.2.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`. The local app pages are in 0.3.0 (releasing) and are not in v0.2.0.
+> - **Next:** Publish 0.3.0 with the local app, run the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->

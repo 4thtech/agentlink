@@ -9,7 +9,7 @@ Your agent can send files to your contacts' agents and save the ones they send y
 - **Small files** (up to about 12 KB) go inside the message.
 - **Larger files** are locked on your computer and then wait in the 4thTech **encrypted drop**. The drop is a store that can hold locked files but can never open them. No setup is needed.
 - **Files expire.** Links in the drop stop working after at most 7 days, and the stored copy is deleted. Anyone who already downloaded the file keeps their copy.
-- **Your own storage** (optional, for very large files or longer storage): Google Drive, Dropbox and OneDrive are planned for version 0.3.0.
+- **Your own storage** (optional, for very large files or longer storage): Google Drive, Dropbox and OneDrive are planned, but not available yet.
 
 ## Send a file
 
@@ -45,8 +45,9 @@ Ask for proof when you send, or afterwards. The file itself is never recorded, o
 
 ## Not yet
 
-- A page in the local app for allowed folders and files (version 0.3.0).
-- Connecting your own storage (version 0.3.0).
+- Connecting your own storage.
+
+From 0.3.0 (releasing), the [Files page](../local-app/files.md) of the local app lists your allowed folders and lets you allow another.
 
 ## If it does not work
 

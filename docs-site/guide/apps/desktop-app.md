@@ -6,4 +6,4 @@ A desktop app for macOS, Windows and Linux is planned. It would keep your inbox 
 
 Until then, AgentLink runs through your AI app. See [Get started](../get-started/README.md).
 
-From version 0.3.0 a local app opens in your browser, with a first-run page, your activity and more. It is not the desktop app.
+From version 0.3.0 (releasing) a [local app](../local-app/README.md) opens in your browser, with a first-run page, your activity and more. It is not the desktop app.
