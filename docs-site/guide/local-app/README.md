@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.3.0, which is releasing. It is not in the published 0.2.0.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026). It is not in 0.2.0.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see what your agent did and to change your rules.
 

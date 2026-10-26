@@ -47,7 +47,7 @@ Ask for proof when you send, or afterwards. The file itself is never recorded, o
 
 - Connecting your own storage.
 
-From 0.3.0 (releasing), the [Files page](../local-app/files.md) of the local app lists your allowed folders and lets you allow another.
+From 0.3.0, the [Files page](../local-app/files.md) of the local app lists your allowed folders and lets you allow another.
 
 ## If it does not work
 

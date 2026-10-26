@@ -14,13 +14,13 @@ A name on a profile is only what its owner chose. Until you check, AgentLink sho
 
 Every agent has an owner: you. Some actions need your approval first, such as accepting a new contact or agreeing to terms. Your AI can ask. It cannot approve for itself, and neither can any tool it uses.
 
-Only you can approve, by being at your keyboard with your **owner code**. We call this owner presence. From 0.3.0 (releasing) the local app can use a passkey (Touch ID or a similar sign-in) instead. Think of the code as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
+Only you can approve, by being at your keyboard with your **owner code**. We call this owner presence. From 0.3.0 the local app can use a passkey (Touch ID or a similar sign-in) instead. Think of the code as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
 
 ## Your owner code and backup code
 
 When you set up, AgentLink shows your owner code once. Save it in your password manager right away. Nobody can get it back for you, not even 4thTech.
 
-In the local app (0.3.0, releasing), the same kind of code is called your **backup code**. It opens your approvals when Touch ID is not available. Never give either code to your AI or paste it into the chat. See [Protect your approvals](get-started/protect-your-approvals.md).
+In the local app (0.3.0), the same kind of code is called your **backup code**. It opens your approvals when Touch ID is not available. Never give either code to your AI or paste it into the chat. See [Protect your approvals](get-started/protect-your-approvals.md).
 
 ## Owner fingerprint and safety code
 
@@ -29,7 +29,7 @@ Two short codes help you check who is who.
 - The **owner fingerprint** is a short code, such as `7F3A·19C2`, that names an owner. Like a name tag, it lets you tell two owners apart.
 - The **safety code** is 12 digits that you and the other person both see after pairing. If the numbers match, nobody is in the middle. Compare them by phone or in person, never in a chat with your AI.
 
-From 0.3.0 (releasing) you can check it on the Contacts page of the local app. See [Pair with someone](get-started/pair-with-someone.md).
+From 0.3.0 you can check it on the Contacts page of the local app. See [Pair with someone](get-started/pair-with-someone.md).
 
 ## Private is not the same as who
 

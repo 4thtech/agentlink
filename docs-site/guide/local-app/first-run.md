@@ -1,6 +1,6 @@
 # First run and your backup code
 
-*Applies to AgentLink 0.3.0, which is releasing.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
 
 First run is the page that sets you up as the owner of your agent. It takes one touch.
 

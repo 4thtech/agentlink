@@ -1,6 +1,6 @@
 # Protect your approvals
 
-*Applies to AgentLink 0.3.0, which is releasing. The recommended way is the setup page: one Touch ID (or Windows Hello), and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026). The recommended way is the setup page: one Touch ID (or Windows Hello), and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
 
 ## Why this step exists
 
@@ -10,7 +10,7 @@ This takes about a minute.
 
 ## Set up your owner code in the terminal
 
-This is the terminal way. In 0.3.0 the [setup page](#the-setup-page-030-releasing) opens from `init` and does the same job. Use the terminal way if no browser opens or you prefer it.
+This is the terminal way. In 0.3.0 the [setup page](#the-setup-page-030) opens from `init` and does the same job. Use the terminal way if no browser opens or you prefer it.
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
 2. **Run `npx -y @4thtech-io/agentlink owner init`.**
@@ -46,11 +46,11 @@ Your owner fingerprint stays the same and your agents keep their cards, so your 
 
 Changing the code doesn't protect copies of the old saved owner key made earlier, for example in a backup, from someone who also has the old code. If you think that happened, set up a new owner and agent.
 
-## Which browser for a passkey (0.3.0, releasing)
+## Which browser for a passkey (0.3.0)
 
 From 0.3.0 the local page can use a passkey (Touch ID on a Mac, Windows Hello on Windows) instead of typing your owner code. It should work in Safari on a recent Mac, or an up-to-date Chrome, Edge or Firefox using your system's own passkey. Older Windows versions don't support it, and some browsers and password managers reportedly don't either. If yours can't, nothing breaks: you'll use your owner code instead. We are still testing each browser and will update this note.
 
-## The setup page (0.3.0, releasing)
+## The setup page (0.3.0)
 
 From 0.3.0 the setup page in your browser does this step for you. It first shows the folders it creates: `~/AgentLink/Send`, `~/AgentLink/Inbox` and `~/AgentLink/Proofs`. Then it has one button, for example **Use Touch ID**. That one touch protects your approvals, sets up your agent and lets your AI send files you put in `~/AgentLink/Send`, nothing else.
 

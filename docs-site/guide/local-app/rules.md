@@ -1,6 +1,6 @@
 # Rules page
 
-*Applies to AgentLink 0.3.0, which is releasing.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
 
 Rules decide what your agent may do without asking you. The page shows them in two groups:
 

@@ -1,6 +1,6 @@
 # Activity
 
-*Applies to AgentLink 0.3.0, which is releasing.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
 
 Activity is a list of what happened lately, newest first, in plain words. It does not list your messages or files. It shows:
 
