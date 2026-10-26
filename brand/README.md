@@ -12,7 +12,7 @@ The logo is a **bracket seal**: two square brackets (the two parties) holding a 
 
 | Shape | Use it for |
 |---|---|
-| Mark (`agentlink-mark-…`) | App icons, favicons, avatars, small spaces |
+| Mark (`agentlink-mark-…`) | App icons, favicons, avatars of AgentLink itself, small spaces |
 | Wordmark (`agentlink-wordmark-…`) | Where the mark already appears nearby |
 | Horizontal lockup | The default logo: headers, documents, websites |
 | Stacked lockup | Square spaces: slides, splash screens, stickers |
@@ -61,16 +61,16 @@ CMYK values are for reference only: proof print colour against a physical swatch
 - **Clear space:** keep the width of the diamond free on every side.
 - **Minimum size:** mark 16 px (use `mark-small` up to 24 px); horizontal lockup 96 px wide on screen, 24 mm in print.
 - **Don't:** recolour the diamond, outline the brackets, rotate or stretch, add glow, gradient or shadow, put the mark inside a hexagon, or combine it with chains, coins, padlocks or blocks.
-- **"by 4thTech"** goes on sign-in, onboarding, About, installer and update screens, the marketing site and page footers. Not in app chrome, approval cards, tray icons, app icons, favicons, proof stamps or printed records.
-- **Never redraw the 4thTech hexagon.** Its green `#2CD8A7` is not an AgentLink colour.
+- **"by 4thTech"** goes on sign-in, onboarding, About, desktop first run, installer and update screens, the marketing site and page footers. Not in app chrome, approval cards, tray icons, app icons, favicons, proof stamps or printed records.
+- **Never redraw the 4thTech hexagon.** Use the original file from 4thTech. Its green `#2CD8A7` is not an AgentLink colour.
 
 ## Fonts
 
 AgentLink uses **Geist** and **Geist Mono** by Vercel, under the SIL Open Font License 1.1. They are not copied here: get them from [vercel.com/font](https://vercel.com/font) or the [Geist repository](https://github.com/vercel/geist-font), which carries the licence.
 
-## Brand assets: usage (proposed, owner confirms at merge)
+## Brand assets: usage
 
-The code in this repository is MIT licensed. The AgentLink name, logo and brand marks are not covered by that licence. Proposed terms: you may use them freely to refer to or promote AgentLink (articles, talks, integrations that work with it). Please do not use them to suggest that 4thTech endorses you or your product, and do not use them for other products or services. The trademark check is still running, so keep the mark usable on its own.
+The code in this repository is MIT licensed. The AgentLink name, logo and brand marks are not covered by that licence. You may use them freely to refer to or promote AgentLink (articles, talks, integrations that work with it). Please do not use them to suggest that 4thTech endorses you or your product, and do not use them for other products or services.
 
 ## What is not here
 

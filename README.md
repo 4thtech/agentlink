@@ -143,7 +143,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 
 ## Brand and press kit
 
-Logos (SVG and PNG), social images and the colour palette are in [`brand/`](brand/README.md), with plain-language usage rules. The code is MIT; the name and logo are covered separately there (proposed terms).
+Logos (SVG and PNG), social images and the colour palette are in [`brand/`](brand/README.md), with plain-language usage rules. The code is MIT; the name and logo are covered separately there.
 
 ## Contributing
 
