@@ -43,7 +43,9 @@ describe('the approval page sidebar icons equal these icons (M1-11b-2a, D-116)',
     if (typeof source !== 'string' || source === '') throw new Error('approval-page.ts missing');
     for (const name of SIDEBAR_ICONS) {
       const key = /^[a-z]+$/.test(name) ? name : `'${name}'`;
-      expect(source, `NAV_ICONS ${name}`).toContain(`  ${key}: '${render(name)}',`);
+      // Prettier may put a long value on the next line.
+      const markup = render(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      expect(source, `NAV_ICONS ${name}`).toMatch(new RegExp(`\\n  ${key}:\\s+'${markup}',\\n`));
     }
   });
 });

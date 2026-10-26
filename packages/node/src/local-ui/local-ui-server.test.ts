@@ -477,7 +477,7 @@ describe('the shared app navigation on the approval page (M1-11b-2a)', () => {
     expect(nav).not.toContain('?t=');
     expect(nav).not.toContain('agentlink-csrf');
     expect(nav).not.toMatch(/:\/\/|javascript:/i);
-    expect(nav).not.toMatch(/<script|style=|on[a-z]+=/i);
+    expect(nav).not.toMatch(/<script|style=|\son[a-z]+=/i);
     // The cookie value never reaches the markup.
     expect(res.body).not.toContain(cookie.split('=')[1] ?? 'missing');
   });

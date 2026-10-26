@@ -4388,6 +4388,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Passkey browser test still passes; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 
+#### M1-11b-2a · approval page: the app's sidebar, step 1 of M1-11b-2 (new, owner feedback 2026-10-26)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts`, `approval-server.ts` (the one `pageHtml` call), their tests, `apps/local-ui/src/approval-page-nav.test.ts`, `packages/ui/src/components/approval-page-icons.test.ts`, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11s-a, M1-11s-b
+- **Spec:** 08 §1; 11 §6.2; 04 §2.5; D-116, D-118, D-120
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Owner: "if I click on Approvals there is no menu to get back". Until M1-11b-2 moves Approvals into `apps/local-ui`, the approval page (`/`, `/approve/<id>`) draws the app's sidebar (the seven `NAV_ITEMS`, Approvals current; AppShell styling from components.css, tokens by value), only when the app bundle is served. Fixed text and fixed same-origin paths; drift tests next to `nav.ts` and `icon-data.ts`.
+  - Navigation only: no change to the page script (`APP_JS`), the presence flows, the session, CSRF, Origin or fetch-metadata checks.
+- **Acceptance:**
+  - Tests: sidebar on `/` and `/approve/<id>` with a bundle, none without; no token, link or outside address in it; the page gate and the decide gate refuse as before (negative tests); passkey and approval browser tests pass unchanged. Threat note and tests-first evidence (S2).
+
 #### M1-11b-2 · local UI: approvals, and `/` switches to the new app (new, D-118)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/approvals.ts` and its test, `e2e/test/local-ui-approvals.test.ts`, its `changelog.d/` fragment and changeset; also `approval-page.ts`, `approval-server.ts`, `approval-ui-browser.test.ts`, `approval-review.test.ts`, `approval-ui.fixture.ts`
@@ -4397,6 +4409,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Scope:**
   - Build the approvals list and the approval and commitment review (Local-approvals) in `apps/local-ui`, switch `/` and `/approve/<id>` to the new app and delete `APP_JS`.
   - Sole editor of `approval-server.ts` in wave 1. Playwright selectors that #398 renamed are updated deliberately and listed in the PR. Merges after M1-11b-1.
+  - Step 1 shipped as M1-11b-2a (the sidebar on the old page). This card also: makes Approvals `routed: true` in `nav.ts`; keeps `/` and `/approve/<id>` working for links from the terminal, notifications and the MCP (served by the app or redirected to it); deletes the sidebar copy and its drift tests with `approval-page.ts`.
 - **Acceptance:**
   - All M1-11a approval flows pass; untrusted strings render as text (XSS fixtures re-run); no external URL in the bundle; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
 

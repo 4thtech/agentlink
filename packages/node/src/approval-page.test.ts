@@ -186,12 +186,16 @@ describe('the shared app navigation (M1-11b-2a)', () => {
       expect(html).toContain(`href="${item.path}"`);
       expect(html).toContain(`<span>${item.label.replace('&', '&amp;')}</span>`);
     }
+    expect(html).toContain('<div class="al-side-brand">');
+    expect(html).toMatch(
+      /<div class="al-side-brand"><svg[^]*?<\/svg><span>AgentLink<\/span><\/div>/,
+    );
     expect(html.split('aria-current="page"').length - 1).toBe(1);
     expect(html).toContain('<a class="al-nav is-active" href="/" aria-current="page">');
     // Same shell rules as before: own stylesheet and script only, nothing inline, nothing outside.
     expect(html).toContain('<link rel="stylesheet" href="/app.css">');
     expect(html).toContain('<script src="/app.js" defer></script>');
-    expect(html).not.toMatch(/<style|style=|on[a-z]+=/i);
+    expect(html).not.toMatch(/<style|style=|\son[a-z]+=/i);
     expect(html).not.toMatch(/:\/\//);
     expect(html).toContain('<main id="app" class="al-page">');
     expect(html.split('agentlink-csrf').length - 1).toBe(1);

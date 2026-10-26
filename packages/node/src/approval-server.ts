@@ -1968,7 +1968,14 @@ export async function startApprovalServerWith(
         sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
         return;
       }
-      sendText(res, 200, 'text/html; charset=utf-8', pageHtml(csrf));
+      // M1-11b-2a: the app's sidebar on the approval page, only when the app is there to go to.
+      // Navigation only: this page's session, CSRF and presence gates are unchanged.
+      sendText(
+        res,
+        200,
+        'text/html; charset=utf-8',
+        pageHtml(csrf, { appNav: localUi.shell !== undefined }),
+      );
       return;
     }
 

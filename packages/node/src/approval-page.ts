@@ -123,8 +123,35 @@ export const UI_STRINGS = Object.freeze({
   passkeyFailed: 'The passkey was not set up. Nothing was changed.',
 });
 
+/** Options for the page shell. */
+export interface PageHtmlOptions {
+  /**
+   * M1-11b-2a: draw the local app's sidebar (Approvals current) so the owner can reach the other
+   * pages. Only when the app is bundled: without it the other links would answer 404.
+   */
+  readonly appNav?: boolean;
+}
+
 /** The page shell. `csrf` is base64url (checked by the caller), so it needs no escaping. */
-export function pageHtml(csrf: string): string {
+export function pageHtml(csrf: string, options: PageHtmlOptions = {}): string {
+  const main = [
+    HEADER,
+    '<main id="app" class="al-page">',
+    `<p class="al-lede">${UI_STRINGS.cannotApprove}</p>`,
+    `<noscript>${UI_STRINGS.noScript}</noscript>`,
+    '</main>',
+  ];
+  const body =
+    options.appNav === true
+      ? [
+          '<div class="al-shell-main">',
+          appSidebar(),
+          '<div class="al-shell-content">',
+          ...main,
+          '</div>',
+          '</div>',
+        ]
+      : main;
   return [
     '<!doctype html>',
     '<html lang="en">',
@@ -137,15 +164,80 @@ export function pageHtml(csrf: string): string {
     '<script src="/app.js" defer></script>',
     '</head>',
     '<body>',
-    HEADER,
-    '<main id="app" class="al-page">',
-    `<p class="al-lede">${UI_STRINGS.cannotApprove}</p>`,
-    `<noscript>${UI_STRINGS.noScript}</noscript>`,
-    '</main>',
+    ...body,
     '</body>',
     '</html>',
     '',
   ].join('\n');
+}
+
+/**
+ * M1-11b-2a: the local app's sidebar (apps/local-ui `NAV_ITEMS` in the @4thtech-io/ui AppShell),
+ * copied by value because this package depends on neither. Drift tests next to the originals fail
+ * on any difference: apps/local-ui/src/approval-page-nav.test.ts (items) and
+ * packages/ui/src/components/approval-page-icons.test.ts (icons). Fixed text and fixed same-origin
+ * paths only: no token, no request data. Goes away when M1-11b-2 moves Approvals into the app.
+ */
+export const APP_NAV: readonly AppNavLink[] = Object.freeze([
+  { label: 'Approvals', icon: 'approval', path: '/' },
+  { label: 'Activity', icon: 'activity', path: '/settings/activity' },
+  { label: 'Contacts', icon: 'users', path: '/settings/contacts' },
+  { label: 'Files', icon: 'folder', path: '/settings/files' },
+  { label: 'Proofs & credits', icon: 'proof-seal', path: '/settings/proofs' },
+  { label: 'Rules', icon: 'sliders-horizontal', path: '/settings/rules' },
+  { label: 'Settings', icon: 'settings', path: '/settings/backup' },
+]);
+
+/** One sidebar link. */
+export interface AppNavLink {
+  readonly label: string;
+  readonly icon: string;
+  readonly path: string;
+}
+
+/** The sidebar icons (@4thtech-io/ui icon-data.ts, 24-unit stroke icons) as fixed SVG markup. */
+const NAV_ICONS: Readonly<Record<string, string>> = {
+  approval:
+    '<path d="M6.5 5.2A8 8 0 0 1 20 11v2"/><path d="M4 11a8 8 0 0 1 .6-3"/><path d="M4 15v-2"/><path d="M8 20v-7a4 4 0 0 1 8 0v2"/><path d="M12 13v8"/><path d="M16 19v2"/>',
+  activity:
+    '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  users:
+    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  folder:
+    '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  'proof-seal':
+    '<path d="M12 2.5 21.5 12 12 21.5 2.5 12Z"/><path d="M12 8.5 15.5 12 12 15.5 8.5 12Z"/>',
+  'sliders-horizontal': '<line/><line/><line/><line/><line/><line/><line/><line/><line/>',
+  settings:
+    '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+};
+
+function navIcon(name: string): string {
+  return (
+    '<svg class="al-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"' +
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+    `${NAV_ICONS[name] ?? ''}</svg>`
+  );
+}
+
+/** Approvals is the current page on `/` and `/approve/<id>`. Labels are fixed text; `&` is escaped. */
+function appSidebar(): string {
+  const links = APP_NAV.map((item) => {
+    const open =
+      item.path === '/'
+        ? `<a class="al-nav is-active" href="${item.path}" aria-current="page">`
+        : `<a class="al-nav" href="${item.path}">`;
+    const label = item.label.replace(/&/g, '&amp;');
+    return `<li>${open}${navIcon(item.icon)}<span>${label}</span></a></li>`;
+  });
+  return [
+    '<nav class="al-side" aria-label="Main">',
+    `<div class="al-side-brand">${MARK}<span>${UI_STRINGS.title}</span></div>`,
+    '<ul>',
+    ...links,
+    '</ul>',
+    '</nav>',
+  ].join('');
 }
 
 /** The AgentLink mark (@4thtech-io/ui Mark, 16 px form), inline: markup, not a loaded resource. */
@@ -788,6 +880,7 @@ export const APP_CSS = `:root {
   --al-color-accent-hover: #ff8240;
   --al-color-accent-pressed: #e5590c;
   --al-color-accent-fg: #ff8a4c;
+  --al-color-accent-subtle: #2b170b;
   --al-color-status-danger-fg: #ff7b7b;
   --al-color-untrusted-bg: #0d0e10;
   --al-color-untrusted-fg: #c9ced6;
@@ -817,6 +910,7 @@ export const APP_CSS = `:root {
     --al-color-accent-hover: #ff6a1a;
     --al-color-accent-pressed: #d94f06;
     --al-color-accent-fg: #b23a09;
+    --al-color-accent-subtle: #ffede2;
     --al-color-status-danger-fg: #b3191f;
     --al-color-untrusted-bg: #f6f4ef;
     --al-color-untrusted-fg: #2a2d31;
@@ -863,6 +957,73 @@ code, pre, .al-mono { font-family: var(--al-font-family-mono); }
 .al-mark { flex: none; }
 .al-mark-ink { fill: var(--al-color-brand-mark); }
 .al-mark-seal { fill: var(--al-color-brand-seal); }
+
+/* App navigation (M1-11b-2a; components.css .al-shell-main, .al-side, .al-nav: the AppShell sidebar) */
+.al-shell-main { display: flex; min-height: 100vh; }
+.al-shell-content { flex: 1; min-width: 0; }
+.al-side {
+  width: 232px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 8px;
+  background: var(--al-color-bg-surface);
+  border-right: 1px solid var(--al-color-border-default);
+}
+.al-side-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 4px;
+  font-weight: 600;
+}
+.al-side ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.al-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--al-color-fg-muted);
+  text-decoration: none;
+  position: relative;
+}
+.al-nav:hover {
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-default);
+}
+.al-nav.is-active {
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-fg);
+}
+.al-nav.is-active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--al-color-accent-default);
+}
+.al-nav span { flex: 1; }
+.al-icon { flex: none; }
+@media (max-width: 600px) {
+  .al-side {
+    display: none;
+  }
+}
+@media (forced-colors: active) {
+  .al-nav.is-active { border: 1px solid CanvasText; forced-color-adjust: auto; }
+}
 
 /* Page */
 .al-page {
