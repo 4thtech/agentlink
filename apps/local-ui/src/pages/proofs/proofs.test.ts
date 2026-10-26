@@ -126,6 +126,25 @@ describe('ProofsPage', () => {
     expect(text()).not.toContain('$0.10');
   });
 
+  it('UX-031-QUICKWINS: with 0 test credits, says free test credits arrive with the first proof', async () => {
+    await mount({
+      [LIST]: { status: 'ok', items: [] },
+      [CREDITS]: { ...OK_CREDITS, proofsLeft: 0, balance: '$0.00' },
+      [TOP_UP]: NO_TOP_UP,
+    });
+    const card = host.querySelector('section[aria-label="Credits"]');
+    expect(card?.textContent).toContain('Free test credits arrive automatically with your first proof.');
+  });
+
+  it('UX-031-QUICKWINS: the first-proof line is absent once there are credits', async () => {
+    await mount({
+      [LIST]: { status: 'ok', items: [] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: NO_TOP_UP,
+    });
+    expect(text()).not.toContain('arrive automatically');
+  });
+
   it('says "1 proof left" for one', async () => {
     await mount({
       [LIST]: { status: 'ok', items: [] },
