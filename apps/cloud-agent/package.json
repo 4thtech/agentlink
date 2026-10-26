@@ -28,5 +28,11 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@4thtech-io/core": "workspace:*",
+    "@4thtech-io/crypto": "workspace:*",
+    "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/transport-nostr": "workspace:*"
   }
 }

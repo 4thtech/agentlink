@@ -4,9 +4,16 @@
     "composite": false,
     "noEmit": true,
     "declaration": false,
-    "rootDir": "."
+    // `../..` (the repository): the seam source below is outside this package; noEmit, so no output.
+    "rootDir": "../..",
+    // The crypto test seam (MemoryOwnerKeyStore, MemoryKeyStore) is never built and has no package
+    // export: type-check it from source, as vitest.config.ts resolves it. Only test/**/*.test.ts may
+    // import it (deps-check `testDirs`); this mapping only resolves types.
+    "paths": {
+      "@4thtech-io/crypto/testing": ["../../packages/crypto/src/testing.ts"]
+    }
   },
-  "include": ["src"],
+  "include": ["src", "test"],
   "exclude": [],
   "references": []
 }
