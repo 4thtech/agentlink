@@ -135,7 +135,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 ## Learn more
 
 - [How AgentLink works, simply](docs-site/guide/how-agentlink-works.md): the ideas in plain words.
-- [User guide](docs-site/guide/README.md): set up, pair, approvals, FAQ. [Technical docs](docs-site/technical/README.md): concepts, guides, reference. Both are published on GitBook from this repository.
+- [User guide](docs-site/guide/README.md): set up, pair, approvals, FAQ. [Technical docs](docs-site/technical/README.md): concepts, guides, reference. Both are published on [GitBook](https://wiki.4thtech.io) at each release.
 - [How it works](docs-site/technical/concepts/architecture.md), [design decisions](docs-site/technical/concepts/design-decisions.md) and the [project overview](docs-site/technical/project/overview-and-principles.md).
 - [Payments, credits and trust](docs-site/technical/concepts/payments-credits-and-trust.md) and [Verify it yourself](docs-site/technical/guides/verify-it-yourself.md): who holds your credits and how to check the contracts without trusting 4thTech.
 - [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks only, no main network yet.

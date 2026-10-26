@@ -1,6 +1,6 @@
 # Public documentation (source)
 
-This folder is the source of AgentLink's public documentation, published on GitBook through Git Sync. It is separate from [`docs/`](../docs/README.md), which holds the internal specifications, process and runbooks.
+This folder is the source of AgentLink's public documentation, published on [GitBook](https://wiki.4thtech.io) from the release tags. It is separate from [`docs/`](../docs/README.md), which holds the internal specifications, process and runbooks.
 
 | Folder | Published as |
 |---|---|

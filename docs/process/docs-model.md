@@ -51,9 +51,9 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 ## 5. Screenshots
 
 - **Real app, test data only.** Capture the real local app, run in a throwaway home folder (user `demo`), on a test network. Names come from the 11 §5 samples (Marko, Ana). Never a real key, owner or backup code, safety code, Agent ID, address, path with a real user name, or a real person.
-- **Fixed frame.** Browser viewport 1280 × 800, device scale 2, PNG, cropped to the app, at most 400 KB. The app's default theme (dark) until the owner decides on light (open question).
+- **Fixed frame.** Browser viewport 1280 × 800, device scale 2, PNG, cropped to the app, at most 400 KB. Dark theme only (decided 2026-10-26).
 - **Names.** `<surface>-<page>--<state>.png`, lowercase with hyphens, for example `local-files--confirm-add.png`.
-- **Stored** in the space's `.gitbook/assets/`; embedded as `<figure><img src="../.gitbook/assets/<name>" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>`.
+- **Stored** in the folder's `.gitbook/assets/`; embedded as `<figure><img src="../.gitbook/assets/<name>" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>`.
 - **Alt text** says what the reader should notice, not "screenshot".
 - **Placeholder** until captured: `<!-- screenshot: <name> | shows: <state> -->` (invisible on both sites, greppable).
 - **Refresh** when any string on the shot changes.
@@ -69,26 +69,26 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 
 ## 7. Links: repo, GitBook, wiki
 
-- **One source:** `docs-site/` on `main`. GitBook renders each space through Git Sync (D-57). Never edit in GitBook.
-- Inside a space: relative links. To the other space, specs or code: absolute `https://github.com/4thtech/agentlink/blob/main/...` URLs until the site URL exists (MAINTAINING §2).
-- **GitHub wiki:** one short Home page that maps where things are (guide, technical docs, repo, releases), with links only. Never a copy of a page.
+- **One source:** `docs-site/` on `main`. Never edit in GitBook; GitBook only shows what the wiki repo holds (§8).
+- Inside the docs: relative links. To specs or code: absolute `https://github.com/4thtech/agentlink/blob/main/...` URLs. Between the guide and the technical docs, relative links keep working because both folders are copied together (§8).
+- **GitHub wiki of this repo:** a short map of a few pages (Home, Guide, Technical docs, Releases and roadmap) that links into GitBook ([wiki.4thtech.io](https://wiki.4thtech.io)) and the repo. Never a copy of a page.
 
-## 8. Where AgentLink lives in the 4thTech GitBook (proposed, owner confirms)
+## 8. GitBook: one space, the 4thTech Docs site
 
-Owner direction (2026-10-26): the existing 4thTech GitBook, covering earlier 4thTech work and AgentLink. We have no access to it yet.
+**Decided by Tali, 2026-10-26.**
 
-```
-4thTech (site home: who 4thTech is, what it builds)
-├── AgentLink
-│   ├── Guide       ← Git Sync: docs-site/guide
-│   └── Technical   ← Git Sync: docs-site/technical
-└── Earlier 4thTech work (existing spaces, edited in GitBook as today)
-```
-
-- **Cross-links.** The AgentLink landing page says in one line that it builds on earlier 4thTech work and links it. Earlier pages carry one line pointing to AgentLink as the current product.
-- **Brand.** The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink sections show the AgentLink horizontal lockup on their landing pages, and the footer uses the endorsed lockup "AgentLink by 4thTech" ([brand rules](../../brand/README.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
-- **OCC v1** (EUPL-1.2 with a non-commercial rider) is reference only. Earlier work may be described and linked, never copied as code.
-- Git Sync stays per space (MAINTAINING §2); only the AgentLink spaces sync from this repo.
+- **One space.** GitBook has a single space, the 4thTech Docs site, Git-synced from the private repo `4thtech/wiki.4thtech.io` (domain `wiki.4thtech.io`). There is no AgentLink-specific space and no Git Sync from this repo.
+- **Single source.** AgentLink's docs stay in this repo's `docs-site/`. They are copied into the wiki repo, never written there.
+- **Sync model.**
+  1. A script in the wiki repo copies `docs-site/guide` and `docs-site/technical` from the **release tag** of AgentLink (tags only, never `main`) into the AgentLink section of the wiki repo.
+  2. The script opens a pull request in the wiki repo; it needs no secrets (public repo read).
+  3. A merge there publishes through that repo's Git Sync.
+  4. After two releases done by hand with the script, it moves to a GitHub Action in the wiki repo.
+- **Brand.** 4thTech is the master brand and AgentLink a sub-brand: "AgentLink by 4thTech". The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink landing pages show its horizontal lockup; the footer uses the endorsed lockup ([brand rules](../../brand/README.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
+- **Cross-links.** The AgentLink landing page says in one line that it builds on earlier 4thTech work and links it; earlier pages carry one line pointing to AgentLink as the current product.
+- **Intro GIF** (`docs-site/` landing) is pinned to the release tag in its URL, so a copied page never shows a newer or missing file.
+- **Screenshots: dark theme only.** One set, no light variants.
+- **OCC v1** (EUPL-1.2 with a non-commercial rider): reference only; link, never copy code.
 
 ## 9. Definition of done (every page)
 

@@ -1,17 +1,17 @@
 # Maintaining the public docs
 
-How the public documentation in `docs-site/` is organised, published and kept true. Internal documents (specifications, process, runbooks) stay in [`docs/`](../docs/README.md); this folder holds only what the public reads on GitBook.
+How the public documentation in `docs-site/` is organised, published and kept true. Internal documents (specifications, process, runbooks) stay in [`docs/`](../docs/README.md); this folder holds only what the public reads on [GitBook](https://wiki.4thtech.io).
 
 ## 1. Layout
 
-| Folder | GitBook space | Audience | Vocabulary |
+| Folder | Section on the site | Audience | Vocabulary |
 |---|---|---|---|
 | [`guide/`](guide/README.md) | User guide | People who use AgentLink through their AI app, including non-developers | Strictly the product vocabulary of [11 §5](../docs/foundation/11-claude-design-brief.md): no "wallet", "gas", "seed phrase" or "transaction" (and the rest of the "Never say" list) outside a section titled "Advanced" |
 | [`technical/`](technical/README.md) | Technical docs | Agent builders, integrators, reviewers, verifiers, contributors | Technical terms allowed; specs win on any conflict |
 
-Each space folder holds a `.gitbook.yaml` (root and structure), a `README.md` (the space's landing page) and a `SUMMARY.md` (the navigation). Every Markdown file in a space appears in its `SUMMARY.md` exactly once.
+Each folder holds a `.gitbook.yaml` (root and structure; kept only if the sync script in the wiki repo uses it, otherwise removed), a `README.md` (the section's landing page) and a `SUMMARY.md` (the navigation). Every Markdown file in a space appears in its `SUMMARY.md` exactly once.
 
-Both spaces follow [Diátaxis](https://diataxis.fr), with plain navigation labels instead of the Diátaxis names:
+Both sections follow [Diátaxis](https://diataxis.fr), with plain navigation labels instead of the Diátaxis names:
 
 | Diátaxis | User guide | Technical docs |
 |---|---|---|
@@ -22,27 +22,26 @@ Both spaces follow [Diátaxis](https://diataxis.fr), with plain navigation label
 
 ## 2. Publishing
 
-The repository is the source of truth (D-57, amends D-29). Each space is connected to `main` with GitBook **Git Sync**, one space per folder, GitHub → GitBook only. A merge to `main` that changes `docs-site/` updates the published docs.
+This repo is the source of truth (D-57, amends D-29). GitBook is **one space**, the 4thTech Docs site at [wiki.4thtech.io](https://wiki.4thtech.io), Git-synced from the private repo `4thtech/wiki.4thtech.io` (decided by Tali, 2026-10-26; model in the [docs model](../docs/process/docs-model.md) §8). Nothing here syncs to GitBook directly.
 
+- **Release-time copy.** At each AgentLink release, a script in the wiki repo copies `docs-site/guide` and `docs-site/technical` from the **release tag** into the wiki repo and opens a PR there (no secrets). Merging it publishes. Release tags only, never `main`. After two releases the script moves to a GitHub Action. A merge to `main` here does not change the published site until the next release.
 - **Review class.** `docs-site/**` is S1 (`audit-rules.md` §2.2): every change gets an independent review and the orchestrator's audit, then auto-merges when the checks are green. Until `review-gate` derives this itself (owner follow-up), the PR declares S1.
-- **Owner-only.** Any change to the publishing setup (Git Sync, domain, site structure, spaces) is made by the owner.
-- **Rollback.** Revert the PR on `main`; Git Sync republishes the previous pages.
+- **Owner-only.** Any change to the publishing setup (the wiki repo, Git Sync, domain, site structure) is made by the owner.
+- **Rollback.** Revert the PR on `main`; the next release copy, or a revert PR in the wiki repo, republishes the previous pages.
 
-- **Never edit in GitBook.** Changes go through a pull request like any other change. `main` accepts changes only through pull requests, so a GitBook-side edit could not sync back without bypassing review. Never add the GitBook app as a ruleset bypass actor.
-- **Moving or renaming a page** needs a `redirects:` entry in that space's `.gitbook.yaml`, so published links keep working.
-- **Links.** Inside a space, use relative links. Links to the other space, to the specs or to other repository files use absolute GitHub URLs (`https://github.com/4thtech/agentlink/blob/main/...`), because GitBook resolves only files inside the space. Once the docs site has its final address, cross-space links switch to site URLs (DOCS-M1a).
-- **Images** go in the space's `.gitbook/assets/` folder.
+- **Never edit in GitBook.** Changes go through a pull request here like any other change; the wiki repo holds only copies. `main` accepts changes only through pull requests, so a GitBook-side edit could not sync back without bypassing review. Never add the GitBook app as a ruleset bypass actor.
+- **Moving or renaming a page** needs a redirect on the site (a `redirects:` entry in `.gitbook.yaml` if the sync script keeps those files, otherwise in the wiki repo), so published links keep working.
+- **Links.** Between guide and technical pages, use relative links (both folders are copied together). Links to the specs or to other repository files use absolute GitHub URLs (`https://github.com/4thtech/agentlink/blob/main/...`), because the copy contains only `docs-site/guide` and `docs-site/technical`.
+- **Images** go in the folder's `.gitbook/assets/`. Screenshots are dark theme only; the intro GIF is pinned to the release tag.
 
-### One-time GitBook setup (owner)
+### One-time setup (owner)
 
 Only the owner does this, in the GitBook and GitHub interfaces. Agents never change GitBook settings.
 
-1. Decide where the docs live (`DECISION NEEDED (owner)`, D-57). Owner direction (2026-10-26): the existing 4thTech GitBook, covering earlier 4thTech work and AgentLink; proposed structure in the [docs model](../docs/process/docs-model.md) §8 (proposed, owner confirms). Either way, create two spaces: **User guide** and **Technical docs**.
-2. Install the GitBook GitHub app on the `4thtech` organisation with access to `4thtech/agentlink` only.
-3. In each space: **Git Sync → GitHub**, repository `4thtech/agentlink`, branch `main`, project directory `docs-site/guide` (or `docs-site/technical`), initial sync direction **GitHub → GitBook**. Use space-level Git Sync: site-wide content mapping makes GitBook commit a mapping file to the repository.
-4. In each space's settings, turn off live editing, and do not merge change requests in GitBook (see "Never edit in GitBook").
-5. Add both spaces to the site (sections "User guide" and "Technical"), check the rendered pages, then publish.
-6. Later: connect the custom domain once the production domain is chosen, and record the final URLs on the sync board for the docs worker.
+1. Keep the single 4thTech Docs space Git-synced from `4thtech/wiki.4thtech.io` (domain `wiki.4thtech.io`). No AgentLink-specific space, no Git Sync from `4thtech/agentlink`, no GitBook app access to this repo.
+2. Turn off live editing and do not merge change requests in GitBook (see "Never edit in GitBook").
+3. Add the release-copy script to the wiki repo (not built yet); run it by hand for two releases, then replace it with a GitHub Action.
+4. The AgentLink section uses the AgentLink by 4thTech branding in the docs model §8.
 
 ## 3. Page conventions
 
