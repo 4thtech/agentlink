@@ -36,7 +36,7 @@ areas:
       - name: "Public documentation"
         state: done
         prs: [88]
-        summary: "`docs-site/` (D-57), published through GitBook Git Sync, and the public knowledge base (`knowledge/` and `llms.txt`)."
+        summary: "`docs-site/` (D-57), planned to be published into 4thTech Docs at each release, and the public knowledge base (`knowledge/` and `llms.txt`)."
       - name: "Redacting logger (@4thtech-io/log)"
         state: done
         summary: "Structured logging for Node, browsers and Workers that redacts secrets by field name and value shape (M0-8)."

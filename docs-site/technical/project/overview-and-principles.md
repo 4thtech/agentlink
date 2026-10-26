@@ -91,4 +91,4 @@ The OCC v2 smart contracts are developed in a separate private repository during
 
 ## Hosting and public docs
 
-The testing environment will live at `agentlink.4thtech.io` (planned). The public docs (a user guide and technical docs) are written in [`docs-site/`](https://github.com/4thtech/agentlink/blob/main/docs-site/README.md) and published on GitBook through Git Sync. They describe the design and the released versions, and mark every feature that is not built as planned. [wiki.4thtech.io](https://wiki.4thtech.io) documents OCC v1.
+The testing environment will live at `agentlink.4thtech.io` (planned). The public docs (a user guide and technical docs) are written in [`docs-site/`](https://github.com/4thtech/agentlink/blob/main/docs-site/README.md) and are planned to be published into 4thTech Docs at each release (today that section is a short summary). They describe the design and the released versions, and mark every feature that is not built as planned. [wiki.4thtech.io](https://wiki.4thtech.io) is 4thTech Docs, covering all 4thTech products and protocols.
