@@ -9,11 +9,11 @@
 // - Saving asks the server to prepare the edit, lists every warning in plain words, and the owner
 //   ticks each one before the save button works (D-119). The browser never signs: the save is one
 //   POST to the presence gate with the passkey assertion or the typed owner code as its body.
-import { act } from 'react';
+import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
-import { RulesPage } from './index.js';
+import { RulesPage, type RulesPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 import { RULES_STRINGS as S } from './strings.js';
 import { warningText } from './warnings.js';
@@ -124,7 +124,7 @@ async function mount(routes: Record<string, unknown>, credentials?: CredentialsC
     token: 't0ken',
     ...(credentials ? { credentials } : {}),
   });
-  act(() => root.render(<RulesPage api={api} owner={owner} />));
+  act(() => root.render(createElement<RulesPageProps>(RulesPage, { api, owner })));
   await flush();
   return srv;
 }
