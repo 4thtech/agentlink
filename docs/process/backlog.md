@@ -4558,7 +4558,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-12b · quickstart and harness permission guidance
 - **Status:** done (4thtech/agentlink#152, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
+- **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published into 4thTech Docs at each release, DOCS-PUB; per-folder Git Sync superseded 26 Oct 2026)
 - **Depends on:** M1-9a, M1-9b, M1-9l; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2 (owner code, opt-in passphrase), §2.5 (residual risk; same-user agents, D-67); 06 §7; 02 J1; 10 M1-12; 11 §5
 - **Invariants:** I-4
@@ -4575,7 +4575,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-12d · quickstart: local UI, storage, credits and proof (new, split from M1-12b)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · docs-site/guide/ (published to GitBook through Git Sync, DOCS-PUB)
+- **Repo/path:** agentlink · docs-site/guide/ (published into 4thTech Docs at each release, DOCS-PUB; per-folder Git Sync superseded 26 Oct 2026)
 - **Depends on:** M1-12b, M1-11a, M1-9h, M1-9i
 - **Spec:** 04 §2.5; 06 §7; 02 F-51, J1–J5; 10 M1-12; D-39, D-40
 - **Invariants:** I-4
@@ -7674,12 +7674,12 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 
 #### M3-11 · Publish AgentLink / OCC v2 docs on GitBook (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S0
-- **Repo/path:** GitBook `wiki.4thtech.io` (OCC v1 space, via the owner-provided GitBook MCP); AgentLink docs are synced from agentlink · docs-site/ by Git Sync (DOCS-PUB)
+- **Repo/path:** GitBook `wiki.4thtech.io` (OCC v1 space, via the owner-provided GitBook MCP); AgentLink docs are to be copied from agentlink · docs-site/ release tags (DOCS-PUB; Superseded by the 26 Oct 2026 owner decision (one GitBook space, 4thTech Docs; AgentLink docs copied in at each release, once the copy script exists))
 - **Depends on:** M3-10, M1-12b, M1-12d, DOCS-M3
 - **Spec:** D-29; 02 (features); 06 §7; 01 positioning rules (private: never claim unimplemented features)
 - **Invariants:** —
 - **Scope:**
-  - AgentLink and OCC v2 docs are already published from `docs-site/` by Git Sync (DOCS-PUB) and brought to the mainnet state by DOCS-M3. This card covers the GitBook side at mainnet beta: mark the OCC v1 docs on `wiki.4thtech.io` as legacy and link them to the AgentLink docs, using the GitBook change-request flow (the v1 space is not Git-synced; no direct edits to published content).
+  - AgentLink and OCC v2 docs are written in `docs-site/` (DOCS-PUB; per-folder Git Sync superseded, see the 26 Oct decision) and brought to the mainnet state by DOCS-M3. This card covers the GitBook side at mainnet beta: mark the OCC v1 docs on `wiki.4thtech.io` as legacy and link them to the AgentLink docs, using the GitBook change-request flow (it is now the single 4thTech Docs space; no direct edits to published content).
   - Only features that are merged and deployed are documented as available; everything else is labelled planned.
   - Update the README Status and roadmap; never claim unimplemented features.
 - **Acceptance:**
@@ -7753,7 +7753,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 
 ### Public documentation across milestones (DOCS-PUB) (new)
 
-The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook space each, published from `main` by Git Sync (D-57); the owner connects Git Sync in the GitBook interface (`docs-site/MAINTAINING.md` §2). `docs-site/**` is S1. Pages for unreleased features carry a **Planned** status hint and are filled in by the milestone's DOCS card below, in the delivery step "Docs and knowledge". A milestone is done only when its DOCS card is done (`development-process.md` §6.3).
+The public docs live in `docs-site/` (`guide/` and `technical/`), published into the single 4thTech Docs GitBook space at each release (`docs-site/MAINTAINING.md` §2). Superseded by the 26 Oct 2026 owner decision (one GitBook space, 4thTech Docs; AgentLink docs copied in at each release, once the copy script exists): originally one space each, published from `main` by Git Sync (D-57), connected by the owner. `docs-site/**` is S1. Pages for unreleased features carry a **Planned** status hint and are filled in by the milestone's DOCS card below, in the delivery step "Docs and knowledge". A milestone is done only when its DOCS card is done (`development-process.md` §6.3).
 
 #### DOCS-PUB · Public documentation: structure and foundation (new)
 - **Status:** ready (in review: PR #8; live status on the sync board) · **Size:** L · **Tier:** Opus · **Security:** S1
@@ -7762,7 +7762,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Spec:** owner request (14 Oct 2026); D-29, D-57; 11 §5; 10 (milestones); `versioning.md` §3
 - **Invariants:** — (pages restate I-1 to I-10 from 04; nothing is relaxed)
 - **Scope:**
-  - Two GitBook Git Sync spaces (`guide/`, `technical/`) organised by Diátaxis; real content only where the specs make it true by design; every other page an outline with a Planned status line.
+  - Two sections (`guide/`, `technical/`; originally two Git Sync spaces, superseded 26 Oct 2026) organised by Diátaxis; real content only where the specs make it true by design; every other page an outline with a Planned status line.
   - `docs-site/MAINTAINING.md` (upkeep table M1a to M3, per-release docs pass, owner's one-time GitBook setup); the DOCS cards below; the Definition of done rule.
 - **Acceptance:**
   - Every page has a status line; every relative link resolves; each `SUMMARY.md` lists every page exactly once; the guide passes the 11 §5 vocabulary check.
@@ -7771,13 +7771,13 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 #### DOCS-M1a · Public docs pass for v0.1.0 (pair and talk) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
 - **Repo/path:** agentlink · docs-site/
-- **Depends on:** M1-12b, M1-25, M1-9c, M1-16 (release); the owner's GitBook Git Sync setup
+- **Depends on:** M1-12b, M1-25, M1-9c, M1-16 (release); the owner's GitBook setup (per-folder Git Sync superseded 26 Oct 2026)
 - **Spec:** `docs-site/MAINTAINING.md` §3–§4; 06 §2, §3, §7, §8; 02 J1, J4, J8, J9; 11 §5; `versioning.md` §3
 - **Invariants:** — (pages restate I-4, I-5 behaviour; any change to the security pages follows the spec)
 - **Scope:**
   - Fill in the M1a column of the `MAINTAINING.md` table: setup pages for Claude Code, Codex, Gemini CLI and Claude Desktop (config), pairing, first message, contacts, messages, approvals (passphrase), negotiation, troubleshooting, FAQ, glossary; technical MCP tools (Talk), policies, CLI, harness configuration, SDK packages (Talk), crypto suites, test vectors.
   - Status hints of shipped features → "Available since v0.1.0" only once v0.1.0 is on npm `latest`; "What works today", Status and roadmap and Versioning updated.
-  - Replace cross-space GitHub links with the published site URLs once the site address exists.
+  - Replace GitHub links to the specs and code with the published site URLs where pages exist once the site address exists.
   - Headless file KeyStore (D-54): mark the "Where seeds live" row available when it ships, and add the headless setup steps to the guide.
 - **Acceptance:**
   - Every page marked available maps to a `done` card and to software on npm `latest`; every unreleased feature still says Planned.
@@ -7890,7 +7890,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
 - **Invariants:** —
 - **Scope:**
   - The docs model: readers and layers, page types with outlines, GitBook components with GitHub fallbacks, the UI ↔ tech bridge, screenshot rules, wording, repo ↔ GitBook ↔ wiki linking, the proposed place of AgentLink in the existing 4thTech GitBook (owner confirms), definition of done, refresh triggers.
-  - Templates (screen guide, how-to, concept, technical concept) outside both Git Sync spaces; the Files screen guide rewritten to the model with screenshot placeholders.
+  - Templates (screen guide, how-to, concept, technical concept) outside `guide/` and `technical/`; the Files screen guide rewritten to the model with screenshot placeholders.
 - **Acceptance:**
   - The guide vocabulary check is green; `node tools/docs-status/index.mjs --check` passes; the templates are not under a synced space.
 

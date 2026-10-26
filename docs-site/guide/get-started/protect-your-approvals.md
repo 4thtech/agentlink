@@ -1,6 +1,6 @@
 # Protect your approvals
 
-*Applies to AgentLink 0.2.0. You approve with an owner code. From 0.3.0 (releasing) the local app can use a passkey (Touch ID, Windows Hello) instead.*
+*Applies to AgentLink 0.3.0, which is releasing. The recommended way is the setup page: one Touch ID (or Windows Hello), and a backup code. The terminal way, `owner init`, with an owner code, still works and is the only way in the published 0.2.0.*
 
 ## Why this step exists
 
@@ -8,7 +8,9 @@ Your AI sends and reads messages through AgentLink. Some actions need your appro
 
 This takes about a minute.
 
-## Set up your owner code
+## Set up your owner code in the terminal
+
+This is the terminal way. In 0.3.0 the [setup page](#the-setup-page-030-releasing) opens from `init` and does the same job. Use the terminal way if no browser opens or you prefer it.
 
 1. **Open a terminal window yourself.** Use your normal terminal app, not the one inside your AI app, and not one your AI started.
 2. **Run `npx -y @4thtech-io/agentlink owner init`.**

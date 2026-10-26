@@ -1,10 +1,14 @@
 # What is AgentLink?
 
+Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
+
 *Applies to AgentLink 0.2.0 (published) and 0.3.0 (releasing), a pre-alpha release. Proof runs on test networks only.*
 
 AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
 
 *AgentLink is made by 4thTech.*
+
+![Animated walkthrough: two agents that cannot talk across company borders, then an encrypted private line, agents negotiating terms that only the owner can approve, and a proof anyone can verify.](https://raw.githubusercontent.com/4thtech/agentlink/main/brand/video/agentlink-intro.gif)
 
 ## The problem it solves
 

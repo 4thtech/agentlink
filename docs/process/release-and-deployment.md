@@ -75,7 +75,7 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 | Encrypted drop Worker (+ DO quota counters, R2 bucket), `drop.` (D-48) | public `apps/drop` (`wrangler.toml`) | `deploy-drop.yml` (§4.5, M1-27b) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52), as for the submitter |
 | Static sites: landing, console, verify, invite, `pay.` deposit page (M3-4) | public, see §1.1 | Cloudflare deploy workflow (§4.6) | `workers.dev` (automatic) | Automatic after staging smoke (`production`, D-52) |
 | Cloud-agent demo instance (when it exists) | public `apps/cloud-agent` | §4.5 | `workers.dev` | Automatic after staging smoke (`production`, D-52) |
-| Public docs (D-29, D-57) | GitBook, synced from `docs-site/` on `main` by Git Sync | §4.9 (not a Workers deploy) | — | Merge to `main` publishes |
+| Public docs (D-29, D-57) | 4thTech Docs on GitBook (one space), copied from `docs-site/` release tags (planned) | §4.9 (not a Workers deploy) | — | Release copy publishes (planned) |
 | Optional 4thTech relay (strfry) | `agentlink-ops` | §4.7 | — | Owner |
 | Cloud-agent template repo `4thtech/agentlink-cloud-agent` | public `apps/cloud-agent` | §4.8 | — | Owner |
 
@@ -115,7 +115,7 @@ Hosting is Cloudflare Workers, with static sites as Workers static assets. The z
 - Clearing `DEPLOY_FREEZE`.
 - Approving production deployments.
 - npm actions with 2FA: bootstrap publishes, `npm deprecate`, manual dist-tag moves.
-- Changing the public docs publishing setup: GitBook Git Sync, domain, site structure and spaces (§4.9, D-57).
+- Changing the public docs publishing setup: the 4thTech Docs GitBook space, the wiki repo, domain and site structure (§4.9, D-57).
 
 Testnet contract deploys stay CI-driven from the private repo (§4.2).
 
@@ -313,7 +313,7 @@ The optional 4thTech relay (strfry, 30-day retention, ciphertext only) is not on
 
 ### 4.9 Public docs (GitBook, D-29, D-57)
 
-Public product and developer docs are written in `docs-site/` (`guide/` and `technical/`) and published on GitBook; they are not a Workers deploy. Each GitBook space syncs from `main` through Git Sync, GitHub → GitBook only, with live editing in GitBook turned off, so a merged pull request publishes and a revert unpublishes. Docs are published continuously, in parallel with the build: every page carries an honest status line and nothing is marked available before the release that ships it reaches npm `latest` or production (`docs-site/MAINTAINING.md`). `docs-site/**` is S1 (`audit-rules.md` §2.2). Changes to the publishing setup (Git Sync, domain, site structure) are owner-only (§3.2). The OCC v1 docs on `wiki.4thtech.io` are not Git-synced; agents MAY prepare a GitBook change request there, which the owner reviews and publishes. The repository README's Status section is updated in the same release (`development-process.md` §6.3).
+Public product and developer docs are written in `docs-site/` (`guide/` and `technical/`) and are published into the single 4thTech Docs GitBook space (`wiki.4thtech.io`, Git-synced from the private repo `4thtech/wiki.4thtech.io`) by copying `docs-site/guide` and `docs-site/technical` from each release tag into a PR in that repo; they are not a Workers deploy. The copy script is planned, not built; until then the AgentLink section there is a short summary. Live editing in GitBook stays off. Docs are published continuously, in parallel with the build: every page carries an honest status line and nothing is marked available before the release that ships it reaches npm `latest` or production (`docs-site/MAINTAINING.md`). `docs-site/**` is S1 (`audit-rules.md` §2.2). Changes to the publishing setup (wiki repo, Git Sync, domain, site structure) are owner-only (§3.2). Decided by Tali, 2026-10-26: one space; the earlier OCC v1 pages in it are edited in GitBook; agents MAY prepare a GitBook change request there, which the owner reviews and publishes. The repository README's Status section is updated in the same release (`development-process.md` §6.3).
 
 ---
 
@@ -421,7 +421,7 @@ Every automatic rollback sets `DEPLOY_FREEZE`; the owner clears it after the inc
 | Contract configuration | Manual: schedule the reverse change | Delays apply; lowering caps is immediate |
 | Cloud-agent template | Revert the template repo to the previous tag | User instances are theirs; notify users |
 | Claude Desktop extension | Republish the previous bundle as the GitHub release asset | Its SHA-256 and attestation are republished with it (§2, D-91) |
-| Public docs (GitBook, synced from `docs-site/`) | Revert the PR on `main`; Git Sync republishes the previous pages | OCC v1 pages on `wiki.4thtech.io`: owner reverts in GitBook |
+| Public docs (4thTech Docs, copied from `docs-site/` release tags) | Revert the PR on `main`, or the copy PR in the wiki repo; Git Sync republishes the previous pages | Earlier 4thTech pages on `wiki.4thtech.io`: owner reverts in GitBook |
 
 ---
 
