@@ -746,6 +746,7 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       'files',
       'getProof',
       'listActivity',
+      'policy',
       'proofs',
     ]);
     expect(Object.isFrozen(client)).toBe(true);

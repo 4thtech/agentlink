@@ -52,6 +52,7 @@ describe('routes', () => {
     '/settings/contacts',
     '/settings/files',
     '/settings/proofs',
+    '/settings/rules',
   ]);
   const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');
   it.each(STUBS)('%s renders its page inside the layout', (path, title) => {

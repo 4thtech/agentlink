@@ -31,6 +31,11 @@ function fakeClient(
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
     listActivity: () => Promise.reject(new Error('not used')),
+    policy: {
+      load: () => Promise.reject(new Error('not used')),
+      prepareEdit: () => Promise.reject(new Error('not used')),
+      recordReceiptsKept: () => Promise.reject(new Error('not used')),
+    },
     files: {
       resolvedFolders: () => Promise.reject(new Error('not used')),
       preparePolicyEdit: () => Promise.reject(new Error('not used')),
@@ -425,6 +430,7 @@ describe('the read-only client view (context.ts)', () => {
       'files',
       'getProof',
       'listActivity',
+      'policy',
       'proofs',
     ]);
     expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list']);
