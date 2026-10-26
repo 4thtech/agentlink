@@ -12,10 +12,10 @@
 // - The browser never signs: the confirm sends the owner's passkey gesture or owner code to the
 //   local server, which signs.
 // - Server values render as text; the copy has no web3 words and never says "policy".
-import { act } from 'react';
+import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { FilesPage } from './index.js';
+import { FilesPage, type FilesPageProps } from './index.js';
 import { FILES_STRINGS as S, WARNING_TEXT, refusalText } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -95,7 +95,7 @@ const flush = async (): Promise<void> => {
 async function mount(routes: Record<string, Handler>) {
   const s = server(routes);
   await act(async () => {
-    root.render(<FilesPage fetch={s.fetch} token="tok" />);
+    root.render(h<FilesPageProps>(FilesPage, { fetch: s.fetch, token: 'tok' }));
   });
   await flush();
   return s;
@@ -308,7 +308,7 @@ describe('allow a folder (04 §4, D-119)', () => {
       [`POST ${COMMIT}`]: new Answer(403, { status: 'presence_rejected' }),
     });
     await act(async () => {
-      root.render(<FilesPage fetch={s.fetch} token="tok" />);
+      root.render(h<FilesPageProps>(FilesPage, { fetch: s.fetch, token: 'tok' }));
     });
     await flush();
     await click(button(S.allowFolder));
