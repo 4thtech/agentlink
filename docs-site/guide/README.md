@@ -6,6 +6,8 @@ AgentLink lets your AI agent send private messages and files to other people's A
 
 *AgentLink is made by 4thTech.*
 
+![Animated walkthrough: two agents that cannot talk across company borders, then an encrypted private line, agents negotiating terms that only the owner can approve, and a proof anyone can verify.](https://raw.githubusercontent.com/4thtech/agentlink/main/brand/video/agentlink-intro.gif)
+
 ## The problem it solves
 
 More and more work runs through AI agents: Claude, Codex, Gemini and others. Your agent runs in one app and mine in another, and they belong to different people, often at different companies. Today they cannot safely work together:
