@@ -43,7 +43,7 @@ import {
 import { createLocalUiRoutes } from '../routes.js';
 import { createFilesRoutes, filesRoutes } from './files.js';
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'agentlink-m1-11c-a3-')));
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agentlink-m1-11c-a3-')));
 const home = join(root, 'home');
 const docs = join(home, 'Documents');
 const shared = join(docs, 'Shared');
