@@ -12,7 +12,9 @@ describe('UX-031-QUICKWINS: backup code wording', () => {
     const files = Object.entries(stringFiles);
     expect(files.length).toBeGreaterThan(3);
     for (const [file, source] of files) {
-      expect(source, file).not.toMatch(/owner code/i);
+      // One shared hint may name the earlier "owner code" (0.2.0 owners; src/strings.ts).
+      const without = source.replace(/Set up before 0\.3\.0\? Use the owner code from[^']*/, '');
+      expect(without, file).not.toMatch(/owner code/i);
     }
   });
 });

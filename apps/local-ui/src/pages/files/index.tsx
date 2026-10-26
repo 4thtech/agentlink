@@ -13,7 +13,7 @@
 // (UX audit 4b "More options"), and Storage (folded in by D-120 later).
 import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import { PAGE_TITLES } from '../../strings.js';
+import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
 import {
   COMMIT_PATH,
   LIST_PATH,
@@ -210,7 +210,7 @@ function Confirm({
           type="password"
           autoComplete="off"
           label={S.ownerCode}
-          hint={S.ownerCodeHint}
+          hint={`${S.ownerCodeHint} ${EARLIER_OWNER_CODE_HINT}`}
           value={code}
           onChange={(e) => setCode(e.target.value)}
           disabled={sending}

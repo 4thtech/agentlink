@@ -31,7 +31,7 @@ import {
   type ReactElement,
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
-import { PAGE_TITLES } from '../../strings.js';
+import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
 import {
   LIST_PATH,
   contactPath,
@@ -241,6 +241,7 @@ function PresencePrompt({
         <form className="ct-presence-form" onSubmit={submitCode}>
           <TextField
             label={S.ownerCode}
+            hint={EARLIER_OWNER_CODE_HINT}
             name="owner-code"
             type="password"
             autoComplete="off"
