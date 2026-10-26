@@ -62,7 +62,7 @@ A format version changes only with a spec change, a decision-log entry, new test
 | M1 gate (M1a and M1b) | `0.2.0` | Local beta on testnets |
 | Usable local app | `0.3.0` | The local app served by the CLI (`agentlink ui` and its pages) |
 | M2, cloud agent first | `0.4.0` | The self-hosted cloud agent, Claude on the web and phones (D-131) |
-| M2, rest | later `0.x.0` | Console, desktop apps and the rest of the M2 cloud work, not in 0.4.0 (D-131 (n), decided by the owner, 2026-10-26); numbers set when planned |
+| M2, rest | later `0.x.0` | Console, desktop apps and the other M2 work; numbers set when planned (proposed, owner confirms at merge). The rest of the M2 cloud work ships in later 0.x releases, not in 0.4.0 (D-131 (n), decided by the owner, 2026-10-26) |
 | M3 mainnet beta | `1.0.0` | First strict SemVer promise |
 
 Patch releases (`0.1.1`, …) fix defects in between. Work toward a milestone ships as `0.x.0-next.N` on `next`; only the milestone version and later patches reach `latest`. Hotfix branches wait until first needed.
