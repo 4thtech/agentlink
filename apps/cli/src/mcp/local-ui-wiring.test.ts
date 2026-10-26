@@ -14,7 +14,8 @@ import {
 
 const AGENT_ID = `0x${'cd'.repeat(20)}`;
 const identity = { get: vi.fn(), init: vi.fn() };
-const client = { agentId: AGENT_ID, identity } as unknown as AgentLinkClient;
+const ownerActions = { preparePolicyEdit: vi.fn(), apply: vi.fn() };
+const client = { agentId: AGENT_ID, identity, ownerActions } as unknown as AgentLinkClient;
 const assets: LocalUiAssets = { files: new Map([['index.html', new Uint8Array([60])]]) };
 const RELAYS = ['wss://relay.one.example', 'wss://relay.two.example'];
 
@@ -41,11 +42,23 @@ describe('localUiOptions (M1-11b-6)', () => {
     const options = await localUiOptions({ name: 'work', client }, d);
     expect(options.assets).toBe(assets);
     expect(options.client).toBe(client);
+    // M1-UX-FIRSTRUN-V2 (D-130 (2)): the same gesture signs the first policy (the Send folder)
+    // with the agent's own core owner actions, in the real home folder (no `home` override).
     expect(options.ownerSetup).toEqual({
-      firstCard: { agent: AGENT_ID, name: 'work', relays: RELAYS, identity },
+      firstCard: {
+        agent: AGENT_ID,
+        name: 'work',
+        relays: RELAYS,
+        identity,
+        firstPolicy: { actions: ownerActions },
+      },
     });
-    // The check ran on exactly the card the setup would sign.
-    expect(d.checked).toEqual([options.ownerSetup?.firstCard]);
+    expect(options.ownerSetup?.firstCard.firstPolicy?.actions).toBe(ownerActions);
+    expect(options.ownerSetup?.firstCard.firstPolicy).not.toHaveProperty('home');
+    // The check ran on the card the setup would sign.
+    expect(d.checked).toEqual([
+      { agent: AGENT_ID, name: 'work', relays: RELAYS, identity },
+    ]);
     // The default owner files (the real home) are kept: no override is passed.
     expect(options.ownerSetup).not.toHaveProperty('ownerFiles');
   });

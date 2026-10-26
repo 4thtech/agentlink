@@ -15,7 +15,7 @@
 //   passkey (`ALKP`) and signs the agent's first card, all or nothing. The owner code is returned
 //   once, for the page's collapsed "backup way to approve", and never logged.
 // - The pending seed is wiped on expiry, on error, on completion and when the server closes.
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
 import { stderr as processStderr, stdout as processStdout } from 'node:process';
@@ -1135,5 +1135,286 @@ describe('IR-M1-11s-c-1 M-2: the wrong-code backoff holds setup back first (429 
     expect(h.seeds).toHaveLength(1);
     // Finish is held back the same way.
     expect((await post(h, FINISH, s, new Uint8Array(0))).status).toBe(429);
+  }, 60_000);
+});
+
+// M1-UX-FIRSTRUN-V2 acceptance (D-130 (1), (2); 08 §1 first run v2; 04 §2.5 one owner flow; 06 §3;
+// I-1, I-4, I-7): the one passkey gesture of the first run also signs the agent's first policy, the
+// 06 §3 defaults with the real `~/AgentLink/Send` allowed. `begin` prepares the folders (Send, Inbox,
+// Proofs, 0700) before the gesture and refuses a Send folder that is a link (at either level), not a
+// folder, or not empty, before any seed exists. A failure after the card leaves no policy and removes
+// the folders this run created. The backup code reaches only the finish answer.
+describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the first policy', () => {
+  const home = (): string => join(dir, 'home');
+  const sendPath = (): string => join(home(), 'AgentLink', 'Send');
+
+  async function withHome(): Promise<string> {
+    await mkdir(home(), { recursive: true });
+    return realpath(home());
+  }
+
+  const withPolicy = (agent: Agent): FirstAgentCard => ({
+    ...firstCardOf(agent),
+    firstPolicy: { actions: agent.client.ownerActions, home: home() },
+  });
+
+  interface DoneBody {
+    status: string;
+    passkey: boolean;
+    ownerCode: string;
+    fingerprint: string;
+    sendFolder?: string;
+    computerName?: string;
+  }
+
+  async function runSetup(
+    agent: Agent,
+    options: { firstCard?: FirstAgentCard; prf?: boolean; internals?: ApprovalServerInternals } = {},
+  ): Promise<{ h: Harness; s: Session; begun: BeginBody; res: Response; done: DoneBody }> {
+    const h = await harness(agent, {
+      firstCard: options.firstCard ?? withPolicy(agent),
+      ...(options.internals === undefined ? {} : { internals: options.internals }),
+    });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator({ prf: options.prf ?? true }).create(begun.publicKey, { origin: h.origin }),
+    );
+    return { h, s, begun, res, done: JSON.parse(res.body) as DoneBody };
+  }
+
+  it('one confirmation: a verified card, a signed first policy with Send allowed, and the folders', async () => {
+    const real = await withHome();
+    const agent = await initAgent();
+    const { h, res, done, begun } = await runSetup(agent);
+    expect(res.status).toBe(200);
+    expect(done.status).toBe('done');
+    expect(done.passkey).toBe(true);
+    expect(done.sendFolder).toBe('allowed');
+
+    const view = await agent.client.identity.get();
+    expect(view !== undefined && verifyAgentCard(view.card, view.cardSig, view.cardAgentSig)).toBe(
+      true,
+    );
+    const effective = await agent.client.ownerActions.loadPolicy();
+    expect(effective.mode).toBe('signed');
+    if (effective.mode !== 'signed') return;
+    expect(effective.version).toBe(1);
+    const folder = join(real, 'AgentLink', 'Send');
+    expect(effective.policy.files.allowedFolders).toEqual([folder]);
+
+    // Send, Inbox and Proofs: real folders, 0700, Send empty.
+    for (const name of ['Send', 'Inbox', 'Proofs']) {
+      const stats = await lstat(join(real, 'AgentLink', name));
+      expect(stats.isDirectory()).toBe(true);
+      expect(stats.isSymbolicLink()).toBe(false);
+      if (process.platform !== 'win32') expect(stats.mode & 0o777).toBe(0o700);
+    }
+    expect(await readdir(folder)).toEqual([]);
+    // The done event carries fixed values only (never the code or the path).
+    expect(h.events.filter((e) => e.kind === 'owner_setup').at(-1)).toEqual({
+      kind: 'owner_setup',
+      outcome: 'done',
+      fingerprint: begun.fingerprint,
+      sendFolder: 'allowed',
+    });
+    expect(JSON.stringify(h.events)).not.toContain(folder);
+  }, 60_000);
+
+  it('without PRF the backup code is the way to approve, and the first policy is still signed', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const { done } = await runSetup(agent, { prf: false });
+    expect(done.status).toBe('done');
+    expect(done.passkey).toBe(false);
+    expect(done.sendFolder).toBe('allowed');
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(false);
+    expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('signed');
+  }, 60_000);
+
+  it('names the computer for the password manager entry, plain and short, never anything else', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const { done } = await runSetup(agent, {
+      internals: { hostname: () => 'Talis-MacBook-Pro.local' },
+    });
+    expect(done.computerName).toBe('Talis-MacBook-Pro');
+    const other = await initAgent();
+    await rm(join(home(), 'AgentLink'), { recursive: true, force: true });
+    const second = await runSetup(other, {
+      internals: { hostname: () => 'bad\u0007name‮' },
+    });
+    expect(second.done.computerName).toBe('this computer');
+  }, 60_000);
+
+  const refusedFolders: [string, () => Promise<void>, readonly string[] | undefined][] = [
+    [
+      'Send is a link',
+      async () => {
+        await mkdir(join(dir, 'elsewhere'), { recursive: true });
+        await mkdir(join(home(), 'AgentLink'), { recursive: true });
+        await symlink(join(dir, 'elsewhere'), sendPath());
+      },
+      [],
+    ],
+    [
+      'AgentLink is a link',
+      async () => {
+        await mkdir(join(dir, 'elsewhere', 'Send'), { recursive: true });
+        await symlink(join(dir, 'elsewhere'), join(home(), 'AgentLink'));
+      },
+      ['Send'],
+    ],
+    [
+      'Send is a file',
+      async () => {
+        await mkdir(join(home(), 'AgentLink'), { recursive: true });
+        await writeFile(sendPath(), 'x');
+      },
+      undefined,
+    ],
+  ];
+  for (const [what, plant, elsewhere] of refusedFolders) {
+    it(`refuses begin before the gesture when ${what}: no seed, nothing stored`, async () => {
+      await withHome();
+      await plant();
+      const agent = await initAgent();
+      const h = await harness(agent, { firstCard: withPolicy(agent) });
+      const s = await h.session();
+      const res = await post(h, BEGIN, s, new Uint8Array(0));
+      expect(res.status).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({
+        status: 'folder_refused',
+        reason: 'folder_unavailable',
+      });
+      expect(h.seeds).toHaveLength(0);
+      expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
+      expect(await agent.client.identity.get()).toBeUndefined();
+      // Nothing was created through the link.
+      if (elsewhere !== undefined) expect(await readdir(join(dir, 'elsewhere'))).toEqual(elsewhere);
+    });
+  }
+
+  it('refuses begin when Send already holds files, and touches none of them', async () => {
+    await withHome();
+    await mkdir(sendPath(), { recursive: true });
+    await writeFile(join(sendPath(), 'tax-return.pdf'), 'private');
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const res = await post(h, BEGIN, await h.session(), new Uint8Array(0));
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ status: 'folder_refused', reason: 'folder_not_empty' });
+    expect(h.seeds).toHaveLength(0);
+    expect(await readdir(sendPath())).toEqual(['tax-return.pdf']);
+    expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+  });
+
+  it('a policy refused after the card leaves no policy and removes the folders it created', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const firstCard: FirstAgentCard = {
+      ...firstCardOf(agent),
+      firstPolicy: {
+        actions: {
+          preparePolicyEdit: (patch, opts) =>
+            agent.client.ownerActions.preparePolicyEdit(patch, opts),
+          apply: () =>
+            Promise.resolve({ status: 'refused', reason: 'bad_signature' } as never),
+        },
+        home: home(),
+      },
+    };
+    const { res, done } = await runSetup(agent, { firstCard });
+    expect(res.status).toBe(200);
+    expect(done.status).toBe('done');
+    expect(done.sendFolder).toBe('not_allowed');
+    // The card is kept (its owner too); no policy; nothing half-written on disk.
+    expect(await agent.client.identity.get()).toBeDefined();
+    expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+    await expect(lstat(join(home(), 'AgentLink'))).rejects.toThrow();
+  }, 60_000);
+
+  it('a card that is not signed rolls everything back, folders included', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const firstCard: FirstAgentCard = {
+      ...withPolicy(agent),
+      relays: ['wss://one.relay-alpha.net', 'wss://one.relay-alpha.net'],
+    };
+    const { res } = await runSetup(agent, { firstCard });
+    expect(res.status).toBe(500);
+    expect(JSON.parse(res.body)).toEqual({ status: 'failed', reason: 'rolled_back' });
+    expect([...agent.keychain.items.keys()].filter((k) => k.startsWith('owner'))).toEqual([]);
+    expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+    await expect(lstat(join(home(), 'AgentLink'))).rejects.toThrow();
+  }, 60_000);
+
+  it('an expired hold removes the folders begin created', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    expect((await lstat(sendPath())).isDirectory()).toBe(true);
+    h.clock += SETUP_HOLD_MS + 1;
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator().create(begun.publicKey, { origin: h.origin }),
+    );
+    expect(JSON.parse(res.body)).toEqual({ status: 'expired' });
+    await vi.waitFor(async () => {
+      await expect(lstat(join(home(), 'AgentLink'))).rejects.toThrow();
+    });
+  });
+
+  it('agent side: without the browser session nothing begins and no folder is made', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const s = await h.session();
+    // A same-user process without the session cookie, or without the page's CSRF token.
+    for (const headers of [{ Cookie: undefined }, { 'X-AgentLink-CSRF': undefined }]) {
+      const res = await post(h, BEGIN, s, new Uint8Array(0), headers);
+      expect([401, 403]).toContain(res.status);
+    }
+    expect(h.seeds).toHaveLength(0);
+    await expect(lstat(join(home(), 'AgentLink'))).rejects.toThrow();
+  });
+
+  it('agent side: a replayed finish signs nothing more and never shows the code again', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const body = new Authenticator().create(begun.publicKey, { origin: h.origin });
+    const first = await post(h, FINISH, s, body.slice());
+    expect(first.status).toBe(200);
+    expect(first.headers['cache-control']).toBe('no-store');
+    const { ownerCode, sendFolder } = JSON.parse(first.body) as DoneBody;
+    expect(sendFolder).toBe('allowed');
+    const compact = ownerCode.replaceAll(' ', '');
+
+    const replay = await post(h, FINISH, s, body);
+    expect(replay.status).toBe(409);
+    const again = await post(h, BEGIN, s, new Uint8Array(0));
+    expect(JSON.parse(again.body)).toEqual({ status: 'owner_exists' });
+    const status = await send(h.port, '/api/ui/first-run', {
+      headers: { Cookie: s.cookie, 'X-AgentLink-CSRF': s.csrf },
+    });
+    const effective = await agent.client.ownerActions.loadPolicy();
+    expect(effective.mode === 'signed' ? effective.version : 0).toBe(1);
+    // Backup-code canary: after the one display answer, no answer or event carries it.
+    for (const later of [replay.body, again.body, status.body, JSON.stringify(h.events)]) {
+      expect(later).not.toContain(compact);
+      expect(later).not.toContain(ownerCode);
+      expect(later).not.toContain(compact.slice(0, 8));
+    }
   }, 60_000);
 });
