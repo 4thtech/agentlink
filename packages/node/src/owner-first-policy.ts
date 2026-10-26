@@ -19,6 +19,12 @@
 // - No half-set state: whenever the rules are not applied, the folders this run created are removed
 //   again (rmdir: only while empty), and the agent keeps the 06 §3 defaults. A store that applied the
 //   rules but could not confirm them is reported with the `policy recover` way back (D-100).
+// - One folder from the check to the rules (M1-UX-FIRSTRUN-V2-b, IR-M1-36b-2-d-1): the agent runs
+//   as the same OS user and can rename, replace or link the folder at any moment. The folder checked
+//   is pinned (allowed-path `pinFolder`: its real path, device and inode; the plan's `pin`) and must
+//   still be that same real, empty folder just before signing AND after signing, just before the
+//   rules are applied; otherwise nothing is applied. This holds for `owner init`, `owner add-agent`
+//   and the first run, which all sign through signFirstPolicy.
 // - I-4: nothing here is reachable from MCP. The owner session never leaves node; core only receives
 //   the signed object. Errors are never shown (I-5): fixed results only, no path in an error.
 import { lstat, mkdir, readdir, realpath, rmdir } from 'node:fs/promises';
@@ -35,6 +41,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
+import { pinFolder, stillPinned, type FolderPin } from './allowed-path.js';
 import { CLI_COMMAND } from './cli-command.js';
 import { assertAllowedOwnerAction } from './owner-allowlist.js';
 import type { FirstAgentCard, FirstPolicy } from './owner-first-card.js';
@@ -61,6 +68,8 @@ export type SendFolderPlan =
       readonly folder: string;
       /** The folders this run created, outermost first (removed again unless the rules apply). */
       readonly created: readonly string[];
+      /** M1-UX-FIRSTRUN-V2-b: the folder as checked (real path, device, inode). */
+      readonly pin: FolderPin;
     }
   | { readonly status: 'unavailable'; readonly reason: 'folder_unavailable' | 'folder_not_empty' };
 
@@ -84,7 +93,12 @@ const isMissing = (error: unknown): boolean =>
 /** Removes the folders a plan created, innermost first; only while empty (rmdir). Never throws. */
 export async function removeCreated(plan: SendFolderPlan | undefined): Promise<void> {
   if (plan?.status !== 'ready') return;
-  for (const folder of [...plan.created].reverse()) {
+  await removeFolders(plan.created);
+}
+
+/** Removes `created` (outermost first), innermost first; only while empty (rmdir). Never throws. */
+async function removeFolders(created: readonly string[]): Promise<void> {
+  for (const folder of [...created].reverse()) {
     try {
       await rmdir(folder);
     } catch {
@@ -109,7 +123,7 @@ export async function prepareSendFolder(home: string = homedir()): Promise<SendF
   const giveUp = async (
     result: Extract<SendFolderPlan, { status: 'unavailable' }>,
   ): Promise<SendFolderPlan> => {
-    await removeCreated({ status: 'ready', folder: '', created });
+    await removeFolders(created);
     return result;
   };
   let current = base;
@@ -131,8 +145,10 @@ export async function prepareSendFolder(home: string = homedir()): Promise<SendF
     }
   }
   const folder = current;
+  // M1-UX-FIRSTRUN-V2-b: pinned here, before the owner secret is asked; also its realpath check.
+  const pin = await pinFolder(folder);
+  if (pin === undefined) return giveUp(unavailable);
   try {
-    if ((await realpath(folder)) !== folder) return giveUp(unavailable);
     if ((await readdir(folder)).length > 0) {
       return giveUp({ status: 'unavailable', reason: 'folder_not_empty' });
     }
@@ -140,7 +156,7 @@ export async function prepareSendFolder(home: string = homedir()): Promise<SendF
     return giveUp(unavailable);
   }
   if (UNPRINTABLE.test(folder)) return giveUp(unavailable);
-  return Object.freeze({ status: 'ready', folder, created: Object.freeze(created) });
+  return Object.freeze({ status: 'ready', folder, created: Object.freeze(created), pin });
 }
 
 /** The line the owner reads before the owner secret is asked. */
@@ -201,7 +217,7 @@ function isFirstPolicyBody(
   return canonicalize(params['policy']) === expectedPolicyJcs(folder);
 }
 
-/** The folder is still the real, empty folder that was checked (re-checked just before signing). */
+/** The folder is still a real, empty folder at its own real path (see stillTheCheckedFolder). */
 export async function stillReady(folder: string): Promise<boolean> {
   try {
     const stats = await lstat(folder);
@@ -211,6 +227,16 @@ export async function stillReady(folder: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * M1-UX-FIRSTRUN-V2-b: still the folder that was checked: the pinned one (same real path, device
+ * and inode, so not another folder swapped in at the same path) and still real and empty.
+ */
+async function stillTheCheckedFolder(
+  plan: Extract<SendFolderPlan, { status: 'ready' }>,
+): Promise<boolean> {
+  return (await stillPinned(plan.pin)) && (await stillReady(plan.folder));
 }
 
 /** A verified stored card for exactly this agent naming exactly this owner. */
@@ -233,7 +259,8 @@ async function cardNamesOwner(first: FirstAgentCard, owner: OwnerPublicKeys): Pr
 /**
  * After the first card: signs and applies the first rules with `inner`, the owner session the one
  * owner-code entry unlocked (the caller closes it). Only when the card is stored and verified, the
- * folder is ready, and what core prepared is exactly the first rules (see the header).
+ * folder is still the one checked (pinned; before and after signing), and what core prepared is
+ * exactly the first rules (see the header).
  */
 export async function signFirstPolicy(
   inner: OwnerSession,
@@ -257,7 +284,7 @@ export async function signFirstPolicy(
     return failed;
   }
   if (!isFirstPolicyBody(body, first.agent, owner, plan.folder)) return failed;
-  if (!(await stillReady(plan.folder))) return failed;
+  if (!(await stillTheCheckedFolder(plan))) return failed;
   let sig: string;
   try {
     assertAllowedOwnerAction(body);
@@ -265,6 +292,8 @@ export async function signFirstPolicy(
   } catch {
     return failed;
   }
+  // M1-UX-FIRSTRUN-V2-b: and again after signing, just before the rules are applied.
+  if (!(await stillTheCheckedFolder(plan))) return failed;
   let outcome: Awaited<ReturnType<typeof actions.apply>>;
   try {
     outcome = await actions.apply({ body, sig });

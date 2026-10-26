@@ -6389,7 +6389,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a link (at either level) or a non-empty Send folder is refused before the gesture; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
 
 #### M1-UX-FIRSTRUN-V2-b · first run: setup folder race, folder pinning and test lows (new, low, IR-M1-UX-FIRSTRUN-V2-1, #542)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Audit:** Fable · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/owner-setup.ts`, `apps/local-ui/src/pages/first-run/**` tests
 - **Depends on:** M1-UX-FIRSTRUN-V2; M1-36b-2-d (folder pinning helper)
 - **Spec:** 04 §2.5, G-1 (accepted residual); 08 §1 (first run v2)

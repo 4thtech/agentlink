@@ -9,7 +9,17 @@
 //   owner as they were before this feature.
 // - The folder is new and empty or already empty, a real folder (no link), so no existing file
 //   becomes sendable.
-import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -27,6 +37,7 @@ import {
   type JsonObject,
   type KeyStore,
   type OwnerPublicKeys,
+  type OwnerSession,
 } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
@@ -35,6 +46,7 @@ import type { KeychainBackend } from './keychain.js';
 import { CLI_COMMAND } from './cli-command.js';
 import { addAgentWith } from './owner-add-agent.js';
 import type { FirstAgentCard, FirstPolicyActions } from './owner-first-card.js';
+import { prepareSendFolder, signFirstPolicy } from './owner-first-policy.js';
 import { initOwnerWith } from './owner-init.js';
 import { OWNER_ACCOUNT } from './owner-keystore.js';
 import type { OwnerTerminal } from './owner-terminal.js';
@@ -626,5 +638,124 @@ describe('owner add-agent signs the first rules with the card (M1-36b-2; 04 §2.
     expect((await bob.client.ownerActions.loadPolicy()).mode).toBe('defaults');
     expect((await alice.client.ownerActions.loadPolicy()).mode).toBe('defaults');
     expect(await exists(join(home, 'AgentLink'))).toBe(false);
+  });
+});
+
+// M1-UX-FIRSTRUN-V2-b (IR-M1-36b-2-d-1, #545; 04 §2.5, G-1): the agent runs as the same OS user and
+// can replace the Send folder at any moment. The folder checked before the owner code is pinned (its
+// real path, device and inode, allowed-path `pinFolder`) and must still be that same real, empty
+// folder just before signing AND after signing, just before the first rules are applied; otherwise
+// nothing is applied. This covers `owner init`, `owner add-agent` and the first run (all three sign
+// through signFirstPolicy).
+describe('M1-UX-FIRSTRUN-V2-b: the first rules apply only to the Send folder that was checked', () => {
+  /** Replaces Send with another real, empty folder (same path, new inode): stillReady still passes. */
+  async function swapSend(): Promise<void> {
+    const folder = await sendFolder();
+    await rename(folder, `${folder}-moved`);
+    await mkdir(folder, { mode: 0o700 });
+  }
+
+  /** Real core actions; `preparePolicyEdit` swaps Send first (after the check, before signing). */
+  function swappingActions(agent: Agent) {
+    const applied: object[] = [];
+    const actions: FirstPolicyActions = {
+      preparePolicyEdit: async (patch, opts) => {
+        await swapSend();
+        return agent.client.ownerActions.preparePolicyEdit(patch, opts);
+      },
+      apply: (input) => {
+        applied.push(input);
+        return agent.client.ownerActions.apply(input);
+      },
+    };
+    return { actions, applied };
+  }
+
+  it('owner init: Send replaced after the check signs and applies nothing', async () => {
+    const alice = await initAgent('alice');
+    const spy = swappingActions(alice);
+    const run = ownerAtInit();
+    const result = await initOwnerWith(
+      keychain,
+      run.terminal,
+      { backend: 'keychain', env: {}, firstCard: withPolicy(alice, 'alice', spy.actions) },
+      { kdf: KDF },
+    );
+    expect(result.card).toBeDefined();
+    expect(spy.applied).toEqual([]);
+    expect(result.sendFolder).toEqual({ status: 'not_allowed', reason: 'failed' });
+    expect((await alice.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+  });
+
+  it('owner add-agent: Send replaced after the check signs and applies nothing', async () => {
+    const alice = await initAgent('alice');
+    const bob = await initAgent('bob');
+    const { owner, code } = await ownerInitFor(alice, cardOnly(alice, 'alice'));
+    const spy = swappingActions(bob);
+    const result = await addAgentWith(keychain, ownerTyping([code]).terminal, {
+      backend: 'keychain',
+      env: {},
+      owner,
+      card: withPolicy(bob, 'bob', spy.actions),
+    });
+    expect(result.card).toBeDefined();
+    expect(spy.applied).toEqual([]);
+    expect(result.sendFolder).toEqual({ status: 'not_allowed', reason: 'failed' });
+    expect((await bob.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+  });
+
+  /** An owner session double whose signature step runs `during` first (a swap while signing). */
+  function signingSession(during: () => Promise<void>): { inner: OwnerSession; signed: number[] } {
+    const signed: number[] = [];
+    const inner = {
+      signOwnerAction: async () => {
+        signed.push(1);
+        await during();
+        return '00'.repeat(64);
+      },
+    } as unknown as OwnerSession;
+    return { inner, signed };
+  }
+
+  it('signFirstPolicy: Send replaced while signing is caught after signing, before applying', async () => {
+    const alice = await initAgent('alice');
+    const { owner } = await ownerInitFor(alice, cardOnly(alice, 'alice'));
+    const plan = await prepareSendFolder(home);
+    expect(plan.status).toBe('ready');
+    if (plan.status !== 'ready') return;
+    const spy = spyActions(alice);
+    const { inner, signed } = signingSession(swapSend);
+    const result = await signFirstPolicy(
+      inner,
+      withPolicy(alice, 'alice', spy.actions) as FirstAgentCard & {
+        firstPolicy: NonNullable<FirstAgentCard['firstPolicy']>;
+      },
+      plan,
+      owner,
+    );
+    expect(signed).toHaveLength(1);
+    expect(spy.applied).toEqual([]);
+    expect(result).toEqual({ status: 'not_allowed', reason: 'failed' });
+  });
+
+  it('signFirstPolicy: Send replaced before signing is not signed at all', async () => {
+    const alice = await initAgent('alice');
+    const { owner } = await ownerInitFor(alice, cardOnly(alice, 'alice'));
+    const plan = await prepareSendFolder(home);
+    if (plan.status !== 'ready') throw new Error('Send not ready');
+    await swapSend();
+    const spy = spyActions(alice);
+    const { inner, signed } = signingSession(() => Promise.resolve());
+    const result = await signFirstPolicy(
+      inner,
+      withPolicy(alice, 'alice', spy.actions) as FirstAgentCard & {
+        firstPolicy: NonNullable<FirstAgentCard['firstPolicy']>;
+      },
+      plan,
+      owner,
+    );
+    expect(signed).toEqual([]);
+    expect(spy.applied).toEqual([]);
+    expect(result).toEqual({ status: 'not_allowed', reason: 'failed' });
   });
 });

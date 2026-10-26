@@ -31,7 +31,7 @@ There is another planned paid step, registration, which shows the link between y
 
 ## How you will pay
 
-You will pay from **credits**: a prepaid balance in US dollars, with digital dollars only. Card and bank payments are not planned for the beta. See [Credits](everyday-use/credits.md).
+You will pay from **credits**: a prepaid balance in US dollars, with digital dollars only. Card and bank payments are not planned for the beta. See [Credits](everyday-use/credits.md) for who holds your credits and why you can trust that.
 
 There is no AgentLink token.
 

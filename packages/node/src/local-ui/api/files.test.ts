@@ -13,7 +13,7 @@
 //   a folder that changed since the review is refused before `sign` is ever called.
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, parse } from 'node:path';
 import {
   canonicalize,
   encodeBase64url,
@@ -43,7 +43,14 @@ import {
 import { createLocalUiRoutes } from '../routes.js';
 import { createFilesRoutes, filesRoutes } from './files.js';
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'agentlink-m1-11c-a3-')));
+// The routes pick the path flavour from the platform; the tests build real paths with node:path, so
+// they must run with the same flavour (a Windows path is never a posix full path).
+const WIN = process.platform === 'win32';
+const FLAVOR = WIN ? 'win32' : 'posix';
+const sepOut = (p: string): string => (WIN ? p.replace(/\//g, '\\') : p);
+// `.native` like the production `fs.promises.realpath`: on Windows it expands 8.3 short names
+// (RUNNER~1), which the JS `realpathSync` keeps, so the two would name the same folder differently.
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agentlink-m1-11c-a3-')));
 const home = join(root, 'home');
 const docs = join(home, 'Documents');
 const shared = join(docs, 'Shared');
@@ -56,7 +63,10 @@ mkdirSync(work, { recursive: true });
 mkdirSync(outside, { recursive: true });
 mkdirSync(join(home, '.ssh'), { recursive: true });
 mkdirSync(join(home, '.config', 'thing'), { recursive: true });
-mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+// A protected folder below the home folder, per platform (04 §4: macOS Keychains, Windows DPAPI).
+const PROTECTED_TOP = WIN ? 'AppData' : 'Library';
+const PROTECTED_TAIL = WIN ? ['Roaming', 'Microsoft', 'Protect'] : ['Keychains'];
+mkdirSync(join(home, PROTECTED_TOP, ...PROTECTED_TAIL), { recursive: true });
 writeFileSync(join(docs, 'note.txt'), 'x');
 symlinkSync(outside, join(home, 'Linked'));
 symlinkSync(join(home, '.ssh'), join(home, 'Keys'));
@@ -203,7 +213,7 @@ const q = (key: 'add' | 'remove', value: string, version = 3): string =>
   new URLSearchParams({ [key]: value, version: String(version) }).toString();
 
 function setup(now?: number) {
-  const routes = createFilesRoutes({ home, flavor: 'posix' });
+  const routes = createFilesRoutes({ home, flavor: FLAVOR });
   const context = ctx(fakeClient(), now);
   const review = (query: string) =>
     read(routes, '/api/ui/files/review').handler(context, req(query));
@@ -298,7 +308,7 @@ describe('GET /api/ui/files: the allowed folders', () => {
   });
 
   it('is 409 not_set_up without an agent, 503 when core fails, 400 for any query', async () => {
-    const routes = createFilesRoutes({ home, flavor: 'posix' });
+    const routes = createFilesRoutes({ home, flavor: FLAVOR });
     const list = read(routes, '/api/ui/files');
     expect(await list.handler(ctx(null), req())).toEqual(UI_NOT_SET_UP);
     fake.resolved = 'throw';
@@ -337,7 +347,7 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     ['dot segments', `${docs}/../Documents/Shared`, 'dot_segments'],
     ['missing', join(home, 'Nope'), 'missing'],
     ['a file', join(docs, 'note.txt'), 'not_folder'],
-    ['the root', '/', 'too_broad'],
+    ['the root', parse(root).root, 'too_broad'],
     ['the home folder', '~', 'too_broad'],
     ['above the home folder', root, 'too_broad'],
     ['inside ~/.ssh', join(home, '.ssh'), 'protected'],
@@ -354,13 +364,13 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
 
   it('D-99: refuses a folder that contains a protected folder and names it', async () => {
     const { review } = setup();
-    const res = await review(q('add', join(home, 'Library')));
+    const res = await review(q('add', join(home, PROTECTED_TOP)));
     expect(res).toEqual({
       status: 422,
       body: {
         error: 'folder_refused',
         reason: 'contains_protected',
-        protectedFolder: '~/Library/Keychains',
+        protectedFolder: sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')),
       },
     });
     expect(fake.patches).toEqual([]);
@@ -480,7 +490,7 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
   });
 
   it('is 409 not_set_up without an agent', async () => {
-    const routes = createFilesRoutes({ home, flavor: 'posix' });
+    const routes = createFilesRoutes({ home, flavor: FLAVOR });
     expect(
       await read(routes, '/api/ui/files/review').handler(ctx(null), req(q('add', shared))),
     ).toEqual(UI_NOT_SET_UP);
@@ -574,7 +584,7 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
   });
 
   it('keeps reviews per server (context), never shared', async () => {
-    const routes = createFilesRoutes({ home, flavor: 'posix' });
+    const routes = createFilesRoutes({ home, flavor: FLAVOR });
     const a = ctx();
     const b = ctx();
     const res = await read(routes, '/api/ui/files/review').handler(a, req(q('add', shared)));
@@ -594,7 +604,7 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
   });
 
   it('refuses an expired review', async () => {
-    const routes = createFilesRoutes({ home, flavor: 'posix' });
+    const routes = createFilesRoutes({ home, flavor: FLAVOR });
     let now = 1_100_000;
     const context: LocalUiContext = { ...ctx(), now: () => now };
     const res = await read(routes, '/api/ui/files/review').handler(context, req(q('add', shared)));
