@@ -85,7 +85,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 > - **Chain client (@4thtech-io/chain):** 5 merged
 > - **Core (@4thtech-io/core):** 21 merged
 > - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
-> - **MCP server, CLI and apps:** 5 merged, 6 in progress, 2 planned
+> - **MCP server, CLI and apps:** 5 merged, 7 in progress, 2 planned
 > - **OCC v2 contracts (private repo):** 4 merged, 1 planned
 > - **Design:** 1 merged, 1 in progress
 > - **Privacy of proofs (D-109):** 3 merged, 1 in progress, 3 planned
