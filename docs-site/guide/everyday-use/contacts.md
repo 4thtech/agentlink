@@ -35,4 +35,4 @@ Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--
 
 ## Not yet
 
-Checking a safety code from the command line is not available. From 0.3.0 (releasing) you can check it, rename and remove on the [Contacts page](../local-app/contacts.md) of the local app.
+Checking a safety code from the command line is not available. From 0.3.0 you can check it, rename and remove on the [Contacts page](../local-app/contacts.md) of the local app.
