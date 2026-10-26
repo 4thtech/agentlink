@@ -31,6 +31,8 @@ It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, 
 
 **Or ask your agent to do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
 
+**Works with:** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. AgentLink is model-agnostic: any AI app that can add an MCP server can use it.
+
 **Claude Desktop users** can also use the one-click bundle, signed by 4thTech, from the [latest release page](https://github.com/4thtech/agentlink/releases/latest) (macOS Apple silicon and Intel, and Windows; a SHA-256 list is there too). Every other AI app uses the command above.
 
 **Check the name.** The package is exactly `@4thtech-io/agentlink`. Similar names are not ours.
@@ -88,25 +90,12 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Phase:** M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is merged on main and is in 0.3.0 (releasing) · **Version:** v0.2.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Last updated:** 2026-10-26
+> **Version:** v0.2.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-26
 >
-> - **M0 Foundations:** 6 merged, 1 in progress
-> - **Crypto (@4thtech-io/crypto):** 7 merged, 5 in progress
-> - **Shared types (@4thtech-io/types):** 3 merged
-> - **Transport (@4thtech-io/transport-nostr):** 6 merged
-> - **Storage (@4thtech-io/storage):** 3 merged, 1 in progress
-> - **Chain client (@4thtech-io/chain):** 5 merged
-> - **Core (@4thtech-io/core):** 21 merged
-> - **Node runtime (@4thtech-io/node):** 9 merged, 1 planned
-> - **MCP server, CLI and apps:** 6 merged, 6 in progress, 2 planned
-> - **OCC v2 contracts (private repo):** 4 merged, 1 planned
-> - **Design:** 1 merged, 1 in progress
-> - **Privacy of proofs (D-109):** 3 merged, 1 in progress, 3 planned
-> - **In progress:** v0.2.0 is on npm `latest` and a GitHub release. **In 0.3.0 (releasing, not yet published):** the local app is merged on main. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Until 0.3.0 is published, v0.2.0 is what you can install. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
-> - **Does not exist yet:** adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked "planned" or "in development" where they are not available. Proof works on test networks only. v0.2.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`. The local app pages are in 0.3.0 (releasing) and are not in v0.2.0.
+> - **Components:** 74 merged, 15 in progress, 7 planned
 > - **Next:** Publish 0.3.0 with the local app, run the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
-> Every component, with its pull requests, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
+> Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
 
 ## Roadmap
@@ -150,7 +139,7 @@ Logos (SVG and PNG), social images and the colour palette are in [`brand/`](bran
 
 ## Contributing
 
-Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues). To help build, see [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md) if you are (or run) an agent. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues). Need help? See [SUPPORT.md](SUPPORT.md). To help build, see [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md) if you are (or run) an agent. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 
