@@ -6590,7 +6590,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Notes:** the workerd test projects for `crypto`, `transport-nostr`, `chain` and `mcp-tools` named in `PLAN-CLOUD-AGENT.md` are the follow-up card M2-3t-w.
 
 #### M2-3t-w · cloud agent: workerd test projects for the shared packages
-- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 (tests and test config only; no source change)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 by path (`packages/crypto/**`; tests and test config only, no source change)
 - **Repo/path:** agentlink · packages/crypto, packages/transport-nostr, packages/chain, packages/mcp-tools (vitest.config.ts and `src/workerd-smoke.workerd.test.ts`), docs/process/repo-reference.md
 - **Depends on:** M2-3t
 - **Spec:** 07 §1 (every shared package runs in Node, browsers and Workers); `PLAN-CLOUD-AGENT.md` §3 (M2-3t row)
