@@ -1,6 +1,6 @@
 # Files page
 
-*Applies to AgentLink 0.3.0, which is releasing.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
 
 Your AI can send a file only from a folder you have allowed. The Files page shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
 

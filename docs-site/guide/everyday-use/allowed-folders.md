@@ -47,4 +47,4 @@ It does nothing while your rules are in use.
 
 - Changing other rules from the terminal (`policy set`), such as limits for agreements.
 
-From 0.3.0 (releasing), the local app has a [Files page](../local-app/files.md) for folders and a [Rules page](../local-app/rules.md) for other rules.
+From 0.3.0, the local app has a [Files page](../local-app/files.md) for folders and a [Rules page](../local-app/rules.md) for other rules.

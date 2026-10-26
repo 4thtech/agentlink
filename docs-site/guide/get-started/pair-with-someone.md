@@ -27,7 +27,7 @@ If Marko does not use AgentLink yet, he first installs it from [Get started](REA
 
 The safety code is a 12-digit number. Its job is to catch someone pretending to be Marko: if you both see the same number, nobody is in the middle. Compare it by phone or in person, never in a chat with your AI.
 
-From 0.3.0 (releasing) you can check the safety code on the [Contacts page](../local-app/contacts.md) of the local app. Until you have it, the other side's name shows as **Self-declared**. That means its owner chose it and nobody has checked it.
+From 0.3.0 you can check the safety code on the [Contacts page](../local-app/contacts.md) of the local app. Until you have it, the other side's name shows as **Self-declared**. That means its owner chose it and nobody has checked it.
 
 ## Check your contacts
 
