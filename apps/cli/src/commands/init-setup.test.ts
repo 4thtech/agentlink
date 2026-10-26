@@ -299,9 +299,53 @@ describe('D5: agents are named after their app', () => {
     const run = await init([]);
     expect(run.code).toBe(EXIT_USAGE);
     expect(run.err).toContain(INIT_TEXT.chooseAgent.replaceAll('{prefix}', NPX));
-    expect(run.err).not.toMatch(/agent-alpha|agent-beta/);
+    // M1-UX-MULTI-AGENT: the names (valid local names only) are listed; nothing else is.
+    expect(run.err).toContain('agent-alpha');
+    expect(run.err).toContain('agent-beta');
     expect(await readAgentConfig(home, 'codex')).toBeUndefined();
     expect(await readAgentConfig(home, 'default')).toBeUndefined();
+  });
+
+  it('M1-UX-MULTI-AGENT: in the owner terminal, several agents are listed and one is picked by number', async () => {
+    for (const name of ['agent-alpha', 'agent-beta']) {
+      const plan = await init(['--agent', name, '--harness', 'none']);
+      await init(['--agent', name, '--harness', 'none', '--confirm', codeOf(plan)]);
+    }
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: TTY, answers: ['2', 'y', 'n'] });
+    expect(run.code).toBe(EXIT_OK);
+    expect(run.out).toContain('1. agent-alpha');
+    expect(run.out).toContain('2. agent-beta');
+    expect(run.err).not.toContain(INIT_TEXT.chooseAgent.replaceAll('{prefix}', NPX));
+    expect(run.out).toContain('--agent agent-beta');
+    expect(run.out).not.toMatch(/owner init --agent agent-alpha/);
+  });
+
+  it.each(['', '0', '3', 'agent-gamma', 'x'])(
+    'M1-UX-MULTI-AGENT: a bad pick (%j) in the owner terminal changes nothing and keeps the fixed message',
+    async (answer) => {
+      for (const name of ['agent-alpha', 'agent-beta']) {
+        const plan = await init(['--agent', name, '--harness', 'none']);
+        await init(['--agent', name, '--harness', 'none', '--confirm', codeOf(plan)]);
+      }
+      await mkdir(join(home, '.codex'));
+      const run = await init([], { terminal: TTY, answers: [answer] });
+      expect(run.code).toBe(EXIT_USAGE);
+      expect(run.err).toContain(INIT_TEXT.chooseAgent.replaceAll('{prefix}', NPX));
+      expect(await readAgentConfig(home, 'codex')).toBeUndefined();
+    },
+  );
+
+  it('M1-UX-MULTI-AGENT: run by an AI (no terminal) the list is shown and nothing is asked', async () => {
+    for (const name of ['agent-alpha', 'agent-beta']) {
+      const plan = await init(['--agent', name, '--harness', 'none']);
+      await init(['--agent', name, '--harness', 'none', '--confirm', codeOf(plan)]);
+    }
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: { ...TTY, env: { CLAUDECODE: '1' } } });
+    expect(run.code).toBe(EXIT_USAGE);
+    expect(run.asked).toBe(0);
+    expect(run.err).toContain('agent-alpha, agent-beta');
   });
 
   it('every app name is a valid agent name', async () => {
