@@ -1,5 +1,23 @@
 # @4thtech-io/core
 
+## 0.3.0
+
+### Minor Changes
+
+- 639f174: The local web app's Proofs and credits page (M1-11c-a4): two read routes, `GET /api/ui/proofs` (your proofs, newest first, paged) and `GET /api/ui/proofs/credits` (proofs left and the dollar balance), and the page itself. The read-only client view that handlers get now also has `proofs.list` and `proofs.creditsBalance`. No network, token, address or ID leaves the server for this page; Add credits stays hidden until the pay page is live. Core exports `PROOF_PRICE_USD_MICROS`, the price of one proof from the chain package's fee schedule, and the credits route returns it formatted. The page routes share fixed answers: 409 `not_set_up`, 400 `invalid_query`, 503 `unavailable`.
+- b3b8782: Add credits by QR on the Gnosis test network, and Withdraw credits, in the local UI (M1-11c-a4c, D-122, D-123). New owner actions `credits.deposit` and `credits.withdraw` (strict params, 600 s lifetime). Core adds a read of where funds can be sent (`proofs.receiveOptions()`), `proofs.addReceivedFunds(signed)` and `proofs.withdrawCredits(signed)`: the agent's own `deposit` or `withdraw` in direct mode, signed by its KeyStore, only after a fresh owner-signed action, keeping a 0.01 xDAI gas reserve, Chiado only, never a mainnet; a withdrawal goes to the agent's own account only. The local UI server adds `GET /api/ui/proofs/top-up` and the presence-gated `POST /api/ui/proofs/top-up` and `POST /api/ui/proofs/withdraw`. The CLI wires direct mode per testnet.
+
+### Patch Changes
+
+- f1cff39: M2-3a: the SQLite DDL of the logical store schema moved unchanged from `@4thtech-io/node` (`sqlite-schema.ts`) to `@4thtech-io/core` (`store/sql-schema.ts`, exported as `createSqlSchemaStatements` and its helpers), so the cloud agent's Durable Object store runs exactly the Node store's statements. The Node store re-exports them under their earlier names; its pinned statement digests are unchanged. No behaviour change.
+- Updated dependencies [b3b8782]
+  - @4thtech-io/types@0.3.0
+  - @4thtech-io/chain@0.3.0
+  - @4thtech-io/transport-nostr@0.3.0
+  - @4thtech-io/crypto@0.3.0
+  - @4thtech-io/log@0.3.0
+  - @4thtech-io/storage@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
