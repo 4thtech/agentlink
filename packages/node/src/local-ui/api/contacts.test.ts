@@ -98,6 +98,10 @@ function fakeClient(contacts: Contacts = fakeContacts()): LocalUiReadClient {
     agentId: SELF,
     getProof: () => Promise.reject(new Error('not used')),
     listActivity: () => Promise.reject(new Error('not used')),
+    files: {
+      resolvedFolders: () => Promise.reject(new Error('not used')),
+      preparePolicyEdit: () => Promise.reject(new Error('not used')),
+    },
     proofs: {
       list: () => Promise.reject(new Error('not used')),
       creditsBalance: () => Promise.reject(new Error('not used')),

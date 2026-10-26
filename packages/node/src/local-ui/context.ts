@@ -81,6 +81,7 @@ export interface LocalUiReadClient {
     resolvedFolders(): Promise<ResolvedFolders>;
     preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
   };
+  /**
    * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
    * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
    * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
