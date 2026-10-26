@@ -957,6 +957,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** `TITLE_RE` accepts `M1-9z`-style IDs with one trailing letter, so a title starting `M1-9ze` is refused. Allow up to two trailing letters (`[a-z]{0,2}`) in `M[0-9]+-<n>` IDs. Owner decision; this changes a required check, so it merges only on Tali's "merge".
 - **Acceptance:** titles `M1-9ze ...` and `M1-1g-j ...` pass; `M1-9zzz`, a missing ID and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
 
+#### CHORE-PR-HYGIENE-UX-IDS · pr-hygiene `TITLE_RE` refuses task IDs like `M1-UX-*` (new, 26 Oct reviews)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`.github/**` is a sensitive path; owner "merge")
+- **Repo/path:** agentlink · `.github/workflows/pr-hygiene.yml`
+- **Depends on:** CHORE-PR-HYGIENE-ID-REGEX (same line; do together)
+- **Scope:** `TITLE_RE` accepts `M<n>-<digits><letter>` and `M<n>-GATE` only, so titles such as `M1-UX-FIRSTRUN-V2 ...` are refused. Allow named IDs of the form `M<n>-<UPPERCASE words, digits and hyphens>`. This changes a required check, so it merges only on Tali's "merge".
+- **Acceptance:** titles `M1-UX-FIRSTRUN-V2 ...` and `M1-UX-OPEN-APP ...` pass; a missing ID, `M1-ux-x` and the existing allowed prefixes behave as before; a test or recorded manual check covers both.
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`
@@ -5870,6 +5877,19 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests: the block works without presence and cannot unblock, verify or loosen anything; the presence-gated routes are unchanged.
 
+#### M1-11c-a2-c · local UI Contacts: "backup code" wording and a UI test sweep (new, low, IR-M1-11c-a2-3, #429)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (strings and UI tests only; no `packages/node` change) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/strings.ts` and its tests, `e2e/test/local-ui-contacts.test.ts`
+- **Depends on:** M1-11c-a2
+- **Spec:** 11 §5 (backup code), §6.2; 08 §1
+- **Invariants:** I-4
+- **Scope:**
+  - The Contacts strings (`presenceIntro`, `useCode`, `ownerCode`, `presenceRejected`, `presenceRequired`) say "owner code"; 11 §5 says "backup code". Align them.
+  - The Contacts page lacks the Playwright flow, the axe-core run and the `lintVocabulary` pass that the sibling pages have; add them.
+  - Not here: the "They don't match" block is M1-11c-a2b.
+- **Acceptance:**
+  - No "owner code" in default Contacts text; the vocabulary lint, axe-core (zero WCAG 2.1 AA violations) and a Playwright flow cover the page; no test weakened.
+
 #### M1-11c-a3b · local UI Files: folder-access approval card (new, IR-M1-11c-a3-1 Q2)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (core approval kind) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (approval kind), `packages/node/src/local-ui/api/files.ts`, `apps/local-ui/src/pages/files/**`, tests
@@ -6305,6 +6325,15 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Tests first: no link appears in the card output; the summary does.
 
+#### M1-11a-ux-d · terminal approve card: test for the parsed-invite success path (new, low, IR-M1-11a-ux-c-1, #544)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · apps/cli terminal approve card tests
+- **Depends on:** M1-11a-ux-c
+- **Scope:**
+  - Add a test for the parsed-invite success path: the card shows the inviter name and the owner fingerprint, and no link.
+- **Acceptance:**
+  - The test passes on main code and fails if the link is printed or the name or fingerprint is missing; no test weakened.
+
 #### M1-36e-b · node: vocabulary lint for error texts (new, low, from the #512 review)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (packages/node texts) · **Phase:** M1b
 - **Repo/path:** agentlink · packages/node (`policy-mark`, `store-errors`, `owner-add-agent`)
@@ -6344,6 +6373,33 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Styled from the design (D-116); copy per 11 §5.5 and §6.2.1.
 - **Acceptance:**
   - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a link (at either level) or a non-empty Send folder is refused before the gesture; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-b · first run: setup folder race, folder pinning and test lows (new, low, IR-M1-UX-FIRSTRUN-V2-1, #542)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/owner-setup.ts`, `apps/local-ui/src/pages/first-run/**` tests
+- **Depends on:** M1-UX-FIRSTRUN-V2; M1-36b-2-d (folder pinning helper)
+- **Spec:** 04 §2.5, G-1 (accepted residual); 08 §1 (first run v2)
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - L-1: `dropSetup` starts `removeSetupFolders` without awaiting it. A new begin right after can see Send ready, then lose it, and finish reports `not_allowed`. The same happens across processes with a terminal `owner init`. Await the removal in `dropSetup` and the sweep, or make begin wait for a pending removal. Effect is UX only (the policy is never widened).
+  - L-2: `prepareSetupFolders` creates Inbox and Proofs under the parent of the Send folder after the parent check; pin the folder with the M1-36b-2-d helper where it fits.
+  - L-3: add a test that the backup code leaves the DOM after "I saved it".
+  - L-5: record a manual Mac check that the browser offers to save the code in its password manager ("if offered" is browser-dependent).
+  - Q-130-1 (the code is readable text and an input value) stays the owner's open question; not decided here.
+- **Acceptance:**
+  - Tests first (RED commit): a begin straight after a dropped setup keeps Send and finish succeeds; the code is absent from the DOM after "I saved it"; the manual check is recorded in the PR; threat note; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-c · first run: 0.2.0 owners enter the backup code once, then add a passkey (new, B-9, left out of #542)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner setup for an existing owner in `packages/node`) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Depends on:** M1-UX-FIRSTRUN-V2
+- **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2; 11 §5.5, §6.2.1
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - The B-9 path of M1-UX-FIRSTRUN-V2 that #542 did not deliver: an owner created by 0.2.0 enters the backup code once, then registers the platform passkey (one Touch ID). Never creates a second owner.
+  - Not here: the second touch for passkeys that give PRF only on `get()` (M1-11s-c-c) and the recovery kit step (M1-11b-3).
+- **Acceptance:**
+  - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
 
 #### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
@@ -6614,6 +6670,18 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - All four smoke suites pass in workerd; the same package's Node suites still pass; a project that falls back to Node fails its runtime assertion.
 - **Notes:** feeds M2-3a (conformance and Worker KeyStore) and M2-3b. Not covered here: Argon2id (must never run in the Worker, CLOUD-SPIKES S-3), `@4thtech-io/crypto/keystore` file KeyStore, relay WebSockets (M2-3a).
+
+#### M2-3t-w-b · cloud agent: workerd acceptance left out of M2-3t-w (new, #541 keeper merge)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 by path (`packages/crypto/**`; tests and test config only, no source change)
+- **Repo/path:** agentlink · packages/crypto (workerd test project, test vectors), docs/process/repo-reference.md
+- **Depends on:** M2-3t-w
+- **Spec:** 07 §1; `PLAN-CLOUD-AGENT.md` §3 (M2-3t-w row); D-131
+- **Invariants:** I-5
+- **Scope:**
+  - The M2-3t-w acceptance that #539 did not cover: the crypto test vectors run and pass in workerd, and a deliberate Node-only import makes the run fail.
+  - Restore the note line on the M2-3t card that points to M2-3t-w (lost in #539; harmless).
+- **Acceptance:**
+  - The crypto vectors pass in the workerd project; a test (or a recorded manual check) shows a Node-only import fails the workerd run; the Node suites still pass; no test weakened.
 
 #### M2-3a · cloud agent: AgentDO, store, relay sync, Worker KeyStore
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
