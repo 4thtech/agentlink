@@ -71,7 +71,7 @@ Other sections:
 | Legacy OPS-L | 9 |
 | Documentation (DOCS) | 1 (DOCS-RB; the public-docs cards are counted below) |
 | Design drops (owner, D-30) | 3 |
-| Design adjustment (D-116) | 1 (DESIGN-ADJ-1, an audit card, not a drop; added on 2026-10-21) |
+| Design adjustment (D-116) | 2 (DESIGN-ADJ-1, an audit card, not a drop, added on 2026-10-21; DESIGN-B11, a design brief, added on 2026-10-26) |
 | M4, M5, M6 | 2 epics and 1 spike card (M6-1, D-110) |
 | Public docs (DOCS-PUB, all milestones) | 7 (DOCS-PUB, DOCS-M1a, DOCS-M1b, DOCS-KNOW, DOCS-M2, DOCS-M3, DOCS-LINT) |
 
@@ -1271,6 +1271,17 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
   - Say whether the tokens are affected (default: not; M1-35a proceeds).
 - **Acceptance:**
   - `docs/design/adjustments.md` covers every row of the screen index; each item names its screen, the spec or decision it follows, (a) or (b), and the card that fixes it; the known copy issues (Pay network name, raw `0x…` record IDs, `strings.en.json`) are included; the owner has seen the (b) briefs.
+
+#### DESIGN-B11 · Design brief B-11: a state-of-the-art local app (new)
+- **Status:** in review (brief written; the owner takes it to Claude Design) · **Size:** S · **Tier:** Opus · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/design/b11-local-app.md` (new), links from `docs/design/README.md` and `docs/design/adjustments.md`
+- **Depends on:** DESIGN-ADJ-1
+- **Spec:** `docs/design/README.md` (D-116), 11 §2.8, §5, §11.6; owner feedback on the 0.3.0 local app and owner decisions of 2026-10-26
+- **Invariants:** —
+- **Scope:**
+  - Brief for the owner: Home with live tiles, the global "Under the hood" switch, state-indicator vocabulary, motion spec (no new library, reduced motion), every screen and state to design, and which D1/D2 screens can be reused.
+- **Acceptance:**
+  - The owner has taken the brief to Claude Design; approved screens are recorded in `docs/design/README.md` before any build card styles Home, Files Received, Add contact, the presence prompt or the motion layer.
 
 #### DESIGN-D3 · Design drop D3: launch brand
 - **Status:** backlog · **Size:** — · **Tier:** Owner · **Security:** S0
