@@ -22,6 +22,9 @@
 // - M1-11b-6: owner setup on the first-run page is wired (local-ui-wiring.ts) only for a keychain
 //   agent while no owner exists anywhere, the file-KeyStore owner files included; checked each
 //   time the server starts.
+// - M1-11b-8: once per start, while that setup may be wired and on a machine with a display, the
+//   start opens the first-run page through the OS opener (first-run-on-start.ts); the tools answer
+//   as before and never see the link.
 import { dirname } from 'node:path';
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
@@ -44,7 +47,8 @@ import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
 import { coreToolClient, type HandlerEnvironment, type ToolContext } from '@4thtech-io/mcp-tools';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
 import { approvalWaitMsFor } from './approval-wait.js';
-import { localUiOptions, logOwnerSetupEvent } from './local-ui-wiring.js';
+import { openFirstRunOnStart, type DisplayEnv } from './first-run-on-start.js';
+import { firstRunReady, localUiOptions, logOwnerSetupEvent } from './local-ui-wiring.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
@@ -66,6 +70,13 @@ export interface McpCommandDeps {
    * server). Without it, `pending_approval` results carry the CLI command only (M1a).
    */
   readonly approvalUi?: (agent: OpenedAgent, logger: Logger) => ApprovalUi;
+  /**
+   * M1-11b-8: true only while owner setup may be wired for the opened agent (fail closed). With
+   * it and the approval UI, the start opens the first-run page once (first-run-on-start.ts).
+   */
+  readonly firstRunAvailable?: (agent: OpenedAgent) => Promise<boolean>;
+  /** M1-11b-8: where the display check looks (default: this process's env and platform). */
+  readonly display?: { readonly env: DisplayEnv; readonly platform: string };
 }
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
@@ -132,15 +143,30 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
     const closed = new Promise<void>((resolve) => {
       server.onclose = resolve;
     });
+    let firstRun: Promise<boolean> | undefined;
     try {
       await server.connect(deps.transport());
       logger.info('mcp server started', { setUp: agent !== undefined });
       loop?.start();
+      // M1-11b-8: once per start, in the background (the tools answer meanwhile); never a tool.
+      const available = deps.firstRunAvailable;
+      if (agent !== undefined && approvalUi !== undefined && available !== undefined) {
+        const display = deps.display ?? { env: process.env, platform: process.platform };
+        firstRun = openFirstRunOnStart({
+          available: () => available(agent),
+          ui: approvalUi,
+          logger,
+          env: display.env,
+          platform: display.platform,
+        });
+      }
       await closed;
     } finally {
       // Stop the passes and release the lease while the store is still open (06 §6), then the
-      // approval server, whose source reads the same store (M1-11a-b).
+      // approval server, whose source reads the same store (M1-11a-b). A first-run open still
+      // under way finishes first (it never throws).
       await loop?.stop();
+      await firstRun;
       await approvalUi?.close();
       await agent?.close();
     }
@@ -183,6 +209,8 @@ export const mcpCommand = (version: string): CommandHandler => {
   // The approval source reads the agent's store and opens its sealed rows (M1-11a ui-source.ts),
   // so the store the runtime opens is kept here, as the owner commands do (commands/owner/deps.ts).
   let opened: AgentStore | undefined;
+  // M1-11b-8: whether the approval server last started had owner setup wired (firstRunReady).
+  let setupWired = false;
   return createMcpCommand({
     openAgent: (options) =>
       openAgent({
@@ -202,6 +230,7 @@ export const mcpCommand = (version: string): CommandHandler => {
       return createApprovalUi({
         agentName: agent.name,
         logger,
+        firstRunWired: () => setupWired,
         start: async () => {
           if (store === undefined) throw new Error('approval ui: no store');
           const source = createUiApprovalSource(
@@ -215,10 +244,12 @@ export const mcpCommand = (version: string): CommandHandler => {
             },
             { now: systemClock },
           );
+          // M1-11b-6: the app, and owner setup only while no owner exists anywhere.
+          const localUi = await localUiOptions({ name: agent.name, client: agent.client });
+          setupWired = firstRunReady(localUi);
           return startApprovalServer({
             source,
-            // M1-11b-6: the app, and owner setup only while no owner exists anywhere.
-            localUi: await localUiOptions({ name: agent.name, client: agent.client }),
+            localUi,
             // Fixed values only (ApprovalServerEvent, I-7).
             onEvent: (event) => {
               logger.debug('approval ui event', { ...event });
@@ -231,5 +262,9 @@ export const mcpCommand = (version: string): CommandHandler => {
         },
       });
     },
+    // M1-11b-8: the same check the server's own wiring makes, before any server starts, so a
+    // machine with an owner starts nothing at all.
+    firstRunAvailable: async (agent) =>
+      firstRunReady(await localUiOptions({ name: agent.name, client: agent.client })),
   });
 };

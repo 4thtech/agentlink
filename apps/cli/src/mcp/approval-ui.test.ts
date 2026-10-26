@@ -541,6 +541,7 @@ describe('agentlink mcp starts and stops the approval UI with the server', () =>
       const created = createApprovalUi({ start, agentName: opened.name, logger: silent });
       return {
         link: created.link,
+        openSetupPage: created.openSetupPage,
         get running() {
           return created.running;
         },

@@ -24,12 +24,22 @@
 // finish; this step adds no route and no authority, only the opener call.
 import process from 'node:process';
 import { createLogger, type Logger } from '@4thtech-io/log';
-import { startApprovalServer } from '@4thtech-io/node';
+import {
+  startApprovalServer,
+  type ApprovalServer,
+  type ApprovalServerOptions,
+  type LocalUiOptions,
+} from '@4thtech-io/node';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import type { CommandContext } from '../dispatch.js';
-import { localUiOptions, logOwnerSetupEvent, ownerSetupDone } from '../mcp/local-ui-wiring.js';
+import {
+  firstRunReady,
+  localUiOptions,
+  logOwnerSetupEvent,
+  ownerSetupDone,
+} from '../mcp/local-ui-wiring.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
-import { nodeOwnerDeps } from './owner/deps.js';
+import { nodeOwnerDeps, type OwnerAgent, type OwnerCommandDeps } from './owner/deps.js';
 
 /** How long `init` keeps the setup page served at most (proposed: 30 minutes). */
 export const FIRST_RUN_WAIT_MS = 30 * 60_000;
@@ -125,17 +135,27 @@ export async function firstRunStep(
   }
 }
 
+/** The outside world of the production step (IR-M1-11b-6-1 L-2: tests pass doubles). */
+export interface FirstRunSeams {
+  readonly owner: Pick<OwnerCommandDeps, 'open'>;
+  /** The `localUi` options for the opened agent (local-ui-wiring.ts). */
+  localUi(agent: OwnerAgent): Promise<LocalUiOptions>;
+  startServer(options: ApprovalServerOptions): Promise<ApprovalServer>;
+  readonly logger: Logger;
+}
+
 /** The production step: the OS user's home, the OS keychain, the OS browser opener. */
-export function nodeFirstRunDeps(): FirstRunDeps {
-  const owner = nodeOwnerDeps();
-  const logger: Logger = createLogger({ name: 'init' });
+export function nodeFirstRunDeps(seams: Partial<FirstRunSeams> = {}): FirstRunDeps {
+  const owner = seams.owner ?? nodeOwnerDeps();
+  const logger: Logger = seams.logger ?? createLogger({ name: 'init' });
+  const uiOptions = seams.localUi ?? ((agent: OwnerAgent) => localUiOptions(agent));
+  const startServer = seams.startServer ?? startApprovalServer;
   return Object.freeze<FirstRunDeps>({
     available: async (name) => {
       const opened = await owner.open(name);
       if (opened.status !== 'ok') return false;
       try {
-        const localUi = await localUiOptions(opened.agent);
-        return localUi.ownerSetup !== undefined && localUi.assets?.files.has('index.html') === true;
+        return firstRunReady(await uiOptions(opened.agent));
       } finally {
         await opened.agent.close();
       }
@@ -145,9 +165,9 @@ export function nodeFirstRunDeps(): FirstRunDeps {
       if (opened.status !== 'ok') return undefined;
       const { agent } = opened;
       try {
-        const localUi = await localUiOptions(agent);
+        const localUi = await uiOptions(agent);
         // No owner setup to offer, or no app in this build (the page would be a 404).
-        if (localUi.ownerSetup === undefined || localUi.assets?.files.has('index.html') !== true) {
+        if (!firstRunReady(localUi)) {
           await agent.close();
           return undefined;
         }
@@ -156,7 +176,7 @@ export function nodeFirstRunDeps(): FirstRunDeps {
           { ...agent, close: () => Promise.resolve() },
           { now: () => Math.floor(Date.now() / 1000) },
         );
-        const server = await startApprovalServer({
+        const server = await startServer({
           source,
           localUi,
           // Fixed values only (ApprovalServerEvent, I-7).

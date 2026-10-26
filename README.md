@@ -62,7 +62,7 @@ Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/age
 
 Not in 0.2.0, and not yet something you can use:
 
-- **A usable local app (0.3.0).** The first-run screen and an Activity page are built and included, but the command line does not open them yet. The Proofs and credits, Contacts, Files and Rules pages, and a pay page for adding credits, are still to come.
+- **A usable local app (0.3.0).** The first-run screen and an Activity page are built and included: `init` and the `ui` command open them in your browser, and while there is no owner yet, your AI app opens the setup page once each time it starts AgentLink. The Proofs and credits, Contacts, Files and Rules pages, and a pay page for adding credits, are still to come.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
 - **Proof on main networks**, after an external audit of the contracts.
 

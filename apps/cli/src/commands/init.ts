@@ -455,6 +455,21 @@ function printSummary(
   }
 }
 
+/**
+ * The other local agents on this computer (D-78); empty when the list cannot be read (only the
+ * owner-step hint and the first-run offer depend on it, and the first-run page checks for other
+ * agent folders again, failing closed: local-ui-wiring.ts).
+ */
+async function otherAgentNames(deps: InitDeps, name: string): Promise<string[]> {
+  try {
+    return (
+      await listAgentNames(deps.home, deps.uid === undefined ? {} : { uid: deps.uid })
+    ).filter((n) => n !== name && isAgentName(n));
+  } catch {
+    return [];
+  }
+}
+
 async function createIdentity(deps: InitDeps, name: string): Promise<void> {
   const agentId = await deps.createAgent();
   await writeAgentConfig(
@@ -708,7 +723,10 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       if (interactive) nowPrefix = await offerInstall(context, deps);
       else installTip(context, deps);
       // M1-11b-6: after the install offer (M1-36b), so the step names the command that now works.
-      await deps.firstRun?.(context, name, interactive, nowPrefix);
+      // IR-M1-11b-6-1 L-1: only with no other agent here, as at the end of a fresh setup.
+      if ((await otherAgentNames(deps, name)).length === 0) {
+        await deps.firstRun?.(context, name, interactive, nowPrefix);
+      }
       return blocked ? EXIT_FAILED : EXIT_OK;
     }
 
@@ -853,14 +871,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     if (declined) output.print(initText(INIT_TEXT.declinedKept, prefix));
     // D-78: with another agent already on this computer, the owner adds this one to the existing
     // owner instead of a second `owner init`. Names follow the 06 §6 pattern (nothing to sanitize).
-    let others: string[] = [];
-    try {
-      others = (
-        await listAgentNames(deps.home, deps.uid === undefined ? {} : { uid: deps.uid })
-      ).filter((n) => n !== name && isAgentName(n));
-    } catch {
-      // Only the hint depends on it.
-    }
+    const others = await otherAgentNames(deps, name);
     // M1-11b-6: with no other agent, the first-run page may take the owner step (first-run.ts).
     if (
       others.length === 0 &&
