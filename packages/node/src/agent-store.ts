@@ -5,12 +5,14 @@
 // item raised under the store's inter-process lock, for AgentLinkClient.create's `policyMark`.
 import {
   StoreUsageError,
+  type OwnStorageKeys,
   type PolicyVersionMark,
   type ReceiptsKeptMark,
   type Store,
   type StoreTx,
 } from '@4thtech-io/core';
 import type { UnlockedFileAgent } from './file-keystore.js';
+import { ownStorageKeysOver } from './key-controls.js';
 import {
   KeychainKeyStore,
   recordedBackend,
@@ -41,6 +43,12 @@ export interface AgentStore {
    * this store's inter-process lock. Pass it as AgentLinkClient.create's `receiptsKept`.
    */
   readonly receiptsKept: ReceiptsKeptMark;
+  /**
+   * The own-storage KeyStore items of the agent's recorded backend (M1-9i-c; 04 §2.2): the
+   * `storage-mark`, written under this store's inter-process lock and read back, and the
+   * credentialDigest of `s3:<id>` (never the credential). Pass it to core's own-storage load.
+   */
+  readonly ownStorageKeys: OwnStorageKeys;
   /** Closes the store and drops the cipher's keys. */
   close(): Promise<void>;
 }
@@ -118,11 +126,25 @@ export async function openAgentStoreWith(
     read: (): Promise<number | null> => (closed ? storeClosed() : kept.read()),
     write: (version: number): Promise<void> => (closed ? storeClosed() : kept.write(version)),
   });
+  const own = ownStorageKeysOver(
+    items,
+    agentId,
+    (fn) => store.withInterProcessLock(fn),
+    options.timeoutMs,
+  );
+  const ownStorageKeys: OwnStorageKeys = Object.freeze({
+    readMark: (): Promise<Uint8Array | null> => (closed ? storeClosed() : own.readMark()),
+    writeMark: (active: string | null): Promise<void> =>
+      closed ? storeClosed() : own.writeMark(active),
+    credentialDigest: (id: string): Promise<string | null> =>
+      closed ? storeClosed() : own.credentialDigest(id),
+  });
   return Object.freeze({
     store: storeFacade(store),
     cipher,
     policyMark,
     receiptsKept,
+    ownStorageKeys,
     close: async (): Promise<void> => {
       closed = true;
       cipher.close();

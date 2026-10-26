@@ -40,12 +40,13 @@ import {
 import { createLocalApprovalChannel, storeApprovalReader } from '../approval/local-channel.js';
 import { readAgentConfig, type AgentPaths } from './agent-dir.js';
 import { DEFAULT_AGENT_NAME, isAgentName } from './agent-name.js';
+import { NPX_PREFIX } from './cli-prefix.js';
 import { RuntimeError } from './errors.js';
 import { DROP_ORIGIN, nodeFileOpener, nodeFilesPlatform } from './files.js';
 import { fileFreeCreditsMarker } from './free-credits.js';
 import { nodeProofs, type NodeProofs } from './proofs.js';
-import type { FileOpener, ProofPlatformTools } from '../tools/context.js';
-import type { FreeCreditsMarker } from '../tools/free-credits.js';
+import type { FileOpener, ProofPlatformTools } from '@4thtech-io/mcp-tools/context.js';
+import type { FreeCreditsMarker } from '@4thtech-io/mcp-tools/free-credits.js';
 
 /** The Node pieces the runtime is built from. Tests pass doubles; production uses @4thtech-io/node. */
 export interface RuntimeDeps {
@@ -122,8 +123,7 @@ export type OpenAgentResult =
     };
 
 /** `needs_setup` `no_agent`: nothing is set up for this name. Fixed text; never names the agent. */
-export const NO_AGENT_MESSAGE =
-  'AgentLink is not set up for this agent on this machine yet. Run `agentlink init` yourself, in your own terminal.';
+export const NO_AGENT_MESSAGE = `AgentLink is not set up for this agent on this machine yet. Run \`${NPX_PREFIX} init\` yourself, in your own terminal.`;
 
 const systemClock = (): number => Math.floor(Date.now() / 1000);
 

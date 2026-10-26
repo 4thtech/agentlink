@@ -11,6 +11,7 @@ import { CoreError } from '@4thtech-io/core';
 import { NodeKeyStoreError, NodeStoreError } from '@4thtech-io/node';
 import type { CommandContext } from '../dispatch.js';
 import { EXIT_FAILED } from '../dispatch.js';
+import { commandPrefix } from '../runtime/cli-prefix.js';
 import { RuntimeError } from '../runtime/errors.js';
 import { openAgent, type OpenAgentResult, type OpenedAgent } from '../runtime/open-agent.js';
 import { terminalOneLine } from '../terminal/sanitize.js';
@@ -85,7 +86,10 @@ export function createDeps(over: Partial<CommandDeps> = {}): CommandDeps {
   });
 }
 
-/** Fixed text for the everyday commands (11 §6.10; the copy sheet has no entry for these yet). */
+/**
+ * Fixed text for the everyday commands (11 §6.10; the copy sheet has no entry for these yet). A
+ * command in it starts with `commandPrefix()` (M1-36e), read through a getter, never the bare name.
+ */
 export const TEXT = Object.freeze({
   inviteReady:
     'Invite ready: it works once, until {date}. Send it only to the person you want to connect with: whoever uses it first is connected.',
@@ -111,7 +115,7 @@ export const TEXT = Object.freeze({
   contactsHeader: '{count, plural, one {1 contact} other {# contacts}}',
   statusOffline:
     "Warning  Can't reach the message network, so this shows only what is already stored.",
-  statusPartial: 'Warning  Some relays did not answer, so this may be incomplete.',
+  statusPartial: 'Warning  Part of the message network did not answer, so this may be incomplete.',
   // M1-5g: a relay returned a second at its cap. Fixed text: no count, relay or time (I-5, I-7).
   statusIncomplete:
     'Warning  Some messages may be missing from this check. AgentLink will look for them again on the next check.',
@@ -119,29 +123,39 @@ export const TEXT = Object.freeze({
   requestId: 'Request ID: {requestId}',
   requestIdUnavailable: 'Request ID: unavailable',
   requestReadable: 'Your AI can read this message.',
-  requestMore:
-    '{count, plural, one {1 more request is not shown.} other {# more requests are not shown.}} Deal with these first, then run `agentlink requests` again.',
+  get requestMore(): string {
+    return `{count, plural, one {1 more request is not shown.} other {# more requests are not shown.}} Deal with these first, then run \`${commandPrefix()} requests\` again.`;
+  },
   requestNotFound: "That request isn't in your list any more.",
   requestIsContact: "That sender is one of your contacts, so it can't be blocked here.",
-  requestNeedsId: 'Say which request: `agentlink requests {action} <requestId>`.',
+  get requestNeedsId(): string {
+    return `Say which request: \`${commandPrefix()} requests {action} <requestId>\`.`;
+  },
   blockedHeader: '{count, plural, one {1 blocked sender} other {# blocked senders}}',
   blockedNone: 'You have not blocked anyone.',
   blockedRow: '{index}. Blocked sender',
   blockedKey: 'Key: {key}',
-  blockedHow: 'To unblock, run `agentlink requests unblock <key>`.',
-  unblockNeedsKey: 'Say which sender: `agentlink requests unblock <key>`.',
+  get blockedHow(): string {
+    return `To unblock, run \`${commandPrefix()} requests unblock <key>\`.`;
+  },
+  get unblockNeedsKey(): string {
+    return `Say which sender: \`${commandPrefix()} requests unblock <key>\`.`;
+  },
   unblockNone: "That sender isn't blocked.",
   doctorKeychain: 'OK       Agent identity: system keychain',
   doctorFile:
     'Warning  Agent identity: passphrase-locked file (no system keychain)\n         That is weaker than a keychain if someone copies this disk.',
-  doctorRelays: '{count, plural, one {OK       1 own relay} other {OK       # own relays}}',
-  doctorNoRelays:
-    'Problem  No own relays\n         Run `agentlink init` again to set up this agent.',
+  doctorRelays:
+    '{count, plural, one {OK       Message network: 1 server for this agent} other {OK       Message network: # servers for this agent}}',
+  get doctorNoRelays(): string {
+    return `Problem  This agent has no message network servers\n         Run \`${commandPrefix()} init\` again to set up this agent.`;
+  },
   doctorSend: 'OK       This agent can send and sign',
   doctorSendBlocked:
     "Problem  This agent can't send or sign right now\n         Its identity is revoked, or a key change is unfinished.",
-  doctorPartial:
-    'Warning  Some relays did not answer\n         Run `agentlink doctor` again, or check your connection.',
+  get doctorPartial(): string {
+    return `Warning  Part of the message network did not answer\n         Run \`${commandPrefix()} doctor\` again, or check your connection.`;
+  },
   doctorOpenFailed:
     "Problem  Couldn't open this agent\n         Check the folder under ~/.agentlink.",
   doctorNoAgent: 'Problem  {message}',
@@ -150,8 +164,9 @@ export const TEXT = Object.freeze({
   doctorStray:
     '{count, plural, one {Warning  1 leftover item from an interrupted setup is in your keychain} other {Warning  # leftover items from an interrupted setup are in your keychain}}',
   doctorStrayAsk: 'Remove them? (y/N)',
-  doctorOwnerCodeUnfinished:
-    "Problem  An owner code change didn't finish. In a terminal you opened yourself, run `agentlink owner change-code` to finish or clean it up. Keep both your current and your new owner code until then.",
+  get doctorOwnerCodeUnfinished(): string {
+    return `Problem  An owner code change didn't finish. In a terminal you opened yourself, run \`${commandPrefix()} owner change-code\` to finish or clean it up. Keep both your current and your new owner code until then.`;
+  },
   doctorStrayRemoved: 'OK       Removed {count} leftover items',
 } as const);
 

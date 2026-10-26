@@ -47,7 +47,7 @@ import { createMcpServer } from '../../apps/cli/dist/mcp/server.js';
 import { nodeFileOpener, nodeFilesPlatform } from '../../apps/cli/dist/runtime/files.js';
 import { packVerifierReaders } from '../../apps/cli/dist/runtime/pack-verifier.js';
 import { nodeProofPacks } from '../../apps/cli/dist/runtime/proofs.js';
-import { coreToolClient } from '../../apps/cli/dist/tools/context.js';
+import { coreToolClient } from '@4thtech-io/mcp-tools/context.js';
 // The core's in-memory Notary (test helper source, never built; it imports only the chain and
 // crypto packages, plus types).
 import { FakeNotary, FEE_UNITS } from '../../packages/core/src/testing/chain.js';

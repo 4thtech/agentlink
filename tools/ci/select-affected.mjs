@@ -3,8 +3,10 @@
 //
 // Input: the changed file names of the pull request (one per line, against its base). Output: either
 // `full` (run everything, exactly as on `main`) or a list of packages for `turbo run --filter`.
-// The merge queue and pushes never call this script: ci.yml runs the full suite there, so a wrong
-// answer here can only delay a failure to the queue, never let it reach `main`.
+// A pull request always goes through it. CHORE-CI-DOCS-FASTLANE (owner decisions 2026-10-25): so does
+// a merge group, and a push to a feature branch, when the diff holds only docs (`fastLane` below);
+// anything else in the queue, and every push to `main`, runs the full suite and never reaches the
+// selection, so a wrong answer here can only delay a failure to the push to `main` (docs) or the queue.
 //
 // Rules (docs/process/ci-cd.md, "What runs where"); when unsure, run everything:
 //   1. No diff, or an empty one: full.
@@ -44,6 +46,29 @@ const FULL_PREFIXES = [
 
 // The same docs set as `detect`'s docs-only rule in ci.yml.
 const DOCS = /^(docs\/|docs-site\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$)/;
+
+/**
+ * CHORE-CI-DOCS-FASTLANE: what a diff may skip. `codeChanged` false = no heavy job (the docs-only
+ * rule of `detect`); `selector` true = `checks` runs through the affected-package selection.
+ * Every unknown (no file list, an empty diff, an event we do not know, a push to `main`) is the full
+ * suite. A pull request always uses the selector, as before; a merge group or a feature-branch push
+ * only when every changed file is a doc (any code PR in the group makes it a full run).
+ *
+ * @param {{ event: string, ref?: string, files: string[] | null }} input
+ * @returns {{ codeChanged: boolean, selector: boolean }}
+ */
+export function fastLane({ event, ref = '', files }) {
+  const full = { codeChanged: true, selector: false };
+  const known =
+    event === 'pull_request' ||
+    event === 'merge_group' ||
+    (event === 'push' && ref !== 'refs/heads/main');
+  if (!known || files == null) return full;
+  const list = files.map((f) => f.trim()).filter(Boolean);
+  if (list.length === 0) return full;
+  if (list.every((f) => DOCS.test(f))) return { codeChanged: false, selector: true };
+  return { codeChanged: true, selector: event === 'pull_request' };
+}
 
 const NAME = /^@4thtech-io\/[a-z0-9][a-z0-9-]*$/;
 
@@ -241,7 +266,20 @@ export function loadWorkspace(root) {
 
 // --- CLI ---------------------------------------------------------------------------------------
 
+// `--scope <event> <ref> <changed-files.txt>`: the fast-lane decision for ci.yml's `detect`. A missing
+// or unreadable list is an unknown diff (full suite). Never throws towards "skip".
+function scope(argv) {
+  const [event, ref, listFile] = argv;
+  const files =
+    listFile && existsSync(listFile) ? readFileSync(listFile, 'utf8').split('\n') : null;
+  const lane = fastLane({ event, ref, files });
+  // Two lines on stdout; ci.yml validates them before it writes its outputs.
+  console.log(`e2e_relevant=${lane.codeChanged}`);
+  console.log(`use_selector=${lane.selector}`);
+}
+
 function main(argv) {
+  if (argv[0] === '--scope') return scope(argv.slice(1));
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
   let files = null;
   if (argv[0] && existsSync(argv[0])) files = readFileSync(argv[0], 'utf8').split('\n');

@@ -64,7 +64,17 @@ export {
 } from './owner-change-code.js';
 // M1-8h: `owner init` signs the agent's first card; the caller passes core's IdentityService. Only
 // types: the restricted session stays inside the package (owner-first-card.ts).
-export type { FirstAgentCard, FirstCardIdentity } from './owner-first-card.js';
+export type {
+  FirstAgentCard,
+  FirstCardIdentity,
+  FirstPolicy,
+  FirstPolicyActions,
+} from './owner-first-card.js';
+// M1-36b-2: the first rules (the Send folder) signed in the same entry; only the result type.
+export type { SendFolderResult } from './owner-first-policy.js';
+// M1-11b-6: whether the first-run page may offer owner setup (no owner anywhere: card, owner items,
+// file-KeyStore owner files). A store-only boolean like hasOwnerOnMachine; the keychain seam stays.
+export { ownerSetupAvailable } from './owner-setup.js';
 export {
   performOwnerOperation,
   type OwnerOperationItem,
@@ -92,7 +102,12 @@ export {
 } from './approval-server.js';
 // M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
 // agent's core client. The route registry and the presence gate stay inside the package.
-export type { LocalUiAssets, LocalUiContext, LocalUiOptions } from './local-ui/context.js';
+export type {
+  LocalUiAssets,
+  LocalUiContext,
+  LocalUiOptions,
+  LocalUiOwnerSetup,
+} from './local-ui/context.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';
@@ -135,3 +150,12 @@ export {
   type AllowedPathErrorCode,
   type AllowedPathOptions,
 } from './allowed-path.js';
+// M1-36b-2-c: the Send folder for an agent that already has its card (`policy allow-send-folder`
+// †). The owner signs through the given owner operation (performOwnerOperation); the folder checks
+// and the byte-exact policy check stay inside.
+export {
+  setUpSendFolder,
+  type SendFolderSetupActions,
+  type SendFolderSetupOptions,
+  type SendFolderSetupResult,
+} from './owner-send-folder.js';

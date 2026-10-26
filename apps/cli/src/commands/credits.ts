@@ -23,13 +23,14 @@ import {
   EXIT_USAGE,
   type CommandHandler,
 } from '../dispatch.js';
-import type { AccountView } from '../tools/context.js';
+import type { AccountView } from '@4thtech-io/mcp-tools/context.js';
 import { buildTopUpLink, suggestTopUpUsd } from '@4thtech-io/core';
 import { harnessMarkerSet, isInteractive } from '../runtime/guards.js';
+import { commandPrefix } from '../runtime/cli-prefix.js';
 import { renderQr } from '../terminal/qr.js';
 import { openInBrowser } from '../runtime/open-browser.js';
-import { dollars } from '../tools/proofs-common.js';
-import { topUpDisclosure } from '../tools/strings/privacy.js';
+import { dollars } from '@4thtech-io/mcp-tools/proofs-common.js';
+import { topUpDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 import { createDeps, fill, printAll, withAgent, type CommandDeps } from './shared.js';
 
 /** How long `--topup` waits for the proof networks (07 §6.3 default per-chain budget). */
@@ -62,7 +63,9 @@ export const CREDITS_TEXT = Object.freeze({
   topUpNotLive: 'Adding credits is not available yet in this version of AgentLink.',
   openedBrowser: 'Opened it in your browser.',
   qrIntro: 'Or scan this to copy your agent ID to your phone:',
-  topUpHelp: 'To see how much to add, run `agentlink credits --topup`.',
+  get topUpHelp(): string {
+    return `To see how much to add, run \`${commandPrefix()} credits --topup\`.`;
+  },
   noProofs:
     "Proofs aren't available in this version of AgentLink, so there are no credits to show.",
 });

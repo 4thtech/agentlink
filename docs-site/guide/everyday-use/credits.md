@@ -1,33 +1,37 @@
 # Credits
 
-> **Status: Partly built.** Seeing your credits (`agentlink credits`, and the status summary): in v0.1.2. The link for adding credits is built but off until the pay page exists. Free test credits: merged for the next release (v0.2.0, M1). Real credits: v1.0.0 (M3). Messages and files stay free.
+*Applies to AgentLink 0.2.0.*
 
-**Purpose:** pay for proof.
+Credits are the balance you pay for proof from. Messages, files and pairing never need credits.
 
-## How credits are designed to work
+## Today: free test credits
 
-- **Credits are in US dollars** and pay for proof. Messages, files and pairing never need credits.
-- **Prepaid and yours.** Unused credits can be withdrawn at any time. 4thTech cannot move or freeze them (the companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means)).
-- **Price before you pay.** Every paid action shows the price in dollars first. You also set a daily limit; above it, your agent asks you.
-- **No network choice.** AgentLink picks where to record proof automatically.
-- **Adding credits is public.** Every way of adding credits says: "The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink."
-- **Free test credits** let you try proof without paying, on the test networks only. Merged for the next release, not in v0.1.2: the first time a proof needs credits, your AI claims a small free amount for your agent once per test network and tells you in one line, then asks you to try the proof again in about a minute. If the free supply is paused, it says "Free test credits are paused right now. Try again later." (M1-36i). Real credits come with v1.0.0.
+Proof runs on test networks for now. You do not need to buy anything.
+
+1. Ask your agent to send something with proof.
+2. The first time, your agent adds a small amount of free test credits for itself, once per test network. It tells you in one line and records the proof in the same step. The proof shows up about a minute later.
+3. If the free supply is paused, your agent says "Free test credits are paused right now. Try again later."
+
+Test credits have no value and are only for trying proof out.
+
+## See your credits
+
+Ask: "How many AgentLink credits do I have?" Or run `npx -y @4thtech-io/agentlink credits`. It shows your agent ID, your credits in dollars and the price of a proof.
+
+## Later: real credits
+
+When AgentLink moves to main networks, credits will be a prepaid balance in US dollars.
+
+- Every paid action shows its price first.
+- You set a daily limit. Above it, your agent asks you.
+- Unused credits can be withdrawn. 4thTech cannot move or freeze them. (The companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means).)
+- AgentLink picks where to record proof. You never choose a network.
+- Adding credits is public. The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.
 
 ## Adding credits (not available yet)
 
-Adding credits from your AI app is not available in this version: the page where credits are added does not exist yet, so AgentLink gives no link for it. When it launches, this is how it is designed to work:
+There is no page for adding real credits yet, so AgentLink gives no link for it. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your owner code, a recovery code or card details, and it will never move your money.
 
-- Your AI app tells you in dollars how much to add and gives you one link. It explains the step, checks your credits and tells you when they arrive. It never asks for your passphrase, a recovery code or card details, and it never moves your money.
-- `agentlink credits --topup` will print the link and a QR code with your agent ID, and open the link in your browser when you run it yourself in a terminal.
-- Everything in the link after the `#` stays in your browser and is never sent to our servers.
-- The amount is a suggestion ($5, $10 or $25, at least $5). You can change it on the page.
+## If you run out of test credits
 
-## Outline
-
-- Checking your credits ("How many AgentLink credits do I have?")
-- Adding credits (M3)
-- Free test credits (M1)
-- Withdrawing unused credits (M3)
-- Spending limits
-
-**Filled in at:** M1 (test credits), M3 (real credits); backlog cards DOCS-M1b and DOCS-M3.
+If there are not enough credits and no free test credits apply, your agent shows your agent ID and says adding credits is not available yet. See [Troubleshooting](../help/troubleshooting.md).

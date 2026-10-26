@@ -43,8 +43,8 @@
 import {
   canonicalize,
   encodeHex,
-  parseEnvelope,
   parseJson,
+  parseEnvelopeText,
   type AgentCard,
   type Envelope,
 } from '@4thtech-io/crypto';
@@ -658,7 +658,7 @@ export class OutboxService {
     let envelope: Envelope;
     try {
       if (row.envelope_json === null) return 'drop';
-      envelope = parseEnvelope(parseJson(row.envelope_json, { integersOnly: true }));
+      envelope = parseEnvelopeText(row.envelope_json);
     } catch {
       return 'drop';
     }

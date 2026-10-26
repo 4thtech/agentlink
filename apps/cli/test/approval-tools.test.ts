@@ -28,7 +28,7 @@ import type { RelayConnector, RelaySocket, RelaySocketHandlers } from '@4thtech-
 import { beforeEach, describe, expect, it } from 'vitest';
 import { agentToolContext } from '../src/mcp/command.js';
 import type { OpenedAgent } from '../src/runtime/open-agent.js';
-import { callTool, type FinishedResult } from '../src/tools/index.js';
+import { callTool, type FinishedResult } from '@4thtech-io/mcp-tools';
 
 const PREFIX = 'test-sealed:';
 const NOW = 1_800_000_000;

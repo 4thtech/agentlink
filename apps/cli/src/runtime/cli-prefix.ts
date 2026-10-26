@@ -47,6 +47,21 @@ function defaultOnPath(script: string): boolean {
 export function cliPrefix(info?: LaunchInfo): string {
   const script = info === undefined ? process.argv[1] : info.script;
   if (script === undefined || script === '') return NPX_PREFIX;
+  // npx and `npm exec` put the cached package's `.bin` on PATH, so the PATH check below would find
+  // that copy and wrongly name the bare `agentlink` (M1-36a-c). Say npx for those launches first.
+  if (process.env['npm_command'] === 'exec' || /[\\/](_npx|dlx)[\\/]/.test(script)) {
+    return NPX_PREFIX;
+  }
   const onPath = info?.onPath ?? defaultOnPath;
   return onPath(script) ? GLOBAL_PREFIX : NPX_PREFIX;
+}
+
+let commandPrefixCache: string | undefined;
+
+/**
+ * M1-36e: `cliPrefix()` worked out once per process, for the fixed text tables whose commands are
+ * read through getters (the launch does not change while the program runs).
+ */
+export function commandPrefix(): string {
+  return (commandPrefixCache ??= cliPrefix());
 }

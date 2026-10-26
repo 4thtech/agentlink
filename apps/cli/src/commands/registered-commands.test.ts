@@ -10,7 +10,7 @@ import { COMMANDS, createDispatcher, helpText, type DispatchIO } from '../dispat
 const SUBCOMMANDS: Readonly<Record<string, readonly string[]>> = {
   owner: ['init', 'add-agent', 'change-code'],
   contacts: ['rename', 'remove'],
-  policy: ['show', 'allow-folder', 'remove-folder', 'recover'],
+  policy: ['show', 'allow-folder', 'remove-folder', 'recover', 'allow-send-folder'],
   requests: ['accept', 'ignore', 'block', 'blocked', 'unblock'],
 };
 /** Flags that the dispatcher itself answers. */
@@ -61,12 +61,6 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-/**
- * Files another card owns and is fixing (M1-36 UX-B and UX-D). Their dead ends are tolerated here
- * only until those cards land; remove each entry then. Every other file must be clean.
- */
-const FIXED_BY_OTHER_CARDS = ['tools/strings/en.ts', 'tools/invite-common.ts'];
-
 describe('the subcommand list matches the handlers (M1-36c)', () => {
   const handlerFile: Readonly<Record<string, string>> = {
     owner: 'owner/owner-init.ts',
@@ -94,13 +88,26 @@ describe('the instructions in --help (M1-36c)', () => {
 
   it('does not list the commands that do not exist yet', () => {
     const help = helpText();
-    for (const dead of ['--verify', 'policy set', '--keystore', 'agentlink ui']) {
+    for (const dead of ['--verify', 'policy set', '--keystore', 'agentlink backup']) {
       expect(help).not.toContain(dead);
     }
   });
 
+  it('the source scan reads the prefix forms too (M1-36e)', () => {
+    const found = (text: string): string[] =>
+      [...text.matchAll(COMMAND_IN_SOURCE)].map((m) => (m[1] ?? '').replace(/\\$/, ''));
+    expect(found('run \\`${commandPrefix()} policy show\\` now')).toEqual(['policy show']);
+    expect(found('run `{prefix} doctor`')).toEqual(['doctor']);
+    expect(found('`${NPX_COMMAND} backup`').map((c) => problemWith(`agentlink ${c}`))).toEqual([
+      'unknown command "backup"',
+    ]);
+    expect(found('`${name} · owner`')).toEqual([]);
+  });
+
   it('the checker itself rejects a dead end', () => {
-    expect(problemWith('agentlink ui')).toContain('unknown command');
+    expect(problemWith('agentlink backup')).toContain('unknown command');
+    expect(problemWith('agentlink ui')).toBeUndefined();
+    expect(problemWith('agentlink ui --agent <name>')).toBeUndefined();
     expect(problemWith('agentlink contacts --verify <id>')).toContain('--verify');
     expect(problemWith('agentlink init --keystore file')).toContain('--keystore');
     expect(problemWith('agentlink policy set <key> <value>')).toContain('"set"');
@@ -108,16 +115,27 @@ describe('the instructions in --help (M1-36c)', () => {
   });
 });
 
+/**
+ * A backticked command in the source: the bare name, or (M1-36a-b, M1-36e) one of the prefix forms
+ * that replace it, so the commands keep being checked after the bare name is gone.
+ */
+const COMMAND_IN_SOURCE =
+  /`(?:agentlink|\{prefix\}|\$\{(?:commandPrefix\(\)|prefix\(\)|cliPrefix\(\)|NPX_COMMAND)\}) ([^`]*)`/g;
+
 describe('the fixed text in the source (M1-36c)', () => {
+  // M1-36e: every file is checked; the M1-36 UX-B and UX-D exceptions are gone.
   it('every backticked `agentlink ...` names something registered', () => {
     const bad: string[] = [];
     for (const file of sourceFiles(SRC)) {
       const rel = relative(SRC, file);
-      if (FIXED_BY_OTHER_CARDS.includes(rel)) continue;
       const text = readFileSync(file, 'utf8');
-      for (const m of text.matchAll(/`(agentlink [^`]*)`/g)) {
-        const problem = problemWith(m[1] ?? '');
-        if (problem !== undefined) bad.push(`${rel}: \`${m[1]}\` (${problem})`);
+      for (const m of text.matchAll(COMMAND_IN_SOURCE)) {
+        // A trailing `\` is the escape of the closing backtick; a `{slot}` glued to a word is its
+        // own (placeholder) token.
+        const rest = (m[1] ?? '').replace(/\\$/, '').replace(/\{(\w+)\}/g, ' {$1}');
+        const command = `agentlink ${rest}`;
+        const problem = problemWith(command);
+        if (problem !== undefined) bad.push(`${rel}: \`${command}\` (${problem})`);
       }
     }
     expect(bad).toEqual([]);

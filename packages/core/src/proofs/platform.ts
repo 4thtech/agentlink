@@ -11,6 +11,8 @@ import type {
   ChainConfig,
   ChainSelector,
   ChainState,
+  DepositAuthErrorCode,
+  DepositAuthorizationRequest,
   ProofSubmitter,
   ReadClient,
 } from '@4thtech-io/chain';
@@ -44,6 +46,12 @@ export type ProofKit = Pick<
   // The local UI's credits read and the free test credits allowlist (M1-11r-a).
   | 'readCreditsAcrossChains'
   | 'isFaucetChain'
+  // The gasless top-up (M3-4b-t-T4-a; 12 §4.1, 07 §7): the eip3009 gate (the client-side kill switch),
+  // the $5 to $50 bounds and the agent-key authorization builder.
+  | 'gaslessToken'
+  | 'gaslessValueBounds'
+  | 'buildReceiveWithAuthorization'
+  | 'readClientEthCall'
 >;
 
 /**
@@ -68,6 +76,32 @@ export interface FreeCreditsPort {
   request(input: { readonly chainId: number; readonly agent: string }): Promise<FreeCreditsAnswer>;
 }
 
+/**
+ * A submitter's answer to `POST /v1/deposit-authorization` (07 §7; M3-4b-t-T4-a), as the runtime
+ * maps it (T4-b). Only the outcome: no transaction hash, URL or server text reaches the core. The
+ * answer is untrusted: the core confirms the credit by reading `creditsOf` on chain.
+ */
+export type DepositAuthAnswer =
+  | { readonly status: 'submitted' | 'already_used' | 'unavailable' }
+  | {
+      readonly status: 'rate_limited';
+      /** Seconds until another try may succeed (from Retry-After, bounded by the runtime). */
+      readonly retryAfter?: number;
+    }
+  | {
+      readonly status: 'refused';
+      /** A fixed submitter code, or `bad_request` for a malformed request or an unknown code. */
+      readonly code: DepositAuthErrorCode | 'bad_request';
+    };
+
+/**
+ * The runtime's call to the shipped submitters' deposit-authorization route (M3-4b-t-T4-a). It sends
+ * exactly the signed, vault-payee authorization the core built; never a key or a URL of the user's.
+ */
+export interface DepositAuthPort {
+  submit(request: DepositAuthorizationRequest): Promise<DepositAuthAnswer>;
+}
+
 export interface ProofsPlatform {
   /** `@4thtech-io/chain` itself: its Record builder is the only source of salts (04 §5, D-61). */
   readonly kit: ProofKit;
@@ -77,4 +111,14 @@ export interface ProofsPlatform {
   readonly selector?: Pick<ChainSelector, 'select' | 'clear'>;
   /** Free test credits (testnets only; M1-11r-a). Without it, `requestFaucet` is unavailable. */
   readonly faucet?: FreeCreditsPort;
+  /**
+   * The gasless top-up route (M3-4b-t-T4-a). Without it, an owner-approved gasless top-up is
+   * refused `not_available` before anything is signed.
+   */
+  readonly depositAuth?: DepositAuthPort;
+  /**
+   * Waits `ms` milliseconds; the fixed delay before a receipt's one retry after `RecordNotFound`
+   * (M1-34-c). Default: a timer.
+   */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
