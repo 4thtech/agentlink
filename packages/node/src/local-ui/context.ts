@@ -10,10 +10,13 @@
 import type {
   ActivityEntry,
   AgentLinkClient,
+  ContactView,
   CreditsView,
   OwnerActionOutcome,
+  OwnerSafetyCode,
   Page,
   PageQuery,
+  PreparedOwnerAction,
   ProofListItem,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
@@ -66,6 +69,19 @@ export interface LocalUiReadClient {
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
   /**
+   * M1-11c-a2 (Contacts): the contact list, the safety code recomputed for the owner surface (04
+   * §3.6.1) and core's prepare helpers for `contact.check`, `contact.rename` and `contact.remove`
+   * (#415). Each prepare builds an unsigned body and writes nothing (I-4); only a signature from the
+   * gate's one-use `sign`, applied by core, changes anything. No direct block, remove or apply.
+   */
+  readonly contacts: {
+    list(): Promise<readonly ContactView[]>;
+    safetyCode(contactId: string): Promise<OwnerSafetyCode>;
+    prepareCheck(contactId: string): Promise<PreparedOwnerAction>;
+    prepareRename(contactId: string, alias: string): Promise<PreparedOwnerAction>;
+    prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
+  };
+  /**
    * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
    * only. Not `requestFaucet` (owner decision D2) and nothing that notarizes.
    */
@@ -82,6 +98,14 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    contacts: Object.freeze({
+      list: () => client.contacts.list(),
+      safetyCode: (contactId: string) => client.pairing.ownerSafetyCode(contactId),
+      prepareCheck: (contactId: string) => client.ownerActions.prepareContactCheck(contactId),
+      prepareRename: (contactId: string, alias: string) =>
+        client.ownerActions.prepareContactRename(contactId, alias),
+      prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
+    }),
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),
       creditsBalance: () => client.proofs.creditsBalance(),

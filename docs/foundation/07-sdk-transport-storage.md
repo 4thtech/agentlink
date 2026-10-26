@@ -17,6 +17,7 @@ All packages live in the public `agentlink` monorepo (see 09). Every package mus
 | `@4thtech-io/core` | all above | `AgentLinkClient`: identity, contacts, envelopes, threads, files, proofs, policies, approvals; `Store`, `ApprovalChannel` interfaces (the key interfaces are in crypto, G-2) |
 | `@4thtech-io/node` | core | Node implementations: keychain `KeyStore` and the opt-in passphrase-locked file `KeyStore` for headless machines (§9, D-54), SQLite `Store`, local approval server (Node only) |
 | `@4thtech-io/agentlink` | node, core | CLI + MCP server (stdio) (Node only). Its tool handlers live in `packages/mcp-tools` (moved there at M2-3t; imports `types`, `log`, `crypto`, `chain`, `core`), which imports no Node built-in, Node global or `@4thtech-io/node` module and nothing outside itself (06 §1, G-15, D-73 (1)); a Worker can import it |
+| `apps/cloud-agent` (not published; template, 0.4.0, D-131) | core, mcp-tools, crypto, transport-nostr, storage, chain, the MCP SDK, `@cloudflare/workers-oauth-provider` (only here, D-131 (11)) | The Worker, `AgentDO` and the owner pages (08 §3). Its Worker `KeyStore` (agent seed from `AGENT_SEED`, or sealed under `SEED_WRAP_KEY` through `@4thtech-io/crypto`) and its Durable Object `Store` implement the same interfaces as `@4thtech-io/node`. Shared packages it imports run Vitest in workerd (M2-3t-w) |
 
 Integrators use `@4thtech-io/core` directly (with their own `KeyStore`/`Store`) and pass their `appId` to earn integrator fees.
 
@@ -112,7 +113,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 
 ### 3.1 Conventions (G-9; proposed, owner confirms at merge)
 
-§3.1–§3.7 add the tables that G-9 found missing and the store-side rules of G-2 (04 §3.1.1, §3.4.2, §5). They are storage-agnostic: SQLite in Node (M1-8b), SQLite storage in the Durable Object (M2-3a, 08 §3.1) and an in-memory Store for tests (M1-7a) implement the same logical schema.
+§3.1–§3.7 add the tables that G-9 found missing and the store-side rules of G-2 (04 §3.1.1, §3.4.2, §5). They are storage-agnostic: SQLite in Node (M1-8b), SQLite storage in the Durable Object (M2-3a, 08 §3.1) and an in-memory Store for tests (M1-7a) implement the same logical schema. **Cloud-only rows (D-131; proposed, owner confirms at merge; M2-3a, M2-3c).** The Durable Object adds three tables the local store does not need: `owner_blobs` (the owner's `ALKP` and `ALKR` blobs, opaque, written once at `/setup`), `connector_grants` (grant_id, client_id, the stored `connector.authorize` text, revoked_at; read on every `/mcp` request, 08 §3.3) and `deploy_state` (setup used, template version, the pinned public `/mcp` URL). Every write runs in `transactionSync` (§3.7). The sealed-column vectors of §3 are the Durable Object store's conformance suite.
 
 - **One store per agent.** A store holds one agent (`identity`), so no table carries an agent column, and "per agent" in 04 and 06 means per store. An owner surface keeps its own, separate store (§3.6).
 - **Types.**

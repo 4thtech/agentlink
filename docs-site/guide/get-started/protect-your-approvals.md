@@ -48,6 +48,12 @@ Changing the code doesn't protect copies of the old saved owner key made earlier
 
 From 0.3.0 the local page can use a passkey (Touch ID on a Mac, Windows Hello on Windows) instead of typing your owner code. It should work in Safari on a recent Mac, or an up-to-date Chrome, Edge or Firefox using your system's own passkey. Older Windows versions don't support it, and some browsers and password managers reportedly don't either. If yours can't, nothing breaks: you'll use your owner code instead. We are still testing each browser and will update this note.
 
+## The setup page (0.3.0)
+
+From 0.3.0 the setup page in your browser does this step for you. It first shows the folders it creates: `~/AgentLink/Send`, `~/AgentLink/Inbox` and `~/AgentLink/Proofs`. Then it has one button, for example **Use Touch ID**. That one touch protects your approvals, sets up your agent and lets your AI send files you put in `~/AgentLink/Send`, nothing else.
+
+The page then shows **your backup code** once. Press **Save in my password manager**, then **I saved it**. The backup code approves when Touch ID isn't available, for example in another browser. Never give it to your AI. If `~/AgentLink/Send` already holds files, or isn't a plain folder, the page asks you to fix that before you touch the sensor.
+
 ## What this protects, and what it can't
 
 The owner code stops your AI from approving anything through AgentLink. Without it, the AI can send what your rules allow, and ask you for the rest.

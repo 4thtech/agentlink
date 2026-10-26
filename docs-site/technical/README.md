@@ -31,4 +31,4 @@ Every page starts with a status line:
 - **Available since vX**: describes released software.
 - **Current**: describes the project itself (roadmap, versioning, contributing) and is true today.
 
-Milestones map to versions: M1a = 0.1.0, M1 = 0.2.0, M2 = 0.3.0, M3 (mainnet beta) = 1.0.0. See [Status and roadmap](project/status-and-roadmap.md).
+Milestones map to versions: M1a = 0.1.0, M1 = 0.2.0, M2 = 0.4.0 first (the cloud agent, D-131), M3 (mainnet beta) = 1.0.0; 0.3.0 is the usable local app. See [Status and roadmap](project/status-and-roadmap.md).

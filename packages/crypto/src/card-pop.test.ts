@@ -106,7 +106,9 @@ describe('TAGS.cardPop and the cardPop helpers (04 §2.9, D-102)', () => {
     const otherSig = signAgentCard(card, evmSecret(OTHER_SEED));
     expect(verifyCardPossession(card, agentSig, pop)).toBe(true);
     expect(verifyCardPossession(card, otherSig, pop)).toBe(false);
-    expect(verifyCardPossession(card, agentSig, `${pop.slice(0, -2)}00`)).toBe(false);
+    // Always differs from pop: a random BIP-340 signature can already end in "00".
+    const corruptedPop = `${pop.slice(0, -2)}${pop.endsWith('00') ? '01' : '00'}`;
+    expect(verifyCardPossession(card, agentSig, corruptedPop)).toBe(false);
     expect(verifyCardPossession(card, undefined, pop)).toBe(false);
     expect(verifyCardPossession(card, agentSig, undefined)).toBe(false);
   });

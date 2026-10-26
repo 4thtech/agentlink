@@ -24,7 +24,9 @@ import {
   createInboxFile,
   openAllowedFile,
   openAllowedFileWith,
+  pinFolder,
   resolveAllowedFile,
+  stillPinned,
 } from './allowed-path.js';
 
 const isWindows = process.platform === 'win32';
@@ -107,11 +109,55 @@ describe('resolveAllowedFile (04 §4)', () => {
     ).toBe(6);
   });
 
-  it('resolves the allowed folder too: a linked allowed folder covers its target', async () => {
-    const file = await resolveAllowedFile(join(home, 'Work', 'a.txt'), opts(['~/WorkLink']));
+  it('resolves the requested path: a link into an allowed folder reaches the same file', async () => {
+    const file = await resolveAllowedFile(join(home, 'Work', 'a.txt'), opts(['~/Work']));
     expect(file.realPath).toBe(realpathSync.native(join(home, 'Work', 'a.txt')));
     const viaLink = await resolveAllowedFile(join(home, 'WorkLink', 'a.txt'), opts(['~/Work']));
     expect(viaLink.realPath).toBe(file.realPath);
+  });
+
+  // M1-36b-2-d L3 (IR-M1-36b-2-c-1): an allowed folder is pinned to its real location. Owner
+  // commands store the realpath, so a stored folder that now resolves anywhere else (it, or a
+  // folder above it, became a link) is not used: a later link cannot widen what is allowed.
+  it('does not use an allowed folder that is a link (M1-36b-2-d)', async () => {
+    expect(
+      await codeOf(resolveAllowedFile(join(home, 'Work', 'a.txt'), opts(['~/WorkLink']))),
+    ).toBe('no_allowed_folder');
+    expect(
+      await codeOf(
+        resolveAllowedFile(join(home, 'Work', 'a.txt'), opts(['~/WorkLink', '~/Inbox'])),
+      ),
+    ).toBe('outside_allowed');
+  });
+
+  it('a symlink swapped in for an allowed folder after allow widens nothing (M1-36b-2-d)', async () => {
+    const pinned = join(realpathSync.native(home), 'Pinned');
+    mkdirSync(pinned);
+    writeFileSync(join(pinned, 'ok.txt'), 'ok');
+    // Allowed as owner commands store it: the realpath.
+    expect((await resolveAllowedFile(join(pinned, 'ok.txt'), opts([pinned]))).size).toBe(2);
+    renameSync(pinned, join(home, 'Pinned-old'));
+    link(outside, pinned);
+    expect(await codeOf(resolveAllowedFile(join(pinned, 'loot.txt'), opts([pinned])))).toBe(
+      'no_allowed_folder',
+    );
+    expect(await codeOf(resolveAllowedFile(join(outside, 'loot.txt'), opts([pinned])))).toBe(
+      'no_allowed_folder',
+    );
+  });
+
+  it('a link swapped in above an allowed folder widens nothing (M1-36b-2-d)', async () => {
+    const parent = join(realpathSync.native(home), 'Deep');
+    const allowed = join(parent, 'Send');
+    mkdirSync(allowed, { recursive: true });
+    const decoy = join(base, 'decoy-parent');
+    mkdirSync(join(decoy, 'Send'), { recursive: true });
+    writeFileSync(join(decoy, 'Send', 'loot.txt'), 'outside');
+    renameSync(parent, join(home, 'Deep-old'));
+    link(decoy, parent);
+    expect(await codeOf(resolveAllowedFile(join(allowed, 'loot.txt'), opts([allowed])))).toBe(
+      'no_allowed_folder',
+    );
   });
 
   it('refuses a symlink inside an allowed folder pointing to ~/.ssh', async () => {
@@ -280,6 +326,25 @@ describe('openAllowedFile', () => {
     },
   );
 
+  it('refuses when the allowed folder becomes a link between the check and the open (M1-36b-2-d)', async () => {
+    const pinned = join(realpathSync.native(home), 'PinnedOpen');
+    mkdirSync(pinned);
+    writeFileSync(join(pinned, 'loot.txt'), 'decoy');
+    const elsewhere = join(base, 'elsewhere-open');
+    mkdirSync(elsewhere);
+    writeFileSync(join(elsewhere, 'loot.txt'), 'outside');
+    let swapped = false;
+    const promise = openAllowedFileWith(join(pinned, 'loot.txt'), opts([pinned]), {
+      afterCheck: () => {
+        renameSync(pinned, join(home, 'PinnedOpen-old'));
+        link(elsewhere, pinned);
+        swapped = true;
+      },
+    });
+    expect(await codeOf(promise)).toBe('no_allowed_folder');
+    expect(swapped).toBe(true);
+  });
+
   it('refuses when the file disappears after the open (L1)', async () => {
     const target = join(home, 'Work', 'gone.txt');
     writeFileSync(target, 'x');
@@ -287,6 +352,52 @@ describe('openAllowedFile', () => {
       afterOpen: () => unlinkSync(target),
     });
     expect(await codeOf(promise)).toBe('not_found');
+  });
+});
+
+describe('pinFolder and stillPinned (M1-36b-2-d: check, sign and use see one folder)', () => {
+  it('pins a real folder and confirms it while nothing changed', async () => {
+    const folder = join(realpathSync.native(home), 'PinMe');
+    mkdirSync(folder);
+    const pin = await pinFolder(folder);
+    expect(pin).toBeDefined();
+    expect(pin?.path).toBe(folder);
+    expect(await stillPinned(pin!)).toBe(true);
+  });
+
+  it('never pins a link, a link above it, a file, a missing or a non-real path', async () => {
+    expect(await pinFolder(join(home, 'WorkLink'))).toBeUndefined();
+    expect(await pinFolder(join(realpathSync.native(home), 'WorkLink', 'sub'))).toBeUndefined();
+    expect(await pinFolder(join(realpathSync.native(home), 'Work', 'a.txt'))).toBeUndefined();
+    expect(await pinFolder(join(realpathSync.native(home), 'NoSuch'))).toBeUndefined();
+    expect(await pinFolder('relative/path')).toBeUndefined();
+  });
+
+  it('a folder renamed away and replaced by another real folder is not the pinned one', async () => {
+    const folder = join(realpathSync.native(home), 'PinSwap');
+    mkdirSync(folder);
+    const pin = await pinFolder(folder);
+    renameSync(folder, join(home, 'PinSwap-old'));
+    mkdirSync(folder);
+    expect(await stillPinned(pin!)).toBe(false);
+  });
+
+  it('a folder replaced by a link (even to itself, moved) is not the pinned one', async () => {
+    const folder = join(realpathSync.native(home), 'PinLink');
+    mkdirSync(folder);
+    const pin = await pinFolder(folder);
+    const moved = join(home, 'PinLink-moved');
+    renameSync(folder, moved);
+    link(moved, folder);
+    expect(await stillPinned(pin!)).toBe(false);
+  });
+
+  it('a removed folder is not the pinned one', async () => {
+    const folder = join(realpathSync.native(home), 'PinGone');
+    mkdirSync(folder);
+    const pin = await pinFolder(folder);
+    rmSync(folder, { recursive: true });
+    expect(await stillPinned(pin!)).toBe(false);
   });
 });
 
