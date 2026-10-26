@@ -484,7 +484,7 @@ describe('M1-UX-FIRSTRUN-V2: the first-run copy passes lintVocabulary (11 §5.1)
           ['Touch ID', 'Safari'],
           ['Windows Hello', 'Chrome or Edge'],
           ['your passkey', 'Chrome'],
-        ]) {
+        ] as const) {
           texts.push(String((value as (a: string, b: string) => string)(sensor, browser)));
         }
       } else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
