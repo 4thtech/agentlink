@@ -1,5 +1,13 @@
 # @4thtech-io/chain
 
+## 0.3.0
+
+### Patch Changes
+
+- Updated dependencies [b3b8782]
+  - @4thtech-io/types@0.3.0
+  - @4thtech-io/crypto@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
