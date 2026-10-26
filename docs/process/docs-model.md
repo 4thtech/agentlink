@@ -81,12 +81,12 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 - **Single source.** AgentLink's docs stay in this repo's `docs-site/`. They are copied into the wiki repo, never written there.
 - **Sync model.**
   1. A script in the wiki repo will copy `docs-site/guide` and `docs-site/technical` from the **release tag** of AgentLink (tags only, never `main`) into the AgentLink section of the wiki repo.
-  2. **Planned: the script is not built yet.** Today the AgentLink section of 4thTech Docs is a summary that links here. When it exists, it opens a pull request in the wiki repo; it needs no secrets (public repo read).
+  2. **Planned: the script is not built yet.** Today the AgentLink section of 4thTech Docs is a short summary. When it exists, it opens a pull request in the wiki repo; it needs no secrets (public repo read).
   3. A merge there publishes through that repo's Git Sync.
   4. After two releases done by hand with the script, it moves to a GitHub Action in the wiki repo.
 - **Brand.** 4thTech is the master brand and AgentLink a sub-brand: "AgentLink by 4thTech". The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink landing pages show its horizontal lockup; the footer uses the endorsed lockup ([brand rules](../../brand/README.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
 - **Cross-links.** The AgentLink landing page says in one line that it builds on earlier 4thTech work and links it; earlier pages carry one line pointing to AgentLink as the current product.
-- **Intro GIF** (on the repo README) is pinned to the release tag in its URL, so a copied page never shows a newer or missing file.
+- **Intro GIF** (on the repo README, today a relative path): pinning its URL to the release tag is planned for the 4thTech Docs copy, so a copied page never shows a newer or missing file.
 - **Screenshots: dark theme only.** One set, no light variants.
 - **OCC v1** (EUPL-1.2 with a non-commercial rider): reference only; link, never copy code.
 

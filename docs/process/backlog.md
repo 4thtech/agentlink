@@ -4558,7 +4558,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-12b · quickstart and harness permission guidance
 - **Status:** done (4thtech/agentlink#152, merged 2026-10-15) · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published to GitBook through Git Sync, DOCS-PUB)
+- **Repo/path:** agentlink · docs-site/guide/get-started/, docs-site/technical/reference/harness-configuration.md (published into 4thTech Docs at each release, DOCS-PUB; per-folder Git Sync superseded 26 Oct 2026)
 - **Depends on:** M1-9a, M1-9b, M1-9l; gap G-1 accepted as a documented M1 residual (D-67)
 - **Spec:** 04 §2.2 (owner code, opt-in passphrase), §2.5 (residual risk; same-user agents, D-67); 06 §7; 02 J1; 10 M1-12; 11 §5
 - **Invariants:** I-4
@@ -4575,7 +4575,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### M1-12d · quickstart: local UI, storage, credits and proof (new, split from M1-12b)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · docs-site/guide/ (published to GitBook through Git Sync, DOCS-PUB)
+- **Repo/path:** agentlink · docs-site/guide/ (published into 4thTech Docs at each release, DOCS-PUB; per-folder Git Sync superseded 26 Oct 2026)
 - **Depends on:** M1-12b, M1-11a, M1-9h, M1-9i
 - **Spec:** 04 §2.5; 06 §7; 02 F-51, J1–J5; 10 M1-12; D-39, D-40
 - **Invariants:** I-4
@@ -7777,7 +7777,7 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), published into
 - **Scope:**
   - Fill in the M1a column of the `MAINTAINING.md` table: setup pages for Claude Code, Codex, Gemini CLI and Claude Desktop (config), pairing, first message, contacts, messages, approvals (passphrase), negotiation, troubleshooting, FAQ, glossary; technical MCP tools (Talk), policies, CLI, harness configuration, SDK packages (Talk), crypto suites, test vectors.
   - Status hints of shipped features → "Available since v0.1.0" only once v0.1.0 is on npm `latest`; "What works today", Status and roadmap and Versioning updated.
-  - Replace cross-space GitHub links with the published site URLs once the site address exists.
+  - Replace GitHub links to the specs and code with the published site URLs where pages exist once the site address exists.
   - Headless file KeyStore (D-54): mark the "Where seeds live" row available when it ships, and add the headless setup steps to the guide.
 - **Acceptance:**
   - Every page marked available maps to a `done` card and to software on npm `latest`; every unreleased feature still says Planned.
