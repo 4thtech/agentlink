@@ -88,7 +88,8 @@ describe('renderers', () => {
     const data = real();
     const status = renderReadmeStatus(data);
     expect(status).toContain(`**Version:** ${data.version}`);
-    expect(status).toContain('- **Crypto (@4thtech-io/crypto):**');
+    expect(status).toContain('- **Components:**');
+    expect(status.split('\n').length).toBeLessThan(10);
     const site = renderSiteSummary(data);
     expect(site).toContain('[#27](https://github.com/4thtech/agentlink/pull/27)');
     expect(site).toContain('contracts#4');
@@ -147,7 +148,7 @@ describe('run', () => {
   it('fails the check when README.md was edited by hand, and fixes it when generating', () => {
     write(
       'README.md',
-      read('README.md').replace(/· \*\*Version:\*\* v\d+\.\d+\.\d+/, '· **Version:** v9.9.9'),
+      read('README.md').replace(/\*\*Version:\*\* v\d+\.\d+\.\d+/, '**Version:** v9.9.9'),
     );
     const checked = run({ root, check: true });
     expect(checked.problems.join('\n')).toContain('README.md is out of date');

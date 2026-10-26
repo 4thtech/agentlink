@@ -113,30 +113,25 @@ const longDate = (iso) => {
 };
 const stateWord = (s) => ({ done: 'Done', 'in-progress': 'In progress', planned: 'Planned' })[s];
 
-/** README: the Status blockquote (compact: the full component list lives on the docs site). */
+/** README: the Status blockquote (short, for a landing page: the full component list lives on the docs site). */
 export function renderReadmeStatus(data) {
+  const all = data.areas.flatMap((area) => area.components);
+  const count = (state) => all.filter((c) => c.state === state).length;
+  const parts = [
+    [count('done'), 'merged'],
+    [count('in-progress'), 'in progress'],
+    [count('planned'), 'planned'],
+  ]
+    .filter(([n]) => n > 0)
+    .map(([n, word]) => `${n} ${word}`);
   const out = [
-    `**Phase:** ${data.phase} · **Version:** ${data.version} (${data.versionLabel}) · **Last updated:** ${data.updated}`,
+    `**Version:** ${data.version} (${data.versionLabel}) · **Milestone:** ${data.milestone} · **Last updated:** ${data.updated}`,
     '',
-  ];
-  for (const area of data.areas) {
-    const count = (state) => area.components.filter((c) => c.state === state).length;
-    const parts = [
-      [count('done'), 'merged'],
-      [count('in-progress'), 'in progress'],
-      [count('planned'), 'planned'],
-    ]
-      .filter(([n]) => n > 0)
-      .map(([n, word]) => `${n} ${word}`);
-    out.push(`- **${area.title}:** ${parts.join(', ')}`);
-  }
-  out.push(
-    `- **In progress:** ${data.inProgress}`,
-    `- **Does not exist yet:** ${data.notYet}`,
+    `- **Components:** ${parts.join(', ')}`,
     `- **Next:** ${data.next}`,
     '',
-    `Every component, with its pull requests, is on the [status and roadmap page](${SITE_STATUS_PAGE}). This section is generated from [\`docs/status.yaml\`](docs/status.yaml) (\`node tools/docs-status/index.mjs\`) and checked in CI.`,
-  );
+    `Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](${SITE_STATUS_PAGE}). This section is generated from [\`docs/status.yaml\`](docs/status.yaml) (\`node tools/docs-status/index.mjs\`) and checked in CI.`,
+  ];
   return out.map((line) => (line === '' ? '>' : `> ${line}`)).join('\n');
 }
 
