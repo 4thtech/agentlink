@@ -2,7 +2,62 @@
 // `localhost` with the PRF extension and hand the creation response to the server. The browser never
 // signs and never derives a key: the PRF output goes to the local server once (it wraps the owner key
 // there) and the page's copy is zeroed after encoding.
+//
+// M1-UX-FIRSTRUN-V2 (08 §1 first run v2): the passkey is asked of the platform authenticator
+// (Touch ID, Windows Hello: `authenticatorAttachment: 'platform'`, `hints: ['client-device']`).
+// Where the browser reports no PRF, the page offers "continue with a backup code only", which asks
+// for any passkey (no attachment): the gesture still proves presence, and the server keeps the
+// backup code as the way to approve.
 import type { CreationValues } from './setup-api.js';
+import type { Platform } from './strings.js';
+
+/** How the passkey is asked for. */
+export interface PasskeyOptions {
+  /** True: the platform authenticator only (the default flow). False: any passkey. */
+  readonly platform: boolean;
+}
+
+/** Whether this browser reports a passkey with PRF on this computer. */
+export type PrfSupport = 'yes' | 'no' | 'unknown';
+
+/** The platform, from the browser's own report (never sent anywhere). */
+export function detectPlatform(): Platform {
+  if (typeof navigator === 'undefined') return 'other';
+  const data = (navigator as { userAgentData?: { platform?: unknown } }).userAgentData;
+  const named = typeof data?.platform === 'string' ? data.platform : navigator.userAgent;
+  if (/mac/i.test(named)) return 'mac';
+  if (/win/i.test(named)) return 'windows';
+  return 'other';
+}
+
+/**
+ * M1-UX-PRF-MATRIX detection: `no` when the browser says there is no platform authenticator with
+ * user verification, or (where it can tell) no PRF; `unknown` when it can't tell (the server then
+ * learns it from the creation response, and without PRF the backup code stays the way to approve).
+ */
+export async function prfSupport(): Promise<PrfSupport> {
+  if (!passkeysAvailable()) return 'no';
+  const pkc = window.PublicKeyCredential as unknown as {
+    isUserVerifyingPlatformAuthenticatorAvailable?: () => Promise<boolean>;
+    getClientCapabilities?: () => Promise<Record<string, boolean | undefined>>;
+  };
+  try {
+    if (
+      typeof pkc.isUserVerifyingPlatformAuthenticatorAvailable === 'function' &&
+      !(await pkc.isUserVerifyingPlatformAuthenticatorAvailable())
+    ) {
+      return 'no';
+    }
+    if (typeof pkc.getClientCapabilities === 'function') {
+      const caps = await pkc.getClientCapabilities();
+      if (caps['extension:prf'] === false) return 'no';
+      if (caps['extension:prf'] === true) return 'yes';
+    }
+  } catch {
+    return 'unknown';
+  }
+  return 'unknown';
+}
 
 export type PasskeyResult =
   | { readonly kind: 'ok'; readonly body: Uint8Array }
@@ -56,7 +111,10 @@ function bytesOf(value: ArrayBuffer | ArrayBufferView | undefined): Uint8Array {
 }
 
 /** Creates the passkey; the browser draws its own dialog. */
-export async function createSetupPasskey(values: CreationValues): Promise<PasskeyResult> {
+export async function createSetupPasskey(
+  values: CreationValues,
+  options: PasskeyOptions = { platform: true },
+): Promise<PasskeyResult> {
   if (!passkeysAvailable()) return { kind: 'unsupported' };
   let credential: Credential | null;
   try {
@@ -73,7 +131,12 @@ export async function createSetupPasskey(values: CreationValues): Promise<Passke
           { type: 'public-key', alg: -7 },
           { type: 'public-key', alg: -257 },
         ],
-        authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+        authenticatorSelection: {
+          ...(options.platform ? { authenticatorAttachment: 'platform' as const } : {}),
+          residentKey: 'required',
+          userVerification: 'required',
+        },
+        ...(options.platform ? { hints: ['client-device'] } : {}),
         attestation: 'none',
         extensions: {
           prf: { eval: { first: fromBase64url(values.prfSalt) } },

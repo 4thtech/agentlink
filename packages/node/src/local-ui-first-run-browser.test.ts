@@ -6,10 +6,23 @@
 // violation on any step. A second visit then shows
 // "already protected" and never offers setup again.
 //
+// M1-UX-FIRSTRUN-V2 (D-130 (1), (2)): the button names the platform, the same gesture signs the
+// first policy (Send allowed, in a temp home), and "Your backup code" is shown once in a save form
+// that moves on only after "I saved it".
+//
 // Needs the built packages and app (`pnpm build`) and the Playwright Chromium; without them it is
 // skipped locally (in CI a missing browser fails it). AGENTLINK_TEST_CHROMIUM names another
 // Chromium executable. The keychain is a file in a temp folder, never the OS keychain or ~/.agentlink.
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -178,6 +191,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
       transport: nostrTransport({ connector: quietRelays as never, addressCheck: 'platform' }),
       policyMark: store.policyMark,
     });
+    mkdirSync(join(root, 'home'), { recursive: true });
     const events: ApprovalServerEvent[] = [];
     const opened: string[] = [];
     const hex = (h: string): Uint8Array => Uint8Array.from(Buffer.from(h.slice(2), 'hex'));
@@ -210,6 +224,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
               name: 'Alice',
               relays: ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'],
               identity: client.identity,
+              firstPolicy: { actions: client.ownerActions, home: join(root, 'home') },
             },
             ownerFiles: defaultOwnerFiles(join(root, 'home')),
           },
@@ -234,11 +249,21 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     await page.goto(`${server.origin}/first-run`);
 
     await page.getByRole('heading', { name: 'Protect your approvals' }).waitFor();
+    expect(await page.locator('main').innerText()).toContain('~/AgentLink/Send');
     expect(await axeViolations(page)).toEqual([]);
-    await page.getByRole('button', { name: 'Create a passkey' }).click();
-    await page.getByRole('heading', { name: 'Approvals are protected' }).waitFor();
+    await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).click();
+    await page.getByRole('heading', { name: 'Your backup code' }).waitFor();
 
-    // The fingerprint is the one the card now names; the code is collapsed.
+    // The same gesture signed the first policy: the real Send folder is allowed.
+    const policy = await client.ownerActions.loadPolicy();
+    expect(policy.mode).toBe('signed');
+    if (policy.mode === 'signed') {
+      expect(policy.policy.files.allowedFolders).toEqual([
+        join(realpathSync(join(root, 'home')), 'AgentLink', 'Send'),
+      ]);
+    }
+
+    // The fingerprint is the one the card now names; the code is shown once, in a save form.
     const view = await client.identity.get();
     expect(view).toBeDefined();
     const fingerprint = events.find((e) => e.kind === 'owner_setup' && e.outcome === 'done');
@@ -247,13 +272,15 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     expect(shown).toContain(
       ((fingerprint as { fingerprint?: string }).fingerprint ?? 'x').replace(/\s/g, ''),
     );
-    expect(await page.locator('details').getAttribute('open')).toBeNull();
-    await page.getByText('Backup way to approve').click();
     expect(await axeViolations(page)).toEqual([]);
-    expect(await page.locator('details .al-secret-val').innerText()).toMatch(/[A-Z0-9]{4}/);
+    expect(await page.locator('.al-secret-val').innerText()).toMatch(/[A-Z0-9]{4}/);
+    expect(await page.locator('form input[autocomplete="new-password"]').count()).toBe(1);
+    expect(await page.locator('form input[autocomplete="username"]').inputValue()).toMatch(
+      /^AgentLink backup code – /,
+    );
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).not.toBeNull();
 
-    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByRole('button', { name: 'I saved it' }).click();
     await page.getByRole('heading', { name: 'Save your recovery kit' }).waitFor();
     expect(await axeViolations(page)).toEqual([]);
     await page.getByRole('button', { name: 'Later' }).click();
@@ -272,6 +299,8 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     await page
       .getByRole('heading', { name: 'Approvals are already protected on this computer' })
       .waitFor();
-    expect(await page.getByRole('button', { name: 'Create a passkey' }).count()).toBe(0);
+    expect(
+      await page.getByRole('button', { name: /^Use (Touch ID|Windows Hello|a passkey)$/ }).count(),
+    ).toBe(0);
   }, 180_000);
 });
