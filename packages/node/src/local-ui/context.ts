@@ -13,6 +13,7 @@ import type {
   ContactView,
   CreditsMoveResult,
   CreditsView,
+  EffectivePolicy,
   OwnerActionOutcome,
   OwnerSafetyCode,
   Page,
@@ -74,6 +75,19 @@ export interface LocalUiReadClient {
     input: Parameters<AgentLinkClient['getProof']>[0],
   ): ReturnType<AgentLinkClient['getProof']>;
   /**
+   * M1-11c-a5 (Rules): the policy in force and the unsigned `policy.set` for an edit (core
+   * `loadPolicy` and `preparePolicyEdit`, M1-11r-b). Both sign, write and grant nothing (I-4): a
+   * prepared body changes nothing until the owner signs it behind the presence gate and core's
+   * `apply` verifies that signature. `recordReceiptsKept` writes only core's receipts-kept marker,
+   * and only for the verified, applied policy at that version with receipts on (D-109): it grants
+   * nothing the signed policy does not already say. Not `apply`, not the store, not the KeyStore.
+   */
+  readonly policy: {
+    load(): Promise<EffectivePolicy>;
+    prepareEdit(patch: unknown, options: PolicyEditOptions): Promise<PreparedPolicyEdit>;
+    recordReceiptsKept(version: number): Promise<boolean>;
+  };
+  /**
    * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
    * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
    * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
@@ -115,6 +129,12 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
   return Object.freeze<LocalUiReadClient>({
     agentId: client.agentId,
     getProof: (input) => client.getProof(input),
+    policy: Object.freeze({
+      load: () => client.ownerActions.loadPolicy(),
+      prepareEdit: (patch: unknown, options: PolicyEditOptions) =>
+        client.ownerActions.preparePolicyEdit(patch, options),
+      recordReceiptsKept: (version: number) => client.ownerActions.recordReceiptsKept(version),
+    }),
     files: Object.freeze({
       resolvedFolders: () => client.files.resolvedFolders(),
       preparePolicyEdit: (patch: unknown, options?: PolicyEditOptions) =>
