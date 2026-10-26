@@ -63,6 +63,7 @@ import { generateSecretCode } from '@4thtech-io/crypto/keystore';
 import { lstat, mkdir, readdir, rmdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { pinFolder, stillPinned } from './allowed-path.js';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
@@ -555,13 +556,27 @@ export interface SetupFolders {
  * only when Send is ready, `Inbox` and `Proofs` beside it (0700, created only when missing; an
  * existing entry, even a link, is left alone and never followed: core checks those folders itself
  * when it uses them). Never throws; never deletes anything it did not create.
+ *
+ * M1-UX-FIRSTRUN-V2-b (L-2): the parent of Send is pinned (allowed-path `pinFolder`) and Send must
+ * still be its pinned folder before anything is made beside it; each folder is made only while the
+ * parent is still that pinned folder. A parent or Send that changed refuses Send (nothing made
+ * beside it, what this run created removed), so the first policy is never signed for it.
  */
 export async function prepareSetupFolders(home: string = homedir()): Promise<SetupFolders> {
   const send = await prepareSendFolder(home);
   const created: string[] = [];
   if (send.status !== 'ready') return Object.freeze({ send, created: Object.freeze(created) });
   const parent = dirname(send.folder);
+  const parentPin = await pinFolder(parent);
+  if (parentPin === undefined || !(await stillPinned(send.pin))) {
+    await removeCreated(send);
+    return Object.freeze({
+      send: Object.freeze({ status: 'unavailable', reason: 'folder_unavailable' } as const),
+      created: Object.freeze(created),
+    });
+  }
   for (const name of OTHER_FOLDERS) {
+    if (!(await stillPinned(parentPin))) break;
     const folder = join(parent, name);
     try {
       await lstat(folder);

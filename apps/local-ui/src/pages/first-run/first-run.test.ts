@@ -380,6 +380,28 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(host.querySelector('input[autocomplete="new-password"]')).toBeNull();
   });
 
+  // M1-UX-FIRSTRUN-V2-b L-3 (IR-M1-UX-FIRSTRUN-V2-1): after "I saved it" the backup code is in no
+  // node, attribute or field value of the whole document (not only the page's visible text).
+  it('L-3: the backup code leaves the DOM after "I saved it"', async () => {
+    await mount(fakeApi());
+    await click(FIRST_RUN.usePasskey);
+    const fields = (): string[] =>
+      [...document.querySelectorAll('input, textarea')].map(
+        (f) => (f as HTMLInputElement | HTMLTextAreaElement).value,
+      );
+    const compact = CODE.replaceAll(' ', '');
+    // Shown while the backup-code step is open (the save form holds it).
+    expect(fields().some((v) => v.replaceAll(' ', '') === compact)).toBe(true);
+    await click(FIRST_RUN.savedIt);
+    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.kitTitle);
+    const html = document.documentElement.outerHTML;
+    for (const part of [CODE, compact, ...CODE.split(' ')]) {
+      expect(html).not.toContain(part);
+      expect(document.body.textContent ?? '').not.toContain(part);
+      for (const value of fields()) expect(value).not.toContain(part);
+    }
+  });
+
   it('says the Send folder is allowed, or why not, in plain words', async () => {
     await mount(fakeApi());
     await click(FIRST_RUN.usePasskey);

@@ -15,7 +15,17 @@
 //   passkey (`ALKP`) and signs the agent's first card, all or nothing. The owner code is returned
 //   once, for the page's collapsed "backup way to approve", and never logged.
 // - The pending seed is wiped on expiry, on error, on completion and when the server closes.
-import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
 import { stderr as processStderr, stdout as processStdout } from 'node:process';
@@ -61,7 +71,13 @@ import {
   OWNER_PASSKEY_ACCOUNT,
   newOwnerSeed,
 } from '../owner-keystore.js';
-import { SETUP_HOLD_MS, defaultOwnerFiles, encodeSetupRegistration } from '../owner-setup.js';
+import {
+  SETUP_HOLD_MS,
+  defaultOwnerFiles,
+  encodeSetupRegistration,
+  removeSetupFolders,
+  type SetupFolders,
+} from '../owner-setup.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
@@ -1420,4 +1436,116 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
       expect(later).not.toContain(compact.slice(0, 8));
     }
   }, 60_000);
+
+  // M1-UX-FIRSTRUN-V2-b L-1 (IR-M1-UX-FIRSTRUN-V2-1): a dropped setup's folder removal finishes
+  // before a new begin prepares the folders, so the new setup never loses its Send folder.
+  it('L-1: a begin straight after a dropped setup keeps Send, and finish allows it', async () => {
+    const real = await withHome();
+    const agent = await initAgent();
+    let removed = false;
+    const slowRemoval = async (folders: SetupFolders | undefined): Promise<void> => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      await removeSetupFolders(folders);
+      removed = true;
+    };
+    const h = await harness(agent, {
+      firstCard: withPolicy(agent),
+      internals: { removeSetupFolders: slowRemoval },
+    });
+    const s = await h.session();
+    await begin(h, s);
+    h.clock += SETUP_HOLD_MS + 1;
+    // This begin sweeps the expired hold; it waits for that hold's folders to be gone first.
+    const begun = await begin(h, s);
+    expect(removed).toBe(true);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator().create(begun.publicKey, { origin: h.origin }),
+    );
+    expect(res.status).toBe(200);
+    expect((JSON.parse(res.body) as DoneBody).sendFolder).toBe('allowed');
+    const effective = await agent.client.ownerActions.loadPolicy();
+    expect(effective.mode === 'signed' ? effective.policy.files.allowedFolders : []).toEqual([
+      join(real, 'AgentLink', 'Send'),
+    ]);
+    expect((await lstat(join(real, 'AgentLink', 'Send'))).isDirectory()).toBe(true);
+  }, 60_000);
+
+  // L-1, across processes: a terminal `owner init` (another process) may adopt the Send folder this
+  // hold created. Once any owner exists, a failed or dropped setup leaves the folders alone.
+  it('L-1: an owner set up elsewhere during the hold keeps the folders when finish fails', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    await agent.keychain.set(OWNER_ACCOUNT, randomBytes(90));
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator().create(begun.publicKey, { origin: h.origin }),
+    );
+    expect(JSON.parse(res.body)).toEqual({ status: 'owner_exists' });
+    expect((await lstat(sendPath())).isDirectory()).toBe(true);
+  }, 60_000);
+
+  it('L-1: an owner set up elsewhere during the hold keeps the folders when the hold expires', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const s = await h.session();
+    await begin(h, s);
+    await agent.keychain.set(OWNER_ACCOUNT, randomBytes(90));
+    h.clock += SETUP_HOLD_MS + 1;
+    const again = await post(h, BEGIN, s, new Uint8Array(0));
+    expect(JSON.parse(again.body)).toEqual({ status: 'owner_exists' });
+    expect((await lstat(sendPath())).isDirectory()).toBe(true);
+  }, 60_000);
+
+  // M1-UX-FIRSTRUN-V2-b L-2 and the post-sign re-check (IR-M1-36b-2-d-1): the Send folder begin
+  // checked is pinned (real path, device, inode); a same-user swap for another empty folder at the
+  // same path before the first policy applies leaves no policy.
+  it('L-2: Send replaced between begin and the first policy applies nothing', async () => {
+    await withHome();
+    const agent = await initAgent();
+    const applied: object[] = [];
+    const firstCard: FirstAgentCard = {
+      ...firstCardOf(agent),
+      firstPolicy: {
+        actions: {
+          preparePolicyEdit: async (patch, opts) => {
+            await rename(sendPath(), `${sendPath()}-moved`);
+            await mkdir(sendPath(), { mode: 0o700 });
+            return agent.client.ownerActions.preparePolicyEdit(patch, opts);
+          },
+          apply: (input) => {
+            applied.push(input);
+            return agent.client.ownerActions.apply(input);
+          },
+        },
+        home: home(),
+      },
+    };
+    const { res, done } = await runSetup(agent, { firstCard });
+    expect(res.status).toBe(200);
+    expect(done.status).toBe('done');
+    expect(done.sendFolder).toBe('not_allowed');
+    expect(applied).toEqual([]);
+    expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+  }, 60_000);
+
+  it('L-2: Inbox and Proofs are made only beside the Send folder that was checked', async () => {
+    const real = await withHome();
+    const agent = await initAgent();
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    await begin(h, await h.session());
+    for (const name of ['Send', 'Inbox', 'Proofs']) {
+      const stats = await lstat(join(real, 'AgentLink', name));
+      expect(stats.isDirectory() && !stats.isSymbolicLink()).toBe(true);
+      expect(await realpath(join(real, 'AgentLink', name))).toBe(join(real, 'AgentLink', name));
+    }
+  });
 });
