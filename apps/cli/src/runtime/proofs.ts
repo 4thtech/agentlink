@@ -48,8 +48,10 @@ import type {
   PackReadOutcome,
   PackSaveOutcome,
   ProofPlatformTools,
-} from '../tools/context.js';
+} from '@4thtech-io/mcp-tools/context.js';
+import { nodeDepositAuthPort } from './deposit-auth.js';
 import { resolveOwnFolder } from './files.js';
+import { isFreeCreditsChain, nodeFreeCreditsPort } from './free-credits.js';
 import { createPackVerifier } from './pack-verifier.js';
 
 const FLAVOR: PathFlavor = process.platform === 'win32' ? 'win32' : 'posix';
@@ -259,10 +261,27 @@ export function nodeProofs(options: NodeProofsOptions = {}): NodeProofs | undefi
   });
   const packs = nodeProofPacks(options);
 
-  const platform: ProofsPlatform = Object.freeze({ kit: chain, chains, selector });
+  // M1-36i: free test credits through the submitter's fixed URLs only, for a shipped testnet on the
+  // chain package's allowlist (checked here, in the port and again in the core).
+  const freeCreditsChain = (chainId: number): boolean => isFreeCreditsChain(chainId, configs);
+  const faucet = nodeFreeCreditsPort({ fetchFn, urls, configs });
+
+  // M3-4b-t-T4-b: the gasless top-up route, on the same fixed submitter URLs. Off by default: it
+  // sends nothing while the chain package's kill switch is off, and only the core's owner-approved
+  // path calls it (never an MCP tool, I-4); the core's `ProofsPlatform.depositAuth` (T4-a).
+  const ports =
+    urls.length === 0 ? {} : { depositAuth: nodeDepositAuthPort({ fetchFn, urls, configs }) };
+  const platform: ProofsPlatform = Object.freeze({
+    kit: chain,
+    chains,
+    selector,
+    faucet,
+    ...ports,
+  });
 
   const tools = Object.freeze<ProofPlatformTools>({
     ...packs,
+    isFreeCreditsChain: freeCreditsChain,
     async verify(pack: Uint8Array | Readonly<Record<string, unknown>>): Promise<PackCheck> {
       const result = await verifyPack(pack);
       if (!result.valid) return { valid: false, verdict: 'failed', reason: result.reason };

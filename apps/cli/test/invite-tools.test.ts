@@ -59,9 +59,9 @@ import type { TerminalContext } from '../src/runtime/guards.js';
 import type { OpenAgentResult, OpenedAgent } from '../src/runtime/open-agent.js';
 import { createMcpServer } from '../src/mcp/server.js';
 import { agentToolContext } from '../src/mcp/command.js';
-import { acceptInviteAction } from '../src/tools/accept-action.js';
-import { INVITE_TEXT } from '../src/tools/invite-common.js';
-import { callTool, type FinishedResult } from '../src/tools/index.js';
+import { acceptInviteAction } from '@4thtech-io/mcp-tools/accept-action.js';
+import { INVITE_TEXT } from '@4thtech-io/mcp-tools/invite-common.js';
+import { callTool, type FinishedResult } from '@4thtech-io/mcp-tools';
 
 // --- doubles ----------------------------------------------------------------------------------------
 
@@ -481,8 +481,8 @@ describe('agentlink_accept_invite under the default policy', () => {
       'pairing',
       'safetyCodeChecked',
     ]);
-    expect(ok.structured.nextStep).toContain('on their own screen');
-    expect(ok.structured.nextStep).toContain('never in this chat');
+    expect(ok.structured.nextStep).toContain('connected when the other agent answers');
+    expect(ok.structured.nextStep).not.toContain('--verify');
     expect((await rows(w.bob)).pairings).toHaveLength(1);
     const published = w.net.eventCount();
     expect(published).toBeGreaterThan(0);
@@ -581,8 +581,7 @@ describe('agentlink_accept_invite called again without approvalId (M1-13a follow
     const id = pendingId(asked);
     const next = String(asked.structured.nextStep);
     expect(next).toContain(`agentlink approve ${id}`);
-    expect(next).toContain('agentlink_accept_invite');
-    expect(next).toContain('same inviteUrl');
+    expect(next).toContain('retry this call with the same inviteUrl');
     expect(next).toContain(`approvalId ${id}`);
     expect(next).not.toContain(url);
   });

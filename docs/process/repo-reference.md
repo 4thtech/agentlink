@@ -25,6 +25,7 @@ agentlink/
 │  ├─ transport-nostr/           # NIP-17/59 gift wraps, relay pool, sync
 │  ├─ storage/                   # inline, drop and S3 (aws4fetch) adapters; Drive/Dropbox/OneDrive connectors (M2)
 │  ├─ core/                      # AgentLinkClient, policies, approvals, Store interface (KeyStore types: @4thtech-io/crypto, G-2)
+│  ├─ mcp-tools/                 # runtime-agnostic MCP tool handlers (moved from apps/cli/src/tools/, M2-3t)
 │  ├─ node/                      # keychain KeyStore, SQLite Store, local approval server
 │  └─ ui/                        # shared React components (design system)
 ├─ apps/
@@ -45,7 +46,7 @@ agentlink/
 ```
 pnpm install
 pnpm build            # turbo build
-pnpm test             # unit tests (all packages); packages/types also runs in Chromium, Firefox, WebKit and workerd (needs `pnpm exec playwright install chromium firefox webkit` once; `pnpm test:node` inside the package runs Node only)
+pnpm test             # unit tests (all packages); packages/types also runs in Chromium, Firefox, WebKit and workerd; crypto, transport-nostr, chain and mcp-tools also run their `*.workerd.test.ts` smoke tests in workerd, M2-3t-w (needs `pnpm exec playwright install chromium firefox webkit` once; `pnpm test:node` inside the package runs Node only)
 pnpm test:e2e         # multi-agent end-to-end (requires testnet RPC + relays)
 pnpm lint && pnpm typecheck
 pnpm vectors:check    # crypto + EIP-712 test vectors across runtimes
@@ -62,5 +63,5 @@ Changing the policy is a reviewed S1 change. A new dependency needs an `external
 - Crypto, policy engine and anything that signs: tests first, including test vectors.
 - Every MCP tool: schema test + behaviour test for each `status` value.
 - New behaviour in core: unit tests plus an e2e scenario when it crosses agents.
-- Status docs (single source): `docs/status.yaml` holds the milestone, phase, per-area component states with PR refs, the testnet deploy state and the version. `tools/docs-status` renders it into marked blocks (`<!-- NAME:start -->` … `<!-- NAME:end -->`) in `README.md` (Status, Roadmap), `docs-site/technical/project/status-and-roadmap.md` and, `knowledge/agentlink-overview.md`. `node tools/docs-status/index.mjs` regenerates; `node tools/docs-status/index.mjs --check` (also part of `pnpm lint`, via the tools `check` script) fails when a block differs from the source. The reader is a small YAML subset parser (`tools/docs-status/yaml.mjs`), so there is no YAML dependency.
+- Status docs (single source): `docs/status.yaml` holds the milestone, phase, per-area component states with PR refs, the testnet deploy state and the version. `tools/docs-status` renders it into marked blocks (`<!-- NAME:start -->` … `<!-- NAME:end -->`) in `README.md` (Status, Roadmap), `docs-site/technical/project/status-and-roadmap.md` and, `knowledge/agentlink-overview.md`. `node tools/docs-status/index.mjs` regenerates; `node tools/docs-status/index.mjs --check` (also part of `pnpm lint`, via the tools `check` script) fails when a block differs from the source. The same tool prints the M0/M1 (M1a, M1b)/M2/M3 card counts of `docs/process/backlog.md` on demand with `node tools/docs-status/index.mjs --counts` (not the §1 example, split parents or cards with a "later" Phase). The counts are not committed, because a stored count goes stale whenever another PR merges first; `--check` fails if a `backlog-counts` block is committed again. The reader is a small YAML subset parser (`tools/docs-status/yaml.mjs`), so there is no YAML dependency.
 - Test timeout policy (M0-10e): every `packages/*` has a `vitest.config.ts` with `testTimeout: 20_000` (the 5 s Vitest default flakes on loaded CI runners); `tools/` uses the same value. A longer limit is allowed where measured (crypto Argon2id files 60 s, types 30 s); never lower one. A new package copies the config of an existing one. (A shared base file cannot be imported: the boundary guard forbids a relative import that leaves a package.)

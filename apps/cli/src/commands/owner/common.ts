@@ -1,14 +1,15 @@
 // Shared steps of the owner commands (M1-9b): choosing the agent, the owner context for signing,
 // printing outcomes, and turning @4thtech-io/node's fixed-text errors into output.
 import type { OwnerActionOutcome } from '@4thtech-io/core';
-import { decodeHex0x } from '@4thtech-io/crypto';
+import { decodeHex0x, KeyStoreError } from '@4thtech-io/crypto';
 import { NodeKeyStoreError, type ApprovalContext } from '@4thtech-io/node';
 import { DISPATCH_TEXT, EXIT_FAILED, EXIT_USAGE, type CommandContext } from '../../dispatch.js';
 import type { Output } from '../../output.js';
 import { isAgentName } from '../../runtime/agent-name.js';
-import { copy } from '../../tools/strings/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import type { OwnerAgent, OwnerCommandDeps } from './deps.js';
 import { readRow } from './pending.js';
+import { withOwnerPrompts } from './prompts.js';
 import { OWNER_TEXT } from './strings.js';
 
 export type Opened =
@@ -121,19 +122,38 @@ export function printOutcome(
 }
 
 /**
- * Runs an owner command body. @4thtech-io/node's errors carry fixed text only (no secret, no stored
- * value), so their message is what the owner sees; every other error goes to the dispatcher, which
- * prints fixed text.
+ * A wrong owner code (`presence_rejected`). By name and code as well as by class: the owner store
+ * may come from another copy of @4thtech-io/crypto than this module's.
+ */
+export function isPresenceRejected(error: unknown): boolean {
+  if (error instanceof KeyStoreError) return error.code === 'presence_rejected';
+  return (
+    error instanceof Error &&
+    error.name === 'KeyStoreError' &&
+    (error as { code?: unknown }).code === 'presence_rejected'
+  );
+}
+
+/**
+ * Runs an owner command body with `deps` that print the owner code reminder before every prompt
+ * (M1-9zd, prompts.ts). @4thtech-io/node's errors carry fixed text only (no secret, no stored
+ * value), so their message is what the owner sees; a wrong owner code gets the fixed reminder
+ * (M1-9zd); every other error goes to the dispatcher, which prints fixed text.
  */
 export async function ownerStep(
   context: CommandContext,
-  body: () => Promise<number>,
+  deps: OwnerCommandDeps,
+  body: (deps: OwnerCommandDeps) => Promise<number>,
 ): Promise<number> {
   try {
-    return await body();
+    return await body(withOwnerPrompts(deps, context.output));
   } catch (error) {
     if (error instanceof NodeKeyStoreError) {
       context.output.printError(error.message);
+      return EXIT_FAILED;
+    }
+    if (isPresenceRejected(error)) {
+      context.output.printError(OWNER_TEXT.wrongCode);
       return EXIT_FAILED;
     }
     throw error;

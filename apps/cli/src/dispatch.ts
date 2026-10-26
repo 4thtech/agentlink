@@ -14,6 +14,9 @@
 //   exact pattern (04 §2.4.1).
 // - Nothing the caller typed is ever echoed: usage errors and refusals are fixed text (I-5), and
 //   values a handler prints go through the terminal output rule (src/terminal/sanitize.ts, 06 §8).
+// - M1-9zd: an argument shaped like a generated owner code (04 §2.8 kind 1) stops every command
+//   before anything else runs, with fixed text that never echoes it. A UX guard, like the others:
+//   the code is already in the shell's history, so the text says how to change it.
 //
 // The commands themselves land with their cards (M1-9a, M1-9b, M1-9l, M1-9m, M1-9c); until then
 // each is registered and answers "not available yet".
@@ -23,6 +26,8 @@ import type { Output } from './output.js';
 import { isAgentName } from './runtime/agent-name.js';
 import { RUNTIME_MESSAGES, RuntimeError } from './runtime/errors.js';
 import { checkOwnerTerminal, type TerminalContext } from './runtime/guards.js';
+import { looksLikeOwnerCode } from './runtime/owner-code-shape.js';
+import { commandPrefix } from './runtime/cli-prefix.js';
 
 type Options = NonNullable<ParseArgsConfig['options']>;
 
@@ -41,7 +46,7 @@ export interface CommandSpec {
   /** The usage lines for `--help`, in 06 §8 form. */
   readonly usage: readonly string[];
   readonly guard: CommandGuard;
-  /** When set, the guard applies only when this returns true (`contacts --verify` is †). */
+  /** When set, the guard applies only when this returns true (`contacts rename | remove` are †). */
   readonly guardWhen?: (parsed: ParsedCommand) => boolean;
   readonly options: Options;
   /** Positionals that must be an approval ID, by index. */
@@ -63,12 +68,13 @@ export type CommandName =
   | 'deny'
   | 'cancel'
   | 'doctor'
+  | 'ui'
   | 'mcp';
 
 const AGENT: Options = { agent: { type: 'string' } };
 
 /**
- * The commands of 06 §8, in its order. M1-9h adds `credits` and `verify`. Not here yet: `ui` and the
+ * The commands of 06 §8, in its order. M1-9h adds `credits` and `verify`. Not here yet: the
  * passkey option of `init` (they wait for the local settings UI), `storage connect`, `backup`,
  * `relays set`, and `init --keystore file` / `keystore passphrase` (they wait for the file KeyStore,
  * M1-8f, off the M1a path, D-73 (4)).
@@ -119,15 +125,15 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     name: 'contacts',
     usage: [
       'agentlink contacts',
-      'agentlink contacts --verify <id>       †',
       'agentlink contacts rename <contactId> <name> [--agent <name>]   †',
       'agentlink contacts remove <contactId> [--agent <name>]   †',
     ],
     guard: 'owner',
-    // `--verify` (M1-9m) and the `rename` and `remove` subcommands (M1-9za) are owner operations;
-    // the plain list is not.
-    guardWhen: (parsed) => parsed.values['verify'] !== undefined || parsed.positionals.length > 0,
-    options: { ...AGENT, verify: { type: 'string' } },
+    // The `rename` and `remove` subcommands (M1-9za) are owner operations; the plain list is not.
+    // `--verify` (M1-9m) is not registered until safety-code checks land, so nothing names it
+    // (M1-36c).
+    guardWhen: (parsed) => parsed.positionals.length > 0,
+    options: AGENT,
   },
   {
     name: 'requests',
@@ -137,14 +143,16 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   },
   {
     name: 'policy',
-    // M1-9m: show, and the allowed folders for sending files. M1-9m-b: recover (D-100). `set <key> <value>` (commitments
-    // limits, the sell warning) is still to come.
+    // M1-9m: show, and the allowed folders for sending files. M1-9m-b: recover (D-100).
+    // `set <key> <value>` (commitments limits, the sell warning) is not registered, so it is not
+    // listed (M1-36c).
     usage: [
       'agentlink policy show [--agent <name>]   †',
       'agentlink policy allow-folder <path> [--agent <name>]   †',
       'agentlink policy remove-folder <path> [--agent <name>]   †',
       'agentlink policy recover [--agent <name>]   †',
-      'agentlink policy set <key> <value>   †',
+      // M1-36b-2-c: the Send folder for an agent set up before its first rules.
+      'agentlink policy allow-send-folder [--agent <name>]   †',
     ],
     guard: 'owner',
     options: AGENT,
@@ -186,7 +194,16 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     approvalIdAt: [0],
   },
   { name: 'doctor', usage: ['agentlink doctor'], guard: 'none', options: AGENT },
-  { name: 'mcp', usage: ['agentlink mcp'], guard: 'none', options: AGENT },
+  // M1-11b-9: opens the local pages in the owner's own terminal; the handler checks the terminal
+  // itself so an agent run gets one fixed line (ui.ts), not the generic guard text.
+  { name: 'ui', usage: ['agentlink ui [--agent <name>]'], guard: 'none', options: AGENT },
+  {
+    name: 'mcp',
+    // M1-36h: `--advanced` serves the Advanced tool surface (the `chain?` override, 06 §2.4).
+    usage: ['agentlink mcp [--advanced]'],
+    guard: 'none',
+    options: { ...AGENT, advanced: { type: 'boolean' } },
+  },
 ] satisfies CommandSpec[]);
 
 /** The command names, for tests and for the harness config writers. */
@@ -221,27 +238,60 @@ export const EXIT_USAGE = 2;
 
 /** Fixed text (I-5: nothing the caller typed is echoed). */
 export const DISPATCH_TEXT = Object.freeze({
-  unknownCommand: 'Unknown command. Run `agentlink --help` to see the commands.',
-  badArguments:
-    "That command's arguments aren't right. Run `agentlink --help` to see how to use it.",
+  get unknownCommand(): string {
+    return `Unknown command. Run \`${commandPrefix()} --help\` to see the commands.`;
+  },
+  get badArguments(): string {
+    return `That command's arguments aren't right. Run \`${commandPrefix()} --help\` to see how to use it.`;
+  },
   notAvailable: "This command isn't available in this version of AgentLink yet.",
   harnessDetected:
     'This looks like a terminal your AI app controls. Run this command yourself, in a terminal window you opened.',
   notInteractive:
     'This command needs you at an interactive terminal. Run it yourself, in a terminal window you opened.',
-  failed: 'Something went wrong. Run `agentlink doctor` in your own terminal to see why.',
+  get failed(): string {
+    return `Something went wrong. Run \`${commandPrefix()} doctor\` in your own terminal to see why.`;
+  },
+  // M1-9zd (11 §5.5, §6.10): fixed text; nothing of what was typed is repeated.
+  get ownerCodeInCommand(): string {
+    return [
+      "Problem  That looks like your owner code, so AgentLink didn't run anything.",
+      '         Type your owner code only at the prompt a command shows. It is never',
+      '         part of a command, and never paste it into a chat. Your shell may have',
+      '         kept what you typed in its history, so change your owner code:',
+      `         ${commandPrefix()} owner change-code`,
+    ].join('\n');
+  },
 });
 
-/** The `--help` text: exactly the registered commands of 06 §8. */
+/** The `--help` groups (M1-36c): a one-line purpose each, so a new user knows where to start. */
+const HELP_GROUPS: readonly { readonly title: string; readonly names: readonly CommandName[] }[] = [
+  { title: 'Start here (once):', names: ['init', 'owner'] },
+  {
+    title: 'Every day:',
+    names: ['status', 'invite', 'accept', 'requests', 'approve', 'deny', 'cancel'],
+  },
+  { title: 'More:', names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'ui', 'mcp'] },
+];
+
+/** The `--help` text: exactly the registered commands of 06 §8, grouped. */
 export function helpText(): string {
   const lines = [
+    'AgentLink: private messages between AI agents, with proof when you want it.',
+    '',
     'Usage: agentlink <command> [options]',
+    `New here? Run \`${commandPrefix()} init\`, then ask your AI to send an invite.`,
     '',
-    'Commands († needs you, the owner, in your own terminal):',
-    ...COMMANDS.flatMap((command) => command.usage.map((line) => `  ${line}`)),
-    '',
-    'Options: --help, --version',
+    '† needs you, the owner, in your own terminal.',
   ];
+  for (const group of HELP_GROUPS) {
+    lines.push('', group.title);
+    for (const name of group.names) {
+      const spec = COMMANDS.find((command) => command.name === name);
+      for (const line of spec?.usage ?? []) lines.push(`  ${line}`);
+    }
+  }
+  lines.push('', 'Options: --help, --version');
   return lines.join('\n');
 }
 
@@ -262,6 +312,11 @@ export function createDispatcher(
 
   return async (argv, io) => {
     const { output } = io;
+    // M1-9zd: before help, the command lookup or argument parsing, so no path can print it.
+    if (looksLikeOwnerCode(argv)) {
+      output.printError(DISPATCH_TEXT.ownerCodeInCommand);
+      return EXIT_USAGE;
+    }
     const [first, ...rest] = argv;
     if (first === undefined || first === '--help' || first === '-h' || first === 'help') {
       output.print(helpText());

@@ -3,6 +3,8 @@
 // as `cause` (I-7). Callers branch on `code`. Schema violations by a write are core's
 // StoreConstraintError and misuse is core's StoreUsageError, as for every Store.
 
+import { CLI_COMMAND } from './cli-command.js';
+
 export type NodeStoreErrorCode =
   /** The store's schema version is newer than this code: it is never opened or downgraded (07 §3.7). */
   | 'store_too_new'
@@ -18,14 +20,11 @@ export type NodeStoreErrorCode =
 const MESSAGES: Readonly<Record<NodeStoreErrorCode, string>> = {
   store_too_new:
     "This agent's local data was written by a newer version of AgentLink. Update AgentLink.",
-  store_foreign:
-    "This file is not AgentLink's local data, or it is damaged. Check the agent's config with `agentlink doctor`.",
+  store_foreign: `This file is not AgentLink's local data, or it is damaged. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
   store_busy:
     "Another AgentLink process is busy with this agent's local data. Try again in a moment.",
-  store_failed:
-    "AgentLink could not read or write this agent's local data. Check free disk space, then `agentlink doctor`.",
-  store_unreadable:
-    "Part of this agent's local data is damaged and was not used. Run `agentlink doctor`.",
+  store_failed: `AgentLink could not read or write this agent's local data. Check free disk space, then \`${CLI_COMMAND} doctor\`.`,
+  store_unreadable: `Part of this agent's local data is damaged and was not used. Run \`${CLI_COMMAND} doctor\`.`,
 };
 
 export class NodeStoreError extends Error {

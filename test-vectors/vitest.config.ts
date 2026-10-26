@@ -68,7 +68,11 @@ export default defineConfig({
             SHARED,
             'harness/schema.test.ts',
             'harness/compare.test.ts',
+            // CHORE-VECTORS-TIMEOUT-RANGE: every suite's timeoutMs is within (0, 120000].
+            'harness/timeout.test.ts',
             'harness/policy-form.test.ts',
+            // M1-11r-b: the owner-operation prepare builder against the signing vectors.
+            'harness/prepare-form.test.ts',
             BATCH_FORM,
             CONTACT_CHECK_FORM,
           ],

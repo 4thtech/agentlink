@@ -21,6 +21,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'NodeKeyStoreError',
       // M1-8b: the store entry returns the Store and its cipher, never the store key.
       'NodeStoreError',
+      // M1-8f: the file KeyStore's two environment variable names (07 §9.2), not their values.
+      'PASSPHRASE_ENV',
+      'PASSPHRASE_FILE_ENV',
       // M1-4a: the address-checked RPC fetch (no lookup, CA or route seam).
       'RPC_FETCH_MAX_BYTES',
       'RpcFetchError',
@@ -31,7 +34,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'addAgentToOwner',
       'assertAgentId',
       // M1-9z: `owner change-code`, a prompting entry point like initOwner (no seed or item seam).
+      // M1-8f: the file KeyStore's prompting entry points (no directory, KDF, kek or probe seam).
+      'changeFileKeyStorePassphrase',
       'changeOwnerCode',
+      'createFileKeyStoreAgent',
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
@@ -48,13 +54,19 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'openAgentKeyStore',
       'openAgentStore',
       'openAllowedFile',
+      // M1-11b-6: a store-only boolean (no owner anywhere: card, owner items, owner files).
+      'ownerSetupAvailable',
       'packageName',
       'performOwnerOperation',
       'probeOsKeychain',
       'resolveAllowedFile',
       'selectKeyStoreBackend',
+      // M1-36b-2-c: the Send folder for an existing agent; the owner signs through the given
+      // owner operation (performOwnerOperation in the CLI), nothing is unlocked here.
+      'setUpSendFolder',
       // M1-8d: the local approval server entry point (no owner-store or opener seam).
       'startApprovalServer',
+      'unlockFileKeyStoreAgent',
     ]);
   });
 
@@ -74,6 +86,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'runOwnerOperation',
       'decideReviewedWith',
       'initOwnerWith',
+      // M1-11b-6: the keychain seam of ownerSetupAvailable stays inside.
+      'ownerSetupAvailableWith',
+      'noOwnerAnywhere',
       'addAgentWith',
       'ttyOwnerTerminal',
       'openAgentStoreWith',
@@ -95,6 +110,21 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'pinnedTls',
       'systemLookup',
       'openAllowedFileWith',
+      // M1-8f: the file backend's raw entries, reader, writer and test seams stay internal.
+      'fileKeychain',
+      'createFileAgent',
+      'unlockFileAgent',
+      'changeFileAgentPassphrase',
+      'writeAgentFile',
+      'readKeystoreFile',
+      'writeKeystoreFile',
+      'createFileKeyStoreAgentWith',
+      'recordedBackend',
+      'secretOpensAnyAgentFile',
+      // M1-36b-2-c: the Send folder internals stay inside.
+      'prepareSendFolder',
+      'signFirstPolicy',
+      'isSendFolderBody',
     ]) {
       expect(names).not.toContain(name);
     }

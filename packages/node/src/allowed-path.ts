@@ -11,6 +11,14 @@
 // protected or hidden inbox, and creates a new file exclusively (never overwrites, never follows a
 // symlink), adding ` (1)`, ` (2)`, … on a clash.
 //
+// Pinned folders (M1-36b-2-d, IR-M1-36b-2-c-1 L3): owner commands store an allowed folder as its
+// realpath (`policy allow-folder`, the Send folder), so the stored string pins the folder's real
+// location. An allowed folder is used only while it still resolves to exactly that location (a
+// leading `~/` stands for the real home folder): one that became a link, or sits below a folder that
+// became a link, is not used, so a later link cannot widen what the owner allowed. pinFolder and
+// stillPinned add the folder's identity on disk (device and inode) for owner flows that check a
+// folder, ask the owner code and then apply: the folder must still be the same one at each step.
+//
 // Nothing here logs, and no error carries a path or a file name (a tool error is shown to the AI):
 // callers branch on AllowedPathError.code.
 import {
@@ -23,7 +31,7 @@ import {
   type PathFlavor,
 } from '@4thtech-io/core';
 import { constants, type Stats } from 'node:fs';
-import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
+import { lstat, open, realpath, stat, type FileHandle } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -107,8 +115,78 @@ function absolute(p: string, home: string): string | undefined {
 }
 
 /**
+ * Where a stored allowed folder must really be: the folder with a leading `~/` expanded to the real
+ * home folder (`realHome`, already resolved), normalised, without a trailing separator. Undefined
+ * when it is not a full path. A folder is used only while its realpath equals this.
+ */
+export function pinnedLocation(folder: string, realHome: string): string | undefined {
+  const abs = absolute(folder, realHome);
+  if (abs === undefined) return undefined;
+  const normal = path.normalize(abs);
+  const { root } = path.parse(normal);
+  return normal.length > root.length && normal.endsWith(path.sep) ? normal.slice(0, -1) : normal;
+}
+
+/**
+ * The real path of every allowed folder that is still where it was allowed (see the header); the
+ * others (missing, a link, below a link) are left out, fail closed.
+ */
+async function pinnedAllowedFolders(
+  allowedFolders: readonly string[],
+  home: string,
+): Promise<string[]> {
+  const realHome = (await realpathOrUndefined(home)) ?? home;
+  const folders = await Promise.all(
+    allowedFolders.map(async (folder) => {
+      if (typeof folder !== 'string') return undefined;
+      const pinned = pinnedLocation(folder, realHome);
+      if (pinned === undefined) return undefined;
+      const real = await realpathOrUndefined(pinned);
+      return real !== undefined && real === pinned ? real : undefined;
+    }),
+  );
+  return folders.filter((f): f is string => f !== undefined);
+}
+
+/** A folder as checked: its real path and its identity on disk (M1-36b-2-d). */
+export interface FolderPin {
+  readonly path: string;
+  readonly dev: bigint;
+  readonly ino: bigint;
+}
+
+/**
+ * Pins `folder` when it is a real folder (not a link) whose realpath is exactly `folder`; undefined
+ * otherwise. The identity is read before and after the realpath and must match, so a swap during
+ * the pin is not pinned.
+ */
+export async function pinFolder(folder: string): Promise<FolderPin | undefined> {
+  if (typeof folder !== 'string' || parseAbsolutePath(folder, FLAVOR) === undefined) {
+    return undefined;
+  }
+  try {
+    const first = await lstat(folder, { bigint: true });
+    if (first.isSymbolicLink() || !first.isDirectory()) return undefined;
+    if ((await realpath(folder)) !== folder) return undefined;
+    const second = await lstat(folder, { bigint: true });
+    if (second.isSymbolicLink() || !second.isDirectory()) return undefined;
+    if (second.dev !== first.dev || second.ino !== first.ino) return undefined;
+    return Object.freeze({ path: folder, dev: first.dev, ino: first.ino });
+  } catch {
+    return undefined;
+  }
+}
+
+/** True while the pinned folder is still that same real folder: same path, device and inode. */
+export async function stillPinned(pin: FolderPin): Promise<boolean> {
+  const now = await pinFolder(pin.path);
+  return now !== undefined && now.dev === pin.dev && now.ino === pin.ino;
+}
+
+/**
  * Checks that `requested` (a tool argument) may be read under 04 §4: realpath on both sides, inside
- * an allowed folder, not hidden, not under a protected root, a regular file. Never opens the file.
+ * an allowed folder that is still where it was allowed (pinned, see the header), not hidden, not
+ * under a protected root, a regular file. Never opens the file.
  */
 export async function resolveAllowedFile(
   requested: string,
@@ -117,14 +195,7 @@ export async function resolveAllowedFile(
   const home = options.home ?? homedir();
   const requestedAbs = absolute(requested, home);
   if (requestedAbs === undefined) throw new AllowedPathError('path_malformed');
-  const folders = (
-    await Promise.all(
-      options.allowedFolders.map(async (folder) => {
-        const abs = absolute(folder, home);
-        return abs === undefined ? undefined : realpathOrUndefined(abs);
-      }),
-    )
-  ).filter((f): f is string => f !== undefined);
+  const folders = await pinnedAllowedFolders(options.allowedFolders, home);
   const roots = await resolvedProtectedRoots(home);
   // Refuse a protected or hidden request before touching the file system for it.
   const early = decidePath({

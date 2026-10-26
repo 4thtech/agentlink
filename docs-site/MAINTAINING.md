@@ -65,7 +65,7 @@ A page for an unreleased feature contains only: the title, the status hint, a **
 
 ### Versions
 
-Milestones map to versions per [versioning.md](../docs/process/versioning.md): M1a = 0.1.0, M1 gate = 0.2.0, M2 = 0.3.0, M3 = 1.0.0.
+Milestones map to versions per [versioning.md](../docs/process/versioning.md): M1a = 0.1.0, M1 gate = 0.2.0, the usable local app = 0.3.0, M2 = 0.4.0 first (the cloud agent, D-131), M3 = 1.0.0.
 
 ## 4. Who updates what, and when
 
@@ -87,7 +87,7 @@ Milestones map to versions per [versioning.md](../docs/process/versioning.md): M
 | Guide: Desktop app; Always-on cloud agent | — | — | Fill in | Review |
 | Guide: What leaves your computer | Check against the build | Files and proof | Desktop, console, cloud | Audit outcome |
 | Guide: Pricing | — | Test credits | — | Live prices, status "Available" |
-| Guide: Credits and payments | — | Free test credits, automatic claim | Top-up paths (exchange, own account) | Real credits, withdraw button, card path, status "Available" |
+| Guide: Credits (who holds what, trust) | — | Free test credits | Top-up paths (exchange, own account) | Real credits, withdraw button, card path, status "Available" |
 | Guide: Troubleshooting; FAQ; Glossary | Fill in | Extend | Extend | Extend |
 | Technical: Architecture; Protocol pages; Security model; Threat model | Mark what shipped | Mark what shipped | Mark what shipped | Audit summary, frozen formats |
 | Technical: MCP tools; Policies; CLI; Harness configuration | Fill in (Talk) | Fill in (files, proof) | Cloud and desktop | Review |

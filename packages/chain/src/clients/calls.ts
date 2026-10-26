@@ -2,7 +2,7 @@
 //
 // `occNotaryClientAbi` and `occFeeVaultClientAbi` hold the functions tagged `client` and every
 // event and error. Admin, upgrade, module, integrator, maintenance and pending functions
-// (`depositWithAuthorization` until M1-3c) are absent, so this package can neither type nor encode
+// (`depositWithAuthorization`, which only the relay ABI carries) are absent, so this package can neither type nor encode
 // them: the call fails before any request. The full interface ABIs are for decoding and review and
 // are never bound to a call here.
 import { occFeeVaultClientAbi, occNotaryClientAbi } from '@4thtech-io/occ-v2-abi';

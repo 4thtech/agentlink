@@ -3,3 +3,4 @@ export * from './types.js';
 export * from './fees.js';
 export * from './testnets.js';
 export * from './validate.js';
+export * from './pay.js';

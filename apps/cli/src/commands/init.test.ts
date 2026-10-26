@@ -22,17 +22,19 @@ import {
   createDispatcher,
   type DispatchIO,
 } from '../dispatch.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
 import { RUNTIME_MESSAGES } from '../runtime/errors.js';
 import { readAgentConfig } from '../runtime/index.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { copy } from '../tools/strings/index.js';
+import { HARNESSES } from '../harness/index.js';
+import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { INIT_TEXT, createInitHandler, type InitDeps } from './init.js';
 
 const POSIX = process.platform !== 'win32';
 const AGENT_ID = `0x${'ab'.repeat(20)}`;
 const NOW = 1_800_000_000;
 const NO_KEYCHAIN_COPY =
-  "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `agentlink init --keystore file` yourself, in your own terminal.";
+  "This machine has no system keychain (common in containers, WSL and SSH sessions), so AgentLink can't protect your agent's identity here yet. To keep it in a passphrase-locked file instead, run `npx -y @4thtech-io/agentlink init --keystore file` yourself, in your own terminal.";
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const PIPE: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };
@@ -67,6 +69,8 @@ interface RunOptions {
   readonly probe?: KeychainProbe;
   readonly answers?: readonly string[];
   readonly platform?: NodeJS.Platform;
+  readonly desktopRunning?: boolean | number;
+  readonly ownerCard?: boolean;
 }
 
 async function init(argv: readonly string[], options: RunOptions = {}): Promise<Run> {
@@ -74,6 +78,7 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
   const err: string[] = [];
   let created = 0;
   let asked = 0;
+  let runningChecks = 0;
   const answers = [...(options.answers ?? [])];
   const deps: InitDeps = {
     home,
@@ -87,6 +92,14 @@ async function init(argv: readonly string[], options: RunOptions = {}): Promise<
       return Promise.resolve(answers.shift() ?? '');
     },
     clock: () => NOW,
+    claudeDesktopRunning: () => {
+      if (typeof options.desktopRunning === 'number') {
+        runningChecks += 1;
+        return Promise.resolve(runningChecks <= options.desktopRunning);
+      }
+      return Promise.resolve(options.desktopRunning === true);
+    },
+    hasOwnerCard: () => Promise.resolve(options.ownerCard === true),
     ...(options.platform === undefined ? {} : { platform: options.platform }),
   };
   const dispatch = createDispatcher({ init: createInitHandler(deps) });
@@ -105,6 +118,9 @@ function codeOf(run: Run): string {
   if (match?.[1] === undefined) throw new Error('no confirmation code printed');
   return match[1];
 }
+
+/** INIT_TEXT with the M1-36a command prefix filled in, as printed here (run through vitest, not npx). */
+const withPrefix = (text: string): string => text.replaceAll('{prefix}', cliPrefix());
 
 const read = (...parts: string[]): Promise<string> => readFile(join(home, ...parts), 'utf8');
 const exists = (...parts: string[]): Promise<boolean> =>
@@ -129,10 +145,10 @@ describe('detection', () => {
     const plan = await init([], { platform: 'darwin' });
     expect(plan.code).toBe(EXIT_OK);
     expect(plan.out).toContain(
-      "didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode or Antigravity",
+      "didn't find Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf",
     );
     expect((await init([], { platform: 'linux' })).out).toContain(
-      "didn't find Claude Code, Codex, Gemini CLI, OpenCode or Antigravity",
+      "didn't find Claude Code, Codex, Gemini CLI, OpenCode, Antigravity, Cursor or Windsurf",
     );
     expect(plan.created).toBe(0);
     const run = await init(['--confirm', codeOf(plan)]);
@@ -182,7 +198,11 @@ describe('detection', () => {
 describe('Claude Desktop (M1-9w)', () => {
   const MAC = ['Library', 'Application Support', 'Claude', 'claude_desktop_config.json'];
   const WIN = ['AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'];
-  const ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
+  // M1-36b (D5): one app, so the agent is named after it.
+  const ENTRY = {
+    command: 'npx',
+    args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'claude-desktop'],
+  };
   const cases: [NodeJS.Platform, string[], string][] = [
     ['darwin', MAC, '~/Library/Application Support/Claude/claude_desktop_config.json'],
     ['win32', WIN, '~/AppData/Roaming/Claude/claude_desktop_config.json'],
@@ -262,17 +282,19 @@ describe('the exact diff of each harness', () => {
     expect(plan.out).toContain(copy('cli.init.changesFor', { appName: 'Claude Code' }));
     const lines = plan.out.split('\n');
     const start = lines.indexOf('--- a/~/.claude.json');
-    expect(lines.slice(start, start + 13)).toEqual([
+    expect(lines.slice(start, start + 15)).toEqual([
       '--- a/~/.claude.json',
       '+++ b/~/.claude.json',
-      '@@ -3,0 +4,10 @@',
+      '@@ -3,0 +4,12 @@',
       '+    "agentlink": {',
       '+      "type": "stdio",',
       '+      "command": "npx",',
       '+      "args": [',
       '+        "-y",',
       '+        "@4thtech-io/agentlink",',
-      '+        "mcp"',
+      '+        "mcp",',
+      '+        "--agent",',
+      '+        "claude-code"',
       '+      ],',
       '+      "env": {}',
       '+    },',
@@ -290,7 +312,7 @@ describe('the exact diff of each harness', () => {
     expect(written.mcpServers.agentlink).toEqual({
       type: 'stdio',
       command: 'npx',
-      args: ['-y', '@4thtech-io/agentlink', 'mcp'],
+      args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'claude-code'],
       env: {},
     });
     expect(written.mcpServers.other).toEqual({ command: 'x', env: { KEY: 'v' } });
@@ -312,7 +334,12 @@ describe('the exact diff of each harness', () => {
     expect(plan.out).not.toContain('"type"');
     await init(['--confirm', codeOf(plan)]);
     expect(JSON.parse(await read('.gemini', 'settings.json'))).toEqual({
-      mcpServers: { agentlink: { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] } },
+      mcpServers: {
+        agentlink: {
+          command: 'npx',
+          args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'gemini-cli'],
+        },
+      },
       theme: 'x',
     });
   });
@@ -331,11 +358,11 @@ describe('the exact diff of each harness', () => {
       '+',
       '+[mcp_servers.agentlink]',
       '+command = "npx"',
-      '+args = ["-y", "@4thtech-io/agentlink", "mcp"]',
+      '+args = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "codex"]',
     ]);
     await init(['--confirm', codeOf(plan)]);
     expect(await read('.codex', 'config.toml')).toBe(
-      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n`,
+      `${before}\n[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "codex"]\n`,
     );
   });
 
@@ -344,7 +371,7 @@ describe('the exact diff of each harness', () => {
     const plan = await init([]);
     await init(['--confirm', codeOf(plan)]);
     expect(await read('.codex', 'config.toml')).toBe(
-      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp"]\n',
+      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "codex"]\n',
     );
     expect(await exists('.codex', 'config.toml')).toBe(true);
   });
@@ -388,10 +415,10 @@ describe('confirmation', () => {
     const plan = await init([]);
     const wrong = await init(['--confirm', '0000-0000']);
     expect(wrong.code).toBe(EXIT_FAILED);
-    expect(wrong.err).toBe(INIT_TEXT.codeMismatch);
+    expect(wrong.err).toBe(withPrefix(INIT_TEXT.codeMismatch));
     const malformed = await init(['--confirm', 'not a code']);
     expect(malformed.code).toBe(EXIT_USAGE);
-    expect(malformed.err).toBe(INIT_TEXT.badCode);
+    expect(malformed.err).toBe(withPrefix(INIT_TEXT.badCode));
     expect(malformed.err).not.toContain('not a code');
     // A code made for one agent name does not work for another.
     const other = await init(['--agent', 'other', '--confirm', codeOf(plan)]);
@@ -421,28 +448,92 @@ describe('confirmation', () => {
     );
   });
 
-  it('in a terminal, asks per harness and writes only what is confirmed', async () => {
+  it('in a terminal, asks once for all apps, then per app on a no', async () => {
     await mkdir(join(home, '.codex'));
     const env = await geminiOnPath();
-    const run = await init([], { terminal: { ...TTY, env }, answers: ['y', 'n'] });
-    expect(run.asked).toBe(2);
-    expect(run.out).toContain(copy('cli.init.apply'));
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['n', 'y', 'n'] });
+    expect(run.out).toContain(INIT_TEXT.allQuestion.replace('{count}', '2'));
+    expect(run.asked).toBe(3);
     expect(await exists('.codex', 'config.toml')).toBe(true);
     expect(await exists('.gemini', 'settings.json')).toBe(false);
     expect(run.created).toBe(1);
   });
 
+  it('a yes to the all question sets up every app and asks nothing per app', async () => {
+    await mkdir(join(home, '.codex'));
+    const env = await geminiOnPath();
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['y'] });
+    expect(run.asked).toBe(1);
+    expect(await exists('.codex', 'config.toml')).toBe(true);
+    expect(await exists('.gemini', 'settings.json')).toBe(true);
+    expect(run.out).toContain('Codex: set up');
+    expect(run.out).toContain('Gemini CLI: set up');
+  });
+
+  it('any answer other than y or yes prints a Skipped line and the summary says skipped', async () => {
+    await mkdir(join(home, '.codex'));
+    const env = await geminiOnPath();
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['n', 'yep', 'yes'] });
+    expect(run.out).toContain('Skipped Codex.');
+    expect(run.out).not.toContain('Skipped Gemini CLI.');
+    expect(run.out).toContain('Codex: skipped');
+    expect(run.out).toContain('Gemini CLI: set up');
+  });
+
+  it('the summary names already set up and blocked apps', async () => {
+    await mkdir(join(home, '.codex'));
+    const env = await geminiOnPath();
+    await mkdir(join(home, '.gemini'), { recursive: true });
+    await writeFile(join(home, '.gemini', 'settings.json'), '{ not json');
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['y'] });
+    expect(run.out).toContain('Codex: set up');
+    expect(run.out).toMatch(/Gemini CLI: blocked\. /);
+    const again = await init([], { terminal: { ...TTY, env }, answers: [] });
+    expect(again.out).toContain('Codex: already set up');
+  });
+
   it('in a terminal, names the app in front of each question (IR-M1-9a-1 F07)', async () => {
     await mkdir(join(home, '.codex'));
     const env = await geminiOnPath();
-    const run = await init([], { terminal: { ...TTY, env }, answers: ['y', 'n'] });
-    const lines = run.out.split('\n');
-    const questions = lines.flatMap((l, i) => (l === copy('cli.init.apply') ? [i] : []));
-    expect(questions).toHaveLength(2);
-    expect(lines[(questions[0] ?? 0) - 1]).toBe(copy('cli.init.changesFor', { appName: 'Codex' }));
-    expect(lines[(questions[1] ?? 0) - 1]).toBe(
-      copy('cli.init.changesFor', { appName: 'Gemini CLI' }),
+    const run = await init([], { terminal: { ...TTY, env }, answers: ['n', 'y', 'n'] });
+    const apply = (appName: string): string => INIT_TEXT.applyApp.replace('{appName}', appName);
+    expect(run.out).toContain(apply('Codex'));
+    expect(run.out).toContain(apply('Gemini CLI'));
+    expect(run.out).toContain(copy('cli.init.changesFor', { appName: 'Codex' }));
+    expect(run.out).toContain(copy('cli.init.changesFor', { appName: 'Gemini CLI' }));
+  });
+
+  it('a single app keeps the diff right above its question', async () => {
+    await mkdir(join(home, '.codex'));
+    const run = await init([], { terminal: TTY, answers: ['y'] });
+    expect(run.out).not.toContain(INIT_TEXT.allQuestion.replace('{count}', '1'));
+    expect(run.out).toContain(copy('cli.init.apply'));
+  });
+
+  it('asks to quit Claude Desktop first when it is running, and says to reopen it', async () => {
+    const parts = ['Library', 'Application Support', 'Claude'];
+    await mkdir(join(home, ...parts), { recursive: true });
+    const run = await init([], {
+      terminal: TTY,
+      platform: 'darwin',
+      desktopRunning: 1,
+      answers: ['y', ''],
+    });
+    expect(run.out).toContain(INIT_TEXT.quitDesktopMac);
+    expect(run.out.indexOf(INIT_TEXT.quitDesktopMac)).toBeLessThan(
+      run.out.indexOf(INIT_TEXT.restartDesktop),
     );
+    expect(run.asked).toBe(2);
+    expect(await exists(...parts, 'claude_desktop_config.json')).toBe(true);
+    expect(INIT_TEXT.quitDesktopMac).toContain('Cmd+Q');
+  });
+
+  it('does not ask to quit Claude Desktop when it is not running', async () => {
+    const parts = ['Library', 'Application Support', 'Claude'];
+    await mkdir(join(home, ...parts), { recursive: true });
+    const run = await init([], { terminal: TTY, platform: 'darwin', answers: ['y'] });
+    expect(run.out).not.toContain(INIT_TEXT.quitDesktopMac);
+    expect(run.asked).toBe(1);
   });
 
   it('does not write to ~/.claude.json when CLAUDE_CONFIG_DIR moves Claude Code elsewhere (F05)', async () => {
@@ -458,10 +549,11 @@ describe('confirmation', () => {
     await mkdir(join(home, '.codex'));
     const run = await init([], { terminal: TTY, answers: ['', 'maybe'] });
     expect(run.code).toBe(EXIT_OK);
-    expect(run.out).toContain(INIT_TEXT.declinedKept);
+    expect(run.out).toContain(withPrefix(INIT_TEXT.declinedKept));
     expect(run.created).toBe(1);
     expect(await exists('.codex', 'config.toml')).toBe(false);
-    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+    // M1-36b (D5): the one app found names the agent.
+    expect((await readAgentConfig(home, 'codex'))?.config.agentId).toBe(AGENT_ID);
   });
 
   it('declining every change never touches an existing identity', async () => {
@@ -489,10 +581,13 @@ describe('an existing agent', () => {
     await mkdir(join(home, '.codex'));
     const first = await init([]);
     await init(['--confirm', codeOf(first)]);
-    const second = await init([], { terminal: { ...PIPE, env: await geminiOnPath() } });
+    const env = await geminiOnPath();
+    const second = await init([], { terminal: { ...PIPE, env } });
     expect(second.out).not.toContain(INIT_TEXT.identity);
-    await init(['--confirm', codeOf(second)], { terminal: { ...PIPE, env: await geminiOnPath() } });
-    expect((await readAgentConfig(home, 'default'))?.config.agentId).toBe(AGENT_ID);
+    await init(['--confirm', codeOf(second)], { terminal: { ...PIPE, env } });
+    // M1-36b (D5): the first run named the agent after Codex; the second run reuses it.
+    expect((await readAgentConfig(home, 'codex'))?.config.agentId).toBe(AGENT_ID);
+    expect(await readAgentConfig(home, 'default')).toBeUndefined();
     expect(await exists('.gemini', 'settings.json')).toBe(true);
   });
 });
@@ -643,12 +738,16 @@ describe('keychain and agent names', () => {
 
 // D-78 (06 §7): one harness at a time, identity only, OpenCode and Antigravity, `--config`.
 describe('init --harness and --config (M1-9t)', () => {
+  // M1-36b (D5): one app, so the agent is named after it.
   const OPENCODE_ENTRY = {
     type: 'local',
-    command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp'],
+    command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'opencode'],
     enabled: true,
   };
-  const ANTIGRAVITY_ENTRY = { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp'] };
+  const ANTIGRAVITY_ENTRY = {
+    command: 'npx',
+    args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'antigravity'],
+  };
   const readAbs = (path: string): Promise<string> => readFile(path, 'utf8');
   const existsAbs = (path: string): Promise<boolean> =>
     readFile(path).then(
@@ -662,7 +761,7 @@ describe('init --harness and --config (M1-9t)', () => {
     const plan = await init(['--harness', 'codex']);
     expect(plan.out).toContain('--- a/~/.codex/config.toml');
     expect(plan.out).not.toContain('settings.json');
-    expect(plan.out).toContain('agentlink init --harness codex --confirm');
+    expect(plan.out).toContain('agentlink init --agent codex --harness codex --confirm');
     const run = await init(['--harness', 'codex', '--confirm', codeOf(plan)]);
     expect(run.code).toBe(EXIT_OK);
     expect(await exists('.codex', 'config.toml')).toBe(true);
@@ -857,5 +956,126 @@ describe('init --harness and --config (M1-9t)', () => {
     const plan = await init(['--harness', 'opencode', '--config', join(outside, 'opencode.toml')]);
     expect(plan.code).not.toBe(EXIT_OK);
     expect(plan.out).not.toContain('--confirm');
+  });
+});
+
+describe('apps lists name every harness (M1-36g-b)', () => {
+  it('appsAll names every app in the harness table, appsLinux all but Claude Desktop', () => {
+    for (const def of HARNESSES) {
+      expect(INIT_TEXT.appsAll).toContain(def.appName);
+      if (def.id === 'claude-desktop') expect(INIT_TEXT.appsLinux).not.toContain(def.appName);
+      else expect(INIT_TEXT.appsLinux).toContain(def.appName);
+    }
+  });
+});
+
+describe('Windsurf: the code binds the path that is written (M1-36g-c)', () => {
+  const xdgEnv = (): Record<string, string> => ({ XDG_CONFIG_HOME: join(home, 'xdg') });
+  const XDG_FILE = ['xdg', 'devin', 'mcp_config.json'] as const;
+  const DEFAULT_FILE = ['.config', 'devin', 'mcp_config.json'] as const;
+
+  it('with XDG_CONFIG_HOME set, shows that path and writes exactly there on confirmation', async () => {
+    const terminal = { ...PIPE, env: xdgEnv() };
+    const plan = await init(['--harness', 'windsurf'], { platform: 'linux', terminal });
+    expect(plan.code).toBe(EXIT_OK);
+    expect(plan.out).toContain('~/xdg/devin/mcp_config.json');
+    expect(plan.out).not.toContain('~/.config/devin/mcp_config.json');
+    expect(await exists(...XDG_FILE)).toBe(false);
+    const run = await init(['--harness', 'windsurf', '--confirm', codeOf(plan)], {
+      platform: 'linux',
+      terminal,
+    });
+    expect(run.code).toBe(EXIT_OK);
+    expect(JSON.parse(await read(...XDG_FILE))).toMatchObject({
+      mcpServers: { agentlink: { command: 'npx' } },
+    });
+    expect(await exists(...DEFAULT_FILE)).toBe(false);
+  });
+
+  it('gives a different code with and without XDG_CONFIG_HOME', async () => {
+    const withXdg = await init(['--harness', 'windsurf'], {
+      platform: 'linux',
+      terminal: { ...PIPE, env: xdgEnv() },
+    });
+    const without = await init(['--harness', 'windsurf'], { platform: 'linux' });
+    expect(without.out).toContain('~/.config/devin/mcp_config.json');
+    expect(codeOf(withXdg)).not.toBe(codeOf(without));
+  });
+
+  it('a code shown with one environment does not confirm under another; nothing is written', async () => {
+    const plan = await init(['--harness', 'windsurf'], {
+      platform: 'linux',
+      terminal: { ...PIPE, env: xdgEnv() },
+    });
+    const moved = await init(['--harness', 'windsurf', '--confirm', codeOf(plan)], {
+      platform: 'linux',
+    });
+    expect(moved.code).toBe(EXIT_FAILED);
+    expect(moved.err).toContain(withPrefix(INIT_TEXT.codeMismatch));
+    expect(moved.created).toBe(0);
+    expect(await exists(...XDG_FILE)).toBe(false);
+    expect(await exists(...DEFAULT_FILE)).toBe(false);
+
+    const back = await init(['--harness', 'windsurf'], { platform: 'linux' });
+    const reverse = await init(['--harness', 'windsurf', '--confirm', codeOf(back)], {
+      platform: 'linux',
+      terminal: { ...PIPE, env: xdgEnv() },
+    });
+    expect(reverse.code).toBe(EXIT_FAILED);
+    expect(await exists(...XDG_FILE)).toBe(false);
+    expect(await exists(...DEFAULT_FILE)).toBe(false);
+  });
+});
+
+describe('the add-agent hint (WAVE-030)', () => {
+  const hint = (name: string): string => withPrefix(INIT_TEXT.ownerStepAdd).replace('{name}', name);
+
+  async function twoRuns(ownerCard: boolean): Promise<Run> {
+    await init(['--agent', 'work', '--harness', 'none'], { terminal: TTY });
+    await mkdir(join(home, '.codex'));
+    await init(['--agent', 'codex', '--harness', 'codex'], { terminal: TTY, answers: ['y'] });
+    const env = await geminiOnPath();
+    return init(['--agent', 'codex', '--harness', 'gemini-cli'], {
+      terminal: { ...TTY, env },
+      answers: ['y'],
+      ownerCard,
+    });
+  }
+
+  it('is shown for another agent that has no owner card yet', async () => {
+    expect((await twoRuns(false)).out).toContain(hint('codex'));
+  });
+
+  it('is not shown when that agent already has an owner card', async () => {
+    expect((await twoRuns(true)).out).not.toContain('owner add-agent');
+  });
+});
+
+describe('Claude Desktop still open (WAVE-030 review)', () => {
+  const parts = ['Library', 'Application Support', 'Claude'];
+  const still = (): string => withPrefix(INIT_TEXT.desktopStillOpen);
+
+  it('an agent-run --confirm does not write while Claude Desktop is running', async () => {
+    await mkdir(join(home, ...parts), { recursive: true });
+    const plan = await init(['--harness', 'claude-desktop'], { platform: 'darwin' });
+    const run = await init(['--harness', 'claude-desktop', '--confirm', codeOf(plan)], {
+      platform: 'darwin',
+      desktopRunning: true,
+    });
+    expect(run.err).toContain(still());
+    expect(await exists(...parts, 'claude_desktop_config.json')).toBe(false);
+  });
+
+  it('in a terminal, asks at most three times, then skips without writing', async () => {
+    await mkdir(join(home, ...parts), { recursive: true });
+    const run = await init(['--harness', 'claude-desktop'], {
+      terminal: TTY,
+      platform: 'darwin',
+      desktopRunning: true,
+      answers: ['y', '', '', ''],
+    });
+    expect(run.asked).toBe(4);
+    expect(run.err).toContain(still());
+    expect(await exists(...parts, 'claude_desktop_config.json')).toBe(false);
   });
 });

@@ -41,6 +41,8 @@ import {
   generateCek,
   parseEnvelope,
   parseJson,
+  parseReceivedJson,
+  parseEnvelopeText,
   randomBytes,
   verifyEnvelope,
   wipe,
@@ -75,6 +77,7 @@ import {
 import { nowOf, seal, type CoreContext } from './context.js';
 import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
+import { receivedFileRows } from './files/received.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
 import {
@@ -467,6 +470,36 @@ function wipeCek(opened: Opened): void {
 }
 
 // --- Service -------------------------------------------------------------------------------------
+
+/**
+ * Payload types whose text carries an owner-signed object (04 §2.5.1 "Received text", D-128): an
+ * `approval`, `policy` or `revoke` payload carries a SignedOwnerAction, and a pairing or
+ * `card-update` payload a card.
+ */
+const OWNER_SIGNED_CARRIERS: ReadonlySet<unknown> = new Set([
+  'approval',
+  'policy',
+  'revoke',
+  'handshake',
+  'handshake-ack',
+  'card-update',
+]);
+
+/**
+ * Step 6's parse of the decrypted payload text. Every payload first passes the generic I-JSON parse
+ * (no duplicate member name). A carrier of an owner-signed object is then parsed again with the
+ * strict received-text parse (no escaped member name, integer tokens only) and that result is the
+ * one used, so a refusal drops it. A free-form body (`text`, `note`, a `request`: 02 F-22) is user
+ * JSON, outside D-128's scope: a key that needs an escape or a non-integer number stays valid.
+ */
+function parsePayloadText(text: string): unknown {
+  const value = parseJson(text);
+  const type =
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as { type?: unknown }).type
+      : undefined;
+  return OWNER_SIGNED_CARRIERS.has(type) ? parseReceivedJson(text) : value;
+}
 
 export class EnvelopeService {
   readonly #ctx: CoreContext;
@@ -999,7 +1032,7 @@ export class EnvelopeService {
   async #open(item: Item, own: OwnKeys, book: Book): Promise<Opened | Final> {
     let envelope: Envelope;
     try {
-      envelope = parseEnvelope(parseJson(item.envelopeJson));
+      envelope = parseEnvelopeText(item.envelopeJson);
     } catch {
       return { kind: 'drop', reason: 'unreadable' };
     }
@@ -1048,7 +1081,7 @@ export class EnvelopeService {
       let payload: Payload;
       try {
         payloadText = decodeUtf8(plaintext);
-        const parsed = payloadSchema.safeParse(parseJson(payloadText));
+        const parsed = payloadSchema.safeParse(parsePayloadText(payloadText));
         if (!parsed.success) return { kind: 'drop', reason: 'payload_invalid' };
         payload = parsed.data;
       } catch {
@@ -1438,7 +1471,19 @@ export class EnvelopeService {
   ): Promise<{ readonly report?: InboundReport | undefined; readonly applied?: AgentCard }> {
     const ctx = this.#ctx;
     const { item, envelope, payload } = o;
-    const sealed = await seal(ctx, 'envelopes', 'payload_json', [item.envelopeId], o.payloadText);
+    // M1-7f-2 (D-98): an inbound payload's file keys move into sealed receiver `files` rows; the
+    // stored payload keeps a placeholder. A sent copy keeps its payload as it is.
+    const received =
+      d.state === 'sent_copy'
+        ? { payloadText: o.payloadText, rows: [] }
+        : await receivedFileRows(ctx, item.envelopeId, payload, o.payloadText);
+    const sealed = await seal(
+      ctx,
+      'envelopes',
+      'payload_json',
+      [item.envelopeId],
+      received.payloadText,
+    );
     const row: Row<'envelopes'> = {
       envelope_id: item.envelopeId,
       envelope_hash: item.envelopeHash,
@@ -1506,6 +1551,11 @@ export class EnvelopeService {
           tx.delete('blocked_keys', { from_key: agentNostrKey(d.cardUpdate.card) });
         }
         writeRow(tx, item, row);
+        for (const f of received.rows) {
+          if (tx.get('files', { envelope_id: f.envelope_id, idx: f.idx }) === undefined) {
+            tx.insert('files', f);
+          }
+        }
         return 'stored' as const;
       });
       if (done === 'lost') return {};
@@ -1624,7 +1674,7 @@ export class EnvelopeService {
     const now = nowOf(ctx);
     let envelope = parsed;
     if (envelope === undefined && final.kind === 'refuse') {
-      envelope = parseEnvelope(parseJson(item.envelopeJson));
+      envelope = parseEnvelopeText(item.envelopeJson);
     }
     const result = await ctx.store.transaction((tx) => {
       if (!claim(tx, item)) return undefined;

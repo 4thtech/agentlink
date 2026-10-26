@@ -31,7 +31,7 @@ We build in public, in stages, and each stage ends with something you can try. T
 | **M0** | Repo, CI and rules are in place | none (foundations) | ~1 week | 0.0.x |
 | **M1a** | Two agents pair and chat. The J9 dogfood: Tali's and Denis's agents sync this project through AgentLink | 1–5 | ~2–3 weeks | 0.1.0 |
 | **M1b** | Send files and get proof on testnets; 10 internal testers | 6, 7, local UI of 8 | ~3–4 weeks | 0.2.0 |
-| **M2** | Console, desktop apps, cloud agent, verify and invite pages, verified domains, storage connectors; 20–50 external testers | 8, 9, 6, 7 | ~4–6+ weeks | 0.3.0 |
+| **M2** | Console, desktop apps, cloud agent, verify and invite pages, verified domains, storage connectors; 20–50 external testers | 8, 9, 6, 7 | ~4–6+ weeks | 0.4.0 first: the cloud agent, Claude only (D-131); then the rest of M2. 0.3.0 is the usable local app |
 | **M3** | External audit, then mainnet on Base and Gnosis | 7 | ~4 weeks | 1.0.0 |
 | **M4/M5** | More chains, batching, finance dashboard, then deals and payments | 7, 8 | rolling | after 1.0.0 |
 | **M6** | AgentLink on Solana, after the EVM chains (D-110; direction only, no dates) | 7, 1, 3 | rolling | after M4 |
@@ -129,7 +129,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 |---|---|---|
 | M2-1 Design system + screens from Claude Design D2 (11) → `packages/ui` (D2 first pass landed; extends M1-35, D-116) | Components | Matches design; accessibility AA |
 | M2-2 Owner console PWA | apps/console | Passkey + PRF identity, backup to relays, new-device restore, owner link from CLI; activity, threads, approvals, policies (`SignedOwnerAction` in owner-channel envelopes, 04 §2.5.1), proofs, credits |
-| M2-3 Cloud agent template | apps/cloud-agent | `agentlink cloud deploy` and Deploy button both work; DO inbox; remote MCP + OAuth; ChatGPT developer-mode connector and claude.ai connector tested |
+| M2-3 Cloud agent template, **first, as 0.4.0** (D-131: build-plan deviation, ahead of the console and desktop apps) | apps/cloud-agent | `agentlink cloud deploy` (certified first) and the Deploy button both work; DO inbox with alarm sync; remote MCP (stateless handler) + OAuth with an owner-signed grant checked on every request; owner pages on the Worker's origin (setup with a passkey, approvals, status); the claude.ai connector tested on the web and in the Claude iOS and Android apps, end to end from a phone; Fable audit of the slice (AUDIT-CLOUD). ChatGPT web follows after 0.4.0 |
 | M2-4 OCCRegistry + verified badge | contracts, chain, console | Register/revoke on testnets; badge shown in contacts |
 | M2-5 Verify page + invite landing | apps/verify, apps/invite | Verification fully client-side; fragment never sent (asserted in tests) |
 | M2-6 Restyle local approval UI with `packages/ui` | apps/cli | — |
@@ -140,7 +140,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M2-17 Privacy of on-chain proofs, M2 part (D-109) | contracts, chain, core, console | Per-relationship signing addresses with proof of possession and no per-address funding (M2-17a); a Registry whose events and calldata carry no guessable identifier (M2-17b, before M2-4a); optional delayed or batched receipts (M2-17c). Contract changes land before the M3 audit |
 | M2-18 Adding credits on the pay page (D-111) | apps/pay, docs | With the pay page (M2-2f): use crypto you already have (connect the user's own account, network detected, one confirmation) and send from an exchange (address, QR, minimum, wrong-network help) on testnets, plus free test credits; payment progress and records. Crypto first: nothing waits for a card path (D-111). Design brief `docs/design/topup-ux.md` |
 
-**Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met; no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
+**Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met by the D-125 rule (median < 5 min, at least 80% of testers < 5 min, no tester > 15 min for a cause on our side); no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
 
 ## M3 — Mainnet beta (≈ 4 weeks, includes audit)
 

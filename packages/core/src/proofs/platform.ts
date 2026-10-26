@@ -11,6 +11,8 @@ import type {
   ChainConfig,
   ChainSelector,
   ChainState,
+  DepositAuthErrorCode,
+  DepositAuthorizationRequest,
   ProofSubmitter,
   ReadClient,
 } from '@4thtech-io/chain';
@@ -41,7 +43,64 @@ export type ProofKit = Pick<
   // The recipient's checks of a signed Record in a `proof` body (04 §3.4 checks 2 and 5; M1-7g-b).
   | 'computeRecordId'
   | 'verifyProofPack'
+  // The local UI's credits read and the free test credits allowlist (M1-11r-a).
+  | 'readCreditsAcrossChains'
+  | 'isFaucetChain'
+  // The gasless top-up (M3-4b-t-T4-a; 12 §4.1, 07 §7): the eip3009 gate (the client-side kill switch),
+  // the $5 to $50 bounds and the agent-key authorization builder.
+  | 'gaslessToken'
+  | 'gaslessValueBounds'
+  | 'buildReceiveWithAuthorization'
+  | 'readClientEthCall'
 >;
+
+/**
+ * The 4thTech free test credits service's answer (05 §9, M1-10b: `POST /v1/faucet`), as the runtime
+ * maps it. Only the outcome: no transaction hash, URL or server text reaches the core.
+ */
+export type FreeCreditsAnswer =
+  | { readonly status: 'sent' }
+  | {
+      readonly status: 'already_claimed' | 'rate_limited' | 'daily_cap_reached';
+      /** Seconds until another claim may succeed. */
+      readonly retryAfter: number;
+    }
+  | { readonly status: 'unavailable' };
+
+/**
+ * The runtime's call to the free test credits service (M1-11r-a). It sends exactly the chain ID and
+ * the agent ID, both public (the agent ID is the credits account on-chain); never a key, a URL of
+ * the user's own or anything else. The core calls it only for an allowlisted testnet.
+ */
+export interface FreeCreditsPort {
+  request(input: { readonly chainId: number; readonly agent: string }): Promise<FreeCreditsAnswer>;
+}
+
+/**
+ * A submitter's answer to `POST /v1/deposit-authorization` (07 §7; M3-4b-t-T4-a), as the runtime
+ * maps it (T4-b). Only the outcome: no transaction hash, URL or server text reaches the core. The
+ * answer is untrusted: the core confirms the credit by reading `creditsOf` on chain.
+ */
+export type DepositAuthAnswer =
+  | { readonly status: 'submitted' | 'already_used' | 'unavailable' }
+  | {
+      readonly status: 'rate_limited';
+      /** Seconds until another try may succeed (from Retry-After, bounded by the runtime). */
+      readonly retryAfter?: number;
+    }
+  | {
+      readonly status: 'refused';
+      /** A fixed submitter code, or `bad_request` for a malformed request or an unknown code. */
+      readonly code: DepositAuthErrorCode | 'bad_request';
+    };
+
+/**
+ * The runtime's call to the shipped submitters' deposit-authorization route (M3-4b-t-T4-a). It sends
+ * exactly the signed, vault-payee authorization the core built; never a key or a URL of the user's.
+ */
+export interface DepositAuthPort {
+  submit(request: DepositAuthorizationRequest): Promise<DepositAuthAnswer>;
+}
 
 export interface ProofsPlatform {
   /** `@4thtech-io/chain` itself: its Record builder is the only source of salts (04 §5, D-61). */
@@ -50,4 +109,16 @@ export interface ProofsPlatform {
   readonly chains: readonly ProofChain[];
   /** The chain selector (07 §6.3). Default: `createChainSelector()`. */
   readonly selector?: Pick<ChainSelector, 'select' | 'clear'>;
+  /** Free test credits (testnets only; M1-11r-a). Without it, `requestFaucet` is unavailable. */
+  readonly faucet?: FreeCreditsPort;
+  /**
+   * The gasless top-up route (M3-4b-t-T4-a). Without it, an owner-approved gasless top-up is
+   * refused `not_available` before anything is signed.
+   */
+  readonly depositAuth?: DepositAuthPort;
+  /**
+   * Waits `ms` milliseconds; the fixed delay before a receipt's one retry after `RecordNotFound`
+   * (M1-34-c). Default: a timer.
+   */
+  readonly sleep?: (ms: number) => Promise<void>;
 }

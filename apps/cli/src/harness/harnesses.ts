@@ -2,11 +2,12 @@
 // M1-9t OpenCode and Antigravity (D-78). Each is a fixed table entry: where its config lives under the
 // home folder, how to tell it is installed, and how the `agentlink` MCP entry is added. Paths never
 // come from the environment (CODEX_HOME and similar overrides are not followed: a variable the agent
-// can set must not move a write). The only path from input is `--config <path>`, for OpenCode and
+// can set must not move a write), except Windsurf's own XDG_CONFIG_HOME and APPDATA, which Windsurf
+// reads itself: followed only when absolute and inside the home folder. The only path from input is `--config <path>`, for OpenCode and
 // Antigravity only, resolved and checked by resolveConfigTarget under the 06 §7 write rules. The entry
 // runs `npx -y @4thtech-io/agentlink mcp`, as 06 §7 shows for every harness; a non-default agent adds
 // `--agent <name>` (the name is checked against 06 §6 first). Claude Desktop (M1-9w) has its own file
-// per system. The printed snippets for Cursor, VS Code, Windsurf and Cline follow in M1b.
+// per system. Cursor and Windsurf are table entries too (M1-36g); VS Code and Cline follow.
 //
 // Nothing here puts a secret in a config: the entry holds the command and its arguments only.
 import { lstat, realpath, stat } from 'node:fs/promises';
@@ -18,7 +19,14 @@ import { addJsonMcpServer } from './json-config.js';
 import { addTomlMcpServer, agentlinkTable } from './toml-config.js';
 
 export type HarnessId =
-  'claude-code' | 'claude-desktop' | 'codex' | 'gemini-cli' | 'opencode' | 'antigravity';
+  | 'claude-code'
+  | 'claude-desktop'
+  | 'codex'
+  | 'gemini-cli'
+  | 'opencode'
+  | 'antigravity'
+  | 'cursor'
+  | 'windsurf';
 
 /** The `--harness` values (06 §7, D-78): one harness id, or `none` for the identity only. */
 export const HARNESS_IDS: readonly HarnessId[] = Object.freeze([
@@ -28,12 +36,15 @@ export const HARNESS_IDS: readonly HarnessId[] = Object.freeze([
   'gemini-cli',
   'opencode',
   'antigravity',
+  'cursor',
+  'windsurf',
 ]);
 
 /** The harnesses whose config may be named with `--config <path>` (06 §7, D-78). */
 export const CONFIG_PATH_HARNESSES: readonly HarnessId[] = Object.freeze([
   'opencode',
   'antigravity',
+  'windsurf',
 ]);
 
 export const isHarnessId = (value: string): value is HarnessId =>
@@ -76,7 +87,7 @@ export interface HarnessDef {
   readonly byPlatform?: Readonly<
     Partial<
       Record<
-        'darwin' | 'win32',
+        'darwin' | 'linux' | 'win32',
         {
           readonly parts: readonly string[];
           readonly installedMarks: readonly (readonly string[])[];
@@ -175,6 +186,54 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     binary: 'antigravity',
     edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
   },
+  {
+    // https://cursor.com/docs/context/mcp (checked 2026-10-22): global `~/.cursor/mcp.json`,
+    // `mcpServers.<name>` with `type: "stdio"`, `command` and `args`.
+    id: 'cursor',
+    appName: 'Cursor',
+    parts: ['.cursor', 'mcp.json'],
+    installedMarks: [['.cursor']],
+    binary: 'cursor',
+    edit: (text, args) =>
+      addJsonMcpServer(text, { type: 'stdio', command: 'npx', args: [...args] }),
+  },
+  {
+    // https://docs.devin.ai/windsurf/plugins/cascade/mcp (checked 2026-10-22; docs.windsurf.com
+    // redirects there): Cascade's file is `~/.config/devin/mcp_config.json` (macOS and Linux) and
+    // `%AppData%/devin/mcp_config.json` (Windows, ~/AppData/Roaming/devin). The docs honour
+    // `$XDG_CONFIG_HOME` (macOS, Linux) and `%AppData%` (Windows), so envConfigParts follows them
+    // when absolute and inside the home folder (else refused). Older installs keep `~/.codeium/windsurf/mcp_config.json`: detected,
+    // and named with `--config`. `mcpServers.<name>` with `command` and `args`.
+    id: 'windsurf',
+    appName: 'Windsurf',
+    parts: [],
+    byPlatform: {
+      darwin: {
+        parts: ['.config', 'devin', 'mcp_config.json'],
+        installedMarks: [
+          ['.config', 'devin'],
+          ['.codeium', 'windsurf'],
+        ],
+      },
+      linux: {
+        parts: ['.config', 'devin', 'mcp_config.json'],
+        installedMarks: [
+          ['.config', 'devin'],
+          ['.codeium', 'windsurf'],
+        ],
+      },
+      win32: {
+        parts: ['AppData', 'Roaming', 'devin', 'mcp_config.json'],
+        installedMarks: [
+          ['AppData', 'Roaming', 'devin'],
+          ['.codeium', 'windsurf'],
+        ],
+      },
+    },
+    installedMarks: [],
+    binary: 'windsurf',
+    edit: (text, args) => addJsonMcpServer(text, { command: 'npx', args: [...args] }),
+  },
 ]);
 
 /** The table entry for a harness id. */
@@ -190,7 +249,7 @@ export function configParts(
   platform: NodeJS.Platform = process.platform,
 ): readonly string[] | undefined {
   if (def.byPlatform === undefined) return def.parts;
-  return platform === 'darwin' || platform === 'win32'
+  return platform === 'darwin' || platform === 'linux' || platform === 'win32'
     ? def.byPlatform[platform]?.parts
     : undefined;
 }
@@ -304,7 +363,7 @@ export async function detectHarnesses(context: HarnessContext): Promise<HarnessD
     const marks =
       def.byPlatform === undefined
         ? def.installedMarks
-        : ((platform === 'darwin' || platform === 'win32'
+        : ((platform === 'darwin' || platform === 'linux' || platform === 'win32'
             ? def.byPlatform[platform]?.installedMarks
             : undefined) ?? []);
     for (const mark of marks) {
@@ -324,6 +383,13 @@ export type HarnessPlan =
       readonly text: string;
       /** The exact diff, as display lines. */
       readonly diff: readonly string[];
+      /** The file as shown to the user (`~/…` or the `--config` display): the diff names it too. */
+      readonly path: string;
+      /** The absolute file that `applyHarness` writes, resolved once here (environment applied). */
+      readonly file: string;
+      /** Where `applyHarness` writes: the folder and the parts below it, checked again at write. */
+      readonly base: string;
+      readonly parts: readonly string[];
     }
   /** AgentLink is already configured there, as it would write it. */
   | { readonly status: 'present'; readonly def: HarnessDef }
@@ -332,13 +398,46 @@ export type HarnessPlan =
   /** Refused with a reason (unsafe path, malformed file, form that cannot be edited exactly). */
   | { readonly status: 'blocked'; readonly def: HarnessDef; readonly reason: HarnessErrorCode };
 
+/**
+ * Windsurf reads `$XDG_CONFIG_HOME/devin/mcp_config.json` (macOS, Linux) and `%AppData%/devin/…`
+ * (Windows) when the variable is set (docs.devin.ai, 2026-10-22). A relative or empty value is
+ * ignored (XDG spec). The folder is turned into parts below the home folder so the usual folder and
+ * link checks apply to every level; a folder outside the home folder is refused (`unsafe_path`).
+ * `undefined`: use the default.
+ */
+async function envConfigParts(
+  def: HarnessDef,
+  context: HarnessContext,
+): Promise<readonly string[] | undefined> {
+  if (def.id !== 'windsurf') return undefined;
+  const win = (context.platform ?? process.platform) === 'win32';
+  const value = context.env[win ? 'APPDATA' : 'XDG_CONFIG_HOME'];
+  if (value === undefined || value === '' || value.includes('\0') || !isAbsolute(value)) {
+    return undefined;
+  }
+  let homeReal: string;
+  try {
+    homeReal = await realpath(context.home);
+  } catch {
+    throw new HarnessError('unsafe_path');
+  }
+  const inside = relative(homeReal, resolve(value, 'devin', 'mcp_config.json'));
+  if (inside === '' || inside.startsWith('..') || isAbsolute(inside)) {
+    throw new HarnessError('unsafe_path');
+  }
+  return inside.split(sep);
+}
+
 /** The folder and parts of the file to read and write: the default, or the `--config` target. */
-function where(def: HarnessDef, context: HarnessContext): [string, readonly string[]] {
+async function where(
+  def: HarnessDef,
+  context: HarnessContext,
+): Promise<[string, readonly string[]]> {
   const config = context.config;
   if (config === undefined) {
     const parts = configParts(def, context.platform);
     if (parts === undefined) throw new HarnessError('unsupported_platform');
-    return [context.home, parts];
+    return [context.home, (await envConfigParts(def, context)) ?? parts];
   }
   if (!(CONFIG_PATH_HARNESSES as readonly string[]).includes(def.id)) {
     throw new HarnessError('unsafe_path');
@@ -354,20 +453,28 @@ export async function planHarness(def: HarnessDef, context: HarnessContext): Pro
     return { status: 'blocked', def, reason: 'unsupported_format' };
   }
   try {
-    const before = await readConfigFile(...where(def, context), context);
+    const envParts = context.config === undefined ? await envConfigParts(def, context) : undefined;
+    // M1-36g-c: resolved once, so the path shown, the path a confirmation code binds and the path
+    // written are the same (the environment is applied here, not again at write).
+    const [base, parts] = await where(def, context);
+    const before = await readConfigFile(base, parts, context);
     const edit = def.edit(before.text, mcpArgs(context.agent));
     if (edit.status === 'present') return { status: 'present', def };
     if (edit.status === 'conflict') return { status: 'conflict', def };
+    const path =
+      context.config === undefined && envParts !== undefined
+        ? `~/${envParts.join('/')}`
+        : displayPath(def, context.config, context.platform);
     return {
       status: 'change',
       def,
       before,
       text: edit.text,
-      diff: unifiedDiff(
-        before.text ?? '',
-        edit.text,
-        displayPath(def, context.config, context.platform),
-      ),
+      diff: unifiedDiff(before.text ?? '', edit.text, path),
+      path,
+      file: join(base, ...parts),
+      base,
+      parts,
     };
   } catch (error) {
     if (error instanceof HarnessError) return { status: 'blocked', def, reason: error.code };
@@ -380,6 +487,6 @@ export async function applyHarness(
   plan: Extract<HarnessPlan, { status: 'change' }>,
   context: HarnessContext,
 ): Promise<{ backup: string | undefined }> {
-  const [base, parts] = where(plan.def, context);
-  return writeConfigFile(base, parts, plan.before, plan.text, context);
+  // The location planned (and bound by the confirmation code), never re-resolved from the environment.
+  return writeConfigFile(plan.base, plan.parts, plan.before, plan.text, context);
 }

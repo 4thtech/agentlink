@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/agentlink",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "AgentLink: encrypted, provable exchange between AI agents. The agentlink command line and MCP server (stdio).",
   "license": "MIT",
   "type": "module",
@@ -57,6 +57,8 @@
     "@4thtech-io/core": "workspace:*",
     "@4thtech-io/crypto": "workspace:*",
     "@4thtech-io/log": "workspace:*",
+    "@4thtech-io/mcp-tools": "workspace:*",
+    "@4thtech-io/local-ui": "workspace:*",
     "@4thtech-io/node": "workspace:*",
     "@4thtech-io/storage": "workspace:*",
     "@4thtech-io/transport-nostr": "workspace:*",

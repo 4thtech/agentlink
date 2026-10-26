@@ -46,6 +46,12 @@
 #                   environment, so it waits for one approval click (no unattended job can move
 #                   `latest`).
 #   record          writes the deploy record draft to the run summary.
+#   desktop-extension-build    (M1-9f, D-91) builds the optional Claude Desktop extension bundles
+#                   (MCPB, one per platform) from the published CLI, without credentials.
+#   desktop-extension-release  after a green smoke-latest: signs them when DESKTOP_EXT_SIGNING_KEY
+#                   exists (else ships unsigned with a notice), writes SHA256SUMS, attests build
+#                   provenance and attaches them to the GitHub Release v<version>. Environment
+#                   `npm-publish` (it holds the key), so one more approval click.
 #
 # GITHUB RELEASES (D-43)
 #   Releases exist only for the product tag `v<version>` of stable versions. The Changesets publish
@@ -69,7 +75,8 @@
 #   1. GitHub Environments:
 #        npm-next       no required reviewer; deployment branches: main only; no secrets.
 #        npm-publish    required reviewer @talirezun, "Prevent self-review" OFF;
-#                       deployment branches: main and tags; no secrets.
+#                       deployment branches: main and tags; one secret, DESKTOP_EXT_SIGNING_KEY
+#                       (optional, M1-9f: the desktop extension signing key, RSA PEM; unset = unsigned).
 #        deploy-freeze  no required reviewer; deployment branches: main only;
 #                       secret DEPLOY_FREEZE_TOKEN (can write repository variables, nothing else).
 #   2. On npmjs.com, for EVERY published package, two trusted publishers (GitHub Actions,
@@ -817,6 +824,177 @@ jobs:
             *"$cli"*) echo "CLI $cli runs." ;;
             *) echo "::error::@4thtech-io/agentlink@$cli --version did not print $cli."; exit 1 ;;
           esac
+
+  # ---------------------------------------------------------------------------
+  # M1-9f (D-91): the OPTIONAL Claude Desktop extension bundle (MCPB, formerly DXT), one per platform,
+  # built from the npm release just published and pinned to its version (release-and-deployment.md §2).
+  # Build: no credentials; installs the published CLI from npm with --ignore-scripts (no package code
+  # runs) and zips it reproducibly (tools/desktop-extension/build.mjs).
+  desktop-extension-build:
+    name: desktop-extension-build
+    needs: publish-latest
+    if: needs.publish-latest.result == 'success' && needs.publish-latest.outputs.published == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # no credentials: reads the npm registry only
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      - name: Read the released CLI version
+        id: version
+        shell: bash
+        env:
+          PACKAGES: ${{ needs.publish-latest.outputs.packages }}
+        run: |
+          set -euo pipefail
+          cli="$(jq -r '.[] | select(.name == "@4thtech-io/agentlink") | .version' <<< "$PACKAGES")"
+          if [ -z "$cli" ]; then
+            echo "::notice::@4thtech-io/agentlink is not part of this release; no desktop extension bundle."
+            echo "version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$cli" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          echo "version=$cli" >> "$GITHUB_OUTPUT"
+
+      - name: Build the bundles (unsigned, reproducible)
+        if: steps.version.outputs.version != ''
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          OUT: ${{ runner.temp }}/desktop-extension
+        run: |
+          set -euo pipefail
+          for target in darwin-arm64 darwin-x64 win32-x64; do
+            node tools/desktop-extension/build.mjs --version "$VERSION" --target "$target" --out "$OUT"
+          done
+
+      - name: Upload the unsigned bundles
+        if: steps.version.outputs.version != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-extension-unsigned
+          path: ${{ runner.temp }}/desktop-extension/*.mcpb
+          if-no-files-found: error
+          retention-days: 7
+
+  # Sign (when the key exists), hash, attest and attach to the GitHub Release v<version>, after a green
+  # production smoke test. The signing key is the environment secret DESKTOP_EXT_SIGNING_KEY of
+  # `npm-publish` (required reviewer), so this job waits for one approval click, like rollback-latest.
+  # Without the key (or with the certificate still the empty placeholder) the bundles ship unsigned,
+  # with their SHA-256 and attestation, and the job stays green. Signature format: tools/desktop-extension/sign.sh.
+  desktop-extension-release:
+    name: desktop-extension-release
+    needs: [publish-latest, smoke-latest, desktop-extension-build]
+    if: needs.smoke-latest.result == 'success' && needs.desktop-extension-build.outputs.version != '' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: npm-publish
+    concurrency:
+      group: release-desktop-extension
+      cancel-in-progress: false
+    permissions:
+      contents: write # attach the bundles to the GitHub Release v<version>
+      id-token: write # build provenance attestation (Sigstore OIDC)
+      attestations: write # store the attestation
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Evaluated after the approval wait: a freeze set while the job waited still stops it.
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      - name: Download the unsigned bundles
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-extension-unsigned
+          path: ${{ runner.temp }}/desktop-extension
+
+      # The only step that reads the key. It is written to a 0600 file in a private temp directory,
+      # used by openssl, and removed; it is never printed. A key that does not match the committed
+      # certificate fails here, before anything is attached.
+      - name: Sign the bundles
+        shell: bash
+        env:
+          SIGNING_KEY: ${{ secrets.DESKTOP_EXT_SIGNING_KEY }}
+          CERT: apps/cli/desktop-extension/4thtech-signing.crt
+          DIR: ${{ runner.temp }}/desktop-extension
+        run: |
+          set -euo pipefail
+          if [ -z "${SIGNING_KEY:-}" ]; then
+            echo "::notice::DESKTOP_EXT_SIGNING_KEY is not set in environment npm-publish, so the desktop extension bundles are not signed. They still get a SHA-256 and a build provenance attestation (D-91)."
+            exit 0
+          fi
+          if ! grep -q -- '-----BEGIN CERTIFICATE-----' "$CERT"; then
+            echo "::warning::$CERT is still the empty placeholder, so the desktop extension bundles are not signed. Commit the public certificate (apps/cli/desktop-extension/README.md)."
+            exit 0
+          fi
+          umask 077
+          keydir="$(mktemp -d)"
+          trap 'rm -f "$keydir/key.pem"; rm -rf "$keydir"' EXIT
+          printf '%s\n' "$SIGNING_KEY" > "$keydir/key.pem"
+          unset SIGNING_KEY
+          bash tools/desktop-extension/sign.sh "$keydir/key.pem" "$CERT" "$DIR"/*.mcpb
+          rm -f "$keydir/key.pem"
+          bash tools/desktop-extension/verify.sh "$CERT" "$DIR"/*.mcpb
+
+      - name: Write SHA256SUMS
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop-extension
+        run: |
+          set -euo pipefail
+          sha256sum -- *.mcpb > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/desktop-extension/*.mcpb
+
+      - name: Attach the bundles to the GitHub Release
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop-extension
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          if ! gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
+            echo "::warning::GitHub Release v$VERSION does not exist, so the desktop extension bundles were not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."
+            exit 0
+          fi
+          gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- *.mcpb SHA256SUMS
+          echo "Attached $(ls -- *.mcpb | wc -l) desktop extension bundles and SHA256SUMS to v$VERSION."
 
   # One approval click: no unattended job can move `latest`.
   rollback-latest:

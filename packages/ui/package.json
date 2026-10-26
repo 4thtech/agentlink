@@ -1,8 +1,8 @@
 {
   "name": "@4thtech-io/ui",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
-  "description": "Shared design system: design tokens (CSS and typed), Geist fonts; components follow.",
+  "description": "Shared design system: design tokens (CSS and typed), Geist fonts and the core React components.",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -24,12 +24,14 @@
       "default": "./dist/index.js"
     },
     "./tokens.css": "./src/tokens/tokens.css",
+    "./components.css": "./src/components/components.css",
     "./fonts/*": "./fonts/*"
   },
   "files": [
     "dist",
     "!dist/tsconfig.tsbuildinfo",
     "src/tokens/tokens.css",
+    "src/components/components.css",
     "fonts",
     "THIRD-PARTY-NOTICES.md"
   ],
@@ -38,5 +40,17 @@
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "axe-core": "4.14.0",
+    "jsdom": "29.1.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }

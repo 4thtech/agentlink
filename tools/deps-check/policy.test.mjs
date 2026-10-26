@@ -11,6 +11,7 @@ import {
   SUBTLE_ZONES,
   WORKSPACE_NAMES,
   ZONES,
+  allowedManifestNames,
   allowedWorkspaceNames,
   violationFor,
 } from './policy.mjs';
@@ -90,6 +91,40 @@ describe('policy data', () => {
     expect(violationFor('packages/core', '@4thtech-io/agentlink')).toMatch(/layering/);
     expect(violationFor('packages/core', '@4thtech-io/chain/sub')).toBeNull();
     expect(violationFor(null, '@4thtech-io/types')).toMatch(/no entry/);
+  });
+});
+
+describe('M1-11s-b: the local UI app zone (D-118)', () => {
+  it('is a browser zone: the UI library and React only, nothing from core, node or crypto', () => {
+    const zone = ZONES['apps/local-ui'];
+    expect(zone?.name).toBe('@4thtech-io/local-ui');
+    expect(allowedWorkspaceNames('apps/local-ui')).toEqual([
+      '@4thtech-io/local-ui',
+      '@4thtech-io/types',
+      '@4thtech-io/ui',
+    ]);
+    expect(zone?.external.map((e) => e.pattern)).toEqual(['react', 'react-dom']);
+    for (const name of ['core', 'node', 'crypto', 'chain', 'storage', 'transport-nostr', 'log']) {
+      expect(violationFor('apps/local-ui', `@4thtech-io/${name}`), name).toMatch(/layering/);
+    }
+    expect(violationFor('apps/local-ui', 'node:fs')).not.toBeNull();
+    expect(NODE_ZONES).not.toContain('apps/local-ui');
+    expect(violationFor('apps/local-ui', '@4thtech-io/ui')).toBeNull();
+  });
+
+  it('lets only the CLI declare it, as a build-time embed (never a runtime dependency)', () => {
+    expect(ZONES['apps/cli']?.embeds).toEqual(['apps/local-ui']);
+    expect(allowedManifestNames('apps/cli')).toContain('@4thtech-io/local-ui');
+    // IR-M1-11s-b-1 L-1: declared for the build, never imported (browser code).
+    expect(allowedWorkspaceNames('apps/cli')).not.toContain('@4thtech-io/local-ui');
+    expect(violationFor('apps/cli', '@4thtech-io/local-ui', 'apps/cli/src/a.ts')).toMatch(
+      /layering/,
+    );
+    for (const [zone, policy] of Object.entries(ZONES)) {
+      if (zone === 'apps/cli' || zone === 'apps/local-ui') continue;
+      expect(policy.embeds, zone).toBeUndefined();
+      expect(allowedManifestNames(zone), zone).not.toContain('@4thtech-io/local-ui');
+    }
   });
 });
 

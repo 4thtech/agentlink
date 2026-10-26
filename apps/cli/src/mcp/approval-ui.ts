@@ -27,7 +27,7 @@
 import type { Logger } from '@4thtech-io/log';
 import type { ApprovalServer } from '@4thtech-io/node';
 import { approveCommand, isApprovalId } from '../approval/next-step.js';
-import type { ApprovalLink } from '../tools/index.js';
+import type { ApprovalLink } from '@4thtech-io/mcp-tools';
 
 /** The shortest time between two browser windows the server opens by itself. */
 export const BROWSER_OPEN_INTERVAL_MS = 30_000;
@@ -37,8 +37,9 @@ const MAX_ANNOUNCED = 256;
 const UI_ORIGIN = /^http:\/\/localhost:([1-9][0-9]{0,4})$/;
 
 const NEVER_FETCH = 'Never open or fetch this link yourself. ';
-const LEAD = 'Tell the user: Approval needed. Approve here: ';
-const OR_CLI = ' or in your own terminal run ';
+// M1-36a: shortened so the longer `npx` command still fits the 500-character limit (06 §2.5).
+const LEAD = 'Tell the user: Approve here: ';
+const OR_CLI = ' or in your terminal run ';
 const ADD_AGENT = " If you have more than one agent, add --agent with this agent's name.";
 const TAIL =
   " Your AI can't approve this for you. After they approve, call the same tool again with approvalId.";
@@ -48,8 +49,13 @@ const TAIL =
  * the caller (the ID by approveCommand, the url by createApprovalUi); the agent name is inserted
  * only after approveCommand checks it again (06 §2.5 step 2).
  */
-export function approvalLinkNextStep(approvalId: string, url: string, agentName?: string): string {
-  const { command, needsAgentHint } = approveCommand(approvalId, agentName);
+export function approvalLinkNextStep(
+  approvalId: string,
+  url: string,
+  agentName?: string,
+  prefix?: string,
+): string {
+  const { command, needsAgentHint } = approveCommand(approvalId, agentName, prefix);
   return `${NEVER_FETCH}${LEAD}${url}${OR_CLI}\`${command}\`.${needsAgentHint ? ADD_AGENT : ''}${TAIL}`;
 }
 

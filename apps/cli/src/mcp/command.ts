@@ -7,7 +7,7 @@
 //   in Node; the CLI output channel is never used here, src/output.ts).
 // - When the agent is not set up, the server still starts and every tool answers `needs_setup` with
 //   the runtime's fixed copy, so the agent can tell the user what to run.
-// - The handlers get M1-9k's `approvalNextStep` through their context (06 §1: src/tools/ may not
+// - The handlers get M1-9k's `approvalNextStep` through their context (06 §1: packages/mcp-tools may not
 //   import it).
 // - The background loop (M1-9r, loop.ts): when the agent is set up, the server competes for the
 //   agent's publisher lease and, while it holds it, keeps receiving, processing and delivering. On
@@ -17,6 +17,12 @@
 //   `approvalLink` that starts the local approval server on the first `pending_approval` and reuses
 //   it; the result then carries the approval page's url next to the `agentlink approve` command. On
 //   close the server stops after the loop and before the agent closes (its source reads the store).
+// - M1-11s-b, the local UI app (D-118): the same server serves the app embedded in this build
+//   (local-ui-assets.ts) at /settings and /first-run, with the agent's core client for its API.
+// - M1-11b-6: owner setup on the first-run page is wired (local-ui-wiring.ts) only for a keychain
+//   agent while no owner exists anywhere, the file-KeyStore owner files included; checked each
+//   time the server starts.
+import { dirname } from 'node:path';
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -33,8 +39,12 @@ import {
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
-import { coreToolClient, type HandlerEnvironment, type ToolContext } from '../tools/index.js';
+import { cliPrefix } from '../runtime/cli-prefix.js';
+import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
+import { coreToolClient, type HandlerEnvironment, type ToolContext } from '@4thtech-io/mcp-tools';
 import { createApprovalUi, type ApprovalUi } from './approval-ui.js';
+import { approvalWaitMsFor } from './approval-wait.js';
+import { localUiOptions, logOwnerSetupEvent } from './local-ui-wiring.js';
 import { attachInboxResource, BackgroundLoop, type BackgroundLoopOptions } from './loop.js';
 import { createMcpServer } from './server.js';
 
@@ -71,6 +81,7 @@ export function agentToolContext(
     client: coreToolClient(agent.client, {
       ...(agent.files === undefined ? {} : { files: agent.files }),
       ...(agent.proofs === undefined ? {} : { proofs: agent.proofs }),
+      ...(agent.freeCredits === undefined ? {} : { freeCredits: agent.freeCredits }),
     }),
     clock,
     logger,
@@ -81,6 +92,11 @@ export function agentToolContext(
     ...(approvalUi === undefined
       ? {}
       : { approvalLink: (approvalId: string) => approvalUi.link(approvalId) }),
+    // M1-36a-b: the no-owner text names the command that works here, and `owner init` on a
+    // machine known to have no owner (folder names and file presence only; never a key).
+    cliPrefix: cliPrefix(),
+    ownerExists: async () =>
+      (await ownerKnownAbsent(dirname(agent.paths.root), agent.name)) ? false : undefined,
   });
 }
 
@@ -98,7 +114,12 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
         ? agentToolContext(opened.agent, logger, deps.clock, approvalUi)
         : { needsSetup: { message: opened.message }, logger };
 
-    const server = createMcpServer(env, deps.version);
+    // M1-36j (D4): only with the approval page can a call wait for the owner's decision.
+    // M1-36h: `--advanced` (the user's own harness config) serves the Advanced tool surface.
+    const server = createMcpServer(env, deps.version, {
+      ...(approvalUi === undefined ? {} : { approvalWaitMs: approvalWaitMsFor }),
+      ...(parsed.values['advanced'] === true ? { advanced: true } : {}),
+    });
     const loop =
       agent === undefined
         ? undefined
@@ -181,8 +202,8 @@ export const mcpCommand = (version: string): CommandHandler => {
       return createApprovalUi({
         agentName: agent.name,
         logger,
-        start: () => {
-          if (store === undefined) return Promise.reject(new Error('approval ui: no store'));
+        start: async () => {
+          if (store === undefined) throw new Error('approval ui: no store');
           const source = createUiApprovalSource(
             {
               name: agent.name,
@@ -196,8 +217,16 @@ export const mcpCommand = (version: string): CommandHandler => {
           );
           return startApprovalServer({
             source,
+            // M1-11b-6: the app, and owner setup only while no owner exists anywhere.
+            localUi: await localUiOptions({ name: agent.name, client: agent.client }),
             // Fixed values only (ApprovalServerEvent, I-7).
-            onEvent: (event) => logger.debug('approval ui event', { ...event }),
+            onEvent: (event) => {
+              logger.debug('approval ui event', { ...event });
+              // IR-M1-11s-c-1 L-2: an owner set up from the first-run page is named outside the
+              // browser too (a fixed line and the public fingerprint), to compare with
+              // `agentlink doctor`.
+              logOwnerSetupEvent(logger, event);
+            },
           });
         },
       });
