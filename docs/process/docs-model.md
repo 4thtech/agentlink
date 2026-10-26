@@ -86,7 +86,7 @@ Owner direction (2026-10-26): the existing 4thTech GitBook, covering earlier 4th
 ```
 
 - **Cross-links.** The AgentLink landing page says in one line that it builds on earlier 4thTech work and links it. Earlier pages carry one line pointing to AgentLink as the current product.
-- **Brand.** The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink sections show the AgentLink horizontal lockup on their landing pages, and the footer uses the endorsed lockup "AgentLink by 4thTech" ([brand rules](../design/brand/brand-guidelines.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
+- **Brand.** The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink sections show the AgentLink horizontal lockup on their landing pages, and the footer uses the endorsed lockup "AgentLink by 4thTech" ([brand rules](../../brand/README.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
 - **OCC v1** (EUPL-1.2 with a non-commercial rider) is reference only. Earlier work may be described and linked, never copied as code.
 - Git Sync stays per space (MAINTAINING §2); only the AgentLink spaces sync from this repo.
 
