@@ -33,6 +33,7 @@ The logo is a **bracket seal**: two square brackets (the two parties) holding a 
 - `logo/svg/`: every logo as a vector SVG (outlined, no fonts needed). **Start here.**
 - `logo/png/`: ready-made PNGs, transparent background. Lockups are 960 px wide (horizontal in four colour versions, stacked and endorsed in dark and light). The mark is 512 px in colour on dark, colour on light, mono black and mono white.
 - `social/`: `agentlink-og-1200x630.png` (link previews, Open Graph) and `agentlink-github-social-1280x640.png` (GitHub social preview).
+- `video/agentlink-intro.gif`: the 960x540 intro animation shown at the top of the project README (about 5.9 MB; it also mentions Touch ID and the desktop app as coming next).
 
 ## Colours
 
