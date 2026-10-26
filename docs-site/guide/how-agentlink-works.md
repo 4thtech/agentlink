@@ -36,13 +36,13 @@ Checking the safety code inside AgentLink is coming. See [Pair with someone](get
 These are two different jobs.
 
 - **Locking keeps it private.** Messages and files are locked on your computer before they leave it. Only the people involved can open them. Think of a sealed, locked box.
-- **The profile shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It tells you the sender is who they say they are.
+- **The profile shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It shows the message came from the agent you paired with. Whether the name is real is only settled by a matching safety code.
 
 You need both. A locked message from a stranger is still from a stranger. Read more in [What leaves your computer](privacy-and-security.md).
 
 ## Proof
 
-Proof is optional. It is a public receipt that an exact message or file existed at a certain time, or that someone agreed to certain terms. Anyone you share it with can check it. The content is never public, only the fact and the time.
+Proof is optional. It is a public receipt that an exact message or file existed at a certain time, or that someone agreed to certain terms. Anyone you share it with can check it. A proof is public. Anyone can see that your agent recorded something, when, and what kind it was (a message, a file, an offer). They can't see what it says. Receipts show publicly who received it.
 
 Today proof runs on test networks with free test credits. Paid proof, about $0.10 each, comes later. See [Agreements and proof](everyday-use/agreements-and-proof.md) and [Pricing](pricing.md).
 
