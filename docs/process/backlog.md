@@ -5808,7 +5808,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests: "Later" survives a server restart on a new port; the banner shows on every page until the kit is saved; the reminder appears after the first contact; default views pass `lintVocabulary`.
 
 #### M1-11b-8 · cli: open the first-run page once per start (new, IR-M1-11b-6-1 rec c)
-- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli` (`agentlink mcp` start, `init.ts`), `docs/foundation/06-mcp-server.md` §7 (proposed), tests
 - **Depends on:** M1-11b-6
 - **Spec:** 06 §7; D-120 (1)
@@ -5820,7 +5820,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests: one open per start, none when an owner exists, none in tool output; the fallback command is unchanged; threat note and tests-first evidence (S2).
 
 #### M1-11b-9 · cli: `agentlink ui` opens the local pages on demand (new, 08 §1; PLAN-431 §2.4)
-- **Status:** in review (stacked on PR 4thtech/agentlink#431) · **Size:** S · **Tier:** Opus · **Security:** S1 (adds one allowlisted opener to `packages/node`, no route and no authority) · **Phase:** M1b
+- **Status:** done (PR 4thtech/agentlink#520, merged 2026-10-25) · **Size:** S · **Tier:** Opus · **Security:** S1 (adds one allowlisted opener to `packages/node`, no route and no authority) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/ui.ts`, `apps/cli/src/dispatch.ts`, `apps/cli/src/main.ts`, `packages/node/src/approval-server.ts` (`openActivity`), tests, `docs-site/guide/get-started`
 - **Depends on:** M1-11b-6
 - **Spec:** 08 §1; 04 §2.5; 11 §5
