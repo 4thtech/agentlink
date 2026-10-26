@@ -58,33 +58,47 @@ UX requirements and screen inventory are in `11-claude-design-brief.md`. This do
 
 ---
 
-## 3. Cloud agent template (P1, M2)
+## 3. Cloud agent template (P1, 0.4.0, D-131)
 
-**Repo:** `apps/cloud-agent` in the monorepo, also published as a standalone template repository for the "Deploy to Cloudflare" button.
+**Repo:** `apps/cloud-agent` in the monorepo. It is generated one way into the public template repository `4thtech/agentlink-cloud-agent` at a release tag, for the "Deploy to Cloudflare" button (D-131 (7), `release-and-deployment.md` §4.8).
+
+**What 0.4.0 gives the user (D-131).** An always-on agent in the user's **own** Cloudflare account, used from Claude on the web and in the Claude iOS and Android apps: "Send this to Ana's agent" works from a phone. 0.4.0 is Claude only; ChatGPT web comes later and ChatGPT mobile is not supported (D-131 (5)). The supported plan is Workers Paid, $5 a month (D-131 (4)). 4thTech hosts nothing that holds a key (D-37).
 
 ### 3.1 Components
 
-- **Worker** (entry): routes `/mcp` (streamable HTTP MCP), `/oauth/*`, `/setup`, `/health`.
-- **AgentDO** (Durable Object, SQLite-backed): one per deployment; holds the store (same schema as local), relay sync via alarms (default 60 s) and WebSocket subscriptions while active.
-- **MCP:** Cloudflare Agents SDK `McpAgent` (verify current API at build time) wrapping the same tool handlers as the local server.
-- **OAuth:** `workers-oauth-provider`; authorization page requires owner proof (see 3.3).
-- **Storage:** user's R2 bucket binding (default, created by the template) or any S3-compatible credentials.
+- **Worker** (entry), on one host, `https://agentlink.<account>.workers.dev` by default: `/mcp` (streamable HTTP MCP, served directly with no redirect), the OAuth endpoints and metadata, the owner pages (`/setup`, the sign-in page, `/approve/<id>`, `/status`), `/health`. Preview URLs are off.
+- **AgentDO** (Durable Object, SQLite-backed): exactly one per deployment (`idFromName("agent")`), so it is the single publisher (06 §6). It holds the store (the local schema, 07 §3), the agent `KeyStore`, the outbox, approvals, the owner-signed grant list (§3.3) and the owner's `ALKP` and `ALKR` blobs (opaque to the Worker). Relay sync runs on alarms only (default 60 s; proposed, owner confirms at merge: no always-open relay socket, because outbound sockets keep the object in memory and billed, spike S-5). The alarm re-arms itself first, is idempotent, keeps a per-relay cursor (cold start reads back at most 48 h) and opens at most 5 relay sockets per run.
+- **MCP:** a stateless MCP handler in the Worker (the MCP SDK's web-standard streamable HTTP transport, the same SDK major as the stdio server) that calls the shared tool handlers (`packages/mcp-tools`, 06 §1) against `AgentDO`. Not the Agents SDK `McpAgent`, which is deprecated (D-131 (10)).
+- **OAuth:** `@cloudflare/workers-oauth-provider`, inside the narrow crypto exception of D-131 (11) and 04 §8; sign-in needs the owner (§3.3).
+- **Storage:** the user's R2 bucket binding, created by the template. Received files are saved there and handed out as a short-lived link (06 §2.3, G-14). Own S3-compatible credentials stay a later option.
+- **Logs:** Workers logs, traces, Tail and Logpush are off in the template's Wrangler config, and a deploy check refuses a config that turns one on (I-7, as for the drop, 07 §5.4).
 
-### 3.2 Keys
+### 3.2 Keys and the owner
 
-- Preferred: `npx @4thtech-io/agentlink cloud deploy` generates the agent seed **locally** and sets it with `wrangler secret put AGENT_SEED` in the **user's** account, then deploys. 4thTech never sees it.
-- Deploy-button path: first visit to `/setup` (protected by a one-time setup code printed in the deploy logs / set as a secret) generates the seed inside the Worker and stores it in Durable Object storage encrypted with the `SEED_WRAP_KEY` secret. Both stay in the user's account.
-- The owner pairs the cloud agent from the console or CLI (agent card signed by the owner).
+- **Agent seed, desktop path (certified first, D-131 (3)).** `npx -y @4thtech-io/agentlink cloud deploy`, which the user's desktop AI app can run, opens Cloudflare's own sign-in in the browser (Wrangler), generates the agent seed **on the user's computer**, sets it with `wrangler secret put AGENT_SEED` in the **user's** account, deploys, and prints the setup link with the setup code in the link's `#` part (never sent to a server). 4thTech never sees the seed or a Cloudflare token.
+- **Agent seed, Deploy-button path.** Cloudflare copies the template into the user's GitHub or GitLab account (the guide says a free account is needed) and asks for two secrets. The guide page generates both in the browser, with copy buttons, and never sends them anywhere (D-131 (9)): `SETUP_CODE` and `SEED_WRAP_KEY`. On the first `/setup`, the Worker generates the agent seed and stores it in `AgentDO` sealed under `SEED_WRAP_KEY` through `@4thtech-io/crypto`. Both stay in the user's account.
+- **Owner (D-131 (1), (2)).** The cloud agent has its **own** owner. `/setup` asks for the setup code, then "Protect your agent with Face ID": one passkey gesture creates the owner seed **in the browser**, wraps it under the passkey PRF (`ALKP`, 04 §2.3.1), signs the agent's first card and first rules (06 §3 defaults) and shows the recovery code once (`ALKR`, 04 §2.3.2), with a save step. The Worker receives only the public keys, the signed objects and the two wrapped blobs. `/setup` then closes for good: it is single use, and refused once an owner exists. Owner presence on the cloud is in 04 §2.5 "Cloud owner presence".
+- **Pairing with a desktop agent.** Like any contact; the accept card offers the local label "my other computer" (D-130 (5)). One owner across devices is later (M2-UX-DEVICE-LINK).
+- **Host name.** The passkey belongs to the exact Worker host (04 §2.5). Renaming the Worker, changing the account subdomain or moving to a custom domain means enrolling again with the recovery code; the guide says "keep the address" (spike S-6).
 
-### 3.3 OAuth sign-in (for ChatGPT / claude.ai connectors)
+### 3.3 OAuth sign-in (Claude connectors; D-131 (6), (11); details proposed, owner confirms at merge)
 
-1. Harness opens the Worker's authorize URL.
-2. Page shows "Sign in as owner": (a) approve in the owner console (console signs the challenge with the owner key), or (b) as a fallback, enter the one-time access code from CLI `agentlink cloud login`. Both ship in M2.
-3. Token scoped to this agent; revocable from the console.
+1. The user adds `https://<host>/mcp` as a custom connector on claude.ai (Settings → Connectors). It then appears in the Claude iOS and Android apps on the same account; connectors cannot be added on a phone.
+2. `/mcp` without a token answers 401 with the protected-resource metadata. Its `resource` is the exact public `/mcp` URL, fixed at deploy time (or pinned at `/setup`), never taken from the request's `Host` header. The authorisation server metadata advertises PKCE `S256`, dynamic client registration and client ID metadata documents (CIMD, with `none` as the token auth method), and the `iss` response parameter. Claude's redirect URI is `https://claude.ai/api/mcp/auth_callback`. CIMD fetches use the Workers public-only fetch flag.
+3. The sign-in page (design `Cloud-signin`) names the app asking, its redirect host and what it gets: "talk, files and proof within your rules; never your rules or keys". The owner approves with the passkey (or the fallback code); the browser signs `connector.authorize` (04 §2.5.1) for that grant. Registering a client grants nothing without this step, and there is no "remember this approval".
+4. **On every `/mcp` request** the handler takes the grant ID and client ID from the library's verified token data and `AgentDO` checks that an owner-signed `connector.authorize` exists for them, with a matching scope, not expired and not revoked. Otherwise it answers 401 (`invalid_token`) and revokes the library's grant too. The scope is checked by our handler (the library does not enforce scopes). Access tokens live 1 h; refresh tokens rotate and live at most 30 days.
+5. `/status` lists the grants (app name, when added, last used) and removes one with `connector.revoke`, signed on that page. A removed grant fails at its next request, whatever the library's token state is (it keeps the previous refresh token valid once, spike S-1).
+6. A token is equivalent to a compromised AI app: it can talk and spend within the signed rules and budget, never sign an owner action (I-4). The 4thTech console's signed challenge and `agentlink cloud login` (a one-time access code from the CLI) come later with the console.
 
 ### 3.4 Autonomy
 
-Cloud agents can be **autonomous** (act on inbound messages without a harness, e.g. auto-acknowledge, auto-reply via a configured LLM) only within policy. Default: autonomous actions off; inbound queued for harness or owner.
+Cloud agents can be **autonomous** (act on inbound messages without a harness, e.g. auto-acknowledge, auto-reply via a configured LLM) only within policy. Default: autonomous actions off; inbound queued for harness or owner. Not in 0.4.0.
+
+### 3.5 Updates, cost and leaving (D-131 (4), (9); details proposed, owner confirms at merge)
+
+- **Updates.** Users deploy into their own accounts, so 4thTech cannot update or roll back their agents. The Worker compares its template version with the latest release tag (a plain public read, nothing about the agent sent) and, when newer, `agentlink_status` says "An update for your cloud agent is available" with the steps ("Sync fork" on GitHub for button users, `agentlink cloud update` from a computer), and `/status` shows the same.
+- **Cost.** The guide states Workers Paid ($5 a month) before the deploy. Limits per IP on `/mcp` and the OAuth endpoints and the unknown-sender limits (07 §3.2) keep floods from raising the bill.
+- **Leaving (I-10).** `/status` downloads an `ALKK` recovery kit after the owner's gesture (04 §2.3.3); the guide lists the uninstall steps.
 
 ---
 

@@ -309,7 +309,7 @@ The optional 4thTech relay (strfry, 30-day retention, ciphertext only) is not on
 
 ### 4.8 Cloud-agent template
 
-`4thtech/agentlink-cloud-agent` is generated one-way from `apps/cloud-agent` at a release tag, holds no secrets and pins npm versions that have provenance. Users deploy it into **their own** Cloudflare accounts; 4thTech never deploys or accesses user instances and cannot roll them back. A 4thTech-run demo instance, when it exists, deploys like the other Workers (§4.5). DECISION NEEDED (owner): sync mechanism (CI push with a scoped token vs manual PR).
+`4thtech/agentlink-cloud-agent` is generated one-way from `apps/cloud-agent` at a release tag, holds no secrets and pins npm versions that have provenance. Users deploy it into **their own** Cloudflare accounts; 4thTech never deploys or accesses user instances and cannot roll them back. A 4thTech-run demo instance, when it exists, deploys like the other Workers (§4.5). The separate repository and the one-way sync at a release tag are decided (D-131 (7)). *Sync mechanism (proposed, owner confirms at merge; M2-3d):* a release job pushes the tagged tree with a token scoped to the template repository only, in a protected environment that waits for the owner's approval click, as for npm `latest`; a failed staging smoke test of the tagged template restores the previous tag. Button users do not follow upstream by themselves, so the cloud agent shows "update available" (08 §3.5).
 
 ### 4.9 Public docs (GitBook, D-29, D-57)
 

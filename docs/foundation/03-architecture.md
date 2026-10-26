@@ -57,7 +57,7 @@ flowchart LR
 | **Local approval UI** | same package | `127.0.0.1` | Approvals, settings, optional own-storage setup, top-up link |
 | **Desktop app** (M2) | `apps/desktop` | User's computer (macOS, Windows, Linux) | Tray app hosting the local MCP server; full local dashboard (shared `packages/ui`); native approval window; OS-biometric owner key; harness auto-setup; signed auto-update (08 §8) |
 | **Owner console** | `apps/console` | Browser (PWA) | Passkey owner identity, reading all agent traffic, approvals, policies, proofs, credits |
-| **Self-host template** | `apps/cloud-agent` | User's Cloudflare | Always-on agent, inbox Durable Object, remote MCP + OAuth |
+| **Self-host template** (0.4.0, D-131) | `apps/cloud-agent` | User's Cloudflare | Always-on agent, inbox Durable Object, remote MCP + OAuth for Claude on the web and phones, owner pages on the Worker's own origin (08 §3) |
 | **Verify** | `apps/verify` + CLI | Browser / CLI | Verify proof packs against chain via public RPC |
 | **Submitter** | `apps/submitter` | 4thTech Cloudflare Worker | Accepts signed records/receipts/authorizations, simulates, submits; pays gas; rate-limited by on-chain credits |
 | **Encrypted drop** | `apps/drop` | 4thTech Cloudflare Worker + R2 | Default store for file ciphertext (D-48): verifies agent-signed uploads, issues short-lived upload targets and signed download URLs, enforces size caps, quotas, rate limits and the hard 7-day expiry; random object keys, no file names, no accounts; holds no user secrets (07 §5.4) |
@@ -77,7 +77,7 @@ AgentLink goes in **two directions** (D-37):
 |---|---|---|---|---|
 | **Local** (`npx`, M1) | stdio | OS keychain (macOS Keychain, Windows Credential Manager, libsecret); on headless machines without one, an opt-in passphrase-locked file (04 §2.8, D-54) | SQLite in user data dir | Default. Agent active only when harness session runs; inbox syncs from relays on each call |
 | **Local, desktop app** (M2) | stdio via the app's bundled CLI shim, relayed to the server hosted by the tray app | OS keychain; owner key gated by OS biometrics in the OS keystore (04 §2.2) | SQLite in user data dir (same schema) | Runs while the user is logged in, so the inbox stays synced between harness sessions; native approval window; full local dashboard (08 §8) |
-| **Self-hosted cloud** | Streamable HTTP + OAuth | Worker secrets in **user's** Cloudflare account | Durable Object (SQLite-backed) | Always-on; polls relays with DO alarms; serves remote-only harnesses |
+| **Self-hosted cloud** (0.4.0, D-131) | Streamable HTTP + OAuth (stateless handler, no `McpAgent`) | Agent seed: Worker secret or sealed in the Durable Object, in the **user's** Cloudflare account. Owner seed: only in the owner's browser, on the Worker's own origin (04 §2.2) | Durable Object (SQLite-backed) | Always-on; polls relays with DO alarms; serves Claude on the web and in the iOS and Android apps (ChatGPT web later); approvals on the Worker's `/approve` page with the owner's passkey |
 | **Hosted remote (P2, M4)** | Streamable HTTP + OAuth | None server-side; signing via owner's browser passkey | Ciphertext only | Approval mode; every action proposed, owner signs in console |
 
 The MCP **tool surface is identical** across packagings (see 06). Differences live behind the `KeyStore`, `Store` and `ApprovalChannel` interfaces. `Store` and `ApprovalChannel` are in core. The key interfaces are types in `@4thtech-io/crypto`, so `transport-nostr` and core share them without a dependency cycle (04 §3.1.1, G-2; D-62, accepted by Tali, 2026-10-14, at merge of 4thtech/agentlink#34).
@@ -112,7 +112,7 @@ interface Store { /* contacts, threads, envelopes, records, approvals, policies 
 interface ApprovalChannel { request(a: ApprovalRequest): Promise<{ approvalId; url? }>; status(id): Promise<ApprovalChannelStatus>; }
 ```
 
-**Channels per packaging (D-73 (3); proposed details, owner confirms at merge).** Local M1a: `LocalApprovalChannel` (`apps/cli`, M1-9k) returns no URL and reports only `pending` or `unknown`, because the owner's own CLI process applies the signed decision through core on the shared store (§4.5, 06 §2.5). Local M1b: the local approval server returns the `127.0.0.1` page URL. Desktop app: the native approval window. Console: the signed object arrives in an `approval` envelope, `status` returns it as `signed` and the core verifies it (`collect`).
+**Channels per packaging (D-73 (3); proposed details, owner confirms at merge).** Local M1a: `LocalApprovalChannel` (`apps/cli`, M1-9k) returns no URL and reports only `pending` or `unknown`, because the owner's own CLI process applies the signed decision through core on the shared store (§4.5, 06 §2.5). Local M1b: the local approval server returns the `127.0.0.1` page URL. Desktop app: the native approval window. Cloud agent (0.4.0, D-131; proposed, owner confirms at merge): a channel in `AgentDO` that returns the `https://<host>/approve/<id>` page URL; the owner's browser signs there and the page hands the signed object to `AgentDO`, so `status` returns it as `signed` and the core verifies it (`collect`). Console: the signed object arrives in an `approval` envelope, `status` returns it as `signed` and the core verifies it (`collect`).
 
 **Tool handlers (G-15, D-73 (1)).** The MCP tool handlers are one runtime-agnostic workspace package, `packages/mcp-tools` (`@4thtech-io/mcp-tools`; moved from `apps/cli/src/tools/` at M2-3t) (no Node built-in, Node global or `@4thtech-io/node` import, and no relative import outside the module; 06 §1), which the stdio server uses in M1 and the cloud agent imports from M2-3b (06 §1).
 
@@ -203,6 +203,8 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | **4thTech submitter** | Signed records and receipts (same as public chain, earlier), submitting IP | Content, keys; cannot forge or alter records (signatures) |
 | **4thTech static sites** | Page loads (IP); never the URL fragment | Keys (generated in the browser), content |
 | **4thTech relay (optional)** | Same as any relay | Same as any relay |
+| **User's Cloudflare account** (cloud agent, D-131) | Everything the cloud agent holds: agent seed, store contents, OAuth data; it runs the owner pages | 4thTech sees none of it. Cloudflare runs it for the user as their processor (04 §7). The owner seed is never in the account unwrapped (only the `ALKP` and `ALKR` blobs); residual: code deployed to the account controls the owner pages (04 §7) |
+| **Chat app provider** (Anthropic for Claude connectors) | The tool results it receives, as with a local AI app; its OAuth tokens for this agent | Owner actions: a token cannot sign one (I-4) |
 
 **Residual risk:** whoever serves the console's JavaScript could serve malicious code. Mitigations: open source, reproducible builds, published build hashes, Subresource Integrity, optional self-hosted console, and the local packaging that avoids the web entirely. See 04.
 
@@ -217,7 +219,7 @@ Console: approval request is sent as an encrypted envelope to the owner key; the
 | EVM client | **viem** (replace ethers) | Typed, tree-shakable, Workers-friendly |
 | Crypto | `@noble/curves`, `@noble/hashes`, `@noble/ciphers`, `@hpke/core` (+ WebCrypto AES-GCM) | Audited, pure-JS, runs everywhere |
 | Nostr | `nostr-tools` | Reference implementation of NIP-44/59/17 |
-| MCP | Official TypeScript MCP SDK; Cloudflare Agents SDK (`McpAgent`) + workers-oauth-provider for Worker | First-party support for stdio and streamable HTTP |
+| MCP | Official TypeScript MCP SDK, stdio locally and its web-standard streamable HTTP transport in the Worker (no `McpAgent`, deprecated); `@cloudflare/workers-oauth-provider` for the Worker's OAuth, inside the narrow crypto exception of D-131 (04 §8) | First-party support for stdio and streamable HTTP; one SDK major on both, so the tool surfaces match |
 | Local store | SQLite (`better-sqlite3`) | Simple, durable |
 | Keychain | `@napi-rs/keyring` (or equivalent) | Cross-platform OS keychain. Headless machines without one: opt-in file KeyStore on `@4thtech-io/crypto` (04 §2.8, D-54) |
 | Contracts | Solidity 0.8.x (exact pin in the contracts repo), **Foundry**, OpenZeppelin v5 | Fast tests, fuzzing, invariants |
