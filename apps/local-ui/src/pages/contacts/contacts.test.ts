@@ -11,11 +11,11 @@
 // - Rename and Remove ask for owner presence; every change is one POST with an octet-stream body
 //   (the presence proof) and the operation input in X-AgentLink-Input. The page never signs.
 // - Empty: one next step, what to ask the AI.
-import { act } from 'react';
+import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
-import { ContactsPage } from './index.js';
+import { ContactsPage, type ContactsPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 import { CONTACTS_STRINGS as S } from './strings.js';
 
@@ -117,7 +117,7 @@ async function mount(routes: Routes): Promise<Call[]> {
   const api = createApiClient({ fetch: s.fetch, token: 't' });
   const owner = createOwnerClient({ fetch: s.fetch, token: 't' });
   await act(async () => {
-    root.render(<ContactsPage api={api} owner={owner} />);
+    root.render(createElement<ContactsPageProps>(ContactsPage, { api, owner }));
     await Promise.resolve();
   });
   await settle();
