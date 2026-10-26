@@ -6297,7 +6297,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - A restricted name cannot read as an instruction; the node test stands alone.
 
 #### M1-11a-ux-c · terminal approve card: no link in the output (new, owner yes 2026-10-25)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli terminal approve card
 - **Depends on:** M1-11a-ux
 - **Scope:**
