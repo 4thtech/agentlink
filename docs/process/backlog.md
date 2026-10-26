@@ -6307,7 +6307,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first for each item; a folder whose real location changes after allow is refused or re-confirmed; no test weakened.
 
 #### M1-36b-2-e · owner send-folder: not-moved test and a "not where it was allowed" diagnostic (new, low, IR-M1-36b-2-d-1, #545)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` policy and folder checks) · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` policy and folder checks) · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/allowed-path.ts` and its tests, `policy show` and `doctor` in `apps/cli` and `packages/node`
 - **Depends on:** M1-36b-2-d
 - **Spec:** 04 §2.5, §4 (realpath rules); 06 §3
@@ -6389,7 +6389,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): one confirmation leaves a verified card and a verified first policy, and the agent can send from Send; a link (at either level) or a non-empty Send folder is refused before the gesture; a failure after the card leaves no policy and nothing half-written; the code reaches only the page (no log line, tool result or terminal output; canary test); "I saved it" gates the next step; threat note in the PR; independent review (S2).
 
 #### M1-UX-FIRSTRUN-V2-b · first run: setup folder race, folder pinning and test lows (new, low, IR-M1-UX-FIRSTRUN-V2-1, #542)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Phase:** M1b
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/owner-setup.ts`, `apps/local-ui/src/pages/first-run/**` tests
 - **Depends on:** M1-UX-FIRSTRUN-V2; M1-36b-2-d (folder pinning helper)
 - **Spec:** 04 §2.5, G-1 (accepted residual); 08 §1 (first run v2)
@@ -6405,7 +6405,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): a begin straight after a dropped setup keeps Send and finish succeeds; the code is absent from the DOM after "I saved it"; the manual check is recorded in the PR; threat note; independent review (S2).
 
 #### M1-UX-FIRSTRUN-V2-c · first run: 0.2.0 owners enter the backup code once, then add a passkey (new, B-9, left out of #542)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner setup for an existing owner in `packages/node`) · **Phase:** M1b
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner setup for an existing owner in `packages/node`) · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
 - **Depends on:** M1-UX-FIRSTRUN-V2
 - **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2; 11 §5.5, §6.2.1
