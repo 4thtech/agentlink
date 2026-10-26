@@ -6476,6 +6476,19 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - Tests first (RED commit): untrusted values render as text (XSS fixture); no invite link in the page or its API view; the code field's attributes; CSP unchanged; presence, the session link and CSRF unchanged; independent review (S2).
 
+#### M1-UX-MULTI-AGENT · cli: list the agents in init and ui, explain a different entry (new, owner test 2026-10-26, 0.3.1)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (fixed text and a numbered pick; no new authority) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`, `ui.ts`, `agent-choice.ts`, `apps/cli/src/harness/conflict.ts`, tests
+- **Depends on:** M1-36b
+- **Spec:** 06 §6, §7; 11 §5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - `init` on a computer with more than one agent lists the agent names (valid local names only); in the owner's own terminal it asks for a number, otherwise it keeps the fixed message plus the list.
+  - `ui` without `--agent` tells "no agent" from "more than one agent": it lists the names and offers the same pick (or names `ui --agent <name>`); the only agent is used without asking.
+  - `init` explains an existing different `agentlink` entry (another agent name, or another way of starting AgentLink) and how to replace it by hand; no value from the file other than a valid agent name is shown.
+- **Acceptance:**
+  - Tests first (RED commit); names are listed in both commands; a bad pick starts nothing; run by an AI nothing is asked; no URL, token or command text from the file is printed.
+
 #### DOCS-OWNER-CODE-SAVE · docs: saving the backup code, and quitting Claude Desktop before setup (new, D-130 (1), (7))
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (user guidance on an owner secret) · **Phase:** M1b
 - **Repo/path:** agentlink · `docs-site/guide/**`, `knowledge/` where it covers setup

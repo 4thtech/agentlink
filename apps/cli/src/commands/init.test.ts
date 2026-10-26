@@ -650,7 +650,7 @@ describe('malformed or unusable configs', () => {
     const plan = await init([]);
     expect(plan.out).toContain('Codex already has an entry named agentlink');
     expect(plan.out).toContain('old-one');
-    expect(plan.out).toContain('default');
+    expect(plan.out).toContain('codex');
     expect(plan.out).toContain('~/.codex/config.toml');
     expect(plan.out).toContain(`${cliPrefix()} init`);
     expect(plan.out).toContain('--harness codex');

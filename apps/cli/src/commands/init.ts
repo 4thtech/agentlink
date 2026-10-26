@@ -81,6 +81,7 @@ import { INSTALL_COMMAND, installGlobally, isAgentlinkOnPath } from './global-in
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
 import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { firstRunStep } from './first-run.js';
+import { AGENT_CHOICE_TEXT, pickAgent, validAgentNames } from './agent-choice.js';
 
 /** The Node pieces `init` uses. Tests pass doubles; production uses `nodeInitDeps()`. */
 export interface InitDeps {
@@ -125,7 +126,7 @@ export interface InitDeps {
  * being lost with a reader that closes after each answer. Paused between questions, so the process
  * can still exit.
  */
-function sharedLineReader(): () => Promise<string> {
+export function sharedLineReader(): () => Promise<string> {
   const queue: string[] = [];
   const waiting: ((line: string) => void)[] = [];
   let rl: ReturnType<typeof createInterface> | undefined;
@@ -226,6 +227,14 @@ export const INIT_TEXT = Object.freeze({
   present: 'OK       {appName} is already set up for AgentLink',
   conflict:
     '{appName} already has an entry named agentlink that is different, so AgentLink left it as it is. Nothing was changed there.',
+  // M1-UX-MULTI-AGENT: what differs, and how to replace. Only fixed text and valid agent names.
+  conflictOtherAgent:
+    '          It starts the agent {existing}, but this run is for the agent {wanted}.',
+  conflictOtherCommand:
+    '          It starts AgentLink in another way (for example an older command or another version).',
+  conflictUnknown: "          AgentLink couldn't tell how it differs.",
+  conflictFix:
+    '          AgentLink never replaces it. To switch, remove the entry named agentlink from {path} (your AI app can help), then run `{prefix} init{agentFlag} --harness {id}`.',
   rerun: 'Then run: {prefix} init{agentFlag}{harnessFlag}{configFlag} --confirm {code}',
   updated: 'OK       {appName} updated. Backup of the old file: {backup}',
   created: 'OK       {appName} set up',
@@ -397,6 +406,10 @@ function printPlan(
   listApps: boolean,
   platform: NodeJS.Platform,
   showDiffs = true,
+  explain: { readonly prefix: string; readonly name: string } = {
+    prefix: cliPrefix(),
+    name: DEFAULT_AGENT_NAME,
+  },
 ): void {
   const { output } = context;
   // With `--harness <id|none>` the owner chose, and nothing was looked for.
@@ -421,12 +434,34 @@ function printPlan(
         break;
       case 'conflict':
         output.print(withApp(INIT_TEXT.conflict, plan.def.appName));
+        for (const line of conflictLines(plan, explain.prefix, explain.name)) output.print(line);
         break;
       case 'blocked':
         output.printError(withApp(HARNESS_MESSAGES[plan.reason], plan.def.appName));
         break;
     }
   }
+}
+
+/** M1-UX-MULTI-AGENT: what differs in the existing entry and how to replace it (fixed text). */
+function conflictLines(
+  plan: Extract<HarnessPlan, { status: 'conflict' }>,
+  prefix: string,
+  name: string,
+): string[] {
+  const { difference } = plan;
+  const what =
+    difference.kind === 'other_agent'
+      ? INIT_TEXT.conflictOtherAgent
+          .replace('{existing}', difference.existing)
+          .replace('{wanted}', difference.wanted)
+      : difference.kind === 'other_command'
+        ? INIT_TEXT.conflictOtherCommand
+        : INIT_TEXT.conflictUnknown;
+  const fix = initText(INIT_TEXT.conflictFix, prefix, name)
+    .replace('{path}', plan.path)
+    .replace('{id}', plan.def.id);
+  return [what, fix];
 }
 
 /** One line per app: set up, already set up, skipped or blocked (with the fixed reason). */
@@ -688,13 +723,23 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     else targets = await detectHarnesses(baseContext);
 
     // D5: named after the app unless `--agent` says otherwise.
-    const name =
+    const defaultName =
       parsed.agent ?? (await defaultAgentName(deps, harnessValue === 'none' ? undefined : targets));
-    if (name === undefined) {
-      // Local names are agent-written text: none is shown (agent-name.ts).
-      output.printError(initText(INIT_TEXT.chooseAgent, startPrefix));
-      return EXIT_USAGE;
+    let picked: string | undefined;
+    if (defaultName === undefined) {
+      // M1-UX-MULTI-AGENT: the names (checked 06 §6 names only, agent-choice.ts) are listed; in the
+      // owner's own terminal one is picked by number. Nothing else about an agent is shown.
+      const names = validAgentNames((await knownAgents(deps)) ?? []);
+      if (checkOwnerTerminal(terminal).ok && confirmValue === undefined) {
+        picked = await pickAgent((text) => output.print(text), names, deps.readLine);
+      }
+      if (picked === undefined) {
+        output.printError(initText(INIT_TEXT.chooseAgent, startPrefix));
+        output.printError(AGENT_CHOICE_TEXT.namesLine(names));
+        return EXIT_USAGE;
+      }
     }
+    const name: string = defaultName ?? picked ?? DEFAULT_AGENT_NAME;
     const existing = await readAgentConfig(
       deps.home,
       name,
@@ -716,7 +761,10 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     const interactive = checkOwnerTerminal(terminal).ok && confirmValue === undefined;
 
     if (!needIdentity && changes.length === 0) {
-      printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
+      printPlan(context, plans, false, listApps, deps.platform ?? process.platform, true, {
+        prefix: startPrefix,
+        name,
+      });
       output.print(INIT_TEXT.nothingToDo);
       printSummary(output, plans, [], new Map());
       let nowPrefix = startPrefix;
@@ -732,7 +780,10 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
 
     // The one harness the owner named can't be changed safely: stop before any code or write.
     if (chosen !== undefined && blocked) {
-      printPlan(context, plans, false, listApps, deps.platform ?? process.platform);
+      printPlan(context, plans, false, listApps, deps.platform ?? process.platform, true, {
+        prefix: startPrefix,
+        name,
+      });
       return EXIT_FAILED;
     }
 
@@ -744,6 +795,7 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
       listApps,
       deps.platform ?? process.platform,
       !interactive,
+      { prefix: startPrefix, name },
     );
 
     let approved: readonly ChangePlan[];

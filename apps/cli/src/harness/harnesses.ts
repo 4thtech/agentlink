@@ -12,6 +12,7 @@
 // Nothing here puts a secret in a config: the entry holds the command and its arguments only.
 import { lstat, realpath, stat } from 'node:fs/promises';
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { explainJsonConflict, explainTomlConflict, type ConflictDifference } from './conflict.js';
 import { unifiedDiff } from './diff.js';
 import { HarnessError, type HarnessErrorCode } from './errors.js';
 import { readConfigFile, writeConfigFile, type ConfigFile, type FileOptions } from './files.js';
@@ -394,7 +395,14 @@ export type HarnessPlan =
   /** AgentLink is already configured there, as it would write it. */
   | { readonly status: 'present'; readonly def: HarnessDef }
   /** An `agentlink` entry exists and differs: left alone. */
-  | { readonly status: 'conflict'; readonly def: HarnessDef }
+  | {
+      readonly status: 'conflict';
+      readonly def: HarnessDef;
+      /** How the entry differs (M1-UX-MULTI-AGENT): fixed kinds and valid agent names only. */
+      readonly difference: ConflictDifference;
+      /** The settings file as shown to the user (`~/…`), for the remove-by-hand hint. */
+      readonly path: string;
+    }
   /** Refused with a reason (unsafe path, malformed file, form that cannot be edited exactly). */
   | { readonly status: 'blocked'; readonly def: HarnessDef; readonly reason: HarnessErrorCode };
 
@@ -460,11 +468,18 @@ export async function planHarness(def: HarnessDef, context: HarnessContext): Pro
     const before = await readConfigFile(base, parts, context);
     const edit = def.edit(before.text, mcpArgs(context.agent));
     if (edit.status === 'present') return { status: 'present', def };
-    if (edit.status === 'conflict') return { status: 'conflict', def };
     const path =
       context.config === undefined && envParts !== undefined
         ? `~/${envParts.join('/')}`
         : displayPath(def, context.config, context.platform);
+    if (edit.status === 'conflict') {
+      const args = mcpArgs(context.agent);
+      const difference =
+        def.parts.at(-1)?.endsWith('.toml') === true
+          ? explainTomlConflict(before.text, args)
+          : explainJsonConflict(before.text, def.id === 'opencode' ? 'mcp' : 'mcpServers', args);
+      return { status: 'conflict', def, difference, path };
+    }
     return {
       status: 'change',
       def,
