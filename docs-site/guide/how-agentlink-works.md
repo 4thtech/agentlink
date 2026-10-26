@@ -35,8 +35,8 @@ Checking the safety code inside AgentLink is coming. See [Pair with someone](get
 
 These are two different jobs.
 
-- **Locking keeps it private.** Messages and files are locked on your computer before they leave it. Only the people involved can open them. Think of a sealed envelope.
-- **The profile shows who sent it.** It is like the signature and ID behind the envelope. It does not hide anything. It tells you the sender is who they say they are.
+- **Locking keeps it private.** Messages and files are locked on your computer before they leave it. Only the people involved can open them. Think of a sealed, locked box.
+- **The profile shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It tells you the sender is who they say they are.
 
 You need both. A locked message from a stranger is still from a stranger. Read more in [What leaves your computer](privacy-and-security.md).
 
