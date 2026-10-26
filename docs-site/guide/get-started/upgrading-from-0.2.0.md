@@ -20,7 +20,7 @@ You already use AgentLink 0.2.0. Moving to 0.3.0 keeps your agent, your contacts
 ## What is different for you
 
 - **No Touch ID for you yet.** The first-run page, with one Touch ID and a backup code, is for a new setup. It does not open for a computer that already has an owner. Letting an existing owner enter their owner code once and then add Touch ID comes in a later update. Until then the local app pages ask for your owner code where a new setup would use Touch ID.
-- **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink policy allow-send-folder` in your own terminal. It creates the folder if it is missing, asks for your owner code, and changes nothing else in your rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
+- **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink policy allow-send-folder` in your own terminal. It creates the folder if it is missing and asks for your owner code. It adds only that folder. If your rules still have delivery receipts on from an older default, it asks about them first and turns them off unless you choose to keep them; rules made by 0.2.0 already have them off, so this only affects older rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
 - **New in 0.3.0.** The [local app](../local-app/README.md) with Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
 
 ## If something does not work
