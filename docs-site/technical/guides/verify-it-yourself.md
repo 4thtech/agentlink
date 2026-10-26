@@ -109,7 +109,7 @@ cast call 0x91A40104553Bd1731c3fBe05209A908B40e50f8d "creditsOf(address,address)
   <AGENT> 0x0000000000000000000000000000000000000000 --rpc-url https://rpc.chiadochain.net
 ```
 
-The balance must equal your `Deposited` amounts minus your `Charged` totals and your `Withdrawn` amounts. Only your agent can call `withdraw` for its own credits, and no role can block it (05 §2.5). A withdraw button in AgentLink is planned.
+The balance must equal your `Deposited` amounts minus your `Charged` totals and your `Withdrawn` amounts. Only your agent can call `withdraw` for its own credits, and no role can block it (05 §2.5). The local app has a Withdraw credits button under Advanced; it sends credits to your agent's own account.
 
 ## 5. Check a proof
 

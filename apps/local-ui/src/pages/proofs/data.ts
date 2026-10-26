@@ -96,3 +96,95 @@ export function listPath(cursor?: string): string {
 }
 
 export const CREDITS_PATH = '/api/ui/proofs/credits';
+
+// ---- Add credits and Withdraw credits (M1-11c-a4c) ------------------------------------------------
+
+export const TOP_UP_PATH = '/api/ui/proofs/top-up';
+export const WITHDRAW_PATH = '/api/ui/proofs/withdraw';
+
+export type NetworkWord = 'gnosis-test' | 'base-test';
+
+export interface Money {
+  /** `$N.NN`. */
+  readonly usd: string;
+  /** Base units, a decimal string: sent back unchanged as the confirmed amount. */
+  readonly amount: string;
+}
+
+export type TopUpNetwork =
+  | { readonly network: NetworkWord; readonly method: 'coming_soon' }
+  | {
+      readonly network: 'gnosis-test';
+      readonly method: 'address';
+      readonly available: false;
+      readonly address: string;
+    }
+  | {
+      readonly network: 'gnosis-test';
+      readonly method: 'address';
+      readonly available: true;
+      readonly address: string;
+      readonly received: string;
+      readonly addable: Money;
+      readonly credits: Money;
+    };
+
+export type TopUpAnswer =
+  | { readonly kind: 'ok'; readonly networks: readonly TopUpNetwork[] }
+  | { readonly kind: 'unavailable' };
+
+const NETWORK_WORDS: ReadonlySet<string> = new Set(['gnosis-test', 'base-test']);
+const ADDRESS = /^0x[0-9a-f]{40}$/;
+const UNITS = /^(0|[1-9][0-9]{0,77})$/;
+
+function money(v: unknown): Money | undefined {
+  if (!isObject(v)) return undefined;
+  const { usd, amount } = v;
+  if (typeof usd !== 'string' || !BALANCE.test(usd)) return undefined;
+  if (typeof amount !== 'string' || !UNITS.test(amount)) return undefined;
+  return { usd, amount };
+}
+
+function network(v: unknown): TopUpNetwork | undefined {
+  if (!isObject(v)) return undefined;
+  const { network: word, method } = v;
+  if (typeof word !== 'string' || !NETWORK_WORDS.has(word)) return undefined;
+  if (method === 'coming_soon') return { network: word as NetworkWord, method };
+  // Only the Gnosis test network takes funds at the agent's address (D-123).
+  if (method !== 'address' || word !== 'gnosis-test') return undefined;
+  const { address, available } = v;
+  if (typeof address !== 'string' || !ADDRESS.test(address)) return undefined;
+  if (available === false) return { network: word, method, available, address };
+  if (available !== true) return undefined;
+  const received = v.received;
+  const addable = money(v.addable);
+  const credits = money(v.credits);
+  if (typeof received !== 'string' || !BALANCE.test(received)) return undefined;
+  if (addable === undefined || credits === undefined) return undefined;
+  return { network: word, method, available, address, received, addable, credits };
+}
+
+export function parseTopUp(data: unknown): TopUpAnswer {
+  if (!isObject(data) || data.status !== 'ok' || !Array.isArray(data.networks)) {
+    return { kind: 'unavailable' };
+  }
+  const networks: TopUpNetwork[] = [];
+  for (const v of data.networks as unknown[]) {
+    const n = network(v);
+    if (n !== undefined) networks.push(n);
+  }
+  return { kind: 'ok', networks };
+}
+
+/** The one network where funds sent to the agent's address become credits, if offered. */
+export function addressNetwork(
+  answer: TopUpAnswer,
+): Extract<TopUpNetwork, { method: 'address' }> | undefined {
+  if (answer.kind !== 'ok') return undefined;
+  return answer.networks.find(
+    (n): n is Extract<TopUpNetwork, { method: 'address' }> => n.method === 'address',
+  );
+}
+
+/** `true` for a base-units amount above zero. */
+export const isPositive = (amount: string): boolean => amount !== '0';

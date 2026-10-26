@@ -95,7 +95,7 @@ describe('policy data', () => {
 });
 
 describe('M1-11s-b: the local UI app zone (D-118)', () => {
-  it('is a browser zone: the UI library and React only, nothing from core, node or crypto', () => {
+  it('is a browser zone: the UI library, React and the QR code library only, nothing from core, node or crypto', () => {
     const zone = ZONES['apps/local-ui'];
     expect(zone?.name).toBe('@4thtech-io/local-ui');
     expect(allowedWorkspaceNames('apps/local-ui')).toEqual([
@@ -103,7 +103,11 @@ describe('M1-11s-b: the local UI app zone (D-118)', () => {
       '@4thtech-io/types',
       '@4thtech-io/ui',
     ]);
-    expect(zone?.external.map((e) => e.pattern)).toEqual(['react', 'react-dom']);
+    expect(zone?.external.map((e) => e.pattern)).toEqual([
+      'react',
+      'react-dom',
+      'qrcode-generator',
+    ]);
     for (const name of ['core', 'node', 'crypto', 'chain', 'storage', 'transport-nostr', 'log']) {
       expect(violationFor('apps/local-ui', `@4thtech-io/${name}`), name).toMatch(/layering/);
     }

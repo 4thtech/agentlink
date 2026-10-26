@@ -55,3 +55,75 @@
 .pf-more {
   align-self: flex-start;
 }
+
+/* M1-11c-a4c: Add credits by QR and Withdraw credits (topup-ux.md 3c). Tokens only. */
+.pf-actions,
+.pf-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+}
+.pf-topup,
+.pf-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-4);
+}
+.pf-topup h2,
+.pf-confirm h2,
+.pf-facts {
+  margin: 0;
+}
+.pf-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--al-space-2) var(--al-space-5);
+}
+.pf-facts dd {
+  margin: 0;
+}
+.pf-address {
+  display: block;
+  word-break: break-all;
+  user-select: all;
+}
+.pf-confirm-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  inline-size: 100%;
+}
+.pf-advanced {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-3);
+}
+/* Scanners need dark modules on a light square in every theme. Dark (the default): the inverse
+   pair; light: the surface and the default text colour. */
+.pf-qr {
+  inline-size: 100%;
+  max-inline-size: calc(var(--al-space-11) * 3);
+  border-radius: var(--al-radius-md);
+}
+.pf-qr-bg {
+  fill: var(--al-color-bg-inverse);
+}
+.pf-qr-dot {
+  fill: var(--al-color-fg-inverse);
+}
+[data-theme='light'] .pf-qr-bg {
+  fill: var(--al-color-bg-surface);
+}
+[data-theme='light'] .pf-qr-dot {
+  fill: var(--al-color-fg-default);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .pf-qr-bg {
+    fill: var(--al-color-bg-surface);
+  }
+  :root:not([data-theme]) .pf-qr-dot {
+    fill: var(--al-color-fg-default);
+  }
+}

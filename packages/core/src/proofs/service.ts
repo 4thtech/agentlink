@@ -112,6 +112,14 @@ import type {
   TermsService,
 } from '../terms-flow.js';
 import type { ProofChain, ProofKit, ProofsPlatform } from './platform.js';
+import {
+  addReceivedFunds,
+  readTopUp,
+  withdrawCredits,
+  type CreditsMoveDeps,
+  type CreditsMoveResult,
+  type TopUpView,
+} from './credits-move.js';
 import type { Page, PageQuery } from '../paging.js';
 import {
   listProofs,
@@ -2417,6 +2425,41 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       await this.#deps.identity.agentAddress(),
       chainId,
     );
+  }
+
+  /**
+   * Where funds can be sent to add credits, and what can be added or withdrawn (M1-11c-a4c; D-123:
+   * Chiado only for now). Reads only; `unavailable` without the proofs platform or before init.
+   */
+  async receiveOptions(): Promise<TopUpView> {
+    return readTopUp(this.#platform, await this.#deps.identity.agentAddress());
+  }
+
+  /**
+   * Turns funds the agent's account received into its own credits, with the agent's own `deposit`
+   * signed by its KeyStore (M1-11c-a4c). Only for a fresh owner-signed `credits.deposit` (owner
+   * presence, 04 §2.5) on a top-up chain, keeping the gas reserve. Never throws for a refusal.
+   */
+  async addReceivedFunds(signed: unknown): Promise<CreditsMoveResult> {
+    return addReceivedFunds(this.#creditsDeps(), signed);
+  }
+
+  /**
+   * Withdraws the agent's credits to its own account (M1-11c-a4c), only for a fresh owner-signed
+   * `credits.withdraw` naming that account. Never throws for a refusal.
+   */
+  async withdrawCredits(signed: unknown): Promise<CreditsMoveResult> {
+    return withdrawCredits(this.#creditsDeps(), signed);
+  }
+
+  #creditsDeps(): CreditsMoveDeps {
+    return {
+      ctx: this.#ctx,
+      platform: this.#platform,
+      ownerActions: this.#deps.ownerActions,
+      agentId: () => this.#deps.identity.agentAddress(),
+      ...(this.#selector === undefined ? {} : { selector: this.#selector }),
+    };
   }
 
   /**

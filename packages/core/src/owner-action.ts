@@ -301,11 +301,15 @@ export function verifyOwnerAction(
     case 'storage.set':
     case 'storage.remove':
     case 'backup.export':
+    case 'credits.deposit':
+    case 'credits.withdraw':
     case 'agent.revoke':
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already
       // checked; contact.rename and contact.remove: a stored contact, M1-9za; storage.set: the
       // KeyStore item `s3:<id>` and its digest, storage.remove: the active row, backup.export: none,
-      // M1-9i-a; agent.revoke: none) and are applied by the store side.
+      // M1-9i-a; credits.deposit and credits.withdraw: the top-up chain, the amount and the
+      // recipient, M1-11c-a4c, proofs/credits-move.ts; agent.revoke: none) and are applied by the
+      // store side or the chain side.
       break;
   }
   return { ok: true, signed, actionHash: ownerActionHash(input) };
