@@ -220,7 +220,7 @@ It records the result as follows (*Orchestrator wording:*) `IR-<TASK-ID>-<n>: PA
 Reviewers apply every checklist the diff touches. Item IDs are stable; new items are appended.
 
 **Crypto (CR)**: 04 §2–§4, §8
-- CR-1 No primitive calls outside `@4thtech-io/crypto`; only allowlisted libraries (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`); no custom primitives (I-8).
+- CR-1 No primitive calls outside `@4thtech-io/crypto`; only allowlisted libraries (`nostr-tools`, `viem`, `@noble/*`, `@hpke/core`, `aws4fetch`, and `@cloudflare/workers-oauth-provider` in `apps/cloud-agent` only, under the narrow exception of D-131 (11), 04 §8); no custom primitives (I-8).
 - CR-2 HKDF derivation exactly per 04 §2.1 (salt `agentlink-v1`; info `label‖0x00‖u32be(epoch)‖u8(counter)`; L=32); secp256k1 rejection loop; EVM label always epoch 0.
 - CR-3 X25519 clamping left to the library.
 - CR-4 `envelopeHash = sha256(JCS(envelope without sig))` (RFC 8785); AEAD AD = `sha256(JCS({v,id,thread,from,createdAt,recipients}))`.

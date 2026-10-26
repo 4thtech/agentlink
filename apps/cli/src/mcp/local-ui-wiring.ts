@@ -11,6 +11,10 @@
 //   agent, an unreadable config, a failed check) leaves it out, and the setup routes then answer
 //   503 `unavailable`. The server checks again on every begin and finish; this is the first gate.
 // - The default owner files (the real home) are kept: no `ownerFiles` override is passed.
+// - M1-UX-FIRSTRUN-V2 (D-130 (2)): the setup's first card carries `firstPolicy` with the agent's own
+//   core owner actions, so the one first-run gesture also signs the first policy (the 06 §3
+//   defaults with `~/AgentLink/Send` allowed), as `owner init` does. The real home is used (no
+//   `home` override). The owner actions stay with the approval server, never with a page handler.
 // - Events: an owner set up from the page is named outside the browser with one fixed line and the
 //   public fingerprint (IR-M1-11s-c-1 L-2), through the redacting logger. Nothing else of an event
 //   is logged at info, and no event ever holds a token, link, code or seed (I-7).
@@ -88,7 +92,13 @@ export async function localUiOptions(
   return {
     assets: deps.assets(),
     client: agent.client,
-    ...(wired ? { ownerSetup: { firstCard } } : {}),
+    ...(wired
+      ? {
+          ownerSetup: {
+            firstCard: { ...firstCard, firstPolicy: { actions: agent.client.ownerActions } },
+          },
+        }
+      : {}),
   };
 }
 
