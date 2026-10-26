@@ -27,9 +27,9 @@
 //   folder); an existing folder; no symbolic link anywhere in it (its realpath must be the path
 //   itself, and the refusal names the real path to use); not the root, the home folder or a folder
 //   above it; not hidden and not under a protected folder (`~/.ssh`, `~/.agentlink`, keychains).
-//   What is stored is that canonical realpath, never `~` and never a link. The core resolves it with
-//   realpath again on every use (files/outgoing.ts), so a folder replaced by a link later still
-//   only allows what its realpath allows.
+//   What is stored is that canonical realpath, never `~` and never a link. It pins the folder: on
+//   every use @4thtech-io/node resolves it again and uses it only while its realpath is still that
+//   stored path (M1-36b-2-d), so a folder replaced by a link later (or below one) is not used.
 // - D-99: a folder that CONTAINS a protected folder (for example `~/Library`, which holds
 //   `~/Library/Keychains`) is refused too, before any owner code; the refusal names the protected
 //   folder and asks for a narrower one. Each protected folder is compared in its lexical form and

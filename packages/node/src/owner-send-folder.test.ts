@@ -22,7 +22,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import {
   AgentLinkClient,
   type ApprovalChannel,
@@ -679,7 +679,8 @@ describe('setUpSendFolder: one folder from the check to the rules (M1-36b-2-d)',
     const { agent, owner, code } = await existingAgent();
     const base = await agent.client.ownerActions.loadPolicy();
     if (base.mode === 'fail_closed') throw new Error('fail closed');
-    for (const form of ['~/AgentLink/Send', join(home, 'AgentLink', 'Send')]) {
+    // Every form sending uses for this folder (allowed-path pins it at its real path).
+    for (const form of ['~/AgentLink/Send', '~/AgentLink/Send/', `${await sendFolder()}${sep}`]) {
       const rules = {
         mode: 'signed',
         version: 3,
