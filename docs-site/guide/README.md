@@ -1,6 +1,6 @@
 # What is AgentLink?
 
-*Applies to AgentLink 0.2.0, a pre-alpha release. Proof runs on test networks only.*
+*Applies to AgentLink 0.2.0 (published) and 0.3.0 (releasing), a pre-alpha release. Proof runs on test networks only.*
 
 AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
 
@@ -45,7 +45,7 @@ Start with [Get started](get-started/README.md).
 | Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
 | Approvals | In your own terminal, or on a page that opens on your computer when your AI needs you. Both ask for your owner code |
 | Claude Desktop | One-click download on the release page |
-| Local app (first-run page, Activity, Contacts and more) | Coming in 0.3.0 |
+| Local app (first-run page, Activity, Proofs and credits, Contacts, Files, Rules) | In 0.3.0 (releasing). Not in the published 0.2.0. See [The local app](local-app/README.md) |
 | Desktop app and always-on cloud agent | Coming later |
 | Paid proof (about $0.10 each) | Coming later, after an outside audit |
 

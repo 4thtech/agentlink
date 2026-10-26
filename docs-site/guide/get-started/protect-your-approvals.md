@@ -1,6 +1,6 @@
 # Protect your approvals
 
-*Applies to AgentLink 0.2.0. You approve with an owner code. A passkey (Touch ID, Windows Hello) comes with the local app in 0.3.0.*
+*Applies to AgentLink 0.2.0. You approve with an owner code. From 0.3.0 (releasing) the local app can use a passkey (Touch ID, Windows Hello) instead.*
 
 ## Why this step exists
 
@@ -44,11 +44,11 @@ Your owner fingerprint stays the same and your agents keep their cards, so your 
 
 Changing the code doesn't protect copies of the old saved owner key made earlier, for example in a backup, from someone who also has the old code. If you think that happened, set up a new owner and agent.
 
-## Which browser for a passkey (0.3.0)
+## Which browser for a passkey (0.3.0, releasing)
 
 From 0.3.0 the local page can use a passkey (Touch ID on a Mac, Windows Hello on Windows) instead of typing your owner code. It should work in Safari on a recent Mac, or an up-to-date Chrome, Edge or Firefox using your system's own passkey. Older Windows versions don't support it, and some browsers and password managers reportedly don't either. If yours can't, nothing breaks: you'll use your owner code instead. We are still testing each browser and will update this note.
 
-## The setup page (0.3.0)
+## The setup page (0.3.0, releasing)
 
 From 0.3.0 the setup page in your browser does this step for you. It first shows the folders it creates: `~/AgentLink/Send`, `~/AgentLink/Inbox` and `~/AgentLink/Proofs`. Then it has one button, for example **Use Touch ID**. That one touch protects your approvals, sets up your agent and lets your AI send files you put in `~/AgentLink/Send`, nothing else.
 

@@ -1,0 +1,22 @@
+# First run and your backup code
+
+*Applies to AgentLink 0.3.0, which is releasing.*
+
+First run is the page that sets you up as the owner of your agent. It takes one touch.
+
+## Steps
+
+1. Open it with `npx -y @4thtech-io/agentlink init`, or `npx -y @4thtech-io/agentlink ui` if you have not set up yet. Run them in a terminal you opened yourself.
+2. The page first lists the folders it will create in your home folder: `AgentLink/Send`, `AgentLink/Inbox` and `AgentLink/Proofs`. If `AgentLink/Send` already holds files, or is not a plain folder, it asks you to fix that first.
+3. Press the one button, for example **Use Touch ID**. This one confirmation protects your approvals, sets up your agent and lets your AI send files from `AgentLink/Send`, and nothing else.
+4. The page shows your **backup code** once. Press **Save in my password manager**, then **I saved it**.
+
+## What the backup code is for
+
+The backup code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.
+
+## If your browser has no passkey
+
+The page tells you which browser works, or lets you continue with the backup code only. Nothing breaks. See [Protect your approvals](../get-started/protect-your-approvals.md) for browsers.
+
+Back to [The local app](README.md).

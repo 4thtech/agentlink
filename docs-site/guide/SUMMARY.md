@@ -20,6 +20,16 @@
 * [Pair with someone](get-started/pair-with-someone.md)
 * [Send your first message](get-started/first-message.md)
 
+## The local app
+
+* [The local app](local-app/README.md)
+  * [First run and your backup code](local-app/first-run.md)
+  * [Activity](local-app/activity.md)
+  * [Proofs and credits](local-app/proofs-and-credits.md)
+  * [Contacts page](local-app/contacts.md)
+  * [Files page](local-app/files.md)
+  * [Rules page](local-app/rules.md)
+
 ## Everyday use
 
 * [Contacts](everyday-use/contacts.md)

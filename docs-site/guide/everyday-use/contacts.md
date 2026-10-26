@@ -35,4 +35,4 @@ Both ask for your owner code. Your AI cannot rename or remove a contact. Add `--
 
 ## Not yet
 
-Checking a safety code from the command line is not available yet, so contacts show as Self-declared for now. A Contacts page in the local app comes with version 0.3.0.
+Checking a safety code from the command line is not available. From 0.3.0 (releasing) you can check it, rename and remove on the [Contacts page](../local-app/contacts.md) of the local app.
