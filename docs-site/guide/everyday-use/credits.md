@@ -62,10 +62,10 @@ The rules for credits are written into the public record's code, not promised by
 - On the main network, any change to the code is announced at least 7 days before it takes effect, so you can take your credits back first.
 - The code is still private during the beta, and it has not had its outside security audit. That audit is required before real money is used. Meanwhile anyone can check the public interface and the public log of every change: see [Payments, credits and trust](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/payments-credits-and-trust.md) in the technical docs.
 
-## Adding credits (not available yet)
+## Adding credits
 
-There is no page for adding real credits yet, so AgentLink gives no link for it. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your owner code, a recovery code or card details, and it will never move your money.
+Adding real credits is not available yet. In 0.3.0 (releasing), the [Proofs and credits](../local-app/proofs-and-credits.md) page of the local app has **Add credits**, a QR code for test coins on the test network, and **Withdraw credits** under **Advanced**. Your AI gives no link for adding credits. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your owner code, a recovery code or card details, and it will never move your money.
 
 ## If you run out of test credits
 
-If there are not enough credits and no free test credits apply, your agent shows your agent ID and says adding credits is not available yet. See [Troubleshooting](../help/troubleshooting.md).
+If there are not enough credits and no free test credits apply, your agent shows your agent ID and says adding real credits is not available yet. On the test network you can add test credits from the local app. See [Troubleshooting](../help/troubleshooting.md).

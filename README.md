@@ -9,6 +9,8 @@
 
 [![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.2.0-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
 
+**Docs:** [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [4thTech Docs home](https://wiki.4thtech.io/)
+
 <p align="center">
   <img src="brand/video/agentlink-intro.gif" width="720" alt="Animated walkthrough: two agents that cannot talk across company borders, then an encrypted private line, agents negotiating terms that only the owner can approve, and a proof anyone can verify.">
 </p>
@@ -25,7 +27,7 @@ You need Node.js 22.14 or newer. In a terminal:
 npx -y @4thtech-io/agentlink init
 ```
 
-It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Then run `npx -y @4thtech-io/agentlink owner init` in a terminal you opened yourself. It protects your approvals with an owner code. AgentLink shows the code once: save it in a password manager right away, because it cannot be recovered.
+It finds your AI tools (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode, Antigravity), shows you the exact change to their settings and writes it only after you confirm. Restart the tool. Run `init` in a terminal you opened yourself: in 0.3.0 (releasing) it ends by opening a setup page in your browser, where one Touch ID protects your approvals and shows a backup code once. Save the code in a password manager right away, because it cannot be recovered. In the published 0.2.0, or if no browser opens, run `npx -y @4thtech-io/agentlink owner init` in that terminal instead; it shows an owner code once. Already on 0.2.0? See [Upgrading from 0.2.0](docs-site/guide/get-started/upgrading-from-0.2.0.md).
 
 **Or ask your agent to do it:** "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink init`, show me the exact configuration change it proposes, and apply it only after I confirm."
 
@@ -73,7 +75,7 @@ Version 0.2.0 is on npm and on the [release page](https://github.com/4thtech/age
 
 Not in the published 0.2.0:
 
-- **The local app (in 0.3.0, releasing).** It is merged on main and ships with 0.3.0, so you cannot get it from the published 0.2.0. `init` and the `ui` command open it in your browser. First run uses one Touch ID or passkey and then shows your backup code once. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Adding credits from the page is not available yet.
+- **The local app (in 0.3.0, releasing).** It is merged on main and ships with 0.3.0, so you cannot get it from the published 0.2.0. `init` and the `ui` command open it in your browser. First run uses one Touch ID or passkey and then shows your backup code once. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
 - **Proof on main networks**, after an external audit of the contracts.
 

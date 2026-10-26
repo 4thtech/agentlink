@@ -2,6 +2,8 @@
 
 Where everything lives in the AgentLink repository, what to read first for your role, and how to get productive in a set time. AgentLink is pre-alpha (M0 Foundations nearly complete; v0.1.0 of M1a released on 16 Oct 2026): the documents describe the design and the way we build; the M1a code (crypto, transport, core, node, the CLI and the MCP server) is released as the `@4thtech-io/agentlink` package. For the current state, see the Status box in the [root README](../README.md).
 
+Published docs: [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) (guide and technical docs from `docs-site/`; home at [wiki.4thtech.io](https://wiki.4thtech.io/)).
+
 Four kinds of document, four jobs:
 
 | Kind | Where | Answers | When two disagree |
