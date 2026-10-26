@@ -32,6 +32,13 @@ function fakeClient(
     getProof: () => Promise.reject(new Error('not used')),
     listActivity: () => Promise.reject(new Error('not used')),
     proofs: { list, creditsBalance: credits },
+    contacts: {
+      list: () => Promise.reject(new Error('not used')),
+      safetyCode: () => Promise.reject(new Error('not used')),
+      prepareCheck: () => Promise.reject(new Error('not used')),
+      prepareRename: () => Promise.reject(new Error('not used')),
+      prepareRemove: () => Promise.reject(new Error('not used')),
+    },
   };
 }
 
@@ -408,7 +415,7 @@ describe('the read-only client view (context.ts)', () => {
       },
     };
     const view = readOnlyClient(full as never);
-    expect(Object.keys(view).sort()).toEqual(['agentId', 'getProof', 'listActivity', 'proofs']);
+    expect(Object.keys(view).sort()).toEqual(['agentId', 'contacts', 'getProof', 'listActivity', 'proofs']);
     expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list']);
     expect(view.proofs).not.toBe(full.proofs);
     expect(Object.isFrozen(view.proofs)).toBe(true);

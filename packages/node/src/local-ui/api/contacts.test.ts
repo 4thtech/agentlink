@@ -97,8 +97,13 @@ function fakeClient(contacts: Contacts = fakeContacts()): LocalUiReadClient {
   return {
     agentId: SELF,
     getProof: () => Promise.reject(new Error('not used')),
+    listActivity: () => Promise.reject(new Error('not used')),
+    proofs: {
+      list: () => Promise.reject(new Error('not used')),
+      creditsBalance: () => Promise.reject(new Error('not used')),
+    },
     contacts,
-  } as LocalUiReadClient;
+  };
 }
 
 interface Applied {
@@ -153,7 +158,7 @@ function readRoute(path: string): LocalUiReadRoute {
 
 function ownerRoute(path: string): LocalUiOwnerRoute {
   const found = contactsRoutes.find((r) => r.path === path && r.method === 'POST');
-  if (found === undefined || !found.presence) throw new Error(`no owner route ${path}`);
+  if (found === undefined || found.presence !== true) throw new Error(`no owner route ${path}`);
   return found;
 }
 
