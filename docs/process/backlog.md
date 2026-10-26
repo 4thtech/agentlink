@@ -7663,6 +7663,17 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
   - A fixture PR touching only `docs-site/` is derived as S1 by `review-gate`.
 
+#### DOCS-BRAND-KIT · Logo in the README and a downloadable brand kit (new)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 (docs and assets) · **Phase:** M1b
+- **Repo/path:** agentlink · `brand/`, `README.md`
+- **Depends on:** none
+- **Scope:**
+  - Curated press kit at `brand/` from the owner-made brand system: SVG logos, a few PNGs, social images, palette, plain-language README with the source's usage rules. Fonts, app icons and tray icons are not copied.
+  - Logo at the top of `README.md` (dark/light) and a pointer to `brand/`.
+  - The brand-assets usage line is proposed; the owner confirms it at merge. The root `LICENSE` is unchanged.
+- **Acceptance:**
+  - `brand/` is under about 1 MB; `node tools/docs-status/index.mjs --check` passes.
+
 #### M3-4b-t-T4-ab-reconcile · gasless top-up: reconcile the core step and the CLI port (new, follow-up of IR-1 on #494 and #490)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/core`, `apps/cli`) · **Phase:** M3
 - **Repo/path:** agentlink · `packages/core` (T4-a step), `apps/cli` (T4-b port)
