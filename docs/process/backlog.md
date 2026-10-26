@@ -6276,8 +6276,8 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first for the exit code and the summary line.
 
 #### M1-36b-2-d · owner send-folder: re-check after signing, match the Send form, pin the folder (new, IR-M1-36b-2-c-1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · apps/cli/src/commands/owner-send-folder.ts, packages/node allowed-path
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · packages/node/src/owner-send-folder.ts, packages/node/src/allowed-path.ts
 - **Depends on:** M1-36b-2-c
 - **Scope:**
   - L1: re-check readiness after signing and before applying (around lines 258-272).

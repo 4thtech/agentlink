@@ -23,6 +23,14 @@
 //   signature, the nonce and the version, as for every owner action.
 // - No half-set state: whenever the rules are not applied, the folders this run created are removed
 //   again (rmdir: only while empty). A wrong owner code is the caller's error (nothing signed).
+// - One folder from the check to the rules (M1-36b-2-d, IR-M1-36b-2-c-1): the agent runs as the
+//   same OS user and can rename, replace or link the folder at any moment. The folder checked is
+//   pinned (allowed-path `pinFolder`: its real path, device and inode) and must still be that same
+//   real, empty folder just before the owner code is asked AND after signing, just before the rules
+//   are applied; otherwise nothing is applied. Once allowed, the stored real path is the pin: a
+//   folder that later resolves anywhere else is not used for sending (allowed-path).
+// - Already allowed: any entry in the rules that names this folder where it really is, `~/` form
+//   included (`~/AgentLink/Send`, as sending reads it), means nothing is asked or signed.
 // - I-4: nothing here is reachable from MCP (the CLI's src/tools/ and src/mcp/ never call it; fence
 //   tests). Errors are never shown (I-5): fixed results only, no path in an error.
 import { realpath } from 'node:fs/promises';
@@ -36,6 +44,7 @@ import {
   type JsonObject,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
+import { pinFolder, pinnedLocation, stillPinned, type FolderPin } from './allowed-path.js';
 import { assertAllowedOwnerAction } from './owner-allowlist.js';
 import {
   SEND_FOLDER_SEGMENTS,
@@ -188,14 +197,20 @@ export async function setUpSendFolder(
     return notAllowed('folder_unavailable');
   }
   const candidate = path.join(realHome, ...SEND_FOLDER_SEGMENTS);
-  if (existing.includes(candidate)) return { status: 'already_allowed', folder: candidate };
+  // The same test sending uses (allowed-path): the entry names this folder where it really is.
+  const allowed = existing.some(
+    (entry) => typeof entry === 'string' && pinnedLocation(entry, realHome) === candidate,
+  );
+  if (allowed) return { status: 'already_allowed', folder: candidate };
   if (existing.length >= MAX_ALLOWED_FOLDERS) return notAllowed('too_many');
 
   const plan: SendFolderPlan = await prepareSendFolder(home);
   if (plan.status !== 'ready') return notAllowed(plan.reason);
   let result: SendFolderSetupResult | undefined;
   try {
-    result = await signAndApply(options, plan, base, baseVersion);
+    const pin = await pinFolder(plan.folder);
+    if (pin === undefined) return notAllowed('folder_unavailable');
+    result = await signAndApply(options, plan, pin, base, baseVersion);
     return result;
   } finally {
     const kept = result !== undefined && result.status !== 'not_allowed';
@@ -206,12 +221,16 @@ export async function setUpSendFolder(
 async function signAndApply(
   options: SendFolderSetupOptions,
   plan: Extract<SendFolderPlan, { status: 'ready' }>,
+  pin: FolderPin,
   base: Plain,
   baseVersion: number,
 ): Promise<SendFolderSetupResult> {
   const { actions, agent, owner } = options;
   const { folder } = plan;
   const failed = notAllowed('failed');
+  /** Still the pinned folder: the same real folder (path, device, inode), and still empty. */
+  const unchanged = async (): Promise<boolean> =>
+    (await stillPinned(pin)) && (await stillReady(folder));
 
   // D-109: asked only when the rules in force have delivery receipts on from an older default.
   let keepReceipts = false;
@@ -255,7 +274,7 @@ async function signAndApply(
   } catch {
     return failed;
   }
-  if (!(await stillReady(folder))) return failed;
+  if (!(await unchanged())) return failed;
 
   // The owner reads the summary and types the owner code once (a wrong code is thrown).
   const signature = await options.sign(owner, {
@@ -266,6 +285,9 @@ async function signAndApply(
   if (signature.kind !== 'owner-action') return failed;
   const signed = signature.signed;
   if (canonicalize(signed.body) !== canonicalize(body)) return failed;
+  // Checked again after signing (L1): the owner code may take a while, and the folder must still be
+  // the one the owner read about when the rules take effect.
+  if (!(await unchanged())) return failed;
 
   let outcome: Awaited<ReturnType<SendFolderSetupActions['apply']>>;
   try {

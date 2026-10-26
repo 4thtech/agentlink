@@ -27,6 +27,7 @@ Received files are saved in `~/AgentLink/Inbox`, which AgentLink creates the fir
 - **Only you can change this.** Your AI cannot, and there is no AI tool for it.
 - **The folder and its subfolders** are allowed, but never hidden files (such as `.env`) or private folders (such as `~/.ssh` and AgentLink's own folder).
 - **The real folder, not a shortcut.** A path that goes through a link is refused, and you are shown the real path to use. If you spell a folder differently from how it is on disk (for example `~/work` for `~/Work`), AgentLink shows the exact path and asks `Use <exact path>? (y/N)`. Type `y` to allow it.
+- **It stays where you allowed it.** If an allowed folder (or a folder above it) is later replaced by a link, AgentLink stops sending from it. Allow the real folder again to use it.
 - **Not too wide.** You cannot allow your whole computer or your whole home folder. Allow a folder inside it. You can allow up to 32 folders.
 - **No folder that holds a private folder.** A folder like `~/Library` (which holds your passwords) is refused before you are asked for your owner code. AgentLink names the private folder and asks for a narrower one.
 
