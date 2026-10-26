@@ -1,6 +1,7 @@
 # Table of contents
 
 * [What is AgentLink?](README.md)
+* [How AgentLink works, simply](how-agentlink-works.md)
 
 ## Get started
 

@@ -10,9 +10,19 @@
 // - A non-empty folder, a link, a non-folder: nothing is asked, nothing is signed.
 // - A failure leaves no half-set state: the folders this run created are removed.
 // - I-4: only the package entry `setUpSendFolder` exists; the seams stay inside (fence.test.ts).
-import { lstat, mkdir, mkdtemp, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import {
   AgentLinkClient,
   type ApprovalChannel,
@@ -576,5 +586,119 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
     });
     expect(plain.status).toBe('allowed');
     expect(askedOther).toBe(0);
+  });
+});
+
+// M1-36b-2-d (IR-M1-36b-2-c-1 L1-L3): the AI agent runs as the same OS user (04 §2.5), so it can
+// rename, replace or link the Send folder at any moment. The folder the owner checked is pinned (its
+// real path and its identity on disk) and must still be exactly that folder, real and empty, just
+// before the owner code is asked AND after signing, just before the rules are applied. Otherwise
+// nothing is applied (fail closed) and nothing the run did not create is removed.
+describe('setUpSendFolder: one folder from the check to the rules (M1-36b-2-d)', () => {
+  type Swap = (folder: string) => Promise<void>;
+  let elsewhereCount = 0;
+  const swaps: readonly (readonly [string, Swap])[] = [
+    [
+      'a link to another empty folder',
+      async (folder) => {
+        elsewhereCount += 1;
+        const elsewhere = join(dir, `elsewhere-${String(elsewhereCount)}`);
+        await mkdir(elsewhere);
+        await rename(folder, `${folder}-old`);
+        await symlink(elsewhere, folder);
+      },
+    ],
+    [
+      'another real, empty folder (rename and replace)',
+      async (folder) => {
+        await rename(folder, `${folder}-old`);
+        await mkdir(folder, { mode: 0o700 });
+      },
+    ],
+    [
+      'a file put into it',
+      async (folder) => {
+        await writeFile(join(folder, 'private.txt'), 'x');
+      },
+    ],
+  ];
+
+  for (const [label, swap] of swaps) {
+    it(`replaced by ${label} between the check and the owner code: nothing signed`, async () => {
+      const { agent, owner, code } = await existingAgent();
+      const before = await rulesOf(agent);
+      const folder = await sendFolder();
+      const spy = spyActions(agent);
+      const prepare = spy.actions.preparePolicyEdit;
+      const actions: SendFolderSetupActions = {
+        ...spy.actions,
+        preparePolicyEdit: async (patch, opts) => {
+          await swap(folder);
+          return prepare(patch, opts);
+        },
+      };
+      const owners = ownerSigning(() => code);
+      const result = await setUpSendFolder({
+        agent: agent.agentId,
+        owner,
+        actions,
+        sign: owners.sign,
+        home,
+      });
+      expect(result).toEqual({ status: 'not_allowed', reason: 'failed' });
+      expect(owners.items).toEqual([]);
+      expect(spy.applied).toEqual([]);
+      expect((await rulesOf(agent)).jcs).toBe(before.jcs);
+    });
+
+    it(`replaced by ${label} after signing, before the rules apply: nothing applied`, async () => {
+      const { agent, owner, code } = await existingAgent();
+      const before = await rulesOf(agent);
+      const folder = await sendFolder();
+      const spy = spyActions(agent);
+      const owners = ownerSigning(() => code);
+      const result = await setUpSendFolder({
+        agent: agent.agentId,
+        owner,
+        actions: spy.actions,
+        sign: async (o, item) => {
+          const signature = await owners.sign(o, item);
+          await swap(folder);
+          return signature;
+        },
+        home,
+      });
+      expect(owners.items).toHaveLength(1);
+      expect(result).toEqual({ status: 'not_allowed', reason: 'failed' });
+      expect(spy.applied).toEqual([]);
+      expect((await rulesOf(agent)).jcs).toBe(before.jcs);
+    });
+  }
+
+  it('the rules already allow ~/AgentLink/Send (the Send form): already allowed, nothing signed', async () => {
+    const { agent, owner, code } = await existingAgent();
+    const base = await agent.client.ownerActions.loadPolicy();
+    if (base.mode === 'fail_closed') throw new Error('fail closed');
+    // Every form sending uses for this folder (allowed-path pins it at its real path).
+    for (const form of ['~/AgentLink/Send', '~/AgentLink/Send/', `${await sendFolder()}${sep}`]) {
+      const rules = {
+        mode: 'signed',
+        version: 3,
+        policy: { ...base.policy, files: { ...base.policy.files, allowedFolders: [form] } },
+      } as unknown as EffectivePolicy;
+      const spy = spyActions(agent, { load: () => Promise.resolve(rules) });
+      const owners = ownerSigning(() => code);
+      const result = await setUpSendFolder({
+        agent: agent.agentId,
+        owner,
+        actions: spy.actions,
+        sign: owners.sign,
+        home,
+      });
+      expect(result).toEqual({ status: 'already_allowed', folder: await sendFolder() });
+      expect(owners.items).toEqual([]);
+      expect(spy.applied).toEqual([]);
+      expect(await exists(join(home, 'AgentLink'))).toBe(false);
+    }
   });
 });
