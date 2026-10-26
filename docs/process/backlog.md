@@ -6576,7 +6576,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 
 ### Cloud agent template (`apps/cloud-agent`)
 
-**0.4.0 slice (D-131).** The cloud agent ships first, as 0.4.0, for Claude on the web and in the Claude iOS and Android apps; ChatGPT web follows later. Two chains meet at M2-3c: **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c** and **CLOUD-SPEC → M2-3f-1 → M2-3c**; then **M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → release 0.4.0**. Fable audits: M2-3a, M2-3f-1, M2-3f-2, M2-3c, M2-3d and AUDIT-CLOUD (keys, owner presence, OAuth and the D-131 (11) crypto exception); Opus review for the others. The console chain (M2-2*) is not on this path.
+**0.4.0 slice (D-131).** The cloud agent ships first, as 0.4.0, for Claude on the web and in the Claude iOS and Android apps; ChatGPT web follows later. Two chains meet at M2-3c: **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c** and **CLOUD-SPEC → M2-3f-1 → M2-3c**; then **M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → release 0.4.0**. Fable audits: M2-3a, M2-3f-1, M2-3f-2, M2-3c, M2-3d and AUDIT-CLOUD, plus M2-3i for `cloud update` (keys, owner presence, OAuth and the D-131 (11) crypto exception); Opus review for the others. The console chain (M2-2*) is not on this path.
 
 #### CLOUD-SPEC · cloud agent spec for 0.4.0 (D-131)
 - **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (by path: 04)
@@ -6705,7 +6705,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - **Deploy (D-25):** template publication only from a release tag, after the owner's approval click; a staging test deployment of the tagged template passes a smoke test (status, send, check inbox) first; a failed check restores the previous template tag; deploy record; halted by `DEPLOY_FREEZE`. 4thTech never deploys into users' accounts.
 
 #### M2-3i · cloud agent: updates, limits, cost and leaving
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable (`cloud update` uses the user's deploy credentials, 04 §2.5)
 - **Repo/path:** agentlink · apps/cloud-agent, apps/cli (`agentlink cloud update`)
 - **Depends on:** M2-3b, M2-3f-2, M2-3d
 - **Spec:** 08 §3.5; 06 §8; I-10; D-131 (4), (9)
@@ -6713,6 +6713,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Scope:**
   - Version check against the latest release tag (nothing about the agent sent) and the "update available" line in `agentlink_status` and `/status`; `agentlink cloud update`.
   - Per-IP limits on `/mcp` and the OAuth endpoints; the expected monthly cost; uninstall steps.
+  - After `cloud deploy` and `cloud update`, the CLI tells the user to run `wrangler logout` or use a token scoped to this Worker (04 §2.5).
 - **Acceptance:**
   - An older deployed version shows the notice; the version request carries no agent data (capture); a flood hits the limits, not the bill.
 
