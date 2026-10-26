@@ -46,7 +46,7 @@ agentlink/
 ```
 pnpm install
 pnpm build            # turbo build
-pnpm test             # unit tests (all packages); packages/types also runs in Chromium, Firefox, WebKit and workerd (needs `pnpm exec playwright install chromium firefox webkit` once; `pnpm test:node` inside the package runs Node only)
+pnpm test             # unit tests (all packages); packages/types also runs in Chromium, Firefox, WebKit and workerd; crypto, transport-nostr, chain and mcp-tools also run their `*.workerd.test.ts` smoke tests in workerd, M2-3t-w (needs `pnpm exec playwright install chromium firefox webkit` once; `pnpm test:node` inside the package runs Node only)
 pnpm test:e2e         # multi-agent end-to-end (requires testnet RPC + relays)
 pnpm lint && pnpm typecheck
 pnpm vectors:check    # crypto + EIP-712 test vectors across runtimes
