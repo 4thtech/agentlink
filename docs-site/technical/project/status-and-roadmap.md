@@ -25,7 +25,7 @@ Code that is merged is not necessarily published: only the `@4thtech-io/agentlin
 |---|---|---|---|---|
 | M0 Foundations | Monorepo skeleton | Done | - | pnpm workspace with Turborepo, strict CI, the Foundry skeleton in the private contracts repo, architecture boundary guards and the cross-runtime test-vector harness (M0-9). |
 | M0 Foundations | Delivery pipeline and runbooks | Done | - | The automated delivery pipeline (D-52) and the runbooks. |
-| M0 Foundations | Public documentation | Done | [#88](https://github.com/4thtech/agentlink/pull/88) | `docs-site/` (D-57), published through GitBook Git Sync, and the public knowledge base (`knowledge/` and `llms.txt`). |
+| M0 Foundations | Public documentation | Done | [#88](https://github.com/4thtech/agentlink/pull/88) | `docs-site/` (D-57), planned to be published into 4thTech Docs at each release, and the public knowledge base (`knowledge/` and `llms.txt`). |
 | M0 Foundations | Redacting logger (@4thtech-io/log) | Done | - | Structured logging for Node, browsers and Workers that redacts secrets by field name and value shape (M0-8). |
 | M0 Foundations | Specifications and process | Done | - | The specifications (`docs/foundation`), including decisions D-53 to D-59 (D-55: dedicated terms tools, one approval per agreement, decided 14 Oct 2026), the development and audit process and a security policy. |
 | M0 Foundations | Dependency updates | Done | [#160](https://github.com/4thtech/agentlink/pull/160) | Renovate groups all non-runtime dev tooling into one weekly pull request, so tooling updates stop rebasing each other; runtime and security-critical updates stay separate and carry a threat note. |

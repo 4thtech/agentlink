@@ -135,7 +135,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 ## Learn more
 
 - [How AgentLink works, simply](docs-site/guide/how-agentlink-works.md): the ideas in plain words.
-- [User guide](docs-site/guide/README.md): set up, pair, approvals, FAQ. [Technical docs](docs-site/technical/README.md): concepts, guides, reference. Both are published on [GitBook](https://wiki.4thtech.io) at each release.
+- [User guide](docs-site/guide/README.md): set up, pair, approvals, FAQ. [Technical docs](docs-site/technical/README.md): concepts, guides, reference. Planned: both will be published into [4thTech Docs](https://wiki.4thtech.io) at each release, once the copy script exists; today the AgentLink section there is a summary that links here.
 - [How it works](docs-site/technical/concepts/architecture.md), [design decisions](docs-site/technical/concepts/design-decisions.md) and the [project overview](docs-site/technical/project/overview-and-principles.md).
 - [Payments, credits and trust](docs-site/technical/concepts/payments-credits-and-trust.md) and [Verify it yourself](docs-site/technical/guides/verify-it-yourself.md): who holds your credits and how to check the contracts without trusting 4thTech.
 - [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks only, no main network yet.
@@ -152,6 +152,6 @@ Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues
 
 ## Licence
 
-[MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). OCC v1 docs: [wiki.4thtech.io](https://wiki.4thtech.io).
+[MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). 4thTech Docs (all 4thTech products and protocols): [wiki.4thtech.io](https://wiki.4thtech.io).
 
 AgentLink is built by [4thTech](https://github.com/4thtech). AgentLink is the product name (trademark check pending).
