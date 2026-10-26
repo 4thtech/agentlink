@@ -229,7 +229,13 @@ describe('M1-1g-b: no build can include the crypto test seam (IR-M1-1c-G2-1 L-1)
   it('every testDirs package of the seam has the alias and the noEmit path it needs (IR-M1-9k-1 F01)', () => {
     // M1-27a: apps/drop/test signs drop requests with fixed test keys (signDropAuthorization).
     // M1-10c: apps/submitter/test signs smoke Records with a random MemoryKeyStore agent.
-    expect(seam?.testDirs).toEqual(['apps/cli/test', 'apps/drop/test', 'apps/submitter/test']);
+    // M2-3a: apps/cloud-agent/test sets up the agent with a test owner and sends from a test sender.
+    expect(seam?.testDirs).toEqual([
+      'apps/cli/test',
+      'apps/drop/test',
+      'apps/submitter/test',
+      'apps/cloud-agent/test',
+    ]);
     for (const pkg of testDirPackages) {
       expect(readFileSync(join(REPO, pkg, 'vitest.config.ts'), 'utf8'), pkg).toMatch(
         /find: \/\^@4thtech-io\\\/crypto\\\/testing\$\//,

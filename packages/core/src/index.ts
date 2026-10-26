@@ -449,6 +449,18 @@ export {
   type StoreTx,
   type Where,
 } from './store/store.js';
+// M2-3a: the SQLite DDL of the logical schema, shared by the Node store and the Durable Object store.
+export {
+  SQL_MAX_INT,
+  SQL_SECOND_LAYER_TRIGGERS,
+  createSqlSchemaStatements,
+  sqlColumnDef,
+  sqlColumnsOf,
+  sqlIdent,
+  sqlMaxRowsTriggerName,
+  sqlTableSpec,
+  sqlUniqueIndexName,
+} from './store/sql-schema.js';
 // NOT FOR PRODUCTION (IR-M1-7a-1 L-6): for tests and development only. It persists nothing, so a
 // restart would forget owner-action nonces, the seen-set and idempotency results. Moving it to a
 // test-only subpath needs a boundary-policy change (S1): backlog M1-7a-b.
