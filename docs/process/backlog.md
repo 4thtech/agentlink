@@ -6660,6 +6660,17 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - Independent review; the owner confirms the proposed details at merge.
 
+#### CLOUD-SPEC-DECIDE · owner confirms nine 0.4.0 cloud details (D-131)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (by path: 04)
+- **Repo/path:** agentlink · docs/foundation (00, 04, 06, 08), docs/process (backlog, versioning, release-and-deployment §4.8)
+- **Depends on:** CLOUD-SPEC; owner decisions in chat, 26 Oct 2026
+- **Spec:** D-131 (c), (f), (g), (h), (j), (k)–(n)
+- **Invariants:** I-1 to I-10 (no change)
+- **Scope:**
+  - Mark as decided only the nine details Tali confirmed: the recovery code as the passkey fallback, `CLOUD_FILES_NOT_YET`, template updates after the owner's click, grant lifetimes, fetched-file link and retention, the tested default list of redirect hosts (model-agnostic), alarm-only sync, "Open in Safari/Chrome", and the rest of M2 in later 0.x releases. Every other proposed item stays proposed.
+- **Acceptance:**
+  - Independent review; no other proposed marker changes.
+
 #### M2-3t · cloud agent: tool handlers into their own package
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (S2 path touch: tool handlers)
 - **Repo/path:** agentlink · packages/mcp-tools (from apps/cli/src/tools), apps/cli, tools/deps-check, eslint.config.mjs
@@ -6777,7 +6788,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 #### M2-3d · cloud agent: deploy paths and template repository
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable (seed and setup claim)
 - **Repo/path:** agentlink · apps/cloud-agent, apps/cli (`agentlink cloud deploy`); template repo `4thtech/agentlink-cloud-agent`; docs-site guide page (setup-code generator)
-- **Depends on:** M2-3a, M2-3f-1, M2-3c; template repository decided (D-131 (7)); sync mechanism in `release-and-deployment.md` §4.8 (proposed)
+- **Depends on:** M2-3a, M2-3f-1, M2-3c; template repository decided (D-131 (7)); sync mechanism in `release-and-deployment.md` §4.8 (decided, D-131 (l))
 - **Spec:** 08 §3.2, §3.5; 06 §8; 02 J6; `release-and-deployment.md` §4.8; D-131 (3), (9)
 - **Invariants:** I-1, I-3, I-7
 - **Scope:**
@@ -8176,7 +8187,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | DESIGN-D1 | Deliver D1 (copy sheet, tokens + core components, local approval UI, invite placeholder) by week 3 of M1; record it in `docs/design/README.md` |
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
 | DESIGN-D3 | Deliver D3 (launch brand, marketing site for the production domain) before M3 public launch |
-| M2-3d | Create `4thtech/agentlink-cloud-agent` (decided, D-131 (7)); confirm the proposed sync mechanism (`release-and-deployment.md` §4.8) |
+| M2-3d | Create `4thtech/agentlink-cloud-agent` (decided, D-131 (7)); the sync mechanism is decided (D-131 (l), `release-and-deployment.md` §4.8) |
 | M2-3e | Provide a Claude plan (Pro; also try Free), an iPhone on iOS 18.4 or later and an Android phone with Google Password Manager, and a Cloudflare test account (Free, then Paid) for connector tests (D-131: Claude only for 0.4.0, no ChatGPT seat now) |
 | M2-10 | **DECISION NEEDED:** production console domain (TBD; choose and register) before external testers |
 | M2-11a | Approve the desktop framework decision after its security review |
