@@ -6600,19 +6600,20 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - Keep the fence (no Node built-in, Node global, MCP SDK or `@4thtech-io/node` import) as ESLint rules scoped to the package, the neutral-platform bundle check on the package entry, and a source test that moved with the package; a deps-check zone, an `audit-rules.md` row (S1), the review-gate class rule, the changesets `fixed` group and the TypeScript references.
 - **Acceptance:**
   - The tool-surface snapshot and the registry snapshot are byte-identical; the CLI bundle still includes the handlers; the package declares no Node or MCP SDK dependency.
-- **Notes:** the workerd test projects are the follow-up M2-3t-w.
+- **Notes:** the workerd test projects for `crypto`, `transport-nostr`, `chain` and `mcp-tools` named in `PLAN-CLOUD-AGENT.md` are the follow-up card M2-3t-w.
 
 #### M2-3t-w · cloud agent: workerd test projects for the shared packages
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (test configuration of S2 packages; no source change)
-- **Repo/path:** agentlink · packages/crypto, packages/transport-nostr, packages/chain, packages/mcp-tools (Vitest configs only), turbo.json
+- **Status:** done (4thtech/agentlink#539, merged 2026-10-26) · **Size:** S · **Tier:** Sonnet · **Security:** S2 by path (`packages/crypto/**`; tests and test config only, no source change)
+- **Repo/path:** agentlink · packages/crypto, packages/transport-nostr, packages/chain, packages/mcp-tools (vitest.config.ts and `src/workerd-smoke.workerd.test.ts`), docs/process/repo-reference.md
 - **Depends on:** M2-3t
-- **Spec:** 07 (runtimes rule: every shared package runs in Node, browsers and Workers); 04 §8 rule 2; D-131
-- **Invariants:** I-8
+- **Spec:** 07 §1 (every shared package runs in Node, browsers and Workers); `PLAN-CLOUD-AGENT.md` §3 (M2-3t row); D-131
+- **Invariants:** I-5
 - **Scope:**
-  - A Vitest project in workerd (`@cloudflare/vitest-pool-workers`, as `core`, `storage` and `types` already have) for `crypto`, `transport-nostr`, `chain` and `mcp-tools`; the committed test vectors run there too.
-  - No source change. A package that fails in workerd gets its own fix card, never a skipped test.
+  - A second Vitest project `workerd` per package (`@cloudflare/vitest-plugin`, already a root devDependency: no new dependency) that runs `src/**/*.workerd.test.ts` in the Workers runtime, without `nodejs_compat`. The Node project excludes those files. `pnpm test` runs both through the existing `test` job: no workflow change.
+  - Smoke tests per package through its public API: crypto (hash, HKDF, JCS, AEAD round trip, envelope sign and verify with the in-memory KeyStore), transport-nostr (gift wrap and unwrap), chain (record id, address check), mcp-tools (registry equals the frozen tool surface; `callTool` answers `needs_setup`). Each asserts the runtime is workerd.
 - **Acceptance:**
-  - The four packages' unit tests and the crypto vectors pass in workerd in CI; a deliberate Node-only import fails the run.
+  - All four smoke suites pass in workerd; the same package's Node suites still pass; a project that falls back to Node fails its runtime assertion.
+- **Notes:** feeds M2-3a (conformance and Worker KeyStore) and M2-3b. Not covered here: Argon2id (must never run in the Worker, CLOUD-SPIKES S-3), `@4thtech-io/crypto/keystore` file KeyStore, relay WebSockets (M2-3a).
 
 #### M2-3a · cloud agent: AgentDO, store, relay sync, Worker KeyStore
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 · **Audit:** Fable
