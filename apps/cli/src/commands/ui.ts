@@ -15,6 +15,7 @@
 // shell-capable agent as the same OS user could start the server itself. This step adds no route and
 // no authority: owner actions on the pages still need the owner's presence (passkey or code) and an
 // owner signature, and first-run setup is the `setupGate` route that re-checks that no owner exists.
+import { homedir } from 'node:os';
 import process from 'node:process';
 import { createLogger, type Logger } from '@4thtech-io/log';
 import { startApprovalServer } from '@4thtech-io/node';
@@ -22,7 +23,10 @@ import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_FAILED, EXIT_OK, type CommandContext, type CommandHandler } from '../dispatch.js';
 import { localUiOptions, logOwnerSetupEvent } from '../mcp/local-ui-wiring.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
+import { listAgentNames } from '../runtime/agent-dir.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
+import { AGENT_CHOICE_TEXT, pickAgent, selectAgent } from './agent-choice.js';
+import { sharedLineReader } from './init.js';
 import { nodeOwnerDeps } from './owner/deps.js';
 
 /** How long `ui` serves the pages at most (proposed: 30 minutes, as for the first-run step). */
@@ -38,6 +42,9 @@ export const UI_TEXT = Object.freeze({
   /** `prefix`: the command as this run was started (M1-36a), never a typed value. */
   notReady: (prefix: string): string =>
     `AgentLink isn't set up here yet. Run \`${prefix} init\` in your own terminal first.`,
+  /** M1-UX-MULTI-AGENT: no `--agent` and several agents here: the names follow on the next line. */
+  moreThanOne: (prefix: string): string =>
+    `This computer has more than one AgentLink agent. Run \`${prefix} ui --agent <name>\` with the agent you want to open.`,
   agentRun: (prefix: string): string =>
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
@@ -57,6 +64,10 @@ export interface UiServer {
 export interface UiDeps {
   /** Opens the agent and starts the server; undefined when the agent is not set up here. */
   start(name: string | undefined): Promise<UiServer | undefined>;
+  /** M1-UX-MULTI-AGENT: the local agent names on this computer (absent: not looked for). */
+  agents?(): Promise<readonly string[]>;
+  /** Reads one typed line (for the numbered pick). */
+  readLine?(): Promise<string>;
   /** The longest serve time, in milliseconds. */
   readonly waitMs: number;
   /** Calls `stop` on Ctrl+C; returns the unsubscribe. */
@@ -74,7 +85,24 @@ export async function uiStep(
     output.printError(UI_TEXT.agentRun(prefix));
     return EXIT_FAILED;
   }
-  const server = await deps.start(context.parsed.agent).catch(() => undefined);
+  let agent = context.parsed.agent;
+  if (agent === undefined && deps.agents !== undefined) {
+    const selection = selectAgent(await deps.agents().catch(() => []));
+    if (selection.kind === 'one') agent = selection.name;
+    else if (selection.kind === 'choose') {
+      const picked =
+        deps.readLine === undefined
+          ? undefined
+          : await pickAgent((text) => output.print(text), selection.names, deps.readLine);
+      if (picked === undefined) {
+        output.printError(UI_TEXT.moreThanOne(prefix));
+        output.printError(AGENT_CHOICE_TEXT.namesLine(selection.names));
+        return EXIT_FAILED;
+      }
+      agent = picked;
+    }
+  }
+  const server = await deps.start(agent).catch(() => undefined);
   if (server === undefined) {
     output.printError(UI_TEXT.notReady(prefix));
     return EXIT_FAILED;
@@ -108,6 +136,8 @@ export function nodeUiDeps(): UiDeps {
   const owner = nodeOwnerDeps();
   const logger: Logger = createLogger({ name: 'ui' });
   return Object.freeze<UiDeps>({
+    agents: () => listAgentNames(homedir()),
+    readLine: sharedLineReader(),
     start: async (name) => {
       const opened = await owner.open(name);
       if (opened.status !== 'ok') return undefined;

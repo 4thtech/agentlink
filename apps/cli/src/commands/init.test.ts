@@ -641,6 +641,57 @@ describe('malformed or unusable configs', () => {
     expect(run.code).toBe(EXIT_OK);
   });
 
+  it('M1-UX-MULTI-AGENT: a different entry says what differs (another agent) and how to replace it', async () => {
+    await mkdir(join(home, '.codex'));
+    await writeFile(
+      join(home, '.codex', 'config.toml'),
+      '[mcp_servers.agentlink]\ncommand = "npx"\nargs = ["-y", "@4thtech-io/agentlink", "mcp", "--agent", "old-one"]\n',
+    );
+    const plan = await init([]);
+    expect(plan.out).toContain('Codex already has an entry named agentlink');
+    expect(plan.out).toContain('old-one');
+    expect(plan.out).toContain('codex');
+    expect(plan.out).toContain('~/.codex/config.toml');
+    expect(plan.out).toContain(`${cliPrefix()} init`);
+    expect(plan.out).toContain('--harness codex');
+  });
+
+  it('M1-UX-MULTI-AGENT: an older command is named as such, and no value from the file is printed', async () => {
+    await mkdir(join(home, '.codex'));
+    await writeFile(
+      join(home, '.codex', 'config.toml'),
+      '[mcp_servers.agentlink]\ncommand = "node"\nargs = ["/opt/old/agentlink.js", "--token", "s3cr3t-token", "https://example.test/x"]\n',
+    );
+    const plan = await init([]);
+    expect(plan.out).toMatch(/another way|older/);
+    expect(plan.out + plan.err).not.toMatch(/s3cr3t-token|example\.test|old\/agentlink/);
+  });
+
+  it('M1-UX-MULTI-AGENT: OpenCode (JSON, command array) with another agent name is explained too', async () => {
+    await mkdir(join(home, '.config', 'opencode'), { recursive: true });
+    await writeFile(
+      join(home, '.config', 'opencode', 'opencode.json'),
+      `${JSON.stringify(
+        {
+          mcp: {
+            agentlink: {
+              type: 'local',
+              command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'work'],
+              enabled: true,
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const plan = await init(['--harness', 'opencode']);
+    expect(plan.out).toContain('OpenCode already has an entry named agentlink');
+    expect(plan.out).toContain('work');
+    expect(plan.out).toContain('~/.config/opencode/opencode.json');
+    expect(plan.out).toContain('--harness opencode');
+  });
+
   it.skipIf(!POSIX)(
     'a symlinked config is refused, and nothing is written through it',
     async () => {
