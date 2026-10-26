@@ -1,10 +1,10 @@
 cff-version: 1.2.0
-message: "If you use AgentLink, please cite it as below."
-title: "AgentLink"
-abstract: "Encrypted, provable exchange between AI agents, on the open protocol OCC v2."
+message: 'If you use AgentLink, please cite it as below.'
+title: 'AgentLink'
+abstract: 'Encrypted, provable exchange between AI agents, on the open protocol OCC v2.'
 type: software
 authors:
-  - name: "4thTech"
+  - name: '4thTech'
 license: MIT
-repository-code: "https://github.com/4thtech/agentlink"
-url: "https://github.com/4thtech/agentlink"
+repository-code: 'https://github.com/4thtech/agentlink'
+url: 'https://github.com/4thtech/agentlink'
