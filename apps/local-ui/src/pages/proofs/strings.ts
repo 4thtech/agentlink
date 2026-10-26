@@ -19,7 +19,74 @@ export const PROOFS_STRINGS = {
   addCreditsNotAvailable: 'Adding credits is not available yet in this version of AgentLink.',
   creditsUnavailable: "Credits can't be checked right now. Try again in a minute.",
   creditsPartial: "Some credits couldn't be checked just now, so you may have more.",
+  // M1-11c-a4c: Add credits by QR (Gnosis test network now) and Withdraw credits (D-122, D-123).
+  // The network and coin are named only inside Add credits, because the sender's app asks for
+  // them (topup-ux.md 3c, D-117 B); the default view stays plain.
+  addCredits: 'Add credits',
+  addCreditsTitle: 'Add credits',
+  addCreditsIntro: 'Send test xDAI to your agent, then turn it into credits here.',
+  networkLabel: 'Network',
+  coinLabel: 'Coin',
+  coin: 'xDAI (test)',
+  addressLabel: "Your agent's address",
+  qrLabel: "QR code of your agent's address",
+  copyAddress: 'Copy address',
+  copied: 'Copied',
+  copyFailed: 'Copy did not work. Select the address and copy it.',
+  // 11 §5.6 "Top-up (each method, once)", verbatim.
+  privacy:
+    'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+  turnIntoCredits: 'Turn received funds into credits',
+  nothingYet: 'Nothing to add yet. After you send, check again.',
+  checkAgain: 'Check again',
+  reserveNote: 'A little stays with your agent to cover network costs.',
+  notReadable: "Your agent's account can't be checked right now. Try again in a minute.",
+  advanced: 'Advanced',
+  withdraw: 'Withdraw credits',
+  withdrawNote:
+    "Credits go back to your agent's own account. Sending them to another account comes in a later update.",
+  confirmTitle: 'Confirm',
+  amountLabel: 'Amount',
+  fromLabel: 'From',
+  toLabel: 'To',
+  fromReceived: 'Funds your agent received',
+  toCredits: 'Your credits',
+  fromCredits: 'Your credits',
+  toOwnAccount: "Your agent's own account",
+  ownerCode: 'Owner code',
+  confirm: 'Confirm',
+  cancel: 'Cancel',
+  working: 'Working…',
+  done: 'Done. Your credits are updated.',
+  pending: 'Sent. Your credits update in a minute.',
+  wrongCode: "That owner code didn't work.",
+  wait: 'Too many tries. Wait a moment, then try again.',
+  amountChanged: 'The amount changed. Check again.',
+  noFundsForFee: "Your agent's account needs a little more to cover network costs.",
+  moveFailed: "That didn't go through. Try again in a minute.",
 } as const;
+
+/** The networks the page names, by the server's fixed word (11 §5: plain words). */
+export const NETWORK_NAMES = {
+  'gnosis-test': 'Gnosis test network',
+  'base-test': 'Base test network',
+} as const;
+
+export function comingSoon(network: string): string {
+  return `${network}: coming soon`;
+}
+
+export function readyToAdd(usd: string): string {
+  return `${usd} received and ready to add.`;
+}
+
+export function addAmount(usd: string): string {
+  return `Add ${usd} to your credits`;
+}
+
+export function withdrawAmount(usd: string): string {
+  return `Withdraw ${usd} of credits`;
+}
 
 export function proofsLeft(n: number): string {
   return n === 1 ? '1 proof left' : `${String(n)} proofs left`;

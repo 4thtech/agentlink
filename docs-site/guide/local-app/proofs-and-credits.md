@@ -6,6 +6,10 @@ This page lists your proofs, with when each was made and whether it was recorded
 
 If you have no proofs yet, the page suggests what to ask your AI.
 
-**Adding credits is not available on this page yet**, and the page says so. How credits work: [Credits](../everyday-use/credits.md). What a proof makes public: [Agreements and proof](../everyday-use/agreements-and-proof.md).
+**Add credits** shows a QR code for your agent's account, with a copy button. On the test network, send test coins to that account, then choose **Turn received funds into credits** and confirm with your owner code. A little stays with your agent to cover network costs. The account you add credits from is publicly linked to your agent. Adding real credits is not available yet.
+
+Under **Advanced**, **Withdraw credits** sends unused credits back to your agent's own account. You see the amount, where it comes from and where it goes, then confirm with your owner code. Sending them to another account comes in a later update.
+
+How credits work: [Credits](../everyday-use/credits.md). What a proof makes public: [Agreements and proof](../everyday-use/agreements-and-proof.md).
 
 Back to [The local app](README.md).

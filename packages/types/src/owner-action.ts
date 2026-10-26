@@ -194,6 +194,49 @@ export const backupExportParamsSchema = z.strictObject({
   contents: z.enum(BACKUP_KIT_CONTENTS),
 });
 
+/**
+ * A token amount in base units (M1-11c-a4c): a decimal string with no sign, leading zero, fraction
+ * or exponent, from 1 to 2^256 - 1 (a uint256 the vault accepts). One spelling per value.
+ */
+const MAX_UINT256 = 2n ** 256n - 1n;
+const BASE_UNITS = /^[1-9][0-9]{0,77}$/;
+export const baseUnitsAmount = z
+  .string()
+  .regex(BASE_UNITS)
+  // Defensive: Zod may run this check on a string that already failed the pattern.
+  .refine((s) => BASE_UNITS.test(s) && BigInt(s) <= MAX_UINT256, 'amount: 1 to 2^256 - 1');
+
+/** The fee-token symbols of 07 §6.2 (12 §3): `NATIVE` is xDAI on Gnosis. */
+export const FEE_TOKEN_SYMBOLS = Object.freeze(['NATIVE', 'USDC', 'USDT'] as const);
+
+/** A chain ID: a positive safe integer. Which chains are allowed is the core's rule. */
+const chainIdSchema = uint53.refine((n) => n > 0, 'chainId must be positive');
+
+/**
+ * `credits.deposit` params (M1-11c-a4c; D-122, D-123; 12 §4.1; proposed, owner confirms at merge):
+ * the agent deposits exactly `amount` base units of `token` that its own account holds on `chainId`
+ * as its own credits there (`deposit`, 05 §2.5), paying the network cost itself. That the chain is a
+ * top-up chain, the amount is there and a gas reserve stays are the core's rules.
+ */
+export const creditsDepositParamsSchema = z.strictObject({
+  chainId: chainIdSchema,
+  token: z.enum(FEE_TOKEN_SYMBOLS),
+  amount: baseUnitsAmount,
+});
+
+/**
+ * `credits.withdraw` params (M1-11c-a4c; 05 §2.5 `withdraw(token, amount, to)`; 12 §4.1; proposed,
+ * owner confirms at merge): `amount` of the agent's credits in `token` on `chainId` go to `to`. The
+ * core allows only the agent's own account as `to` until an owner-signed recipient grant exists
+ * (IR-M1-4c-b-1 M-1); the KeyStore enforces the same (M1-4c-b).
+ */
+export const creditsWithdrawParamsSchema = z.strictObject({
+  chainId: chainIdSchema,
+  token: z.enum(FEE_TOKEN_SYMBOLS),
+  amount: baseUnitsAmount,
+  to: evmAddress,
+});
+
 // --- OwnerAction ---------------------------------------------------------------------------------
 
 const head = {
@@ -312,6 +355,26 @@ export const backupExportActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/** Turns funds the agent's account holds into its credits (M1-11c-a4c). Applied only on its machine. */
+export const creditsDepositActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('credits.deposit'),
+    params: creditsDepositParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
+/** Withdraws the agent's credits (M1-11c-a4c). Applied only on the agent's own machine. */
+export const creditsWithdrawActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('credits.withdraw'),
+    params: creditsWithdrawParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** `agent.revoke`: `expiresAt` is exactly 0 (permanent; the core skips expiry and lifetime checks). */
 export const agentRevokeActionSchema = z.strictObject({
   ...head,
@@ -336,6 +399,8 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   storageSetActionSchema,
   storageRemoveActionSchema,
   backupExportActionSchema,
+  creditsDepositActionSchema,
+  creditsWithdrawActionSchema,
   agentRevokeActionSchema,
 ]);
 
@@ -378,6 +443,8 @@ export type StorageRemoveParams = z.infer<typeof storageRemoveParamsSchema>;
 export type BackupExportParams = z.infer<typeof backupExportParamsSchema>;
 export type StorageSetAction = z.infer<typeof storageSetActionSchema>;
 export type SignedStorageSet = z.infer<typeof signedStorageSetSchema>;
+export type CreditsDepositParams = z.infer<typeof creditsDepositParamsSchema>;
+export type CreditsWithdrawParams = z.infer<typeof creditsWithdrawParamsSchema>;
 export type ApprovalDecideAction = z.infer<typeof approvalDecideActionSchema>;
 export type ApprovalDecideBatchAction = z.infer<typeof approvalDecideBatchActionSchema>;
 export type ApprovalCancelAction = z.infer<typeof approvalCancelActionSchema>;

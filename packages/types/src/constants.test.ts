@@ -164,6 +164,8 @@ describe('constants (04, 05, 06)', () => {
         'contact.check',
         'contact.remove',
         'contact.rename',
+        'credits.deposit',
+        'credits.withdraw',
         'policy.set',
         // M1-9i-a (D-115): own storage and the recovery kit.
         'storage.set',
@@ -242,6 +244,8 @@ describe('constants (04, 05, 06)', () => {
       'storage.set': 600,
       'storage.remove': 600,
       'backup.export': 600,
+      'credits.deposit': 600,
+      'credits.withdraw': 600,
       'agent.revoke': null,
     });
     expect(LATER_OP_DEFAULT_LIFETIME_SECONDS).toBe(600);

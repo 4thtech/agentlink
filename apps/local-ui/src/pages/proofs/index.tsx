@@ -1,22 +1,31 @@
 // Proofs and credits (M1-11c-a4; d1 Local-proofs with DESIGN-ADJ-1 PR-1, X-4, X-6; 11 §5, §6.2).
 //
 // The proof list (newest first, paged) beside the credits card. Credits lead with proofs left; the
-// dollar balance is small. Nothing here names a network, token or address, and the Agent ID and QR
-// code are not on this page (PR-1: they live in Advanced). "Add credits" stays hidden until the pay
-// page is live (X-6). Reads only: the page sends GET requests and nothing else.
+// dollar balance is small. The default view names no network, token or address, and the Agent ID is
+// not on this page (PR-1: it lives in Advanced). M1-11c-a4c: where the agent can be paid (the Gnosis
+// test network now, D-123), "Add credits" opens the address, its QR code and the privacy note, and
+// "Withdraw credits" returns credits to the agent's own account; both changes are owner operations
+// behind a confirm screen and the owner code (top-up.tsx). Elsewhere the not-available line stays.
+// On load the page only reads.
 import { Button, EmptyState, Icon, ProofBadge } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
+import { AddCreditsPanel, ConfirmMove, type Move } from './top-up.js';
 import { PAGE_TITLES } from '../../strings.js';
 import {
   CREDITS_PATH,
+  TOP_UP_PATH,
+  addressNetwork,
+  isPositive,
   listPath,
   parseCredits,
   parseList,
+  parseTopUp,
   type CreditsAnswer,
   type ProofRow,
+  type TopUpAnswer,
 } from './data.js';
-import { PROOFS_STRINGS as S, inCredits, priceLine, proofsLeft } from './strings.js';
+import { NETWORK_NAMES, PROOFS_STRINGS as S, inCredits, priceLine, proofsLeft } from './strings.js';
 import './proofs.css';
 
 type ListState =
@@ -83,7 +92,14 @@ function ProofTable({ items }: { items: readonly ProofRow[] }): ReactElement {
   );
 }
 
-function CreditsCard({ credits }: { credits: CreditsState }): ReactElement {
+function CreditsCard({
+  credits,
+  actions,
+}: {
+  credits: CreditsState;
+  /** Add credits and Withdraw credits, when the agent can be paid (M1-11c-a4c). */
+  actions?: ReactElement | undefined;
+}): ReactElement {
   if (credits.kind === 'loading') {
     return (
       <section className="al-credits" aria-label={S.creditsLabel} aria-busy="true">
@@ -116,8 +132,8 @@ function CreditsCard({ credits }: { credits: CreditsState }): ReactElement {
       </div>
       {credits.partial ? <p className="al-text-caption al-muted">{S.creditsPartial}</p> : null}
       {credits.test ? <p className="al-text-caption al-muted">{S.testCredits}</p> : null}
-      {/* X-6: no "Add credits" until the pay page is live (D-113, M1-26-e). */}
-      <p className="al-text-caption al-muted">{S.addCreditsNotAvailable}</p>
+      {/* X-6 until a network takes funds at the agent's address (M1-11c-a4c, D-123). */}
+      {actions ?? <p className="al-text-caption al-muted">{S.addCreditsNotAvailable}</p>}
       {/* No free test credits button: the agent claims them once by itself (D-120 (3), M1-36i). */}
     </section>
   );
@@ -137,6 +153,27 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
   const api = useMemo(() => given ?? createApiClient(), [given]);
   const [list, setList] = useState<ListState>({ phase: 'loading' });
   const [credits, setCredits] = useState<CreditsState>({ kind: 'loading' });
+  const [topUp, setTopUp] = useState<TopUpAnswer>({ kind: 'unavailable' });
+  const [panel, setPanel] = useState<'none' | 'add'>('none');
+  const [move, setMove] = useState<Move | undefined>(undefined);
+  const [notice, setNotice] = useState<string | undefined>(undefined);
+  // IR-M1-11c-a4c-1 L-1 (owner, 11 §14 Q7): Withdraw credits lives under Advanced.
+  const [advanced, setAdvanced] = useState(false);
+
+  const readMoney = useCallback(() => {
+    void api.get(CREDITS_PATH).then((res) => {
+      setCredits(
+        res.kind === 'ok'
+          ? parseCredits(res.data)
+          : isNotSetUp(res)
+            ? { kind: 'not_set_up' }
+            : { kind: 'unavailable' },
+      );
+    });
+    void api.get(TOP_UP_PATH).then((res) => {
+      setTopUp(res.kind === 'ok' ? parseTopUp(res.data) : { kind: 'unavailable' });
+    });
+  }, [api]);
 
   useEffect(() => {
     let live = true;
@@ -164,6 +201,10 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
             : { kind: 'unavailable' },
       );
     });
+    void api.get(TOP_UP_PATH).then((res) => {
+      if (!live) return;
+      setTopUp(res.kind === 'ok' ? parseTopUp(res.data) : { kind: 'unavailable' });
+    });
     return () => {
       live = false;
     };
@@ -189,6 +230,61 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
   }, [api, list]);
 
   const title = <h1 className="al-text-title-1">{PAGE_TITLES.proofs}</h1>;
+
+  // M1-11c-a4c: the network where funds sent to the agent's address become credits, if any.
+  const net = addressNetwork(topUp);
+  const soon =
+    topUp.kind === 'ok'
+      ? topUp.networks
+          .filter((n) => n.method === 'coming_soon')
+          .map((n) => NETWORK_NAMES[n.network])
+      : [];
+  const withdrawable = net?.available === true && isPositive(net.credits.amount) ? net : undefined;
+  const actions =
+    net === undefined ? undefined : (
+      <div className="pf-actions">
+        {panel === 'add' ? null : (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              setNotice(undefined);
+              setMove(undefined);
+              setPanel('add');
+            }}
+          >
+            {S.addCredits}
+          </Button>
+        )}
+        {withdrawable === undefined ? null : (
+          <div className="pf-advanced">
+            <Button
+              size="sm"
+              variant="ghost"
+              aria-expanded={advanced}
+              aria-controls="pf-advanced-actions"
+              onClick={() => setAdvanced(!advanced)}
+            >
+              {S.advanced}
+            </Button>
+            {advanced ? (
+              <div id="pf-advanced-actions" className="pf-actions">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setNotice(undefined);
+                    setPanel('none');
+                    setMove({ kind: 'withdraw', money: withdrawable.credits, net: withdrawable });
+                  }}
+                >
+                  {S.withdraw}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+    );
 
   if (list.phase === 'not_set_up' || credits.kind === 'not_set_up') {
     return (
@@ -234,7 +330,35 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
           )}
         </div>
         <aside className="pf-side">
-          <CreditsCard credits={credits} />
+          <CreditsCard credits={credits} actions={actions} />
+          {notice === undefined ? null : (
+            <p className="al-text-body-sm" role="status">
+              {notice}
+            </p>
+          )}
+          {move !== undefined ? (
+            <ConfirmMove
+              api={api}
+              move={move}
+              onClose={() => setMove(undefined)}
+              onDone={(line) => {
+                setMove(undefined);
+                setPanel('none');
+                setNotice(line);
+                readMoney();
+              }}
+            />
+          ) : panel === 'add' && net !== undefined ? (
+            <AddCreditsPanel
+              net={net}
+              soon={soon}
+              onTurn={(m) => {
+                setNotice(undefined);
+                setMove(m);
+              }}
+              onCheckAgain={readMoney}
+            />
+          ) : null}
           {credits.kind === 'ok' ? (
             <p className="al-text-body-sm al-muted">{priceLine(credits.price)}</p>
           ) : null}

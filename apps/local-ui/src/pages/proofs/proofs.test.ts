@@ -4,8 +4,9 @@
 //
 // - Credits lead with "N proofs left"; the dollar balance is small; no Agent ID, QR code, address,
 //   network or token anywhere in the default view (PR-1: they live in Advanced).
-// - "Add credits" stays hidden while the pay page is off (X-6), with the not-available line; there is
-//   no free test credits button (owner decision D2 pending).
+// - "Add credits" shows only where the agent can be paid (M1-11c-a4c: the Gnosis test network); the
+//   address and QR code appear only after the owner opens it. Elsewhere the not-available line
+//   stays; there is no free test credits button (D-120 (3)).
 // - An empty list shows one next step: what to ask the AI.
 // - Server values render as text; a row the page does not recognise is left out. Reads only: the
 //   page never sends anything but GET.
@@ -34,6 +35,8 @@ afterEach(() => {
 interface Call {
   readonly url: string;
   readonly method: string;
+  readonly headers: Headers;
+  readonly body: unknown;
 }
 
 type Routes = Record<string, unknown>;
@@ -52,8 +55,14 @@ function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
   const calls: Call[] = [];
   const fetchFn = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
-    calls.push({ url, method: init?.method ?? 'GET' });
-    const body = routes[url];
+    calls.push({
+      url,
+      method: init?.method ?? 'GET',
+      headers: new Headers(init?.headers),
+      body: init?.body,
+    });
+    const key = (init?.method ?? 'GET') === 'GET' ? url : `${init?.method ?? ''} ${url}`;
+    const body = routes[key];
     if (body === undefined) return Promise.resolve(new Response('{}', { status: 404 }));
     if (body instanceof Error) return Promise.reject(body);
     const answer = body instanceof Answer ? body : new Answer(200, body);
@@ -69,6 +78,8 @@ function server(routes: Routes): { calls: Call[]; fetch: typeof fetch } {
 
 const LIST = '/api/ui/proofs?limit=20';
 const CREDITS = '/api/ui/proofs/credits';
+const TOP_UP = '/api/ui/proofs/top-up';
+const NO_TOP_UP = { status: 'ok', networks: [{ network: 'base-test', method: 'coming_soon' }] };
 const OK_CREDITS = {
   status: 'ok',
   proofsLeft: 48,
@@ -98,7 +109,11 @@ const text = (): string => host.textContent ?? '';
 
 describe('ProofsPage', () => {
   it('shows proofs left first, the balance small, and the beta line on test credits', async () => {
-    await mount({ [LIST]: { status: 'ok', items: [] }, [CREDITS]: OK_CREDITS });
+    await mount({
+      [LIST]: { status: 'ok', items: [] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: NO_TOP_UP,
+    });
     const card = host.querySelector('section[aria-label="Credits"]');
     expect(card).not.toBeNull();
     const big = card?.querySelector('.al-credits-bal');
@@ -119,8 +134,12 @@ describe('ProofsPage', () => {
     expect(host.querySelector('.al-credits-bal')?.textContent).toBe('1 proof left');
   });
 
-  it('has no Add credits, no free test credits button, no Agent ID and no QR code', async () => {
-    await mount({ [LIST]: { status: 'ok', items: [] }, [CREDITS]: OK_CREDITS });
+  it('without a network to pay on: no Add credits, no free test credits button, no QR code', async () => {
+    await mount({
+      [LIST]: { status: 'ok', items: [] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: NO_TOP_UP,
+    });
     const buttons = [...host.querySelectorAll('button')].map((b) => b.textContent ?? '');
     expect(buttons.some((b) => /add credits/i.test(b))).toBe(false);
     expect(buttons.some((b) => /free test credits/i.test(b))).toBe(false);
@@ -210,10 +229,10 @@ describe('ProofsPage', () => {
     expect(calls.map((c) => c.url)).toContain(`${LIST}&cursor=${encodeURIComponent(cursor)}`);
   });
 
-  it('only ever reads', async () => {
+  it('only reads on load', async () => {
     const calls = await mount({ [LIST]: { status: 'ok', items: [] }, [CREDITS]: OK_CREDITS });
-    expect(calls.map((c) => c.method)).toEqual(['GET', 'GET']);
-    expect(calls.map((c) => c.url).sort()).toEqual([CREDITS, LIST].sort());
+    expect(calls.map((c) => c.method)).toEqual(['GET', 'GET', 'GET']);
+    expect(calls.map((c) => c.url).sort()).toEqual([CREDITS, LIST, TOP_UP].sort());
   });
 
   it('leaves out rows it does not recognise and renders server text as text', async () => {
@@ -288,5 +307,192 @@ describe('ProofsPage', () => {
   it('keeps the page title', async () => {
     await mount({ [LIST]: { status: 'ok', items: [] }, [CREDITS]: OK_CREDITS });
     expect(host.querySelector('h1')?.textContent).toBe('Proofs & credits');
+  });
+});
+
+// M1-11c-a4c: Add credits by QR (Chiado now) and Withdraw credits (D-122, D-123; 11 §5.6; 12 §4.4).
+describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
+  const AGENT = '0x71c4000000000000000000000000000000009a2e';
+  const ADDABLE = '4990000000000000000';
+  const CREDIT_UNITS = '2000000000000000000';
+  const GNOSIS = {
+    network: 'gnosis-test',
+    method: 'address',
+    available: true,
+    address: AGENT,
+    received: '$5.00',
+    addable: { usd: '$4.99', amount: ADDABLE },
+    credits: { usd: '$2.00', amount: CREDIT_UNITS },
+  };
+  const TOP = {
+    status: 'ok',
+    networks: [{ network: 'base-test', method: 'coming_soon' }, GNOSIS],
+  };
+  const base = (extra: Routes = {}): Routes => ({
+    [LIST]: { status: 'ok', items: [] },
+    [CREDITS]: OK_CREDITS,
+    [TOP_UP]: TOP,
+    ...extra,
+  });
+  const button = (label: string): HTMLButtonElement | undefined =>
+    [...host.querySelectorAll('button')].find((b) => b.textContent === label);
+  const click = async (label: string): Promise<void> => {
+    const b = button(label);
+    expect(b, label).toBeDefined();
+    await act(async () => {
+      b?.click();
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  };
+  const typeCode = async (code: string): Promise<void> => {
+    const input = host.querySelector<HTMLInputElement>('input[type="password"]');
+    expect(input).not.toBeNull();
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      set?.call(input, code);
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+  };
+  const decodeInput = (header: string | null): unknown => {
+    const b64 = (header ?? '').replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4)));
+  };
+
+  it('the default view stays plain: an Add credits button, no address, QR or network yet', async () => {
+    await mount(base());
+    expect(button(PROOFS_STRINGS.addCredits)).toBeDefined();
+    // IR-M1-11c-a4c-1 L-1: Withdraw credits is under Advanced, not in the default view.
+    expect(button(PROOFS_STRINGS.withdraw)).toBeUndefined();
+    expect(button(PROOFS_STRINGS.advanced)?.getAttribute('aria-expanded')).toBe('false');
+    expect(text()).not.toMatch(/wallet|\bgas\b|seed phrase|transaction|address|network|0x/i);
+    expect(host.querySelector('svg[aria-label]')).toBeNull();
+  });
+
+  it('opens the QR code and copy button for the agent address, on the Gnosis test network', async () => {
+    await mount(base());
+    await click(PROOFS_STRINGS.addCredits);
+    const panel = host.querySelector('section[aria-label="Add credits"]');
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent).toContain('Gnosis test network');
+    expect(panel?.textContent).toContain(AGENT);
+    const qr = panel?.querySelector('svg[aria-label]');
+    expect(qr?.getAttribute('aria-label')).toBe(PROOFS_STRINGS.qrLabel);
+    expect(qr?.getAttribute('data-value')).toBe(AGENT);
+    expect(qr?.querySelectorAll('rect').length).toBeGreaterThan(50);
+    // The 11 §5.6 privacy note, once for this method.
+    expect(panel?.textContent).toContain(
+      'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
+    );
+    expect(panel?.textContent).toContain('Base test network: coming soon');
+  });
+
+  it('copies the address', async () => {
+    const copied: string[] = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: (t: string) => (copied.push(t), Promise.resolve()) },
+    });
+    await mount(base());
+    await click(PROOFS_STRINGS.addCredits);
+    await click(PROOFS_STRINGS.copyAddress);
+    expect(copied).toEqual([AGENT]);
+    expect(text()).toContain(PROOFS_STRINGS.copied);
+  });
+
+  it('no QR without a way to turn funds into credits: only Base test network, coming soon', async () => {
+    await mount(base({ [TOP_UP]: NO_TOP_UP }));
+    expect(button(PROOFS_STRINGS.addCredits)).toBeUndefined();
+    expect(host.querySelector('svg[aria-label]')).toBeNull();
+    expect(text()).not.toContain(AGENT);
+  });
+
+  it('drops an unknown network and a malformed address', async () => {
+    await mount(
+      base({
+        [TOP_UP]: {
+          status: 'ok',
+          networks: [
+            { ...GNOSIS, network: 'gnosis' },
+            { ...GNOSIS, address: '0xZZ' },
+            { ...GNOSIS, address: `${AGENT}<b>` },
+          ],
+        },
+      }),
+    );
+    expect(button(PROOFS_STRINGS.addCredits)).toBeUndefined();
+  });
+
+  it('turns received funds into credits after a confirm screen and the owner code', async () => {
+    const calls = await mount(base({ [`POST ${TOP_UP}`]: { status: 'done' } }));
+    await click(PROOFS_STRINGS.addCredits);
+    expect(text()).toContain('$4.99');
+    await click(PROOFS_STRINGS.turnIntoCredits);
+    const confirm = host.querySelector('section[aria-label="Confirm"]');
+    expect(confirm?.textContent).toContain('$4.99');
+    expect(confirm?.textContent).toContain('Gnosis test network');
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    await typeCode('7K2M-9QXA');
+    await click(PROOFS_STRINGS.confirm);
+    const post = calls.find((c) => c.method === 'POST');
+    expect(post?.url).toBe(TOP_UP);
+    expect(post?.headers.get('content-type')).toBe('application/octet-stream');
+    expect(post?.headers.get('x-agentlink-csrf')).toBe('t');
+    expect(decodeInput(post?.headers.get('x-agentlink-input') ?? null)).toEqual({
+      network: 'gnosis-test',
+      amount: ADDABLE,
+    });
+    // The owner code is the body only, never in the URL or the input header.
+    expect(post?.body).toBe('7K2M-9QXA');
+    expect(post?.url).not.toContain('7K2M');
+    expect(text()).toContain(PROOFS_STRINGS.done);
+  });
+
+  it('withdraws credits to the agent own account after a confirm screen', async () => {
+    const calls = await mount(base({ [`POST /api/ui/proofs/withdraw`]: { status: 'done' } }));
+    await click(PROOFS_STRINGS.advanced);
+    expect(button(PROOFS_STRINGS.advanced)?.getAttribute('aria-expanded')).toBe('true');
+    await click(PROOFS_STRINGS.withdraw);
+    const confirm = host.querySelector('section[aria-label="Confirm"]');
+    expect(confirm?.textContent).toContain('$2.00');
+    expect(confirm?.textContent).toContain("Your agent's own account");
+    expect(confirm?.textContent).toContain(AGENT);
+    await typeCode('7K2M-9QXA');
+    await click(PROOFS_STRINGS.confirm);
+    const post = calls.find((c) => c.method === 'POST');
+    expect(post?.url).toBe('/api/ui/proofs/withdraw');
+    expect(decodeInput(post?.headers.get('x-agentlink-input') ?? null)).toEqual({
+      network: 'gnosis-test',
+      amount: CREDIT_UNITS,
+    });
+  });
+
+  it('cancel sends nothing; a wrong owner code says so', async () => {
+    const calls = await mount(
+      base({ [`POST ${TOP_UP}`]: new Answer(403, { status: 'presence_rejected' }) }),
+    );
+    await click(PROOFS_STRINGS.advanced);
+    await click(PROOFS_STRINGS.withdraw);
+    await click(PROOFS_STRINGS.cancel);
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+    await click(PROOFS_STRINGS.addCredits);
+    await click(PROOFS_STRINGS.turnIntoCredits);
+    await typeCode('0000-0000');
+    await click(PROOFS_STRINGS.confirm);
+    expect(text()).toContain(PROOFS_STRINGS.wrongCode);
+  });
+
+  it('nothing received yet: no button to add, a check-again button instead', async () => {
+    await mount(
+      base({
+        [TOP_UP]: {
+          status: 'ok',
+          networks: [{ ...GNOSIS, received: '$0.00', addable: { usd: '$0.00', amount: '0' } }],
+        },
+      }),
+    );
+    await click(PROOFS_STRINGS.addCredits);
+    expect(button(PROOFS_STRINGS.turnIntoCredits)).toBeUndefined();
+    expect(button(PROOFS_STRINGS.checkAgain)).toBeDefined();
   });
 });

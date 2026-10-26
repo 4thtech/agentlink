@@ -128,7 +128,7 @@ describe('route registration (M1-11s-b, I-4)', () => {
 describe('the default registry: one stub per page (M1-11s-b)', () => {
   it('registers every page stub as a read route that answers 501 not_implemented', async () => {
     // A built page's own test covers its routes (files: api/files.test.ts, M1-11c-a3; contacts: api/contacts.test.ts, M1-11c-a2; proofs:
-    // api/proofs.test.ts, M1-11c-a4).
+    // api/proofs.test.ts, M1-11c-a4; top-up and withdraw: api/proofs-top-up.test.ts, M1-11c-a4c).
     const built = new Set([
       '/api/ui/rules',
       '/api/ui/rules/review',
@@ -143,6 +143,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/contacts/:ref/remove',
       '/api/ui/proofs',
       '/api/ui/proofs/credits',
+      '/api/ui/proofs/top-up',
+      '/api/ui/proofs/withdraw',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

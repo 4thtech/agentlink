@@ -375,6 +375,16 @@ export {
   type ApprovalDecision,
   type ActivityMessageStatus,
 } from './activity.js';
+export {
+  TOP_UP_CHAIN_IDS,
+  TOP_UP_GAS_RESERVE_WEI,
+  TOP_UP_MIN_WEI,
+  type CreditsMoveRefusal,
+  type CreditsMoveResult,
+  type TopUpAmount,
+  type TopUpChain,
+  type TopUpView,
+} from './proofs/credits-move.js';
 export type { FilesView, ResolvedFolders } from './files/view.js';
 // M1-11r-c: the Storage page's drop meter (07 §5.4 Limits). Numbers only.
 export {
