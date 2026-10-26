@@ -184,7 +184,7 @@ describe('the shared app navigation (M1-11b-2a)', () => {
     ]);
     for (const item of APP_NAV) {
       expect(html).toContain(`href="${item.path}"`);
-      expect(html).toContain(`<span>${item.label.replace('&', '&amp;')}</span>`);
+      expect(html).toContain(`<span>${item.label.replace(/&/g, '&amp;')}</span>`);
     }
     expect(html).toContain('<div class="al-side-brand">');
     expect(html).toMatch(
