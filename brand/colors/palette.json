@@ -3,193 +3,85 @@
     {
       "name": "Signal orange",
       "hex": "#FF6A1A",
-      "rgb": [
-        255,
-        106,
-        26
-      ],
-      "cmyk_approx": [
-        0,
-        58,
-        90,
-        0
-      ],
+      "rgb": [255, 106, 26],
+      "cmyk_approx": [0, 58, 90, 0],
       "use": "Brand accent. The seal in the mark, primary actions, focus."
     },
     {
       "name": "Graphite canvas",
       "hex": "#0B0C0E",
-      "rgb": [
-        11,
-        12,
-        14
-      ],
-      "cmyk_approx": [
-        21,
-        14,
-        0,
-        95
-      ],
+      "rgb": [11, 12, 14],
+      "cmyk_approx": [21, 14, 0, 95],
       "use": "Dark background."
     },
     {
       "name": "Graphite surface",
       "hex": "#111316",
-      "rgb": [
-        17,
-        19,
-        22
-      ],
-      "cmyk_approx": [
-        23,
-        14,
-        0,
-        91
-      ],
+      "rgb": [17, 19, 22],
+      "cmyk_approx": [23, 14, 0, 91],
       "use": "Panels; app icon background."
     },
     {
       "name": "Graphite raised",
       "hex": "#171A1E",
-      "rgb": [
-        23,
-        26,
-        30
-      ],
-      "cmyk_approx": [
-        23,
-        13,
-        0,
-        88
-      ],
+      "rgb": [23, 26, 30],
+      "cmyk_approx": [23, 13, 0, 88],
       "use": "Cards, menus."
     },
     {
       "name": "Ink light",
       "hex": "#E7E9EC",
-      "rgb": [
-        231,
-        233,
-        236
-      ],
-      "cmyk_approx": [
-        2,
-        1,
-        0,
-        7
-      ],
+      "rgb": [231, 233, 236],
+      "cmyk_approx": [2, 1, 0, 7],
       "use": "Mark brackets and text on dark."
     },
     {
       "name": "Ink dark",
       "hex": "#0E1013",
-      "rgb": [
-        14,
-        16,
-        19
-      ],
-      "cmyk_approx": [
-        26,
-        16,
-        0,
-        93
-      ],
+      "rgb": [14, 16, 19],
+      "cmyk_approx": [26, 16, 0, 93],
       "use": "Mark brackets and text on light."
     },
     {
       "name": "Paper",
       "hex": "#F5F6F7",
-      "rgb": [
-        245,
-        246,
-        247
-      ],
-      "cmyk_approx": [
-        1,
-        0,
-        0,
-        3
-      ],
+      "rgb": [245, 246, 247],
+      "cmyk_approx": [1, 0, 0, 3],
       "use": "Light background."
     },
     {
       "name": "Proof violet",
       "hex": "#A495FF",
-      "rgb": [
-        164,
-        149,
-        255
-      ],
-      "cmyk_approx": [
-        36,
-        42,
-        0,
-        0
-      ],
+      "rgb": [164, 149, 255],
+      "cmyk_approx": [36, 42, 0, 0],
       "use": "Proof seal on dark (#5B4BD6 on light)."
     },
     {
       "name": "Success teal",
       "hex": "#4FD1A5",
-      "rgb": [
-        79,
-        209,
-        165
-      ],
-      "cmyk_approx": [
-        62,
-        0,
-        21,
-        18
-      ],
+      "rgb": [79, 209, 165],
+      "cmyk_approx": [62, 0, 21, 18],
       "use": "Success on dark (#0A6E51 text on light)."
     },
     {
       "name": "Info blue",
       "hex": "#6CB6FF",
-      "rgb": [
-        108,
-        182,
-        255
-      ],
-      "cmyk_approx": [
-        58,
-        29,
-        0,
-        0
-      ],
+      "rgb": [108, 182, 255],
+      "cmyk_approx": [58, 29, 0, 0],
       "use": "Info and verified domain on dark."
     },
     {
       "name": "Warning amber",
       "hex": "#F2C94C",
-      "rgb": [
-        242,
-        201,
-        76
-      ],
-      "cmyk_approx": [
-        0,
-        17,
-        69,
-        5
-      ],
+      "rgb": [242, 201, 76],
+      "cmyk_approx": [0, 17, 69, 5],
       "use": "Warnings on dark."
     },
     {
       "name": "Danger red",
       "hex": "#FF6B6B",
-      "rgb": [
-        255,
-        107,
-        107
-      ],
-      "cmyk_approx": [
-        0,
-        58,
-        58,
-        0
-      ],
+      "rgb": [255, 107, 107],
+      "cmyk_approx": [0, 58, 58, 0],
       "use": "Destructive and integrity failures only."
     }
   ],
