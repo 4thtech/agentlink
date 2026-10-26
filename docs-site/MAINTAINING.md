@@ -37,7 +37,7 @@ The repository is the source of truth (D-57, amends D-29). Each space is connect
 
 Only the owner does this, in the GitBook and GitHub interfaces. Agents never change GitBook settings.
 
-1. Decide where the docs live (`DECISION NEEDED (owner)`, D-57): a new GitBook site for AgentLink (recommended: own brand, D-42; custom domain after D-38), or new sections in the existing `wiki.4thtech.io` site. Either way, create two spaces: **User guide** and **Technical docs**.
+1. Decide where the docs live (`DECISION NEEDED (owner)`, D-57). Owner direction (2026-10-26): the existing 4thTech GitBook, covering earlier 4thTech work and AgentLink; proposed structure in the [docs model](../docs/process/docs-model.md) §8 (proposed, owner confirms). Either way, create two spaces: **User guide** and **Technical docs**.
 2. Install the GitBook GitHub app on the `4thtech` organisation with access to `4thtech/agentlink` only.
 3. In each space: **Git Sync → GitHub**, repository `4thtech/agentlink`, branch `main`, project directory `docs-site/guide` (or `docs-site/technical`), initial sync direction **GitHub → GitBook**. Use space-level Git Sync: site-wide content mapping makes GitBook commit a mapping file to the repository.
 4. In each space's settings, turn off live editing, and do not merge change requests in GitBook (see "Never edit in GitBook").
@@ -45,6 +45,8 @@ Only the owner does this, in the GitBook and GitHub interfaces. Agents never cha
 6. Later: connect the custom domain once the production domain is chosen, and record the final URLs on the sync board for the docs worker.
 
 ## 3. Page conventions
+
+**How to write a page** (page types and outlines, callouts, diagrams, screenshots, the UI ↔ tech bridge, definition of done) is in the [docs model](../docs/process/docs-model.md). Start a new page from a template in [`_templates/`](_templates/README.md); that folder is outside both spaces, so Git Sync never publishes it.
 
 ### Status hints (honesty rule)
 

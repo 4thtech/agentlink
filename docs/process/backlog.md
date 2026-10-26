@@ -7882,6 +7882,55 @@ The public docs live in `docs-site/` (`guide/` and `technical/`), one GitBook sp
   - Unit tests with a passing and a failing fixture for each rule; the check passes on `main` and fails on a planted broken link and a planted "wallet" in the guide.
   - A fixture PR touching only `docs-site/` is derived as S1 by `review-gate`.
 
+#### DOCS-MODEL · One docs system for the guide, technical docs, GitBook and wiki (new, owner request 2026-10-26)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S1 (docs/process, docs-site)
+- **Repo/path:** agentlink · `docs/process/docs-model.md`; `docs-site/_templates/`; `docs-site/guide/local-app/files.md` (worked example); links in `docs/README.md` and `docs-site/MAINTAINING.md`
+- **Depends on:** —
+- **Spec:** owner request (Tali, 2026-10-26); D-57; 11 §5; `docs/design/README.md` (D-116); brand guidelines (endorsement)
+- **Invariants:** —
+- **Scope:**
+  - The docs model: readers and layers, page types with outlines, GitBook components with GitHub fallbacks, the UI ↔ tech bridge, screenshot rules, wording, repo ↔ GitBook ↔ wiki linking, the proposed place of AgentLink in the existing 4thTech GitBook (owner confirms), definition of done, refresh triggers.
+  - Templates (screen guide, how-to, concept, technical concept) outside both Git Sync spaces; the Files screen guide rewritten to the model with screenshot placeholders.
+- **Acceptance:**
+  - The guide vocabulary check is green; `node tools/docs-status/index.mjs --check` passes; the templates are not under a synced space.
+
+#### DOCS-SCREENSHOTS · Screenshot capture for the local app pages (new, follow-up of DOCS-MODEL)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (docs-site; test data only)
+- **Repo/path:** agentlink · `tools/` (capture script), `docs-site/guide/.gitbook/assets/`
+- **Depends on:** DOCS-MODEL
+- **Scope:**
+  - A repeatable capture of every local-app page and state named in the screen guides' `<!-- screenshot: … -->` placeholders, following `docs-model.md` §5: throwaway home, test data, 1280 × 800 at scale 2, file names, size cap.
+  - Replace the placeholders with figures and alt text.
+- **Acceptance:**
+  - No placeholder left in `guide/local-app/`; a check of each image shows no real key, code, name, Agent ID or user path.
+
+#### DOCS-GUIDE-REWRITE · All user guide pages to the docs model (new, follow-up of DOCS-MODEL)
+- **Status:** backlog · **Size:** L · **Tier:** Sonnet · **Security:** S1 (docs-site)
+- **Repo/path:** agentlink · `docs-site/guide/`
+- **Depends on:** DOCS-MODEL
+- **Scope:**
+  - Every guide page gets its page type and outline, the marked deeper part and links to its technical page; the other local-app pages follow the Files example, with their bridge tables. Split into PR-sized parts (get started, local app, everyday use, help).
+- **Acceptance:**
+  - Each page meets the `docs-model.md` §9 definition of done; the vocabulary check is green.
+
+#### DOCS-TECH-REWRITE · Technical concept pages to the docs model (new, follow-up of DOCS-MODEL)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S1 (docs-site)
+- **Repo/path:** agentlink · `docs-site/technical/concepts/`
+- **Depends on:** DOCS-MODEL
+- **Scope:**
+  - Each concept page opens with **In short**, explains why it is built this way, has one diagram, guarantees and limits, a "Where it is built" table with code and spec links, and links back to its guide page. Facts checked against the code and specs; stale status lines fixed.
+- **Acceptance:**
+  - Each page meets the `docs-model.md` §9 definition of done; specs win on every conflict.
+
+#### DOCS-DRIFT-CHECK · CI check that screen guides follow UI strings (new, follow-up of DOCS-MODEL)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (adds a CI check)
+- **Repo/path:** agentlink · `tools/` (check and tests); CI wiring may touch `.github/` (sensitive path)
+- **Depends on:** DOCS-MODEL, DOCS-LINT
+- **Scope:**
+  - Fail when a PR changes `apps/local-ui/src/pages/<page>/strings.ts` and not `docs-site/guide/local-app/<page>.md`, or when a bold UI string quoted in a screen guide no longer exists in that page's strings. Report screenshot placeholders left in published pages.
+- **Acceptance:**
+  - Unit tests with a passing and a failing fixture for each rule; passes on `main`.
+
 #### DOCS-BRAND-KIT · Logo in the README and a downloadable brand kit (new)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 (docs and assets) · **Phase:** M1b
 - **Repo/path:** agentlink · `brand/`, `README.md`

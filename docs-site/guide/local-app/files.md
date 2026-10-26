@@ -2,15 +2,107 @@
 
 *Applies to AgentLink 0.3.0, which is releasing.*
 
-The page lists the folders your AI may send files from. For how sending works, see [Files](../everyday-use/files.md) and [Folders for sending files](../everyday-use/allowed-folders.md).
+Your AI can send a file only from a folder you have allowed. The Files page shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
+
+<!-- screenshot: local-files--list.png | shows: two allowed folders, one opening at another location -->
+
+## What you see
+
+| What you see | What it means | What happens behind |
+|---|---|---|
+| **Folders your AI can send files from** | The list of your [allowed folders](../help/glossary.md). Subfolders count too | Read from your rules on your computer. Nothing is sent anywhere |
+| A folder, then **Opens at** another folder | The folder you allowed is a link to somewhere else. Your AI sends from the real folder | AgentLink always follows the link and checks the real folder |
+| **Not found on this computer. Your AI can't send from it.** | The folder was moved or deleted | Nothing can be sent from it until it is back |
+| The **×** button (**Stop sending from** …) | Stop your AI using this folder | Opens a confirm step first |
+| **Allow a folder** | Add a folder | Opens the **Folder** field |
+| **Every change here needs your passkey or owner code.** | Your AI cannot change this list | No tool your AI uses can add a folder |
+
+With no folders yet, the page says **Your AI can't send files yet. Allow a folder it may send from.** New setups already have the `~/AgentLink/Send` folder. See [Folders for sending files](../everyday-use/allowed-folders.md).
 
 ## Allow a folder
 
-1. Press **Allow a folder**. Type the full path of the folder in the **Folder** field, for example `~/Documents/Shared`, and press **Check folder**.
-2. The page shows the real folder that would be allowed (a link is followed to where it really points).
-3. It lists every warning in plain words, each with its own tick. You must tick them all before AgentLink makes the change.
-4. Press **Allow folder** and confirm with your passkey or owner code.
+<!-- screenshot: local-files--enter.png | shows: the Folder field with ~/Documents/Shared typed -->
 
-Folders that hold keys or AgentLink's own data, hidden folders and your whole home folder cannot be allowed. With no folders yet, the page says what to do next.
+1. Press **Allow a folder**.
+2. In **Folder**, type the full path, for example `~/Documents/Shared`. Press **Check folder**.
+3. The confirm step asks **Allow your AI to send files from this folder?** It shows the real folder that will be allowed. If you typed a link or another spelling, it says so: "You typed … It leads to the folder above, so that is the folder allowed."
+4. Under **Before you confirm, tick each one:**, tick every line. Each line says, in plain words, what the change lets your AI do. **Allow folder** stays off until all are ticked.
+5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use owner code instead** and type your owner code.
+6. The page says **Allowed. Your AI can now send files from this folder.**
+
+<!-- screenshot: local-files--confirm-add.png | shows: the confirm step with the real folder and one ticked warning -->
+
+{% hint style="warning" %}
+**Before you continue:** type your owner code only on this page. Never give it to your AI or paste it into a chat.
+{% endhint %}
+
+Your AI can send any file in the folder and its subfolders to your contacts. Hidden files, such as `.env`, are never sent.
+
+{% hint style="info" %}
+**Good to know:** your AI can open this page with the folder already filled in. That only fills the field. Nothing is allowed until you check, tick and confirm.
+{% endhint %}
+
+## Stop sending from a folder
+
+1. Press the **×** next to the folder.
+2. The page asks **Stop your AI sending files from this folder?**
+3. Press **Stop sending** and confirm with your passkey or owner code.
+
+Files already sent stay sent. Your AI can no longer send new ones from that folder.
+
+## Folders that can't be allowed
+
+AgentLink refuses these, and says why:
+
+- **Your whole computer or your whole home folder.** Choose a folder inside it, such as `~/Documents/Shared`.
+- **Folders that hold keys or AgentLink's own data**, such as `~/.ssh` and `~/.agentlink`, and any folder that contains one.
+- **Hidden folders**, and folders inside them.
+- **Something that isn't a folder**, a folder that doesn't exist, or a path with `.` or `..` in it.
+- **More than 32 folders.** Remove one first.
+
+## Messages you may see
+
+| Message | What to do |
+|---|---|
+| **This check timed out. Nothing was changed.** | Press **Check folder** again |
+| **Your rules changed in the meantime. Nothing was changed.** | Something else changed your rules. Check the folder again |
+| **That didn't match your passkey or owner code. Nothing was changed.** | Try again. After too many tries, the page asks you to wait |
+| **Before changing folders, answer one question about delivery receipts on the Rules page.** | Press **Open Rules**, answer, then come back |
+| **Your change was saved, but AgentLink couldn't confirm it** | Run `agentlink doctor` in your own terminal. Until then AgentLink uses its strictest settings |
+| **Your rules couldn't be checked, so no folder can be changed.** | Run `agentlink policy recover` in your own terminal |
+| **This page has expired.** | Ask your AI to open AgentLink again |
+
+<details>
+
+<summary>For the technically curious: how this page is built</summary>
+
+The page never makes the change itself. The local AgentLink server on your computer checks the folder, prepares the change and, after your passkey or owner code, makes it. Your browser only sees the folder, the warning lines and a one-time review token.
+
+```mermaid
+sequenceDiagram
+  participant You
+  participant Page as Files page (browser)
+  participant Local as AgentLink on your computer
+  You->>Page: Type a folder, press Check folder
+  Page->>Local: Review this folder
+  Local-->>Page: The real folder, the warnings, a one-time token
+  You->>Page: Tick every warning, confirm with passkey
+  Page->>Local: Token, ticked warnings, your passkey
+  Local->>Local: Check passkey and ticks, make the change once
+  Local-->>Page: Allowed
+```
+
+| On the page | What happens | Where it is built |
+|---|---|---|
+| Folder list, **Opens at**, **Not found** | The allowed folders and where each really points | `GET /api/ui/files` · [`files.ts`](https://github.com/4thtech/agentlink/blob/main/packages/node/src/local-ui/api/files.ts) · [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) `files.allowedFolders` |
+| **Check folder** | Full path, no `.` or `..`, real folder found, protected and too-broad folders refused | `GET /api/ui/files/review?add=` · [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · D-99 |
+| The tick list | Allowed only when the ticked set is exactly the warnings for this change | `preparePolicyEdit` in `@4thtech-io/core` · D-119 |
+| **Allow folder**, **Stop sending** | Your passkey or owner code is checked first; then the local server signs exactly the reviewed change, once. The browser never signs | `POST /api/ui/files/folders` (`presence: true`) · [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · I-4 |
+| Delivery receipts question | A folder change never switches receipts off silently | D-109 · [Rules page](rules.md) |
+| Page text | Every string on this page | [`strings.ts`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/files/strings.ts) · [`index.tsx`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/files/index.tsx) |
+
+More: [Files in the technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/files.md) and [Security model](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/security-model.md).
+
+</details>
 
 Back to [The local app](README.md).

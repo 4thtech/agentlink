@@ -32,6 +32,7 @@ Applies to AgentLink 0.2.0. These are the words AgentLink uses, in the product's
 | **Owner code** | The code you type in your own terminal to approve things. Never give it to your agent or paste it into the chat |
 | **Backup code** | In the local app (0.3.0, releasing), the code that opens your approvals when Touch ID is not available. Shown once: save it in your password manager. Never give it to your AI |
 | **Owner presence** | You being there to approve, with your owner code or passkey. Your AI cannot do it for you |
+| **Allowed folder** | A folder you allowed your agent to send files from, with its subfolders. Hidden files in it are never sent. See [Files page](../local-app/files.md) |
 | **Send folder** | `AgentLink/Send` in your home folder, where your agent may send files from. Setup creates it |
 | **Inbox folder** | `AgentLink/Inbox` in your home folder, where files sent to you are saved. Created when you receive your first file |
 | **Passkey** | Touch ID, Windows Hello or a similar sign-in on your device. It protects your approvals |

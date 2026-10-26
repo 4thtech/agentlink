@@ -128,6 +128,7 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | [`onboarding.md`](process/onboarding.md) | Onboarding for collaborators and the agents working for them |
 | [`backlog.md`](process/backlog.md) | Task cards (the IDs you see in branches and PR titles) |
 | [`repo-reference.md`](process/repo-reference.md) | Stack, repository layout, commands and testing |
+| [`docs-model.md`](process/docs-model.md) | How every public docs page is written: readers and layers, page types, components, screenshots, the UI ↔ tech bridge, the 4thTech GitBook structure, definition of done |
 | [`test-reports/`](process/test-reports/README.md) | Reports of end-to-end and acceptance test runs (setup, how to rerun, measured results) |
 
 ### `explainers/`: plain-language guides
@@ -150,7 +151,7 @@ One short file per lesson (problem, symptom, cause, rule). Index: [`lessons/READ
 
 ### Elsewhere
 
-- [`../docs-site/`](../docs-site/README.md): source of the **public documentation** on GitBook (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs-site/MAINTAINING.md).
+- [`../docs-site/`](../docs-site/README.md): source of the **public documentation** on GitBook (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs-site/MAINTAINING.md); how every page is written (page types, components, screenshots, the UI ↔ tech bridge) in the [docs model](process/docs-model.md).
 - [`design/`](design/README.md): design intake and status (the three design drops, and the rules for building UI before a design lands).
 - **Decision log:** the table in [`foundation/00-README.md`](foundation/00-README.md). Every decision has an ID (D-xx); changes to it go through a PR.
 - **Release history:** [`../CHANGELOG.md`](../CHANGELOG.md).
