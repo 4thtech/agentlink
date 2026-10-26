@@ -9,7 +9,7 @@
 // - The invite link of an accept-invite request never reaches the page: it is the capability that
 //   opens the invite, and the owner decides on who it connects to, not on the link.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { APP_CSS, pageHtml } from './approval-page.js';
+import { APP_CSS, APP_NAV, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import {
   startApprovalServerWith,
   type ApprovalDetails,
@@ -152,6 +152,60 @@ describe('the page shell (M1-11a-ux)', () => {
     expect(html).not.toMatch(/<style|style=/i);
     expect(html).not.toMatch(/:\/\//);
     expect(html).not.toMatch(/<script>(?!<\/script>)/);
+  });
+});
+
+describe('the shared app navigation (M1-11b-2a)', () => {
+  it('is left out by default, so the page without the app is unchanged', () => {
+    const html = pageHtml('abc');
+    expect(html).not.toContain('al-side');
+    expect(html).not.toContain('/settings/');
+  });
+
+  it('lists the seven app pages in the app order, Approvals current, as plain same-origin links', () => {
+    const html = pageHtml('abc', { appNav: true });
+    expect(APP_NAV.map((i) => i.path)).toEqual([
+      '/',
+      '/settings/activity',
+      '/settings/contacts',
+      '/settings/files',
+      '/settings/proofs',
+      '/settings/rules',
+      '/settings/backup',
+    ]);
+    expect(APP_NAV.map((i) => i.label)).toEqual([
+      'Approvals',
+      'Activity',
+      'Contacts',
+      'Files',
+      'Proofs & credits',
+      'Rules',
+      'Settings',
+    ]);
+    for (const item of APP_NAV) {
+      expect(html).toContain(`href="${item.path}"`);
+      expect(html).toContain(`<span>${item.label.replace('&', '&amp;')}</span>`);
+    }
+    expect(html.split('aria-current="page"').length - 1).toBe(1);
+    expect(html).toContain('<a class="al-nav is-active" href="/" aria-current="page">');
+    // Same shell rules as before: own stylesheet and script only, nothing inline, nothing outside.
+    expect(html).toContain('<link rel="stylesheet" href="/app.css">');
+    expect(html).toContain('<script src="/app.js" defer></script>');
+    expect(html).not.toMatch(/<style|style=|on[a-z]+=/i);
+    expect(html).not.toMatch(/:\/\//);
+    expect(html).toContain('<main id="app" class="al-page">');
+    expect(html.split('agentlink-csrf').length - 1).toBe(1);
+  });
+
+  it('draws the sidebar from the AppShell rules and hides it on narrow screens like the app', () => {
+    for (const rule of ['.al-side {', '.al-nav {', '.al-nav.is-active {', '.al-shell-main {']) {
+      expect(APP_CSS).toContain(rule);
+    }
+    expect(APP_CSS).toMatch(/@media \(max-width: 600px\) \{\s*\.al-side \{\s*display: none;/);
+  });
+
+  it('never puts the navigation on the expired-link page', () => {
+    expect(EXPIRED_HTML).not.toContain('al-side');
   });
 });
 

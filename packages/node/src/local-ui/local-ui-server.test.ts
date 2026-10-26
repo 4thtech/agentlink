@@ -426,6 +426,103 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
   });
 });
 
+// M1-11b-2a (owner feedback 2026-10-26: "if I click on Approvals there is no menu to get back"): the
+// approval page carries the app's sidebar when the app is bundled. Navigation only: the session,
+// CSRF and presence gates of the approval page are unchanged (04 §2.5, I-4).
+describe('the shared app navigation on the approval page (M1-11b-2a)', () => {
+  const NAV_PATHS = [
+    '/',
+    '/settings/activity',
+    '/settings/contacts',
+    '/settings/files',
+    '/settings/proofs',
+    '/settings/rules',
+    '/settings/backup',
+  ];
+
+  it('shows the app sidebar on / and /approve/<id> when the app is bundled, Approvals current', async () => {
+    const h = await harness();
+    const cookie = await h.cookie();
+    for (const path of ['/', `/approve/apr_${'A'.repeat(22)}`]) {
+      const res = await send(h.port, path, { headers: { Cookie: cookie } });
+      expect(res.status, path).toBe(200);
+      expect(res.body).toContain('<nav class="al-side" aria-label="Main">');
+      const hrefs = [...res.body.matchAll(/<a class="al-nav[^"]*" href="([^"]*)"/g)].map(
+        (m) => m[1],
+      );
+      expect(hrefs, path).toEqual(NAV_PATHS);
+      expect(res.body).toMatch(/<a class="al-nav is-active" href="\/" aria-current="page">/);
+      expect(res.body.split('aria-current').length - 1).toBe(1);
+      // Still the approval page, under the same strict headers.
+      expect(res.body).toContain('<script src="/app.js" defer></script>');
+      expectStrictHeaders(res);
+    }
+  });
+
+  it('leaves the sidebar out when there is no app to go to (no bundle)', async () => {
+    const h = await harness({ assets: { files: new Map() } });
+    const cookie = await h.cookie();
+    const res = await send(h.port, '/', { headers: { Cookie: cookie } });
+    expect(res.status).toBe(200);
+    expect(res.body).not.toContain('al-side');
+    expect(res.body).not.toContain('/settings/');
+  });
+
+  it('puts no token, session link or outside address into the navigation', async () => {
+    const h = await harness();
+    const cookie = await h.cookie();
+    const res = await send(h.port, '/', { headers: { Cookie: cookie } });
+    const nav = res.body.slice(res.body.indexOf('<nav'), res.body.indexOf('</nav>'));
+    expect(nav).not.toBe('');
+    expect(nav).not.toContain('?t=');
+    expect(nav).not.toContain('agentlink-csrf');
+    expect(nav).not.toMatch(/:\/\/|javascript:/i);
+    expect(nav).not.toMatch(/<script|style=|on[a-z]+=/i);
+    // The cookie value never reaches the markup.
+    expect(res.body).not.toContain(cookie.split('=')[1] ?? 'missing');
+  });
+
+  it('keeps the page gate: no session, no page (the sidebar never opens a door)', async () => {
+    const h = await harness();
+    expect((await send(h.port, '/')).status).toBe(401);
+    expect((await send(h.port, `/approve/apr_${'A'.repeat(22)}`)).status).toBe(401);
+    // An expired link shows the fixed page with no navigation into the app.
+    const expired = await send(h.port, '/');
+    expect(expired.body).not.toContain('al-side');
+  });
+
+  it('keeps the decide gate: no CSRF, no Origin or no presence is refused as before', async () => {
+    const h = await harness();
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    const path = `/api/approvals/apr_${'A'.repeat(22)}/approve`;
+    const base = {
+      Cookie: cookie,
+      Origin: h.origin,
+      'Sec-Fetch-Site': 'same-origin',
+      'Content-Type': 'application/json',
+    };
+    const body = encodeUtf8(JSON.stringify({}));
+    const cases: [string, Record<string, string>][] = [
+      ['no csrf', base],
+      [
+        'no origin',
+        { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Content-Type': 'application/json' },
+      ],
+      ['cross-site', { ...base, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'cross-site' }],
+      ['no presence', { ...base, 'X-AgentLink-CSRF': csrf }],
+    ];
+    for (const [name, headers] of cases) {
+      const res = await send(h.port, path, { method: 'POST', headers, body });
+      expect(res.status, name).toBeGreaterThanOrEqual(400);
+      expect(res.body, name).not.toContain('applied');
+    }
+    // A GET on the decide route never decides.
+    const get = await send(h.port, path, { headers: { Cookie: cookie } });
+    expect(get.status).toBeGreaterThanOrEqual(400);
+  });
+});
+
 describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)', () => {
   it('needs the session cookie, the CSRF header and same-origin metadata on every route', async () => {
     const h = await harness();
