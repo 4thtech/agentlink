@@ -10,6 +10,7 @@ First run is the page that sets you up as the owner of your agent. It takes one 
 2. The page first lists the folders it will create in your home folder: `AgentLink/Send`, `AgentLink/Inbox` and `AgentLink/Proofs`. If `AgentLink/Send` already holds files, or is not a plain folder, it asks you to fix that first.
 3. Press the one button, for example **Use Touch ID**. This one confirmation protects your approvals, sets up your agent and lets your AI send files from `AgentLink/Send`, and nothing else.
 4. The page shows your **backup code** once. Press **Save in my password manager**, then **I saved it**.
+5. **Save your recovery kit** (step 3 of 4 on the page). The kit brings your agent and its contacts back if this computer is lost. Saving the kit from this page arrives in an update, so for now press **Later**; the page says it will remind you until it is saved.
 
 ## What the backup code is for
 

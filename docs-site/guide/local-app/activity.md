@@ -2,9 +2,8 @@
 
 *Applies to AgentLink 0.3.0, which is releasing.*
 
-Activity is a list of what happened lately, newest first, in plain words. It shows:
+Activity is a list of what happened lately, newest first, in plain words. It does not list your messages or files. It shows:
 
-- messages and files you sent or received, with the contact's name and what each cost,
 - requests you approved or denied, and requests your rules approved for you,
 - proofs,
 - senders and contacts you blocked,
