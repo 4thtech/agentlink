@@ -19,7 +19,7 @@ If your AI runs this command, nothing opens. It tells you to run it yourself. Th
 
 - [First run](first-run.md): protect your approvals with Touch ID and get your backup code.
 - [Activity](activity.md): what your agent did lately.
-- [Proofs and credits](proofs-and-credits.md): your proofs and your credits.
+- [Proofs and credits](proofs-and-credits.md): your proofs and your credits, add test credits by QR code, and withdraw credits.
 - [Contacts](contacts.md): check a safety code, rename or remove a contact.
 - [Files](files.md): the folders your agent may send files from.
 - [Rules](rules.md): what your agent may do without asking.
@@ -28,4 +28,4 @@ Looking at a page changes nothing. Any change asks for your passkey or your owne
 
 ## Not in the app yet
 
-Adding credits from a page is not available yet. See [Credits](../everyday-use/credits.md).
+Adding real credits is not available yet. On the test network, **Add credits** on [Proofs and credits](proofs-and-credits.md) shows a QR code, and **Withdraw credits** under **Advanced** sends unused credits back to your agent's own account. Sending them to another account comes in a later update. See [Credits](../everyday-use/credits.md).
