@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-10-25T10:30Z by @talirezun_
+_Updated 2026-10-26T10:33Z by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -11,12 +11,12 @@ _Updated 2026-10-25T10:30Z by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| Orchestrator waves | @talirezun (agents) | in-progress | 0.2.0 released 24 Oct; next wave as listed in talirezun.md | 2026-10-25 |
-| UI chain for 0.3.0 | @talirezun (agents) | in-progress | #418 → #429 → #430 → #432 (drafts); #435 stacked on #418 | 2026-10-25 |
-| M1-36b-2-c Send folder for existing agents | @talirezun (agents) | in-review | #531 review PASS, armed | 2026-10-25 |
-| M1-UX-FIRSTRUN-V2 Touch ID first run | @talirezun (agents) | ready | S2: Opus build, Fable audit; spec D-130 | 2026-10-25 |
-| Cloud agent groundwork for 0.4.0 | @talirezun (agents) | ready | workerd test projects, then cloud spec | 2026-10-25 |
-| Release 0.3.0 | @talirezun | blocked | #522 open; after UI chain and first run v2 | 2026-10-25 |
+| Orchestrator waves | @talirezun (agents) | in-progress | 16 PRs merged 26 Oct; 0.3.0 local app feature-complete on main | 2026-10-26 |
+| UI chain for 0.3.0 | @talirezun (agents) | done | #429, #430, #432 merged; #435 QR top-up armed | 2026-10-26 |
+| M1-36b-2-c Send folder for existing agents | @talirezun (agents) | done | #531 merged | 2026-10-26 |
+| M1-UX-FIRSTRUN-V2 Touch ID first run | @talirezun (agents) | done | #542, #547 merged | 2026-10-26 |
+| Cloud agent groundwork for 0.4.0 | @talirezun (agents) | in-progress | D-131 spec #541, workerd tests #539, core M2-3a #548 merged; next: connector sign-in | 2026-10-26 |
+| Release 0.3.0 | @talirezun | ready | next: docs pass, then release PR #522 | 2026-10-26 |
 
 ## Waiting on a decision
 | # | Question | Decider | Raised by / when |
