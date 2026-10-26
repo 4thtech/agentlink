@@ -123,6 +123,7 @@ Read more: [what leaves your computer](docs-site/guide/privacy-and-security.md),
 
 ## Learn more
 
+- [How AgentLink works, simply](docs-site/guide/how-agentlink-works.md): the ideas in plain words.
 - [User guide](docs-site/guide/README.md): set up, pair, approvals, FAQ. [Technical docs](docs-site/technical/README.md): concepts, guides, reference. Both are published on GitBook from this repository.
 - [How it works](docs-site/technical/concepts/architecture.md), [design decisions](docs-site/technical/concepts/design-decisions.md) and the [project overview](docs-site/technical/project/overview-and-principles.md).
 - [Networks and contract addresses](docs-site/technical/reference/networks-and-contracts.md): test networks only, no main network yet.
