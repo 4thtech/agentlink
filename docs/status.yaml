@@ -14,11 +14,11 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-10-25"
+updated: "2026-10-26"
 version: "v0.2.0"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
-phase: "M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app usable from the command line is planned for 0.3.0"
+phase: "M0 Foundations nearly complete; M1a (walking skeleton) released as v0.1.0 on 16 Oct 2026, updated in v0.1.1 and v0.1.2; M1b (files, proof, credits) released as v0.2.0 (pre-alpha, test networks only); the local app is merged on main and is in 0.3.0 (releasing)"
 
 # Components by area. state: done | in-progress | planned.
 # `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.2.0) is published or user-runnable until a release says so.
@@ -348,10 +348,10 @@ areas:
         state: in-progress
         prs: [207, 225, 247, 256, 267]
         summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page: first run with a localhost passkey (M1-8e), approval cards with who, what, cost and the rule, and review together, where one passkey gesture or owner code entry confirms exactly the listed approvals while terms stay single (M1-11a). Session links open once and repeated wrong owner codes make you wait. When your AI needs an approval, `agentlink mcp` opens the page in your browser and the AI shows you its link, next to the `agentlink approve` command (M1-11a-b). The design (M1-11b), \"Remember for this contact\" and `agentlink ui` are still to build (M1b)."
-      - name: "Local app pages (in development)"
-        state: in-progress
-        prs: [407, 428, 417, 500]
-        summary: "The styled local app is being built on the localhost server: the shell with a seven-item navigation (Approvals, Activity, Contacts, Files, Proofs & credits, Rules, Settings; the status bar never claims a connection it has not checked), the Activity page (a newest-first list of what the agent did, with \"Show more\" and plain empty, offline and error states) and the cards for reviewing several approvals together (M1-11s-a, M1-11s-a-b, M1-11c-a1, M1-35b-b). The pages are merged but not yet served by the released CLI, and the other pages are still placeholders. Not available."
+      - name: "Local app pages (in 0.3.0, releasing)"
+        state: done
+        prs: [407, 428, 417, 500, 418, 429, 430, 432, 520, 542, 547, 549]
+        summary: "The styled local app is merged on main and is in 0.3.0 (releasing, not yet published): `agentlink ui` opens it in your browser from your own terminal, with the shell and a seven-item navigation, the Activity page, the Proofs and credits page (your proofs and your credits as proofs left), the Contacts page (safety-code check, rename, remove), the Files page (allowed folders, with every warning shown and ticked before you confirm) and the Rules page, all changed only with your passkey or owner code. First run: one Touch ID or passkey sets up your owner, agent profile and first rule, then shows your backup code once. Adding credits from the page is not merged yet (M1-11c-a1 to a5, M1-11b-9, M1-UX-FIRSTRUN-V2, M1-UX-FIRSTRUN-V2-b, M1-11b-8)."
       - name: "Claude Desktop extension"
         state: in-progress
         prs: [514, 517]
@@ -455,9 +455,9 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). No released CLI version uses it yet. The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-inProgress: "v0.2.0 is on npm `latest` and a GitHub release. It adds setup for Cursor and Windsurf with `init`, free test credits on a first proof, receipts covered by the sender's proof fee, delivery receipts off by default with plain notices on what a proof makes public, offers and accepts recorded with proof under one approval, Gnosis Chiado chosen automatically next to Base Sepolia, stricter checks on owner-signed messages, a fresh link for an expired stored file, and one-click Claude Desktop bundles signed by 4thTech. The first-run screen and the Activity page of the local app are in the package but the command line does not open them yet. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23)."
-notYet: "the local app served by the command line (0.3.0), the Proofs and credits, Contacts, Files and Rules pages, the pay page for adding credits, backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.2.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`."
-next: "Ship 0.3.0 with a usable local app (`agentlink ui`, Activity, Proofs and credits, Contacts, Files, Rules), run the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
+inProgress: "v0.2.0 is on npm `latest` and a GitHub release. **In 0.3.0 (releasing, not yet published):** the local app is merged on main. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Until 0.3.0 is published, v0.2.0 is what you can install. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23)."
+notYet: "adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), backup and restore commands, the owner console, desktop apps and the cloud agent. They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.2.0 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; install it with `npx -y @4thtech-io/agentlink init`. The local app pages are in 0.3.0 (releasing) and are not in v0.2.0."
+next: "Publish 0.3.0 with the local app, run the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
 # docs-site wording, `progress` an optional README note on what is done so far.
