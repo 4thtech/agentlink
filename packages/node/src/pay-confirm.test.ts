@@ -1007,7 +1007,9 @@ describe('M1-PAY-CONFIRM-b: "Remember for this contact" in one gesture (06 §3; 
     const page = await h.page();
     addAction(h, 1, remembered('0.123', ['proofs.perActionMaxUSD']));
     const b = await begin(h, page, { flow: 'proof', approvalId: approvalId(1), remember: true });
-    h.policy.current['contactRules'] = [{ contact: CONTACT, proofs: { notarize: 'deny' } }];
+    (h.policy.current as Record<string, JsonValue>)['contactRules'] = [
+      { contact: CONTACT, proofs: { notarize: 'deny' } },
+    ];
     const res = await finishPasskey(
       h,
       page,

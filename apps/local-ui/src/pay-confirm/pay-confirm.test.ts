@@ -65,8 +65,7 @@ function server(answers: Record<string, unknown[]>) {
     });
     const queue = answers[url] ?? [];
     const next = (queue.length > 1 ? queue.shift() : queue[0]) as
-      | { status: number; body: unknown }
-      | undefined;
+      { status: number; body: unknown } | undefined;
     const a = next ?? { status: 404, body: {} };
     return Promise.resolve(
       new Response(JSON.stringify(a.body), {
@@ -149,6 +148,8 @@ async function open(
   });
   const onDone = vi.fn();
   const onClose = vi.fn();
+  // A new sheet each time (a fresh begin).
+  act(() => root.render(null));
   act(() =>
     root.render(
       createElement<PayConfirmProps>(PayConfirm, {
@@ -174,7 +175,11 @@ describe('begin: the page names the flow, the server states it', () => {
     const { srv, auth } = await open({ [BEGIN]: [ok(READY)] });
     const call = srv.calls[0];
     expect(call?.url).toBe(BEGIN);
-    expect(decodeInput(call)).toEqual({ flow: 'limits', review: 'ab'.repeat(32), acknowledged: [] });
+    expect(decodeInput(call)).toEqual({
+      flow: 'limits',
+      review: 'ab'.repeat(32),
+      acknowledged: [],
+    });
     expect(call?.headers.get('x-agentlink-csrf')).toBe('t0ken');
     expect(call?.body.length).toBe(0);
     const dialog = document.querySelector('[role="dialog"]');
@@ -284,7 +289,9 @@ describe('finish with the backup code (D-132 decision 2)', () => {
       ],
     });
     await click(buttonNamed(P.useBackup));
-    const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]');
+    const input = document.querySelector<HTMLInputElement>(
+      '[role="dialog"] input[type="password"]',
+    );
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     act(() => {
       setter?.call(input, 'ABCD-EFGH');

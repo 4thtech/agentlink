@@ -187,12 +187,26 @@ export function parsePasskeyAssertion(bytes: Uint8Array): PasskeyAssertion {
   return Object.freeze({ credentialId, authenticatorData, userHandle, prfOutput });
 }
 
-/** The registration body: the owner code (16-bit big-endian length first), then the assertion. */
+/**
+ * The registration body: the owner code (16-bit big-endian length first), then the assertion, then
+ * (M1-PAY-CONFIRM-b) optionally the `create()` response's authenticator data as a fifth field, also
+ * length-prefixed. The page sends it when the authenticator evaluates PRF only on use, so the
+ * assertion comes from a second gesture whose authenticator data carries no credential public key.
+ */
 export function encodePasskeyRegistration(
   ownerSecret: Uint8Array,
   assertion: PasskeyAssertion,
+  options: { readonly creationAuthenticatorData?: Uint8Array } = {},
 ): Uint8Array {
-  const body = encodePasskeyAssertion(assertion);
+  const fields = encodePasskeyAssertion(assertion);
+  const creation =
+    options.creationAuthenticatorData === undefined
+      ? new Uint8Array(0)
+      : encodeFields([options.creationAuthenticatorData]);
+  const body = new Uint8Array(fields.length + creation.length);
+  body.set(fields, 0);
+  body.set(creation, fields.length);
+  wipe(fields);
   try {
     const out = new Uint8Array(2 + ownerSecret.length + body.length);
     out.set(u16(ownerSecret.length), 0);
@@ -211,6 +225,8 @@ export function encodePasskeyRegistration(
 export function parsePasskeyRegistration(bytes: Uint8Array): {
   readonly ownerSecret: Uint8Array;
   readonly assertion: PasskeyAssertion;
+  /** M1-PAY-CONFIRM-b: the `create()` authenticator data, when the page sent it (fifth field). */
+  readonly creationAuthenticatorData?: Uint8Array;
 } {
   if (bytes.length < 2) throw presenceRequired();
   const length = ((bytes[0] as number) << 8) | (bytes[1] as number);
@@ -219,11 +235,37 @@ export function parsePasskeyRegistration(bytes: Uint8Array): {
   }
   const ownerSecret = bytes.slice(2, 2 + length);
   try {
-    return { ownerSecret, assertion: parsePasskeyAssertion(bytes.subarray(2 + length)) };
+    const rest = bytes.subarray(2 + length);
+    const end = fieldsEnd(rest, 4);
+    const assertion = parsePasskeyAssertion(rest.subarray(0, end));
+    if (end === rest.length) return { ownerSecret, assertion };
+    let creation: Uint8Array;
+    try {
+      [creation] = decodeFields(rest.subarray(end), 1) as [Uint8Array];
+    } catch (error) {
+      wipe(assertion.prfOutput);
+      throw error;
+    }
+    if (creation.length < MIN_AUTH_DATA || creation.length > MAX_AUTH_DATA) {
+      wipe(assertion.prfOutput);
+      throw presenceRequired();
+    }
+    return { ownerSecret, assertion, creationAuthenticatorData: creation };
   } catch (error) {
     wipe(ownerSecret);
     throw error;
   }
+}
+
+/** Where `count` length-prefixed fields end in `bytes` (`presence_required` when they don't fit). */
+function fieldsEnd(bytes: Uint8Array, count: number): number {
+  let at = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (at + 2 > bytes.length) throw presenceRequired();
+    at += 2 + (((bytes[at] as number) << 8) | (bytes[at + 1] as number));
+    if (at > bytes.length) throw presenceRequired();
+  }
+  return at;
 }
 
 /** rpIdHash = SHA-256("localhost") and flags UP and UV set (proposed, owner confirms at merge). */
@@ -297,6 +339,13 @@ export function assertPasskeyAssertion(
 
 export interface RegisterOwnerPasskeyOptions {
   readonly timeoutMs?: number;
+  /**
+   * M1-PAY-CONFIRM-b: the `create()` response's authenticator data, when the assertion came from a
+   * second gesture (PRF only on use). The credential public key is kept from it (rule 5) when its
+   * rpIdHash is this page's and its attested credential is the asserted one; otherwise no key is
+   * kept, as before, and paid actions use the backup code.
+   */
+  readonly creationAuthenticatorData?: Uint8Array;
 }
 
 /**
@@ -370,7 +419,16 @@ export async function registerOwnerPasskey(
     // The stored blob opens with this passkey's PRF output to this owner.
     check = await openPasskeySeed(back, prf, { expectedOwnerNostr: owner.ownerNostr });
     // M1-PAY-CONFIRM-a (rule 5): keep the credential public key for paid-action confirmations.
-    await storeOwnerPasskeyKey(keychain, credentialId, assertion.authenticatorData, timeoutMs);
+    // M1-PAY-CONFIRM-b: from the create() data when the assertion was a second gesture; that data
+    // must name this page (rpIdHash) and the asserted credential (checked when the key is read).
+    const creation = options.creationAuthenticatorData;
+    const keyFrom =
+      creation !== undefined &&
+      creation.length >= MIN_AUTH_DATA &&
+      equalBytes(creation.subarray(0, 32), sha256(encodeUtf8(PASSKEY_RP_ID)))
+        ? creation
+        : assertion.authenticatorData;
+    await storeOwnerPasskeyKey(keychain, credentialId, keyFrom, timeoutMs);
   } finally {
     wipe(ownerSecret, prf, alko, seed, back, check);
   }

@@ -120,6 +120,7 @@ import {
   buildPayConfirmFlow,
   isPaidPendingAction,
   policySetSpendingChanges,
+  rememberContactRules,
   type OwnerActionOutcome,
   type PayConfirmFlow,
 } from '@4thtech-io/core';
@@ -229,8 +230,11 @@ const MAX_PORT_ATTEMPTS = 5;
 const NO_IPV6 = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT']);
 /** Longest accepted owner secret in bytes (the same bound as the TTY prompt). */
 const MAX_SECRET_BYTES = 1024;
-/** Longest accepted passkey body (assertion, or owner code plus assertion), M1-8e. */
-const MAX_PASSKEY_BYTES = 4096;
+/**
+ * Longest accepted passkey body (assertion, or owner code plus assertion), M1-8e; M1-PAY-CONFIRM-b
+ * adds room for the create() authenticator data a registration may carry.
+ */
+const MAX_PASSKEY_BYTES = 6144;
 const PASSKEY_PATH = '/api/owner/passkey';
 const NOTIFICATION = ['AgentLink', 'An approval is waiting for you.'] as const;
 const REVIEW_PATH = '/api/approvals/review';
@@ -394,6 +398,12 @@ export interface PendingApprovalView {
   readonly expiresAt: number;
   /** A commitment (D-31): decided alone. */
   readonly commitment: boolean;
+  /**
+   * M1-PAY-CONFIRM-b: the request carries a fee (core `isPaidPendingAction`): never a list item,
+   * approved only through the confirmation sheet (04 §2.5.3 rule 7). A display flag only: the
+   * server enforces the rule from the stored action whatever the page shows.
+   */
+  readonly paid?: boolean;
   /** M1-11a: the card's facts; without them the page shows the summary only. */
   readonly details?: ApprovalDetails;
 }
@@ -547,6 +557,8 @@ export type ApprovalServerEvent =
         | 'verification_required'
         /** Rule 5: the passkey has no stored credential key; use the backup code. */
         | 'passkey_update_needed'
+        /** M1-PAY-CONFIRM-b: "Remember for this contact" is not offered for this request (06 §3). */
+        | 'not_offered'
         | 'tries_exhausted'
         | 'refused'
         | 'failed';
@@ -807,10 +819,8 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
 /** The view sent to the page: only checked, structured fields; never the action. */
 function view(item: unknown): PendingApprovalView | undefined {
   if (typeof item !== 'object' || item === null) return undefined;
-  const { approvalId, summary, actionDigest, expiresAt, commitment, details } = item as Record<
-    string,
-    unknown
-  >;
+  const { approvalId, summary, actionDigest, expiresAt, commitment, details, paid } =
+    item as Record<string, unknown>;
   if (typeof approvalId !== 'string' || !APPROVAL_ID.test(approvalId)) return undefined;
   if (typeof summary !== 'string' || summary.length === 0) return undefined;
   if (typeof actionDigest !== 'string' || !DIGEST.test(actionDigest)) return undefined;
@@ -824,6 +834,10 @@ function view(item: unknown): PendingApprovalView | undefined {
     actionDigest,
     expiresAt,
     commitment,
+    // M1-PAY-CONFIRM-b: from the stored action when the source gives it (one request), else the
+    // source's flag (the list carries no action).
+    paid:
+      'action' in item ? isPaidPendingAction((item as { action: unknown }).action) : paid === true,
     ...(facts === undefined ? {} : { details: facts }),
   };
 }
@@ -1383,10 +1397,16 @@ export async function startApprovalServerWith(
           finishPasskey(res, 503, 'needs_setup');
           return;
         }
-        const { ownerSecret, assertion } = parsed;
+        const { ownerSecret, assertion, creationAuthenticatorData } = parsed;
         parsed = undefined; // registerOwnerPasskey wipes the code and the PRF output
         try {
-          await registerOwnerPasskey(keychainOf(), context.owner, ownerSecret, assertion);
+          await registerOwnerPasskey(
+            keychainOf(),
+            context.owner,
+            ownerSecret,
+            assertion,
+            creationAuthenticatorData === undefined ? {} : { creationAuthenticatorData },
+          );
         } catch (error) {
           const code = (error as { code?: unknown } | null)?.code;
           if (code === 'owner_passkey_exists') finishPasskey(res, 409, 'passkey_exists');
@@ -1719,10 +1739,100 @@ export async function startApprovalServerWith(
       }
     }
     return {
-      target: { kind: 'proof', approvalId },
+      target: { kind: 'proof', approvalId, remember: false },
       flow,
       requests: [{ kind: 'owner-action', action: body }],
     };
+  };
+
+  /**
+   * M1-PAY-CONFIRM-b: "Remember for this contact" (06 §3; 04 §2.5.3 rule 2): the proof approval
+   * and the contact's proof rule in one gesture. The rule comes from core `rememberContactRules`
+   * over the policy in force and the stored request, never from the page; core prepares the
+   * complete unsigned `policy.set` and `buildPayConfirmFlow` checks it changes nothing else. At
+   * finish (`signed`) the held bodies are checked against the policy and request as they are now.
+   */
+  const rememberFlow = async (
+    approvalId: string,
+    context: ApprovalContext,
+    signed?: readonly OwnerSignRequest[],
+  ): Promise<BuiltFlow> => {
+    const decide = signed?.[0];
+    const plain = await proofFlow(
+      approvalId,
+      context,
+      decide?.kind === 'owner-action' ? decide.action : undefined,
+    );
+    if (typeof plain === 'string') return plain;
+    const entry = await source.get(approvalId);
+    const current = await policyInForce();
+    if (entry === undefined) return 'not_pending';
+    if (current === undefined) return 'refused';
+    let rules: ReturnType<typeof rememberContactRules>;
+    try {
+      rules = rememberContactRules(current.policy as never, entry.action);
+    } catch {
+      return 'refused';
+    }
+    if (rules === null) return 'not_offered';
+    let policySet: JsonObject;
+    if (signed !== undefined) {
+      const held = signed[1];
+      if (held?.kind !== 'owner-action') return 'changed';
+      policySet = held.action;
+    } else {
+      const client = options.localUi?.client;
+      if (client === undefined) return 'refused';
+      let prepared: Awaited<ReturnType<typeof client.ownerActions.preparePolicyEdit>>;
+      try {
+        prepared = await client.ownerActions.preparePolicyEdit(
+          { contactRules: rules },
+          { baseVersion: current.version },
+        );
+      } catch {
+        return 'refused';
+      }
+      if (prepared.status !== 'prepared') {
+        return prepared.reason === 'stale_version' ? 'changed' : 'refused';
+      }
+      // D-109: receipts on from an older default are a question only the Rules page asks.
+      if (prepared.askKeepDeliveryReceipts) return 'not_offered';
+      policySet = prepared.body as unknown as JsonObject;
+    }
+    let flow: PayConfirmFlow;
+    try {
+      flow = buildPayConfirmFlow({
+        kind: 'proof_remember',
+        pendingAction: entry.action,
+        counterpartyName: plain.flow.statement.counterparty,
+        before: current.policy as never,
+        policySet,
+      });
+    } catch (error) {
+      if (signed !== undefined) return 'changed';
+      return error instanceof PayConfirmError && error.reason === 'remember_not_offered'
+        ? 'not_offered'
+        : 'refused';
+    }
+    const decideRequest = plain.requests[0];
+    if (decideRequest === undefined) return 'refused';
+    return {
+      target: { kind: 'proof', approvalId, remember: true },
+      flow,
+      requests: [decideRequest, { kind: 'owner-action', action: policySet }],
+    };
+  };
+
+  /** M1-PAY-CONFIRM-b: whether the sheet may offer "Remember for this contact" for a request. */
+  const rememberOffered = async (approvalId: string): Promise<boolean> => {
+    try {
+      const entry = await source.get(approvalId);
+      const current = await policyInForce();
+      if (entry === undefined || current === undefined) return false;
+      return rememberContactRules(current.policy as never, entry.action) !== null;
+    } catch {
+      return false;
+    }
   };
 
   /** A limits change's flow from the policy in force and the body the page reviewed. */
@@ -1764,10 +1874,13 @@ export async function startApprovalServerWith(
     input: JsonValue | undefined,
     context: ApprovalContext,
   ): Promise<BuiltFlow> => {
-    if (onlyKeys(input, ['flow', 'approvalId']) && input['flow'] === 'proof') {
+    if (onlyKeys(input, ['flow', 'approvalId', 'remember']) && input['flow'] === 'proof') {
       const approvalId = input['approvalId'];
       if (typeof approvalId !== 'string' || !APPROVAL_ID.test(approvalId)) return 'invalid';
-      return proofFlow(approvalId, context);
+      // M1-PAY-CONFIRM-b: "Remember for this contact" is asked for with exactly `true`.
+      const remember = input['remember'];
+      if (remember !== undefined && remember !== true) return 'invalid';
+      return remember === true ? rememberFlow(approvalId, context) : proofFlow(approvalId, context);
     }
     if (onlyKeys(input, ['flow', 'review', 'acknowledged']) && input['flow'] === 'limits') {
       const reviewed = takeReviewedRules(uiContext, input['review'], input['acknowledged']);
@@ -1782,7 +1895,9 @@ export async function startApprovalServerWith(
     const signed = hold.requests[0];
     if (signed?.kind !== 'owner-action') return 'changed';
     if (hold.target.kind === 'proof') {
-      return proofFlow(hold.target.approvalId, context, signed.action);
+      return hold.target.remember
+        ? rememberFlow(hold.target.approvalId, context, hold.requests)
+        : proofFlow(hold.target.approvalId, context, signed.action);
     }
     return limitsFlow(signed.action, hold.target.keepDeliveryReceipts);
   };
@@ -1874,6 +1989,13 @@ export async function startApprovalServerWith(
       finishPay(res, 200, 'ready', {
         ceremony: hold.id,
         statement: hold.statement as unknown as JsonValue,
+        // M1-PAY-CONFIRM-b: the sheet offers "Remember for this contact" only when core would.
+        ...(built.target.kind === 'proof'
+          ? {
+              rememberOffered:
+                built.target.remember || (await rememberOffered(built.target.approvalId)),
+            }
+          : {}),
         expiresInMs: PAY_CONFIRM_TTL_MS,
         publicKey: {
           rpId: PASSKEY_RP_ID,

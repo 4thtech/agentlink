@@ -26,6 +26,9 @@ export const NEVER_SAY: readonly (readonly [name: string, pattern: RegExp])[] = 
   ['encryption key', /\bdecrypt\w*\b|\bencryption keys?\b/i],
   ['loopback address', /127\.0\.0\.1/],
   ['address', /\baddress\b/i],
+  // M1-PAY-CONFIRM-b (b11 §19.6): AgentLink is not a bank, and credits are not a payment method.
+  ['bank', /\bbank(s|ing)?\b/i],
+  ['payment method', /\bpayment methods?\b|\bbalance top-ups?\b/i],
 ];
 
 export interface LintOptions {

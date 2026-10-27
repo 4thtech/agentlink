@@ -120,6 +120,8 @@ describe('ProofsPage', () => {
     expect(big?.textContent).toBe('48 proofs left');
     expect(card?.textContent).toContain('$4.80');
     expect(card?.textContent).toContain(PROOFS_STRINGS.testCredits);
+    // M1-PAY-CONFIRM-b (b11 §19.4): the trust line under the credits.
+    expect(card?.textContent).toContain('Your credits stay yours; 4thTech never holds them.');
     expect(card?.textContent).toContain(PROOFS_STRINGS.addCreditsNotAvailable);
     // The price comes from the server (core's schedule), never a literal in the page.
     expect(text()).toContain(priceLine('$0.25'));

@@ -17,6 +17,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -37,6 +38,12 @@ import {
   type RulesView,
 } from './data.js';
 import { createOwnerClient, type OwnerClient, type PasskeyInfo, type SaveAnswer } from './owner.js';
+import {
+  PayConfirm,
+  createPayConfirmClient,
+  type PayConfirmClient,
+  type PayConfirmInput,
+} from '../../pay-confirm/index.js';
 import { RULES_STRINGS as S } from './strings.js';
 import { warningText } from './warnings.js';
 import './rules.css';
@@ -56,6 +63,11 @@ interface Confirm {
   readonly passkey: PasskeyInfo | null;
   readonly busy: boolean;
   readonly error?: string;
+  /**
+   * M1-PAY-CONFIRM-b (04 §2.5.3 table; D-132): the edit changes a spending limit, so it is
+   * confirmed on the confirmation sheet with the platform check, not by the ordinary save.
+   */
+  readonly spending: boolean;
 }
 
 type Step = { readonly kind: 'edit' } | { readonly kind: 'preparing' } | Confirm;
@@ -68,7 +80,11 @@ interface Notice {
 export interface RulesPageProps {
   readonly api?: ApiClient;
   readonly owner?: OwnerClient;
+  readonly payConfirm?: PayConfirmClient;
 }
+
+/** The spending fields of the proofs section (04 §2.5.3 "Which actions"). */
+const SPENDING_FIELDS = ['notarize', 'dailyBudgetUSD', 'perActionMaxUSD'] as const;
 
 function Row({
   title,
@@ -99,9 +115,12 @@ function Row({
 
 const unique = (codes: readonly string[]): string[] => [...new Set(codes)];
 
-export function RulesPage({ api, owner }: RulesPageProps = {}): ReactElement {
+export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): ReactElement {
   const client = useMemo(() => api ?? createApiClient(), [api]);
   const ownerClient = useMemo(() => owner ?? createOwnerClient(), [owner]);
+  const payClient = useMemo(() => payConfirm ?? createPayConfirmClient(), [payConfirm]);
+  const [sheet, setSheet] = useState<PayConfirmInput | undefined>(undefined);
+  const sheetDone = useRef(false);
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [draft, setDraft] = useState<Draft | undefined>(undefined);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -157,6 +176,7 @@ export function RulesPage({ api, owner }: RulesPageProps = {}): ReactElement {
       return;
     }
     const passkey = step.kind === 'confirm' ? step.passkey : await ownerClient.passkey();
+    const proofs = checked.patch['proofs'] ?? {};
     setCode('');
     setStep({
       kind: 'confirm',
@@ -165,8 +185,38 @@ export function RulesPage({ api, owner }: RulesPageProps = {}): ReactElement {
       keep: keep ?? false,
       passkey,
       busy: false,
+      spending: SPENDING_FIELDS.some((f) => proofs[f] !== undefined),
     });
   };
+
+  /** M1-PAY-CONFIRM-b: a spending change opens the sheet with the review the owner ticked. */
+  const confirmSpending = (confirm: Confirm): void => {
+    sheetDone.current = false;
+    setSheet({
+      flow: 'limits',
+      review: confirm.review.review,
+      acknowledged: unique(confirm.review.warnings.map((w) => w.code)),
+    });
+  };
+  const onSheetDone = async (): Promise<void> => {
+    sheetDone.current = true;
+    await reload();
+    setNotice({ tone: 'success', text: S.saved });
+  };
+  const onSheetClose = (): void => {
+    setSheet(undefined);
+    // The begin took the review: a new one, so the owner can try again.
+    if (!sheetDone.current && step.kind === 'confirm') void prepare(step.keep);
+  };
+  const sheetView =
+    sheet === undefined ? null : (
+      <PayConfirm
+        client={payClient}
+        input={sheet}
+        onDone={() => void onSheetDone()}
+        onClose={onSheetClose}
+      />
+    );
 
   const save = async (confirm: Confirm): Promise<void> => {
     setStep({ ...confirm, busy: true });
@@ -270,9 +320,10 @@ export function RulesPage({ api, owner }: RulesPageProps = {}): ReactElement {
             setStep({ ...rest, acks });
           }}
           onKeep={(keep) => void prepare(keep)}
-          onSave={() => void save(step)}
+          onSave={() => (step.spending ? confirmSpending(step) : void save(step))}
           onBack={() => setStep({ kind: 'edit' })}
         />
+        {sheetView}
       </>
     );
   }
@@ -561,7 +612,8 @@ function ConfirmStep({
 }): ReactElement {
   const codes = unique(confirm.review.warnings.map((w) => w.code));
   const allAcked = codes.every((c) => confirm.acks.has(c));
-  const ready = allAcked && !confirm.busy && (confirm.passkey !== null || code.length > 0);
+  const ready =
+    allAcked && !confirm.busy && (confirm.spending || confirm.passkey !== null || code.length > 0);
   return (
     <section className="rl-group rl-confirm" aria-labelledby="rules-confirm">
       <h2 id="rules-confirm" className="al-text-title-3">
@@ -600,7 +652,7 @@ function ConfirmStep({
             onChange={onKeep}
           />
         ) : null}
-        {confirm.passkey === null ? (
+        {confirm.passkey === null && !confirm.spending ? (
           <TextField
             label={S.codeLabel}
             hint={`${S.codeHint} ${EARLIER_OWNER_CODE_HINT}`}
@@ -622,11 +674,15 @@ function ConfirmStep({
           </Button>
           <Button
             variant="primary"
-            {...(confirm.passkey === null ? {} : { icon: 'approval' })}
+            {...(confirm.passkey === null || confirm.spending ? {} : { icon: 'approval' })}
             disabled={!ready}
             onClick={onSave}
           >
-            {confirm.passkey === null ? S.saveCode : S.save}
+            {confirm.spending
+              ? S.continueToConfirm
+              : confirm.passkey === null
+                ? S.saveCode
+                : S.save}
           </Button>
         </div>
         {confirm.busy ? (

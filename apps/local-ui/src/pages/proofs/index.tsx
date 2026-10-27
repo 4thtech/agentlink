@@ -7,7 +7,7 @@
 // "Withdraw credits" returns credits to the agent's own account; both changes are owner operations
 // behind a confirm screen and the owner code (top-up.tsx). Elsewhere the not-available line stays.
 // On load the page only reads.
-import { Button, EmptyState, Icon, ProofBadge } from '@4thtech-io/ui';
+import { Button, EmptyState, Icon, PAY_CONFIRM_STRINGS, ProofBadge } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { AddCreditsPanel, ConfirmMove, type Move } from './top-up.js';
@@ -132,6 +132,8 @@ function CreditsCard({
       </div>
       {credits.partial ? <p className="al-text-caption al-muted">{S.creditsPartial}</p> : null}
       {credits.test ? <p className="al-text-caption al-muted">{S.testCredits}</p> : null}
+      {/* M1-PAY-CONFIRM-b (b11 §19.4; D-132): under the credits, small. */}
+      <p className="al-text-caption al-muted">{PAY_CONFIRM_STRINGS.trustCredits}</p>
       {credits.test && credits.proofsLeft === 0 ? (
         <p className="al-text-caption al-muted">{S.firstProofFree}</p>
       ) : null}

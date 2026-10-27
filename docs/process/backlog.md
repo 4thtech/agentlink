@@ -6795,7 +6795,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): a missing UV flag, a reused or expired challenge, a changed amount, limit or contact after begin, a statement amount other than the pending request's `context.fee.usd`, a "Remember for this contact" `policy.set` not in the challenge, an `approval.decideBatch` containing a paid item, and a statement built from a URL or tool value are each refused; a policy change without a spending field keeps the ordinary prompt; no MCP tool or CLI flag reaches begin or finish; threat note; independent review and Fable audit (S2).
 
 #### M1-PAY-CONFIRM-b · local UI: the confirmation sheet, the credits line and receipt rows (new, D-132)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence UI on a money path) · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence UI on a money path) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/**` (approval card, Rules spending fields, Proofs & credits, Activity), `packages/ui` (sheet, ring, check), `docs/design/d1/tokens/tokens.css` (the §14 tokens approved in D-132), tests, its `changelog.d/` fragment
 - **Depends on:** M1-PAY-CONFIRM-a; approved screens for brief §19 recorded in `docs/design/README.md` (D-116)
 - **Spec:** `docs/design/b11-local-app.md` §13 to §15, §19; 08 §1; 11 §5, §10, §11; D-132

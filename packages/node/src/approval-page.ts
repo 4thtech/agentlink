@@ -25,8 +25,12 @@
 //   list again and leaves out what is no longer waiting, says so, and shows "This covers exactly
 //   these n"; then one passkey gesture or one owner code entry signs exactly those items.
 // - One request (`/approve/<id>`): its card with Approve and Deny, then presence.
-// - "Remember for this contact" is not offered yet (it needs the per-contact rules of G-32); it is
-//   never part of the list's single confirmation (04 §2.5.2).
+// - M1-PAY-CONFIRM-b (04 §2.5.3; b11 §19, §20; D-132): a request that costs credits (`paid`) is
+//   never a list item; its card has its own Approve, which opens the confirmation sheet: a modal
+//   dialog showing only the statement the server returned for it, the platform's check ("Confirm
+//   with Touch ID"), the backup code as a small link, and "Remember for this contact" when core
+//   offers it (both bodies in one challenge). The sheet's words are PAY_* below, the same as
+//   @4thtech-io/ui PAY_CONFIRM_STRINGS (a test there compares them).
 
 import { CLI_COMMAND } from './cli-command.js';
 
@@ -128,6 +132,68 @@ export const UI_STRINGS = Object.freeze({
   passkeyExists: 'A passkey is already set up for approvals on this computer.',
   passkeyUnsupported: "This passkey can't protect approvals here. Keep using your owner code.",
   passkeyFailed: 'The passkey was not set up. Nothing was changed.',
+  // M1-PAY-CONFIRM-b: a request that costs credits, and the confirmation sheet (b11 §19.6).
+  paidAlone: 'Costs {cost}. Approve it on its own.',
+  listPaid:
+    'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',
+  confirmRequired: 'This costs credits. Approve it on its own card. Nothing was changed.',
+  payTitleProof: 'Record proof',
+  payTitleLimits: 'Change your spending limits',
+  payRowFor: 'For',
+  payForProof: 'A proof with {name}',
+  payForSelf: 'A proof of your own note',
+  payRowPaidFrom: 'Paid from',
+  payPaidFrom: 'Your credits',
+  payChangeProofs: 'Proofs',
+  payChangeBudget: '24-hour budget',
+  payChangePerProof: 'Per-proof limit',
+  payChangeContactProofs: 'Proofs for {name}',
+  payChangeContactPerProof: 'Per-proof limit for {name}',
+  payAContact: 'a contact',
+  payNotSet: 'Not set',
+  payRuleAllow: 'Automatic',
+  payRuleApproval: 'Ask me',
+  payRuleDeny: 'Never',
+  payChangedTo: '{old} to {new}',
+  payTrustCredits: 'Your credits stay yours; 4thTech never holds them.',
+  payTrustAi: "Your AI can't confirm this for you.",
+  payRemember: 'Remember for this contact',
+  payRememberHint: 'Next time, proofs like this for {name} run without asking.',
+  payConfirmMac: 'Confirm with Touch ID',
+  payConfirmWindows: 'Confirm with Windows Hello',
+  payConfirmOther: 'Confirm with your passkey',
+  payWaitingMac: 'Waiting for Touch ID',
+  payWaitingWindows: 'Waiting for Windows Hello',
+  payWaitingOther: 'Waiting for your passkey',
+  payCancel: 'Cancel',
+  payUseBackup: 'Use backup code instead',
+  payCodeLabel: 'Backup code',
+  payCodeHint: 'The backup code AgentLink showed you when you set up.',
+  payConfirmCode: 'Confirm',
+  payClose: 'Close',
+  payRecordingProof: 'Confirming…',
+  payRecordingLimits: 'Saving your limits…',
+  payDoneProof: 'Done. Your AI records the proof now.',
+  payDoneLimits: 'Done. Your limits are saved.',
+  payCancelled: 'Not confirmed. Nothing was paid.',
+  payNotVerified: "Couldn't confirm it was you. Try again.",
+  payExpired: 'This request expired.',
+  payDecided: 'Already decided on another screen.',
+  payChanged: 'Something changed since you opened this. Check it again.',
+  payUpdateNeeded:
+    'Your passkey needs to be set up again for paid actions. Use your backup code this time.',
+  payWrongCode: "That backup code didn't match. Nothing was paid.",
+  payTriesUsed: 'Too many wrong backup codes. Nothing was paid.',
+  payWait: 'Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was paid.',
+  payBusy: 'Another confirmation is running. Try again in a moment.',
+  payStillWorking: "Still working. Your AI will let you know when it's done. You can close this.",
+  payRefusedProof: "Couldn't approve this. Nothing was paid.",
+  payRefusedLimits: "Couldn't save your limits. Nothing changed.",
+  payFailedStart: "This can't be confirmed right now. Nothing was paid.",
+  payNotOffered: "Remembering isn't available for this request.",
+  payCents: '{cents} cents',
+  payDollars: '{dollars} dollars',
+  payDollarsCents: '{dollars} dollars and {cents} cents',
 });
 
 /** Options for the page shell. */
@@ -401,8 +467,20 @@ const SCRIPT = String.raw`
         return body;
       }
       if (!prf.enabled) return null;
-      // PRF is supported but only evaluated when the passkey is used: one more gesture.
-      return assertionBody(bytes(credential.rawId));
+      // PRF is supported but only evaluated when the passkey is used: one more gesture. That
+      // get() carries no credential key, so the create() authenticator data goes along as a fifth
+      // field (M1-PAY-CONFIRM-b): the server keeps the key from it for paid actions (rule 5).
+      var creation = credential.response.getAuthenticatorData
+        ? bytes(credential.response.getAuthenticatorData()) : new Uint8Array(0);
+      return assertionBody(bytes(credential.rawId)).then(function (body) {
+        if (creation.length < 37) return body;
+        var extra = fields([creation]);
+        var out = new Uint8Array(body.length + extra.length);
+        out.set(body, 0);
+        out.set(extra, body.length);
+        body.fill(0);
+        return out;
+      });
     });
   }
   function hasPasskey() { return canPasskey && passkey && passkey.registered; }
@@ -416,7 +494,8 @@ const SCRIPT = String.raw`
     changed: S.changed,
     busy: S.busy,
     refused: S.refused,
-    needs_setup: S.needsSetup
+    needs_setup: S.needsSetup,
+    confirm_required: S.confirmRequired
   };
   var LIST_RESULT = {
     presence_required: S.presenceRequired,
@@ -424,6 +503,7 @@ const SCRIPT = String.raw`
     not_pending: S.listNotPending,
     changed: S.listChanged,
     commitment: S.listTerms,
+    paid_item_in_batch: S.listPaid,
     busy: S.busy,
     refused: S.listRefused,
     invalid: S.listRefused,
@@ -497,6 +577,9 @@ const SCRIPT = String.raw`
     var box = el('section');
     cardBody(item, box);
     if (item.commitment) box.appendChild(el('p', S.termsAlone, 'al-note'));
+    if (item.paid) {
+      box.appendChild(el('p', fmt(S.paidAlone, { cost: (item.details && item.details.cost) || '' }), 'al-note'));
+    }
     // Results and the presence step go here, above the footer.
     var slot = el('div', null, 'al-slot');
     box.appendChild(slot);
@@ -506,7 +589,17 @@ const SCRIPT = String.raw`
       ['deny', 'approve'].forEach(function (decision) {
         var b = button(decision === 'approve' ? S.approve : S.deny,
           decision === 'approve' ? 'al-btn-primary al-btn-lg' : 'al-btn-lg');
-        b.addEventListener('click', function () { confirmStep(item, decision, slot, actions); });
+        b.addEventListener('click', function () {
+          // M1-PAY-CONFIRM-b: approving a request that costs credits is the confirmation sheet's.
+          if (item.paid && decision === 'approve') {
+            paySheet({ flow: 'proof', approvalId: item.approvalId }, function () {
+              actions.hidden = true;
+              say(slot, S.approved);
+            });
+            return;
+          }
+          confirmStep(item, decision, slot, actions);
+        });
         actions.appendChild(b);
       });
       slot.appendChild(actions);
@@ -747,7 +840,7 @@ const SCRIPT = String.raw`
         return picked;
       }
       shown.forEach(function (item) {
-        if (item.commitment || !ownerReady) { card(item, listHolder); return; }
+        if (item.commitment || item.paid || !ownerReady) { card(item, listHolder); return; }
         var box = el('section');
         cardBody(item, box);
         var group = el('div', null, 'al-choices');
@@ -798,7 +891,7 @@ const SCRIPT = String.raw`
       var live = {};
       (out.approvals || []).forEach(function (i) { live[i.approvalId] = i.actionDigest; });
       var kept = picked.filter(function (p) {
-        return live[p.item.approvalId] === p.item.actionDigest && !p.item.commitment;
+        return live[p.item.approvalId] === p.item.actionDigest && !p.item.commitment && !p.item.paid;
       });
       var dropped = picked.length - kept.length;
       if (dropped === 1) say(notices, S.droppedOne);
@@ -854,6 +947,407 @@ const SCRIPT = String.raw`
     }, function () { say(notices, S.notRunning); reopen(); });
   }
 
+  // --- M1-PAY-CONFIRM-b: the confirmation sheet for a paid action (b11 §19; 04 §2.5.3) ---------
+  //
+  // The page names the flow only; the server builds the statement from stored data and answers
+  // it with a fresh challenge (POST /api/ui/pay-confirm/begin). The sheet shows only that
+  // statement. One WebAuthn get() with that challenge and user verification required, or the
+  // backup code, then POST /api/ui/pay-confirm/finish. Every value is textContent (I-5).
+
+  var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var PAY_FIELDS = {
+    'proofs.notarize': 'rule', 'proofs.dailyBudgetUSD': 'usd', 'proofs.perActionMaxUSD': 'usd',
+    'contactRules.proofs.notarize': 'rule', 'contactRules.proofs.perActionMaxUSD': 'usd'
+  };
+  var USD = /^(0|[1-9][0-9]{0,8})(\.[0-9]{1,6})?$/;
+
+  function payPlatform() {
+    var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent || '';
+    return /mac/i.test(p) ? 'Mac' : /win/i.test(p) ? 'Windows' : 'Other';
+  }
+  function usdText(v) {
+    var parts = String(v).split('.');
+    var frac = parts[1] || '';
+    if (frac.length === 0) return '$' + parts[0];
+    while (frac.length < 2) frac += '0';
+    return '$' + parts[0] + '.' + frac;
+  }
+  function usdSpoken(v) {
+    var parts = String(v).split('.');
+    var dollars = parts[0];
+    var frac = ((parts[1] || '') + '00');
+    var cents = String(Number(frac.slice(0, 2))) + (frac.length > 4 && frac.slice(2).replace(/0+$/, '') ? '.' + frac.slice(2).replace(/0+$/, '') : '');
+    if (dollars === '0') return fmt(S.payCents, { cents: cents });
+    if (cents === '0') return fmt(S.payDollars, { dollars: dollars });
+    return fmt(S.payDollarsCents, { dollars: dollars, cents: cents });
+  }
+  /** The statement as the server returned it, checked; null when it is anything else. */
+  function payStatement(v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    var keys = Object.keys(v).sort().join(',');
+    if (keys !== 'amountUsd,changes,counterparty,kind,purpose,v' || v.v !== 1) return null;
+    if (v.kind !== 'proof' && v.kind !== 'proof_remember' && v.kind !== 'limits') return null;
+    if (v.kind === 'limits' ? v.amountUsd !== null || v.purpose !== 'limits_change' : typeof v.amountUsd !== 'string' || !USD.test(v.amountUsd) || v.purpose !== 'proof') return null;
+    if (v.counterparty !== null && (typeof v.counterparty !== 'string' || v.counterparty.length === 0 || v.counterparty.length > 200)) return null;
+    if (!Array.isArray(v.changes) || v.changes.length > 32) return null;
+    for (var i = 0; i < v.changes.length; i += 1) {
+      var c = v.changes[i];
+      if (!c || typeof c !== 'object' || !PAY_FIELDS[c.field]) return null;
+      var kind = PAY_FIELDS[c.field];
+      var okValue = function (x) {
+        return x === null || (typeof x === 'string' && (kind === 'usd' ? USD.test(x) : /^(allow|approval|deny)$/.test(x)));
+      };
+      if (!okValue(c.old) || !okValue(c['new'])) return null;
+    }
+    return v;
+  }
+  function payValue(field, value) {
+    if (value === null) return S.payNotSet;
+    if (PAY_FIELDS[field] === 'usd') return usdText(value);
+    return value === 'allow' ? S.payRuleAllow : value === 'approval' ? S.payRuleApproval : S.payRuleDeny;
+  }
+  function payChangeLabel(c, name) {
+    var who = name || S.payAContact;
+    if (c.field === 'proofs.notarize') return S.payChangeProofs;
+    if (c.field === 'proofs.dailyBudgetUSD') return S.payChangeBudget;
+    if (c.field === 'proofs.perActionMaxUSD') return S.payChangePerProof;
+    if (c.field === 'contactRules.proofs.notarize') return fmt(S.payChangeContactProofs, { name: who });
+    return fmt(S.payChangeContactPerProof, { name: who });
+  }
+  function svg(tag, attrs) {
+    var node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    Object.keys(attrs).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    return node;
+  }
+  /** The ring (waiting, recording) that closes into a check (done). Vector strokes only. */
+  function payRing(state) {
+    var ring = svg('svg', { viewBox: '0 0 48 48', width: '48', height: '48', 'aria-hidden': 'true', focusable: 'false' });
+    ring.setAttribute('class', 'al-pay-ring');
+    ring.setAttribute('data-state', state);
+    ring.appendChild(svg('circle', { cx: '24', cy: '24', r: '20', 'class': 'al-pay-ring-track' }));
+    ring.appendChild(svg('circle', { cx: '24', cy: '24', r: '20', 'class': 'al-pay-ring-arc', pathLength: '100' }));
+    if (state === 'done') ring.appendChild(svg('path', { d: 'M15 24.5l6 6 12-13', 'class': 'al-pay-check', pathLength: '100' }));
+    return ring;
+  }
+
+  /**
+   * Opens the sheet for input ({ flow: 'proof', approvalId } here). onApplied runs once after
+   * the server applied it. Focus starts on the title and returns to the opener on close.
+   */
+  function paySheet(input, onApplied) {
+    var opener = document.activeElement;
+    var platform = payPlatform();
+    var st = {
+      phase: 'loading', statement: null, ceremony: null, publicKey: null, stale: false,
+      remember: false, offered: false, backup: false, closed: false, notice: null, error: null
+    };
+    uid += 1;
+    var titleId = 'pay-title-' + uid;
+    var amountId = 'pay-amount-' + uid;
+    var forId = 'pay-for-' + uid;
+    var overlay = el('div', null, 'al-pay-overlay');
+    var sheet = el('div', null, 'al-pay-sheet');
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', titleId);
+    sheet.setAttribute('aria-describedby', amountId + ' ' + forId);
+    sheet.setAttribute('data-motion', reducedMotion ? 'reduced' : 'full');
+    sheet.tabIndex = -1;
+    overlay.appendChild(sheet);
+    document.body.appendChild(overlay);
+    var timer = null;
+    var shownOnce = false;
+
+    function close() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (opener && opener.focus && document.contains(opener)) opener.focus();
+    }
+    function onKey(event) {
+      if (event.key === 'Escape') {
+        if (st.phase === 'recording' || st.phase === 'waiting') return;
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      var list = Array.prototype.filter.call(sheet.querySelectorAll('button, input, [href]'), function (n) {
+        return !n.disabled && !n.hidden;
+      });
+      if (list.length === 0) return;
+      var first = list[0];
+      var last = list[list.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === sheet)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    }
+    document.addEventListener('keydown', onKey, true);
+
+    function isLimits() { return st.statement && st.statement.kind === 'limits'; }
+    function confirmLabel() { return S['payConfirm' + platform]; }
+    function waitingLabel() { return S['payWaiting' + platform]; }
+    function liveText() {
+      if (st.phase === 'waiting') return waitingLabel();
+      if (st.phase === 'recording') return isLimits() ? S.payRecordingLimits : S.payRecordingProof;
+      if (st.phase === 'done') return isLimits() ? S.payDoneLimits : S.payDoneProof;
+      return st.notice || '';
+    }
+
+    function render() {
+      var keepFocus = sheet.contains(document.activeElement) ? document.activeElement.getAttribute('data-key') : null;
+      sheet.textContent = '';
+      var grab = el('div', null, 'al-pay-grab');
+      grab.setAttribute('aria-hidden', 'true');
+      sheet.appendChild(grab);
+      var v = st.statement;
+      var title = el('h2', v ? (v.kind === 'limits' ? S.payTitleLimits : S.payTitleProof) : S.payTitleProof, 'al-pay-title');
+      title.id = titleId;
+      title.tabIndex = -1;
+      sheet.appendChild(title);
+      if (v && v.amountUsd !== null) {
+        var amount = el('p', usdText(v.amountUsd), 'al-pay-amount');
+        amount.id = amountId;
+        amount.setAttribute('aria-label', usdSpoken(v.amountUsd));
+        sheet.appendChild(amount);
+      }
+      if (v) {
+        var rows = el('dl', null, 'al-pay-rows');
+        if (v.kind !== 'limits') {
+          rows.appendChild(el('dt', S.payRowFor));
+          var forValue = el('dd', v.counterparty ? fmt(S.payForProof, { name: v.counterparty }) : S.payForSelf);
+          forValue.id = forId;
+          rows.appendChild(forValue);
+          rows.appendChild(el('dt', S.payRowPaidFrom));
+          rows.appendChild(el('dd', S.payPaidFrom));
+        }
+        v.changes.forEach(function (c) {
+          rows.appendChild(el('dt', payChangeLabel(c, v.counterparty)));
+          var dd = el('dd', null, 'al-pay-change');
+          dd.setAttribute('aria-label', fmt(S.payChangedTo, { old: payValue(c.field, c.old), 'new': payValue(c.field, c['new']) }));
+          dd.appendChild(el('span', payValue(c.field, c.old), 'al-pay-old'));
+          var arrow = el('span', ' → ', 'al-pay-arrow');
+          arrow.setAttribute('aria-hidden', 'true');
+          dd.appendChild(arrow);
+          dd.appendChild(el('span', payValue(c.field, c['new']), 'al-pay-new'));
+          rows.appendChild(dd);
+        });
+        sheet.appendChild(rows);
+        var trust = el('div', null, 'al-pay-trust');
+        trust.appendChild(el('p', S.payTrustCredits));
+        trust.appendChild(el('p', S.payTrustAi));
+        sheet.appendChild(trust);
+      }
+      if (st.offered && !st.closed && (st.phase === 'ready' || st.phase === 'backup')) {
+        var rem = el('label', null, 'al-check al-pay-remember');
+        var box = el('input');
+        box.type = 'checkbox';
+        box.checked = st.remember;
+        box.setAttribute('data-key', 'remember');
+        box.addEventListener('change', function () { setRemember(box.checked); });
+        rem.appendChild(box);
+        var words = el('span');
+        words.appendChild(el('span', S.payRemember));
+        if (v && v.counterparty) words.appendChild(el('span', fmt(S.payRememberHint, { name: v.counterparty }), 'al-field-hint'));
+        rem.appendChild(words);
+        sheet.appendChild(rem);
+      }
+      var status = el('div', null, 'al-pay-status');
+      if (st.phase === 'waiting' || st.phase === 'recording' || st.phase === 'done') {
+        status.appendChild(payRing(st.phase));
+      }
+      var live = el('p', liveText(), 'al-pay-live');
+      live.setAttribute('aria-live', 'polite');
+      status.appendChild(live);
+      if (st.error) {
+        var alert = el('p', st.error, 'al-pay-alert');
+        alert.setAttribute('role', 'alert');
+        status.appendChild(alert);
+      }
+      sheet.appendChild(status);
+
+      var actions = el('div', null, 'al-pay-actions');
+      if (st.closed || (st.phase === 'done' && reducedMotion)) {
+        var closeB = button(S.payClose, 'al-btn-primary al-btn-lg al-btn-block');
+        closeB.setAttribute('data-key', 'close');
+        closeB.addEventListener('click', close);
+        actions.appendChild(closeB);
+      } else if (st.phase === 'ready' && v && hasPasskey() && !st.backup) {
+        var go = button(confirmLabel(), 'al-btn-primary al-btn-lg al-btn-block');
+        go.setAttribute('data-key', 'confirm');
+        go.addEventListener('click', usePasskey);
+        actions.appendChild(go);
+      } else if (st.phase === 'backup' || (st.phase === 'ready' && v && !hasPasskey())) {
+        st.phase = 'backup';
+        var form = codeForm(S.payCodeLabel, S.payConfirmCode, function (code) { return useCode(code); });
+        actions.appendChild(form);
+      }
+      if (!st.closed && st.phase !== 'done' && st.phase !== 'recording') {
+        var cancel = button(S.payCancel, 'al-btn-ghost al-btn-block');
+        cancel.setAttribute('data-key', 'cancel');
+        cancel.addEventListener('click', close);
+        actions.appendChild(cancel);
+      }
+      if (!st.closed && st.phase === 'ready' && v && hasPasskey()) {
+        var link = button(S.payUseBackup, 'al-btn-ghost al-btn-sm al-pay-link');
+        link.setAttribute('data-key', 'backup');
+        link.addEventListener('click', function () { st.backup = true; st.phase = 'backup'; st.error = null; render(); });
+        actions.appendChild(link);
+      }
+      sheet.appendChild(actions);
+      var again = keepFocus ? sheet.querySelector('[data-key="' + keepFocus + '"]') : null;
+      if (!shownOnce && v) { shownOnce = true; title.focus(); }
+      else if (again) again.focus();
+      else if (!sheet.contains(document.activeElement)) title.focus();
+    }
+
+    function stop(text, isError) {
+      st.closed = true;
+      st.phase = 'ready';
+      if (isError) st.error = text; else st.notice = text;
+      render();
+    }
+
+    /** Begin: the server's statement and challenge. Resolves true when ready. */
+    function begin() {
+      var flow = { flow: input.flow, approvalId: input.approvalId };
+      if (st.remember) flow.remember = true;
+      return api('/api/ui/pay-confirm/begin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream', 'X-AgentLink-Input': b64json(flow) }
+      }).then(function (res) { return res.json(); }).then(function (out) {
+        if (out.status === 'not_offered' && st.remember) {
+          st.remember = false;
+          st.offered = false;
+          st.notice = S.payNotOffered;
+          return begin();
+        }
+        var statement = out.status === 'ready' ? payStatement(out.statement) : null;
+        if (!statement || typeof out.ceremony !== 'string' || !out.publicKey) {
+          if (out.status === 'not_pending') stop(S.payDecided, false);
+          else if (out.status === 'busy') { st.error = S.payBusy; st.phase = 'ready'; render(); }
+          else stop(S.payFailedStart, false);
+          return false;
+        }
+        var before = st.statement ? JSON.stringify(st.statement) : null;
+        st.statement = statement;
+        st.ceremony = out.ceremony;
+        st.publicKey = out.publicKey;
+        st.stale = false;
+        st.offered = out.rememberOffered === true;
+        if (st.phase === 'loading') st.phase = 'ready';
+        if (before !== null && before !== JSON.stringify(statement)) {
+          st.phase = st.backup ? 'backup' : 'ready';
+          st.notice = S.payChanged;
+          render();
+          return false;
+        }
+        render();
+        return true;
+      }, function () { stop(S.payFailedStart, false); return false; });
+    }
+    function setRemember(on) {
+      st.remember = on;
+      st.notice = null;
+      st.error = null;
+      begin();
+    }
+    function fresh() { return st.stale ? begin() : Promise.resolve(true); }
+
+    function finish(body, presence) {
+      var headers = { 'Content-Type': 'application/octet-stream', 'X-AgentLink-Input': b64json({ ceremony: st.ceremony }) };
+      if (presence) headers['X-AgentLink-Presence'] = 'passkey';
+      var shown = setTimeout(function () { st.phase = 'recording'; render(); }, 400);
+      return api('/api/ui/pay-confirm/finish', { method: 'POST', headers: headers, body: body })
+        .then(function (res) { return res.json().then(function (out) { return { http: res.status, out: out }; }); })
+        .then(function (r) {
+          clearTimeout(shown);
+          body.fill(0);
+          outcome(r.out.status, r.out, presence);
+        }, function () {
+          clearTimeout(shown);
+          body.fill(0);
+          stop(S.payStillWorking, false);
+        });
+    }
+    function outcome(status, out, presence) {
+      st.notice = null;
+      st.error = null;
+      if (presence || status !== 'presence_rejected') st.stale = true;
+      if (status === 'applied') {
+        st.phase = 'done';
+        render();
+        onApplied();
+        if (!reducedMotion) timer = setTimeout(close, 1200);
+        return;
+      }
+      st.phase = st.backup ? 'backup' : 'ready';
+      if (status === 'presence_rejected' && !presence) { st.stale = false; st.error = S.payWrongCode; }
+      else if (status === 'verification_required' || status === 'presence_rejected' || status === 'presence_required') st.error = S.payNotVerified;
+      else if (status === 'passkey_update_needed') { st.backup = true; st.phase = 'backup'; st.notice = S.payUpdateNeeded; }
+      else if (status === 'tries_exhausted') return stop(S.payTriesUsed, false);
+      else if (status === 'expired' || status === 'unknown') return stop(S.payExpired, false);
+      else if (status === 'not_pending') return stop(S.payDecided, false);
+      else if (status === 'changed') { st.notice = S.payChanged; begin(); return; }
+      else if (status === 'wait') {
+        var seconds = typeof out.retryAfter === 'number' && out.retryAfter > 0 ? Math.ceil(out.retryAfter) : 1;
+        st.error = fmt(S.payWait, { seconds: seconds });
+      } else if (status === 'busy') st.error = S.payBusy;
+      else if (status === 'refused') return stop(isLimits() ? S.payRefusedLimits : S.payRefusedProof, true);
+      else return stop(S.payStillWorking, false);
+      render();
+    }
+
+    function usePasskey() {
+      st.notice = null;
+      st.error = null;
+      fresh().then(function (ok) {
+        if (!ok) return;
+        var pk = st.publicKey;
+        st.phase = 'waiting';
+        render();
+        var prf = new Uint8Array(0);
+        navigator.credentials.get({ publicKey: {
+          challenge: fromB64(pk.challenge),
+          rpId: pk.rpId,
+          allowCredentials: (pk.allowCredentials || []).map(function (id) { return { type: 'public-key', id: fromB64(id) }; }),
+          userVerification: 'required',
+          timeout: pk.timeoutMs,
+          extensions: { prf: { eval: { first: fromB64(pk.prfSalt) } } }
+        } }).then(function (credential) {
+          prf = prfOf(credential).output;
+          var r = credential.response;
+          var body = fields([bytes(credential.rawId), bytes(r.authenticatorData), bytes(r.clientDataJSON),
+            bytes(r.signature), bytes(r.userHandle), prf]);
+          prf.fill(0);
+          return finish(body, true);
+        }, function () {
+          // The person dismissed the system prompt: nothing was sent, the challenge still holds.
+          st.phase = 'ready';
+          st.notice = S.payCancelled;
+          render();
+        });
+      });
+    }
+    function useCode(code) {
+      return fresh().then(function (ok) {
+        if (!ok) { code.fill(0); return null; }
+        return finish(code, false);
+      });
+    }
+
+    render();
+    begin();
+  }
+  function b64json(value) {
+    var utf8 = new TextEncoder().encode(JSON.stringify(value));
+    var bin = '';
+    for (var i = 0; i < utf8.length; i += 1) bin += String.fromCharCode(utf8[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
   // --- Start -------------------------------------------------------------------------------------
 
   var match = ID.exec(location.pathname);
@@ -886,6 +1380,11 @@ export const APP_JS = `'use strict';\n(function () {\n  var S = ${JSON.stringify
  * `.al-field`, `.al-btn`, `.al-untrusted`). No url(), no @import, no web font.
  */
 export const APP_CSS = `:root {
+  --al-color-bg-overlay: rgba(5, 6, 8, 0.72);
+  --al-color-diff-removed-fg: #ff8e8e;
+  --al-color-diff-added-fg: #4fd1a5;
+  --al-color-status-success-fg: #4fd1a5;
+  --al-shadow-4: 0 24px 64px rgba(0, 0, 0, 0.6);
   --al-color-bg-canvas: #0b0c0e;
   --al-color-bg-surface: #111316;
   --al-color-bg-raised: #171a1e;
@@ -916,6 +1415,11 @@ export const APP_CSS = `:root {
 }
 @media (prefers-color-scheme: light) {
   :root {
+    --al-color-bg-overlay: rgba(14, 16, 19, 0.48);
+    --al-color-diff-removed-fg: #b3191f;
+    --al-color-diff-added-fg: #0a6e51;
+    --al-color-status-success-fg: #0a6e51;
+    --al-shadow-4: 0 24px 64px rgba(14, 16, 19, 0.16);
     --al-color-bg-canvas: #f5f6f7;
     --al-color-bg-surface: #ffffff;
     --al-color-bg-raised: #ffffff;
@@ -1283,4 +1787,132 @@ code, pre, .al-mono { font-family: var(--al-font-family-mono); }
   outline-offset: -2px;
 }
 .al-lines { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+
+/* M1-PAY-CONFIRM-b: the confirmation sheet (b11 §13.1 level 4, §14 motion, §19). The same classes
+   as @4thtech-io/ui components.css. Only transform, opacity and stroke-dashoffset animate. */
+html {
+  --al-pay-duration-fast: 120ms;
+  --al-pay-duration-base: 200ms;
+  --al-pay-duration-slow: 320ms;
+  --al-pay-duration-moment: 480ms;
+  --al-pay-duration-ambient: 2000ms;
+  --al-pay-duration-ambient-sweep: 1400ms;
+  --al-pay-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+.al-pay-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--al-color-bg-overlay);
+  animation: al-pay-fade var(--al-pay-duration-base) ease-out both;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .al-pay-overlay { backdrop-filter: blur(8px); }
+}
+.al-pay-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--al-color-border-subtle);
+  border-radius: 16px;
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-4);
+  animation: al-pay-rise var(--al-pay-duration-slow) var(--al-pay-easing-emphasized) both;
+}
+.al-pay-sheet:focus { outline: none; }
+.al-pay-grab { display: none; }
+.al-pay-title { margin: 0 0 8px; font-size: 17px; line-height: 24px; font-weight: 600; }
+.al-pay-title:focus-visible { outline: 2px solid var(--al-color-focus-ring); outline-offset: 2px; }
+.al-pay-amount {
+  margin: 0 0 16px;
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.al-pay-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.al-pay-rows dt { color: var(--al-color-fg-muted); }
+.al-pay-rows dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.al-pay-old { color: var(--al-color-diff-removed-fg); text-decoration: line-through; }
+.al-pay-new { color: var(--al-color-diff-added-fg); font-weight: 600; }
+.al-pay-arrow { color: var(--al-color-fg-subtle); }
+.al-pay-trust { margin: 0 0 16px; color: var(--al-color-fg-muted); font-size: 13px; line-height: 18px; }
+.al-pay-trust p { margin: 0 0 4px; }
+.al-pay-remember { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 16px; }
+.al-pay-remember .al-field-hint { display: block; }
+.al-pay-status { display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 0 12px; min-height: 20px; }
+.al-pay-live { margin: 0; text-align: center; }
+.al-pay-alert {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--al-color-status-danger-fg);
+  color: var(--al-color-status-danger-fg);
+  align-self: stretch;
+}
+.al-pay-actions { display: flex; flex-direction: column; gap: 8px; }
+.al-pay-actions .al-btn { min-height: 44px; }
+.al-pay-link { align-self: center; min-height: 44px; font-size: 13px; color: var(--al-color-fg-muted); }
+.al-pay-ring { width: 48px; height: 48px; overflow: visible; }
+.al-pay-ring circle, .al-pay-ring path { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+.al-pay-ring-track { stroke: var(--al-color-border-default); }
+.al-pay-ring-arc { stroke: var(--al-color-accent-default); stroke-dasharray: 100; stroke-dashoffset: 75; transform-origin: 24px 24px; }
+.al-pay-ring[data-state='waiting'] .al-pay-ring-arc { stroke-dashoffset: 100; }
+.al-pay-ring[data-state='waiting'] { animation: al-pay-breathe var(--al-pay-duration-ambient) ease-in-out infinite; }
+.al-pay-ring[data-state='recording'] .al-pay-ring-arc { animation: al-pay-sweep var(--al-pay-duration-ambient-sweep) linear infinite; }
+.al-pay-ring[data-state='done'] .al-pay-ring-arc {
+  stroke: var(--al-color-status-success-fg);
+  stroke-dashoffset: 0;
+  animation: al-pay-close var(--al-pay-duration-moment) var(--al-pay-duration-moment) both;
+  animation-timing-function: var(--al-pay-easing-emphasized);
+}
+.al-pay-check {
+  stroke: var(--al-color-status-success-fg);
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  animation: al-pay-draw var(--al-pay-duration-moment) var(--al-pay-easing-emphasized) both;
+}
+@keyframes al-pay-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes al-pay-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes al-pay-breathe { 0%, 100% { opacity: 0.45; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes al-pay-sweep { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes al-pay-close { from { stroke-dashoffset: 75; } to { stroke-dashoffset: 0; } }
+@keyframes al-pay-draw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@media (max-width: 599px) {
+  .al-pay-overlay { align-items: flex-end; padding: 0; }
+  .al-pay-sheet { max-width: none; border-radius: 16px 16px 0 0; max-height: 100vh; }
+  .al-pay-grab { display: block; width: 36px; height: 4px; margin: -12px auto 12px; border-radius: 2px; background: var(--al-color-border-default); }
+}
+.al-pay-sheet[data-motion='reduced'],
+.al-pay-sheet[data-motion='reduced'] *,
+.al-pay-overlay:has(.al-pay-sheet[data-motion='reduced']) {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .al-pay-overlay, .al-pay-sheet, .al-pay-sheet * { animation: none !important; transition: none !important; }
+  .al-pay-ring[data-state='recording'] .al-pay-ring-arc { stroke-dashoffset: 50; }
+  .al-pay-ring[data-state='waiting'] .al-pay-ring-arc { stroke-dashoffset: 100; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .al-pay-overlay { backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .al-pay-sheet { border: 1px solid CanvasText; }
+  .al-pay-ring circle, .al-pay-ring path { stroke: CanvasText; }
+}
 `;

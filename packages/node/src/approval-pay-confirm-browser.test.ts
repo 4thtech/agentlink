@@ -190,7 +190,13 @@ function fakeSource(): ApprovalServerSource & {
     context: () => Promise.resolve({ agent: agentId, owner }),
     list: () =>
       Promise.resolve(
-        [...rows.values()].map(({ action: _a, storedDigest: _s, ...view }) => view),
+        [...rows.values()].map((row) => {
+          // The list never carries the action (as the CLI's source).
+          const view: Record<string, unknown> = { ...row };
+          delete view['action'];
+          delete view['storedDigest'];
+          return view as never;
+        }),
       ),
     get: (approvalId) => Promise.resolve(rows.get(approvalId)),
     apply: (signed) => {
@@ -282,20 +288,23 @@ describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromiu
     source.addPaid(2);
     await page.goto(server.origin + '/');
     // Rule 7: the paid request has no list choice; the free one does.
-    await page.locator(`input[name="choice-${id(1)}"]`).first().waitFor();
+    await page
+      .locator(`input[name="choice-${id(1)}"]`)
+      .first()
+      .waitFor();
     expect(await page.locator(`input[name="choice-${id(2)}"]`).count()).toBe(0);
     const paidCard = page.locator(`[data-approval="${id(2)}"]`);
-    await paidCard.getByText(UI_STRINGS.paidAlone).waitFor();
+    await paidCard.getByText(UI_STRINGS.paidAlone.replace('{cost}', '$0.10')).waitFor();
 
     await paidCard.getByRole('button', { name: 'Approve', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
     expect(await dialog.getAttribute('aria-modal')).toBe('true');
-    // Focus starts on the title, never on Confirm (b11 §19.2, §19.5).
-    expect(await page.evaluate('document.activeElement && document.activeElement.textContent')).toBe(
-      UI_STRINGS.payTitleProof,
-    );
     await dialog.getByText('$0.10', { exact: true }).waitFor();
+    // Focus starts on the title, never on Confirm (b11 §19.2, §19.5).
+    expect(
+      await page.evaluate('document.activeElement && document.activeElement.textContent'),
+    ).toBe(UI_STRINGS.payTitleProof);
     await dialog.getByText(UI_STRINGS.payTrustCredits).waitFor();
     await dialog.getByText(UI_STRINGS.payTrustAi).waitFor();
     const confirm = dialog.getByRole('button', { name: CONFIRM });

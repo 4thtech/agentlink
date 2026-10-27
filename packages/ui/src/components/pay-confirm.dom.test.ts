@@ -139,7 +139,9 @@ describe('the statement the server returned, and nothing else', () => {
     expect(parsePayStatement({ ...PROOF, extra: 1 })).toBeUndefined();
     expect(parsePayStatement({ ...PROOF, kind: 'register' })).toBeUndefined();
     expect(parsePayStatement({ ...PROOF, amountUsd: '1e3' })).toBeUndefined();
-    expect(parsePayStatement({ ...LIMITS, changes: [{ field: 'files.max', old: '1', new: '2' }] })).toBeUndefined();
+    expect(
+      parsePayStatement({ ...LIMITS, changes: [{ field: 'files.max', old: '1', new: '2' }] }),
+    ).toBeUndefined();
     expect(parsePayStatement(null)).toBeUndefined();
   });
 
@@ -337,7 +339,9 @@ describe('copy (11 §5; b11 §19.6)', () => {
   it('passes the vocabulary lint, and never says bank, deposit or payment method', () => {
     for (const text of all()) {
       expect(lintVocabulary(text), text).toEqual([]);
-      expect(text).not.toMatch(/\b(wallet|bank|transaction|gas|deposit|payment method|balance top-up)\b/i);
+      expect(text).not.toMatch(
+        /\b(wallet|bank|transaction|gas|deposit|payment method|balance top-up)\b/i,
+      );
     }
   });
 

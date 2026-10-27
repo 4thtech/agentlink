@@ -11,6 +11,8 @@ export const RULES_STRINGS = {
 
   allowed: 'Allowed',
   askMe: 'Ask me',
+  // M1-PAY-CONFIRM-b: a spending change continues to the confirmation sheet (b11 §19.1).
+  continueToConfirm: 'Continue',
   never: 'Never',
   allow: 'Allow',
   askEveryTime: 'Ask me every time',

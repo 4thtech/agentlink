@@ -27,7 +27,7 @@ import {
   type JsonValue,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
-import type { OwnerActionOutcome } from '@4thtech-io/core';
+import { isPaidPendingAction, type OwnerActionOutcome } from '@4thtech-io/core';
 import type { ApprovalForDecision, ApprovalServerSource } from './approval-server.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
@@ -183,12 +183,14 @@ export function fakeSource(world: Pick<OwnerWorld, 'agentId' | 'owner'>): FakeSo
     list: () =>
       Promise.resolve(
         [...rows.values()].map(
-          ({ approvalId: id, summary, actionDigest, expiresAt, commitment, details }) => ({
+          ({ approvalId: id, summary, actionDigest, expiresAt, commitment, details, action }) => ({
             approvalId: id,
             summary,
             actionDigest,
             expiresAt,
             commitment,
+            // As the CLI's source does (M1-PAY-CONFIRM-b): the flag, never the action.
+            paid: isPaidPendingAction(action),
             ...(details === undefined ? {} : { details }),
           }),
         ),

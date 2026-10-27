@@ -1308,6 +1308,21 @@
     "name": "al-duration-slow",
     "value": "320ms",
     "usage": "Signature moments: proof stamp settles, approval confirmed, pairing matched."
+   },
+   {
+    "name": "al-duration-moment",
+    "value": "480ms",
+    "usage": "Once-only signature moments: the approval check drawing, safety codes merging, the pulse on Connected (D-132)."
+   },
+   {
+    "name": "al-duration-ambient",
+    "value": "2000ms",
+    "usage": "Progress loops: the breathing ring while waiting for Touch ID (D-132)."
+   },
+   {
+    "name": "al-duration-ambient-sweep",
+    "value": "1400ms",
+    "usage": "Progress loops: skeleton shimmer, the indeterminate bar and arc (D-132)."
    }
   ]
  },
@@ -1327,6 +1342,11 @@
     "name": "al-easing-exit",
     "value": "cubic-bezier(0.3, 0, 1, 1)",
     "usage": "Elements leaving."
+   },
+   {
+    "name": "al-easing-emphasized",
+    "value": "cubic-bezier(0.05, 0.7, 0.1, 1)",
+    "usage": "Signature moments and the ring meter filling: a slower settle than enter (D-132)."
    }
   ]
  },
