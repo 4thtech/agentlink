@@ -201,44 +201,52 @@ function creationValues(value: unknown): CreationValues | undefined {
   return { rpId, rpName, userId, userName, challenge, prfSalt };
 }
 
+/** One same-origin call with the page's CSRF token; the copy of `body` sent is zeroed after. */
+async function request(
+  doFetch: Fetch,
+  token: string | undefined,
+  method: 'GET' | 'POST',
+  path: string,
+  body?: Uint8Array,
+): Promise<Answer | 'offline'> {
+  const headers = new Headers({ [CSRF_HEADER]: token ?? pageToken() });
+  const init: RequestInit = { method, headers, credentials: 'same-origin', cache: 'no-store' };
+  // The copy sent (for finish, it holds the PRF output; for the passkey switch, also the backup
+  // code) is zeroed once fetch has it (IR-M1-11b-1-1 L-3); the caller zeroes its own buffer.
+  let sent: Uint8Array<ArrayBuffer> | undefined;
+  if (method === 'POST') {
+    headers.set('content-type', 'application/octet-stream');
+    sent = body === undefined ? new Uint8Array(0) : new Uint8Array(body);
+    init.body = sent;
+  }
+  let res: Response;
+  try {
+    res = await doFetch(path, init);
+  } catch {
+    return 'offline';
+  } finally {
+    sent?.fill(0);
+  }
+  let json: Record<string, unknown> | undefined;
+  try {
+    const parsed: unknown = await res.json();
+    json =
+      typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : undefined;
+  } catch {
+    json = undefined;
+  }
+  return { status: res.status, json };
+}
+
 export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
   const doFetch: Fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-
-  async function call(
+  const call = (
     method: 'GET' | 'POST',
     path: string,
     body?: Uint8Array,
-  ): Promise<Answer | 'offline'> {
-    const headers = new Headers({ [CSRF_HEADER]: options.token ?? pageToken() });
-    const init: RequestInit = { method, headers, credentials: 'same-origin', cache: 'no-store' };
-    // The copy sent (for finish, it holds the PRF output) is zeroed once fetch has it
-    // (IR-M1-11b-1-1 L-3); the caller zeroes its own buffer.
-    let sent: Uint8Array<ArrayBuffer> | undefined;
-    if (method === 'POST') {
-      headers.set('content-type', 'application/octet-stream');
-      sent = body === undefined ? new Uint8Array(0) : new Uint8Array(body);
-      init.body = sent;
-    }
-    let res: Response;
-    try {
-      res = await doFetch(path, init);
-    } catch {
-      return 'offline';
-    } finally {
-      sent?.fill(0);
-    }
-    let json: Record<string, unknown> | undefined;
-    try {
-      const parsed: unknown = await res.json();
-      json =
-        typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
-          ? (parsed as Record<string, unknown>)
-          : undefined;
-    } catch {
-      json = undefined;
-    }
-    return { status: res.status, json };
-  }
+  ): Promise<Answer | 'offline'> => request(doFetch, options.token, method, path, body);
 
   return {
     async status() {
@@ -299,6 +307,116 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
         };
       }
       return problemOf(answer);
+    },
+  };
+}
+
+// --- M1-UX-FIRSTRUN-V2-c (B-9): an owner set up before 0.3.0 switches to a passkey ---------------
+//
+// The switch is the existing owner operation of the approval server (M1-8e, owner-passkey.ts
+// registerOwnerPasskey): `GET /api/owner/passkey` says whether a passkey is registered and gives the
+// public WebAuthn values; `POST /api/owner/passkey` takes the backup code and the passkey assertion
+// in one octet-stream body. The server opens the `owner` item with the code (the wrong-code backoff
+// applies), seals the same owner key under the passkey and never writes the `owner` item, so the
+// backup code keeps working. Nothing here signs; the code is never in a URL or a log.
+
+export const PASSKEY_PATH = '/api/owner/passkey';
+
+/** The public values for the passkey gesture (base64url fields). */
+export interface UpgradeValues {
+  readonly rpId: 'localhost';
+  /** The owner's public key as `user.id` (04 §2.3 step 2). */
+  readonly userId: string;
+  readonly prfSalt: string;
+}
+
+export type PasskeyInfoResult =
+  | { readonly kind: 'ok'; readonly registered: boolean; readonly values: UpgradeValues }
+  /** No owner yet (503): owner setup, not the switch. */
+  | { readonly kind: 'needs_setup' }
+  | SetupError;
+
+/** Why the switch didn't happen (strings.ts UPGRADE_MESSAGES); fixed codes only. */
+export type UpgradeProblem =
+  | 'presence_required'
+  | 'presence_rejected'
+  | 'passkey_exists'
+  | 'passkey_unsupported'
+  | 'busy'
+  | 'wait'
+  | 'needs_setup'
+  | 'failed'
+  | 'offline'
+  | 'session_expired'
+  | 'forbidden'
+  | 'unknown';
+
+export type UpgradeResult =
+  | { readonly kind: 'registered' }
+  | { readonly kind: 'error'; readonly problem: UpgradeProblem; readonly retryAfter?: number };
+
+export interface UpgradeApi {
+  info(): Promise<PasskeyInfoResult>;
+  /** One registration body (passkey.ts encodeUpgradeBody); the caller zeroes its buffer. */
+  register(body: Uint8Array): Promise<UpgradeResult>;
+}
+
+const UPGRADE_PROBLEMS: ReadonlySet<string> = new Set<UpgradeProblem>([
+  'presence_required',
+  'presence_rejected',
+  'passkey_exists',
+  'passkey_unsupported',
+  'busy',
+  'needs_setup',
+  'failed',
+]);
+
+export function createUpgradeApi(options: SetupApiOptions = {}): UpgradeApi {
+  const doFetch: Fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  return {
+    async info() {
+      const answer = await request(doFetch, options.token, 'GET', PASSKEY_PATH);
+      if (answer === 'offline') return { kind: 'error', problem: 'offline' };
+      if (answer.status === 503) return { kind: 'needs_setup' };
+      if (answer.status !== 200) return problemOf(answer);
+      const raw = answer.json?.['passkey'];
+      const p =
+        typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : undefined;
+      const userId = str(p?.['userId']);
+      const prfSalt = str(p?.['prfSalt']);
+      const registered = p?.['registered'];
+      if (
+        p?.['rpId'] !== 'localhost' ||
+        typeof registered !== 'boolean' ||
+        userId === undefined ||
+        !BASE64URL.test(userId) ||
+        prfSalt === undefined ||
+        !BASE64URL.test(prfSalt)
+      ) {
+        return { kind: 'error', problem: 'unknown' };
+      }
+      return { kind: 'ok', registered, values: { rpId: 'localhost', userId, prfSalt } };
+    },
+
+    async register(body) {
+      const answer = await request(doFetch, options.token, 'POST', PASSKEY_PATH, body);
+      if (answer === 'offline') return { kind: 'error', problem: 'offline' };
+      const status = str(answer.json?.['status']);
+      if (answer.status === 200 && status === 'registered') return { kind: 'registered' };
+      if (status === 'wait') {
+        const raw = answer.json?.['retryAfter'];
+        const retryAfter =
+          typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0 && raw <= 86_400
+            ? raw
+            : 1;
+        return { kind: 'error', problem: 'wait', retryAfter };
+      }
+      if (status !== undefined && UPGRADE_PROBLEMS.has(status)) {
+        return { kind: 'error', problem: status as UpgradeProblem };
+      }
+      if (answer.status === 401) return { kind: 'error', problem: 'session_expired' };
+      if (answer.status === 403) return { kind: 'error', problem: 'forbidden' };
+      return { kind: 'error', problem: 'unknown' };
     },
   };
 }

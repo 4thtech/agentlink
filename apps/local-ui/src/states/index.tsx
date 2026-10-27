@@ -3,6 +3,7 @@
 // Classes and components come from packages/ui only (CSP: no inline styles).
 import { Banner, Button, CopyPrompt, EmptyState } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
+import { UPGRADE, type Platform } from '../pages/first-run/strings.js';
 import { STATE_STRINGS as S } from './strings.js';
 
 export { STATE_STRINGS } from './strings.js';
@@ -66,6 +67,28 @@ export function SetupUnfinishedBanner(): ReactElement {
       }
     >
       {S.setupUnfinishedBody}
+    </Banner>
+  );
+}
+
+/**
+ * M1-UX-FIRSTRUN-V2-c (B-9; b11 Home "Next step"): an owner set up before 0.3.0 has no passkey yet.
+ * One action, a fixed same-origin link to the first-run page, where the switch happens. The link
+ * carries nothing (no token, no code, no query).
+ */
+export function SwitchToPasskeyBanner({ platform }: { platform: Platform }): ReactElement {
+  return (
+    <Banner
+      tone="info"
+      icon="key-round"
+      title={UPGRADE.bannerTitle(platform)}
+      action={
+        <a className="al-btn al-btn-primary al-btn-sm" href="/first-run">
+          {UPGRADE.bannerAction(platform)}
+        </a>
+      }
+    >
+      {UPGRADE.bannerBody}
     </Banner>
   );
 }

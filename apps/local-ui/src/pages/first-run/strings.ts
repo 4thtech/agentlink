@@ -5,6 +5,7 @@
 // M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 11 §5.5, §6.2.1; copy proposed, owner confirms at merge): the
 // passkey-first flow, Protect approvals (with the folders) → Your backup code (save form, "I saved
 // it") → Recovery kit → Ready. The button names the platform. The backup code is never "password".
+import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 
 export const STEPS = ['Protect approvals', 'Backup code', 'Recovery kit', 'Ready'] as const;
 
@@ -155,4 +156,61 @@ export const SETUP_MESSAGES = {
   finishedNoCode:
     "Setup probably finished, but the connection dropped before your backup code could be shown. Approve with your passkey. If your passkey doesn't work, run `agentlink doctor` in your own terminal.",
   notFinished: "The connection dropped and setup didn't finish. Nothing was kept. Try again.",
+} as const;
+
+/** M1-UX-FIRSTRUN-V2-c: what the switch is called on each platform. */
+const SWITCH_TITLE: Readonly<Record<Platform, string>> = {
+  mac: 'Switch to Touch ID',
+  windows: 'Switch to Windows Hello',
+  other: 'Switch to a passkey',
+};
+const ON_TITLE: Readonly<Record<Platform, string>> = {
+  mac: 'Touch ID is on',
+  windows: 'Windows Hello is on',
+  other: 'Your passkey is on',
+};
+const APPROVE_WITH: Readonly<Record<Platform, string>> = {
+  mac: 'Approve with Touch ID.',
+  windows: 'Approve with Windows Hello.',
+  other: 'Approve with a passkey.',
+};
+
+/**
+ * M1-UX-FIRSTRUN-V2-c (B-9; 08 §1 first run v2; 11 §5.5, §6.2.1; copy proposed, owner confirms at
+ * merge): an owner set up before 0.3.0 (in the terminal, with the code `owner init` printed, the backup code
+ * in the local app) enters it once, then one passkey gesture. The backup code keeps working.
+ */
+export const UPGRADE = {
+  title: (platform: Platform): string => SWITCH_TITLE[platform],
+  body: (sensor: string): string =>
+    `Enter your backup code once, then approve with ${sensor} instead of typing it. Your backup code keeps working when ${sensor} isn't available. Never give it to your AI.`,
+  codeLabel: 'Backup code',
+  // 0.2.0 owners know the code by its terminal name (the one shared hint, src/strings.ts).
+  codeHint: EARLIER_OWNER_CODE_HINT,
+  noPrf: (sensor: string, browser: string): string =>
+    `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to switch. Until then, approve with your backup code.`,
+  doneTitle: (platform: Platform): string => ON_TITLE[platform],
+  doneBody: (sensor: string): string =>
+    `Next time, approve with ${sensor}. Your backup code still works if ${sensor} isn't available, so keep it saved.`,
+  toApprovals: 'Go to Approvals',
+  // The next step on every app page (b11 Home "Next step"; the d1 shared-states banner).
+  bannerTitle: (platform: Platform): string => APPROVE_WITH[platform],
+  bannerBody: 'Enter your backup code once to switch. It keeps working as your backup.',
+  bannerAction: (platform: Platform): string => SWITCH_TITLE[platform],
+} as const;
+
+/** The switch's fixed answers in plain words (setup-api.ts UpgradeProblem); never server text. */
+export const UPGRADE_MESSAGES = {
+  empty: 'Enter your backup code first.',
+  presence_rejected: "That backup code didn't work. Check it and try again. Nothing changed.",
+  presence_required: "Your browser didn't send the backup code. Nothing changed. Try again.",
+  cancelled: SETUP_MESSAGES.cancelled,
+  unsupported: (browser: string): string =>
+    `This passkey can't protect approvals here. Nothing changed. Keep approving with your backup code, or open this page in ${browser}.`,
+  busy: SETUP_MESSAGES.busy,
+  wait: SETUP_MESSAGES.wait,
+  failed: "The switch didn't finish. Run `agentlink doctor` in your own terminal.",
+  offline: SETUP_MESSAGES.offline,
+  session_expired: SETUP_MESSAGES.session_expired,
+  forbidden: SETUP_MESSAGES.forbidden,
 } as const;

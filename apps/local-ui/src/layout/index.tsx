@@ -4,6 +4,10 @@
 import { AppShell, type NavItem } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
+import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
+import { createUpgradeApi } from '../pages/first-run/setup-api.js';
+import type { Platform } from '../pages/first-run/strings.js';
+import { SwitchToPasskeyBanner } from '../states/index.js';
 
 /**
  * What the status bar shows. "Connected" may appear only when the local server reports healthy. No
@@ -56,9 +60,57 @@ function inSettings(path: string): boolean {
   return SETTINGS_PAGES.some((p) => p.path === path);
 }
 
-export function Layout({ path, children }: { path: string; children: ReactNode }): ReactElement {
+/**
+ * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the backup code (no
+ * passkey) and this browser can make one. Any failure is false: the next step is a nudge, never a
+ * gate, and nothing about it can be skipped or completed from here.
+ */
+export async function needsPasskeySwitch(): Promise<boolean> {
+  if (!passkeysAvailable()) return false;
+  const info = await createUpgradeApi().info();
+  return info.kind === 'ok' && !info.registered;
+}
+
+const FIRST_RUN_PATH = '/first-run';
+
+export interface LayoutProps {
+  readonly path: string;
+  readonly children?: ReactNode;
+  /** Test seam: whether to show the "Switch to …" next step. Default: needsPasskeySwitch. */
+  readonly nextStep?: () => Promise<boolean>;
+  /** The platform the next step names. Default: detected from the browser. */
+  readonly platform?: Platform;
+}
+
+export function Layout({
+  path,
+  children,
+  nextStep = needsPasskeySwitch,
+  platform: givenPlatform,
+}: LayoutProps): ReactElement {
   const connection = useConnectionState();
   const settings = inSettings(path);
+  const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
+  const [switchNeeded, setSwitchNeeded] = useState(false);
+  useEffect(() => {
+    if (path === FIRST_RUN_PATH) {
+      setSwitchNeeded(false);
+      return undefined;
+    }
+    let live = true;
+    // Re-read on every page change, so the step is gone once the passkey is registered.
+    nextStep().then(
+      (needed) => {
+        if (live) setSwitchNeeded(needed);
+      },
+      () => {
+        if (live) setSwitchNeeded(false);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [path, nextStep]);
   const nav: NavItem[] = NAV_ITEMS.map((item) => ({
     icon: item.icon,
     label: item.label,
@@ -67,6 +119,9 @@ export function Layout({ path, children }: { path: string; children: ReactNode }
   }));
   return (
     <AppShell nav={nav} connection={SHELL_STATE[connection]}>
+      {switchNeeded && path !== FIRST_RUN_PATH ? (
+        <SwitchToPasskeyBanner platform={platform} />
+      ) : null}
       {settings ? (
         <nav aria-label="Settings" className="al-subnav">
           {SETTINGS_PAGES.map((p) => (

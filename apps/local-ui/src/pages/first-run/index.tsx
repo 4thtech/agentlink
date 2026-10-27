@@ -26,25 +26,34 @@ import {
 } from '../../states/index.js';
 import {
   createSetupPasskey,
+  createUpgradePasskey as browserUpgradePasskey,
   detectPlatform,
+  encodeUpgradeBody,
   passkeysAvailable,
   prfSupport as browserPrfSupport,
   type PasskeyOptions,
   type PasskeyResult,
   type PrfSupport,
+  type UpgradePasskeyResult,
 } from './passkey.js';
 import {
   createSetupApi,
+  createUpgradeApi,
   type CreationValues,
   type SendFolderOutcome,
   type SetupApi,
   type SetupError,
+  type UpgradeApi,
+  type UpgradeResult,
+  type UpgradeValues,
 } from './setup-api.js';
 import {
   FIRST_RUN as T,
   SENSOR,
   SETUP_MESSAGES,
   STEPS,
+  UPGRADE as U,
+  UPGRADE_MESSAGES,
   WORKING_BROWSER,
   type Platform,
 } from './strings.js';
@@ -61,6 +70,12 @@ export interface FirstRunPageProps {
   readonly platform?: Platform;
   /** Whether a passkey with PRF is available. Default: asked of the browser. */
   readonly prfSupport?: () => Promise<PrfSupport>;
+  /** M1-UX-FIRSTRUN-V2-c: the passkey switch for an existing owner (`/api/owner/passkey`). */
+  readonly upgradeApi?: UpgradeApi;
+  readonly createUpgradePasskey?: (
+    values: UpgradeValues,
+    options: PasskeyOptions,
+  ) => Promise<UpgradePasskeyResult>;
 }
 
 interface Done {
@@ -83,6 +98,15 @@ type View =
       readonly noPrf?: boolean;
     }
   | { readonly k: 'unsupported' }
+  | {
+      /** M1-UX-FIRSTRUN-V2-c (B-9): an owner without a passkey: backup code once, one gesture. */
+      readonly k: 'upgrade';
+      readonly values: UpgradeValues;
+      readonly working: boolean;
+      readonly noPrf: boolean;
+      readonly message?: string;
+    }
+  | { readonly k: 'upgraded' }
   | { readonly k: 'already' }
   | { readonly k: 'expired' }
   | { readonly k: 'down' }
@@ -207,18 +231,46 @@ export function FirstRunPage({
   passkeysAvailable: available = passkeysAvailable,
   platform: givenPlatform,
   prfSupport = browserPrfSupport,
+  upgradeApi: givenUpgrade,
+  createUpgradePasskey = browserUpgradePasskey,
 }: FirstRunPageProps = {}): ReactElement {
   const [api] = useState<SetupApi>(() => given ?? createSetupApi());
+  const [upgradeApi] = useState<UpgradeApi>(() => givenUpgrade ?? createUpgradeApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [view, setView] = useState<View>({ k: 'loading' });
+  // M1-UX-FIRSTRUN-V2-c: the backup code as typed, only while the switch is on screen.
+  const [code, setCode] = useState('');
   const sensor = SENSOR[platform];
+
+  /**
+   * M1-UX-FIRSTRUN-V2-c: an owner exists. Without a usable passkey (and with passkeys in this
+   * browser) the page offers the switch; otherwise approvals are already protected. A failed read
+   * never offers setup.
+   */
+  const existingOwner = useCallback(
+    async (isLive: () => boolean = () => true): Promise<void> => {
+      const info = await upgradeApi.info();
+      if (!isLive()) return;
+      if (info.kind !== 'ok' || info.registered || !available()) {
+        if (info.kind === 'error' && info.problem === 'session_expired') {
+          setView({ k: 'expired' });
+        } else setView({ k: 'already' });
+        return;
+      }
+      const prf = await prfSupport().catch((): PrfSupport => 'unknown');
+      if (isLive()) {
+        setView({ k: 'upgrade', values: info.values, working: false, noPrf: prf === 'no' });
+      }
+    },
+    [upgradeApi, available, prfSupport],
+  );
 
   useEffect(() => {
     let live = true;
     void api.status().then((result) => {
       if (!live) return;
       if (result.kind === 'ok') {
-        if (result.owner === 'set_up') setView({ k: 'already' });
+        if (result.owner === 'set_up') void existingOwner(() => live);
         // IR-M1-11b-1-1 L-1: a failed check is never "no owner": doctor, not setup.
         else if (result.owner === 'unknown') {
           setView({ k: 'stuck', message: SETUP_MESSAGES.unknown });
@@ -237,7 +289,7 @@ export function FirstRunPage({
     return () => {
       live = false;
     };
-  }, [api, available, prfSupport]);
+  }, [api, available, prfSupport, existingOwner]);
 
   const protect = useCallback(
     async (noPrf: boolean) => {
@@ -246,7 +298,7 @@ export function FirstRunPage({
         setView({ k: 'protect', working: false, message, noPrf });
       setView({ k: 'protect', working: true, noPrf });
       const begun = await api.begin();
-      if (begun.kind === 'owner_exists') return setView({ k: 'already' });
+      if (begun.kind === 'owner_exists') return existingOwner();
       if (begun.kind === 'error') {
         if (begun.problem === 'session_expired') return setView({ k: 'expired' });
         return again(setupMessage(begun));
@@ -261,7 +313,7 @@ export function FirstRunPage({
       } finally {
         made.body.fill(0);
       }
-      if (finished.kind === 'owner_exists') return setView({ k: 'already' });
+      if (finished.kind === 'owner_exists') return existingOwner();
       if (finished.kind === 'error') {
         if (finished.problem === 'session_expired') return setView({ k: 'expired' });
         if (finished.problem === 'offline') {
@@ -302,7 +354,66 @@ export function FirstRunPage({
         },
       });
     },
-    [api, createPasskey],
+    [api, createPasskey, existingOwner],
+  );
+
+  /**
+   * M1-UX-FIRSTRUN-V2-c (B-9): the backup code once, then one passkey gesture, in one owner
+   * operation of the server (`POST /api/owner/passkey`), which checks the code (with the wrong-code
+   * backoff) and keeps the same owner. The code goes only into that one body; its bytes are zeroed
+   * after sending and the field is cleared once the server has answered.
+   */
+  const upgrade = useCallback(
+    async (values: UpgradeValues, noPrf: boolean, typed: string) => {
+      const again = (message: string, clear: boolean): void => {
+        if (clear) setCode('');
+        setView({ k: 'upgrade', values, working: false, noPrf, message });
+      };
+      if (typed.length === 0) return again(UPGRADE_MESSAGES.empty, false);
+      setView({ k: 'upgrade', values, working: true, noPrf });
+      const made = await createUpgradePasskey(values, { platform: !noPrf });
+      if (made.kind === 'cancelled') return again(UPGRADE_MESSAGES.cancelled, false);
+      if (made.kind === 'unsupported') {
+        return again(UPGRADE_MESSAGES.unsupported(WORKING_BROWSER[platform]), true);
+      }
+      const secret = new TextEncoder().encode(typed);
+      let body: Uint8Array;
+      try {
+        body = encodeUpgradeBody(secret, made.body);
+      } catch {
+        return again(UPGRADE_MESSAGES.presence_required, true);
+      } finally {
+        secret.fill(0);
+        made.body.fill(0);
+      }
+      let result: UpgradeResult;
+      try {
+        result = await upgradeApi.register(body);
+      } finally {
+        body.fill(0);
+      }
+      setCode('');
+      if (result.kind === 'registered') return setView({ k: 'upgraded' });
+      const problem = result.problem;
+      if (problem === 'passkey_exists') return setView({ k: 'already' });
+      if (problem === 'session_expired') return setView({ k: 'expired' });
+      if (problem === 'offline') return setView({ k: 'down' });
+      if (problem === 'wait') return again(UPGRADE_MESSAGES.wait(result.retryAfter ?? 1), true);
+      if (problem === 'passkey_unsupported') {
+        return again(UPGRADE_MESSAGES.unsupported(WORKING_BROWSER[platform]), true);
+      }
+      if (
+        problem === 'presence_rejected' ||
+        problem === 'presence_required' ||
+        problem === 'busy' ||
+        problem === 'forbidden'
+      ) {
+        return again(UPGRADE_MESSAGES[problem], true);
+      }
+      // needs_setup, failed, unknown: never offer a plain retry; doctor tells what is wrong.
+      return setView({ k: 'stuck', message: UPGRADE_MESSAGES.failed });
+    },
+    [createUpgradePasskey, upgradeApi, platform],
   );
 
   // The owner code is dropped from state when the owner leaves the step that shows it.
@@ -333,6 +444,69 @@ export function FirstRunPage({
             {T.protectTitle}
           </h1>
           <Banner tone="warning">{view.message}</Banner>
+        </section>
+      );
+    case 'upgrade': {
+      const { values, noPrf } = view;
+      return (
+        <section aria-labelledby="fr-h">
+          <h1 id="fr-h" className="al-text-display">
+            {U.title(platform)}
+          </h1>
+          <p className="al-text-body-lg al-muted">{U.body(sensor)}</p>
+          {noPrf ? (
+            <Banner tone="warning">{U.noPrf(SENSOR[platform], WORKING_BROWSER[platform])}</Banner>
+          ) : null}
+          {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
+          {/* A real form so a password manager can fill the code; it never navigates (no action;
+              the page's CSP has form-action 'none') and sends nothing itself. */}
+          <form
+            autoComplete="on"
+            onSubmit={(event: FormEvent<HTMLFormElement>) => {
+              event.preventDefault();
+              if (!view.working) void upgrade(values, noPrf, code);
+            }}
+          >
+            <TextField
+              label={U.codeLabel}
+              hint={U.codeHint}
+              name="backup-code"
+              type="password"
+              autoComplete="current-password"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              mono
+              value={code}
+              disabled={view.working}
+              onChange={(event) => setCode(event.currentTarget.value)}
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              icon="key-round"
+              disabled={view.working}
+            >
+              {noPrf ? T.usePasskey : label}
+            </Button>
+          </form>
+          <p className="al-text-caption al-muted" role="status" aria-live="polite">
+            {view.working ? T.waiting : T.passkeyNote}
+          </p>
+        </section>
+      );
+    }
+    case 'upgraded':
+      return (
+        <section aria-labelledby="fr-h">
+          <h1 id="fr-h" className="al-text-display">
+            {U.doneTitle(platform)}
+          </h1>
+          <p className="al-text-body-lg al-muted">{U.doneBody(sensor)}</p>
+          <a className="al-btn al-btn-primary al-btn-lg" href="/">
+            {U.toApprovals}
+          </a>
         </section>
       );
     case 'already':
