@@ -19,11 +19,7 @@ import {
 } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import { readOnlyClient, type LocalUiContext, type LocalUiReadClient } from '../context.js';
-import {
-  UI_NOT_SET_UP,
-  type LocalUiReadRoute,
-  type LocalUiResult,
-} from '../route-types.js';
+import { UI_NOT_SET_UP, type LocalUiReadRoute, type LocalUiResult } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
 import { filesIoRoutes } from './files-io.js';
 
@@ -35,7 +31,9 @@ const ABS_PATH = '/Users/someone/AgentLink/Inbox/report.pdf';
 
 const marko = { name: 'Marko Novak', label: 'self-declared', nameSource: 'counterparty' } as const;
 
-function receivedItem(over: Partial<ReceivedFileItem> = {}): ReceivedFileItem {
+type Over<T> = { [K in keyof T]?: T[K] | undefined };
+
+function receivedItem(over: Over<ReceivedFileItem> = {}): ReceivedFileItem {
   return {
     id: `${ENV_A}.00`,
     from: marko as never,
@@ -49,7 +47,7 @@ function receivedItem(over: Partial<ReceivedFileItem> = {}): ReceivedFileItem {
   } as ReceivedFileItem;
 }
 
-function sentItem(over: Partial<SentFileItem> = {}): SentFileItem {
+function sentItem(over: Over<SentFileItem> = {}): SentFileItem {
   return {
     id: `${ENV_B}.01`,
     to: marko as never,
@@ -68,9 +66,7 @@ type FilesIo = LocalUiReadClient['filesIo'];
 
 function contextWith(filesIo: Partial<FilesIo> | undefined): LocalUiContext {
   const client =
-    filesIo === undefined
-      ? undefined
-      : ({ agentId: 'a', filesIo } as unknown as LocalUiReadClient);
+    filesIo === undefined ? undefined : ({ agentId: 'a', filesIo } as unknown as LocalUiReadClient);
   return {
     client,
     ownerContext: () => Promise.resolve(undefined),
@@ -108,7 +104,9 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
 
   it('keeps the existing /api/ui/files routes', () => {
     const routes = createLocalUiRoutes();
-    expect(routes.match('GET', '/api/ui/files')).toMatchObject({ route: { path: '/api/ui/files' } });
+    expect(routes.match('GET', '/api/ui/files')).toMatchObject({
+      route: { path: '/api/ui/files' },
+    });
     expect(routes.match('GET', '/api/ui/files/review')).toMatchObject({
       route: { path: '/api/ui/files/review' },
     });
@@ -206,7 +204,14 @@ describe('GET /api/ui/files/received (MSG-FILES-IO-d)', () => {
     const res = await call(RECEIVED, contextWith({ received: () => pageOf([leaky]) }));
     expect(res.status).toBe(200);
     const text = JSON.stringify(res.body);
-    for (const bad of [SECRET_URL, FILE_KEY, 'bucket', 'cd'.repeat(32), ABS_PATH, 'envelope_json']) {
+    for (const bad of [
+      SECRET_URL,
+      FILE_KEY,
+      'bucket',
+      'cd'.repeat(32),
+      ABS_PATH,
+      'envelope_json',
+    ]) {
       expect(text).not.toContain(bad);
     }
     expect(Object.keys(bodyOf(res).items[0] ?? {}).sort()).toEqual([
@@ -287,7 +292,9 @@ describe('GET /api/ui/files/received (MSG-FILES-IO-d)', () => {
     const name = '<img src=x onerror=alert(1)>.pdf';
     const res = await call(
       RECEIVED,
-      contextWith({ received: () => pageOf([receivedItem({ name, savedName: undefined, state: 'not_saved' })]) }),
+      contextWith({
+        received: () => pageOf([receivedItem({ name, savedName: undefined, state: 'not_saved' })]),
+      }),
     );
     expect(bodyOf(res).items[0]?.name).toBe(name);
   });
@@ -321,7 +328,12 @@ describe('GET /api/ui/files/sent (MSG-FILES-IO-d)', () => {
         sent: () =>
           pageOf([
             sentItem({ id: `${ENV_B}.00`, state: 'deleted', expiresAt: null }),
-            sentItem({ id: `${ENV_A}.00`, state: 'expired', status: 'not_delivered', receipt: false }),
+            sentItem({
+              id: `${ENV_A}.00`,
+              state: 'expired',
+              status: 'not_delivered',
+              receipt: false,
+            }),
             sentItem({ id: `${ENV_A}.01`, status: 'queued' }),
           ]),
       }),
@@ -392,24 +404,27 @@ describe('the Files In/Out reads: query and errors (MSG-FILES-IO-d)', () => {
     expect(seen).toEqual([{ limit: 100, cursor: 'abc_-1' }, { limit: 1 }]);
   });
 
-  it.each([RECEIVED, SENT])('%s refuses a bad query with bad_request, never echoing it', async (path) => {
-    for (const query of [
-      'limit=0',
-      'limit=101',
-      'limit=-1',
-      'limit=1.5',
-      'limit=abc',
-      'limit=1&limit=2',
-      'cursor=',
-      `cursor=${'c'.repeat(257)}`,
-      'cursor=a&cursor=b',
-      'box=in',
-      'path=%2Fetc%2Fpasswd',
-    ]) {
-      const res = await call(path, contextWith(ok()), query);
-      expect(res).toEqual({ status: 400, body: { error: 'bad_request' } });
-    }
-  });
+  it.each([RECEIVED, SENT])(
+    '%s refuses a bad query with bad_request, never echoing it',
+    async (path) => {
+      for (const query of [
+        'limit=0',
+        'limit=101',
+        'limit=-1',
+        'limit=1.5',
+        'limit=abc',
+        'limit=1&limit=2',
+        'cursor=',
+        `cursor=${'c'.repeat(257)}`,
+        'cursor=a&cursor=b',
+        'box=in',
+        'path=%2Fetc%2Fpasswd',
+      ]) {
+        const res = await call(path, contextWith(ok()), query);
+        expect(res).toEqual({ status: 400, body: { error: 'bad_request' } });
+      }
+    },
+  );
 
   it.each([RECEIVED, SENT])('%s: a cursor core refuses is bad_request', async (path) => {
     const refuse = () => Promise.reject(new CoreError('page_query_invalid', 'bad cursor <x>'));
@@ -417,17 +432,20 @@ describe('the Files In/Out reads: query and errors (MSG-FILES-IO-d)', () => {
     expect(res).toEqual({ status: 400, body: { error: 'bad_request' } });
   });
 
-  it.each([RECEIVED, SENT])('%s: any other failure is unavailable, with no error text', async (path) => {
-    const fail = () =>
-      Promise.reject(new CoreError('store_unreadable', `could not open ${ABS_PATH} report.pdf`));
-    const res = await call(path, contextWith({ received: fail, sent: fail }));
-    expect(res).toEqual({ status: 503, body: { error: 'unavailable' } });
-    const thrown = () => {
-      throw new Error(SECRET_URL);
-    };
-    const sync = await call(path, contextWith({ received: thrown, sent: thrown }));
-    expect(sync).toEqual({ status: 503, body: { error: 'unavailable' } });
-  });
+  it.each([RECEIVED, SENT])(
+    '%s: any other failure is unavailable, with no error text',
+    async (path) => {
+      const fail = () =>
+        Promise.reject(new CoreError('store_unreadable', `could not open ${ABS_PATH} report.pdf`));
+      const res = await call(path, contextWith({ received: fail, sent: fail }));
+      expect(res).toEqual({ status: 503, body: { error: 'unavailable' } });
+      const thrown = () => {
+        throw new Error(SECRET_URL);
+      };
+      const sync = await call(path, contextWith({ received: thrown, sent: thrown }));
+      expect(sync).toEqual({ status: 503, body: { error: 'unavailable' } });
+    },
+  );
 
   it.each([RECEIVED, SENT])('%s without an agent is not_set_up', async (path) => {
     expect(await call(path, contextWith(undefined))).toBe(UI_NOT_SET_UP);
