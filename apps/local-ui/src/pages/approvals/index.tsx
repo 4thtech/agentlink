@@ -1,6 +1,6 @@
 // M1-11b-2: Approvals in the app (08 §1; 11 §6.2.1; 04 §2.5, §2.5.2, §2.5.3; D-68, D-118, D-132).
-// Ported from the server-rendered approval page (packages/node approval-page.ts APP_JS), which stays
-// only for a CLI without the app bundle until its removal card. Same routes, words and rules:
+// Ported from the server-rendered approval page, removed in M1-11b-2c (a server without the app
+// bundle now shows a fixed page that points to the terminal). Same routes, words and rules:
 //
 // - "Waiting for you (n)": the pending requests, soonest to expire first, at most 20. A plain
 //   request offers Approve, Deny or Later; one button names exactly what is included. Before asking

@@ -1,5 +1,5 @@
-// M1-11b-2: one approval card and its owner step, ported from the server-rendered approval page
-// (packages/node approval-page.ts APP_JS `cardBody`, `card`, `confirmStep`, `codeForm`) into the
+// M1-11b-2: one approval card and its owner step, ported from the former server-rendered approval
+// page's script (`cardBody`, `card`, `confirmStep`, `codeForm`; removed in M1-11b-2c) into the
 // app (D-118). The same words, classes and rules:
 //
 // - The card leads with the plain headline, then the facts, the terms, and what the AI chose in its

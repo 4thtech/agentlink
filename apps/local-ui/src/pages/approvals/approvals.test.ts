@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // M1-11b-2: Approvals inside the app (08 §1; 04 §2.5, §2.5.2, §2.5.3; D-68, D-118, D-132; I-4, I-5).
-// Parity with the server-rendered approval page (packages/node/src/approval-page.ts, APP_JS): the
+// Parity with the former server-rendered approval page (removed in M1-11b-2c): the
 // same endpoints, headers and bodies, the same words, the same rules. A paid request is never a list
 // item: its card has its own Approve, which opens the confirmation sheet (proof flow, "Remember for
 // this contact" when offered, the backup code with the server's three tries). Review together leaves

@@ -50,7 +50,6 @@ import {
 } from '@4thtech-io/crypto/keystore';
 import type { OwnerActionOutcome } from '@4thtech-io/core';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { APP_JS } from './approval-page.js';
 import {
   MAX_PRESENCE_BACKOFF_S,
   startApprovalServerWith,
@@ -76,6 +75,7 @@ import {
 } from './owner-passkey.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
+import { TEST_APP } from './local-ui-app.fixture.js';
 
 // Every owner seed opened, copied before it is wiped, so the scan knows what to look for.
 const seen = vi.hoisted(() => ({ seeds: [] as Uint8Array[], prfs: [] as Uint8Array[] }));
@@ -584,7 +584,8 @@ async function harness(clockStep = 0): Promise<Harness> {
   const opened: string[] = [];
   const clock = { ms: Date.now() };
   const server = await startApprovalServerWith(
-    { source, onEvent: (e) => void events.push(e) },
+    // M1-11b-2c: the page (and its CSRF token) is the app's; a minimal bundle stands in.
+    { source, onEvent: (e) => void events.push(e), localUi: { assets: TEST_APP } },
     {
       keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(keychain, expected),
@@ -862,19 +863,9 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
 });
 
 // --- The page script ---------------------------------------------------------------------------------
-
-describe('the page asks for the passkey only after a click (11 §6.2.1)', () => {
-  it('uses RP ID localhost, the PRF extension, user verification and the stored credential', () => {
-    expect(APP_JS).toContain("rpId: 'localhost'");
-    expect(APP_JS).toContain("id: 'localhost'");
-    expect(APP_JS).toContain("userVerification: 'required'");
-    expect(APP_JS).toContain("residentKey: 'required'");
-    expect(APP_JS).toContain('allowCredentials');
-    expect(APP_JS).toContain('prf');
-    expect(APP_JS).toContain("'X-AgentLink-Presence': 'passkey'");
-    expect(APP_JS).toContain('/api/owner/passkey');
-  });
-});
+// M1-11b-2c: the server-rendered page is gone; "the page asks for the passkey only after a click"
+// (RP ID localhost, PRF, user verification, the stored credential, resident key, the presence header)
+// moved to the app that asks for it: apps/local-ui/src/pages/approvals/passkey-request.test.ts.
 
 // --- On-disk scan and the same-user script -----------------------------------------------------------
 
