@@ -11,7 +11,7 @@
 
 In the owner's words: a breathtaking, modern, native-feeling Mac app. Depth, smooth transitions everywhere, animated progress for anything slow; a simple surface with an optional "Under the hood"; reduced motion and accessibility throughout. Nothing new for the user to learn: the pages, routes and flows stay; how they look and move changes.
 
-**Not in scope:** new server routes or API fields (a card that needs one stops and asks: `packages/node` is S2), owner-presence or signing logic, the paid-action sheet (§19, built in #584; it only adopts the shared tokens if they change), Profile and Passkeys pages (M1-UX3-SETTINGS), compose in Messages, any new dependency.
+**Not in scope:** new server routes or API fields (a card that needs one stops and asks: `packages/node` is S2), owner-presence or signing logic, the paid-action sheet (§19, built in #584; it only adopts the shared tokens if they change), Profile and Passkeys pages (UX-V3 plan §3; not yet carded), compose in Messages, any new dependency.
 
 ## 2. What the code has today (checked 27 Oct, main at 0e048e49)
 
@@ -43,11 +43,11 @@ Dependencies: a → b, c, d, e → f → g…n; o needs f and M1-11b-2; p and q 
 
 ## 4. Foundation (cards a to e)
 
-**Tokens (a).** Add exactly the approved values (§13, §18 decision 3): `--al-highlight-top` (dark: white at 5 %; light: transparent), `--al-material-chrome-bg` (the surface colour at 72 %; raised if the contrast measurement in card f requires it), `--al-material-blur` (`blur(20px) saturate(1.4)`). In increased contrast and forced colours the material is the solid surface and the highlight is `transparent`. Both copies change together (`docs/design/d1/tokens/` and `packages/ui/src/tokens/`; the token diff test reads both). New stylesheets `depth.css`, `progress.css`, `motion.css`, `hood.css`, `chrome.css` are created empty and exported from `@4thtech-io/ui`, and imported once in `main.tsx`, so wave-2 cards never edit the same file. Stub modules (`surface.tsx`, `progress.tsx`, `motion.tsx`, `hood.tsx`) are exported from `components/index.ts` now.
+**Tokens (a).** Add exactly the approved values (§13, §18 decision 3): `--al-highlight-top` (dark: white at 5 % for level 1) and `--al-highlight-top-raised` (dark: white at 7 % for levels 2 to 4, §13.1 "6 to 8 %"; light: both transparent; the second name is proposed, owner confirms at merge), `--al-material-chrome-bg` (the surface colour at 72 %; raised if the contrast measurement in card f requires it), `--al-material-blur` (`blur(20px) saturate(1.4)`). In increased contrast and forced colours the material is the solid surface and the highlight is `transparent`. Both copies change together (`docs/design/d1/tokens/` and `packages/ui/src/tokens/`; the token diff test reads both). New stylesheets `depth.css`, `progress.css`, `motion.css`, `hood.css`, `chrome.css` are created empty and exported from `@4thtech-io/ui`, and imported once in `main.tsx`, so wave-2 cards never edit the same file. Stub modules (`surface.tsx`, `progress.tsx`, `motion.tsx`, `hood.tsx`) are exported from `components/index.ts` now.
 
 **Motion lint (a).** A test reads every stylesheet of `packages/ui` and `apps/local-ui` and fails when a `transition` or `@keyframes` animates anything but `opacity`, `transform` or `stroke-dashoffset` (the §6 row 4 height collapse is the one named exception), when a duration is a literal instead of a token, or when an animation has no reduced-motion rule. Every later card is held to it.
 
-**Reduced motion, one switch (a, e).** CSS keys on both `@media (prefers-reduced-motion: reduce)` and `:root[data-motion="reduce"]`; e sets the attribute from Settings › Appearance (Follow system, On, Off). Reduced transparency works the same way with `data-transparency="reduce"`. JavaScript reads one hook, `useReducedMotion()` (d), never `matchMedia` directly.
+**Reduced motion, one switch (a, e).** CSS keys on both `@media (prefers-reduced-motion: reduce)` and `:root[data-motion="reduced"]` (the value the paid-action sheet already uses); e sets the attribute from Settings › Appearance (Follow system, On, Off). Reduced transparency works the same way with `data-transparency="reduced"`. JavaScript reads one hook, `useReducedMotion()` (d), never `matchMedia` directly.
 
 **Components (b, c, d, e).** Built from the §15.1 catalogue and §5, each with a word, an accessible name and, where it changes, a polite live region; never colour only. The pay sheet's private ring and check move into `motion.tsx` only if card d can do it without changing the sheet's tested behaviour; otherwise they stay and d mirrors them.
 
@@ -58,7 +58,7 @@ Dependencies: a → b, c, d, e → f → g…n; o needs f and M1-11b-2; p and q 
 | Chrome material classes (`al-chrome`) with all §13.2 fallbacks | b | Solid by default; translucent only with `:root[data-os="macos"]`, blur support and no reduce-transparency or contrast |
 | `ProgressBar` (determinate, stepped, indeterminate), `RingMeter`, `Skeleton` | c | §15.2 timing (`useDelayedShow`: nothing under 400 ms, at least 500 ms once shown) lives here |
 | `LiveDot`, `SuccessMoment` (check, stamp, codes merge, file drop), `CountBadge` tick, `useRowPresence` (enter, highlight, leave), error nudge, `useReducedMotion`, `useVisibilityPause` | d | Web Animations API for sequences; at most two moves at once |
-| Global Under the hood store, `UnderTheHood` panel (terminal icon, mono, recessed, collapsible, empty text), `Appearance` page (theme, reduce motion, transparency, Under the hood default, live preview tile) | e | The panel accepts only typed, allowlisted fields; never keys, codes, tokens, drop or presigned links, or the session link (§7) |
+| Global Under the hood store, `UnderTheHood` panel (terminal icon, mono, recessed, collapsible, empty text), `Appearance` page (theme, reduce motion, transparency, Under the hood default, live preview tile) | e | The panel accepts only typed, allowlisted fields. Allowed: the public proof record link (a block-explorer link to a public record; UX-V3 plan §3). Never shown: keys, codes, tokens, the session link, drop, upload or download URLs, presigned links (§7) |
 
 ## 5. Shell (card f)
 
@@ -81,6 +81,7 @@ Home (g) reads only existing read routes (`/api/ui/health`, `/api/ui/activity`, 
 - No forced synchronous layout in motion code: read before write, no `offsetHeight` inside a loop; FLIP measurements in one `requestAnimationFrame`.
 - At most two things move at once; loops (shimmer, indeterminate, breathing ring) and polling pause while the tab is hidden.
 - A route change paints the new page within 100 ms of the click; no motion delays content.
+- Automated: card q records a Playwright performance trace of scrolling Activity and of each route change, with CPU throttled 4×, and fails on a frame over 33 ms or a long task over 50 ms from motion code; the owner's 60 fps check on the reference Mac stays manual.
 - Bundle: no new dependency; added CSS ≤ 15 KB and added JS ≤ 10 KB, both gzipped (card q measures against 0.4.0).
 - Any chrome surface that drops frames on the reference machine falls back to solid (§13.2, last row).
 
@@ -102,8 +103,8 @@ Each card commits its failing tests alone first (`RED (expected): UI-REFRESH-<x>
 - **Token tests:** exact values per brief §13 and §14 in every theme; the two token copies equal; contrast and forced-colours themes give `none` shadows, solid material and a transparent highlight.
 - **CSS lint:** the motion lint of card a; no literal durations; no inline styles (08 §4).
 - **DOM tests** for every state a component or page shows (start, middle, done, error, empty, offline, loading), with the word and accessible name present and the live region text checked.
-- **Reduced-motion tests:** with `data-motion="reduce"` and with the media query, no `Element.animate` call, no transform keyframes, loops replaced by the still state and its word; the same for `data-transparency="reduce"`.
-- **Under the hood tests:** off by default; remembered per browser (storage failing still works); no panel renders a forbidden field (fixtures with keys, codes and links never reach the DOM).
+- **Reduced-motion tests:** with `data-motion="reduced"` and with the media query, no `Element.animate` call, no transform keyframes, loops replaced by the still state and its word; the same for `data-transparency="reduced"`.
+- **Under the hood tests:** off by default; remembered per browser (storage failing still works); the panel renders the public proof record link and nothing outside the allowlist (fixtures with keys, codes, tokens, the session link, drop, upload, download and presigned URLs never reach the DOM).
 - **Accessibility:** axe-core zero WCAG 2.1 AA violations per page in dark, light and increased contrast; keyboard order; no autofocus on any Approve.
 - **Vocabulary:** default views pass `lintVocabulary` (11 §5).
 
@@ -120,7 +121,7 @@ Card p re-captures the user-guide screenshots with the existing tool and adds a 
 5. Every slow thing shows progress: a file sending, adding proof, credits arriving, the first load of each page.
 6. Approving, recording a proof and matching safety codes each end with one calm "done" moment.
 7. Home: five tiles, the right states (fine, approvals waiting, paused, not running, offline).
-8. Under the hood: off by default; on shows a marked technical panel per page; never a key, code or link.
+8. Under the hood: off by default; on shows a marked technical panel per page; the only link is the public proof record link; never a key, code, token, session link, drop or presigned link.
 9. With Reduce motion on (system or Settings › Appearance), nothing slides or loops and every state still has its word.
 10. Scrolling Activity with 200 rows stays smooth.
 11. Windows or Linux (if available): solid chrome, same layout.

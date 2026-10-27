@@ -4611,11 +4611,11 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Spec:** B-11 §13.1, §13.2, §14, §18 decision 3; plan §4, §9; 11 §11; 08 §4
 - **Invariants:** —
 - **Scope:**
-  - Add `--al-highlight-top`, `--al-material-chrome-bg` and `--al-material-blur` with the approved values per theme; increased contrast and forced colours: solid material, transparent highlight. Pin the existing §14 motion tokens.
+  - Add `--al-highlight-top` (level 1, dark white at 4 to 6 %), `--al-highlight-top-raised` (levels 2 to 4, dark white at 6 to 8 %, §13.1; the name is proposed, owner confirms at merge), `--al-material-chrome-bg` and `--al-material-blur` with the approved values per theme; increased contrast and forced colours: solid material, transparent highlight. Pin the existing §14 motion tokens.
   - The scaffold of plan §4, so wave-2 cards never share a file.
-  - Motion lint: transitions and keyframes animate only `opacity`, `transform` and `stroke-dashoffset` (named exception: the row-leave height collapse); durations from tokens; every animation has a reduced-motion rule (`@media (prefers-reduced-motion: reduce)` and `:root[data-motion="reduce"]`).
+  - Motion lint: transitions and keyframes animate only `opacity`, `transform` and `stroke-dashoffset` (named exception: the row-leave height collapse); durations from tokens (existing literals: `apps/local-ui/src/pages/files/files.css` shimmer 1.4s moves to `--al-duration-ambient-sweep` in UI-REFRESH-j; `components.css` `al-spin` 1.2s stays a named exception until UI-REFRESH-c replaces the spinner; both listed as named exceptions in the lint until then); every animation has a reduced-motion rule (`@media (prefers-reduced-motion: reduce)` and `:root[data-motion="reduced"]`).
 - **Acceptance (tests first, RED commit):**
-  - Token tests: exact values in every theme, both token copies equal. The lint fails on a fixture that animates `width` or uses a literal duration, and passes on the current stylesheets (existing offenders fixed, or listed in the PR as named exceptions).
+  - Token tests: exact values in every theme, both token copies equal. The lint fails on a fixture that animates `width` or uses a literal duration, and passes on the current stylesheets with exactly the two named exceptions above.
 
 #### UI-REFRESH-b · ui: Surface levels, Sheet and the chrome material (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
@@ -4628,11 +4628,11 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - `Sheet` (level-3 side sheet, a full page at 360) and the level-4 dialog frame over the blurred overlay: focus trap, Escape, focus return, one level-4 layer at a time.
   - `al-chrome` material: translucent only with `:root[data-os="macos"]`, blur support and no reduced transparency or contrast; every §13.2 fallback is solid.
 - **Acceptance (tests first, RED commit):**
-  - DOM tests per level and state; increased contrast and forced colours give every level a 1 px border; `data-transparency="reduce"`, `@supports not`, Windows and Linux give solid chrome; Sheet focus and Escape tests.
+  - DOM tests per level and state; increased contrast and forced colours give every level a 1 px border; `data-transparency="reduced"`, `@supports not`, Windows and Linux give solid chrome; Sheet focus and Escape tests.
 
 #### UI-REFRESH-c · ui: progress components (bars, ring meter, skeleton) (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/ui/src/components/progress.tsx`, `progress.css` and their tests; changeset
+- **Repo/path:** agentlink · `packages/ui/src/components/progress.tsx`, `progress.css` and their tests; the `al-spin` block of `components.css` and its lint exception; changeset
 - **Depends on:** UI-REFRESH-a
 - **Spec:** B-11 §15.1, §15.2, §15.3; 11 §11
 - **Invariants:** —
@@ -4650,7 +4650,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Invariants:** —
 - **Scope:**
   - `LiveDot` (the six §5 states: shape plus word, one pulse on Connected), `SuccessMoment` (check draw, proof stamp, codes merge, file drop), `CountBadge` tick ("99+"), `useRowPresence` (enter with the 1.2 s highlight; leave with the height collapse), the error nudge, `useReducedMotion`, `useVisibilityPause`. Web Animations API for sequences; at most two moves at once.
-  - The paid-action sheet keeps its tested behaviour; its ring and check move here only if its tests stay unchanged.
+  - The paid-action sheet (`pay-confirm.tsx`) is not touched: its ring and check stay where they are; `SuccessMoment` mirrors their timing.
 - **Acceptance (tests first, RED commit):**
   - DOM tests per LiveDot state (shape, word, tone, live region); with reduced motion (app setting and media query) no `Element.animate` call and an instant state plus a text line; interrupted motion continues without a restart; amounts and codes never animate.
 
@@ -4662,10 +4662,10 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Invariants:** I-5
 - **Scope:**
   - One preference store (`localStorage` in try/catch; works without storage): Under the hood (default off), reduce motion (follow system, on, off), transparency (follow system, reduce), theme (system, light, dark). It sets `data-motion`, `data-transparency` and `data-theme` on the root.
-  - `UnderTheHood` panel: `terminal` icon, mono type, recessed, collapsible, in over 200 ms, empty text "Nothing technical to show here yet."; accepts only typed, allowlisted fields.
+  - `UnderTheHood` panel: `terminal` icon, mono type, recessed, collapsible, in over 200 ms, empty text "Nothing technical to show here yet."; accepts only typed, allowlisted fields. Allowed: the public proof record link (a block-explorer link to a public record; UX-V3 plan §3). Never shown: keys, codes, tokens, the session link, drop, upload or download URLs, presigned links.
   - The Appearance page with a live preview tile. Its route and nav entry come with UI-REFRESH-f.
 - **Acceptance (tests first, RED commit):**
-  - Off by default; remembered per browser; storage that throws still renders; the panel never renders a key, code, token, drop or presigned link or the session link (fixtures); each setting sets its root attribute.
+  - Off by default; remembered per browser; storage that throws still renders; a fixture test asserts exactly the allowlist: the public proof record link renders, while keys, codes, tokens, the session link and drop, upload, download and presigned URLs never reach the DOM; each setting sets its root attribute.
 
 #### UI-REFRESH-f · ui + local-ui: shell with top bar, Mac materials and route transitions (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
@@ -4674,7 +4674,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Spec:** B-11 §3, §6 row 11, §13.2, §16 (Settings); UX-V3 plan §3; plan §5
 - **Invariants:** I-5
 - **Scope:**
-  - Top bar: the page title; the Under the hood switch, the live status chip and the theme control. Sidebar, top bar, status bar and the Settings sub-navigation on the chrome material on Mac (`data-os` set at start-up), solid elsewhere.
+  - Top bar: the page title; the Under the hood switch, the live status chip and the theme control. At 360 the sidebar becomes the bottom bar (§13.2). Sidebar, top bar, status bar, the 360 bottom bar and the Settings sub-navigation on the chrome material on Mac (`data-os` set at start-up), solid elsewhere.
   - The nav highlight slides; route changes use the View Transitions API where present, change instantly otherwise and with reduced motion, and never delay navigation.
   - Home (at the address chosen in plan open question 1) and Settings › Appearance join the nav and the router.
   - Measure the chrome text contrast over the worst-case fixture page; raise the material opacity token if needed; record the numbers in the PR.
@@ -4723,7 +4723,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Spec:** B-11 §16 (Files), §15.3, §17.3, §6 row 10
 - **Invariants:** I-5, I-7
 - **Scope:**
-  - Stepped and determinate bars on rows that are sending or arriving; the Received card slightly raised; the file-received moment; tab badges tick. Under the hood: real folder paths, storage, size used. Show in Finder unchanged.
+  - Stepped and determinate bars on rows that are sending or arriving; the Received card slightly raised; the file-received moment; tab badges tick; the `files.css` 1.4s shimmer literal becomes `--al-duration-ambient-sweep` (or the shared `Skeleton`) and its lint exception is removed. Under the hood: real folder paths, storage, size used. Show in Finder unchanged.
 - **Acceptance (tests first, RED commit):**
   - DOM tests per row state; reduced motion; others' file names only inside `UntrustedContent`; the existing files and io tests unchanged.
 
@@ -4736,7 +4736,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Scope:**
   - The contact list on level 1, the conversation solid; a skeleton on first load; new items enter; its own Under the hood panel moves to the shared `UnderTheHood` component. Inbound text stays plain text in `UntrustedContent` and never animates.
 - **Acceptance (tests first, RED commit):**
-  - The existing messages tests unchanged; DOM tests per state; reduced motion; the panel shows only message ID, size and proof.
+  - The existing messages tests unchanged; DOM tests per state; reduced motion; the panel shows only message ID, size and proof status with the public proof record link where there is a proof; no key, code, token, session, drop or presigned link.
 
 #### UI-REFRESH-l · local-ui: Proofs & credits refresh (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
@@ -4745,9 +4745,9 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Spec:** B-11 §16 (Proofs & credits), §15.3, §19.4
 - **Invariants:** I-5
 - **Scope:**
-  - Credits as a ring meter on a level-2 card, filling on load and after a top-up; "Waiting for your credits…" after a top-up; the proof stamp on new proofs. Add credits and Withdraw credits flows unchanged; no charts, no counting-up amounts. Under the hood: record ID, network name, public record link.
+  - Credits as a ring meter on a level-2 card, filling on load and after a top-up; "Waiting for your credits…" after a top-up; the proof stamp on new proofs. Add credits and Withdraw credits flows unchanged; no charts, no counting-up amounts. Under the hood: record ID, network name, the public proof record link (block explorer; allowed, UX-V3 plan §3).
 - **Acceptance (tests first, RED commit):**
-  - DOM tests per state; amounts never animate; reduced motion; the existing proofs tests unchanged.
+  - DOM tests per state; the panel shows the public record link and no key, code, token, session, drop or presigned link; amounts never animate; reduced motion; the existing proofs tests unchanged.
 
 #### UI-REFRESH-m · local-ui: Rules refresh (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
@@ -4762,12 +4762,12 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 
 #### UI-REFRESH-n · local-ui: Settings pages refresh and About (new)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**`, `advanced/**`, `storage/**`, `about/**` (new); one `ROUTES` line in `router.tsx` and one `SETTINGS_PAGES` line in `nav.ts` for About
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**`, `advanced/**`, `storage/**`, `about/**` (new); after UI-REFRESH-f has merged: one `ROUTES` line in `router.tsx`, one `SETTINGS_PAGES` line in `nav.ts` and one `PAGE_TITLES.about` entry in `apps/local-ui/src/strings.ts` (UI-REFRESH-f owns those files until it merges; no other wave-4 card edits them)
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Settings), §7 (Advanced); UX-V3 plan §3
 - **Invariants:** I-7
 - **Scope:**
-  - Each section on level 1; writing the backup uses the determinate bar; About shows the version from the health read. Profile and Passkeys stay with M1-UX3-SETTINGS. Backup's presence step and secret display unchanged.
+  - Each section on level 1; writing the backup uses the determinate bar; About shows the version from the health read. Profile and Passkeys are out of scope (UX-V3 plan §3; not yet carded). Backup's presence step and secret display unchanged.
 - **Acceptance (tests first, RED commit):**
   - DOM tests per state; reduced motion; the recovery kit appears only inside `SecretDisplay`.
 
@@ -4778,7 +4778,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Spec:** B-11 §16 (Approvals), §6 rows 4, 7 and 12; 08 §1; 04 §2.5
 - **Invariants:** I-4, I-5
 - **Scope:**
-  - Cards on level 1, the card being decided on level 2; a ring meter for time left; on approve the check draws and the card collapses out, on deny it fades; the badge ticks down. Visual only: no change to presence, signing or the decide calls; no autofocus on Approve.
+  - Cards on level 1, the card being decided on level 2; a ring meter for time left; on approve the check draws and the card collapses out, on deny it fades; the badge ticks down. Under the hood: approval ID, kind, exact expiry. Visual only: no change to presence, signing or the decide calls; no autofocus on Approve.
 - **Acceptance (tests first, RED commit):**
   - All M1-11a and M1-11b-2 approval flows unchanged; DOM and reduced-motion tests; threat note (S2).
 
@@ -4800,7 +4800,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Spec:** plan §7, §8, §10
 - **Invariants:** —
 - **Scope:**
-  - Playwright across every page in dark, light, increased contrast, forced colours, reduced motion and reduced transparency: axe; no layout-property animation in computed styles; at most four `backdrop-filter` elements plus the overlay; a route change painted within 100 ms; bundle growth within budget against 0.4.0. Hand the plan §10 checklist to the owner.
+  - Playwright across every page in dark, light, increased contrast, forced colours, reduced motion and reduced transparency: axe; no layout-property animation in computed styles; at most four `backdrop-filter` elements plus the overlay; a route change painted within 100 ms; an automated frame-time check (Playwright performance trace, CPU throttled 4×, scrolling Activity with 200 rows and every route change: no frame over 33 ms, no long task over 50 ms from motion code); bundle growth within budget against 0.4.0. The owner's 60 fps check on the reference Mac stays manual. Hand the plan §10 checklist to the owner.
 - **Acceptance:**
   - The e2e test green in CI; budget numbers in the PR; the owner's go-ahead on the checklist recorded before the release.
 
