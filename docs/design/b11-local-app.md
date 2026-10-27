@@ -202,7 +202,7 @@ Five levels, built from tokens that exist today (a background and a shadow per t
 
 **Recessed** (below level 1): `--al-color-bg-sunken` for wells: the Under the hood panels (§7), code and fingerprint blocks, and the inbound message container (§17).
 
-**Rules.** A thing rises one level on hover or focus (shadow and background cross-fade over `--al-duration-fast`; it may also lift 1 px); it never jumps two levels. At most one level-4 layer at a time. In **dark**, shadows barely show, so depth comes from the lighter background and the top highlight (11 §11: "dark may use surface tint instead"). In **increased contrast and forced colours**, the shadow tokens are already `none`: every level keeps a visible 1 px border instead, so the layering still reads. Orange never marks a level; it still means "this needs you".
+**Rules.** A thing rises one level on hover or focus (the higher level's shadow and background sit on a pseudo-element whose opacity cross-fades over `--al-duration-fast`, so only opacity animates; it may also lift 1 px with a transform); it never jumps two levels. At most one level-4 layer at a time. In **dark**, shadows barely show, so depth comes from the lighter background and the top highlight (11 §11: "dark may use surface tint instead"). In **increased contrast and forced colours**, the shadow tokens are already `none`: every level keeps a visible 1 px border instead, so the layering still reads. Orange never marks a level; it still means "this needs you".
 
 ### 13.2 Materials (translucency)
 
@@ -213,7 +213,7 @@ Two places get a translucent, frosted material, the way a Mac sidebar and toolba
 | **Chrome** | Left sidebar, top bar, the 360 bottom bar, sticky day headers | `--al-material-chrome-bg` (the surface colour at about 72 % opacity) with a background blur of about 20 px and saturation 1.4 (`--al-material-blur`); hairline border on the content side |
 | **Overlay** | Behind the presence prompt and dialogs | `--al-color-bg-overlay` plus a light blur (about 8 px) |
 
-Cards, rows and anything a person reads stay **solid**: text never sits on a translucent background, so contrast holds whatever scrolls under it.
+Cards, rows, messages and anything a person reads at length stay **solid**. The chrome itself carries short text (sidebar labels and badges, the page title, the top bar controls, sticky day headers), so: **chrome text must meet WCAG 2.1 AA contrast against the worst-case content that can scroll under it** (the brightest and the busiest); if it does not, raise the chrome opacity until it does. The solid fallbacks below always meet it.
 
 **Solid fallbacks** (design each one; they are not afterthoughts):
 
@@ -227,7 +227,7 @@ Cards, rows and anything a person reads stay **solid**: text never sits on a tra
 
 Technique: CSS only (`backdrop-filter`, `@supports`, media queries), set by classes in the stylesheet, so the CSP (08 §4) is unaffected.
 
-**Design deliverable:** one **elevation and material sheet**: the five levels plus recessed, each in dark, light and increased contrast, and the chrome material over busy and calm content with its solid fallback beside it.
+**Design deliverable:** one **elevation and material sheet**: the five levels plus recessed, each in dark, light and increased contrast, and the chrome material over busy and calm content with its solid fallback beside it, **with the contrast of the chrome text measured over the worst-case content** and the chrome opacity chosen from that.
 
 ## 14. Motion system: tokens and how they fit 11 §11
 
@@ -250,7 +250,7 @@ Technique: CSS only (`backdrop-filter`, `@supports`, media queries), set by clas
 - Only `transform` and `opacity` animate (plus `stroke-dashoffset` for a drawn check). Never width, height or other layout properties, except a leaving row's height collapse (§6 row 4).
 - Every state change transitions; nothing snaps unless reduced motion is on. Interrupted motion continues from where it is (no restart, no jump).
 - At most two things move at once. Content a person must read (amounts, codes, fingerprints, message text) never animates letter by letter.
-- CSS transitions and keyframes; the Web Animations API for sequences; the View Transitions API for route changes where supported. **No motion library** (Decision 8).
+- CSS transitions and keyframes; the Web Animations API for sequences; the View Transitions API for route changes where supported. **No motion library** (§1, owner decision 3).
 - **Reduced motion** (system setting, or Settings › Appearance › Reduce motion): no transforms; fades of 120 ms or none; loops become a still state with its word; signature moments become an instant change plus a text line (§6). **Reduced transparency** is separate (§13.2).
 
 ## 15. Progress and state components
@@ -289,7 +289,7 @@ One family for everything that takes time or has a live state. Every component h
 | Credits arriving after a top-up | Indeterminate bar "Waiting for your credits…"; then the meter fills over `--al-duration-slow` |
 | An invite waiting for the contact | Ring meter counting down the days left, with "Waiting for {name} to accept" |
 | An approval waiting | Ring meter for the time left, on the card and on the Home tile |
-| Waiting for Touch ID | Breathing ring (§6 row 12) |
+| Waiting for Touch ID (on other platforms: "Waiting for Windows Hello", or "Waiting for your passkey" when the platform has no name for it, as in 11 §6.2 first run) | Breathing ring (§6 row 12) |
 | The agent connecting or reconnecting | Live dot |
 | Writing the recovery kit or backup | Determinate bar |
 | The first load of any page or tile | Skeleton |
@@ -346,8 +346,8 @@ The Files page (§8 screens 12 and 13) gets three tabs (owner decision 4): **Rec
 ## 18. Owner decisions raised by v2 (recommended first)
 
 1. **Messages and Files In/Out (§17):** (a) **yes, read-only, as sketched** (recommended); (b) Files In/Out only; (c) not now.
-2. **Motion durations and 11 §11 item 6 (§14):** (a) **120–320 ms is the range for transitions; once-only signature moments may take up to 480 ms and progress loops are exempt; add `--al-duration-moment`, `--al-duration-ambient` and `--al-easing-emphasized` to the tokens and clarify 11 §11 in a later spec PR** (recommended); (b) keep everything within 320 ms and shorten the 480 ms moments in §6.
-3. **Translucency on Windows and Linux (§13.2):** (a) **solid by default there, translucent on Mac** (recommended); (b) translucent wherever the browser supports it.
-4. **Files tabs (§17.3):** (a) **Received · Sent · Send folders** (recommended); (b) keep Decision 8's two tabs, Send (folders plus a Sent list) and Received.
+2. **Motion durations and 11 §11 item 6 (§14):** (a) **120–320 ms is the range for transitions; exempt are once-only signature moments (up to 480 ms), progress loops, and the 1200 ms soft highlight on a new row (§6 row 3, an opacity fade, not movement); add `--al-duration-moment`, `--al-duration-ambient` and `--al-easing-emphasized` to the tokens and clarify 11 §11 in a later spec PR** (recommended); (b) keep everything within 320 ms and shorten the 480 ms moments in §6.
+3. **Translucency and depth tokens (§13):** (a) **add the proposed `--al-highlight-top`, `--al-material-chrome-bg` and `--al-material-blur` to the tokens; solid by default on Windows and Linux, translucent on Mac** (recommended); (b) the same tokens, translucent wherever the browser supports it; (c) no new tokens: solid chrome everywhere, depth from shadows and backgrounds only.
+4. **Files tabs (§17.3):** (a) **Received · Sent · Send folders** (recommended); (b) keep the two tabs of §1 owner decision 5, Send (folders plus a Sent list) and Received.
 5. **Does reading a message in the app mark it read for the AI?** (a) **No: the app keeps its own "seen" marker, so the AI still gets it as new** (recommended); (b) yes, one shared read state.
 6. **Writing messages from the app:** (a) **not now; "To reply, ask your AI."** (recommended); (b) a compose box in a later version.
