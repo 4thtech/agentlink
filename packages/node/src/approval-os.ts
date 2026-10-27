@@ -92,11 +92,15 @@ function run(
   program: string,
   args: readonly string[],
   anyExit = false,
+  verbatim = false,
 ): Promise<boolean> {
   if (!seams.executable(program)) return Promise.resolve(false);
+  const options: ExecFileOptions = verbatim
+    ? { ...RUN_OPTIONS, windowsVerbatimArguments: true }
+    : { ...RUN_OPTIONS };
   return new Promise((resolve) => {
     try {
-      seams.execFile(program, [...args], { ...RUN_OPTIONS }, (error) =>
+      seams.execFile(program, [...args], options, (error) =>
         resolve(
           error === null || (anyExit && typeof error.code === 'number' && error.killed !== true),
         ),
@@ -152,17 +156,23 @@ export function notifierWith(seams: OsSeams): OsNotifier {
  */
 export type FileRevealer = (file: string, folder: string) => Promise<boolean>;
 
-/** A full path that cannot read as an option, with no NUL (the paths are checked before; defence in depth). */
+/**
+ * A full path that cannot read as an option, with no NUL (the paths are checked before; defence in
+ * depth). On Windows also no `"`: the path is quoted by us (fileRevealerWith), and a `"` cannot occur
+ * in a Windows path anyway (sanitizeFileName removes it from the saved name).
+ */
 function revealablePath(p: string, platform: NodeJS.Platform): boolean {
   if (typeof p !== 'string' || p.length === 0 || p.includes('\0')) return false;
-  return platform === 'win32' ? /^[A-Za-z]:\\/.test(p) : p.startsWith('/');
+  return platform === 'win32' ? /^[A-Za-z]:\\/.test(p) && !p.includes('"') : p.startsWith('/');
 }
 
 /**
  * The revealer over `seams`: macOS `open -R <file>` (Finder selects it), Windows
- * `explorer.exe /select, <file>` (exits 1 even when it worked), elsewhere `xdg-open <folder>` (no
+ * `explorer.exe /select,"<file>"` (exits 1 even when it worked), elsewhere `xdg-open <folder>` (no
  * portable "select" exists, so the folder opens). Fixed programs by absolute path, shell false, the
- * path as its own argument.
+ * path as its own argument. explorer.exe parses its own command line and splits on commas, so on
+ * Windows the path is quoted here and passed verbatim (windowsVerbatimArguments, still no shell); it
+ * holds no `"` (revealablePath), so the quotes cannot be closed early (CHORE-MAIN-NODEOS-040).
  */
 export function fileRevealerWith(seams: OsSeams): FileRevealer {
   return (file, folder) => {
@@ -173,7 +183,7 @@ export function fileRevealerWith(seams: OsSeams): FileRevealer {
       case 'darwin':
         return run(seams, OS_PROGRAMS.darwinOpen, ['-R', file]);
       case 'win32':
-        return run(seams, windowsExplorer(seams.env), ['/select,', file], true);
+        return run(seams, windowsExplorer(seams.env), [`/select,"${file}"`], true, true);
       default:
         return run(seams, OS_PROGRAMS.linuxOpen, [folder]);
     }
