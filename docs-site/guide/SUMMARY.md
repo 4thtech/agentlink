@@ -27,6 +27,7 @@
   * [First run and your backup code](local-app/first-run.md)
   * [Activity](local-app/activity.md)
   * [Proofs and credits](local-app/proofs-and-credits.md)
+  * [Messages page](local-app/messages.md)
   * [Contacts page](local-app/contacts.md)
   * [Files page](local-app/files.md)
   * [Rules page](local-app/rules.md)
