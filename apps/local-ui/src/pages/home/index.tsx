@@ -19,6 +19,7 @@ import {
   LiveDot,
   RingMeter,
   Skeleton,
+  UnderTheHood,
   useRowPresence,
   type LiveDotState,
 } from '@4thtech-io/ui';
@@ -32,7 +33,8 @@ import {
   type ReactNode,
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
-import { HEALTH_PATH, startHealthPoller } from '../../layout/health.js';
+import { subscribeHealth } from '../../layout/health-feed.js';
+import { HEALTH_PATH } from '../../layout/health.js';
 import { needsPasskeySwitch } from '../../layout/index.js';
 import { recoveryKitPending } from '../../states/recovery-kit.js';
 import { createApprovalsClient, type ListAnswer } from '../approvals/client.js';
@@ -79,8 +81,6 @@ export interface HomePageProps {
   };
   readonly platform?: Platform;
   readonly now?: () => Date;
-  /** Show the Under the hood panel (the global switch, card e, decides). Off by default. */
-  readonly hood?: boolean;
 }
 
 const EVENT_TEXT: Readonly<Record<EventKind, string>> = {
@@ -301,46 +301,26 @@ function NextStep({ step }: { step: Step }): ReactElement {
   );
 }
 
-/** The technical layer (B-11 §7): typed, read-only, only the fields listed there. */
+/**
+ * The technical layer (B-11 §7): the global Under the hood panel (card e; it renders only while the
+ * switch is on and keeps only allowlisted fields). Version and routes up; nothing else.
+ */
 function Hood({ health }: { health: HealthSnapshot | undefined }): ReactElement {
-  const [open, setOpen] = useState(true);
-  const fields: { label: string; value: string }[] = [];
-  if (health?.version != null) fields.push({ label: S.hoodVersion, value: health.version });
+  const fields: { kind: 'id' | 'count'; label: string; value: string }[] = [];
+  if (health?.version != null) {
+    fields.push({ kind: 'id', label: S.hoodVersion, value: health.version });
+  }
   if (health?.relays != null) {
     fields.push({
+      kind: 'count',
       label: S.hoodRoutes,
       value: routesLine(health.relays.connected, health.relays.total),
     });
   }
-  if (health?.lastSyncAt != null) {
-    fields.push({ label: S.hoodLastSync, value: clock(secondsToDate(health.lastSyncAt)) });
-  }
   return (
-    <section className="hm-hood" data-hood aria-label={S.hoodTitle}>
-      <button
-        type="button"
-        className="hm-hood-head al-text-label"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <Icon name="terminal" size={14} />
-        {S.hoodTitle}
-      </button>
-      {open ? (
-        fields.length === 0 ? (
-          <p className="hm-hood-body al-text-code al-muted">{S.hoodEmpty}</p>
-        ) : (
-          <dl className="hm-hood-body al-text-code">
-            {fields.map((f) => (
-              <div key={f.label} className="hm-hood-row">
-                <dt>{f.label}</dt>
-                <dd>{f.value}</dd>
-              </div>
-            ))}
-          </dl>
-        )
-      ) : null}
-    </section>
+    <div className="hm-hood" data-hood>
+      <UnderTheHood fields={fields} />
+    </div>
   );
 }
 
@@ -350,7 +330,6 @@ export function HomePage({
   nextStep,
   platform: givenPlatform,
   now = () => new Date(),
-  hood = false,
 }: HomePageProps): ReactElement {
   const client = useRef<ApiClient>(api ?? createApiClient());
   const approvalsClient = useRef(approvals ?? createApprovalsClient());
@@ -373,38 +352,50 @@ export function HomePage({
     if (reading.current) return;
     reading.current = true;
     lastSecondary.current = Date.now();
-    const get = (path: string): Promise<ApiResult<unknown>> => client.current.get(path);
-    const [activity, credits, contacts, waiting] = await Promise.all([
-      get(ACTIVITY_PATH),
-      get(CREDITS_PATH),
-      get(CONTACTS_PATH),
-      approvalsClient.current.list().catch((): ListAnswer => ({ kind: 'offline' })),
-    ]);
-    reading.current = false;
-    // A failed read keeps the value from before; the first read only marks the tile as settled.
-    patch((m) => {
-      const events = activity.kind === 'ok' ? parseEvents(activity.data) : undefined;
-      const cr = credits.kind === 'ok' ? creditsOf(credits.data) : undefined;
-      const count = contacts.kind === 'ok' ? contactCount(contacts.data) : undefined;
-      return {
-        events: events === undefined ? { ...m.events, done: true } : { done: true, value: events },
-        credits: cr === undefined ? { ...m.credits, done: true } : { done: true, value: cr },
-        contacts:
-          count === undefined ? { ...m.contacts, done: true } : { done: true, value: count },
-        waiting:
-          waiting.kind === 'ok'
-            ? { done: true, value: waitingOf(waiting.items) }
-            : { ...m.waiting, done: true },
-      };
-    });
+    try {
+      const get = (path: string): Promise<ApiResult<unknown>> => client.current.get(path);
+      const [activity, credits, contacts, waiting] = await Promise.all([
+        get(ACTIVITY_PATH),
+        get(CREDITS_PATH),
+        get(CONTACTS_PATH),
+        approvalsClient.current.list().catch((): ListAnswer => ({ kind: 'offline' })),
+      ]);
+      // A failed read keeps the value from before; the first read only marks the tile as settled.
+      patch((m) => {
+        const events = activity.kind === 'ok' ? parseEvents(activity.data) : undefined;
+        const cr = credits.kind === 'ok' ? creditsOf(credits.data) : undefined;
+        const count = contacts.kind === 'ok' ? contactCount(contacts.data) : undefined;
+        return {
+          events:
+            events === undefined ? { ...m.events, done: true } : { done: true, value: events },
+          credits: cr === undefined ? { ...m.credits, done: true } : { done: true, value: cr },
+          contacts:
+            count === undefined ? { ...m.contacts, done: true } : { done: true, value: count },
+          waiting:
+            waiting.kind === 'ok'
+              ? { done: true, value: waitingOf(waiting.items) }
+              : { ...m.waiting, done: true },
+        };
+      });
+    } catch {
+      // A request that throws counts as no answer: old values stay, the tiles settle.
+      patch((m) => ({
+        events: { ...m.events, done: true },
+        credits: { ...m.credits, done: true },
+        contacts: { ...m.contacts, done: true },
+        waiting: { ...m.waiting, done: true },
+      }));
+    } finally {
+      reading.current = false;
+    }
   }, [patch]);
 
   useEffect(() => {
     live.current = true;
     void loadSecondary();
-    const read = async (): Promise<ApiResult<unknown>> => {
-      const result = await client.current.get(HEALTH_PATH);
-      if (!live.current) return result;
+    // The shell's health poller is shared (layout/health-feed.ts): Home does not start a second one.
+    const onResult = (result: ApiResult<unknown>): void => {
+      if (!live.current) return;
       const snapshot = parseHealthSnapshot(result);
       if (snapshot !== undefined) {
         patch({
@@ -419,9 +410,8 @@ export function HomePage({
       } else {
         patch((m) => ({ health: { ...m.health, done: true }, offline: false, error: true }));
       }
-      return result;
     };
-    const stop = startHealthPoller({ read, onState: () => undefined });
+    const stop = subscribeHealth(() => client.current.get(HEALTH_PATH), { onResult });
     return () => {
       live.current = false;
       stop();
@@ -573,7 +563,7 @@ export function HomePage({
           )}
         </Tile>
       </div>
-      {hood ? <Hood health={health} /> : null}
+      <Hood health={health} />
     </>
   );
 }

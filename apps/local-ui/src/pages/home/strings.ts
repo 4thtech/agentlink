@@ -52,11 +52,8 @@ export const HOME_STRINGS = {
   errorLine: "Couldn't read the latest. Trying again.",
   offlineLine: "Can't reach AgentLink on this computer. Showing the last values.",
   // Under the hood
-  hoodTitle: 'Under the hood',
-  hoodEmpty: 'Nothing technical to show here yet.',
   hoodVersion: 'Version',
   hoodRoutes: 'Routes up',
-  hoodLastSync: 'Last sync',
 } as const;
 
 /** `{n} min left` for the soonest waiting request. */

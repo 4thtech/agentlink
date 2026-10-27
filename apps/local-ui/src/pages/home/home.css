@@ -170,47 +170,12 @@
   opacity: var(--al-opacity-disabled);
 }
 
-/* Under the hood: marked, recessed, mono. */
+/* Under the hood: the global panel (card e) sits below the tiles. */
 .hm-hood {
   margin-block-start: var(--al-space-6);
-  padding: var(--al-space-4) var(--al-space-5);
-  border: var(--al-border-width-thin) dashed var(--al-color-border-default);
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-sunken);
-  animation: hm-hood-in var(--al-duration-base) var(--al-easing-enter) both;
 }
-.hm-hood-head {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--al-color-fg-muted);
-  font: inherit;
-  cursor: pointer;
-}
-.hm-hood-body {
-  margin: var(--al-space-3) 0 0;
-}
-.hm-hood-row {
-  display: flex;
-  gap: var(--al-space-5);
-}
-.hm-hood-row dt {
-  min-inline-size: 120px;
-  color: var(--al-color-fg-muted);
-}
-.hm-hood-row dd {
-  margin: 0;
-}
-@keyframes hm-hood-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.hm-hood:empty {
+  display: none;
 }
 
 /* 360: the tiles stack, Waiting for you first. */
@@ -236,9 +201,6 @@
   .hm-tile:focus-within {
     transform: none;
   }
-  .hm-hood {
-    animation: none;
-  }
 }
 [data-motion='reduced'] .hm-tile,
 [data-motion='reduced'] .hm-tile::before {
@@ -247,9 +209,6 @@
 [data-motion='reduced'] .hm-tile:hover,
 [data-motion='reduced'] .hm-tile:focus-within {
   transform: none;
-}
-[data-motion='reduced'] .hm-hood {
-  animation: none;
 }
 
 @media (forced-colors: active), (prefers-contrast: more) {

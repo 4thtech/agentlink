@@ -15,6 +15,8 @@ import homeCss from './home.css?raw';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ApprovalItem, ListAnswer } from '../approvals/client.js';
 import { ROUTES } from '../../router.js';
+import { HoodProvider, HOOD_STRINGS } from '@4thtech-io/ui';
+import { Layout } from '../../layout/index.js';
 import { HomePage, type HomePageProps } from './index.js';
 import { HOME_STRINGS as S } from './strings.js';
 
@@ -125,9 +127,9 @@ function setup(answers: Answers = {}): {
   return { props, get, list, answers: a };
 }
 
-async function mount(props: HomePageProps): Promise<void> {
+async function mount(props: HomePageProps, hood = false): Promise<void> {
   await act(async () => {
-    root.render(h(HomePage, props));
+    root.render(hood ? h(HoodProvider, { value: true }, h(HomePage, props)) : h(HomePage, props));
   });
 }
 
@@ -541,7 +543,7 @@ describe('Home: inbound content is plain text (I-5, §17.4)', () => {
         agentCard: 'CARDCANARY',
       }),
     });
-    await mount({ ...props, hood: true });
+    await mount(props, true);
     for (const canary of ['SESSIONCANARY', 'TOKENCANARY', 'CARDCANARY', '127.0.0.1']) {
       expect(text()).not.toContain(canary);
     }
@@ -549,31 +551,90 @@ describe('Home: inbound content is plain text (I-5, §17.4)', () => {
 });
 
 describe('Home: Under the hood', () => {
-  it('is off by default', async () => {
+  it('is off by default (the global switch decides)', async () => {
     const { props } = setup();
     await mount(props);
-    expect(host.querySelector('[data-hood]')).toBeNull();
-    expect(text()).not.toContain(S.hoodTitle);
+    expect(host.querySelector('.al-hood')).toBeNull();
+    expect(text()).not.toContain(HOOD_STRINGS.title);
   });
 
-  it('shows only the listed fields when on', async () => {
+  it('shows only the listed fields when the global switch is on, and not Last sync', async () => {
     const { props } = setup();
-    await mount({ ...props, hood: true });
-    const panel = host.querySelector('[data-hood]') as HTMLElement;
-    expect(panel.textContent).toContain(S.hoodTitle);
+    await mount(props, true);
+    const panel = host.querySelector('.al-hood') as HTMLElement;
+    expect(panel.textContent).toContain(HOOD_STRINGS.title);
     expect(panel.textContent).toContain('0.4.0');
     expect(panel.textContent).toContain('3 of 3');
-    expect(panel.textContent).toContain(S.hoodLastSync);
+    expect(panel.textContent).not.toContain('Last sync');
     expect(panel.querySelectorAll('a').length).toBe(0);
-    expect(panel.querySelectorAll('dt').length).toBeLessThanOrEqual(4);
+    expect(panel.querySelectorAll('dt').length).toBe(2);
   });
 
   it('says so when there is nothing technical to show', async () => {
     const { props } = setup({
       health: ok({ agent: 'running', relays: null, lastSyncAt: null, version: null }),
     });
-    await mount({ ...props, hood: true });
-    expect((host.querySelector('[data-hood]') as HTMLElement).textContent).toContain(S.hoodEmpty);
+    await mount(props, true);
+    expect((host.querySelector('.al-hood') as HTMLElement).textContent).toContain(
+      HOOD_STRINGS.empty,
+    );
+  });
+});
+
+describe('Home: one health poller with the shell', () => {
+  it('shares the shell poller: no doubled /api/ui/health reads', async () => {
+    vi.useFakeTimers();
+    const { props, get } = setup();
+    const shellRead = vi.fn(async (): Promise<ApiResult<unknown>> => ok(HEALTH));
+    await act(async () => {
+      root.render(
+        h(
+          Layout,
+          {
+            path: '/settings/home',
+            readHealth: shellRead,
+            nextStep: async () => false,
+            unseenMessages: async () => 0,
+          },
+          h(HomePage, props),
+        ),
+      );
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_000);
+    });
+    const homeReads = get.mock.calls.filter((c) => c[0] === '/api/ui/health').length;
+    // Ticks at 0, 5, 10 and 15 s: one poller reads four times between the two of them, not eight.
+    expect(shellRead.mock.calls.length + homeReads).toBe(4);
+    // Both still see every answer: the tile and the status bar.
+    expect(text()).toContain(S.agentRunningLine);
+    expect(host.querySelector('.al-sb-state .is-connected')).not.toBeNull();
+  });
+});
+
+describe('Home: a request that throws', () => {
+  it('lets the next tick read again (the reading flag is reset)', async () => {
+    vi.useFakeTimers();
+    const { props, get, answers } = setup();
+    let fail = true;
+    const base = get.getMockImplementation() as (p: string) => Promise<ApiResult<unknown>>;
+    get.mockImplementation(async (path: string) => {
+      if (fail && path.startsWith('/api/ui/activity')) throw new Error('boom');
+      return base(path);
+    });
+    await mount(props);
+    const activityReads = (): number =>
+      get.mock.calls.filter((c) => String(c[0]).startsWith('/api/ui/activity')).length;
+    expect(activityReads()).toBe(1);
+    // The failed round settles the tiles instead of leaving them loading.
+    expect(host.querySelectorAll('.al-skeleton').length).toBe(0);
+    fail = false;
+    answers.contacts = ok(CONTACTS);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16_000);
+    });
+    expect(activityReads()).toBeGreaterThan(1);
+    expect(tile('activity').textContent).not.toContain(S.activityNone);
   });
 });
 
