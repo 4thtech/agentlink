@@ -21,6 +21,11 @@ export interface ContactRow {
   readonly pairing: Pairing;
   /** Unix seconds. */
   readonly since: number;
+  /**
+   * M1-UX3-DUP-CONTACTS: the ref of the next older contact with the same owner (the server groups
+   * by owner fingerprint and sends only the ref). Never shown.
+   */
+  readonly olderSameOwner?: string;
 }
 
 export type ListAnswer =
@@ -52,7 +57,7 @@ const oneOf = <T extends string>(v: unknown, set: readonly T[]): v is T =>
 
 function row(v: unknown): ContactRow | undefined {
   if (!isObject(v)) return undefined;
-  const { ref, name, nameSource, fingerprint, label, status, pairing, since } = v;
+  const { ref, name, nameSource, fingerprint, label, status, pairing, since, olderSameOwner } = v;
   if (typeof ref !== 'string' || !REF.test(ref)) return undefined;
   if (typeof name !== 'string' || name.length > MAX_NAME) return undefined;
   if (!oneOf(nameSource, ['owner', 'counterparty'] as const)) return undefined;
@@ -61,6 +66,10 @@ function row(v: unknown): ContactRow | undefined {
   if (!oneOf(pairing, ['pending', 'complete', 'mismatch'] as const)) return undefined;
   if (typeof since !== 'number' || !Number.isSafeInteger(since) || since < 0) return undefined;
   const fp = typeof fingerprint === 'string' && FINGERPRINT.test(fingerprint) ? fingerprint : null;
+  const older =
+    typeof olderSameOwner === 'string' && REF.test(olderSameOwner) && olderSameOwner !== ref
+      ? olderSameOwner
+      : null;
   return {
     ref,
     name,
@@ -70,6 +79,7 @@ function row(v: unknown): ContactRow | undefined {
     pairing,
     since,
     ...(fp === null ? {} : { fingerprint: fp }),
+    ...(older === null ? {} : { olderSameOwner: older }),
   };
 }
 

@@ -14,6 +14,7 @@
 // Rename and Remove ask for owner presence (the passkey, or the owner code). Every change is one POST
 // to a presence route; the page never signs (owner.ts).
 import {
+  Banner,
   Button,
   ContactName,
   EmptyState,
@@ -42,6 +43,7 @@ import {
   type CodeAnswer,
   type ContactRow,
 } from './data.js';
+import { isKept, keep, loadKept } from './kept.js';
 import {
   createOwnerClient,
   passkeyProof,
@@ -56,6 +58,7 @@ import {
   countLine,
   mismatchBody,
   nudge,
+  secondConnection,
   since,
   waitSeconds,
 } from './strings.js';
@@ -80,6 +83,9 @@ const DATE = new Intl.DateTimeFormat(undefined, {
   month: 'short',
   year: 'numeric',
 });
+
+/** The pairing day in the second-connection notice ("paired 25 Oct"). */
+const DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
 
 const nameInput = (c: ContactRow): { alias?: string; name?: string; fingerprint?: string } =>
   c.nameSource === 'owner'
@@ -362,12 +368,17 @@ function Detail({
   api,
   owner,
   passkey,
+  older,
+  onKeepBoth,
   onChanged,
 }: {
   contact: ContactRow;
   api: ApiClient;
   owner: OwnerClient;
   passkey: PasskeyInfo | undefined;
+  /** An older contact with the same owner, not yet kept (M1-UX3-DUP-CONTACTS). */
+  older: ContactRow | undefined;
+  onKeepBoth: () => void;
   onChanged: (what: Pending['what']) => void;
 }): ReactElement {
   const ref = contact.ref;
@@ -481,6 +492,32 @@ function Detail({
 
   const removeNow = (): void => ask({ what: 'remove', ref, summary: SUMMARY.remove(name) });
 
+  // The same Remove as above, for the older contact: the existing presence route, nothing new.
+  const duplicate =
+    older === undefined || pending !== undefined || renaming || confirmRemove ? null : (
+      <div className="ct-dup">
+        <Banner tone="info" icon="users">
+          <p className="al-text-body">
+            {secondConnection(shownName(older), DAY.format(new Date(older.since * 1000)))}
+          </p>
+          <div className="ct-actions">
+            <Button variant="ghost" size="sm" onClick={onKeepBoth}>
+              {S.keepBoth}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() =>
+                ask({ what: 'remove', ref: older.ref, summary: SUMMARY.remove(shownName(older)) })
+              }
+            >
+              {S.removeOlder}
+            </Button>
+          </div>
+        </Banner>
+      </div>
+    );
+
   let safety: ReactElement | null = null;
   if (matched || contact.label === 'safety-code-checked') {
     safety = (
@@ -561,6 +598,7 @@ function Detail({
       <p className="al-text-body-sm al-muted">
         {since(DATE.format(new Date(contact.since * 1000)))}
       </p>
+      {duplicate}
       {contact.status === 'blocked' ? <p className="al-text-body">{S.blockedDetail}</p> : null}
       {contact.status === 'revoked' ? <p className="al-text-body">{S.revokedDetail}</p> : null}
       {notice === undefined ? null : (
@@ -651,6 +689,7 @@ export function ContactsPage({
   const [passkey, setPasskey] = useState<PasskeyInfo | undefined>(undefined);
   const [tick, setTick] = useState(0);
   const [removed, setRemoved] = useState(false);
+  const [kept, setKept] = useState(loadKept);
 
   useEffect(() => {
     let live = true;
@@ -734,6 +773,15 @@ export function ContactsPage({
     );
   }
   const current = list.contacts.find((c) => c.ref === selected) ?? list.contacts[0];
+  // M1-UX3-DUP-CONTACTS: the server links a newer contact to an older one with the same owner by
+  // ref only; the notice shows on the newer one unless "Keep both" was chosen in this browser.
+  const olderRef = current?.olderSameOwner;
+  const older =
+    current === undefined || olderRef === undefined || isKept(kept, current.ref, olderRef)
+      ? undefined
+      : list.contacts.find(
+          (c) => c.ref === olderRef && c.ref !== current.ref && c.status === 'active',
+        );
   return (
     <>
       <p className="al-text-label al-muted ct-count">{countLine(list.contacts.length)}</p>
@@ -759,6 +807,10 @@ export function ContactsPage({
             api={api}
             owner={owner}
             passkey={passkey}
+            older={older}
+            onKeepBoth={() => {
+              if (olderRef !== undefined) setKept(keep(kept, current.ref, olderRef));
+            }}
             onChanged={onChanged}
           />
         )}

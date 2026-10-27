@@ -971,6 +971,15 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** (1) Rules nav icon `sliders-horizontal`, and the other icons whose `line` shapes had no coordinates, get their Lucide geometry. (2) `html`, `body` and `#root` fill the viewport. (3) Proofs and credits: with 0 test credits, one line that free test credits arrive automatically with the first proof (D-120). (4) The local app says "backup code" where it said "owner code" (11 §5.5). (5) Contacts: one-line safety-code explanation (11 §5) and a UI-only hint when two contacts share a name; the fingerprint-based suggestion is a later card (M1-UX3-DUP-CONTACTS).
 - **Acceptance:** tests for each item (every icon shape has attributes; built CSS has the full-height rules; the zero-credit line; no "owner code" in local-ui `strings.ts`; the safety-code line; the duplicate hint on both rows).
 
+#### M1-UX3-DUP-CONTACTS · local app: suggest removing the older of two contacts with the same owner (new, owner decision 8, plan UX-V3-LOCAL-APP)
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (by path: a read-only field on the node's local-UI contact list; removal reuses the existing owner route)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/contacts.ts`, `apps/local-ui/src/pages/contacts`
+- **Depends on:** UX-031-QUICKWINS (the same-name hint)
+- **Spec:** 04 §2.5, §2.9; 11 §5; `docs/design/b11-local-app.md` §8 (row 11), §13–§16
+- **Invariants:** I-4 (no new owner path; not reachable from MCP), I-5 (contact names rendered as text)
+- **Scope:** `GET /api/ui/contacts` adds `olderSameOwner` (a ref the list already shows) to a newer active contact whose full owner fingerprint equals an older active one's; the fingerprint stays a server-side grouping key. The page shows one calm notice on the newer contact: "Looks like a second connection with <name> (paired <date>). Keep both, or remove the older one?". Remove older is the existing `POST /api/ui/contacts/:ref/remove` with its owner presence; Keep both is remembered per browser (localStorage, wrapped). Same name with a different owner keeps only the existing hint.
+- **Acceptance:** node tests (newer only, by date, aliased contacts, different owner, active only, three in a chain, no fingerprint leak); page tests (notice text, Remove older asks for presence then posts the older ref's remove, Cancel sends nothing, Keep both persists, blocked storage, same-name-only shows no suggestion, unknown or malformed link ignored, name as text).
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`

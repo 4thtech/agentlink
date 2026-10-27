@@ -28,6 +28,9 @@
 // short fingerprint only for a contact's own name (the name rule's fallback), a label no stronger
 // than core's, a status, the pairing state and a date. Never the card, a key, the raw name, the
 // pairing digest or an error's text. A row with a value this file does not know is left out.
+// M1-UX3-DUP-CONTACTS: a newer active contact with the same owner as an older active one also
+// carries `olderSameOwner`, that older contact's ref (a ref the list already shows); the full owner
+// fingerprint is only a grouping key here and never leaves.
 import type { ContactView, PreparedOwnerAction } from '@4thtech-io/core';
 import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
@@ -92,6 +95,31 @@ function row(view: ContactView): JsonObject | undefined {
   };
 }
 
+/**
+ * M1-UX3-DUP-CONTACTS: for each active contact, the ref of the next older active contact with the
+ * same owner (same full owner fingerprint, 04 §2.9; cards are owner-signed, so the same fingerprint
+ * means the same owner keys). Older is by pairing date, then list order. Only refs leave; the
+ * fingerprint is used here as a grouping key and never added to a row.
+ */
+function olderSameOwner(views: readonly ContactView[]): ReadonlyMap<number, string> {
+  const byDate = views
+    .map((view, i) => ({ view, i }))
+    .filter(({ view }) => {
+      const long: unknown = view.ownerFingerprint.long;
+      return view.status === 'active' && typeof long === 'string' && long.length > 0;
+    })
+    .sort((a, b) => a.view.createdAt - b.view.createdAt || a.i - b.i);
+  const last = new Map<string, string>();
+  const links = new Map<number, string>();
+  for (const { view, i } of byDate) {
+    const key = view.ownerFingerprint.long;
+    const older = last.get(key);
+    if (older !== undefined) links.set(i, older);
+    last.set(key, view.id);
+  }
+  return links;
+}
+
 async function listContacts(
   context: LocalUiContext,
   request: LocalUiRequest,
@@ -100,11 +128,19 @@ async function listContacts(
   if (client === undefined) return UI_NOT_SET_UP;
   if ([...request.query.keys()].length > 0) return UI_INVALID_QUERY;
   try {
-    const contacts: JsonObject[] = [];
+    const views: ContactView[] = [];
+    const rows: JsonObject[] = [];
     for (const view of await client.contacts.list()) {
-      const r = row(view);
-      if (r !== undefined) contacts.push(r);
+      const out = row(view);
+      if (out === undefined) continue;
+      views.push(view);
+      rows.push(out);
     }
+    const links = olderSameOwner(views);
+    const contacts = rows.map((out, i) => {
+      const older = links.get(i);
+      return older === undefined ? out : { ...out, olderSameOwner: older };
+    });
     return { status: 200, body: { status: 'ok', contacts } };
   } catch {
     // Never the error's text: it could name a path.

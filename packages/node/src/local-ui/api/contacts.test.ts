@@ -376,6 +376,79 @@ describe('GET /api/ui/contacts: the list', () => {
   });
 });
 
+describe('GET /api/ui/contacts: same owner, second connection (M1-UX3-DUP-CONTACTS)', () => {
+  const list = readRoute('/api/ui/contacts');
+  const OTHER_LONG = '1111·2222·3333·4444';
+  const THIRD = '0x9a9a000000000000000000000000000000000003';
+  const at = (id: string, createdAt: number, over: Record<string, unknown> = {}): ContactView =>
+    view({ id, createdAt, ...over } as Partial<ContactView> & { id: string });
+
+  async function rows(views: ContactView[]): Promise<Record<string, unknown>[]> {
+    const contacts = fakeContacts({ list: () => Promise.resolve(views) });
+    const r = await list.handler(ctx(fakeClient(contacts)), req());
+    expectNoLeak(r.body);
+    return body(r)['contacts'] as Record<string, unknown>[];
+  }
+
+  it('marks only the newer of two active same-owner contacts, by ref, never the fingerprint', async () => {
+    const r = await rows([at(MARKO, 1_759_449_600), at(ANA, 1_761_350_400)]);
+    expect(r[0]).not.toHaveProperty('olderSameOwner');
+    expect(r[1]?.['olderSameOwner']).toBe(MARKO);
+  });
+
+  it('decides "older" by the pairing date, not the list order', async () => {
+    const r = await rows([at(ANA, 1_761_350_400), at(MARKO, 1_759_449_600)]);
+    expect(r[0]?.['olderSameOwner']).toBe(MARKO);
+    expect(r[1]).not.toHaveProperty('olderSameOwner');
+  });
+
+  it('keeps the same-owner link for aliased contacts, which show no fingerprint', async () => {
+    const r = await rows([
+      at(MARKO, 1_759_449_600, {
+        display: { name: 'Marko', label: 'self-declared', nameSource: 'owner' },
+      }),
+      at(ANA, 1_761_350_400, {
+        display: { name: 'oc-test', label: 'self-declared', nameSource: 'owner' },
+      }),
+    ]);
+    expect(r[1]?.['olderSameOwner']).toBe(MARKO);
+    expect(r[0]).not.toHaveProperty('fingerprint');
+    expect(r[1]).not.toHaveProperty('fingerprint');
+  });
+
+  it('links nothing for a different owner, even with the same name', async () => {
+    const r = await rows([
+      at(MARKO, 1_759_449_600),
+      at(ANA, 1_761_350_400, { ownerFingerprint: { short: '1111·2222', long: OTHER_LONG } }),
+    ]);
+    for (const row of r) expect(row).not.toHaveProperty('olderSameOwner');
+  });
+
+  it('links only active contacts (blocked or revoked is already the owner’s choice)', async () => {
+    const r = await rows([
+      at(MARKO, 1_759_449_600, { status: 'blocked' }),
+      at(THIRD, 1_760_000_000, { status: 'revoked' }),
+      at(ANA, 1_761_350_400),
+    ]);
+    for (const row of r) expect(row).not.toHaveProperty('olderSameOwner');
+  });
+
+  it('with three, each newer one points at the next older one', async () => {
+    const r = await rows([
+      at(MARKO, 1_759_449_600),
+      at(THIRD, 1_760_000_000),
+      at(ANA, 1_761_350_400),
+    ]);
+    expect(r.map((x) => x['olderSameOwner'])).toEqual([undefined, MARKO, THIRD]);
+  });
+
+  it('links nothing when the owner fingerprint is missing', async () => {
+    const none = { ownerFingerprint: { short: '7F3A·19C2' } };
+    const r = await rows([at(MARKO, 1_759_449_600, none), at(ANA, 1_761_350_400, none)]);
+    for (const row of r) expect(row).not.toHaveProperty('olderSameOwner');
+  });
+});
+
 describe('GET /api/ui/contacts/:ref/safety-code', () => {
   const code = readRoute('/api/ui/contacts/:ref/safety-code');
 
