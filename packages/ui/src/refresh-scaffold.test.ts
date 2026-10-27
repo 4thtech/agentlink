@@ -32,11 +32,11 @@ describe('refresh scaffold', () => {
     expect(Object.keys(sheets).sort()).toEqual(NAMES.map((n) => `./components/${n}.css`).sort());
   });
 
-  it('only motion.css carries rules; the other four start as comments only', () => {
+  it('motion.css, depth.css and chrome.css carry rules; the other two start as comments only', () => {
     for (const n of NAMES) {
       const text = sheets[`./components/${n}.css`] as string;
       const rules = text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-      if (n === 'motion') expect(rules, n).toContain('{');
+      if (n === 'motion' || n === 'depth' || n === 'chrome') expect(rules, n).toContain('{');
       else expect(rules, n).toBe('');
     }
   });
