@@ -4,8 +4,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // messages.test.ts and home.test.ts read their stylesheet as text (`?raw`); the default config would replace it with "".
-    css: { include: [/messages\.css/, /home\.css/] },
+    // messages.test.ts, home.test.ts and approvals.refresh.test.ts read their stylesheet as text (`?raw`); the default config would replace it with "".
+    css: { include: [/messages\.css/, /home\.css/, /approvals\.css/] },
     testTimeout: 20_000,
   },
 });
