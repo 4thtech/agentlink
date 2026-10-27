@@ -1,6 +1,6 @@
 # Proofs and credits
 
-*Applies to AgentLink 0.3.0 (released 26 Oct 2026). Confirming paid actions is from 0.4.0.*
+*Applies to AgentLink 0.4.0 (released 27 Oct 2026). Confirming paid actions is not in 0.3.0.*
 
 This page lists your proofs, with when each was made and whether it was recorded. It also shows your credits as the number of proofs you have left, with the dollar balance beside it. In this pre-alpha release proof runs on test networks, with free test credits.
 
