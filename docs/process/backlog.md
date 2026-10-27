@@ -6702,9 +6702,9 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - (b) Read the passkey state once and cache it for the session instead of on every page change.
   - (c) Recorded residual, no code change: a passkey created without the key-derivation output leaves an unused credential; no new check route is added (owner-presence review advises against one).
 - **Acceptance:**
-  - Tests first (RED commit) for (a) and (b); no test weakened; independent review (S2).
+  - Tests first (RED commit) for (a) and (b); no test weakened; independent review (S2, Fable: owner passkey).
 
-#### M1-PAY-CONFIRM-c · paid-action confirmation hardening: seal the passkey public key, keep-key fallback (new, low, #581)
+#### M1-PAY-CONFIRM-c · paid-action confirmation hardening: keep-key fallback and item binding (new, low, #581)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core`, `packages/node/src/local-ui/**` (passkey registration and the confirmation finish), tests
 - **Depends on:** M1-PAY-CONFIRM-a; folds into M1-PAY-CONFIRM-b where the same files change
@@ -6712,7 +6712,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Invariants:** I-1, I-4
 - **Scope:**
   - (a) For M1-PAY-CONFIRM-b: when the passkey read at finish falls back to a later derivation, the stored owner-passkey item is kept (the registration response data is sent along so the item is not dropped).
-  - (b) Hardening: seal the stored passkey public key under the passkey-derived key together with the seed, so the item cannot be swapped without presence.
+  - (b) Hardening: bind the stored passkey item to the sealed seed.
   - (c) The challenge comparison uses a constant-time compare (consistency).
 - **Acceptance:**
   - Tests first (RED commit) for (a) and (b); an item written by the earlier build still verifies (migration path stated); no test weakened; threat note; independent review (S2, Fable).
@@ -6729,18 +6729,18 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - Tests first (RED commit): a version-5 cloud store opens, migrates once and keeps every row; a version-6 store is unchanged; no test weakened; independent review (S2).
 
-#### CHORE-WIN-REVEAL-QUOTING · Windows Show in folder: names with a comma (new, low, #582)
+#### CHORE-WIN-REVEAL-ARGS · Windows Show in folder: pass file names verbatim (new, low, #582)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` OS opener) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-os.ts`, `packages/node/src/local-ui/reveal-file.ts`, tests
 - **Depends on:** MSG-FILES-IO-h
 - **Spec:** 04 §4
 - **Invariants:** I-4
 - **Scope:**
-  - On Windows the select argument for Explorer is split at a comma in the file name. Pass the argument verbatim with the path quoted, or open the folder instead; the checked path is still one argument and never reaches a shell.
+  - On Windows some file names are not passed to the file manager as one argument; pass them verbatim and quoted, or open the folder instead. The checked path is still one argument and never reaches a shell.
   - Optional: at most one reveal in flight per session.
   - The real-Windows check is an owner step in the 0.3.1 owner steps.
 - **Acceptance:**
-  - Test first: a name with a comma yields one correctly quoted argument; no shell is used; no test weakened; independent review (S2).
+  - Test first: such a name yields one correctly quoted argument; no shell is used; no test weakened; independent review (S2).
 
 #### CHORE-NODEOS-BROWSERS · node-os job: install the test browser so browser tests run on macOS and Windows (new, from #580)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** sensitive (`.github/**`) · **Phase:** M1b
