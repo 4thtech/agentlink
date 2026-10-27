@@ -6,7 +6,14 @@ export default defineConfig({
   test: {
     // Tests that read their stylesheet as text (`?raw`) need it listed here; the default config would replace it with "".
     css: {
-      include: [/messages\.css/, /home\.css/, /contacts\.css/, /approvals\.css/, /activity\.css/, /about\.css/],
+      include: [
+        /messages\.css/,
+        /home\.css/,
+        /contacts\.css/,
+        /approvals\.css/,
+        /activity\.css/,
+        /about\.css/,
+      ],
     },
     testTimeout: 20_000,
   },
