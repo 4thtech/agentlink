@@ -1,6 +1,6 @@
 // The sidebar, eight items (D-120, D-133): Approvals, Activity, Messages, Contacts, Files, Proofs & credits, Rules and
-// Settings (Backup, Passkeys, Advanced in a sub-navigation). Before: the settings pages (d1/screens/local). Approvals still lives on the
-// approval page at `/` until M1-11b-2 moves it here, so that link is not routed by this app.
+// Settings (Backup, Passkeys, Advanced in a sub-navigation). Before: the settings pages (d1/screens/local). M1-11b-2: Approvals
+// (`/`) is a page of this app now.
 import { PAGE_TITLES } from './strings.js';
 
 export const SETTINGS_LABEL = 'Settings';
@@ -16,7 +16,7 @@ export interface AppNavItem {
 }
 
 export const NAV_ITEMS: readonly AppNavItem[] = [
-  { id: 'approvals', label: PAGE_TITLES.approvals, icon: 'approval', path: '/', routed: false },
+  { id: 'approvals', label: PAGE_TITLES.approvals, icon: 'approval', path: '/', routed: true },
   {
     id: 'activity',
     label: PAGE_TITLES.activity,

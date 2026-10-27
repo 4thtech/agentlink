@@ -68,7 +68,8 @@
 //   server listens. `/assets/<name>` is an exact map lookup (no decoding, no path join), served with
 //   its fixed content type, nosniff, the strict CSP (plus `font-src 'self'`) and immutable caching;
 //   anything else is 404. The app's index.html, with this server's CSRF token filled in, is served
-//   only for `/first-run` and `/settings[/...]`; `/` and `/approve/<id>` keep the approval page.
+//   for `/first-run` and `/settings[/...]`, and (M1-11b-2) for `/` and `/approve/<id>`; without a
+//   bundle those two keep the server-rendered approval page.
 //   The session cookie gates the app pages, the assets and every /api/ui/ route.
 // - M1-11s-b, the /api/ui/ routes (local-ui/routes.ts): each declares `presence`; a mutating route
 //   must declare `presence: true`. Every route needs the session cookie, the CSRF header and
@@ -2744,7 +2745,10 @@ export async function startApprovalServerWith(
         return;
       }
       if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
-      if (appPage) {
+      // M1-11b-2: with the app bundled, Approvals (`/`) and one request (`/approve/<id>`) render
+      // inside it too. Where the UI renders only: the session gate above, and the CSRF, Origin,
+      // fetch-metadata and presence gates of the approval API below, are unchanged.
+      if (appPage || localUi.shell !== undefined) {
         const shell = localUi.shell;
         if (shell === undefined) return reject(res, 404, 'not_found');
         // The token is base64url, so it needs no escaping.
@@ -2752,14 +2756,8 @@ export async function startApprovalServerWith(
         sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
         return;
       }
-      // M1-11b-2a: the app's sidebar on the approval page, only when the app is there to go to.
-      // Navigation only: this page's session, CSRF and presence gates are unchanged.
-      sendText(
-        res,
-        200,
-        'text/html; charset=utf-8',
-        pageHtml(csrf, { appNav: localUi.shell !== undefined }),
-      );
+      // No app bundle: the server-rendered approval page (removed by its follow-up card).
+      sendText(res, 200, 'text/html; charset=utf-8', pageHtml(csrf));
       return;
     }
 

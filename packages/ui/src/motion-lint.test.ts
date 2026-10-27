@@ -180,8 +180,6 @@ const NAMED_EXCEPTIONS: Record<string, string> = {
   'apps/local-ui/src/pages/files/files.css | literal-duration | fl-shimmer | 1.4s': 'UI-REFRESH-j',
   'apps/local-ui/src/pages/files/files.css | keyframes-property | fl-shimmer | background-position':
     'UI-REFRESH-j',
-  // The spinner is replaced in UI-REFRESH-c.
-  'packages/ui/src/components/components.css | literal-duration | al-spin | 1.2s': 'UI-REFRESH-c',
 };
 // Colour and position transitions that predate the lint (plain hover and switch states). They are
 // listed so nothing new joins them; the page and component cards remove them as they restyle.
@@ -231,15 +229,12 @@ describe('motion lint on the real stylesheets', () => {
     );
   });
 
-  it('names exactly the two named exceptions of the card (files.css shimmer, components.css spin)', () => {
+  it('names exactly the named exception left (the files.css shimmer, UI-REFRESH-j)', () => {
     const files = new Set(Object.keys(NAMED_EXCEPTIONS).map((k) => k.split(' | ')[0]));
-    expect([...files].sort()).toEqual([
-      'apps/local-ui/src/pages/files/files.css',
-      'packages/ui/src/components/components.css',
-    ]);
+    expect([...files].sort()).toEqual(['apps/local-ui/src/pages/files/files.css']);
     expect(
       Object.keys(NAMED_EXCEPTIONS).filter((k) => k.includes('literal-duration')),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
   });
 
   it('every animating stylesheet has a reduced-motion rule, and motion.css holds the global switch', () => {
