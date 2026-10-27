@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/local-ui",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "The local web app (React, browser only): settings, first run and approvals, served by the approval server.",
   "license": "MIT",
