@@ -4478,6 +4478,109 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Rendering tests: no invite link in the page or the API view, the headline shown, the field's attributes and toggle, the CSP byte for byte, colours equal to the tokens, no external request, no sideways scroll at 360 px; all M1-11a browser flows pass.
 
+#### MSG-FILES-IO · Messages and Files In/Out: people see what their AI did (new, owner decision 2026-10-27)
+
+Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 6 (a)): a read-only **Messages** page (Inbox and Sent per contact) and **Files** tabs Received · Sent · Send folders. Decrypted only on this computer, nothing new sent to any 4thTech service, inbound content as untrusted plain text, no new AI authority, the app's own "seen" marker. Plan, API contract and threat notes: [`docs/process/proposals/MSG-FILES-IO.md`](proposals/MSG-FILES-IO.md). Design: `docs/design/b11-local-app.md` §17. These cards replace the 0.3.1 plan items M1-UX3-FILES-EXPLAIN and the Sent list of M1-UX3-FILES-SEND (never carded; the folder picker stays a later card). PR titles: `CHORE: MSG-FILES-IO-<x> …`. Order: a, b, g in parallel; then c and d; e and f start early against the plan's §4 contract with a mocked API and merge after c and d; h follows b and f. Owner decisions of 27 Oct on the plan's three questions: Show in Finder with no Touch ID (card h), message history kept as today, the session-cookie residual accepted for 0.3.x and revisited before M3 (plan §8).
+
+#### MSG-FILES-IO-a · core: read-only messages and files views for the local app, no read mark (new)
+- **Status:** backlog · **Size:** M · **Tier:** Opus (Fable audit: opens sealed payloads at the zero-access boundary) · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/ui-messages.ts` (new) and its test, one export line in `packages/core/src/index.ts`; `inbox-page.ts` only to export a shared helper, with no behaviour change; changeset
+- **Depends on:** —
+- **Spec:** 06 §2.2 (items, read state), §4; 07 §3, §3.1; 04 §4; plan §3, §4
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - `MessagesView`: conversations (contacts not removed, last message time, last inbound time) and one page of a contact's Inbox or Sent items, reusing the inbox selection (`INBOX_TYPES`, state `ok`, no requests, refused, held or protocol rows). Body as plain text (a JSON body as indented JSON text; terms types their note); file names and sizes; Sent status and receipt; proof flag.
+  - `FilesIoView`: received and sent files with name, contact, time, size, state; `savedName` read when the column exists (b). The file list comes from the file entries of each envelope's sealed payload (name, size, `expiresAt`; never `url` or `fileKey`), joined to its `files` row. Retention (`files/retention.ts`) deletes the whole `files` row, key included, at expiry or on receipt; only an inline file's row is kept with `deleted_at`. So a payload entry without a row reads `expired` when `expiresAt` has passed and `deleted` otherwise; an inline file with `deleted_at` reads `deleted`.
+  - Never writes: no `read_at`, no other store change. Every item built from an allowlist.
+- **Acceptance (tests first, RED commit):**
+  - Exact key set per item; no URL, file key, `envelope_json`, salt or sealed value in any result (scan for the fixture's stored URL and key).
+  - `read_at` and every row unchanged after each call; requests, refused, held, protocol and removed-contact rows never listed.
+  - Works with the transport and storage failing (no network).
+
+#### MSG-FILES-IO-b · core + node: record where a fetched file was saved (schema 6) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/files/incoming.ts`, `files/received.ts`, `store/schema.ts`, `store/sql-schema.ts`, `store/memory-store.ts`, `constants.ts` (`STORE_SCHEMA_VERSION`); `packages/node/src/sqlite-schema.ts`, `sqlite-store.ts` (migration) and their tests; changeset
+- **Depends on:** —
+- **Spec:** 07 §3, §3.1; 04 §4 (realpath, retention); plan §3
+- **Invariants:** I-7
+- **Scope:**
+  - New column `files.saved_name` (`enc`): the single file name `fetchFile` placed in the Inbox folder, sealed like `name`, written after the rename succeeds. Never a full path. Schema 5 → 6; old rows read `null`.
+  - A reader for MSG-FILES-IO-a (`savedNameOf`).
+  - Migrations are forward-only: an older build refuses a version-6 store (`store_schema_newer`, `client.ts`). The changeset and the `changelog.d/` fragment say so plainly (after the update, going back to an older version needs a newer one again).
+- **Acceptance (tests first, RED commit):**
+  - A reader at schema 5 refuses a version-6 store with `store_schema_newer`; `memory-store.test.ts` expects version 6 (was `toBe(5)`).
+  - Migration from a version-5 fixture keeps every row; a fetch records the name sealed (the raw column is not the plain name); a failed or refused fetch records nothing; retention shredding leaves no readable file key and keeps working.
+
+#### MSG-FILES-IO-c · node: Messages API routes (read-only) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/messages.ts` (new) and its test, one line each in `local-ui/routes.ts` and `local-ui/context.ts` (`readOnlyClient` gets `messages`); changeset
+- **Depends on:** MSG-FILES-IO-a
+- **Spec:** 08 §1; 04 §2.5; plan §4
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - `GET /api/ui/messages` and `GET /api/ui/messages/:contactId?box=in|out&cursor=&limit=`, `presence: false`, the plan §4 allowlist and limits. Fixed error codes; logs carry counts only.
+- **Acceptance (tests first, RED commit):**
+  - Without the session cookie, CSRF header or same-origin metadata: refused, as every `/api/ui/` route. Bad `box`, `limit`, cursor or contact: `bad_request` without echoing input.
+  - Exact key sets; no URL or key in any response; `read_at` unchanged; the MCP tool registry test unchanged (no new tool).
+
+#### MSG-FILES-IO-d · node: Files Received and Sent API routes (read-only) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files-io.ts` (new) and its test, one line each in `local-ui/routes.ts` and `local-ui/context.ts`; changeset
+- **Depends on:** MSG-FILES-IO-a, MSG-FILES-IO-b
+- **Spec:** 08 §1; 04 §2.5, §4; plan §4
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - `GET /api/ui/files/received` and `GET /api/ui/files/sent`, `presence: false`, the plan §4 allowlist (`savedName` only when saved). No file is opened, read or hashed by the server.
+- **Acceptance (tests first, RED commit):**
+  - Same gate and error tests as c; no locator, URL, file key or path in any response; a file whose row retention deleted reads `expired` or `deleted` from its payload entry (plan §3), and an inline file with `deleted_at` reads `deleted`; the existing `/api/ui/files` routes behave as before.
+
+#### MSG-FILES-IO-e · local-ui: Messages page (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/**` (new, own `strings.ts`), `apps/local-ui/src/nav.ts`, `router.tsx`, `strings.ts` (page title), their tests; `changelog.d/` fragment; README Status line
+- **Depends on:** MSG-FILES-IO-c (build against plan §4 with a mocked API; merge after c)
+- **Spec:** 08 §1; 11 §5; design b11 §17.2; D-116; plan §5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Sidebar item Messages between Activity and Contacts (`/settings/messages` until M1-11b-2), badge from a `localStorage` seen marker (contact and time only, try/catch, works without storage). Contact list; Inbox and Sent tabs; inbound text and file names only in `UntrustedContent`; "Show all" clamp; Copy text; "To reply, ask your AI."; empty, nothing-yet and offline states; Under the hood: message ID, size, proof. Existing components and D1 styling only.
+- **Acceptance (tests first):**
+  - A body with HTML, Markdown, an image tag and a `javascript:` link renders no element, attribute or anchor from it; a link shows as an inert domain chip.
+  - Message text never in `document.title`, toasts or any element outside the untrusted container; no compose control exists; opening a conversation makes no non-GET request; the seen marker holds no message text; 360 px has no sideways scroll.
+
+#### MSG-FILES-IO-f · local-ui: Files tabs Received · Sent · Send folders (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound file names) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**` and their tests; `changelog.d/` fragment
+- **Depends on:** MSG-FILES-IO-d (build against plan §4 with a mocked API; merge after d)
+- **Spec:** 08 §1; 11 §5; design b11 §8, §17.3; plan §5
+- **Invariants:** I-5
+- **Scope:**
+  - The top explainer line; tabs Received (from, when, size, proof badge, "saved as" name (it may be stale if the person moved the file), the one-time untrusted-file note), Sent (file, to whom, when, status chips, receipt) and Send folders (today's page, unchanged behaviour). The app never opens a received file. Other people's file names only as untrusted text.
+- **Acceptance (tests first):**
+  - Tab order and default (Received); a file name with bidi or control characters renders as inert text; no link to a file, URL or path; Send folders tests pass unchanged; empty and offline states; 360 px.
+
+#### MSG-FILES-IO-g · spec: Messages and Files In/Out in 08 §1 and 11 §5, decision log (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/08-*.md` §1, `docs/foundation/11-*.md` §5, `docs/foundation/00-README.md` (decision log), `docs/design/b11-local-app.md` §17 status line; `changelog.d/` fragment
+- **Depends on:** —
+- **Spec:** plan §1 to §6
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Record the owner decision of 27 Oct as the next D-number; 08 §1: the Messages page, Files tabs and the four read-only routes; 11 §5: the new strings ("To reply, ask your AI.", the Files explainer line, empty states); b11 §17 status "decided".
+- **Acceptance:**
+  - Spec text matches the plan's §4 contract and threat notes; no other behaviour changes; `node tools/docs-status/index.mjs --check` passes.
+
+#### MSG-FILES-IO-h · Show in Finder for a saved received file (new, owner decision 2026-10-27)
+- **Status:** backlog · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/routes.ts`, `route-types.ts`, `approval-server.ts` (the gate for the new route kind), `approval-os.ts` (opener), `local-ui/api/files-io.ts`, `apps/local-ui/src/pages/files/**`, tests; changeset
+- **Depends on:** MSG-FILES-IO-b, MSG-FILES-IO-f
+- **Spec:** 04 §2.5, §4 (realpath); 08 §1; plan §6
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - Owner decision (Tali, 27 Oct, in chat; plan §8 1 (a)): Show in Finder with no Touch ID. A new route kind for this one fixed local OS action (POST, no presence, no signing, no store write), still behind the session, CSRF, Origin and octet-stream checks.
+  - The request carries only the item ID (`<envelopeId>.<idx>`). The server reads the sealed `saved_name` from the store; it accepts no name or path from the request.
+  - Resolves the Inbox folder's realpath, opens the file once with no-follow and checks that handle (a regular file, a direct child of that folder), then passes that checked path to the OS opener as one argument, never through a shell. Fail closed on any doubt; no separate `lstat`-then-open step (no check-then-use race).
+- **Acceptance (tests first, RED commit):**
+  - Registration still refuses a POST without presence unless it is this kind; a body that carries a path or name besides the ID is refused and never reaches the opener; a link, `..`, a file outside the Inbox folder or a missing file is refused; the opener gets one argument; a test that no other route can use the kind.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
