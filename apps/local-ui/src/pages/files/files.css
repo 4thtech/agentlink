@@ -73,3 +73,145 @@
   flex-wrap: wrap;
   gap: var(--al-space-3);
 }
+
+/* Tabs, Received and Sent (MSG-FILES-IO-f; b11 §13, §15, §17.3). Tokens only; no inline styles. */
+.fl-tabs {
+  display: flex;
+  gap: var(--al-space-2);
+  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-default);
+  overflow-x: auto;
+}
+.fl-tab {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  padding: var(--al-space-3) var(--al-space-4);
+  color: var(--al-color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    color var(--al-duration-fast) var(--al-easing-standard),
+    border-color var(--al-duration-fast) var(--al-easing-standard);
+}
+.fl-tab:hover {
+  color: var(--al-color-text-primary);
+}
+.fl-tab.is-active {
+  color: var(--al-color-text-primary);
+  border-block-end-color: currentColor;
+}
+.fl-tab:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+.fl-feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.fl-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  padding: var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  min-inline-size: 0;
+}
+.fl-item-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--al-space-3);
+  min-inline-size: 0;
+}
+.fl-name {
+  min-inline-size: 0;
+  padding: var(--al-space-1) var(--al-space-2);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.fl-item p,
+.fl-note p {
+  margin: 0;
+}
+.fl-meta,
+.fl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-2) var(--al-space-4);
+  overflow-wrap: anywhere;
+}
+.fl-state {
+  overflow-wrap: anywhere;
+}
+.fl-receipt {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-1);
+}
+.fl-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--al-space-2);
+}
+.fl-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.fl-skeleton {
+  display: block;
+  block-size: var(--al-space-4);
+  border-radius: var(--al-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--al-color-bg-sunken) 25%,
+    var(--al-color-bg-raised) 50%,
+    var(--al-color-bg-sunken) 75%
+  );
+  background-size: 200% 100%;
+  animation: fl-shimmer 1.4s linear infinite;
+}
+.fl-skeleton-name {
+  inline-size: 60%;
+}
+.fl-skeleton-meta {
+  inline-size: 35%;
+}
+@keyframes fl-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fl-skeleton {
+    animation: none;
+  }
+  .fl-tab {
+    transition: none;
+  }
+}
+@media (max-width: 40rem) {
+  .fl-item {
+    padding: var(--al-space-3);
+  }
+  .fl-meta,
+  .fl-chips {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

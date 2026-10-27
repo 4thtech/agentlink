@@ -4548,7 +4548,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Message text never in `document.title`, toasts or any element outside the untrusted container; no compose control exists; opening a conversation makes no non-GET request; the seen marker holds no message text; 360 px has no sideways scroll.
 
 #### MSG-FILES-IO-f · local-ui: Files tabs Received · Sent · Send folders (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound file names) · **Security:** S1 · **Phase:** M1b
+- **Status:** in-review · **Size:** M · **Tier:** Sonnet (Opus review: inbound file names) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**` and their tests; `changelog.d/` fragment
 - **Depends on:** MSG-FILES-IO-d (build against plan §4 with a mocked API; merge after d)
 - **Spec:** 08 §1; 11 §5; design b11 §8, §17.3; plan §5
