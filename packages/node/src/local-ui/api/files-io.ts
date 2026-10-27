@@ -12,6 +12,12 @@
 // people's file names are untrusted data (I-5): passed through as text, never interpreted; the page
 // shows them as untrusted text. An item outside its allowlist is left out and the rest still shows.
 // Errors are fixed codes and never carry an error's text or the input; nothing is logged here (I-7).
+//
+// MSG-FILES-IO-h (D-134): `POST /api/ui/files/received/reveal`, Show in Finder. The reveal kind
+// (route-types.ts): no presence, no signing, no store write. The server's gate hands the handler only
+// the checked item ID; the handler reads the sealed saved name from the store and the Inbox folder
+// from the rules in force, and passes just those to the checked reveal (local-ui/reveal-file.ts). No
+// name or path from the request is ever used. Not an MCP tool (I-4).
 import {
   CoreError,
   type PageQuery,
@@ -26,7 +32,10 @@ import {
   type LocalUiReadRoute,
   type LocalUiRequest,
   type LocalUiResult,
+  type LocalUiRevealFile,
+  type LocalUiRevealRoute,
 } from '../route-types.js';
+import { REVEAL_PATH } from '../reveal-path.js';
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -195,3 +204,55 @@ export const filesIoRoutes: readonly LocalUiReadRoute[] = Object.freeze([
     sentView,
   ),
 ]);
+
+const fixed = (status: number, body: JsonObject): LocalUiResult =>
+  Object.freeze({ status, body: Object.freeze(body) });
+
+/** MSG-FILES-IO-h: each reveal outcome as one fixed answer (never the name or the folder). */
+const REVEAL_ANSWERS: Readonly<Record<string, LocalUiResult>> = Object.freeze({
+  shown: fixed(200, { status: 'shown' }),
+  not_found: fixed(404, { error: 'not_found' }),
+  refused: fixed(403, { error: 'refused' }),
+  unavailable: UI_UNAVAILABLE,
+  not_opened: fixed(502, { error: 'not_opened' }),
+});
+const NOT_FOUND = REVEAL_ANSWERS['not_found'] as LocalUiResult;
+
+async function reveal(
+  context: LocalUiContext,
+  itemId: string,
+  revealFile: LocalUiRevealFile,
+): Promise<LocalUiResult> {
+  const client = context.client;
+  if (client === undefined) return UI_NOT_SET_UP;
+  if (!ITEM_ID.test(itemId)) return NOT_FOUND;
+  let savedName: string | null;
+  let inboxFolder: unknown;
+  try {
+    savedName = await client.filesIo.savedName(itemId);
+    if (savedName === null) return NOT_FOUND;
+    const policy = await client.policy.load();
+    // Rules that fail closed name no Inbox folder: nothing is shown.
+    if (policy.mode === 'fail_closed') return UI_UNAVAILABLE;
+    inboxFolder = (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
+  } catch {
+    // Never the error's text: it could name a file or a path.
+    return UI_UNAVAILABLE;
+  }
+  if (typeof inboxFolder !== 'string' || inboxFolder.length === 0) return UI_UNAVAILABLE;
+  let outcome: string;
+  try {
+    outcome = await revealFile(inboxFolder, savedName);
+  } catch {
+    return UI_UNAVAILABLE;
+  }
+  return REVEAL_ANSWERS[outcome] ?? UI_UNAVAILABLE;
+}
+
+/** MSG-FILES-IO-h: Show in Finder, the one reveal route (D-134). */
+export const filesRevealRoute: LocalUiRevealRoute = Object.freeze<LocalUiRevealRoute>({
+  method: 'POST',
+  path: REVEAL_PATH,
+  presence: 'reveal',
+  handler: reveal,
+});
