@@ -139,11 +139,14 @@ export function approvalHoodFields(item: ApprovalItem): readonly unknown[] {
   return fields;
 }
 
-/** The approved moment. Its words are the status line's, so the moment itself is not read out. */
+/**
+ * The approved moment, with the shared component's own word ("Approved"). The status line ("Approved.")
+ * stays the one announced and the one the browser tests find, so the moment is not read out.
+ */
 export function ApprovedMoment(): ReactElement {
   return (
     <span className="ap-moment" aria-hidden="true">
-      <SuccessMoment kind="approved" label={S.approved} />
+      <SuccessMoment kind="approved" />
     </span>
   );
 }
