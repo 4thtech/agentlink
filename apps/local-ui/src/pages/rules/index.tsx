@@ -12,7 +12,18 @@
 //
 // Deviation from the d1 screen (D-116 rule 4, UX audit 6a/6c, flagged in the PR): the two groups and
 // the unsaved-changes bar in place of one flat list with a top Save button.
-import { Banner, Button, Icon, Segmented, Switch, TextField } from '@4thtech-io/ui';
+import {
+  Banner,
+  Button,
+  Icon,
+  Segmented,
+  Skeleton,
+  SuccessMoment,
+  Surface,
+  Switch,
+  TextField,
+  UnderTheHood,
+} from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -112,6 +123,10 @@ function Row({
     </div>
   );
 }
+
+/** The summary's word for a three-way rule. */
+const ruleWord = (v: 'allow' | 'approval' | 'deny'): string =>
+  v === 'allow' ? S.allowed : v === 'approval' ? S.askMe : S.never;
 
 const unique = (codes: readonly string[]): string[] => [...new Set(codes)];
 
@@ -284,9 +299,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
       <>
         {header}
         {load.kind === 'loading' ? (
-          <p className="al-text-body al-muted" aria-busy="true">
-            {message}
-          </p>
+          <Skeleton loading label={message} lines={5} />
         ) : (
           <Banner tone={load.kind === 'not_valid' ? 'warning' : 'info'}>{message}</Banner>
         )}
@@ -295,7 +308,9 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   }
 
   const noticeBanner =
-    notice === undefined ? null : (
+    notice === undefined ? null : notice.tone === 'success' ? (
+      <SuccessMoment kind="approved" label={notice.text} />
+    ) : (
       <Banner tone={notice.tone} compact>
         {notice.text}
       </Banner>
@@ -341,11 +356,36 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
     <>
       {header}
       {noticeBanner}
+      <Surface
+        level="recessed"
+        as="section"
+        className="rl-summary"
+        aria-labelledby="rules-summary-title"
+      >
+        <h2 id="rules-summary-title" className="al-text-title-3">
+          {S.summaryTitle}
+        </h2>
+        <p className="al-text-body-sm al-muted">{S.summaryNote}</p>
+        <dl className="rl-summary-list al-text-body-sm">
+          <div>
+            <dt>{S.proofTitle}</dt>
+            <dd>{ruleWord(view.proofs.notarize)}</dd>
+          </div>
+          <div>
+            <dt>{S.invitesTitle}</dt>
+            <dd>{view.contacts.acceptInvites === 'auto' ? S.allow : S.askMe}</dd>
+          </div>
+          <div>
+            <dt>{S.termsTitle}</dt>
+            <dd>{ruleWord(c.accept)}</dd>
+          </div>
+        </dl>
+      </Surface>
       <section className="rl-group" aria-labelledby="rules-everyday">
         <h2 id="rules-everyday" className="al-text-title-3">
           {S.everyday}
         </h2>
-        <div className="rl-card">
+        <Surface className="rl-card">
           <Row
             title={S.proofTitle}
             help={S.proofHelp}
@@ -419,7 +459,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
               />
             }
           />
-        </div>
+        </Surface>
       </section>
 
       <section className="rl-group" aria-labelledby="rules-more-title">
@@ -436,7 +476,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           </button>
         </h2>
         {moreOpen ? (
-          <div id="rules-more" className="rl-card">
+          <Surface id="rules-more" className="rl-card">
             <Row
               title={S.unknownTitle}
               help={S.unknownHelp}
@@ -552,7 +592,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                 ) : null}
               </div>
             </Row>
-          </div>
+          </Surface>
         ) : null}
       </section>
 
@@ -587,6 +627,9 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           {S.preparing}
         </p>
       ) : null}
+      <UnderTheHood
+        fields={[{ kind: 'count', label: S.hoodVersion, value: String(load.version) }]}
+      />
     </>
   );
 }
@@ -619,7 +662,7 @@ function ConfirmStep({
       <h2 id="rules-confirm" className="al-text-title-3">
         {S.confirmTitle}
       </h2>
-      <div className="rl-card rl-confirm-body">
+      <Surface className="rl-card rl-confirm-body">
         {codes.length === 0 ? (
           <p className="al-text-body">{S.noWarnings}</p>
         ) : (
@@ -690,7 +733,7 @@ function ConfirmStep({
             {S.saving}
           </p>
         ) : null}
-      </div>
+      </Surface>
     </section>
   );
 }

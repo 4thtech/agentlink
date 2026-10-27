@@ -118,7 +118,7 @@ describe('first load: Skeleton', () => {
       await vi.advanceTimersByTimeAsync(450);
     });
     expect(host.querySelector('.al-skeleton')).not.toBeNull();
-    expect(host.textContent).not.toContain('Loading your rules…');
+    expect(host.querySelector('p[aria-busy]')).toBeNull();
   });
 });
 
