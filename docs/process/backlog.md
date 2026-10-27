@@ -1287,6 +1287,7 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** —
 - **Scope:**
   - Brief for the owner: Home with live tiles, the global "Under the hood" switch, state-indicator vocabulary, motion spec (no new library, reduced motion), every screen and state to design, and which D1/D2 screens can be reused.
+  - v2 (DESIGN-B11-v2, owner direction of 2026-10-27): elevation and materials with solid fallbacks, motion tokens and the 11 §11 duration question, progress and state components, per-screen notes, and Messages and Files In/Out (pending owner decision), with six owner decisions in §18.
 - **Acceptance:**
   - The owner has taken the brief to Claude Design; approved screens are recorded in `docs/design/README.md` before any build card styles Home, Files Received, Add contact, the presence prompt or the motion layer.
 
