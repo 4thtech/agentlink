@@ -241,7 +241,10 @@ export function parsePasskeyRegistration(bytes: Uint8Array): {
     if (end === rest.length) return { ownerSecret, assertion };
     let creation: Uint8Array;
     try {
-      [creation] = decodeFields(rest.subarray(end), 1) as [Uint8Array];
+      // Exactly one more field, and nothing after it (PRE-031-FIXES: trailing bytes refused).
+      const tail = rest.subarray(end);
+      if (fieldsEnd(tail, 1) !== tail.length) throw presenceRequired();
+      [creation] = decodeFields(tail, 1) as [Uint8Array];
     } catch (error) {
       wipe(assertion.prfOutput);
       throw error;

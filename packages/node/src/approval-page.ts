@@ -133,7 +133,8 @@ export const UI_STRINGS = Object.freeze({
   passkeyUnsupported: "This passkey can't protect approvals here. Keep using your owner code.",
   passkeyFailed: 'The passkey was not set up. Nothing was changed.',
   // M1-PAY-CONFIRM-b: a request that costs credits, and the confirmation sheet (b11 §19.6).
-  paidAlone: 'Costs {cost}. Approve it on its own.',
+  // PRE-031-FIXES: no amount here; the sheet shows the one from the signed statement.
+  paidAlone: 'This costs credits. Approve it on its own.',
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',
   confirmRequired: 'This costs credits. Approve it on its own card. Nothing was changed.',
@@ -581,7 +582,7 @@ const SCRIPT = String.raw`
     cardBody(item, box);
     if (item.commitment) box.appendChild(el('p', S.termsAlone, 'al-note'));
     if (item.paid) {
-      box.appendChild(el('p', fmt(S.paidAlone, { cost: (item.details && item.details.cost) || '' }), 'al-note'));
+      box.appendChild(el('p', S.paidAlone, 'al-note'));
     }
     // Results and the presence step go here, above the footer.
     var slot = el('div', null, 'al-slot');

@@ -980,6 +980,13 @@ D-25 is decided (decision log, 12 Oct 2026): agents merge only through GitHub au
 - **Scope:** `GET /api/ui/contacts` adds `olderSameOwner` (a ref the list already shows) to a newer active contact whose full owner fingerprint equals an older active one's; the fingerprint stays a server-side grouping key. The page shows one calm notice on the newer contact: "Looks like a second connection with <name> (paired <date>). Keep both, or remove the older one?". Remove older is the existing `POST /api/ui/contacts/:ref/remove` with its owner presence; Keep both is remembered per browser (localStorage, wrapped). Same name with a different owner keeps only the existing hint.
 - **Acceptance:** node tests (newer only, by date, aliased contacts, different owner, active only, three in a chain, no fingerprint leak); page tests (notice text, Remove older asks for presence then posts the older ref's remove, Cancel sends nothing, Keep both persists, blocked storage, same-name-only shows no suggestion, unknown or malformed link ignored, name as text).
 
+#### PRE-031-FIXES · review follow-ups before the 0.3.1 release (new, 2026-10-27 reviews of #581, #584, #587)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: `packages/node`)
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts`, `packages/node/src/owner-passkey.ts`, `apps/local-ui/src/pages/contacts`
+- **Depends on:** M1-UX3-DUP-CONTACTS (#587)
+- **Scope:** (1) The paid approval card's note names no amount of its own ("This costs credits. Approve it on its own."), so it can never differ from the signed statement the confirmation sheet shows. (2) The optional fifth registration field (the `create()` authenticator data) must end the body exactly; trailing bytes are `presence_required`, checked explicitly. (3) Contacts "Remove older" shows the same "Remove this contact?" confirm step as Remove before the presence prompt, and the button is described by the notice text (`aria-describedby`). No change to presence, policy or crypto.
+- **Acceptance:** a test for each item; the existing duplicate-contact and pay-confirm tests stay green; no test weakened.
+
 #### CHORE-DROP-ENTRY-EXPORTS · Local `wrangler dev` for the drop fails on non-handler entry exports (new, 2026-10-21)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (by path: the drop)
 - **Repo/path:** agentlink · `apps/drop/src/index.ts`
