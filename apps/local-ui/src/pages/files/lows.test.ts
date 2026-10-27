@@ -102,7 +102,7 @@ describe('folder labels in the Under the hood panel', () => {
       true,
     );
     const rows = hoodRows();
-    expect(rows.filter((r) => r[0].startsWith('Folder ')).length).toBe(5);
+    expect(rows.filter((r) => (r[0] ?? '').startsWith('Folder ')).length).toBe(5);
     expect(rows.some((r) => r[1] === '2 more')).toBe(true);
   });
 
