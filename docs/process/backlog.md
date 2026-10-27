@@ -6436,14 +6436,17 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): a begin straight after a dropped setup keeps Send and finish succeeds; the code is absent from the DOM after "I saved it"; the manual check is recorded in the PR; threat note; independent review (S2).
 
 #### M1-UX-FIRSTRUN-V2-c · first run: 0.2.0 owners enter the backup code once, then add a passkey (new, B-9, left out of #542)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner setup for an existing owner in `packages/node`) · **Audit:** Fable · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence for an existing owner; approval page in `packages/node`) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/layout/**`, `apps/local-ui/src/states/**`, `packages/node/src/approval-page.ts`, tests
 - **Depends on:** M1-UX-FIRSTRUN-V2
-- **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2; 11 §5.5, §6.2.1
+- **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2, §2.3.1; 11 §5.5, §6.2.1; b11 Home "Next step"
 - **Invariants:** I-1, I-4, I-7
 - **Scope:**
   - The B-9 path of M1-UX-FIRSTRUN-V2 that #542 did not deliver: an owner created by 0.2.0 enters the backup code once, then registers the platform passkey (one Touch ID). Never creates a second owner.
-  - Not here: the second touch for passkeys that give PRF only on `get()` (M1-11s-c-c) and the recovery kit step (M1-11b-3).
+  - Reuses the existing owner operation `POST /api/owner/passkey` (M1-8e `registerOwnerPasskey`: code checked against the `owner` item, wrong-code backoff, `owner` item never written, so the backup code keeps working). No new server route.
+  - The "Switch to Touch ID" next step (b11 Home) on every app page and on Approvals (`/`, beside the app sidebar) until a passkey is registered; it links to `/first-run`, where the switch happens. Without the app bundle the approval page keeps its inline passkey set-up.
+  - A passkey that gives PRF only on `get()` gets the second touch in the same flow (as the approval page's inline set-up does), so hiding that set-up behind the link loses nothing.
+  - Not here: the recovery kit step (M1-11b-3); Settings › Passkeys (M1-UX3-SETTINGS).
 - **Acceptance:**
   - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
 

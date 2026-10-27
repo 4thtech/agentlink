@@ -13,6 +13,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Layout } from '../../layout/index.js';
 import { SwitchToPasskeyBanner } from '../../states/index.js';
+import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { FirstRunPage, type FirstRunPageProps } from './index.js';
 import { encodeRegistration, encodeUpgradeBody } from './passkey.js';
 import {
@@ -78,8 +79,7 @@ function fakeUpgrade(
   return {
     bodies,
     originals,
-    info: () =>
-      Promise.resolve(options.info ?? { kind: 'ok', registered: false, values: VALUES }),
+    info: () => Promise.resolve(options.info ?? { kind: 'ok', registered: false, values: VALUES }),
     register: (body) => {
       originals.push(body);
       bodies.push(body.slice());
@@ -277,14 +277,13 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
       UPGRADE.title('mac'),
       UPGRADE.body('Touch ID'),
       UPGRADE.codeLabel,
-      UPGRADE.codeHint,
       UPGRADE.noPrf('Touch ID', 'Safari'),
       UPGRADE.doneTitle('mac'),
       UPGRADE.doneBody('Touch ID'),
       UPGRADE.toApprovals,
       UPGRADE.bannerTitle('mac'),
-      UPGRADE.bannerBody('Touch ID'),
-      UPGRADE.bannerAction,
+      UPGRADE.bannerBody,
+      UPGRADE.bannerAction('mac'),
       UPGRADE_MESSAGES.empty,
       UPGRADE_MESSAGES.presence_rejected,
       UPGRADE_MESSAGES.presence_required,
@@ -296,6 +295,11 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     expect(lintVocabulary(all)).toEqual([]);
     expect(all.toLowerCase()).not.toContain('password');
     expect(all).not.toMatch(/owner code/i);
+    // The one exception: the field hint names the terminal's "owner code", for 0.2.0 owners, and
+    // is the app's one shared hint (quickwins.test.ts).
+    expect(UPGRADE.codeHint).toBe(EARLIER_OWNER_CODE_HINT);
+    expect(lintVocabulary(UPGRADE.codeHint)).toEqual([]);
+    expect(text()).toContain(EARLIER_OWNER_CODE_HINT);
   });
 });
 
@@ -313,7 +317,7 @@ describe('the upgrade API (existing /api/owner/passkey owner operation)', () => 
         calls.push({
           url,
           init: init ?? {},
-          ...(body instanceof Uint8Array ? { sent: body.slice() } : {}),
+          ...(body instanceof Uint8Array ? { sent: (body as Uint8Array).slice() } : {}),
         });
         const answer = answers[`${init?.method ?? 'GET'} ${url}`] ?? { status: 500, body: {} };
         return Promise.resolve(
@@ -330,7 +334,9 @@ describe('the upgrade API (existing /api/owner/passkey owner operation)', () => 
     const r = recorder({
       [`GET ${PASSKEY_PATH}`]: {
         status: 200,
-        body: { passkey: { registered: false, rpId: 'localhost', userId: 'AQID', prfSalt: 'BwgJ' } },
+        body: {
+          passkey: { registered: false, rpId: 'localhost', userId: 'AQID', prfSalt: 'BwgJ' },
+        },
       },
     });
     const api = createUpgradeApi({ fetch: r.fetch, token: 'tok' });
@@ -344,14 +350,18 @@ describe('the upgrade API (existing /api/owner/passkey owner operation)', () => 
     const bad = recorder({
       [`GET ${PASSKEY_PATH}`]: {
         status: 200,
-        body: { passkey: { registered: false, rpId: 'evil.test', userId: 'AQID', prfSalt: 'BwgJ' } },
+        body: {
+          passkey: { registered: false, rpId: 'evil.test', userId: 'AQID', prfSalt: 'BwgJ' },
+        },
       },
     });
     expect(await createUpgradeApi({ fetch: bad.fetch, token: 't' }).info()).toEqual({
       kind: 'error',
       problem: 'unknown',
     });
-    const none = recorder({ [`GET ${PASSKEY_PATH}`]: { status: 503, body: { status: 'needs_setup' } } });
+    const none = recorder({
+      [`GET ${PASSKEY_PATH}`]: { status: 503, body: { status: 'needs_setup' } },
+    });
     expect(await createUpgradeApi({ fetch: none.fetch, token: 't' }).info()).toEqual({
       kind: 'needs_setup',
     });
@@ -363,7 +373,9 @@ describe('the upgrade API (existing /api/owner/passkey owner operation)', () => 
   });
 
   it('posts the body once as octet-stream to the passkey route, never in the URL, and zeroes its copy', async () => {
-    const r = recorder({ [`POST ${PASSKEY_PATH}`]: { status: 200, body: { status: 'registered' } } });
+    const r = recorder({
+      [`POST ${PASSKEY_PATH}`]: { status: 200, body: { status: 'registered' } },
+    });
     const api = createUpgradeApi({ fetch: r.fetch, token: 'tok' });
     const code = new TextEncoder().encode(CODE);
     const body = encodeUpgradeBody(code, ASSERTION);
@@ -429,10 +441,10 @@ describe('the "Switch to Touch ID" next step on every app page', () => {
   it('links to the first-run page and names the platform', () => {
     act(() => root.render(h(SwitchToPasskeyBanner, { platform: 'mac' })));
     expect(text()).toContain(UPGRADE.bannerTitle('mac'));
-    expect(text()).toContain(UPGRADE.bannerBody('Touch ID'));
+    expect(text()).toContain(UPGRADE.bannerBody);
     const link = host.querySelector('a');
     expect(link?.getAttribute('href')).toBe('/first-run');
-    expect(link?.textContent).toBe(UPGRADE.bannerAction);
+    expect(link?.textContent).toBe(UPGRADE.bannerAction('mac'));
     // A fixed same-origin path: no token, no code, no query.
     expect(link?.getAttribute('href')).not.toContain('?');
   });
