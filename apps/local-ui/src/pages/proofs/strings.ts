@@ -14,6 +14,7 @@ export const PROOFS_STRINGS = {
   listUnavailable: "Your proofs can't be loaded right now. Try again in a minute.",
   notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
   creditsLabel: 'Credits',
+  waiting: 'Waiting for your credits…',
   testCreditsLabel: 'Test credits',
   testCredits: 'During the beta, proofs use free test credits.',
   firstProofFree: 'Free test credits arrive automatically with your first proof.',
