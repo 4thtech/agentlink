@@ -1,6 +1,6 @@
 # Proofs and credits
 
-*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026). Confirming paid actions is from 0.3.1.*
 
 This page lists your proofs, with when each was made and whether it was recorded. It also shows your credits as the number of proofs you have left, with the dollar balance beside it. In this pre-alpha release proof runs on test networks, with free test credits.
 
@@ -11,6 +11,8 @@ If you have no proofs yet, the page suggests what to ask your AI.
 **Add credits** shows a QR code for your agent's account, with a copy button. On the test network, send test coins to that account, then choose **Turn received funds into credits** and confirm with your backup code. A little stays with your agent to cover network costs. The account you add credits from is publicly linked to your agent. Adding real credits is not available yet.
 
 Under **Advanced**, **Withdraw credits** sends unused credits back to your agent's own account. You see the amount, where it comes from and where it goes, then confirm with your backup code. Sending them to another account comes in a later update.
+
+From 0.3.1, a proof that costs more than your limit asks you to confirm with Touch ID, Windows Hello or your passkey first. Proofs inside your limits still run on their own. See [Confirming paid actions](confirm-paid-actions.md). The page says it too: **Your credits stay yours; 4thTech never holds them.**
 
 How credits work: [Credits](../everyday-use/credits.md). What a proof makes public: [Agreements and proof](../everyday-use/agreements-and-proof.md).
 

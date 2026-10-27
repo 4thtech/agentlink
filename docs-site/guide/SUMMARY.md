@@ -31,6 +31,7 @@
   * [Contacts page](local-app/contacts.md)
   * [Files page](local-app/files.md)
   * [Rules page](local-app/rules.md)
+  * [Confirming paid actions](local-app/confirm-paid-actions.md)
 
 ## Everyday use
 

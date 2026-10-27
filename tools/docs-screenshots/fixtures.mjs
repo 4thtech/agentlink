@@ -44,6 +44,24 @@ export const CONTACTS = {
   ],
 };
 
+/** The same list with a second, older connection of "Ana's agent" (same owner): the duplicate notice. */
+export const CONTACTS_DUPLICATE = {
+  status: 'ok',
+  contacts: [
+    ...CONTACTS.contacts.map((c) => (c.ref === ref(2) ? { ...c, olderSameOwner: ref(4) } : c)),
+    {
+      ref: ref(4),
+      name: "Ana's agent",
+      nameSource: 'owner',
+      fingerprint: '2D3E·4F5A',
+      label: 'self-declared',
+      status: 'active',
+      pairing: 'complete',
+      since: NOW - 20 * DAY,
+    },
+  ],
+};
+
 export const SAFETY_CODE = { status: 'ok', code: '4821 7390 1564' };
 
 export const ACTIVITY = {
@@ -123,7 +141,139 @@ export const FILES_REVIEW = {
 
 export const FIRST_RUN = { owner: 'missing' };
 
-/** The route table: exact path (no query) to the JSON answer. */
+/** The status bar's health read: the agent is running (08 §1; apps/local-ui layout/health.ts). */
+export const HEALTH = { agent: 'running', version: '0.3.1' };
+
+export const MESSAGE_CONVERSATIONS = {
+  conversations: [
+    { contactId: ref(1), name: "Marko's agent", lastAt: NOW - 20 * MIN, lastInAt: NOW - 20 * MIN },
+    { contactId: ref(2), name: "Ana's agent", lastAt: NOW - 1 * DAY, lastInAt: NOW - 1 * DAY },
+  ],
+};
+
+const MESSAGES_IN = {
+  items: [
+    {
+      id: 'm-in-2',
+      at: NOW - 20 * MIN,
+      text: 'The draft is ready. Can your agent send the notes before Friday?',
+      files: [{ name: 'draft-notes.txt', size: 2048 }],
+      receipt: false,
+      proof: false,
+      size: 180,
+    },
+    {
+      id: 'm-in-1',
+      at: NOW - 3 * HOUR,
+      text: 'Thanks, I got the terms. I will go through them this afternoon.',
+      files: [],
+      receipt: false,
+      proof: true,
+      size: 96,
+    },
+  ],
+};
+
+const MESSAGES_OUT = {
+  items: [
+    {
+      id: 'm-out-1',
+      at: NOW - 4 * HOUR,
+      text: 'Here are the terms we talked about.',
+      files: [],
+      status: 'sent',
+      receipt: true,
+      proof: false,
+      size: 64,
+    },
+  ],
+};
+
+export const FILES_RECEIVED = {
+  items: [
+    {
+      id: 'f-in-2',
+      from: "Marko's agent",
+      at: NOW - 20 * MIN,
+      name: 'draft-notes.txt',
+      size: 2048,
+      state: 'saved',
+      savedName: 'draft-notes.txt',
+      proof: false,
+    },
+    {
+      id: 'f-in-1',
+      from: "Ana's agent",
+      at: NOW - 1 * DAY,
+      name: 'agreement.pdf',
+      size: 184320,
+      state: 'saved',
+      savedName: 'agreement (2).pdf',
+      proof: true,
+    },
+  ],
+  next: null,
+};
+
+export const FILES_SENT = {
+  items: [
+    {
+      id: 'f-out-1',
+      to: "Marko's agent",
+      at: NOW - 5 * HOUR,
+      name: 'project-plan.pdf',
+      size: 96256,
+      status: 'sent',
+      receipt: true,
+      state: 'available',
+      expiresAt: NOW + 6 * DAY,
+    },
+    {
+      id: 'f-out-2',
+      to: "Ana's agent",
+      at: NOW - 2 * DAY,
+      name: 'invoice.pdf',
+      size: 40960,
+      status: 'sent',
+      receipt: false,
+      state: 'available',
+      expiresAt: NOW + 5 * DAY,
+    },
+  ],
+  next: null,
+};
+
+/** Rules: the review for raising "Ask me over" from $0.50 to $1 (no new warnings). */
+export const RULES_REVIEW = {
+  status: 'review',
+  review: 'b'.repeat(64),
+  warnings: [],
+  askKeepDeliveryReceipts: false,
+};
+
+/** The paid-action sheet's begin answer for that spending change (fake challenge and credential). */
+export const PAY_BEGIN = {
+  status: 'ready',
+  ceremony: 'C'.repeat(43),
+  statement: {
+    v: 1,
+    kind: 'limits',
+    amountUsd: null,
+    purpose: 'limits_change',
+    counterparty: null,
+    changes: [{ field: 'proofs.perActionMaxUSD', old: '0.5', new: '1' }],
+  },
+  publicKey: {
+    rpId: 'localhost',
+    challenge: 'D'.repeat(43),
+    allowCredentials: ['AAAAAAAAAAAAAAAAAAAAAA'],
+    timeoutMs: 120000,
+    prfSalt: 'E'.repeat(43),
+  },
+  rememberOffered: false,
+};
+
+/** The route table: exact path (no query) to the JSON answer, or a function of the URL. */
 export const ROUTES = {
   '/api/ui/contacts': CONTACTS,
   [`/api/ui/contacts/${ref(2)}/safety-code`]: SAFETY_CODE,
@@ -134,4 +284,12 @@ export const ROUTES = {
   '/api/ui/files': FILES,
   '/api/ui/files/review': FILES_REVIEW,
   '/api/ui/first-run': FIRST_RUN,
+  '/api/ui/health': HEALTH,
+  '/api/ui/messages': MESSAGE_CONVERSATIONS,
+  [`/api/ui/messages/${ref(1)}`]: (url) =>
+    url.searchParams.get('box') === 'out' ? MESSAGES_OUT : MESSAGES_IN,
+  '/api/ui/files/received': FILES_RECEIVED,
+  '/api/ui/files/sent': FILES_SENT,
+  '/api/ui/rules/review': RULES_REVIEW,
+  '/api/ui/pay-confirm/begin': PAY_BEGIN,
 };

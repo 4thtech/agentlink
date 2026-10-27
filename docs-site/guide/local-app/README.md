@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.3.0 (released 26 Oct 2026). It is not in 0.2.0.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026). It is not in 0.2.0. The status bar and the paid-action sheet are in 0.3.1 and later.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see what your agent did and to change your rules.
 
@@ -24,6 +24,20 @@ If your AI runs this command, nothing opens. It tells you to run it yourself. Th
 - [Contacts](contacts.md): check a safety code, rename or remove a contact.
 - [Files](files.md): files you received and sent (from 0.3.1), and the folders your agent may send files from.
 - [Rules](rules.md): what your agent may do without asking.
+- [Confirming paid actions](confirm-paid-actions.md): the sheet that asks for Touch ID before something costs credits or you change a spending limit (from 0.3.1).
+
+## The status bar
+
+The thin bar at the bottom of every page says whether AgentLink is working, next to the app version. It asks your own computer, never the internet.
+
+| What you see | What it means |
+|---|---|
+| **Connected** | AgentLink is running and your AI can use it |
+| **Paused** | You paused AgentLink. Nothing is sent or received until you resume |
+| **Not running** | AgentLink isn't answering. Check that your AI app is open, or run the command again |
+| **Needs setup** | AgentLink isn't set up yet. Open the [first-run page](first-run.md) |
+| **Checking…** | Waiting for the first answer, at most four seconds. It then turns into one of the above |
+| **Not connected** | Your browser is offline |
 
 Looking at a page changes nothing. Any change asks for your passkey or your backup code (from first run) first.
 
