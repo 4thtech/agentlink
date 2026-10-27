@@ -130,6 +130,10 @@ How a user adds credits on the pay page (08 §2.3). Design brief: `docs/design/t
 - **Zero access.** A provider receives only the agent's address and the amount.
 - **Privacy.** Each path's public link between the paying account and the agent is stated once on the pay page (D-109).
 
+### 4.6 Confirming paid actions (D-132)
+
+The two paid actions are a proof and verified registration (§2); AgentLink is not a wallet or a bank, moves no money between agents, and 4thTech never holds credits (§4.1). *Decided by the owner (2026-10-27):* the owner confirms paid actions with the computer's own verification (Touch ID or another fingerprint reader, Windows Hello, a passkey or a PIN), in a confirmation sheet that shows the amount and what it is for. *Also decided (2026-10-27):* verified registration, a proof above the owner's signed limits (or set to "Ask me") and any change to those limits use the sheet; a proof inside the limits stays automatic (06 §3). The ceremony rules (proposed, owner confirms at merge) (user verification, bound to the amount and purpose shown) are in 04 §2.5.3; adding and withdrawing credits keep their current owner steps.
+
 ---
 
 ## 5. Integrator fees

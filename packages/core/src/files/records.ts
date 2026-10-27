@@ -43,6 +43,8 @@ export async function sealFileRows(
       deleted_at: null,
       // M1-1g-i: the retention in effect at send time; a later policy change never applies to it.
       delete_after: r.deleteAfter,
+      // MSG-FILES-IO-b: only a received file is saved by fetchFile.
+      saved_name: null,
     });
   }
   return rows;

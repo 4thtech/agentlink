@@ -539,6 +539,26 @@ export async function readInboxPage(deps: InboxPageDeps, q: InboxPageQuery): Pro
   throw new CoreError('inbox_busy', 'The inbox changed while it was read. Try again.');
 }
 
+/**
+ * The stored payload of an envelope row, opened and checked (`payloadSchema`, the row's own type),
+ * with its plaintext text; undefined when it is absent or cannot be read (07 §3.1, fail closed).
+ * Opening never writes. Shared with the local app's read views (ui-messages.ts).
+ */
+export async function openStoredPayload(
+  ctx: CoreContext,
+  row: Row<'envelopes'>,
+): Promise<{ readonly payload: Payload; readonly text: string } | undefined> {
+  if (row.payload_json === null) return undefined;
+  try {
+    const text = await open(ctx, 'envelopes', 'payload_json', [row.envelope_id], row.payload_json);
+    const parsed = payloadSchema.safeParse(parseJson(text));
+    if (!parsed.success || parsed.data.type !== row.type) return undefined;
+    return { payload: parsed.data, text };
+  } catch {
+    return undefined;
+  }
+}
+
 /** One candidate as an item, or undefined when its payload or its contact cannot be read. */
 async function buildItem(
   ctx: CoreContext,
@@ -551,16 +571,9 @@ async function buildItem(
   },
 ): Promise<InboxPageItem | undefined> {
   const { row, category } = candidate;
-  if (row.payload_json === null) return undefined;
-  let payload: Payload;
-  try {
-    const text = await open(ctx, 'envelopes', 'payload_json', [row.envelope_id], row.payload_json);
-    const parsed = payloadSchema.safeParse(parseJson(text));
-    if (!parsed.success || parsed.data.type !== row.type) return undefined;
-    payload = parsed.data;
-  } catch {
-    return undefined;
-  }
+  const opened = await openStoredPayload(ctx, row);
+  if (opened === undefined) return undefined;
+  const payload = opened.payload;
   const base = baseOf(row, payload, drop);
   if (category === 'request') {
     const code = selection.codes.get(row.from_key);
