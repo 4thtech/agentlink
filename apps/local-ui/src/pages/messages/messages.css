@@ -1,7 +1,9 @@
 /* Messages (MSG-FILES-IO-e; design b11 §13 to §17; D-116): the contacts list beside the conversation;
    below 720 px they are separate pages (the markup flips with a class, no inline styles: 08 §4 CSP).
-   Tokens only. Depth: rows and cards on level 1, the inbound well recessed (the component's own
-   style). Motion: opacity only, and none under reduced motion (b11 §14). */
+   Tokens only. Depth (UI-REFRESH-k): the contact list and each message sit on a solid level 1 surface
+   (the Surface component draws the border, fill and shadow); nothing here is frosted. Motion: none in
+   this file. Entering contact rows and the first-load skeleton are the shared components'; inbound text
+   never moves (I-5). */
 .ms-head {
   display: flex;
   flex-wrap: wrap;
@@ -42,11 +44,12 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
-  box-shadow: var(--al-shadow-1);
+}
+.ms-list-surface {
   overflow: hidden;
+}
+.ms-row-item {
+  position: relative;
 }
 .ms-row {
   display: flex;
@@ -101,10 +104,6 @@
   gap: var(--al-space-3);
   min-width: 0;
   padding: var(--al-space-5);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
-  box-shadow: var(--al-shadow-1);
 }
 .ms-meta {
   display: flex;
@@ -129,24 +128,6 @@
   flex-wrap: wrap;
   gap: var(--al-space-2);
 }
-.ms-hood {
-  border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-sunken);
-  padding: var(--al-space-3) var(--al-space-4);
-}
-.ms-hood summary {
-  cursor: pointer;
-}
-.ms-hood dl {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--al-space-2) var(--al-space-5);
-  margin: var(--al-space-3) 0 0;
-  overflow-wrap: anywhere;
-}
-.ms-hood dd {
-  margin: 0;
-}
 .ms-footer {
   margin: 0;
   color: var(--al-color-fg-muted);
@@ -154,12 +135,6 @@
 .ms-more {
   display: flex;
   justify-content: center;
-}
-.ms-skeleton {
-  height: 4.5em;
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-sunken);
-  margin-bottom: var(--al-space-3);
 }
 .ms-new {
   color: var(--al-color-fg-default);
@@ -180,35 +155,17 @@
   }
 }
 
-/* A skeleton appears only if loading takes a while (b11 §15.2: under 400 ms show nothing). */
-@media (prefers-reduced-motion: no-preference) {
-  .ms-skeleton {
-    opacity: 0;
-    animation: ms-appear var(--al-duration-fast) var(--al-easing-enter) 400ms forwards;
-  }
-  .ms-item {
-    animation: ms-appear var(--al-duration-base) var(--al-easing-enter);
-  }
-  @keyframes ms-appear {
-    to {
-      opacity: 1;
-    }
-    from {
-      opacity: 0;
-    }
-  }
-}
+/* No motion in this file; the shared components own theirs. */
 @media (prefers-reduced-motion: reduce) {
-  .ms-skeleton,
+  .ms-row,
   .ms-item {
     animation: none;
     transition: none;
   }
 }
 @media (forced-colors: active), (prefers-contrast: more) {
-  .ms-list,
-  .ms-item,
-  .ms-hood {
+  .ms-list-surface,
+  .ms-item {
     border: var(--al-border-width-thin) solid CanvasText;
     box-shadow: none;
   }

@@ -60,7 +60,7 @@ const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabi
 // was already inert before is left alone and never released by us.
 const inertCounts = new Map<Element, number>();
 
-function holdInert(frame: HTMLElement): () => void {
+export function holdInert(frame: HTMLElement): () => void {
   const held: Element[] = [];
   for (let node: HTMLElement = frame; node !== document.body;) {
     const parent = node.parentElement;

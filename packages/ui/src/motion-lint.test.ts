@@ -174,24 +174,14 @@ function lintMotion(files: Record<string, string>): Hit[] {
   return [...new Map(hits.map((h) => [id(h), h])).values()];
 }
 
-// The named exceptions: exactly these, each with its owner card. Not for new code.
-const NAMED_EXCEPTIONS: Record<string, string> = {
-  // Shimmer moves to --al-duration-ambient-sweep in UI-REFRESH-j.
-  'apps/local-ui/src/pages/files/files.css | literal-duration | fl-shimmer | 1.4s': 'UI-REFRESH-j',
-  'apps/local-ui/src/pages/files/files.css | keyframes-property | fl-shimmer | background-position':
-    'UI-REFRESH-j',
-};
+// The named exceptions: none left (the files.css shimmer went in UI-REFRESH-j). Not for new code.
+const NAMED_EXCEPTIONS: Record<string, string> = {};
 // Colour and position transitions that predate the lint (plain hover and switch states). They are
 // listed so nothing new joins them; the page and component cards remove them as they restyle.
 const LEGACY_EXCEPTIONS: Record<string, string> = {
   'packages/ui/src/components/components.css | transition-property | .al-btn | background-color':
     'legacy',
   'packages/ui/src/components/components.css | transition-property | .al-btn | border-color':
-    'legacy',
-  'packages/ui/src/components/components.css | transition-property | .al-switch-knob | left':
-    'legacy',
-  'apps/local-ui/src/pages/files/files.css | transition-property | .fl-tab | color': 'legacy',
-  'apps/local-ui/src/pages/files/files.css | transition-property | .fl-tab | border-color':
     'legacy',
 };
 
@@ -229,12 +219,9 @@ describe('motion lint on the real stylesheets', () => {
     );
   });
 
-  it('names exactly the named exception left (the files.css shimmer, UI-REFRESH-j)', () => {
-    const files = new Set(Object.keys(NAMED_EXCEPTIONS).map((k) => k.split(' | ')[0]));
-    expect([...files].sort()).toEqual(['apps/local-ui/src/pages/files/files.css']);
-    expect(
-      Object.keys(NAMED_EXCEPTIONS).filter((k) => k.includes('literal-duration')),
-    ).toHaveLength(1);
+  it('names no exception any more (the files.css shimmer and tab transitions are gone, UI-REFRESH-j)', () => {
+    expect(Object.keys(NAMED_EXCEPTIONS)).toEqual([]);
+    expect(Object.keys(LEGACY_EXCEPTIONS).filter((k) => k.includes('/pages/files/'))).toEqual([]);
   });
 
   it('every animating stylesheet has a reduced-motion rule, and motion.css holds the global switch', () => {

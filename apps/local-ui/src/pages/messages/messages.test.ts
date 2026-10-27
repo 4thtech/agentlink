@@ -8,6 +8,7 @@
 //   or anchor from the body; a link is an inert domain chip; nothing in the title.
 // - The seen marker lives in this browser's localStorage (contact and time only), works without storage.
 // - Under the hood shows metadata only: never a URL, key, code or token, even if the server sent one.
+import { HoodProvider } from '@4thtech-io/ui';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -325,9 +326,13 @@ describe('a conversation', () => {
   });
 
   it('shows metadata only under the hood, never a URL or key the server may have sent', async () => {
-    await openMarko();
-    const details = host.querySelector('details');
-    expect(details?.querySelector('summary')?.textContent).toBe(S.underTheHood);
+    // UI-REFRESH-k: the local details block became the shared Under the hood panel (on with the switch).
+    await act(async () => {
+      root.render(h(HoodProvider, { value: true }, h(MessagesPage, { api: mockApi() })));
+    });
+    await click(button('Marko'));
+    const details = host.querySelector('.al-hood');
+    expect(details?.getAttribute('aria-label')).toBe(S.underTheHood);
     expect(details?.textContent).toContain('env-1');
     expect(details?.textContent).toContain(S.proofYes);
     expect(text()).not.toContain('SECRET-URL');

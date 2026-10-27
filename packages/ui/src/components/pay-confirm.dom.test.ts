@@ -3,7 +3,7 @@
 // D-132). The sheet renders only the statement the server returned, names the platform's check,
 // never focuses Confirm by default, announces each state in one live region, closes itself about
 // 1.2 s after Done (and waits for Close with reduced motion), and its copy passes the 11 §5 lint.
-import { act, createElement as h } from 'react';
+import { act, createElement as h, useState, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { lintVocabulary } from '../strings/lint.js';
@@ -354,4 +354,133 @@ describe('copy (11 §5; b11 §19.6)', () => {
 
   // M1-11b-2c: the server-rendered approval page, which drew this sheet without React and copied
   // these words, is gone; the local app renders this component, so there is no copy to compare.
+});
+
+// UI-REFRESH-f-b (S2): while the sheet is open, the page behind it is inert (no click, no Tab, no
+// focus moved by script reaches it), so nothing on the page can act while the owner reads the
+// amount and confirms. The hold is released whenever the sheet goes: closed, unmounted, after Done
+// closes itself, after an error is closed, and with reduced motion after Close. jsdom does not
+// enforce `inert`; the browser does, so these tests pin the attribute and its timing.
+describe('the page behind the open sheet is inert (UI-REFRESH-f-b)', () => {
+  let page: HTMLElement;
+  let pageButton: HTMLButtonElement;
+  beforeEach(() => {
+    page = document.createElement('main');
+    pageButton = document.createElement('button');
+    pageButton.textContent = 'Something on the page';
+    page.append(pageButton);
+    document.body.prepend(page);
+  });
+  afterEach(() => {
+    page.remove();
+  });
+
+  const inertNow = (): Element[] => [...document.querySelectorAll('[inert]')];
+
+  /** A host that shows the sheet until its onClose runs, like the local app does. */
+  function Host(p: { sheet: PayConfirmSheetProps }): ReactElement {
+    const [open, setOpen] = useState(true);
+    return open
+      ? h(PayConfirmSheet, {
+          ...p.sheet,
+          onClose: () => {
+            p.sheet.onClose();
+            setOpen(false);
+          },
+        })
+      : h('div');
+  }
+
+  it('holds the page inert while open; the sheet, its ancestors and the focus stay live', () => {
+    mount(props());
+    expect(page.hasAttribute('inert')).toBe(true);
+    expect(dialog().closest('[inert]')).toBeNull();
+    expect(host.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement?.closest('[inert]') ?? null).toBeNull();
+  });
+
+  it('keeps the hold across every phase (ready, waiting, recording, done, backup)', () => {
+    for (const phase of ['ready', 'waiting', 'recording', 'done', 'backup'] as const) {
+      mount(props({ phase, reducedMotion: true }));
+      expect(page.hasAttribute('inert')).toBe(true);
+    }
+    act(() => root.render(h('div')));
+    expect(inertNow()).toEqual([]);
+  });
+
+  it('releases the page when the sheet closes (the host stops rendering it)', () => {
+    mount(props());
+    act(() => root.render(h('div')));
+    expect(page.hasAttribute('inert')).toBe(false);
+    expect(inertNow()).toEqual([]);
+  });
+
+  it('releases the page when the sheet is unmounted', () => {
+    mount(props());
+    act(() => root.unmount());
+    expect(page.hasAttribute('inert')).toBe(false);
+    root = createRoot(host);
+  });
+
+  it('releases the page after Done closes itself (about 1.2 s, D-132)', () => {
+    vi.useFakeTimers();
+    const p = props({ phase: 'done' });
+    act(() => root.render(h(Host, { sheet: p })));
+    act(() => vi.advanceTimersByTime(1100));
+    expect(page.hasAttribute('inert')).toBe(true);
+    act(() => vi.advanceTimersByTime(200));
+    expect(p.onClose).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(page.hasAttribute('inert')).toBe(false);
+  });
+
+  it('stays inert while an error shows, and releases once it is closed', () => {
+    const p = props({ notice: { tone: 'error', text: P.notVerified } });
+    act(() => root.render(h(Host, { sheet: p })));
+    expect(page.hasAttribute('inert')).toBe(true);
+    const q = props({ closed: true, notice: { tone: 'error', text: P.refusedProof } });
+    act(() => root.render(h(Host, { sheet: q })));
+    expect(page.hasAttribute('inert')).toBe(true);
+    act(() => buttonNamed(P.close)?.click());
+    expect(q.onClose).toHaveBeenCalledTimes(1);
+    expect(page.hasAttribute('inert')).toBe(false);
+  });
+
+  it('with reduced motion, stays inert after Done until Close, then releases', () => {
+    vi.useFakeTimers();
+    const p = props({ phase: 'done', reducedMotion: true });
+    act(() => root.render(h(Host, { sheet: p })));
+    act(() => vi.advanceTimersByTime(5000));
+    expect(p.onClose).not.toHaveBeenCalled();
+    expect(page.hasAttribute('inert')).toBe(true);
+    act(() => buttonNamed(P.close)?.click());
+    expect(page.hasAttribute('inert')).toBe(false);
+  });
+
+  it('focus still returns to the opener, and the opener is live when it gets it', () => {
+    act(() => pageButton.focus());
+    const seen: boolean[] = [];
+    const focus = pageButton.focus.bind(pageButton);
+    pageButton.focus = (o?: FocusOptions) => {
+      seen.push(pageButton.closest('[inert]') !== null);
+      focus(o);
+    };
+    mount(props());
+    expect(page.hasAttribute('inert')).toBe(true);
+    expect(document.activeElement).not.toBe(pageButton);
+    act(() => root.render(h('div')));
+    expect(document.activeElement).toBe(pageButton);
+    expect(seen).toEqual([false]);
+  });
+
+  it('leaves an element that was inert before the sheet opened inert after it closes', () => {
+    const before = document.createElement('aside');
+    before.setAttribute('inert', '');
+    document.body.prepend(before);
+    mount(props());
+    act(() => root.render(h('div')));
+    expect(before.hasAttribute('inert')).toBe(true);
+    expect(page.hasAttribute('inert')).toBe(false);
+    before.remove();
+  });
 });

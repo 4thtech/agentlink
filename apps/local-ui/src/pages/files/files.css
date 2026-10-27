@@ -82,25 +82,38 @@
   overflow-x: auto;
 }
 .fl-tab {
+  position: relative;
   appearance: none;
   background: none;
   border: 0;
-  border-block-end: 2px solid transparent;
   padding: var(--al-space-3) var(--al-space-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
   color: var(--al-color-text-secondary);
   font: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    color var(--al-duration-fast) var(--al-easing-standard),
-    border-color var(--al-duration-fast) var(--al-easing-standard);
+}
+/* The underline slides in with a transform; colour changes at once. */
+.fl-tab::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 2px;
+  background: currentColor;
+  transform: scaleX(0);
+  transition: transform var(--al-duration-fast) var(--al-easing-standard);
 }
 .fl-tab:hover {
   color: var(--al-color-text-primary);
 }
 .fl-tab.is-active {
   color: var(--al-color-text-primary);
-  border-block-end-color: currentColor;
+}
+.fl-tab.is-active::after {
+  transform: scaleX(1);
 }
 .fl-tab:focus-visible {
   outline: 2px solid currentColor;
@@ -116,10 +129,17 @@
   flex-direction: column;
   gap: var(--al-space-2);
   padding: var(--al-space-4);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
   min-inline-size: 0;
+}
+.fl-row-li {
+  list-style: none;
+  min-inline-size: 0;
+  border-radius: var(--al-radius-lg);
+}
+.fl-card {
+  padding: var(--al-space-3);
+  border-radius: var(--al-radius-xl);
 }
 .fl-item-head {
   display: flex;
@@ -170,40 +190,13 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.fl-skeleton {
-  display: block;
-  block-size: var(--al-space-4);
-  border-radius: var(--al-radius-sm);
-  background: linear-gradient(
-    90deg,
-    var(--al-color-bg-sunken) 25%,
-    var(--al-color-bg-raised) 50%,
-    var(--al-color-bg-sunken) 75%
-  );
-  background-size: 200% 100%;
-  animation: fl-shimmer 1.4s linear infinite;
-}
-.fl-skeleton-name {
-  inline-size: 60%;
-}
-.fl-skeleton-meta {
-  inline-size: 35%;
-}
-@keyframes fl-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-  to {
-    background-position: -200% 0;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .fl-skeleton {
-    animation: none;
-  }
-  .fl-tab {
+  .fl-tab::after {
     transition: none;
   }
+}
+:root[data-motion='reduced'] .fl-tab::after {
+  transition: none;
 }
 @media (max-width: 40rem) {
   .fl-item {
