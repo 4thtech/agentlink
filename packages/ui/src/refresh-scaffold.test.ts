@@ -40,7 +40,10 @@ describe('refresh scaffold', () => {
         expect(rules, n).toContain('{');
       } else expect(rules, n).toBe('');
     }
-    const progress = (sheets['./components/progress.css'] as string).replace(/\/\*[\s\S]*?\*\//g, '');
+    const progress = (sheets['./components/progress.css'] as string).replace(
+      /\/\*[\s\S]*?\*\//g,
+      '',
+    );
     expect(progress).toContain('.al-pb');
   });
 
