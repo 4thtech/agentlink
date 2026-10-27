@@ -30,6 +30,7 @@ export const PAGE_TITLES = {
   backup: 'Backup',
   appearance: 'Appearance',
   advanced: 'Advanced',
+  about: 'About',
 } as const;
 
 /** Shown under every code field: 0.2.0 owners only know the code from the terminal (B-9 not built yet). */

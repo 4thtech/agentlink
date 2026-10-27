@@ -4718,7 +4718,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests for new row, filter, empty, offline and loading; reduced motion; a 200-row fixture never animates more than two rows at once.
 
 #### UI-REFRESH-i · local-ui: Contacts refresh (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Contacts), §6 rows 4 and 9
@@ -4751,7 +4751,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - The existing messages tests unchanged; DOM tests per state; reduced motion; the panel shows only message ID, size and proof status with the public proof record link where there is a proof; no key, code, token, session, drop or presigned link.
 
 #### UI-REFRESH-l · local-ui: Proofs & credits refresh (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Proofs & credits), §15.3, §19.4
@@ -4762,7 +4762,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests per state; the panel shows the public record link and no key, code, token, session, drop or presigned link; amounts never animate; reduced motion; the existing proofs tests unchanged.
 
 #### UI-REFRESH-m · local-ui: Rules refresh (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Rules)
@@ -4773,7 +4773,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - The existing rules and warnings tests unchanged; DOM tests for saved and error; reduced motion.
 
 #### UI-REFRESH-n · local-ui: Settings pages refresh and About (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**`, `advanced/**`, `storage/**`, `about/**` (new); after UI-REFRESH-f has merged: one `ROUTES` line in `router.tsx`, one `SETTINGS_PAGES` line in `nav.ts` and one `PAGE_TITLES.about` entry in `apps/local-ui/src/strings.ts` (UI-REFRESH-f owns those files until it merges; no other wave-4 card edits them)
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Settings), §7 (Advanced); UX-V3 plan §3

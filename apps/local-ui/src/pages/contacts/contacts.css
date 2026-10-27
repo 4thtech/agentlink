@@ -12,11 +12,10 @@
   margin-top: var(--al-space-6);
 }
 .ct-list {
-  flex: 1 1 calc(var(--al-layout-max-content) / 2);
+  flex: 1 1 100%;
   list-style: none;
   margin: 0;
   padding: 0;
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
   overflow: hidden;
 }
@@ -37,14 +36,9 @@
   background: var(--al-color-bg-sunken);
 }
 .ct-detail {
-  flex: 1 1 calc(var(--al-layout-max-content) / 2);
   display: flex;
   flex-direction: column;
   gap: var(--al-space-5);
-  padding: var(--al-space-6);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
-  border-radius: var(--al-radius-lg);
-  background: var(--al-color-bg-surface);
 }
 .ct-detail p {
   margin: 0;
@@ -110,4 +104,33 @@
       transform: none;
     }
   }
+}
+
+/* "Waiting for {name}": the line breathes (opacity only) while the other agent has not answered.
+   Still with reduced motion (the system setting or the app's own). */
+.ct-waiting {
+  display: flex;
+  gap: var(--al-space-3);
+  align-items: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ct-waiting[data-motion='full'] {
+    animation: ct-breathe var(--al-duration-ambient) var(--al-easing-standard) infinite alternate;
+  }
+  @keyframes ct-breathe {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0.55;
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ct-waiting {
+    animation: none;
+  }
+}
+:root[data-motion='reduced'] .ct-waiting {
+  animation: none;
 }
