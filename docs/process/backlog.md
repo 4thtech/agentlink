@@ -4718,7 +4718,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests for new row, filter, empty, offline and loading; reduced motion; a 200-row fixture never animates more than two rows at once.
 
 #### UI-REFRESH-i · local-ui: Contacts refresh (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Contacts), §6 rows 4 and 9

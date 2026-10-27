@@ -4,6 +4,8 @@
 // formatted by the ui name rule and the page renders the result as text.
 export const CONTACTS_STRINGS = {
   listLabel: 'Your contacts',
+  detailTitle: 'Contact',
+  closeSheet: 'Close',
   loading: 'Loading…',
   emptyTitle:
     'No contacts yet. Ask your AI to create an invite and send it to someone you work with.',
@@ -65,6 +67,15 @@ export const CONTACTS_STRINGS = {
   failed: "That didn't work. Nothing was changed. Try again in a minute.",
 } as const;
 
+/** Under the hood labels and values (B-11 §16). */
+export const HOOD = {
+  fingerprint: 'Fingerprint',
+  identity: 'Identity level',
+  paired: 'Paired',
+  checked: 'Safety code checked',
+  selfDeclared: 'Self-declared',
+} as const;
+
 export function countLine(n: number): string {
   return n === 1 ? '1 contact' : `${String(n)} contacts`;
 }
@@ -84,6 +95,11 @@ export function mismatchBody(name: string): string {
  */
 export function secondConnection(name: string, date: string): string {
   return `Looks like a second connection with ${name} (paired ${date}). Keep both, or remove the older one?`;
+}
+
+/** The pending invite line. `name` is the name-rule output; the page renders it as text. */
+export function waitingFor(name: string): string {
+  return `Waiting for ${name}`;
 }
 
 export function since(date: string): string {
