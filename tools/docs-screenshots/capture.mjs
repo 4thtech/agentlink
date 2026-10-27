@@ -148,7 +148,10 @@ try {
     await page.route('**/api/**', answer);
     await page.goto(origin + shot.path);
     await shot.ready(page);
-    await page.getByText('Checking…').waitFor({ state: 'detached', timeout: 6000 }).catch(() => {});
+    await page
+      .getByText('Checking…')
+      .waitFor({ state: 'detached', timeout: 6000 })
+      .catch(() => {});
     if (shot.steps) await shot.steps(page);
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);
