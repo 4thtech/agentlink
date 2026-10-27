@@ -8,6 +8,21 @@ export const FILES_IO_STRINGS = {
   tabReceived: 'Received',
   tabSent: 'Sent',
   tabFolders: 'Send folders',
+  // Screen-reader words after a tab's number.
+  waitingLabel: {
+    received: 'waiting to be saved',
+    sent: 'waiting to send',
+    folders: 'waiting',
+  },
+  // Stepped bars on rows in flight (no byte progress is served, so no determinate bar).
+  progressArriving: 'File arriving',
+  progressSending: 'File sending',
+  arrivingSteps: ['Arrived', 'Saved'],
+  sendingSteps: ['Waiting to send', 'Sent', 'Delivered'],
+  // Under the hood: what the lists hold, nothing private.
+  hoodFiles: 'Files listed',
+  hoodSize: 'Size listed',
+  hoodFolders: 'Folders allowed',
   untrustedNote:
     "File names come from other people. They're shown as plain text, and AgentLink never opens a file for you.",
   gotIt: 'Got it',

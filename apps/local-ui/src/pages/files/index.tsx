@@ -12,7 +12,7 @@
 // Three tabs (MSG-FILES-IO-f): Received and Sent (io.tsx, read-only) and this page as Send folders.
 // Out of scope here: inbox folder and link expiry (UX audit 4b "More options"), and Storage
 // (folded in by D-120 later).
-import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
+import { Banner, Button, EmptyState, Icon, TextField, UnderTheHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
 import {
@@ -34,7 +34,7 @@ import {
   type FilesApi,
   type PasskeyInfo,
 } from './files-api.js';
-import { FilesTabs, ReceivedPanel, SentPanel, type FilesTab } from './io.js';
+import { FilesSkeleton, FilesTabs, ReceivedPanel, SentPanel, type FilesTab } from './io.js';
 import {
   FILES_IO_STRINGS as IO,
   FILES_STRINGS as S,
@@ -373,7 +373,7 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
 
   let content: ReactElement;
   if (list.phase === 'loading') {
-    content = <p className="al-text-body-sm al-muted">{S.loading}</p>;
+    content = <FilesSkeleton word={S.loading} />;
   } else if (list.phase === 'not_set_up') {
     content = <Banner tone="info">{S.notSetUp}</Banner>;
   } else if (list.phase === 'error') {
@@ -493,6 +493,11 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
         {S.foldersLabel}
       </h2>
       {content}
+      {list.phase === 'ok' ? (
+        <UnderTheHood
+          fields={[{ kind: 'count', label: IO.hoodFolders, value: String(list.folders.length) }]}
+        />
+      ) : null}
     </section>
   );
 }
@@ -513,14 +518,19 @@ export function FilesPage({
   const [tab, setTab] = useState<FilesTab>(
     () => initialTab ?? (prefill().length > 0 ? 'folders' : 'received'),
   );
+  const [waiting, setWaiting] = useState<Readonly<Partial<Record<FilesTab, number>>>>({});
+  const onReceived = useCallback((n: number) => setWaiting((w) => ({ ...w, received: n })), []);
+  const onSent = useCallback((n: number) => setWaiting((w) => ({ ...w, sent: n })), []);
   return (
     <div className="fl-page">
       <h1 className="al-text-title-1">{PAGE_TITLES.files}</h1>
       <p className="al-text-body-sm al-muted">{IO.explainer}</p>
-      <FilesTabs tab={tab} onTab={setTab} />
+      <FilesTabs tab={tab} onTab={setTab} counts={waiting} />
       <div id="fl-tabpanel" role="tabpanel" aria-labelledby={`fl-tab-${tab}`}>
-        {tab === 'received' ? <ReceivedPanel get={api.get} reveal={api.reveal} /> : null}
-        {tab === 'sent' ? <SentPanel get={api.get} /> : null}
+        {tab === 'received' ? (
+          <ReceivedPanel get={api.get} reveal={api.reveal} onWaiting={onReceived} />
+        ) : null}
+        {tab === 'sent' ? <SentPanel get={api.get} onWaiting={onSent} /> : null}
         {tab === 'folders' ? <SendFolders api={api} /> : null}
       </div>
     </div>
