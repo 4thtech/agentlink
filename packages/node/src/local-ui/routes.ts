@@ -18,6 +18,7 @@ import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only).
 import { filesIoRoutes } from './api/files-io.js';
 import { firstRunRoutes } from './api/first-run.js';
+import { messagesRoutes } from './api/messages.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
@@ -170,6 +171,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     firstRunRoutes,
     approvalsRoutes,
     activityRoutes,
+    // MSG-FILES-IO-c: the Messages page (read-only).
+    messagesRoutes,
     contactsRoutes,
     filesRoutes,
     // MSG-FILES-IO-d: Files, Received and Sent (read-only).

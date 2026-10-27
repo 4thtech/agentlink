@@ -4513,7 +4513,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Migration from a version-5 fixture keeps every row; a fetch records the name sealed (the raw column is not the plain name); a failed or refused fetch records nothing; retention shredding leaves no readable file key and keeps working.
 
 #### MSG-FILES-IO-c · node: Messages API routes (read-only) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/messages.ts` (new) and its test, one line each in `local-ui/routes.ts` and `local-ui/context.ts` (`readOnlyClient` gets `messages`); changeset
 - **Depends on:** MSG-FILES-IO-a
 - **Spec:** 08 §1; 04 §2.5; plan §4
@@ -4536,7 +4536,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Same gate and error tests as c; no locator, URL, file key or path in any response; a file whose row retention deleted reads `expired` or `deleted` from its payload entry (plan §3), and an inline file with `deleted_at` reads `deleted`; the existing `/api/ui/files` routes behave as before.
 
 #### MSG-FILES-IO-e · local-ui: Messages page (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (page built against the mocked contract; merges after c) · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/**` (new, own `strings.ts`), `apps/local-ui/src/nav.ts`, `router.tsx`, `strings.ts` (page title), their tests; `changelog.d/` fragment; README Status line
 - **Depends on:** MSG-FILES-IO-c (build against plan §4 with a mocked API; merge after c)
 - **Spec:** 08 §1; 11 §5; design b11 §17.2; D-116; plan §5
@@ -4548,7 +4548,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Message text never in `document.title`, toasts or any element outside the untrusted container; no compose control exists; opening a conversation makes no non-GET request; the seen marker holds no message text; 360 px has no sideways scroll.
 
 #### MSG-FILES-IO-f · local-ui: Files tabs Received · Sent · Send folders (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound file names) · **Security:** S1 · **Phase:** M1b
+- **Status:** in-review · **Size:** M · **Tier:** Sonnet (Opus review: inbound file names) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**` and their tests; `changelog.d/` fragment
 - **Depends on:** MSG-FILES-IO-d (build against plan §4 with a mocked API; merge after d)
 - **Spec:** 08 §1; 11 §5; design b11 §8, §17.3; plan §5
