@@ -1,5 +1,34 @@
 # @4thtech-io/node
 
+## 0.4.0
+
+### Minor Changes
+
+- 7bab3f5: M1-11s-a-d: the local app's health read, `GET /api/ui/health`, answering a fixed shape (agent running, paused, not running or needs setup; relay counts; last sync time; app version), cached for 3 s and bounded, behind the owner's browser session. The app's status bar polls it (with backoff, paused while hidden) and shows Connected, Paused, Not running or Needs setup in a polite live region, instead of "Checking…" forever. `AppShell` gains the `not-running` and `needs-setup` states.
+- 662785b: M1-PAY-CONFIRM-a: confirming paid actions with the computer's own verification (04 §2.5.3, D-132). Core builds the confirmation statement and the challenge from stored data (`buildPayConfirmFlow`, `payConfirmChallenge`, `spendingChanges`) and refuses a paid item in `approval.decideBatch` (`paid_item_in_batch`). The local approval server adds `POST /api/ui/pay-confirm/begin` and `/finish`: user verification required, single use, bound to the page session, 120 s; the passkey's own signature is verified with the credential key kept at registration (crypto `verifyWebauthnSignature`, ES256 and EdDSA); the backup code keeps the three-tries rule. Approving a paid proof or changing a spending limit through an ordinary owner route now answers `confirm_required`; `agentlink approve` with no ID lists a paid request but sends it to `approve <id>` on its own.
+- 08f35cb: M1-PAY-CONFIRM-b: the confirmation sheet for paid actions (b11 §19, §20; 04 §2.5.3; D-132). The approval page opens it for a request that costs credits (its card has its own Approve; it is never a list item), and the app's Rules page for a change to a spending limit: one modal sheet with the amount and what it is for, built only from the statement the server returned, the platform's check ("Confirm with Touch ID", "Windows Hello", "your passkey"), the backup code as a small link, every state with a reduced-motion version, and an automatic close about 1.2 s after Done. `POST /api/ui/pay-confirm/begin` takes `remember: true` for "Remember for this contact" (both bodies in one challenge; `rememberOffered` says when core offers it; `not_offered` otherwise). Approval views carry `paid`. A passkey whose PRF works only on use now sends the `create()` authenticator data with its registration, so its credential key is kept for paid actions (#581 audit).
+- be3d7dd: MSG-FILES-IO-c: the local app's Messages reads, `GET /api/ui/messages` (conversations) and `GET /api/ui/messages/:contactId?box=in|out&limit=&cursor=` (one contact's Inbox or Sent). Read-only, behind the owner's browser session; allowlisted fields only, fixed error codes, never a read mark for the AI.
+- a6846b5: MSG-FILES-IO-h: Show in Finder for a saved received file in the local app ("Show in folder" on Windows and Linux), with no Touch ID (D-134). The page sends only the item's ID; the local server reads the saved name from the store (core `filesIo.savedName`), opens the file once inside the Inbox folder without following a link, checks it, and asks the OS file manager to show it (no shell). New route kind `presence: 'reveal'` for `POST /api/ui/files/received/reveal` only. The Received and Sent tabs now read the real file lists: other people's file names sit in the untrusted-content box, a malformed item is skipped instead of hiding the list, and a file that was not delivered says so.
+
+### Patch Changes
+
+- 867a9f6: Show in Finder on Windows: a dangling link with the saved name is refused rather than reported missing, and Explorer gets the file path as one quoted argument so names with commas select the right file (CHORE-MAIN-NODEOS-040).
+- 75407d8: The approvals page now shows the same sidebar as the other pages of the local app (Approvals, Activity, Contacts, Files, Proofs & credits, Rules, Settings), so the owner can get back from Approvals. Navigation only: how approvals are confirmed is unchanged.
+- 5dfda6f: Owners who set up AgentLink before 0.3.0 can now switch to Touch ID (or Windows Hello, or a passkey) in the local app (M1-UX-FIRSTRUN-V2-c): every page shows "Switch to Touch ID" until it is done; the switch asks for the backup code once, then one touch. The owner stays the same and the backup code keeps working.
+- d157039: M1-UX3-DUP-CONTACTS: the local app's contact list (`GET /api/ui/contacts`) marks a newer active contact that has the same owner as an older active one with `olderSameOwner` (the older contact's ID, which the list already shows; the owner fingerprint itself never leaves). The Contacts page uses it to suggest removing the older connection; removal is the existing owner-confirmed Remove.
+- f4d0c03: When your AI fetches a received file, the local store now remembers the name it was saved under in your Inbox folder, encrypted like the file's other details (MSG-FILES-IO-b), so the local app can show which received files are saved. Store schema version 6 adds `files.saved_name`; the SQLite store migrates automatically and existing files read "not saved yet". Migrations are forward-only: once a store is at version 6, an older AgentLink refuses to open it (`store_schema_newer` / `store_too_new`), so you cannot roll the package back after upgrading.
+- c5425de: The local app's server can now list the files you received and sent (MSG-FILES-IO-d): two read-only routes, `GET /api/ui/files/received` and `GET /api/ui/files/sent`, for the owner's browser session only. Each item shows who, when, the file name, size and state; a received file you saved shows only the single name it was saved under. No file key, link, storage location, hash or folder path is ever returned, nothing is written, and no AI tool changes. Core's `client.filesIo` now reads that saved name; a saved name that cannot be read shows that one file without it instead of hiding the list.
+- d5464ed: MSG-FILES-IO-e: the sidebar on the approval page lists Messages between Activity and Contacts, like the local app.
+- 59d3801: PRE-031-FIXES: the paid approval card says "This costs credits. Approve it on its own." without an amount of its own, so it can never differ from the signed amount the confirmation sheet shows; a passkey registration body with bytes after its optional fifth field (the creation authenticator data) is refused explicitly (`presence_required`).
+- Updated dependencies [662785b]
+- Updated dependencies [64dab44]
+- Updated dependencies [f4d0c03]
+- Updated dependencies [c5425de]
+- Updated dependencies [a6846b5]
+  - @4thtech-io/crypto@0.4.0
+  - @4thtech-io/core@0.4.0
+  - @4thtech-io/transport-nostr@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

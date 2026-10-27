@@ -32,13 +32,15 @@ describe('refresh scaffold', () => {
     expect(Object.keys(sheets).sort()).toEqual(NAMES.map((n) => `./components/${n}.css`).sort());
   });
 
-  it('only motion.css and hood.css (UI-REFRESH-e) carry rules; the rest start as comments only', () => {
+  it('motion, hood (UI-REFRESH-e) and progress (UI-REFRESH-c) carry rules; the rest start as comments only', () => {
     for (const n of NAMES) {
       const text = sheets[`./components/${n}.css`] as string;
       const rules = text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-      if (n === 'motion' || n === 'hood') expect(rules, n).toContain('{');
+      if (n === 'motion' || n === 'hood' || n === 'progress') expect(rules, n).toContain('{');
       else expect(rules, n).toBe('');
     }
+    const progress = (sheets['./components/progress.css'] as string).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(progress).toContain('.al-pb');
   });
 
   it('exports each stylesheet and ships it in "files"', () => {

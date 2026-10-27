@@ -13,7 +13,10 @@
 // 3. The joined path must sit directly in that folder and pass decidePath: else `refused`.
 // 4. The file is opened once, read-only, with O_NOFOLLOW (a final link is not followed) and
 //    O_NONBLOCK (a FIFO cannot block): no file is `not_found`; a link or any other open failure is
-//    `refused` (or `unavailable` for an I/O error). There is no lstat-then-open step.
+//    `refused` (or `unavailable` for an I/O error). There is no lstat-then-open step. Where the
+//    open cannot refuse a final link (Windows has no O_NOFOLLOW, so the open follows it), a missing
+//    target is `not_found` only when nothing at all has the saved name: an lstat after the failed
+//    open sees a dangling link (or junction, or anything else) and that is `refused`.
 // 5. That handle is checked: a regular file, and the path still names it (realpath equals the joined
 //    path, and its device and inode equal the handle's). Any doubt is `refused`. The handle is closed.
 // 6. Only then the checked path (and the folder, for Linux) goes to the OS revealer, which runs a
@@ -23,10 +26,13 @@
 // could swap the file between step 5 and the reveal; the OS file manager then only selects whatever
 // is at that path inside the Inbox, and nothing is opened, run or read (04 §2.5: such a process can
 // already open Finder itself). A hard link to a file elsewhere is the same inode and is not detected.
-// Windows has no O_NOFOLLOW; there the realpath and inode re-check of step 5 refuses a link.
+// Windows has no O_NOFOLLOW; there the realpath and inode re-check of step 5 refuses a link to a
+// file (the native realpath resolves symlinks and junctions, expands 8.3 short names and returns the
+// on-disk casing, so any difference from the joined path fails closed), and step 4's lstat refuses
+// a dangling one (CHORE-MAIN-NODEOS-040).
 // Nothing here logs; outcomes are fixed words, never the name, the folder or an error's text.
 import { constants, type Stats } from 'node:fs';
-import { open, realpath, stat, type FileHandle } from 'node:fs/promises';
+import { lstat, open, realpath, stat, type FileHandle } from 'node:fs/promises';
 import path from 'node:path';
 import { sanitizeFileName } from '@4thtech-io/core';
 import { directlyInsideInbox, resolveInboxFolder, type ResolvedInbox } from '../allowed-path.js';
@@ -42,6 +48,11 @@ export interface RevealSeams {
   readonly home?: string;
   /** Tests: runs after the open, before the handle is checked. */
   readonly afterOpen?: () => Promise<void> | void;
+  /**
+   * Tests: open as Windows does, without O_NOFOLLOW (the open follows a final link), so the
+   * Windows path of the checks runs on every OS. Never set outside tests.
+   */
+  readonly openFollowsLinks?: true;
 }
 
 const MAX_NAME_BYTES = 255;
@@ -58,15 +69,24 @@ function plainName(name: unknown): name is string {
   }
 }
 
-const OPEN_FLAGS =
-  constants.O_RDONLY |
-  ((constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0) |
-  ((constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0);
+const O_NOFOLLOW = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+const O_NONBLOCK = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
 
 /** The open's failure as an outcome: no file is `not_found`; anything else fails closed. */
-function openFailure(error: unknown): RevealOutcome {
+async function openFailure(error: unknown, target: string): Promise<RevealOutcome> {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
-  if (code === 'ENOENT') return 'not_found';
+  if (code === 'ENOENT') {
+    // Without O_NOFOLLOW the open followed a final link: something still has the saved name (a
+    // dangling link or junction) and is refused. Only a name with nothing at all is not_found.
+    try {
+      await lstat(target);
+    } catch (missing) {
+      return (missing as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+        ? 'not_found'
+        : 'refused';
+    }
+    return 'refused';
+  }
   if (code === 'EIO' || code === 'EMFILE' || code === 'ENFILE') return 'unavailable';
   // ELOOP / EMLINK / EFTYPE (a final link), ENOTDIR, EACCES, ENXIO (a socket), anything else.
   return 'refused';
@@ -112,9 +132,10 @@ export async function revealSavedFile(
 
   let handle: FileHandle;
   try {
-    handle = await open(target, OPEN_FLAGS);
+    const noFollow = seams.openFollowsLinks === true ? 0 : O_NOFOLLOW;
+    handle = await open(target, constants.O_RDONLY | noFollow | O_NONBLOCK);
   } catch (error) {
-    return openFailure(error);
+    return openFailure(error, target);
   }
   let checked: boolean;
   try {

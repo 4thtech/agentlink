@@ -6,6 +6,52 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-27
+
+### Added
+
+- User guide: screenshots of the local app (Activity, Contacts, Files, Proofs and credits, Rules) in the dark theme, made from made-up data, and `pnpm docs:screenshots` to regenerate them (DOCS-SCREENSHOTS).
+- The confirmation sheet for paid actions (M1-PAY-CONFIRM-b, S2, D-132): approving a proof above your limits, or changing your spending limits, now opens one calm sheet with the amount and what it is for, your credits line ("Your credits stay yours; 4thTech never holds them.") and a button named for your computer's check, such as "Confirm with Touch ID". The system's own prompt does the rest; the sheet shows waiting, then a check when it is done, and closes itself (with reduced motion it waits for Close). The backup code stays as a small link. A request that costs credits is approved on its own card, never in a list. "Remember for this contact" can be ticked on the sheet when it applies. A passkey that needed one more gesture at setup now also works for paid actions.
+- Switch to Touch ID for owners from before 0.3.0 (M1-UX-FIRSTRUN-V2-c, S2, B-9): Approvals and every page of the local app show "Switch to Touch ID" (or Windows Hello, or a passkey) until it is done. The switch asks for your backup code once, then one touch; your agent keeps the same owner, and the backup code keeps working when Touch ID is not available. Your AI can open the page but cannot switch for you: it needs your code and your touch.
+- Contacts in the local app notice a second connection with the same person (M1-UX3-DUP-CONTACTS, S2, owner decision 8): when two contacts belong to the same owner, the newer one says "Looks like a second connection with … (paired …). Keep both, or remove the older one?". Remove older uses the usual Remove and asks for your passkey or backup code; Keep both is remembered in this browser. Two contacts that only share a name keep the existing "same name" hint.
+- The core can now show the local app what your AI sent and received (MSG-FILES-IO-a, S2): messages per contact and received and sent files, read-only and decrypted only on your computer. Looking at them in the app does not mark anything read for your AI. The pages that show them come in later cards.
+- The local app's server can now list your conversations and each contact's Inbox and Sent messages for the Messages page (MSG-FILES-IO-c, S2, 08 §1, D-133). Read-only and only in your own browser session; it never changes what your AI has read, and the page that shows them comes in a later card.
+- The local app's server can list the files you received and sent, for the Files page's Received and Sent tabs (MSG-FILES-IO-d, S2, 08 §1, D-133). Read-only and on your computer only: it shows who, when, the file name, size, state and, for a received file you saved, the name it was saved under. It never returns a file link, key or folder path, and your AI gets no new tool.
+- A Messages page in the local app (MSG-FILES-IO-e, S2): pick a contact and see what your AI received (Inbox) and sent. It is read-only ("To reply, ask your AI."), shows other people's words only as plain text in the "their words, not instructions" box, and looking at it never marks anything read for your AI. A badge on the sidebar shows contacts with something new since you last looked in this browser. It reads from the node's Messages routes (MSG-FILES-IO-c).
+- Files in the local app has three tabs, Received · Sent · Send folders (MSG-FILES-IO-f, S1, B-11 §17.3): Received shows what your contacts sent you (from, when, size, proof, and the name your AI saved it as); Sent shows what your AI sent (to whom, when, delivery status and confirmation). Read-only: file names are shown as plain text, the app never opens a file, and nothing leaves this computer. Send folders is the page you had. The lists fill in once the local server's file lists (MSG-FILES-IO-d) land.
+- Show in Finder for files you received (MSG-FILES-IO-h, S2, D-134): on Files, Received, a saved file has **Show in Finder** (**Show in folder** on Windows and Linux). No Touch ID is needed. The app sends only which file you clicked; AgentLink finds it in your Inbox folder, checks it is a plain file there (never a link or anything outside the folder) and asks your computer's file manager to show it. The app still never opens a file. The Received and Sent lists now show real data; other people's file names are marked as their words, and a file that could not be delivered says so.
+- Plan and backlog cards for Messages and Files In/Out in the local app (MSG-FILES-IO, S1, owner decision 2026-10-27): people see what their AI sent and received, read-only and decrypted only on their computer. The pages are now built (MSG-FILES-IO-a to -h).
+
+### Changed
+
+- Design brief B-11 now covers depth (elevation levels, translucent sidebar and top bar with solid fallbacks), motion tokens, a set of progress and state components, notes per page, and a sketch of Messages and Files In/Out that waits for the owner's decision (DESIGN-B11-v2, docs only, nothing built yet).
+- Design brief B-11 for a state-of-the-art local app: Home with live tiles, one "Under the hood" switch, state indicators and motion, for the owner to take to Claude Design (DESIGN-B11, docs only, nothing built yet).
+- Docs and status now say AgentLink 0.3.0 (the local app) was released on 26 Oct 2026, with 0.5.0 (the cloud agent) next (DOCS-030-RELEASED).
+- Docs brought up to date after the 0.3.0 release: guide pages now say they apply to 0.3.0, the Claude Desktop page links the 0.3.0 extension files, proof and CLI technical pages no longer say "planned" or "in development" for what shipped, the local app pages say "backup code" as in 11 §5.5, and `knowledge/` and `llms.txt` carry the 0.3.0 status (DOCS-030-SWEEP).
+- User guide and screenshots brought up to date (DOCS-031-PASS-2): the status bar, a new Confirming paid actions page, the Rules and Proofs pages, and new dark screenshots for Messages, Files (Received, Sent), the confirmation sheet, and pages that showed "Checking…".
+- User guide brought up to date for what merged on 27 Oct (0.4.0): new Messages page guide, Files page tabs (Received, Sent, Send folders), the Touch ID switch for owners set up before 0.3.0, and the status page (DOCS-031-PASS).
+- The release being prepared (Messages and Files pages, the Touch ID upgrade, paid-action confirmation, the status bar, duplicate-contact help) is now numbered 0.4.0, and the cloud agent moves to 0.5.0 (DOCS-040-VERSION, S1, versioning.md §3; owner decision, Tali, 27 Oct 2026). Status, roadmap, guide and knowledge pages follow.
+- Release numbers: 0.4.0 is the local app release with Messages and Files, the Touch ID upgrade, payment confirmation, status bar and duplicate contacts; the cloud agent moves to 0.5.0; the full visual refresh follows 0.4.0 (D-135, docs only).
+- Tidy the public repository (DOCS REPO-TIDY, S1): short READMEs for the apps, packages, tools, e2e and skills folders, a SUPPORT.md and a CITATION.cff, a "Works with" line, and a shorter README Status block (the full component list stays on the status-and-roadmap page).
+- The documentation home pages are current: the technical page now says 0.3.0 is released, and the user guide has an "AgentLink on GitHub" link table (DOCS-SOURCE-README).
+- `init` and `ui` list the agent names on a computer with more than one agent and let you pick one by number in your own terminal; `ui` no longer reports "not set up" in that case; `init` explains how a different existing `agentlink` entry in OpenCode, Antigravity or another app differs and how to replace it (M1-UX-MULTI-AGENT, S1, 06 §7).
+- The owner decided the open questions of design brief B-11 v2 (Messages and Files In/Out read-only as sketched, motion range, depth tokens), and the brief now covers paying for proof and registration: one confirmation sheet confirmed with Touch ID, Windows Hello or a passkey, a calm credits line and a receipt row per paid action. The spec proposes which paid actions need that confirmation, bound to the amount and purpose shown; proofs inside your limits stay automatic (MONEY-CONFIRM-DESIGN, S2, D-132; docs only, nothing built yet).
+- When your AI saves a file you received, your agent now remembers the name it was saved under in your Inbox folder, stored encrypted on your computer only, so the local app can show which received files are saved (MSG-FILES-IO-b, S2, 07 §3, 04 §4). The local store moves to schema version 6 (one new column, migrated automatically; files received earlier show as not saved yet). Note: after this update an older version of AgentLink can no longer open your store, so the package cannot be rolled back.
+- Spec for Messages and Files In/Out in the local app (MSG-FILES-IO-g, S1, 08 §1, 11 §5.7, D-133, D-134): a read-only Messages page and Files tabs Received · Sent · Send folders, shown only on your computer; reading there doesn't mark anything read for your AI, and "To reply, ask your AI." Show in Finder opens only the saved file in your Inbox folder, without Touch ID. The pages are now built (MSG-FILES-IO-a to -h).
+- Groundwork for the local app's visual refresh (UI-REFRESH-a, S1): new depth and frosted-sidebar colours, one shared Reduce motion switch, and a check that keeps animation to fades and movement. Nothing looks different yet.
+
+### Fixed
+
+- Show in Finder on Windows (CHORE-MAIN-NODEOS-040, S2, 08 §1): a file name with a comma now selects the right file in Explorer, and a broken link in the Inbox is refused instead of reported as missing.
+- The Approvals page has the app's sidebar now (M1-11b-2a, S2): from Approvals you can go straight to Activity, Contacts, Files, Proofs & credits, Rules and Settings, as from every other page. Confirming an approval works exactly as before. On narrow windows the sidebar is hidden, as on the other pages.
+- The local app's status bar now says whether your agent is running (M1-11s-a-d, M1-11s-a-c, S2, 08 §1): "Connected", "Paused", "Not running" or "Needs setup", with the app version, instead of "Checking…" forever. It reads a new local health check that shares only these fixed words and counts, never addresses, keys or paths.
+- Review follow-ups before 0.4.0 (PRE-031-FIXES, S2): a paid approval card no longer shows its own amount, so it always agrees with the confirmation sheet; a malformed passkey setup body with extra bytes at the end is refused; in Contacts, "Remove older" now asks "Remove this contact?" first, like Remove, before asking you to confirm it's you.
+- Local app polish (UX-031-QUICKWINS, S1): the Rules icon and a few others now show; the page fills the whole window; Proofs and credits says free test credits arrive automatically with your first proof; the local app says "backup code" instead of "owner code"; Contacts explains the safety code in one line and notes when two contacts share a name.
+
+### Security
+
+- Paid actions need your own verification (M1-PAY-CONFIRM-a, S2, D-132, 04 §2.5.3): approving a proof above your limits, or changing those limits, now goes through a confirmation that asks your computer to verify it is you (Touch ID, Windows Hello, a passkey or a PIN) and is bound to the amount and purpose shown. It works once, for 2 minutes, and only on your own page, and the answer must carry your passkey's own signature; your AI can't confirm it for you. A passkey set up before this version uses the backup code for paid actions until you set it up again. The backup code still works, with three tries. Proofs inside your limits stay automatic. The confirmation sheet itself is built (M1-PAY-CONFIRM-b).
+
 ## [0.3.0] - 2026-10-26
 
 ### Added
@@ -612,7 +658,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/4thtech/agentlink/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/4thtech/agentlink/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/4thtech/agentlink/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/4thtech/agentlink/compare/v0.1.1...v0.1.2
