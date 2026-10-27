@@ -43,6 +43,8 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   // UI-REFRESH-f: Home (at /settings/home until M1-11b-2 moves it to /, D-135) and Appearance.
   ['/settings/home', 'Home'],
   ['/settings/appearance', 'Appearance'],
+  // UI-REFRESH-n: About.
+  ['/settings/about', 'About'],
 ];
 
 describe('routes', () => {
@@ -62,6 +64,7 @@ describe('routes', () => {
     '/settings/proofs',
     '/settings/rules',
     '/settings/appearance',
+    '/settings/about',
   ]);
   const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');
   it.each(STUBS)('%s renders its page inside the layout', (path, title) => {
@@ -112,6 +115,7 @@ describe('nav', () => {
       'Passkeys',
       'Appearance',
       'Advanced',
+      'About',
     ].join(' ');
     expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
   });
@@ -122,7 +126,7 @@ describe('nav', () => {
     expect(host.querySelector('main h1')?.textContent).toBe('Files');
   });
 
-  it('shows a Settings sub-navigation with Backup, Passkeys, Appearance and Advanced', () => {
+  it('shows a Settings sub-navigation with Backup, Passkeys, Appearance, Advanced and About', () => {
     mountAt('/settings/passkeys');
     const sub = host.querySelector('nav[aria-label="Settings"]');
     expect(sub).not.toBeNull();
@@ -131,6 +135,7 @@ describe('nav', () => {
       'Passkeys',
       'Appearance',
       'Advanced',
+      'About',
     ]);
     expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
     expect(
