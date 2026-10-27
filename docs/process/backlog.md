@@ -4942,6 +4942,22 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Acceptance:**
   - Tests first (RED commit) for (a) to (e); axe zero violations on Contacts and Messages; no test weakened. If axe-core is not yet a dependency of local-ui, the PR justifies adding it as a devDependency (no `postinstall`).
 
+#### UI-REFRESH-t · local-ui: refresh performance and accessibility ship blockers (new, ship blocker for the refresh release, from the UI-REFRESH-q audit)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/shell/**`, `apps/local-ui/src/pages/{messages,proofs}/**`, `apps/local-ui/src/strings.ts`, `packages/ui/src/**` (only where a shared style is the cause), `e2e/test/local-ui-refresh.test.ts` (the known-violation entry), tests; changeset if `packages/ui` changes
+- **Depends on:** UI-REFRESH-q
+- **Spec:** plan §7–§10; B-11 (`docs/design/b11-local-app.md`)
+- **Invariants:** —
+- **Scope:** ship blocker for the refresh release. Findings come from the UI-REFRESH-q audit (numbers at 4× CPU throttle, headless Chromium).
+  - (a) Route transitions drop 3–5 frames (max 50 ms). Profile first, then fix, for example: no layout or paint work inside the view transition, contain the content area, lighter blur during the transition, a lighter first frame for Activity and Messages. Meet plan §7 (no frame over 33 ms on route changes).
+  - (b) Messages scrolling drops frames (33 ms, 2–6 per run, no long tasks). Profile, then fix, for example `content-visibility: auto` on message rows, no blur repaint over the scroller, cheaper row effects.
+  - (c) JS is +21.6 KB gz against the 0.4.0 baseline, over the +10 KB budget. Measure the refresh-only share honestly: exclude non-refresh work such as the Approvals page move, then trim (code-split rarely used panels, remove duplicated helpers). If the refresh-only share is within budget, record the measurement and why the total is acceptable.
+  - (d) axe serious: the Proofs table at 360 px is not keyboard-scrollable. Make the scroll region focusable with a label, or restructure it as cards at 360. Remove its entry from the known-violation list in the e2e test.
+  - (e) Low: add a skip-to-content link in the shell (first Tab stop, visible on focus, plain words per 11 §5).
+- **Acceptance:**
+  - Tests first (RED commit) for (d) and (e); the strict local run of the UI-REFRESH-q test (`LOCAL_UI_REFRESH_STRICT=1`) passes plan §7: no frame over 33 ms on route changes and on Messages scrolling at 4× CPU, JS growth within budget or the measured refresh-only share recorded in the PR.
+  - axe: 0 serious or critical on all pages and modes; no test weakened.
+
 #### CHORE-GASLESS-NONCE-TIMEOUT · chain: gasless nonce uniqueness test hit the 60 s timeout (new, flake 2026-10-27, #607 push run)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
 - **Repo/path:** agentlink · `packages/chain/src/fees/gasless.test.ts` (tests only, no product code)
