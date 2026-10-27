@@ -437,6 +437,7 @@ describe('the read-only client view (context.ts)', () => {
       'agentId',
       'contacts',
       'files',
+      'filesIo',
       'getProof',
       'listActivity',
       'policy',
