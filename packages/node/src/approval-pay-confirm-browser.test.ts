@@ -8,7 +8,7 @@
 //   the platform's check; one live region says Waiting, then Done; the trust lines are shown.
 // - After Done it closes itself (about 1.2 s); with reduced motion it waits for Close.
 //
-// M1-11b-2: the same flows inside the app (apps/local-ui), which serves `/` and `/approve/<id>` when
+// M1-11b-2: the same flows inside the local app, which serves `/` and `/approve/<id>` when
 // the CLI embeds it: the paid card, the sheet, the passkey and the backup code, axe-core clean. That
 // part needs the built app (`pnpm build`); without it, it is skipped locally.
 //
@@ -235,7 +235,7 @@ const AXE_SOURCE = readFileSync(fileURLToPath(import.meta.resolve('axe-core/axe.
 
 /**
  * axe-core over the page's main content (the approvals and the sheet). The app's status bar is the
- * shell's (packages/ui) and has its own checks; its "Needs setup" state is reported separately.
+ * design system shell's and has its own checks; its "Needs setup" state is reported separately.
  */
 async function axeViolations(page: Page): Promise<string[]> {
   await page.evaluate(AXE_SOURCE);
