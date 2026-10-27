@@ -12,7 +12,9 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { PAY_CONFIRM_STRINGS as P } from '@4thtech-io/ui';
 import { createApiClient } from '../../api/client.js';
+import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import { RulesPage, type RulesPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 import { RULES_STRINGS as S } from './strings.js';
@@ -124,7 +126,12 @@ async function mount(routes: Record<string, unknown>, credentials?: CredentialsC
     token: 't0ken',
     ...(credentials ? { credentials } : {}),
   });
-  act(() => root.render(createElement<RulesPageProps>(RulesPage, { api, owner })));
+  const payConfirm = createPayConfirmClient({
+    fetch: srv.fetch,
+    token: 't0ken',
+    ...(credentials ? { credentials } : {}),
+  });
+  act(() => root.render(createElement<RulesPageProps>(RulesPage, { api, owner, payConfirm })));
   await flush();
   return srv;
 }
@@ -331,7 +338,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
       'GET /api/owner/passkey': NO_PASSKEY,
       'POST /api/ui/rules': { status: 'saved', version: 1 },
     });
-    await type(inputLabelled(S.budget), '20');
+    await click(radio(S.invitesTitle, S.allow));
     await click(radio(S.termsTitle, S.allow));
     await click(buttonByText(S.reviewSave));
     const confirm = host.querySelector('section[aria-labelledby="rules-confirm"]');
@@ -374,7 +381,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
       'GET /api/owner/passkey': NO_PASSKEY,
       'POST /api/ui/rules': { status: 'saved', version: 1 },
     });
-    await click(radio(S.proofTitle, S.never));
+    await click(radio(S.invitesTitle, S.allow));
     await click(buttonByText(S.reviewSave));
     expect(text()).toContain(S.noWarnings);
     await type(inputLabelled(S.codeLabel), 'ABCD-EFGH');
@@ -433,7 +440,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
       },
       credentials,
     );
-    await click(radio(S.proofTitle, S.never));
+    await click(radio(S.invitesTitle, S.allow));
     await click(buttonByText(S.reviewSave));
     expect(asked).toBe(0);
     expect(inputLabelled(S.codeLabel)).toBeNull();
@@ -461,7 +468,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
       'GET /api/owner/passkey': NO_PASSKEY,
       'POST /api/ui/rules': { status: 'saved', version: 1 },
     });
-    await click(radio(S.proofTitle, S.never));
+    await click(radio(S.invitesTitle, S.allow));
     await click(buttonByText(S.reviewSave));
     expect(text()).toContain(S.keepText);
     expect(switchNamed(S.keepTitle)?.getAttribute('aria-checked')).toBe('false');
@@ -492,7 +499,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
         'GET /api/owner/passkey': NO_PASSKEY,
         'POST /api/ui/rules': answer,
       });
-      await click(radio(S.proofTitle, S.never));
+      await click(radio(S.invitesTitle, S.allow));
       await click(buttonByText(S.reviewSave));
       await type(inputLabelled(S.codeLabel), 'ABCD-EFGH');
       await click(buttonByText(S.saveCode));
@@ -512,5 +519,90 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
     await click(buttonByText(S.back));
     expect(radio(S.proofTitle, S.never)?.getAttribute('aria-checked')).toBe('true');
     expect(srv.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+});
+
+// M1-PAY-CONFIRM-b (04 §2.5.3 table; b11 §19.1; D-132 decision 1 (a)): a change to a spending
+// limit is confirmed on the sheet with the platform check, showing old and new values. Any other
+// change keeps the ordinary save above.
+describe('spending limits: confirmed on the sheet (D-132)', () => {
+  const READY = {
+    status: 'ready',
+    ceremony: 'c'.repeat(22),
+    statement: {
+      v: 1,
+      kind: 'limits',
+      amountUsd: null,
+      purpose: 'limits_change',
+      counterparty: null,
+      changes: [{ field: 'proofs.dailyBudgetUSD', old: '5', new: '10' }],
+    },
+    expiresInMs: 120000,
+    publicKey: {
+      rpId: 'localhost',
+      challenge: 'AQIDBA',
+      allowCredentials: [],
+      userVerification: 'required',
+      timeoutMs: 120000,
+      prfSalt: 'BQY',
+    },
+  };
+
+  it('Save opens the sheet with the reviewed edit; it never posts the ordinary save', async () => {
+    const srv = await mount({
+      'GET /api/ui/rules': RULES(),
+      'GET /api/ui/rules/review': { ...REVIEW_OK, warnings: [{ code: 'proofs_spend_raised' }] },
+      'GET /api/owner/passkey': NO_PASSKEY,
+      'POST /api/ui/pay-confirm/begin': READY,
+      'POST /api/ui/pay-confirm/finish': { status: 'applied' },
+    });
+    await type(inputLabelled(S.budget), '10');
+    await click(buttonByText(S.reviewSave));
+    // No code field on the review: the sheet asks for the check.
+    expect(inputLabelled(S.codeLabel)).toBeNull();
+    const box = host.querySelector<HTMLInputElement>(
+      'section[aria-labelledby="rules-confirm"] input[type="checkbox"]',
+    );
+    expect(buttonByText(S.continueToConfirm)?.disabled).toBe(true);
+    await click(box);
+    await click(buttonByText(S.continueToConfirm));
+    const begin = srv.calls.find((c) => c.url === '/api/ui/pay-confirm/begin');
+    expect(decodeInput(begin)).toEqual({
+      flow: 'limits',
+      review: 'ab'.repeat(32),
+      acknowledged: ['proofs_spend_raised'],
+    });
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog?.textContent).toContain('Change your spending limits');
+    expect(dialog?.textContent).toContain('$5');
+    expect(dialog?.textContent).toContain('$10');
+    expect(srv.calls.some((c) => c.method === 'POST' && c.url === '/api/ui/rules')).toBe(false);
+
+    // No passkey here: the backup code on the sheet.
+    const code = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]');
+    await type(code, 'ABCD-EFGH');
+    await click(
+      [...document.querySelectorAll('button')].find((b) => b.textContent === P.confirmCode),
+    );
+    const finish = srv.calls.find((c) => c.url === '/api/ui/pay-confirm/finish');
+    expect(new TextDecoder().decode(finish?.body)).toBe('ABCD-EFGH');
+    expect(text()).toContain(S.saved);
+  });
+
+  it('cancelling the sheet goes back to the review and saves nothing', async () => {
+    const srv = await mount({
+      'GET /api/ui/rules': RULES(),
+      'GET /api/ui/rules/review': REVIEW_OK,
+      'GET /api/owner/passkey': NO_PASSKEY,
+      'POST /api/ui/pay-confirm/begin': READY,
+    });
+    await click(radio(S.proofTitle, S.never));
+    await click(buttonByText(S.reviewSave));
+    await click(buttonByText(S.continueToConfirm));
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    await click([...document.querySelectorAll('button')].find((b) => b.textContent === P.cancel));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(srv.calls.some((c) => c.url === '/api/ui/pay-confirm/finish')).toBe(false);
+    expect(host.querySelector('section[aria-labelledby="rules-confirm"]')).not.toBeNull();
   });
 });

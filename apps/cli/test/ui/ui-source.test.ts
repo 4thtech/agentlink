@@ -11,6 +11,7 @@ import {
   AgentLinkClient,
   MemoryStore,
   computeActionDigest,
+  isPaidPendingAction,
   rowKeyOf,
   type ApprovalChannel,
   type Sealed,
@@ -172,6 +173,20 @@ describe('the local UI approval source (M1-11a)', () => {
     ]);
     // M1-11a-ux: a plain headline; not a contact, so no name in it.
     expect(view.details?.headline).toBe('Send a message');
+  });
+
+  it('M1-PAY-CONFIRM-b: says which requests cost credits (`paid`), from the stored action', async () => {
+    const w = await world();
+    const paid = await w.request();
+    const free = await w.request(undefined, freeAction('f'));
+    expect(isPaidPendingAction(paid.action)).toBe(true);
+    expect(isPaidPendingAction(free.action)).toBe(false);
+    const list = await w.source.list();
+    const byId = new Map(list.map((v) => [v.approvalId, v.paid]));
+    expect(byId.get(paid.approvalId)).toBe(true);
+    expect(byId.get(free.approvalId)).toBe(false);
+    // The list still never carries the action itself.
+    expect(JSON.stringify(list)).not.toContain('"context"');
   });
 
   it('never hands the page the invite link of an accept-invite request (M1-11a-ux)', async () => {
