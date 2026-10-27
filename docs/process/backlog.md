@@ -6801,7 +6801,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Reuses the existing owner operation `POST /api/owner/passkey` (M1-8e `registerOwnerPasskey`: code checked against the `owner` item, wrong-code backoff, `owner` item never written, so the backup code keeps working). No new server route.
   - The "Switch to Touch ID" next step (b11 Home) on every app page and on Approvals (`/`, beside the app sidebar) until a passkey is registered; it links to `/first-run`, where the switch happens. Without the app bundle the approval page keeps its inline passkey set-up.
   - A passkey that gives PRF only on `get()` gets the second touch in the same flow (as the approval page's inline set-up does), so hiding that set-up behind the link loses nothing.
-  - Not here: the recovery kit step (M1-11b-3); Settings › Passkeys (M1-UX3-SETTINGS).
+  - Not here: the recovery kit step (M1-11b-3); Settings › Passkeys (not carded yet).
 - **Acceptance:**
   - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
 
@@ -6939,14 +6939,14 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - Tests first (RED commit) for (a) and (b); an item written by the earlier build still verifies (migration path stated); no test weakened; threat note; independent review (S2, Fable).
 
-#### M2-3a-store6 · cloud agent: store migration from schema 5 to 6 before 0.4.0 (new, from #574)
+#### M2-3a-store6 · cloud agent: store migration from schema 5 to 6 before 0.5.0 (new, from #574)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`apps/cloud-agent` store) · **Phase:** M2
 - **Repo/path:** agentlink · `apps/cloud-agent/src/**` (do-store), tests
 - **Depends on:** MSG-FILES-IO-b; M2-3a
 - **Spec:** 03 §3; 07 §3; 08 §3.1
 - **Invariants:** I-1, I-7
 - **Scope:**
-  - The local store went from schema 5 to 6 (saved name for received files). The cloud agent store needs the same step (a forward-only migration) before the 0.4.0 release, with a test from a version-5 store.
+  - The local store went from schema 5 to 6 (saved name for received files). The cloud agent store needs the same step (a forward-only migration) before the 0.5.0 release, with a test from a version-5 store.
   - Release checklist note: a forward-only schema bump is a minor version, not a patch.
 - **Acceptance:**
   - Tests first (RED commit): a version-5 cloud store opens, migrates once and keeps every row; a version-6 store is unchanged; no test weakened; independent review (S2).
@@ -7293,11 +7293,11 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Spec:** D-131
 - **Invariants:** I-1 to I-10 (no change; the narrow crypto exception is recorded in 04 §8)
 - **Scope:**
-  - D-131; the cloud owner on the Worker's own origin (04 §2.5), the `connector.*` ops and threat rows (04 §2.5.1, §7), the OAuth library exception (04 §8); 08 §3 rewrite; 06 §2.3, §2.5, §7, §8; 03; 07 §1, §3; 10 M2-3; the cards above and below; G-14 and the cloud part of G-16 resolved; self-host moves to 0.4.0.
+  - D-131; the cloud owner on the Worker's own origin (04 §2.5), the `connector.*` ops and threat rows (04 §2.5.1, §7), the OAuth library exception (04 §8); 08 §3 rewrite; 06 §2.3, §2.5, §7, §8; 03; 07 §1, §3; 10 M2-3; the cards above and below; G-14 and the cloud part of G-16 resolved; self-host moves to 0.5.0.
 - **Acceptance:**
   - Independent review; the owner confirms the proposed details at merge.
 
-#### CLOUD-SPEC-DECIDE · owner confirms nine 0.4.0 cloud details (D-131)
+#### CLOUD-SPEC-DECIDE · owner confirms nine 0.5.0 cloud details (D-131)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (by path: 04)
 - **Repo/path:** agentlink · docs/foundation (00, 04, 06, 08), docs/process (backlog, versioning, release-and-deployment §4.8)
 - **Depends on:** CLOUD-SPEC; owner decisions in chat, 26 Oct 2026
@@ -7370,7 +7370,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - L1: the sealed-column vectors are inline in tests; move them to one shared vector file used by the Node store and the Durable Object store.
   - L2: test the Worker HTTP surface: `GET` and `HEAD` on `/health` answer 200 and every other path answers 404.
   - L3: `do-store.ts` detects a constraint error by matching the message text; use a typed check or a code instead.
-  - L4: before 0.4.0, run the 24-hour alarm loop on a test account (owner's Cloudflare account); owner step, recorded in the PR.
+  - L4: before 0.5.0, run the 24-hour alarm loop on a test account (owner's Cloudflare account); owner step, recorded in the PR.
   - L5: the sealed seed passes through a hex string that cannot be wiped; give the column cipher a bytes API so the seed stays in a wipeable buffer.
   - Product questions for the owner, not decided here: keep the nine-day first look-back of the sync engine and fix the wording in 08 §3.1, or change the engine; rotate the relay start index on each run (a card if yes).
 - **Acceptance:**
@@ -7498,7 +7498,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - From a phone: `agentlink_status` → `agentlink_send` → `agentlink_inbox` → an approval round trip with Face ID or a fingerprint (transcripts in the PR); docs updated.
 
-#### AUDIT-CLOUD · independent audit of the 0.4.0 cloud slice
+#### AUDIT-CLOUD · independent audit of the 0.5.0 cloud slice
 - **Status:** backlog · **Size:** M · **Tier:** Fable · **Security:** S2
 - **Repo/path:** agentlink-ops (private report); agentlink · apps/cloud-agent (read only)
 - **Depends on:** M2-3a, M2-3b, M2-3c, M2-3d, M2-3f-1, M2-3f-2, M2-3h, M2-3i
@@ -7507,7 +7507,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Scope:**
   - Audit the slice against 04 and the D-131 threat rows, including the OAuth library's crypto use, the owner pages (web checklist: CSP, SRI, RP ID, cookies), the setup claim and logging.
 - **Acceptance:**
-  - A report with no open Critical or High finding; it is the release gate for 0.4.0.
+  - A report with no open Critical or High finding; it is the release gate for 0.5.0.
 
 #### DOCS-CLOUD · guide: use AgentLink from your phone
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 (docs-site)
@@ -8737,12 +8737,12 @@ Sizes are effort, not calendar time. The M1a path has thirteen sequential M1 car
 | **C — M1a weeks 2–4** | Core: M1-7a → M1-7b → M1-7c → M1-7h → M1-7j; M1-7d → {M1-7e, M1-20} → M1-32 · Transport: M1-5a → M1-5b → M1-5c · Node: M1-8a → {M1-8b, M1-8c}; M1-8f in parallel, off the critical path · CLI: M1-9a → M1-9b · MCP: M1-9c → {M1-9e, M1-9g (after DESIGN-D1), M1-12a, M1-13b} · Install: M1-12b → M1-25 → M1-19 (invite page with prompt); M1-29 · E2E: M1-13a → M1-22 → **M1-23 (M1a gate)** · Spec follow-up: M1-30 (after D-53 merges) · M1b in parallel: M1-1d, M1-1j, M1-1k, M1-3c, M1-3e, M1-3f, M1-6a |
 | **D — M1b weeks 4–6** | Chain: M1-4a → {M1-4b → M1-26, M1-4d}, M1-3g → M1-4c · Storage: M1-6b → M1-6c · Drop: M1-27a → M1-27b · Core: M1-7f, M1-7i, M1-7g · Owner presence: M1-8d → M1-8e → M1-11a → M1-11c → M1-11b (after DESIGN-D1) · Submitter: M1-10a → M1-10b → M1-10c · CLI: M1-9h, M1-9i · Owner: M2-14 enrolment and M2-16 OAuth registrations start |
 | **E — M1b weeks 6–7** | M1-9d, M1-9f, M1-12c, M1-12d, M1-13c, M1-13d → M1-GATE |
-| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f → {M2-18b, M2-18c, M2-18d}, M2-2h · Top-up (D-111, crypto first): M1-26-d → M1-26-e; card last: D-15 → M2-18a → M3-4c · Cloud (0.4.0 first, D-131): M2-3t → M2-3t-w → M2-3a → {M2-3b, M2-3h, M2-3f-1} → M2-3c (after M2-3b and M2-3f-1) → M2-3d → M2-3e → AUDIT-CLOUD, with M2-3f-2, M2-3g, M2-3i, M2-3j alongside and DOCS-CLOUD after M2-3e; M2-2g later (0.4.x) · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
+| **M2** | Design: DESIGN-D2 → M2-1a → M2-1b → M2-6 · Console: M2-2a → M2-2b → {M2-2c, M2-2d → M2-2e}, M2-2f → {M2-18b, M2-18c, M2-18d}, M2-2h · Top-up (D-111, crypto first): M1-26-d → M1-26-e; card last: D-15 → M2-18a → M3-4c · Cloud (0.5.0 first, D-131): M2-3t → M2-3t-w → M2-3a → {M2-3b, M2-3h, M2-3f-1} → M2-3c (after M2-3b and M2-3f-1) → M2-3d → M2-3e → AUDIT-CLOUD, with M2-3f-2, M2-3g, M2-3i, M2-3j alongside and DOCS-CLOUD after M2-3e; M2-2g later (0.4.x) · Registry: M2-4a → M2-4b → M2-12 · Public pages: M2-5a, M2-5b → M2-13, M2-8 · Desktop: M2-11a → M2-11b → {M2-11c, M2-11d, M2-11e (+ M2-14) → M2-11f}, M2-11g (after M2-2e, DESIGN-D2) · Storage connectors: M2-16 (owner) → M2-15a (after M2-11b, M2-11g) → {M2-15b, M2-15c, M2-15d} · M2-7, M2-9 · M2-10 (after M1-24) before external testers → M2-GATE |
 | **M3** | M3-12 and M3-2a first · Audits: M3-1a, M3-1b · Governance: M3-2b → M3-2c → {M3-3, M3-4a, M3-5, M3-6} · M3-4b · M3-7, M3-8, M3-9 · M3-14, M3-15, M3-16 (after M3-3) · M3-10 → M3-11 → M3-GATE |
 
 ### 7.3 M2 critical path
 
-**DESIGN-D2 → M2-1a → M2-1b → M2-2a → M2-2b → M2-2d → M2-2e → M2-GATE**; the cloud agent no longer waits for the console (D-131): its own path is **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → 0.4.0**, joined at M2-3c by **CLOUD-SPEC → M2-3f-1**, with M2-10 (console domain) before external testers. The M2 critical path starts from DESIGN-D2: if D2 arrives late, M2 slips by the same amount. Non-UI work (M2-3a, M2-4a, M2-7, M2-9, M2-11a) can start before D2.
+**DESIGN-D2 → M2-1a → M2-1b → M2-2a → M2-2b → M2-2d → M2-2e → M2-GATE**; the cloud agent no longer waits for the console (D-131): its own path is **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → 0.5.0**, joined at M2-3c by **CLOUD-SPEC → M2-3f-1**, with M2-10 (console domain) before external testers. The M2 critical path starts from DESIGN-D2: if D2 arrives late, M2 slips by the same amount. Non-UI work (M2-3a, M2-4a, M2-7, M2-9, M2-11a) can start before D2.
 
 Desktop chain (D-36, D-41): M2-11a → M2-11b → M2-11g (after M2-2e) → M2-GATE, with the M2-14 certificates needed before M2-11e. The desktop apps add substantial scope to the build plan's 4–6 weeks for M2; M2-11a re-checks the estimate.
 
@@ -8810,7 +8810,7 @@ Found while decomposing. None is resolved here; each needs a spec-change PR (or 
 13. **G-13 (L) Record kind ↔ payload type.** **RESOLVED (D-86, Tali, in chat, 18 Oct 2026):** fixed mapping in 05 §3.1; control, pairing and owner types are refused for notarization; the recipient checks the kind before signing a receipt. *Was:* 05 §3.1 kinds vs 04 §3.4 payload types; no mapping. *Blocked:* M1-7g.
 14. **G-14 (M) `agentlink_fetch_file` and SSRF in Workers.** 06 §2.3 (`savedTo`, inbox folder) vs 08 §3 (no filesystem); 04 §4 DNS checks are not possible in Workers. *Proposed:* cloud `agentlink_fetch_file` stores the decrypted file in the user's R2 and returns a short-lived link; Workers SSRF = https + IP-literal and hostname checks, documented reliance on Workers egress. *Blocks:* M2-3b only (owner decision, 2026-10-17). M1-15's Node-side safe download does not depend on G-14. **Resolved in spec by CLOUD-SPEC (D-131 (g); decided by the owner, 2026-10-26):** 06 §2.3 "Files on the cloud agent"; built in M2-3h.
 15. **G-15 (L) Shared tool handlers.** **RESOLVED (D-73 (1), Tali, in chat, 15 Oct 2026; spec in 06 §1, 03 §3, 07 §1 by M1-9j):** for M1a the handlers live in `apps/cli`. *Derived (D-73; proposed, owner confirms at merge):* the module is `apps/cli/src/tools/`, runtime-agnostic (no Node built-in, Node global or `@4thtech-io/node` import, fenced by ESLint rules and a neutral-platform bundle check in CI), moved into `packages/mcp-tools` by M2-3t (done: audit-rules row added). *Was:* 06 §1 rule 1; no shared package between `apps/cli` and `apps/cloud-agent` in the layout. *Proposed:* `packages/mcp-tools`. *Blocks:* M1-9c (structure), M2-3b.
-16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d. **Cloud part resolved by CLOUD-SPEC (D-131; proposed, owner confirms at merge):** `agentlink cloud deploy` and `cloud update` are in 06 §8; the 0.4.0 OAuth sign-in uses the owner's passkey on the Worker's page, so `cloud login` and the owner-link protocol stay with the console (M2-2c) and no longer block M2-3c or M2-3d.
+16. **G-16 (M) Owner link and cloud commands.** 08 §2.1 (QR direction, code derivation and channel unspecified); `agentlink owner link`, `cloud deploy`, `cloud login` (08 §2.1, §3.2, §3.3) are missing from the 06 §8 command list. *Proposed:* specify the owner-link protocol (short code from a transcript hash) and add the commands with † where owner presence applies. *Blocks:* M2-2c, M2-3c, M2-3d. **Cloud part resolved by CLOUD-SPEC (D-131; proposed, owner confirms at merge):** `agentlink cloud deploy` and `cloud update` are in 06 §8; the 0.5.0 OAuth sign-in uses the owner's passkey on the Worker's page, so `cloud login` and the owner-link protocol stay with the console (M2-2c) and no longer block M2-3c or M2-3d.
 17. **G-17 (L) EIP-3009 flag location.** 05 §2.2 has no on-chain flag; 05 §2.5 says "flagged in the chain config". **RESOLVED (D-89, Tali, in chat, 2026-10-19, option a):** the flag is off-chain (per-chain config, read by the client and the submitter); the contract keeps no flag but requires an allowed token and `value ≥ minDeposit`, measures its balance before and after `receiveWithAuthorization`, and reverts `DepositMismatch()` unless the increase equals `value` (05 §2.5, §7). Contract work: M1-3c, in the private repo.
 18. **G-18 (L) GA undefined.** 05 §5 freezes the Notary "at GA"; 10 has no GA milestone. *Blocks:* M4-EPIC.
 19. **G-19 (M) Who pays `REGISTER`.** 05 §4 charges `card.ownerEvm`; there is no owner top-up flow (J3 is for agents) and local owner keys are presence-gated. *Proposed:* allow the agent to pay under the owner's `regOwnerSig`, or add owner credits to the console. *Blocks:* M2-4b.
@@ -8912,7 +8912,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 | DESIGN-D2 | Deliver D2 (full component library, console, verify, invite landing, onboarding, pay page and pricing, prototypes, rationale) before M1-GATE; late delivery slips M2 |
 | DESIGN-D3 | Deliver D3 (launch brand, marketing site for the production domain) before M3 public launch |
 | M2-3d | Create `4thtech/agentlink-cloud-agent` (decided, D-131 (7)); the sync mechanism is decided (D-131 (l), `release-and-deployment.md` §4.8) |
-| M2-3e | Provide a Claude plan (Pro; also try Free), an iPhone on iOS 18.4 or later and an Android phone with Google Password Manager, and a Cloudflare test account (Free, then Paid) for connector tests (D-131: Claude only for 0.4.0, no ChatGPT seat now) |
+| M2-3e | Provide a Claude plan (Pro; also try Free), an iPhone on iOS 18.4 or later and an Android phone with Google Password Manager, and a Cloudflare test account (Free, then Paid) for connector tests (D-131: Claude only for 0.5.0, no ChatGPT seat now) |
 | M2-10 | **DECISION NEEDED:** production console domain (TBD; choose and register) before external testers |
 | M2-11a | Approve the desktop framework decision after its security review |
 | M2-16, M2-15b–M2-15d | (D-49) Register the OAuth clients with Google, Dropbox and Microsoft under a 4thTech organisation account and pass provider reviews; **DECISION NEEDED:** per provider, sender-side revocation where no expiring link exists, and OneDrive's scope (G-45) |

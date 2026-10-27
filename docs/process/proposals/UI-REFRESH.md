@@ -64,7 +64,7 @@ Dependencies: a → b, c, d, e → f → g…n; o needs f and M1-11b-2; p and q 
 
 Top bar (one row): page title left; right the Under the hood switch, the live status chip (LiveDot) and the theme control. Sidebar, top bar, status bar and sticky Settings sub-navigation on the chrome material on Mac (`data-os` set from the browser's platform at start-up; Windows and Linux stay solid, §18 decision 3). Nav highlight slides to the new item (transform only). Route changes use `document.startViewTransition` where it exists (content fades in with a 4 px rise over `--al-duration-fast`), and change instantly elsewhere or with reduced motion; navigation is never delayed. Home and Appearance join the nav and router. **Chrome text contrast** is measured over the worst-case content scrolling under it (the brightest and busiest fixture page) and the chrome opacity raised until it meets WCAG 2.1 AA; the result is written into the PR and, if it changes, into the token in the same PR.
 
-**Home's address (open question 1).** `/` is served by the old approval page in `packages/node` until M1-11b-2. Recommended: Home ships at `/settings/home` (the server already serves `/settings/*`) and becomes `/` when M1-11b-2 lands, with the old path redirecting.
+**Home's address (decided, D-135).** `/` is served by the old approval page in `packages/node` until M1-11b-2. Recommended: Home ships at `/settings/home` (the server already serves `/settings/*`) and becomes `/` when M1-11b-2 lands, with the old path redirecting.
 
 ## 6. Pages (cards g to o)
 
@@ -131,13 +131,15 @@ The owner's go-ahead on this checklist is the release gate for the refresh.
 ## 11. Risks
 
 - **Translucency hurts legibility** on busy content: measured in f; the opacity token rises if needed.
-- **Release timing:** the local app ships inside the npm package, so anything merged before a release cut ships with it (open question 2).
+- **Release timing:** the local app ships inside the npm package, so anything merged before a release cut ships with it (decided, D-135).
 - **Approvals depend on M1-11b-2 (S2):** the refresh pass o waits for it; until then the old approval page keeps its D1 styling.
 - **Scope creep:** page cards apply §16 only; new features become new cards.
 
-## 12. Open questions for the owner
+## 12. Open questions for the owner (all decided, D-135)
 
-1. **Home's address until M1-11b-2:** (a) `/settings/home` now, `/` when M1-11b-2 lands (recommended); (b) wait for M1-11b-2 and ship Home only at `/`.
-2. **Merge timing against 0.4.0:** (a) build now; merge the invisible foundation (a to e) any time, and merge the visible cards (f onwards) only after 0.4.0 is published (recommended); (b) hold every refresh merge until 0.4.0 is published; (c) merge as ready and let 0.4.0 ship whatever has landed.
-3. **Recording your 27 Oct decision:** (a) log it in the decision log in the next spec PR (build B-11 v2 from the brief; the owner's visual QA replaces the screens-first step of D-116 for this refresh) (recommended); (b) leave it in this plan only.
-4. **The reference slow machine for the performance budget:** (a) your oldest available Mac plus Chrome's 4× CPU throttle in CI-style runs (recommended); (b) a named device you choose.
+Decided by Tali in chat, 27 Oct 2026 (decisions 14 and 15, recorded as D-135):
+
+1. **Home's address until M1-11b-2: decided (a).** `/settings/home` now, `/` when M1-11b-2 lands, the old path redirecting.
+2. **Merge timing against 0.4.0: decided (a).** Cards a to e (the invisible foundation) may merge any time; cards f (the shell) onwards merge only after 0.4.0 is published. 0.4.0 is the Messages/Files release; the cloud agent is 0.5.0 (decision 13).
+3. **Recording the decision: decided (a).** Logged as D-135, with the explicit, refresh-scoped exception to D-116: build from the approved B-11 v2 brief instead of from owner-approved screens; the owner's visual review on his Mac replaces the screens-first step.
+4. **The reference slow machine: decided (a).** The owner's oldest Mac plus Chrome's 4x CPU throttle.
