@@ -4855,6 +4855,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - (b) Remove the border-colour rule on the pseudo-element that has no effect; the overlay blur uses a token and the increased-contrast setting turns it off.
   - (c) Sheet and dialog frame render in a portal so a transformed ancestor cannot break fixed positioning.
   - (d) For UI-REFRESH-f: the shell sets the OS marker for the chrome material and a test measures chrome text contrast against WCAG AA.
+  - This card does not change approval behaviour; any change to approval logic makes it S2.
 - **Acceptance:**
   - Tests first (RED commit): focus cannot leave an open modal by click or script; fixed positioning holds inside a transformed parent; contrast check green; no test weakened.
 
@@ -7071,13 +7072,13 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Spec:** B-11 §7; 08 §1
 - **Invariants:** I-5, I-7
 - **Scope:**
-  - Add the fields the page cards need, from B-11 §7: event IDs (Activity); record ID, network and public record link (Proofs); rules version and signer (Rules); storage and size used (Files).
+  - Add the fields the page cards need, from B-11 §7: event IDs (Activity); record ID, network and public record link (Proofs); rules version and signer (Rules); storage and size used, and real folder paths (Files).
   - Every field comes from an explicit allowlist; no key, code, token, session link, drop URL or presigned link is added. The routes stay read-only.
 - **Acceptance:**
   - Tests first (RED commit): exact key set per route; a scan of each response for stored secrets and URLs of the fixture finds none; no store change after a call; no test weakened; independent review (S2).
 
 #### M1-11b-2-b · approvals in the app shell: accessibility and prop lows (new, low, #595)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (approval UI, no data-flow change) · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (approvals: how the approve page gets the request id) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**`, tests
 - **Depends on:** M1-11b-2
 - **Spec:** 08 §1; 11 §5
@@ -7088,7 +7089,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit) for the name and the prop; axe zero violations; approval behaviour unchanged; no test weakened.
 
 #### M1-UX3-DUP-CONTACTS-b · duplicate contacts: test and panel-state lows (new, low, #587, #589)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`apps/local-ui` only) · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`packages/node` test file; paid approval card) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`, `packages/node/src/local-ui/api/contacts.test.ts`, tests
 - **Depends on:** M1-UX3-DUP-CONTACTS, PRE-031-FIXES
 - **Spec:** 08 §1; 11 §5
@@ -7104,6 +7105,8 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs tooling; test data only) · **Phase:** M1b
 - **Repo/path:** agentlink · `tools/docs-screenshots/**`, `docs-site/guide/.gitbook/assets/`
 - **Depends on:** DOCS-SCREENSHOTS, M1-11s-a-d
+- **Spec:** docs-model §5
+- **Invariants:** —
 - **Scope:**
   - (a) The capture blocks every request that is not to the local test server.
   - (b) The footer status line is captured settled once the health read exists; re-capture the affected figures.
@@ -7115,6 +7118,8 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation text, `docs/status.yaml`) · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/status.yaml`, `docs/foundation/00-README.md` (design-decisions text), `docs-site/**`, `knowledge/**`
 - **Depends on:** none
+- **Spec:** docs-model; 00 (decision log)
+- **Invariants:** —
 - **Scope:**
   - (a) `docs/status.yaml`: "Released in 0.1.2" lines that belong to 0.2.0 (check the npm history), and "Merged for the next release" rows that have since been released.
   - (b) Unverified "in development" wording in the design-decisions text, the security-model drop key note, the sdk-packages submitter note, `contracts.md` and `versioning.md`: verify against `main` and fix or record as correct.
@@ -7125,8 +7130,10 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 
 #### DOCS-050-RENUMBER · docs: cloud agent 0.4.0 becomes 0.5.0 in the specs and card texts (new, D-135)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation) · **Phase:** M2
-- **Repo/path:** agentlink · `docs/foundation/` (D-131, 03, 04, 06, 07, 08, 10), `docs/process/backlog.md` (cloud card texts)
+- **Repo/path:** agentlink · `docs/foundation/` (D-131, 03, 06, 07, 08, 10; 04 already says 0.5.0), `docs/process/backlog.md` (cloud card texts)
 - **Depends on:** DOCS-040-RELEASED
+- **Spec:** D-131, D-135
+- **Invariants:** —
 - **Scope:**
   - Where a spec or card says the cloud agent ships in 0.4.0, say 0.5.0 (D-135). Keep D-131's history readable. Do not touch text about the local app's 0.4.0.
 - **Acceptance:**
