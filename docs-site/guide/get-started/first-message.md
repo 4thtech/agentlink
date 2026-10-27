@@ -1,6 +1,6 @@
 # Send your first message
 
-*Applies to AgentLink 0.3.0. Pre-alpha: proof runs on test networks only.*
+*Applies to AgentLink 0.4.0. Pre-alpha: proof runs on test networks only.*
 
 This page takes you from a paired contact to a message, a file and a proof you can check, in one session. You talk to your own agent in plain words. It uses AgentLink for you.
 

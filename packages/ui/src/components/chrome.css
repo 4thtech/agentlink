@@ -1,1 +1,48 @@
-/* UI-REFRESH-b: the al-chrome material and its solid fallbacks (B-11 §13.2). Empty until that card. */
+/* The al-chrome material (UI-REFRESH-b, B-11 §13.2): sidebar, top bar, bottom bar and sticky day
+   headers. Solid by default. Translucent and blurred only on macOS (the app sets data-os at
+   start-up) and only where the browser can blur. Every fallback is solid: reduced transparency,
+   increased contrast, forced colours, no blur support, Windows and Linux. The solid overrides come
+   last so they win at equal specificity plus one attribute. */
+
+.al-chrome {
+  background: var(--al-color-bg-surface);
+  border: 0 solid var(--al-color-border-subtle);
+  border-color: var(--al-color-border-subtle);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  :root[data-os='macos'] .al-chrome {
+    background: var(--al-material-chrome-bg);
+    backdrop-filter: var(--al-material-blur);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-os='macos'] .al-chrome {
+    background: var(--al-color-bg-surface);
+    backdrop-filter: none;
+  }
+}
+:root[data-os='macos'][data-transparency='reduced'] .al-chrome {
+  background: var(--al-color-bg-surface);
+  backdrop-filter: none;
+}
+@media (prefers-contrast: more) {
+  :root[data-os='macos'] .al-chrome {
+    background: var(--al-color-bg-surface);
+    backdrop-filter: none;
+    border-color: var(--al-color-border-default);
+  }
+}
+:root[data-os='macos'][data-contrast='more'] .al-chrome {
+  background: var(--al-color-bg-surface);
+  backdrop-filter: none;
+  border-color: var(--al-color-border-default);
+}
+@media (forced-colors: active) {
+  :root[data-os='macos'] .al-chrome {
+    background: Canvas;
+    backdrop-filter: none;
+    border-color: CanvasText;
+  }
+}
