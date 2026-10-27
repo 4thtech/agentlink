@@ -54,6 +54,7 @@ import {
 } from './owner-passkey.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
+import { TEST_APP } from './local-ui-app.fixture.js';
 import {
   BACKUP_CODE_TRIES,
   PAY_CONFIRM_TTL_MS,
@@ -225,7 +226,8 @@ async function harness(): Promise<Harness> {
     {
       source: wrapped,
       onEvent: (e) => void events.push(e),
-      localUi: { client: policyClient(state) as never },
+      // M1-11b-2c: the page (and its CSRF token) is the app's; a minimal bundle stands in.
+      localUi: { client: policyClient(state) as never, assets: TEST_APP },
     },
     {
       keychain: world.keychain,

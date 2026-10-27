@@ -1,6 +1,8 @@
 // M1-36e (11 §5.1, finding F14): the user guide (docs-site/guide, the default pages a user reads)
-// and the local approval page (packages/node/src/approval-page.ts) stay inside the default
-// vocabulary. The approval page is linted here because packages/node cannot import the list. The technical docs (docs-site/technical) are the "Advanced"
+// and the approval server's fixed pages (packages/node/src/approval-pages.ts: the expired link and
+// the page without the app; M1-11b-2c removed the server-rendered approval page) stay inside the
+// default vocabulary. They are linted here because packages/node cannot import the list; the
+// approvals' own words live in the app (apps/local-ui strings.test.ts lints them). The technical docs (docs-site/technical) are the "Advanced"
 // side and are not linted. The banned terms are the CLI's list (apps/cli/src/vocabulary.ts), so the
 // terminal and the guide use one source.
 //
@@ -13,7 +15,8 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { lintVocabulary } from '../apps/cli/src/vocabulary.ts';
-import { APP_JS, EXPIRED_HTML, UI_STRINGS, pageHtml } from '../packages/node/src/approval-page.ts';
+import { EXPIRED_HTML, NO_APP_HTML, PAGE_STRINGS } from '../packages/node/src/approval-pages.ts';
+import { APPROVAL_STRINGS } from '../apps/local-ui/src/pages/approvals/strings.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GUIDE = join(root, 'docs-site/guide');
@@ -145,9 +148,10 @@ describe('approval page vocabulary (M1-36e, 11 §5.1)', () => {
 
   it('no approval page text uses a banned term', () => {
     const texts = [
-      ...Object.entries(UI_STRINGS).map(([key, text]) => [`UI_STRINGS.${key}`, text]),
+      ...Object.entries(PAGE_STRINGS).map(([key, text]) => [`PAGE_STRINGS.${key}`, text]),
+      ...Object.entries(APPROVAL_STRINGS).map(([key, text]) => [`APPROVAL_STRINGS.${key}`, text]),
       ['EXPIRED_HTML', visible(EXPIRED_HTML)],
-      ['pageHtml', visible(pageHtml('abc'))],
+      ['NO_APP_HTML', visible(NO_APP_HTML)],
     ];
     expect(texts.length).toBeGreaterThan(40);
     const bad = texts.flatMap(([where, text]) =>
@@ -156,13 +160,8 @@ describe('approval page vocabulary (M1-36e, 11 §5.1)', () => {
     expect(bad).toEqual([]);
   });
 
-  it('the page script shows only the UI_STRINGS texts', () => {
-    // Every sentence the script can show comes from S (UI_STRINGS), checked above.
-    expect(APP_JS).toContain(JSON.stringify(UI_STRINGS));
-  });
-
   it('a planted violation in the page text is caught (self-test)', () => {
-    const planted = { ...UI_STRINGS, planted: 'Sign the transaction in your wallet.' };
+    const planted = { ...PAGE_STRINGS, planted: 'Sign the transaction in your wallet.' };
     const bad = Object.values(planted).flatMap((text) => lintVocabulary(text));
     expect(bad).toEqual(['wallet', 'transaction']);
   });

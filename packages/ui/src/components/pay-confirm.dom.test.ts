@@ -352,17 +352,6 @@ describe('copy (11 §5; b11 §19.6)', () => {
     expect(P.useBackup).toBe('Use backup code instead');
   });
 
-  it('the approval page carries the same words (it cannot import this package)', () => {
-    const files = import.meta.glob(['../../../../packages/node/src/approval-page.ts'], {
-      query: '?raw',
-      import: 'default',
-      eager: true,
-    });
-    const source = Object.values(files)[0];
-    expect(typeof source).toBe('string');
-    for (const text of all()) {
-      if (text.includes('$0.10')) continue;
-      expect(source as string, text).toContain(JSON.stringify(text).slice(1, -1));
-    }
-  });
+  // M1-11b-2c: the server-rendered approval page, which drew this sheet without React and copied
+  // these words, is gone; the local app renders this component, so there is no copy to compare.
 });

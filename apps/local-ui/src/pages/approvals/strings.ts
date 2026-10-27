@@ -1,7 +1,7 @@
-// M1-11b-2: the approvals words (11 §5 vocabulary; 11 §6.2.1 copy). The same text as the
-// server-rendered approval page's UI_STRINGS (packages/node/src/approval-page.ts; strings.test.ts
-// compares them), except that the local app says "backup code" where that page still says "owner
-// code" (11 §5.5, UX-031-QUICKWINS; BACKUP_CODE_WORDING below). `{name}` marks an inserted value;
+// M1-11b-2: the approvals words (11 §5 vocabulary; 11 §6.2.1 copy). The same text as the former
+// server-rendered approval page's UI_STRINGS (removed in M1-11b-2c; these are now the only ones),
+// except that the local app says "backup code" where that page used the older wording (11 §5.5,
+// UX-031-QUICKWINS; BACKUP_CODE_WORDING below). `{name}` marks an inserted value;
 // the result is only ever rendered as text. The sheet's words are @4thtech-io/ui PAY_CONFIRM_STRINGS.
 
 /** The CLI prefix every command shown to the owner uses (packages/node cli-command.ts). */

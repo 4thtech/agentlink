@@ -46,6 +46,7 @@ import type { KeychainBackend } from './keychain.js';
 import type { FirstAgentCard } from './owner-init.js';
 import { OWNER_ACCOUNT, OWNER_PASSKEY_ACCOUNT, newOwnerSeed } from './owner-keystore.js';
 import { completeOwnerSetup, defaultOwnerFiles, encodeSetupRegistration } from './owner-setup.js';
+import { TEST_APP } from './local-ui-app.fixture.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 const NOW = 1_800_000_000;
@@ -286,7 +287,9 @@ async function canarySetup(agent: Agent): Promise<CanaryRun> {
         apply: () => Promise.reject(new Error('not used')),
       },
       onEvent: (event) => void events.push(event),
+      // M1-11b-2c: the page (and its CSRF token) is the app's; a minimal bundle stands in.
       localUi: {
+        assets: TEST_APP,
         ownerSetup: {
           firstCard: firstCardOf(agent),
           ownerFiles: defaultOwnerFiles(join(dir, 'home')),

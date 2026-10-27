@@ -439,12 +439,16 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
     const h = await harness({ assets: { files: new Map() } });
     const cookie = await h.cookie();
     expect((await send(h.port, '/settings', { headers: { Cookie: cookie } })).status).toBe(404);
-    // Without the app, `/` and `/approve/<id>` keep the server-rendered approval page.
+    // M1-11b-2c: without the app, `/` and `/approve/<id>` answer the fixed page that points to
+    // the terminal; the server-rendered approval page is gone (approval-pages.test.ts).
     for (const path of ['/', `/approve/apr_${'A'.repeat(22)}`]) {
       const res = await send(h.port, path, { headers: { Cookie: cookie } });
-      expect(res.status, path).toBe(200);
-      expect(res.body).toContain('<script src="/app.js" defer></script>');
+      expect(res.status, path).toBe(503);
+      expect(res.body).not.toContain('<script');
+      expect(res.body).not.toContain('/app.js');
+      expect(res.body).not.toContain('agentlink-csrf');
       expect(res.body).not.toContain('<div id="root"></div>');
+      expectStrictHeaders(res);
     }
   });
 });
@@ -471,7 +475,7 @@ describe('Approvals inside the app (M1-11b-2)', () => {
     const h = await harness({ assets: { files: new Map() } });
     const cookie = await h.cookie();
     const res = await send(h.port, '/', { headers: { Cookie: cookie } });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     expect(res.body).not.toContain('al-side');
     expect(res.body).not.toContain('/settings/');
   });
