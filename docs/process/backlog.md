@@ -6490,19 +6490,19 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit) for (a) and (b); (d) keeps every existing test green; no test weakened; independent review (S2).
 
 #### M1-UX-OPEN-APP-b · cli opener fence keyed by path; hanging start delays shutdown (new, low, IR-M1-11b-8-1, #549)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`apps/cli` opener fence and shutdown; no `packages/node` change) · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (owner-surface boundary; parent M1-UX-OPEN-APP is S2) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/mcp/**` (opener fence, loop), tests
 - **Depends on:** M1-11b-8
 - **Spec:** 06 §2.5; 08 §1
 - **Invariants:** I-4
 - **Scope:**
-  - (a) The opener fence allowance is keyed by the file's base name while `sources()` walks folders; key it by the full path so two files with one name cannot share an allowance.
+  - (a) Key the opener allowance by full path.
   - (b) A `start()` that never returns delays shutdown (existing behaviour); bound the wait.
 - **Acceptance:**
-  - Tests first (RED commit): two sources with one base name are fenced separately; shutdown completes within the bound with a hanging `start()`; no test weakened.
+  - Tests first (RED commit): the opener allowance is keyed by full path; shutdown completes within the bound with a hanging `start()`; no test weakened; independent review (S2).
 
 #### M1-11b-6-c · cli init: one fixed clause when an AI runs init (new, low, IR-M1-11b-6-1 L-3; copy)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (fixed text; 11 §5) · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`apps/cli`; fixed text, 11 §5) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
 - **Depends on:** M1-11b-6
 - **Spec:** 11 §5
@@ -6543,7 +6543,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Test first: a Windows-style path with capitals shows its original spelling; the refusal result is unchanged; no test weakened.
 
 #### CHORE-DESIGN-B11-MOTION · B-11 signature motion exceeds the 11 §5 motion range (new, owner decision, #560)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S0 (owner decision; docs)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (owner decision; may change `docs/foundation/11`; spec change: owner confirms at merge)
 - **Repo/path:** agentlink · `docs/foundation/11-*.md` (§5 motion range) or the B-11 brief
 - **Depends on:** DESIGN-B11 (#560)
 - **Scope:**
@@ -6553,7 +6553,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 
 #### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)
-- **Repo/path:** agentlink · `apps/cli/src/commands/agent-name.ts` (or `agent-choice.ts`) and its tests
+- **Repo/path:** agentlink · `apps/cli/src/runtime/agent-name.ts` and the `toContain('codex')` assertion in `apps/cli/src/commands/init.test.ts`
 - **Depends on:** M1-UX-MULTI-AGENT
 - **Scope:**
   - The comment saying the agent name is never shown in an error is stale now that names are listed; update it.
@@ -6562,7 +6562,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - The tightened assertion fails if a name is missing from the list; no test weakened.
 
 #### M1-11b-2b · approval page: skip link and a single brand (new, low, IR-M1-11b-2a-1, #563)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`packages/node` approval page markup; no change to what is approved) · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`packages/node/src/approval-page.ts`; audit-rules §2) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (or its current home), tests
 - **Depends on:** M1-11b-2a
 - **Spec:** 08 §1; 11 §6.2.1 (keyboard)
@@ -6571,7 +6571,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - The page header repeats the brand shown in the sidebar; show it once.
   - Not here: moving Approvals into the React shell (M1-11b-2).
 - **Acceptance:**
-  - A test finds the skip link as the first tab stop and that it lands on `<main>`; axe-core zero violations; no test weakened.
+  - A test finds the skip link as the first tab stop and that it lands on `<main>`; axe-core zero violations; no test weakened; independent review (S2).
 
 #### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
