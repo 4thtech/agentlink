@@ -1,0 +1,53 @@
+// Messages page copy (MSG-FILES-IO-e; 11 §5.7 and §5.1: plain words, no "wallet", "address", "hash",
+// "token", "transaction"; the page never suggests it can write). Checked by messages.test.ts.
+export const MESSAGES_STRINGS = {
+  title: 'Messages',
+  listLabel: 'Contacts with messages',
+  newMessages: 'New',
+  loading: 'Loading messages…',
+  refresh: 'Refresh',
+  back: 'All contacts',
+  boxLabel: 'Messages shown',
+  inbox: 'Inbox',
+  sent: 'Sent',
+  // 11 §5.7
+  reply: 'To reply, ask your AI.',
+  noContacts: 'Messages appear here once you have a contact.',
+  nothingYet: (contactName: string): string =>
+    `Nothing yet. When your AI and ${contactName}'s agent exchange messages, they show here.`,
+  asOf: (time: string): string => `as of ${time}`,
+  showAll: 'Show all',
+  showLess: 'Show less',
+  copy: 'Copy text',
+  copied: 'Copied.',
+  copyFailed: "Couldn't copy. Select the text and copy it yourself.",
+  showMore: 'Show more',
+  loadingMore: 'Loading…',
+  // Who the words belong to, for your own AI's messages (the untrusted label names it).
+  yourAi: 'your AI',
+  // Sent status
+  statusSent: 'Sent',
+  statusQueued: 'Waiting to send',
+  statusNotDelivered: 'Not delivered',
+  receiptYes: 'Delivery receipt received',
+  proofChip: 'Proof recorded',
+  // Under the hood (metadata only)
+  underTheHood: 'Under the hood',
+  idLabel: 'Message ID',
+  sizeLabel: 'Size',
+  proofLabel: 'Proof',
+  proofYes: 'Recorded',
+  proofNo: 'None',
+  receiptLabel: 'Receipt',
+  receiptNo: 'Not yet',
+  // Problems
+  tryAgain: 'Try again',
+  errorTitle: "Messages didn't load.",
+  errorBody: 'Nothing changed. Try again in a moment.',
+  offlineTitle: "Can't reach AgentLink on this computer.",
+  offlineBody: 'Check that your AI app is still open, then try again.',
+  sessionTitle: 'This page has ended.',
+  sessionBody: 'Ask your AI to open AgentLink again.',
+  notSetUpTitle: "AgentLink isn't set up on this computer yet.",
+  notSetUpPrompt: 'set up AgentLink',
+} as const;

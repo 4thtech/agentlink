@@ -4535,7 +4535,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Same gate and error tests as c; no locator, URL, file key or path in any response; a file whose row retention deleted reads `expired` or `deleted` from its payload entry (plan §3), and an inline file with `deleted_at` reads `deleted`; the existing `/api/ui/files` routes behave as before.
 
 #### MSG-FILES-IO-e · local-ui: Messages page (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (page built against the mocked contract; merges after c) · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/**` (new, own `strings.ts`), `apps/local-ui/src/nav.ts`, `router.tsx`, `strings.ts` (page title), their tests; `changelog.d/` fragment; README Status line
 - **Depends on:** MSG-FILES-IO-c (build against plan §4 with a mocked API; merge after c)
 - **Spec:** 08 §1; 11 §5; design b11 §17.2; D-116; plan §5

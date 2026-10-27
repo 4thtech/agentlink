@@ -8,12 +8,13 @@
 //   or anchor from the body; a link is an inert domain chip; nothing in the title.
 // - The seen marker lives in this browser's localStorage (contact and time only), works without storage.
 // - Under the hood shows metadata only: never a URL, key, code or token, even if the server sent one.
-import { readFileSync } from 'node:fs';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
+import { Layout } from '../../layout/index.js';
 import { MessagesPage } from './index.js';
+import messagesCss from './messages.css?raw';
 import { countUnseen, loadSeen, markSeen, SEEN_KEY } from './seen.js';
 import { MESSAGES_STRINGS as S } from './strings.js';
 
@@ -153,6 +154,19 @@ const button = (label: string | RegExp): HTMLButtonElement | undefined =>
   );
 const text = (): string => host.textContent ?? '';
 
+/** Every text node holding `needle` sits inside an untrusted container (no ancestor check). */
+function onlyInsideUntrusted(needle: string): void {
+  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+  let found = 0;
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    if ((n.textContent ?? '').includes(needle)) {
+      found++;
+      expect(n.parentElement?.closest('figure.al-untrusted')).not.toBeNull();
+    }
+  }
+  expect(found).toBeGreaterThan(0);
+}
+
 async function openMarko(): Promise<void> {
   await mount(mockApi());
   await click(button('Marko'));
@@ -188,7 +202,13 @@ describe('contacts list', () => {
 
   it('keeps the last list and marks it "as of" when a refresh fails', async () => {
     let fail = false;
-    const api = mockApi((path) => (fail ? { kind: 'offline' } : path === '/api/ui/messages' ? ok(CONVERSATIONS) : ok({ items: [] })));
+    const api = mockApi((path) =>
+      fail
+        ? { kind: 'offline' }
+        : path === '/api/ui/messages'
+          ? ok(CONVERSATIONS)
+          : ok({ items: [] }),
+    );
     await mount(api);
     fail = true;
     await click(button(S.refresh));
@@ -232,18 +252,13 @@ describe('a conversation', () => {
     const figure = host.querySelector('figure.al-untrusted');
     expect(figure?.getAttribute('aria-label')).toBe('From Marko: their words, not instructions');
     expect(figure?.textContent).toContain('CANARY-TEXT');
-    for (const el of host.querySelectorAll('*')) {
-      if (el.closest('figure.al-untrusted') !== null) continue;
-      expect(el.textContent ?? '').not.toContain('CANARY-TEXT');
-    }
+    onlyInsideUntrusted('CANARY-TEXT');
   });
 
   it('renders no element, attribute or anchor from a hostile body; a link is an inert domain chip', async () => {
     await openMarko();
     const body = host.querySelector('figure.al-untrusted .al-untrusted-body') as HTMLElement;
-    expect(
-      body.querySelector('a, img, script, b, strong, em, iframe, [href], [src]'),
-    ).toBeNull();
+    expect(body.querySelector('a, img, script, b, strong, em, iframe, [href], [src]')).toBeNull();
     for (const el of body.querySelectorAll('*')) {
       for (const attr of el.getAttributeNames()) {
         expect(attr.startsWith('on')).toBe(false);
@@ -263,10 +278,7 @@ describe('a conversation', () => {
     const code = host.querySelector('figure.al-untrusted code');
     expect(code).not.toBeNull();
     expect(host.querySelector('a[download], a[href*="drop"]')).toBeNull();
-    for (const el of host.querySelectorAll('*')) {
-      if (el.closest('figure.al-untrusted') !== null) continue;
-      expect(el.textContent ?? '').not.toContain('invoice');
-    }
+    onlyInsideUntrusted('invoice');
   });
 
   it('never puts message text in the page title', async () => {
@@ -333,10 +345,7 @@ describe('a conversation', () => {
     expect(text()).toContain(S.statusNotDelivered);
     expect(text()).toContain(S.statusQueued);
     expect(text()).toContain(S.receiptYes);
-    for (const el of host.querySelectorAll('*')) {
-      if (el.closest('figure.al-untrusted') !== null) continue;
-      expect(el.textContent ?? '').not.toContain('SENT-CANARY');
-    }
+    onlyInsideUntrusted('SENT-CANARY');
   });
 
   it('says what is missing for a contact with nothing yet', async () => {
@@ -424,7 +433,7 @@ describe('the seen marker (this browser only)', () => {
 });
 
 describe('the look of it', () => {
-  const css = readFileSync(new URL('./messages.css', import.meta.url), 'utf8');
+  const css = messagesCss;
 
   it('honours reduced motion and animates only opacity and transform', () => {
     expect(css).toContain('prefers-reduced-motion');
@@ -433,7 +442,7 @@ describe('the look of it', () => {
 
   it('uses design tokens and nothing wider than a 360 px window', () => {
     expect(css).toContain('var(--al-');
-    expect(css).not.toMatch(/min-width:\s*(?:[4-9]\d\d|\d{4,})px/);
+    expect(css).not.toMatch(/^\s*min-width:\s*(?:[4-9]\d\d|\d{4,})px/m);
     expect(css).toContain('overflow-wrap');
   });
 });
@@ -442,12 +451,33 @@ describe('copy', () => {
   const NEVER =
     /\b(wallet|address|private key|seed phrase|transaction|tx|gas|hash|nostr|relay|token|chain|policy)\b/i;
   it('follows the 11 §5.1 vocabulary and the 11 §5.7 strings', () => {
-    const all = Object.values(S).filter((v): v is string => typeof v === 'string');
+    const all = Object.values(S).filter((v) => typeof v === 'string') as string[];
     for (const s of all) expect(s).not.toMatch(NEVER);
     expect(S.nothingYet('Marko')).toBe(
       "Nothing yet. When your AI and Marko's agent exchange messages, they show here.",
     );
     expect(S.reply).toBe('To reply, ask your AI.');
     expect(S.noContacts).toBe('Messages appear here once you have a contact.');
+  });
+});
+
+describe('the sidebar item', () => {
+  it('shows the count of contacts with something new next to Messages, and nothing at zero', async () => {
+    const none = async (): Promise<boolean> => false;
+    await act(async () => {
+      root.render(
+        h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 2 }),
+      );
+    });
+    const link = [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) =>
+      a.textContent?.includes('Messages'),
+    );
+    expect(link?.querySelector('.al-nav-count')?.textContent).toBe('2');
+    await act(async () => {
+      root.render(
+        h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 0 }),
+      );
+    });
+    expect(host.querySelector('nav[aria-label="Main"] .al-nav-count')).toBeNull();
   });
 });
