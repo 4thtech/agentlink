@@ -34,10 +34,12 @@
 import {
   CryptoInputError,
   KeyStoreError,
+  decodeWebauthnPublicKey,
   equalBytes,
   encodeUtf8,
   readPasskeyBlobHeader,
   sha256,
+  webauthnPublicKeyFromAuthenticatorData,
   wipe,
   type OwnerPublicKeys,
   type PasskeyBlobHeader,
@@ -367,6 +369,8 @@ export async function registerOwnerPasskey(
     }
     // The stored blob opens with this passkey's PRF output to this owner.
     check = await openPasskeySeed(back, prf, { expectedOwnerNostr: owner.ownerNostr });
+    // M1-PAY-CONFIRM-a (rule 5): keep the credential public key for paid-action confirmations.
+    await storeOwnerPasskeyKey(keychain, credentialId, assertion.authenticatorData, timeoutMs);
   } finally {
     wipe(ownerSecret, prf, alko, seed, back, check);
   }
@@ -456,4 +460,63 @@ export async function removeOwnerPasskeyItemIfOurs(
     () => false,
   );
   return removed ? 'removed' : 'failed';
+}
+
+/**
+ * M1-PAY-CONFIRM-a (04 §2.5.3 rule 5): the keychain account that keeps the owner passkey's
+ * credential public key (COSE_Key), next to `owner-passkey`. Public data; it is bound to the
+ * credential ID it was registered for, so a key left from an earlier passkey is never used for
+ * another. Like every owner item it is writable by the same OS user (G-1 residual, 04 §2.5).
+ */
+export const OWNER_PASSKEY_KEY_ACCOUNT = 'owner-passkey-key';
+const PASSKEY_KEY_VERSION = 1;
+
+/**
+ * Stores the credential public key from a registration's authenticator data (attested credential
+ * data for `credentialId`). Returns false, writing nothing, when the authenticator data carries no
+ * supported key (an RS256 key, say): the passkey still unlocks approvals, and a paid action then
+ * uses the backup code until the passkey is set up again.
+ */
+export async function storeOwnerPasskeyKey(
+  keychain: KeychainBackend,
+  credentialId: Uint8Array,
+  authenticatorData: Uint8Array,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<boolean> {
+  let coseKey: Uint8Array;
+  try {
+    coseKey = webauthnPublicKeyFromAuthenticatorData(authenticatorData, credentialId);
+  } catch {
+    return false;
+  }
+  const item = new Uint8Array(3 + credentialId.length + coseKey.length);
+  item[0] = PASSKEY_KEY_VERSION;
+  item.set(u16(credentialId.length), 1);
+  item.set(credentialId, 3);
+  item.set(coseKey, 3 + credentialId.length);
+  await guarded(() => keychain.set(OWNER_PASSKEY_KEY_ACCOUNT, item), timeoutMs);
+  return true;
+}
+
+/**
+ * The stored credential public key for `credentialId`, or null when none is stored, it is for
+ * another credential, or it does not parse (fail closed: the caller refuses the passkey path).
+ */
+export async function readOwnerPasskeyKey(
+  keychain: KeychainBackend,
+  credentialId: Uint8Array,
+  timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
+): Promise<Uint8Array | null> {
+  const item = await guarded(() => keychain.get(OWNER_PASSKEY_KEY_ACCOUNT), timeoutMs);
+  if (item === null || item.length < 4 || item[0] !== PASSKEY_KEY_VERSION) return null;
+  const idLength = ((item[1] as number) << 8) | (item[2] as number);
+  if (3 + idLength >= item.length) return null;
+  if (!equalBytes(item.subarray(3, 3 + idLength), credentialId)) return null;
+  const coseKey = item.slice(3 + idLength);
+  try {
+    decodeWebauthnPublicKey(coseKey);
+  } catch {
+    return null;
+  }
+  return coseKey;
 }

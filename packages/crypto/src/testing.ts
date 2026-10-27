@@ -23,6 +23,7 @@ import {
   deriveKeyCommitment,
   derivePayloadKey,
 } from './aead.js';
+import { p256 } from '@noble/curves/nist.js';
 import { argon2idRaw, type Argon2idParams } from './argon2.js';
 import { bip340PublicKey, bip340Sign } from './bip340.js';
 import { assertBytes, equalBytes } from './bytes.js';
@@ -169,6 +170,34 @@ export {
 // IR-M1-1f-1 L-7: pairingDigest without the commitment check is not public; the `labels` vectors
 // (the same input under both tags) reach it here.
 export { pairingDigest } from './safety-code.js';
+
+/**
+ * M1-PAY-CONFIRM-a (test seam only): a WebAuthn ES256 credential standing in for an
+ * authenticator's own key. `coseKey` is its public key as a COSE_Key (as a registration returns
+ * it); `sign` is the assertion signature over authenticatorData ‖ SHA-256(clientDataJSON) (DER).
+ */
+export function newWebauthnTestCredential(): {
+  readonly coseKey: Uint8Array;
+  sign(authenticatorData: Uint8Array, clientDataJSON: Uint8Array): Uint8Array;
+} {
+  const { secretKey } = p256.keygen();
+  const point = p256.getPublicKey(secretKey, false);
+  const head = new Uint8Array([0xa5, 0x01, 0x02, 0x03, 0x26, 0x20, 0x01, 0x21, 0x58, 0x20]);
+  const coseKey = new Uint8Array(head.length + 32 + 3 + 32);
+  coseKey.set(head, 0);
+  coseKey.set(point.subarray(1, 33), head.length);
+  coseKey.set([0x22, 0x58, 0x20], head.length + 32);
+  coseKey.set(point.subarray(33, 65), head.length + 35);
+  return {
+    coseKey,
+    sign: (authenticatorData, clientDataJSON) => {
+      const message = new Uint8Array(authenticatorData.length + 32);
+      message.set(authenticatorData, 0);
+      message.set(sha256(clientDataJSON), authenticatorData.length);
+      return p256.sign(message, secretKey, { format: 'der' });
+    },
+  };
+}
 
 /**
  * M1-27a: a drop request's Authorization header signed with a raw test drop key, for the drop

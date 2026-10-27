@@ -609,6 +609,28 @@ describe('batch use (D-68, 04 §2.5.2)', () => {
     });
   });
 
+  it('refuses a batch that contains a paid item, whole (04 §2.5.3 rule 7, M1-PAY-CONFIRM-a)', async () => {
+    const t = await setup();
+    const fee = feeContextFromQuote({ token: FEE_TOKEN, amount: 100_000n, decimals: 6 });
+    const plain = await t.request();
+    const paid = await t.request({
+      tool: 'agentlink_notarize',
+      args: { envelopeId: b64id() },
+      context: { triggers: ['proofs.notarize'], counterparty: null, envelopeHash: hex0x(), fee },
+    });
+    const outcome = await t.client.ownerActions.apply(await batchOf(t, [plain, paid]));
+    expect(outcome).toMatchObject({
+      status: 'refused',
+      reason: 'item_refused',
+      items: [{ approvalId: paid.approvalId, reason: 'paid_item_in_batch' }],
+    });
+    // Whole or nothing: the free item is still pending, and so is the paid one.
+    expect(await t.row(plain.approvalId)).toMatchObject({ status: 'pending' });
+    expect(await t.row(paid.approvalId)).toMatchObject({ status: 'pending' });
+    // Decided alone (after its own confirmation), the paid item applies.
+    expect(await t.approve(paid)).toMatchObject({ status: 'applied' });
+  });
+
   it('a request edited in the store after the batch was signed no longer matches its item', async () => {
     const t = await setup();
     const rs = [await t.request(), await t.request()];

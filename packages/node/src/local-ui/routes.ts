@@ -22,6 +22,7 @@ import { filesRoutes } from './api/files.js';
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
 import { firstRunRoutes } from './api/first-run.js';
 import { messagesRoutes } from './api/messages.js';
+import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import { storageRoutes } from './api/storage.js';
@@ -33,6 +34,8 @@ export { REVEAL_PATH };
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
 const SETUP_PREFIX = '/api/ui/first-run/';
+/** M1-PAY-CONFIRM-a: paid-action confirmation routes live only here. */
+const PAY_CONFIRM_PREFIX = '/api/ui/pay-confirm/';
 
 const OWNER_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const FIXED = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -104,6 +107,17 @@ export class LocalUiRouteRegistry {
       if (step !== 'begin' && step !== 'finish') throw invalid('unknown setup step');
       if (this.#entries.some((e) => e.route.presence === 'setup' && e.route.step === step)) {
         throw invalid('this setup step is already registered');
+      }
+    } else if (presence === 'pay-confirm') {
+      // M1-PAY-CONFIRM-a: run by the server's pay-confirm gate, never by a page handler.
+      if (method !== 'POST') throw invalid('a pay-confirm route is a POST');
+      if (handler !== undefined) throw invalid('a pay-confirm route has no handler');
+      if (typeof route.path !== 'string' || !route.path.startsWith(PAY_CONFIRM_PREFIX)) {
+        throw invalid('a pay-confirm route is under /api/ui/pay-confirm/');
+      }
+      if (step !== 'begin' && step !== 'finish') throw invalid('unknown pay-confirm step');
+      if (this.#entries.some((e) => e.route.presence === 'pay-confirm' && e.route.step === step)) {
+        throw invalid('this pay-confirm step is already registered');
       }
     } else if (presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder only; the server's reveal gate runs it (D-134).
@@ -182,6 +196,7 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     storageRoutes,
     proofsRoutes,
     rulesRoutes,
+    payConfirmRoutes,
     backupRoutes,
     advancedRoutes,
   ]) {

@@ -86,6 +86,7 @@ import {
 import {
   PASSKEY_RP_ID,
   removeOwnerPasskeyItemIfOurs,
+  storeOwnerPasskeyKey,
   storeOwnerPasskeySeed,
 } from './owner-passkey.js';
 import { CLI_COMMAND } from './cli-command.js';
@@ -358,6 +359,11 @@ export interface OwnerSetupInput {
   readonly credentialId: Uint8Array;
   /** Its PRF output (32 bytes), or empty (owner code only). Not modified; the caller wipes it. */
   readonly prfOutput: Uint8Array;
+  /**
+   * M1-PAY-CONFIRM-a: the checked creation response's authenticator data, whose attested
+   * credential public key is kept for paid-action confirmations (04 §2.5.3 rule 5). Optional.
+   */
+  readonly authenticatorData?: Uint8Array;
   /** The agent whose first card this setup signs. */
   readonly firstCard: FirstAgentCard;
   /**
@@ -477,6 +483,9 @@ export async function completeOwnerSetup(
             passkeyBlob = blob.slice();
           },
         });
+        if (input.authenticatorData !== undefined) {
+          await storeOwnerPasskeyKey(keychain, credentialId, input.authenticatorData, timeoutMs);
+        }
       }
     } catch (error) {
       const removal = await rollback();

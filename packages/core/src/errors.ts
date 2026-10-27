@@ -57,6 +57,8 @@ export type CoreErrorCode =
   | 'approval_summary_invalid'
   | 'approval_scope_expired'
   | 'fee_quote_invalid'
+  // Paid-action confirmation (04 §2.5.3; M1-PAY-CONFIRM-a)
+  | 'pay_confirm_refused'
   | 'idempotency_unavailable'
   | 'idempotency_args_invalid'
   | 'idempotency_result_invalid'
