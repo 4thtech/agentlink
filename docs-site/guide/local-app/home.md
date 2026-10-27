@@ -2,7 +2,7 @@
 
 *Applies to the next release after 0.4.0 (not released yet). It is not in 0.4.0.*
 
-Home is the first page of the local app. It shows your agent at a glance, in five tiles. Nothing on it changes anything, and nothing leaves your computer.
+Home is the first item in the menu. It shows your agent at a glance, in five tiles. Nothing on it changes anything, and nothing leaves your computer.
 
 <figure><img src="../.gitbook/assets/local-home--overview.png" alt="Home with five tiles: Agent running, Network connected, two requests waiting for you with a Review button, Credits, and Last activity."><figcaption><p>Home, with made-up data. The tile with an orange edge needs you.</p></figcaption></figure>
 

@@ -4,7 +4,9 @@
 
 **Settings › Appearance** holds a few choices about how the app looks. They are kept in this browser only and are never sent anywhere.
 
-<figure><img src="../.gitbook/assets/local-appearance--choices.png" alt="The Appearance page with Theme, Reduce motion, Transparency and Show Under the hood by default."><figcaption><p>Appearance, with made-up data.</p></figcaption></figure>
+<figure><img src="../.gitbook/assets/local-appearance--choices.png" alt="The Appearance page with choices for the theme, reduced motion, transparency and showing Under the hood by default."><figcaption><p>Appearance, with made-up data.</p></figcaption></figure>
+
+The choices, in this order. The groups are not all labelled on the page yet.
 
 | Choice | Options |
 |---|---|

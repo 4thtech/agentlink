@@ -97,6 +97,15 @@ export const CREDITS = {
   partial: false,
 };
 
+/** Add credits offered on the test network; the address is an obvious placeholder, never a real one. */
+export const TOP_UP = {
+  status: 'ok',
+  networks: [
+    { network: 'gnosis-test', method: 'address', available: false, address: ref(9) },
+    { network: 'base-test', method: 'coming_soon' },
+  ],
+};
+
 export const RULES = {
   status: 'ok',
   version: 4,
@@ -328,6 +337,7 @@ export const ROUTES = {
   '/api/ui/activity': ACTIVITY,
   '/api/ui/proofs': PROOFS,
   '/api/ui/proofs/credits': CREDITS,
+  '/api/ui/proofs/top-up': TOP_UP,
   '/api/ui/rules': RULES,
   '/api/ui/files': FILES,
   '/api/ui/files/review': FILES_REVIEW,

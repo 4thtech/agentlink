@@ -9,7 +9,7 @@ This is the page where requests wait for you. Your AI can ask, but only you can 
 Each card says who is asking, what it would do, what it costs, how long is left (the small ring and the minutes) and which of your rules made it ask. Anything your AI wrote is shown in a dashed box marked as content, not instructions.
 
 1. Choose **Approve**, **Deny** or **Later** on each card.
-2. Confirm with your passkey, or with your backup code if you have no passkey. Your AI can't do this for you.
+2. Confirm with your passkey, or with your backup code. The backup code is always offered, whether or not you have a passkey. Your AI can't do this for you.
 3. A short "done" note tells you it went through.
 
 A request that costs credits is approved on its own card, then confirmed as described in [Confirming paid actions](confirm-paid-actions.md).
