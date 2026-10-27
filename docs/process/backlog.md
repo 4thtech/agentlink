@@ -6556,10 +6556,11 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Begin builds the exact owner flow (proof approval, `policy.set` that changes a spending field) and its confirmation statement; challenge per 04 §2.5.3 rule 2; single use, session-bound, 120 s.
   - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; `maxFee` never above the statement.
   - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before.
-  - The backup-code path signs under the same statement binding (if decision 2 keeps it). Proofs evaluated `allow` are unchanged (automatic).
+  - The backup-code path signs under the same statement binding (if decision 2 keeps it), with the three-tries rule. Proofs evaluated `allow` are unchanged (automatic).
+  - Paid items are excluded from batch approval (04 §2.5.3 rule 7): the batch screen does not offer them and the core refuses such a batch (`paid_item_in_batch`). "Remember for this contact" digests both bodies in one challenge (rule 2).
   - Registration (`REGISTER`) is out of scope here (M2-PAY-CONFIRM-c).
 - **Acceptance:**
-  - Tests first (RED commit): a missing UV flag, a reused or expired challenge, a changed amount, limit or contact after begin, and a statement built from a URL or tool value are each refused; a policy change without a spending field keeps the ordinary prompt; no MCP tool or CLI flag reaches begin or finish; threat note; independent review and Fable audit (S2).
+  - Tests first (RED commit): a missing UV flag, a reused or expired challenge, a changed amount, limit or contact after begin, a statement amount other than the pending request's `context.fee.usd`, a "Remember for this contact" `policy.set` not in the challenge, an `approval.decideBatch` containing a paid item, and a statement built from a URL or tool value are each refused; a policy change without a spending field keeps the ordinary prompt; no MCP tool or CLI flag reaches begin or finish; threat note; independent review and Fable audit (S2).
 
 #### M1-PAY-CONFIRM-b · local UI: the confirmation sheet, the credits line and receipt rows (new, D-132)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence UI on a money path) · **Phase:** M1b
@@ -6572,7 +6573,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Renders only the statement the server returned. Credits line with "Your credits stay yours; 4thTech never holds them."; one receipt row per paid action (Held, Paid, Not charged). Add credits and Withdraw credits keep their flows, restyled to the sheet's look only.
   - No charts, balance hero or new money features.
 - **Acceptance:**
-  - Playwright: each variant and state, focus order (no autofocus on Confirm), live-region text, reduced motion; copy passes `lintVocabulary` (no wallet, bank, transaction, gas); no amount or name read from the URL; Fable audit (S2).
+  - Tests first (RED commit). Playwright: each variant and state, focus order (no autofocus on Confirm), live-region text, reduced motion; copy passes `lintVocabulary` (no wallet, bank, transaction, gas); no amount or name read from the URL; Fable audit (S2).
 
 ---
 

@@ -382,7 +382,7 @@ The rule is in 04 §2.5.3 (proposed, the owner confirms at merge; §20 decision 
 
 A **level-4 modal** (§13.1) over the blurred overlay. At 1280 it is centred, about 400 px wide; at 360 it rises from the bottom edge as a full-width sheet with a grab handle. Anatomy, top to bottom:
 
-1. **What it is for**, as the title: "Record proof", "Get the Registered label", "Change your spending limits", "Withdraw credits".
+1. **What it is for**, as the title: "Record proof", "Get the Registered badge", "Change your spending limits", "Withdraw credits".
 2. **The amount**, large (`--al-text-display-*`, tabular figures of Geist): "$0.10". It never animates and never rolls (§6: amounts are never revealed piecemeal). For a limits change: "24-hour budget $5 → $10" with the `--al-color-diff-*` tokens.
 3. **Detail rows** (label left, value right, `--al-text-body-sm-*`): "For" (a proof of the message to Marko, using the contact's owner alias per 11 §5.2, never counterparty text); "Paid from" "Your credits · $4.80"; "After" "$4.70". Registration adds "Once for this agent".
 4. **The trust line** in muted text: "Your credits stay yours; 4thTech never holds them." and "Your AI can't confirm this for you."
@@ -412,7 +412,7 @@ Rules: never claim "nothing was paid" while a held amount may still be charged (
 ### 19.4 Credits line and receipt rows
 
 - **Credits** stay as they are today: the Home tile and the Proofs & credits card show "$4.80 · about 48 proofs" with the ring meter (§15.1), plus "Used in the last 24 hours: $0.30 of $5" (06 §3). The meter fills over `--al-duration-slow` when the value changes; nothing counts up and there is no chart. Under it, small: "Your credits stay yours; 4thTech never holds them."
-- **A receipt row per paid action** in Activity and in the proof list: icon (proof stamp or Registered label), "Proof · message to Marko" or "Verified registration", "$0.10", time, and a status word: **Held** (reserved while the proof is being recorded), **Paid**, or **Not charged** (the hold was released, 06 §3). Selecting it opens the existing proof detail; Under the hood (§7) adds the record ID and public record link. Inbound text and others' file names never appear in the row (§17.4).
+- **A receipt row per paid action** in Activity and in the proof list: icon (proof stamp or Registered badge), "Proof · message to Marko" or "Verified registration", "$0.10", time, and a status word: **Held** (reserved while the proof is being recorded), **Paid**, or **Not charged** (the hold was released, 06 §3). Selecting it opens the existing proof detail; Under the hood (§7) adds the record ID and public record link. Inbound text and others' file names never appear in the row (§17.4).
 
 ### 19.5 Accessibility
 
