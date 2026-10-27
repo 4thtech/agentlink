@@ -135,8 +135,11 @@ describe('the file revealer (MSG-FILES-IO-h)', () => {
     },
   );
 
-  it('on Windows runs explorer.exe /select, with the path as its own argument (any exit code)', async () => {
-    const file = 'C:\\Users\\me\\AgentLink\\Inbox\\a b & c.pdf';
+  it('on Windows runs explorer.exe /select,"<path>" verbatim, so the path stays one argument (any exit code)', async () => {
+    // CHORE-MAIN-NODEOS-040: explorer.exe parses its own command line and splits on commas, so the
+    // path is quoted by us and passed verbatim. A `"` cannot occur in a Windows path (and the saved
+    // name went through sanitizeFileName), so the quotes cannot be closed early.
+    const file = 'C:\\Users\\me\\AgentLink\\Inbox\\a b, & c;(1).pdf';
     const { seams: s, calls } = seams('win32', {
       execFile: (file_, args, options, callback) => {
         calls.push({ file: file_, args: [...args], options: { ...options } });
@@ -145,8 +148,18 @@ describe('the file revealer (MSG-FILES-IO-h)', () => {
     });
     expect(await fileRevealerWith(s)(file, 'C:\\Users\\me\\AgentLink\\Inbox')).toBe(true);
     expect(calls[0]?.file).toBe('C:\\Windows\\explorer.exe');
-    expect(calls[0]?.args).toEqual(['/select,', file]);
+    expect(calls[0]?.args).toEqual([`/select,"${file}"`]);
     expect(calls[0]?.options['shell']).toBe(false);
+    expect(calls[0]?.options['windowsVerbatimArguments']).toBe(true);
+  });
+
+  it('the verbatim Windows arguments are used only for the revealer', async () => {
+    const { seams: s, calls } = seams('win32');
+    expect(await browserOpenerWith(s)(URL_)).toBe(true);
+    expect(calls[0]?.options['windowsVerbatimArguments']).toBeUndefined();
+    const mac = seams('darwin');
+    expect(await fileRevealerWith(mac.seams)(FILE, FOLDER)).toBe(true);
+    expect(mac.calls[0]?.options['windowsVerbatimArguments']).toBeUndefined();
   });
 
   it('never runs for a path that is not absolute, or that could read as an option', async () => {
@@ -155,6 +168,8 @@ describe('the file revealer (MSG-FILES-IO-h)', () => {
       ['darwin', '-n', '/Users/me/Inbox'],
       ['linux', '/home/me/Inbox/x.pdf', '--help'],
       ['win32', '/select,C:\\x', 'C:\\Inbox'],
+      ['win32', 'C:\\Inbox\\a" /select,"C:\\x.pdf', 'C:\\Inbox'],
+      ['win32', 'C:\\Inbox\\a.pdf', 'C:\\In"box'],
       ['darwin', '/Users/me/Inbox/x\u0000.pdf', '/Users/me/Inbox'],
     ] as const) {
       const { seams: s, calls } = seams(p);

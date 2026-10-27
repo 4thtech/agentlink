@@ -946,7 +946,8 @@ describe('Show in Finder: the server gate (MSG-FILES-IO-h)', () => {
       `reveal-inbox-${String(Date.now())}-${String(Math.random()).slice(2)}`,
     );
     mkdirSync(inbox, { recursive: true });
-    const real = realpathSync(inbox);
+    // Native: on Windows it expands 8.3 short names as the server's realpath does (CHORE-MAIN-NODEOS-040).
+    const real = realpathSync.native(inbox);
     writeFileSync(join(real, 'saved.pdf'), 'x');
     const revealed: [string, string][] = [];
     const lookups: string[] = [];
