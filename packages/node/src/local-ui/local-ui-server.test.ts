@@ -842,6 +842,7 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       'agentId',
       'contacts',
       'files',
+      'filesIo',
       'getProof',
       'listActivity',
       'policy',
@@ -849,4 +850,35 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     ]);
     expect(Object.isFrozen(client)).toBe(true);
   });
+});
+
+// MSG-FILES-IO-d: the Files Received and Sent reads sit behind the same gate as every /api/ui/ route.
+describe('the Files In/Out reads: the server gate (MSG-FILES-IO-d)', () => {
+  it.each(['/api/ui/files/received', '/api/ui/files/sent'])(
+    '%s needs the session cookie, the CSRF header and same-origin metadata; GET only',
+    async (path) => {
+      const h = await harness();
+      expect((await send(h.port, path)).status).toBe(401);
+      const cookie = await h.cookie();
+      const csrf = await h.csrf(cookie);
+      expect((await send(h.port, path, { headers: { Cookie: cookie } })).status).toBe(403);
+      for (const site of ['cross-site', 'same-site', 'none']) {
+        const res = await send(h.port, path, {
+          headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': site },
+        });
+        expect(res.status).toBe(403);
+      }
+      const res = await send(h.port, path, {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
+      });
+      // The handler ran: this harness has no agent client.
+      expect(res.status).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({ error: 'not_set_up' });
+      const post = await send(h.port, path, {
+        method: 'POST',
+        headers: { Cookie: cookie, Origin: h.origin, 'X-AgentLink-CSRF': csrf },
+      });
+      expect(post.status).toBe(405);
+    },
+  );
 });
