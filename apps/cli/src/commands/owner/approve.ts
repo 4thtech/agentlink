@@ -17,6 +17,7 @@
 //
 // The owner code never passes through this module (I-1). Nothing here decides: authority is the
 // owner signature the core verifies (I-4).
+import { isPaidPendingAction } from '@4thtech-io/core';
 import { MAX_APPROVAL_BATCH_ITEMS, type ReviewedApproval } from '@4thtech-io/node';
 import { batchRegions } from '../../terminal/sanitize.js';
 import { cliPrefix } from '../../runtime/cli-prefix.js';
@@ -173,6 +174,13 @@ async function reviewList(deps: OwnerCommandDeps, context: CommandContext): Prom
         output.print(
           copy('cli.approve.termsOwn', { approvalId: entry.approvalId, prefix: cliPrefix() }),
         );
+        output.print('');
+        continue;
+      }
+      if (isPaidPendingAction(entry.action)) {
+        // M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a request that costs something is never a batch
+        // item; it is approved on its own, like terms.
+        output.print(OWNER_TEXT.paidOwn(`${cliPrefix()} approve ${entry.approvalId}`));
         output.print('');
         continue;
       }

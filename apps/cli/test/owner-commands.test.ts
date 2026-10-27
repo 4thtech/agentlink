@@ -87,6 +87,22 @@ const channel: ApprovalChannel = {
 
 const evm = (): string => `0x${encodeHex(randomBytes(20))}`;
 
+/**
+ * M1-PAY-CONFIRM-a: a free request (`agentlink_export_proof_pack`, no fee). Requests that carry a
+ * fee are never batch items (04 §2.5.3 rule 7), so the list and batch tests use free ones.
+ */
+function freeAction(note = 'x'): JsonObject {
+  return {
+    tool: 'agentlink_export_proof_pack',
+    args: { recordId: '0x01', includeKey: true, note },
+    context: {
+      triggers: ['proofs.allowKeyDisclosure'],
+      recordId: `0x${encodeHex(randomBytes(32))}`,
+      envelopeHash: `0x${encodeHex(randomBytes(32))}`,
+    },
+  };
+}
+
 /** A valid `agentlink_send` action (types approval.ts): `args` are what the agent chose. */
 function sendAction(args: JsonObject): JsonObject {
   return {
@@ -116,6 +132,10 @@ interface World {
   readonly inits: OwnerSetupOptions[];
   onAsk?: (question: string) => Promise<void>;
   request(
+    args?: JsonObject,
+  ): Promise<{ approvalId: string; action: JsonObject; actionDigest: string }>;
+  /** M1-PAY-CONFIRM-a: a free request (no fee), for the list and batch tests. */
+  freeRequest(
     args?: JsonObject,
   ): Promise<{ approvalId: string; action: JsonObject; actionDigest: string }>;
   run(
@@ -242,6 +262,14 @@ async function world(): Promise<World> {
       const pending = await client.approvalService.request({
         action,
         summary: 'Send a message to a contact',
+      });
+      return { approvalId: pending.approvalId, action, actionDigest: pending.actionDigest };
+    },
+    freeRequest: async (args?: JsonObject) => {
+      const action = args === undefined ? freeAction() : { ...freeAction(), args };
+      const pending = await client.approvalService.request({
+        action,
+        summary: 'Include the document key in an export',
       });
       return { approvalId: pending.approvalId, action, actionDigest: pending.actionDigest };
     },
@@ -478,7 +506,7 @@ describe('approve <id> and deny <id> (06 §2.5 step 3, D-73 (3))', () => {
 describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2.5.2)', () => {
   it('three requests approved with one entry; each proceeds exactly once', async () => {
     const w = await world();
-    const rs = [await w.request(), await w.request(), await w.request()];
+    const rs = [await w.freeRequest(), await w.freeRequest(), await w.freeRequest()];
     w.answers.push('a', 'a', 'a');
     expect(await w.run(['approve'])).toBe(0);
     expect(w.codeEntries).toHaveLength(1);
@@ -497,7 +525,7 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
 
   it('later leaves a request pending; approve and deny are signed together', async () => {
     const w = await world();
-    const [a, b, c] = [await w.request(), await w.request(), await w.request()];
+    const [a, b, c] = [await w.freeRequest(), await w.freeRequest(), await w.freeRequest()];
     w.answers.push('a', 'd', '');
     expect(await w.run(['approve'])).toBe(0);
     const decided = (w.codeEntries[0]?.reviewed ?? []).map((i) => i.decision).sort();
@@ -510,11 +538,11 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
 
   it('a request the agent raises during the review is not signed and stays pending', async () => {
     const w = await world();
-    await w.request();
-    await w.request();
+    await w.freeRequest();
+    await w.freeRequest();
     let late: { approvalId: string } | undefined;
     w.onAsk = async () => {
-      if (late === undefined) late = await w.request();
+      if (late === undefined) late = await w.freeRequest();
     };
     w.answers.push('a', 'a');
     expect(await w.run(['approve'])).toBe(0);
@@ -526,8 +554,8 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
 
   it('drops a request decided elsewhere during the review, with a notice', async () => {
     const w = await world();
-    const a = await w.request();
-    const b = await w.request();
+    const a = await w.freeRequest();
+    const b = await w.freeRequest();
     let asks = 0;
     w.onAsk = async () => {
       asks += 1;
@@ -547,8 +575,8 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
 
   it('a refused batch names the failed item and holds the others back, still pending (IR-M1-9b-1 L-2)', async () => {
     const w = await world();
-    const a = await w.request();
-    const b = await w.request();
+    const a = await w.freeRequest();
+    const b = await w.freeRequest();
     const decide = w.deps.decide;
     w.deps.decide = async (context, reviewed) => {
       const signed = await decide(context, reviewed);
@@ -566,9 +594,21 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
     expect((await row(w, b.approvalId))?.status).toBe('pending');
   });
 
+  it('a paid request is listed but never selected: it is approved on its own (rule 7)', async () => {
+    const w = await world();
+    const free = await w.freeRequest();
+    const paid = await w.request();
+    w.answers.push('a');
+    expect(await w.run(['approve'])).toBe(0);
+    expect(w.asked).toHaveLength(1);
+    expect(w.out.some((l) => l.includes(`approve ${paid.approvalId}`))).toBe(true);
+    expect((await row(w, free.approvalId))?.status).toBe('approved');
+    expect((await row(w, paid.approvalId))?.status).toBe('pending');
+  });
+
   it('a pending commitment is listed but cannot be selected', async () => {
     const w = await world();
-    const r = await w.request();
+    const r = await w.freeRequest();
     const scoped = await insertRow(w, canonicalize(sendAction({ to: 'Ana', text: 'terms' })), {
       scopeJson: '{}',
     });
@@ -584,7 +624,7 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
 
   it('a mismatched request is shown as a problem and not offered', async () => {
     const w = await world();
-    const r = await w.request();
+    const r = await w.freeRequest();
     await insertRow(w, JSON.stringify(sendAction({ to: 'Ana', text: 'x' }), null, 2));
     w.answers.push('a');
     expect(await w.run(['approve'])).toBe(0);
@@ -597,7 +637,7 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
     const w = await world();
     expect(await w.run(['approve'])).toBe(0);
     expect(w.out).toEqual(['Nothing is waiting for your approval.']);
-    await w.request();
+    await w.freeRequest();
     w.answers.push('');
     expect(await w.run(['approve'])).toBe(0);
     expect(w.codeEntries).toEqual([]);
@@ -605,7 +645,7 @@ describe('approve with no ID: one agent list, one owner code entry (D-68, 04 §2
 
   it('asks which agent when there are several and no --agent', async () => {
     const w = await world();
-    await w.request();
+    await w.freeRequest();
     w.deps.listAgents = () => Promise.resolve(['default', 'work']);
     const opened: (string | undefined)[] = [];
     const open = w.deps.open;
@@ -641,7 +681,8 @@ describe('the owner code prompt says where the code goes (M1-9zd; 11 §5.5, §6.
     const seen = atPrompt(w);
     const a = await w.request();
     const b = await w.request();
-    await w.request();
+    // M1-PAY-CONFIRM-a: the list's own request is free (a paid one is approved on its own).
+    await w.freeRequest();
     expect(await w.run(['approve', a.approvalId])).toBe(0);
     expect(await w.run(['deny', b.approvalId])).toBe(0);
     w.answers.push('a', 'y');
@@ -804,10 +845,15 @@ describe('the terminal output rule on a hostile stored action (06 §8, IR-M1-9j-
   it('approve with no ID: the same rule for every card', async () => {
     const w = await world();
     const r = await w.request(hostileArgs());
-    w.answers.push('a');
     expect(await w.run(['approve'])).toBe(0);
     checkHostileOutput(w.out);
-    expect(computeActionDigest(w.codeEntries[0]?.reviewed?.[0]?.action)).toBe(r.actionDigest);
+    // M1-PAY-CONFIRM-a: the card is shown under the same rule, but a paid request is approved on
+    // its own (04 §2.5.3 rule 7), by its ID; the hostile text never reaches that line.
+    expect(w.codeEntries).toHaveLength(0);
+    expect(
+      w.out.some((l) => l.startsWith('This one costs') && l.endsWith(`approve ${r.approvalId}`)),
+    ).toBe(true);
+    expect(computeActionDigest(r.action)).toBe(r.actionDigest);
   });
 
   it('cancel <id>: the same rule', async () => {

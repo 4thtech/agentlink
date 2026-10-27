@@ -11,6 +11,9 @@ let prefixCache: string | undefined;
 const prefix = (): string => (prefixCache ??= cliPrefix());
 
 export const OWNER_TEXT = Object.freeze({
+  /** M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a paid request is approved on its own. */
+  paidOwn: (command: string): string =>
+    `This one costs something, so it is approved on its own: ${command}`,
   // Card facts (11 §5 vocabulary).
   free: 'Free',
   noteToSelf: 'You (a note to yourself)',

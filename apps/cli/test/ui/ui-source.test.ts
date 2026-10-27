@@ -68,6 +68,22 @@ const channel: ApprovalChannel = {
 };
 const evm = (): string => `0x${encodeHex(randomBytes(20))}`;
 
+/**
+ * M1-PAY-CONFIRM-a: a free request (`agentlink_export_proof_pack`, no fee). Requests that carry a
+ * fee are never batch items (04 §2.5.3 rule 7), so the list and batch tests use free ones.
+ */
+function freeAction(note = 'x'): JsonObject {
+  return {
+    tool: 'agentlink_export_proof_pack',
+    args: { recordId: '0x01', includeKey: true, note },
+    context: {
+      triggers: ['proofs.allowKeyDisclosure'],
+      recordId: `0x${encodeHex(randomBytes(32))}`,
+      envelopeHash: `0x${encodeHex(randomBytes(32))}`,
+    },
+  };
+}
+
 function sendAction(args: JsonObject, usd = '0.1'): JsonObject {
   return {
     tool: 'agentlink_send',
@@ -111,8 +127,10 @@ async function world() {
     close: () => Promise.resolve(),
   };
   const source = createUiApprovalSource(agent, { now: () => clock.t });
-  const request = async (args: JsonObject = { to: 'Ana', text: 'hello' }) => {
-    const action = sendAction(args);
+  const request = async (
+    args: JsonObject = { to: 'Ana', text: 'hello' },
+    action: JsonObject = sendAction(args),
+  ) => {
     const pending = await client.approvalService.request({ action, summary: 'Send a message' });
     return { approvalId: pending.approvalId, action, actionDigest: pending.actionDigest };
   };
@@ -245,8 +263,9 @@ describe('the local UI approval source (M1-11a)', () => {
 
   it('context() names the agent and its owner; apply() is core verifying the owner signature', async () => {
     const w = await world();
-    const a = await w.request();
-    const b = await w.request({ to: 'Ben', text: 'x' });
+    // M1-PAY-CONFIRM-a: free requests; a paid one is never a batch item (04 §2.5.3 rule 7).
+    const a = await w.request(undefined, freeAction('a'));
+    const b = await w.request(undefined, freeAction('b'));
     const context = await w.source.context();
     expect(context?.agent).toBe(w.client.agentId);
     expect(context?.owner.ownerNostr).toEqual((await w.owner.getPublicKeys()).ownerNostr);
