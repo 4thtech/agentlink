@@ -21,7 +21,9 @@ import { CONTACTS_DUPLICATE, ROUTES } from './fixtures.mjs';
 
 const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
 const OUT = fileURLToPath(new URL('../../docs-site/guide/.gitbook/assets/', import.meta.url));
-const QA_DIR = process.argv.includes('--qa') ? process.argv[process.argv.indexOf('--qa') + 1] : undefined;
+const QA_DIR = process.argv.includes('--qa')
+  ? process.argv[process.argv.indexOf('--qa') + 1]
+  : undefined;
 const MAX_BYTES = 400 * 1024;
 const TYPES = {
   '.html': 'text/html',
