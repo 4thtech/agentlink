@@ -4655,7 +4655,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests per LiveDot state (shape, word, tone, live region); with reduced motion (app setting and media query) no `Element.animate` call and an instant state plus a text line; interrupted motion continues without a restart; amounts and codes never animate.
 
 #### UI-REFRESH-e · ui + local-ui: preferences, the Under the hood switch and panel, Settings › Appearance (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/hood.tsx`, `hood.css` and their tests; `apps/local-ui/src/prefs/**` (new), `apps/local-ui/src/pages/appearance/**` (new) and their tests; changeset, changelog fragment
 - **Depends on:** UI-REFRESH-a
 - **Spec:** B-11 §7, §13.2, §14 (reduced motion); UX-V3 plan §3; 11 §5

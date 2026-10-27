@@ -42,18 +42,21 @@ const render = (fields: unknown, on = true): void =>
 const record = (href: string): unknown => ({ kind: 'proofLink', label: 'Public record', href });
 const FORBIDDEN: readonly [string, unknown][] = [
   ['a private key', { kind: 'text', label: 'Key', value: 'a'.repeat(64) }],
-  [
-    'a base64 key',
-    { kind: 'text', label: 'Note', value: 'MC4CAQAwBQYDK2VwBCIEIOy3Zq0aQw8e7u1xK2pL9v' },
-  ],
+  ['a base64 key', { kind: 'text', label: 'Note', value: 'Zm9vYmFy-Zm9vYmFy-Zm9vYmFy' }],
   ['a code', { kind: 'text', label: 'Backup code', value: 'ABCD-EFGH-JKLM-NPQR' }],
-  ['a token', { kind: 'text', label: 'Access token', value: 'tok_live_123' }],
-  ['a token by value', { kind: 'text', label: 'Detail', value: 'Bearer eyJhbGciOiJIUzI1NiJ9abcdefgh' }],
-  ['the session link', { kind: 'text', label: 'Session link', value: 'http://127.0.0.1:4318/#s=abc' }],
+  ['a token', { kind: 'text', label: 'Access token', value: 'tok_example_1' }],
+  ['a token by value', { kind: 'text', label: 'Detail', value: 'Bearer zzzzzzzzzzzzzzzzzzzzzzzz' }],
+  [
+    'the session link',
+    { kind: 'text', label: 'Session link', value: 'http://127.0.0.1:4318/#s=abc' },
+  ],
   ['a session link as proof link', record('http://127.0.0.1:4318/#s=abc')],
   ['a drop url', { kind: 'text', label: 'Drop', value: 'https://drop.4th.tech/d/abc123' }],
   ['an upload url', { kind: 'text', label: 'Upload', value: 'https://example.com/upload/abc' }],
-  ['a download url', { kind: 'text', label: 'Download', value: 'https://example.com/download/abc' }],
+  [
+    'a download url',
+    { kind: 'text', label: 'Download', value: 'https://example.com/download/abc' },
+  ],
   ['a presigned url', record('https://bucket.s3.amazonaws.com/o?X-Amz-Signature=abc')],
   ['a presigned url on an explorer host', record('https://basescan.org/tx/1?X-Amz-Signature=abc')],
   ['a link with credentials', record('https://user:pw@basescan.org/tx/1')],
@@ -62,7 +65,7 @@ const FORBIDDEN: readonly [string, unknown][] = [
   ['an http explorer link', record('http://basescan.org/tx/1')],
   ['a look-alike host', record('https://basescan.org.evil.example/tx/1')],
   ['a link typed as text', { kind: 'text', label: 'Record', value: PROOF_URL }],
-  ['an unknown kind', { kind: 'secret', label: 'Thing', value: 'x' }],
+  ['an unknown kind', { kind: 'secret', label: 'Thing', value: 'odd-kind-value' }],
   ['a non-object', 'https://example.com'],
 ];
 
@@ -88,7 +91,9 @@ describe('the Under the hood panel', () => {
     expect(region.querySelector('svg.al-icon')).not.toBeNull();
     expect(host.textContent).toContain('m-12');
     expect(host.textContent).toContain('2.4 KB');
-    expect(host.querySelectorAll('input, textarea, select, form, [contenteditable]').length).toBe(0);
+    expect(host.querySelectorAll('input, textarea, select, form, [contenteditable]').length).toBe(
+      0,
+    );
     expect(host.querySelectorAll('button').length).toBe(1);
   });
 
@@ -142,7 +147,13 @@ describe('the Under the hood panel', () => {
 
   it('does not carry extra properties of a field into the DOM', () => {
     render([
-      { kind: 'id', label: 'Message ID', value: 'm-12', token: 'zzz-secret', href: 'https://x.test/u' },
+      {
+        kind: 'id',
+        label: 'Message ID',
+        value: 'm-12',
+        token: 'zzz-secret',
+        href: 'https://x.test/u',
+      },
     ]);
     expect(host.innerHTML).not.toContain('zzz-secret');
     expect(host.innerHTML).not.toContain('x.test');
