@@ -499,7 +499,16 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
             { kind: 'count', label: IO.hoodFolders, value: String(list.folders.length) },
             ...list.folders
               .slice(0, 5)
-              .map((row, i) => ({ kind: 'path', label: `Folder ${i + 1}`, value: row.path })),
+              .map((row, i) => ({ kind: 'path', label: IO.hoodFolder(i + 1), value: row.path })),
+            ...(list.folders.length > 5
+              ? [
+                  {
+                    kind: 'text',
+                    label: IO.hoodMoreFolders,
+                    value: IO.hoodMore(list.folders.length - 5),
+                  },
+                ]
+              : []),
           ]}
         />
       ) : null}

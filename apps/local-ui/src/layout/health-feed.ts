@@ -27,6 +27,15 @@ function each(call: (s: HealthSubscriber) => void): void {
   }
 }
 
+/** For tests only: stop the poller and forget every subscriber and answer. */
+export function resetHealthFeedForTests(): void {
+  stop?.();
+  stop = undefined;
+  subscribers.clear();
+  lastState = undefined;
+  lastResult = undefined;
+}
+
 /** Follow the shared health poller (starting it if needed); returns the unsubscribe. */
 export function subscribeHealth(
   read: () => Promise<ApiResult<unknown>>,

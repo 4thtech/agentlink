@@ -141,3 +141,8 @@
 .pf-waiting {
   margin: 0;
 }
+
+/* The wrapper adds no box: the ring stays the flex child it was. */
+.pf-ring {
+  display: contents;
+}
