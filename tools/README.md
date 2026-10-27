@@ -4,6 +4,7 @@ Scripts that keep the repository healthy. They are for maintainers and CI, not f
 
 - [`ci`](ci): CI helpers (affected-package selection, retries, keyring setup).
 - [`deps-check`](deps-check): enforces which package may import which.
+- [`docs-screenshots`](docs-screenshots): `pnpm docs:screenshots` regenerates the dark-theme screenshots of the local app for the user guide, from made-up fixtures (no agent, keys or network). Not part of CI.
 - [`docs-status`](docs-status): generates the status blocks in the README and docs from `docs/status.yaml`.
 - [`release`](release): changelog, changeset and deploy checks.
 - [`vectors`](vectors): generates and checks the shared test vectors.

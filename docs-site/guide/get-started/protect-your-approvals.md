@@ -56,6 +56,10 @@ From 0.3.0 the setup page in your browser does this step for you. It first shows
 
 The page then shows **your backup code** once. Press **Save in my password manager**, then **I saved it**. The backup code approves when Touch ID isn't available, for example in another browser. Never give it to your AI. If `~/AgentLink/Send` already holds files, or isn't a plain folder, the page asks you to fix that before you touch the sensor.
 
+## Already set up in the terminal? Switch to Touch ID
+
+If you set up your owner code with `owner init` (as in 0.2.0), the local app shows **Switch to Touch ID** (or Windows Hello) on every page until you do it. Press it, enter your owner code once (the app calls it your backup code), then touch the sensor. Your owner and your agents stay the same. Your code keeps working as the backup way to approve, for example in another browser or in the terminal. Your AI can open the page, but it can't switch for you: it needs your code and your touch.
+
 ## What this protects, and what it can't
 
 The owner code stops your AI from approving anything through AgentLink. Without it, the AI can send what your rules allow, and ask you for the rest.

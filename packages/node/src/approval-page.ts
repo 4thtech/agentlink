@@ -49,6 +49,13 @@ export const UI_STRINGS = Object.freeze({
     'Set up a passkey to approve with Touch ID, Face ID or Windows Hello instead of typing your owner code. Your owner code keeps working.',
   passkeySetUp: 'Set up a passkey',
   passkeyCodeLabel: 'Owner code',
+  // M1-UX-FIRSTRUN-V2-c (B-9; copy proposed, owner confirms at merge): with the app beside this
+  // page, the switch happens on its first-run page (apps/local-ui first-run strings UPGRADE).
+  switchMac: 'Switch to Touch ID',
+  switchWindows: 'Switch to Windows Hello',
+  switchOther: 'Switch to a passkey',
+  switchBody:
+    'Enter your backup code once, then approve without typing it. Your backup code keeps working.',
   continue: 'Continue',
   noPasskeys:
     "Passkeys aren't available in this browser. Approve with your owner code or owner passphrase.",
@@ -619,6 +626,20 @@ const SCRIPT = String.raw`
       return;
     }
     if (hasPasskey()) return;
+    if (canPasskey && passkey && document.querySelector('.al-side')) {
+      // M1-UX-FIRSTRUN-V2-c: the app is here, so its first-run page is the one place to switch.
+      // A fixed same-origin link: no token, no code, no query.
+      var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent;
+      var title = /mac/i.test(platform) ? S.switchMac : /win/i.test(platform) ? S.switchWindows : S.switchOther;
+      var next = el('section', null, 'al-card al-panel');
+      next.appendChild(el('h2', title));
+      next.appendChild(el('p', S.switchBody));
+      var go = el('a', title, 'al-btn al-btn-primary al-btn-lg al-btn-block');
+      go.href = '/first-run';
+      next.appendChild(go);
+      holder.appendChild(next);
+      return;
+    }
     var box = el('section', null, 'al-card al-panel');
     box.appendChild(el('h2', canPasskey && passkey ? S.passkeyTitle : S.firstRunTitle));
     box.appendChild(el('p', S.firstRun));

@@ -16,13 +16,13 @@ Files are encrypted on the device in chunks (default 1 MiB) with AES-256-GCM in 
 
 Every backend receives only `ALF1` ciphertext. The file key, file name and `plaintextSha256` travel only inside the end-to-end-encrypted envelope.
 
-### Storage selection (in development)
+### Storage selection
 
-The drop adapter and the selection rules are built in `@4thtech-io/storage` (M1-6c) and used by the file tools of the next release (M1-9d-1). Small files go inline first (D-85): every file of at most 12 288 bytes of ciphertext is placed inline, and while the encrypted payload would exceed the 17 136 bytes a receiver accepts, the largest inline file moves to storage; a message that still cannot fit is refused and nothing is sent. Everything else goes to the encrypted drop by default, with no setup. With `files.storage: own`, or with own storage configured under `auto`, files go to your own storage and never silently fall back to the drop. A file above the drop's size or weekly quota asks you to set up own storage; a busy or unavailable drop asks you to try again later. Whatever the backend, it receives only ciphertext, its size and SHA-256, and an expiry; the drop's signed links are treated as secrets and never logged.
+The drop adapter and the selection rules are built in `@4thtech-io/storage` (M1-6c) and used by the file tools since v0.2.0 (M1-9d-1). Small files go inline first (D-85): every file of at most 12 288 bytes of ciphertext is placed inline, and while the encrypted payload would exceed the 17 136 bytes a receiver accepts, the largest inline file moves to storage; a message that still cannot fit is refused and nothing is sent. Everything else goes to the encrypted drop by default, with no setup. With `files.storage: own`, or with own storage configured under `auto`, files go to your own storage and never silently fall back to the drop. A file above the drop's size or weekly quota asks you to set up own storage; a busy or unavailable drop asks you to try again later. Whatever the backend, it receives only ciphertext, its size and SHA-256, and an expiry; the drop's signed links are treated as secrets and never logged.
 
-### Sending and fetching (in development)
+### Sending and fetching
 
-The core sends and fetches files end to end (M1-7f); the MCP file tools that expose it (`agentlink_send` with `path`, `agentlink_fetch_file`; M1-9d-1) are merged for the next release. The design, in the order the core applies it:
+The core sends and fetches files end to end (M1-7f); the MCP file tools that expose it (`agentlink_send` with `path`, `agentlink_fetch_file`; M1-9d-1) are released (v0.2.0). The design, in the order the core applies it:
 
 - **Nothing is read before every check passed.** Each file's size cap, its realpath strictly inside an allowed folder, and where it would be stored are checked first. Then the inline plan (D-85) is made, and a message whose files cannot fit even with every file stored is refused (`PAYLOAD_TOO_LARGE`) before any file is read or uploaded. A file that would need storage the agent cannot use returns `needs_setup`, again before any upload.
 - **One fresh key per file.** Each file is read once and encrypted with a new 32-byte key; the payload carries the key, both hashes and either the inline ciphertext or the download link. If anything fails after an upload, or the final payload check refuses the message, the uploaded objects are deleted.

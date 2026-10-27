@@ -4479,6 +4479,109 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - Rendering tests: no invite link in the page or the API view, the headline shown, the field's attributes and toggle, the CSP byte for byte, colours equal to the tokens, no external request, no sideways scroll at 360 px; all M1-11a browser flows pass.
 
+#### MSG-FILES-IO · Messages and Files In/Out: people see what their AI did (new, owner decision 2026-10-27)
+
+Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 6 (a)): a read-only **Messages** page (Inbox and Sent per contact) and **Files** tabs Received · Sent · Send folders. Decrypted only on this computer, nothing new sent to any 4thTech service, inbound content as untrusted plain text, no new AI authority, the app's own "seen" marker. Plan, API contract and threat notes: [`docs/process/proposals/MSG-FILES-IO.md`](proposals/MSG-FILES-IO.md). Design: `docs/design/b11-local-app.md` §17. These cards replace the 0.3.1 plan items M1-UX3-FILES-EXPLAIN and the Sent list of M1-UX3-FILES-SEND (never carded; the folder picker stays a later card). PR titles: `CHORE: MSG-FILES-IO-<x> …`. Order: a, b, g in parallel; then c and d; e and f start early against the plan's §4 contract with a mocked API and merge after c and d; h follows b and f. Owner decisions of 27 Oct on the plan's three questions: Show in Finder with no Touch ID (card h), message history kept as today, the session-cookie residual accepted for 0.3.x and revisited before M3 (plan §8).
+
+#### MSG-FILES-IO-a · core: read-only messages and files views for the local app, no read mark (new)
+- **Status:** backlog · **Size:** M · **Tier:** Opus (Fable audit: opens sealed payloads at the zero-access boundary) · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/ui-messages.ts` (new) and its test, one export line in `packages/core/src/index.ts`; `inbox-page.ts` only to export a shared helper, with no behaviour change; changeset
+- **Depends on:** —
+- **Spec:** 06 §2.2 (items, read state), §4; 07 §3, §3.1; 04 §4; plan §3, §4
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - `MessagesView`: conversations (contacts not removed, last message time, last inbound time) and one page of a contact's Inbox or Sent items, reusing the inbox selection (`INBOX_TYPES`, state `ok`, no requests, refused, held or protocol rows). Body as plain text (a JSON body as indented JSON text; terms types their note); file names and sizes; Sent status and receipt; proof flag.
+  - `FilesIoView`: received and sent files with name, contact, time, size, state; `savedName` read when the column exists (b). The file list comes from the file entries of each envelope's sealed payload (name, size, `expiresAt`; never `url` or `fileKey`), joined to its `files` row. Retention (`files/retention.ts`) deletes the whole `files` row, key included, at expiry or on receipt; only an inline file's row is kept with `deleted_at`. So a payload entry without a row reads `expired` when `expiresAt` has passed and `deleted` otherwise; an inline file with `deleted_at` reads `deleted`.
+  - Never writes: no `read_at`, no other store change. Every item built from an allowlist.
+- **Acceptance (tests first, RED commit):**
+  - Exact key set per item; no URL, file key, `envelope_json`, salt or sealed value in any result (scan for the fixture's stored URL and key).
+  - `read_at` and every row unchanged after each call; requests, refused, held, protocol and removed-contact rows never listed.
+  - Works with the transport and storage failing (no network).
+
+#### MSG-FILES-IO-b · core + node: record where a fetched file was saved (schema 6) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/files/incoming.ts`, `files/received.ts`, `store/schema.ts`, `store/sql-schema.ts`, `store/memory-store.ts`, `constants.ts` (`STORE_SCHEMA_VERSION`); `packages/node/src/sqlite-schema.ts`, `sqlite-store.ts` (migration) and their tests; changeset
+- **Depends on:** —
+- **Spec:** 07 §3, §3.1; 04 §4 (realpath, retention); plan §3
+- **Invariants:** I-7
+- **Scope:**
+  - New column `files.saved_name` (`enc`): the single file name `fetchFile` placed in the Inbox folder, sealed like `name`, written after the rename succeeds. Never a full path. Schema 5 → 6; old rows read `null`.
+  - A reader for MSG-FILES-IO-a (`savedNameOf`).
+  - Migrations are forward-only: an older build refuses a version-6 store (`store_schema_newer`, `client.ts`). The changeset and the `changelog.d/` fragment say so plainly (after the update, going back to an older version needs a newer one again).
+- **Acceptance (tests first, RED commit):**
+  - A reader at schema 5 refuses a version-6 store with `store_schema_newer`; `memory-store.test.ts` expects version 6 (was `toBe(5)`).
+  - Migration from a version-5 fixture keeps every row; a fetch records the name sealed (the raw column is not the plain name); a failed or refused fetch records nothing; retention shredding leaves no readable file key and keeps working.
+
+#### MSG-FILES-IO-c · node: Messages API routes (read-only) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/messages.ts` (new) and its test, one line each in `local-ui/routes.ts` and `local-ui/context.ts` (`readOnlyClient` gets `messages`); changeset
+- **Depends on:** MSG-FILES-IO-a
+- **Spec:** 08 §1; 04 §2.5; plan §4
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - `GET /api/ui/messages` and `GET /api/ui/messages/:contactId?box=in|out&cursor=&limit=`, `presence: false`, the plan §4 allowlist and limits. Fixed error codes; logs carry counts only.
+- **Acceptance (tests first, RED commit):**
+  - Without the session cookie, CSRF header or same-origin metadata: refused, as every `/api/ui/` route. Bad `box`, `limit`, cursor or contact: `bad_request` without echoing input.
+  - Exact key sets; no URL or key in any response; `read_at` unchanged; the MCP tool registry test unchanged (no new tool).
+
+#### MSG-FILES-IO-d · node: Files Received and Sent API routes (read-only) (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files-io.ts` (new) and its test, one line each in `local-ui/routes.ts` and `local-ui/context.ts`; changeset
+- **Depends on:** MSG-FILES-IO-a, MSG-FILES-IO-b
+- **Spec:** 08 §1; 04 §2.5, §4; plan §4
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - `GET /api/ui/files/received` and `GET /api/ui/files/sent`, `presence: false`, the plan §4 allowlist (`savedName` only when saved). No file is opened, read or hashed by the server.
+- **Acceptance (tests first, RED commit):**
+  - Same gate and error tests as c; no locator, URL, file key or path in any response; a file whose row retention deleted reads `expired` or `deleted` from its payload entry (plan §3), and an inline file with `deleted_at` reads `deleted`; the existing `/api/ui/files` routes behave as before.
+
+#### MSG-FILES-IO-e · local-ui: Messages page (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/**` (new, own `strings.ts`), `apps/local-ui/src/nav.ts`, `router.tsx`, `strings.ts` (page title), their tests; `changelog.d/` fragment; README Status line
+- **Depends on:** MSG-FILES-IO-c (build against plan §4 with a mocked API; merge after c)
+- **Spec:** 08 §1; 11 §5; design b11 §17.2; D-116; plan §5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Sidebar item Messages between Activity and Contacts (`/settings/messages` until M1-11b-2), badge from a `localStorage` seen marker (contact and time only, try/catch, works without storage). Contact list; Inbox and Sent tabs; inbound text and file names only in `UntrustedContent`; "Show all" clamp; Copy text; "To reply, ask your AI."; empty, nothing-yet and offline states; Under the hood: message ID, size, proof. Existing components and D1 styling only.
+- **Acceptance (tests first):**
+  - A body with HTML, Markdown, an image tag and a `javascript:` link renders no element, attribute or anchor from it; a link shows as an inert domain chip.
+  - Message text never in `document.title`, toasts or any element outside the untrusted container; no compose control exists; opening a conversation makes no non-GET request; the seen marker holds no message text; 360 px has no sideways scroll.
+
+#### MSG-FILES-IO-f · local-ui: Files tabs Received · Sent · Send folders (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound file names) · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**` and their tests; `changelog.d/` fragment
+- **Depends on:** MSG-FILES-IO-d (build against plan §4 with a mocked API; merge after d)
+- **Spec:** 08 §1; 11 §5; design b11 §8, §17.3; plan §5
+- **Invariants:** I-5
+- **Scope:**
+  - The top explainer line; tabs Received (from, when, size, proof badge, "saved as" name (it may be stale if the person moved the file), the one-time untrusted-file note), Sent (file, to whom, when, status chips, receipt) and Send folders (today's page, unchanged behaviour). The app never opens a received file. Other people's file names only as untrusted text.
+- **Acceptance (tests first):**
+  - Tab order and default (Received); a file name with bidi or control characters renders as inert text; no link to a file, URL or path; Send folders tests pass unchanged; empty and offline states; 360 px.
+
+#### MSG-FILES-IO-g · spec: Messages and Files In/Out in 08 §1 and 11 §5, decision log (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/foundation/08-*.md` §1, `docs/foundation/11-*.md` §5, `docs/foundation/00-README.md` (decision log), `docs/design/b11-local-app.md` §17 status line; `changelog.d/` fragment
+- **Depends on:** —
+- **Spec:** plan §1 to §6
+- **Invariants:** I-4, I-5, I-7
+- **Scope:**
+  - Record the owner decision of 27 Oct as the next D-number; 08 §1: the Messages page, Files tabs and the four read-only routes; 11 §5: the new strings ("To reply, ask your AI.", the Files explainer line, empty states); b11 §17 status "decided".
+- **Acceptance:**
+  - Spec text matches the plan's §4 contract and threat notes; no other behaviour changes; `node tools/docs-status/index.mjs --check` passes.
+
+#### MSG-FILES-IO-h · Show in Finder for a saved received file (new, owner decision 2026-10-27)
+- **Status:** backlog · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/routes.ts`, `route-types.ts`, `approval-server.ts` (the gate for the new route kind), `approval-os.ts` (opener), `local-ui/api/files-io.ts`, `apps/local-ui/src/pages/files/**`, tests; changeset
+- **Depends on:** MSG-FILES-IO-b, MSG-FILES-IO-f
+- **Spec:** 04 §2.5, §4 (realpath); 08 §1; plan §6
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - Owner decision (Tali, 27 Oct, in chat; plan §8 1 (a)): Show in Finder with no Touch ID. A new route kind for this one fixed local OS action (POST, no presence, no signing, no store write), still behind the session, CSRF, Origin and octet-stream checks.
+  - The request carries only the item ID (`<envelopeId>.<idx>`). The server reads the sealed `saved_name` from the store; it accepts no name or path from the request.
+  - Resolves the Inbox folder's realpath, opens the file once with no-follow and checks that handle (a regular file, a direct child of that folder), then passes that checked path to the OS opener as one argument, never through a shell. Fail closed on any doubt; no separate `lstat`-then-open step (no check-then-use race).
+- **Acceptance (tests first, RED commit):**
+  - Registration still refuses a POST without presence unless it is this kind; a body that carries a path or name besides the ID is refused and never reaches the opener; a link, `..`, a file outside the Inbox folder or a missing file is refused; the opener gets one argument; a test that no other route can use the kind.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
@@ -6353,6 +6456,34 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first (RED commit) for (a) and (b); no test weakened; threat note; independent review (S2).
 - **Notes:** Send-time dev/ino pin: no (Fable IR-M1-36b-2-d-1; the signed realpath is the pin).
 
+#### M1-11c-a3c · local UI Files and Rules: folder checks use the pin helpers; one folder count (new, low, IR-M1-11c-a3-3 #430, IR-M1-11c-a5-3 #432)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` Files and Rules routes) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts`, `packages/node/src/local-ui/api/rules.ts`, tests
+- **Depends on:** M1-36b-2-d (`pinFolder`, `stillPinned`, `pinnedLocation`); M1-11c-shared
+- **Spec:** 04 §2.5, §4 (realpath rules); 08 §1; D-119
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - #430 L1: the Files review-to-commit step uses `pinFolder` / `stillPinned`, so a folder whose real location changed between review and commit is refused.
+  - #430 L2: the Files list uses `pinnedLocation`, so an entry stored as a link shows "not used".
+  - #432 L1: the Rules page folder count and the Files page `resolvedFolders().configured` count the same entries, so the two pages agree.
+  - #430 L3: the Files review store is per server, not per session, and the eight-review cap can evict a pending review; handled together with the cap in M1-11c-shared, not twice.
+  - Not here: the #432 L2 cap on pending reviews (M1-11c-shared).
+- **Acceptance:**
+  - Tests first (RED commit) for each item; the Files and Rules counts match for a link-stored entry; no test weakened; threat note; independent review (S2).
+
+#### M1-11c-a4e · local UI credits: guard test for unsigned money input, top-up e2e (new, low, IR-M1-11c-a4c-2, #435)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` proof service guard tests) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node` (guard 9b test, proof service), `e2e/test/local-ui-proofs-topup.test.ts`, local UI credits route
+- **Depends on:** M1-11c-a4c
+- **Spec:** 04 §2.5.1; 07 §6.2; D-122
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - L-1: guard 9b no longer names the ProofService money methods; add a test that `addReceivedFunds` and `withdrawCredits` refuse unsigned input.
+  - L-3: add the missing Playwright flow `local-ui-proofs-topup.test.ts` (top-up by QR).
+  - L-4: the route answers "refused" when the amount in dollars is missing; return a plain "not available yet" instead (benign).
+- **Acceptance:**
+  - Tests first (RED commit) for L-1 and L-4; the Playwright flow passes; no test weakened; independent review (S2).
+
 #### M1-11a-ux-b · approval page: headline and test lows (new, low, IR-M1-11a-ux-1)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli approval page, packages/ui
@@ -6438,16 +6569,117 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): a begin straight after a dropped setup keeps Send and finish succeeds; the code is absent from the DOM after "I saved it"; the manual check is recorded in the PR; threat note; independent review (S2).
 
 #### M1-UX-FIRSTRUN-V2-c · first run: 0.2.0 owners enter the backup code once, then add a passkey (new, B-9, left out of #542)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (owner setup for an existing owner in `packages/node`) · **Audit:** Fable · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `packages/node/src/local-ui/**` setup routes, `packages/node/src/owner-passkey.ts`, tests
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence for an existing owner; approval page in `packages/node`) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/layout/**`, `apps/local-ui/src/states/**`, `packages/node/src/approval-page.ts`, tests
 - **Depends on:** M1-UX-FIRSTRUN-V2
-- **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2; 11 §5.5, §6.2.1
+- **Spec:** 08 §1 (first run v2, B-9); 04 §2.5, §2.2, §2.3.1; 11 §5.5, §6.2.1; b11 Home "Next step"
 - **Invariants:** I-1, I-4, I-7
 - **Scope:**
   - The B-9 path of M1-UX-FIRSTRUN-V2 that #542 did not deliver: an owner created by 0.2.0 enters the backup code once, then registers the platform passkey (one Touch ID). Never creates a second owner.
-  - Not here: the second touch for passkeys that give PRF only on `get()` (M1-11s-c-c) and the recovery kit step (M1-11b-3).
+  - Reuses the existing owner operation `POST /api/owner/passkey` (M1-8e `registerOwnerPasskey`: code checked against the `owner` item, wrong-code backoff, `owner` item never written, so the backup code keeps working). No new server route.
+  - The "Switch to Touch ID" next step (b11 Home) on every app page and on Approvals (`/`, beside the app sidebar) until a passkey is registered; it links to `/first-run`, where the switch happens. Without the app bundle the approval page keeps its inline passkey set-up.
+  - A passkey that gives PRF only on `get()` gets the second touch in the same flow (as the approval page's inline set-up does), so hiding that set-up behind the link loses nothing.
+  - Not here: the recovery kit step (M1-11b-3); Settings › Passkeys (M1-UX3-SETTINGS).
 - **Acceptance:**
   - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-d · first run: setup lows from the folder-pinning review (new, low, IR-M1-UX-FIRSTRUN-V2-b-1, #547)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/owner-send-folder.ts`, tests
+- **Depends on:** M1-UX-FIRSTRUN-V2-b
+- **Spec:** 04 §2.5; 08 §1 (first run v2)
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - (a) The folder-refused path of begin removes setup folders without the "an owner exists anywhere" guard; add the guard (negligible, consistency).
+  - (b) A terminal `owner init` running in parallel can lose Send to a page release; it fails closed and is documented; add a plain-words message and a test of the documented behaviour.
+  - (d) `stillReady` repeats the realpath check that `stillPinned` already makes; trim the duplicate without loosening the check.
+  - (c) The manual password-manager check on a Mac is an owner test step and already recorded in M1-UX-FIRSTRUN-V2-b (L-5); not repeated here.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); (d) keeps every existing test green; no test weakened; independent review (S2).
+
+#### M1-UX-OPEN-APP-b · cli opener fence keyed by path; hanging start delays shutdown (new, low, IR-M1-11b-8-1, #549)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (owner-surface boundary; parent M1-UX-OPEN-APP is S2) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/mcp/**` (opener fence, loop), tests
+- **Depends on:** M1-11b-8
+- **Spec:** 06 §2.5; 08 §1
+- **Invariants:** I-4
+- **Scope:**
+  - (a) Key the opener allowance by full path.
+  - (b) A `start()` that never returns delays shutdown (existing behaviour); bound the wait.
+- **Acceptance:**
+  - Tests first (RED commit): the opener allowance is keyed by full path; shutdown completes within the bound with a hanging `start()`; no test weakened; independent review (S2).
+
+#### M1-11b-6-c · cli init: one fixed clause when an AI runs init (new, low, IR-M1-11b-6-1 L-3; copy)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`apps/cli`; fixed text, 11 §5) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-11b-6
+- **Spec:** 11 §5
+- **Scope:**
+  - When `init` is run by an AI, the message appends the fixed clause "or restart your AI app: the setup page opens"; check wording against 11 §5 and add it.
+- **Acceptance:**
+  - A test pins the text for an AI-run `init`; the vocabulary lint passes.
+
+#### CHORE-FLAKY-NEGOTIATE · e2e negotiate-and-agree: "versions arriving together" test times out on a slow runner (new, from a #549 queue run)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only)
+- **Repo/path:** agentlink · `e2e/test/negotiate-and-agree.test.ts`
+- **Depends on:** none
+- **Scope:**
+  - The deterministic e2e test "versions arriving together" hit its 60-second timeout once on a slow Linux runner. Find the slow step, make it event-driven instead of waiting, or give the test an honest budget.
+- **Acceptance:**
+  - Ten consecutive runs on CI pass; the test still fails when versions are lost; no test weakened.
+
+#### CHORE-COPY-AGENT-PROFILE · docs/status.yaml: "agent card" becomes "agent profile" (new, S0 copy)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (copy)
+- **Repo/path:** agentlink · `docs/status.yaml`
+- **Depends on:** none
+- **Spec:** 11 §5.1
+- **Scope:**
+  - Older entries in `docs/status.yaml` still say "agent card" (for example "First agent card at owner setup"); 11 §5.1 wants "agent profile". Change the wording only; leave IDs and typed-data names alone.
+  - Check the guide text added in #435 ("confirm with your owner code") against 11 §5.5 ("backup code") at the same time.
+- **Acceptance:**
+  - `grep -i "agent card" docs/status.yaml` finds only code names; the docs-status check passes.
+
+#### CHORE-FILES-WIN-NAME-CASE · Files page on Windows shows a protected folder's name in lower case (new, IR-CHORE-WIN-D99-1, #559)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` Files route; display only, no change to what is refused)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts` (near the protected-folder check), tests
+- **Depends on:** none
+- **Spec:** 04 §4
+- **Invariants:** I-4
+- **Scope:**
+  - The Files page shows the name of a protected folder in lower case on Windows because the path guard returns the parsed form. Build the shown name from the tail of the original root string. Display only: what is refused does not change.
+- **Acceptance:**
+  - Test first: a Windows-style path with capitals shows its original spelling; the refusal result is unchanged; no test weakened.
+
+#### CHORE-DESIGN-B11-MOTION · B-11 signature motion exceeds the 11 §5 motion range (new, owner decision, #560)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (owner decision; may change `docs/foundation/11`; spec change: owner confirms at merge)
+- **Repo/path:** agentlink · `docs/foundation/11-*.md` (§5 motion range) or the B-11 brief
+- **Depends on:** DESIGN-B11 (#560)
+- **Scope:**
+  - The B-11 signature motion moments run 400 to 480 ms and one highlight 1.2 s; 11 §5 allows 120 to 320 ms. The owner either accepts the exceptions (11 is amended, marked "proposed, owner confirms at merge") or the brief is shortened.
+- **Acceptance:**
+  - 11 §5 and B-11 agree; reduced-motion behaviour is stated for both.
+
+#### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)
+- **Repo/path:** agentlink · `apps/cli/src/runtime/agent-name.ts` and the `toContain('codex')` assertion in `apps/cli/src/commands/init.test.ts`
+- **Depends on:** M1-UX-MULTI-AGENT
+- **Scope:**
+  - The comment saying the agent name is never shown in an error is stale now that names are listed; update it.
+  - The `toContain('codex')` assertion always passes; assert the full expected list text.
+- **Acceptance:**
+  - The tightened assertion fails if a name is missing from the list; no test weakened.
+
+#### M1-11b-2b · approval page: skip link and a single brand (new, low, IR-M1-11b-2a-1, #563)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`packages/node/src/approval-page.ts`; audit-rules §2) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (or its current home), tests
+- **Depends on:** M1-11b-2a
+- **Spec:** 08 §1; 11 §6.2.1 (keyboard)
+- **Scope:**
+  - The sidebar comes before `<main>`, so there are seven tab stops before Approve; add a skip link to the main content.
+  - The page header repeats the brand shown in the sidebar; show it once.
+  - Not here: moving Approvals into the React shell (M1-11b-2).
+- **Acceptance:**
+  - A test finds the skip link as the first tab stop and that it lands on `<main>`; axe-core zero violations; no test weakened; independent review (S2).
 
 #### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
@@ -6799,6 +7031,22 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - Miniflare tests: alarm sync picks up a message; a thrown alarm still re-arms; restart is idempotent; the seed never appears in logs or unwrapped in DO storage; the sealed-column vectors pass against the DO store.
   - On a test account: a 24 h alarm loop with its missed-alarm count, and the behaviour after a redeploy, recorded in the PR.
+
+#### M2-3a-b · cloud agent: shared sealed-column vectors, Worker HTTP test, constraint detection, seed bytes (new, low, IR-M2-3a-1, #548)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`apps/cloud-agent` store and key handling; sealed columns) · **Audit:** Fable · **Phase:** M2
+- **Repo/path:** agentlink · `apps/cloud-agent/src/do-store.ts`, `store-cipher.ts`, `worker-keystore.ts`, `index.ts`, tests, shared vector file
+- **Depends on:** M2-3a
+- **Spec:** 07 §3 (sealed-column format), §1; D-131
+- **Invariants:** I-1, I-2, I-5
+- **Scope:**
+  - L1: the sealed-column vectors are inline in tests; move them to one shared vector file used by the Node store and the Durable Object store.
+  - L2: test the Worker HTTP surface: `GET` and `HEAD` on `/health` answer 200 and every other path answers 404.
+  - L3: `do-store.ts` detects a constraint error by matching the message text; use a typed check or a code instead.
+  - L4: before 0.4.0, run the 24-hour alarm loop on a test account (owner's Cloudflare account); owner step, recorded in the PR.
+  - L5: the sealed seed passes through a hex string that cannot be wiped; give the column cipher a bytes API so the seed stays in a wipeable buffer.
+  - Product questions for the owner, not decided here: keep the nine-day first look-back of the sync engine and fix the wording in 08 §3.1, or change the engine; rotate the relay start index on each run (a card if yes).
+- **Acceptance:**
+  - Tests first (RED commit) for L1, L2, L3 and L5; the Node and Durable Object suites read the same vectors; L4 recorded; no test weakened; threat note; independent review (S2, Fable).
 
 #### M2-3b · cloud agent: remote MCP over streamable HTTP
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2

@@ -1,6 +1,6 @@
 # Project overview and principles
 
-> **Status: Mixed.** Pair, talk and negotiate terms are released (v0.1.x, pre-alpha, testnets only); files, proof and the apps are in development or planned, as marked below. The current state is on [Status and roadmap](status-and-roadmap.md).
+> **Status: Mixed.** Pair, talk, negotiate terms, files and proof on test networks, and the local app are released (v0.3.0, 26 Oct 2026, pre-alpha, test networks only); the desktop app, the cloud agent and real-money proof are planned, as marked below. The current state is on [Status and roadmap](status-and-roadmap.md).
 
 **Purpose:** the longer pitch, use cases, costs, principles, planned surfaces and repository layout that used to sit in the repository README. The README is now a short landing page that links here.
 
@@ -15,7 +15,7 @@ AI agents from different people and companies cannot safely work together today:
 
 ## How it works in brief
 
-The design (the messaging, pairing, approval and terms parts are released in v0.1.1; files, proof and the apps are planned): the only setup is adding the AgentLink MCP server to your harness, and your own agent can do that for you. No wallet, browser extension or chain choice. Everything sensitive happens on your side. Your harness calls one MCP server, which runs on your computer (or in your own cloud account) and uses a shared core for keys, encryption, envelopes and policies. Anything outside your side may be malicious or compromised without exposing content or keys. At worst it can withhold or delay service.
+The design (messaging, pairing, approvals, terms, files, proof on test networks and the local app are released in v0.3.0; the desktop app and the cloud agent are planned): the only setup is adding the AgentLink MCP server to your harness, and your own agent can do that for you. No wallet, browser extension or chain choice. Everything sensitive happens on your side. Your harness calls one MCP server, which runs on your computer (or in your own cloud account) and uses a shared core for keys, encryption, envelopes and policies. Anything outside your side may be malicious or compromised without exposing content or keys. At worst it can withhold or delay service.
 
 ```mermaid
 flowchart LR
@@ -33,7 +33,7 @@ flowchart LR
 
 - **Messages** travel as end-to-end encrypted, gift-wrapped Nostr events. The owners of both agents can read them.
 - **Files** are encrypted on your device. Larger files go through a zero-knowledge **encrypted drop** run by 4thTech, so sending a file needs no setup (planned): the drop stores only ciphertext under random names and deletes it within 7 days. Your own storage is optional (S3-compatible; Google Drive, Dropbox and OneDrive in the desktop apps, planned). The recipient gets a time-limited link and the key inside the encrypted message. Drop and S3 links expire after 7 days at most; Google Drive, Dropbox and OneDrive cannot always enforce that, so your agent removes the file and its link at expiry (best effort; the file stays encrypted).
-- **Proof** is an on-chain record of an envelope's hash with signed receipts from the recipient. Anyone can check a proof pack against the chain without an account (in development).
+- **Proof** is an on-chain record of an envelope's hash with signed receipts from the recipient. Anyone can check a proof pack against the chain without an account (released on test networks in v0.2.0).
 - **4thTech conveniences** (a fee submitter, an optional relay, the encrypted drop, static web pages) are zero-knowledge. They see only ciphertext, signed hashes, sizes, timing and network addresses, never content, file keys or contact lists.
 
 ## Use cases (planned)
@@ -48,8 +48,8 @@ flowchart LR
 |---|---|
 | Install, identity, pairing, contacts | Free |
 | Encrypted messages and acknowledgements | Free |
-| Send files (in development; inline, through the encrypted drop, or via your own storage) | Free within the drop's quotas (your own storage may bill you) |
-| Approvals and policies (released); owner console and local verify (in development) | Free |
+| Send files (released in v0.2.0; inline, through the encrypted drop, or via your own storage) | Free within the drop's quotas (your own storage may bill you) |
+| Approvals and policies (released); owner console (planned) and local verify (released) | Free |
 | **Add proof** (record, with up to 3 receipts) | $0.10, paid by the sender |
 | **Verified registration** of an agent | $5 one-time, paid by the owner |
 | Batched receipts, deal records, arbitrator disclosure | Fee, planned for later |
@@ -70,7 +70,7 @@ flowchart LR
 
 | Surface | What it is | Status |
 |---|---|---|
-| Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.1.1 (M1a), `npx -y @4thtech-io/agentlink` |
+| Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.3.0, `npx -y @4thtech-io/agentlink` |
 | Local: approval page | Small page on `localhost` for owner approvals and settings | planned (M1) |
 | Local: desktop apps | Signed apps for macOS, Windows and Linux: a full local dashboard, tray, and approvals with Touch ID or Windows Hello | planned (M2) |
 | Cloud: self-host | Always-on agent with a remote MCP endpoint in your **own** Cloudflare account | planned (M2) |

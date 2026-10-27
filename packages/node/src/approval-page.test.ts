@@ -9,7 +9,7 @@
 // - The invite link of an accept-invite request never reaches the page: it is the capability that
 //   opens the invite, and the owner decides on who it connects to, not on the link.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { APP_CSS, APP_NAV, EXPIRED_HTML, pageHtml } from './approval-page.js';
+import { APP_CSS, APP_JS, APP_NAV, EXPIRED_HTML, UI_STRINGS, pageHtml } from './approval-page.js';
 import {
   startApprovalServerWith,
   type ApprovalDetails,
@@ -210,6 +210,30 @@ describe('the shared app navigation (M1-11b-2a)', () => {
 
   it('never puts the navigation on the expired-link page', () => {
     expect(EXPIRED_HTML).not.toContain('al-side');
+  });
+});
+
+describe('the "Switch to …" next step on Approvals (M1-UX-FIRSTRUN-V2-c, B-9)', () => {
+  it('names the platform and the backup code in plain words, never a password', () => {
+    expect(UI_STRINGS.switchMac).toBe('Switch to Touch ID');
+    expect(UI_STRINGS.switchWindows).toBe('Switch to Windows Hello');
+    expect(UI_STRINGS.switchOther).toBe('Switch to a passkey');
+    const copy = [
+      UI_STRINGS.switchMac,
+      UI_STRINGS.switchWindows,
+      UI_STRINGS.switchOther,
+      UI_STRINGS.switchBody,
+    ].join(' ');
+    expect(copy).toContain('backup code');
+    expect(copy.toLowerCase()).not.toMatch(/password|wallet|seed|transaction|gas\b/);
+  });
+
+  it('links only to the fixed first-run path, and only when the app is there to go to', () => {
+    // The page script draws the link only beside the app sidebar (pageHtml appNav); the old
+    // inline set-up stays for a server without the app bundle.
+    expect(APP_JS).toContain("href = '/first-run'");
+    expect(APP_JS).toMatch(/querySelector\('\.al-side'\)/);
+    expect(APP_JS).not.toMatch(/first-run\?/);
   });
 });
 

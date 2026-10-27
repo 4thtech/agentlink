@@ -19,6 +19,7 @@
     "lint": "turbo run lint check && prettier --check .",
     "typecheck": "turbo run typecheck",
     "test:e2e": "turbo run test:e2e",
+    "docs:screenshots": "turbo run build --filter=@4thtech-io/local-ui... && node tools/docs-screenshots/capture.mjs",
     "vectors:check": "node tools/vectors/check.mjs",
     "format": "prettier --write .",
     "changeset": "changeset",
