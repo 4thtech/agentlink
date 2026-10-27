@@ -222,8 +222,8 @@ const AXE_MODES: readonly Mode[] =
   STRICT || process.env['LOCAL_UI_REFRESH_FULL'] === '1'
     ? MODES
     : MODES.filter((m) => ['dark-1280', 'light-1280', 'dark-360'].includes(m.name));
-/** About 20 s per mode on a CI runner (PR #621); the limit is three times that. */
-const AXE_MS_PER_MODE = 60_000;
+/** The whole test file took 109 s on a CI runner (PR #621); 3 modes × 80 s = 240 s, over twice that. */
+const AXE_MS_PER_MODE = 80_000;
 
 async function axe(page: Page, forced: boolean): Promise<AxeViolation[]> {
   await page.addScriptTag({ content: AXE });
