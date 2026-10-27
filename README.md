@@ -93,7 +93,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 > **Version:** v0.3.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-27
 >
 > - **Components:** 75 merged, 15 in progress, 7 planned
-> - **Next:** 0.4.0 is next: the cloud agent (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+> - **Next:** 0.4.0 is the release now being prepared (Messages, Files, Touch ID upgrade, payment confirmation, status bar, duplicate contacts). The cloud agent follows as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
@@ -106,7 +106,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
 | **M1b Files, proof, credits** (v0.2.0 and v0.3.0 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
-| **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.4.0 (cloud agent first) and later |
+| **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.5.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |
 | **M5 Agent commerce** | Deal records, payment linkage, arbitrator disclosure | after 1.0.0 |

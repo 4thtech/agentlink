@@ -7078,9 +7078,9 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 
 ### Cloud agent template (`apps/cloud-agent`)
 
-**0.4.0 slice (D-131).** The cloud agent ships first, as 0.4.0, for Claude on the web and in the Claude iOS and Android apps; ChatGPT web follows later. Two chains meet at M2-3c: **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c** and **CLOUD-SPEC → M2-3f-1 → M2-3c**; then **M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → release 0.4.0**. Fable audits: M2-3a, M2-3f-1, M2-3f-2, M2-3c, M2-3d and AUDIT-CLOUD, plus M2-3i for `cloud update` (keys, owner presence, OAuth and the D-131 (11) crypto exception); Opus review for the others. The console chain (M2-2*) is not on this path.
+**0.5.0 slice (D-131; D-131 says 0.4.0, renumbered to 0.5.0 by the owner on 27 Oct).** The cloud agent ships first, as 0.5.0, for Claude on the web and in the Claude iOS and Android apps; ChatGPT web follows later. Two chains meet at M2-3c: **M2-3t → M2-3t-w → M2-3a → M2-3b → M2-3c** and **CLOUD-SPEC → M2-3f-1 → M2-3c**; then **M2-3c → M2-3d → M2-3e → AUDIT-CLOUD → release 0.5.0**. Fable audits: M2-3a, M2-3f-1, M2-3f-2, M2-3c, M2-3d and AUDIT-CLOUD, plus M2-3i for `cloud update` (keys, owner presence, OAuth and the D-131 (11) crypto exception); Opus review for the others. The console chain (M2-2*) is not on this path.
 
-#### CLOUD-SPEC · cloud agent spec for 0.4.0 (D-131)
+#### CLOUD-SPEC · cloud agent spec for 0.5.0 (D-131 says 0.4.0; renumbered to 0.5.0 by the owner on 27 Oct)
 - **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (by path: 04)
 - **Repo/path:** agentlink · docs/foundation (00, 03, 04, 06, 07, 08, 10), docs/process (backlog, versioning, release-and-deployment §4.8, audit-rules CR-1), docs/runbooks/add-dependency.md, docs/status.yaml
 - **Depends on:** CLOUD-0 spikes (done, 25 Oct 2026); owner decisions of 25 Oct 2026

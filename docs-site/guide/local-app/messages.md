@@ -1,6 +1,6 @@
 # Messages page
 
-*Applies to AgentLink 0.3.1 and later. It is not in 0.3.0.*
+*Applies to AgentLink 0.4.0 and later. It is not in 0.3.0.*
 
 The Messages page shows what you and your contacts have written, one contact at a time, in an **Inbox** and a **Sent** list. It is for reading only. To reply, ask your AI.
 

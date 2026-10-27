@@ -1,6 +1,6 @@
 # Rules page
 
-*Applies to AgentLink 0.3.0 (released 26 Oct 2026). Confirming spending changes with Touch ID is from 0.3.1.*
+*Applies to AgentLink 0.3.0 (released 26 Oct 2026). Confirming spending changes with Touch ID is from 0.4.0.*
 
 Rules decide what your agent may do without asking you. The page shows them in two groups:
 
@@ -15,7 +15,7 @@ Rules decide what your agent may do without asking you. The page shows them in t
 2. Before saving, the page lists in plain words everything the change lets your agent do without asking. Tick each one.
 3. Approve once with your passkey or backup code.
 
-From 0.3.1, a change to what your agent may spend (proofs on or off, the 24-hour budget, the per-proof limit, or a limit for one contact) ends with **Continue** and a confirmation sheet instead. It shows each old and new value, and you confirm with Touch ID, Windows Hello or your passkey. See [Confirming paid actions](confirm-paid-actions.md). Other changes keep the passkey or backup-code check.
+From 0.4.0, a change to what your agent may spend (proofs on or off, the 24-hour budget, the per-proof limit, or a limit for one contact) ends with **Continue** and a confirmation sheet instead. It shows each old and new value, and you confirm with Touch ID, Windows Hello or your passkey. See [Confirming paid actions](confirm-paid-actions.md). Other changes keep the passkey or backup-code check.
 
 If you turn selling on, an extra warning appears while you do. Your agent cannot change your rules.
 

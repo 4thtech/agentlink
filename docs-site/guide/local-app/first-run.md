@@ -18,7 +18,7 @@ The backup code approves things when Touch ID is not available, for example in a
 
 ## If you set up before 0.3.0
 
-*Applies to AgentLink 0.3.1 and later.*
+*Applies to AgentLink 0.4.0 and later.*
 
 If you set up AgentLink in the terminal before the local app, your approvals use a code. The local app now offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** on other computers), and shows a reminder on each page.
 
