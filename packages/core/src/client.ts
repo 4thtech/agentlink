@@ -26,8 +26,10 @@ import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
+import { savedNameOf } from './files/received.js';
 import type { FilesPlatform } from './files/platform.js';
 import { FilesView } from './files/view.js';
+import { FilesIoView, MessagesView } from './ui-messages.js';
 import {
   FileLinks,
   type RequestFileLinkInput,
@@ -180,6 +182,10 @@ export class AgentLinkClient {
   readonly files: FilesView;
   /** refresh-link (M1-7f-3; 04 §4): requests, and answers after each processing pass. */
   readonly fileLinks: FileLinks;
+  /** The local app's Messages (MSG-FILES-IO-a): read-only, store only, never a read mark. */
+  readonly messages: MessagesView;
+  /** The local app's Files Received and Sent (MSG-FILES-IO-a): read-only, store only. */
+  readonly filesIo: FilesIoView;
   /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
@@ -264,6 +270,12 @@ export class AgentLinkClient {
       files,
     );
     this.activity = new ActivityService(ctx, this.contacts);
+    this.messages = new MessagesView(ctx, this.contacts);
+    // MSG-FILES-IO-d: "saved as" from the sealed files.saved_name; a value that does not open shows
+    // that one item without it (FilesIoView catches per row).
+    this.filesIo = new FilesIoView(ctx, this.contacts, {
+      savedName: (row) => savedNameOf(ctx, row),
+    });
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,

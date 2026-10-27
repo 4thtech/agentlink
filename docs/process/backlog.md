@@ -1287,7 +1287,8 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Invariants:** —
 - **Scope:**
   - Brief for the owner: Home with live tiles, the global "Under the hood" switch, state-indicator vocabulary, motion spec (no new library, reduced motion), every screen and state to design, and which D1/D2 screens can be reused.
-  - v2 (DESIGN-B11-v2, owner direction of 2026-10-27): elevation and materials with solid fallbacks, motion tokens and the 11 §11 duration question, progress and state components, per-screen notes, and Messages and Files In/Out (pending owner decision), with six owner decisions in §18.
+  - v2 (DESIGN-B11-v2, owner direction of 2026-10-27): elevation and materials with solid fallbacks, motion tokens and the 11 §11 duration question, progress and state components, per-screen notes, and Messages and Files In/Out (pending owner decision), with six owner decisions in §18 (decided 2026-10-27 as recommended, D-132).
+  - Paying for proof and registration (MONEY-CONFIRM-DESIGN, D-132): §19 (one confirmation sheet, credits line, receipt rows) and §20 (three owner decisions); build cards M1-PAY-CONFIRM-a, M1-PAY-CONFIRM-b, M2-PAY-CONFIRM-c.
 - **Acceptance:**
   - The owner has taken the brief to Claude Design; approved screens are recorded in `docs/design/README.md` before any build card styles Home, Files Received, Add contact, the presence prompt or the motion layer.
 
@@ -6775,6 +6776,37 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - The manual check is recorded; `init` output and docs name the extension first; copy passes `lintVocabulary`.
 
+### Confirming paid actions (new, D-132)
+
+#### M1-PAY-CONFIRM-a · core and node: paid-action confirmation bound to amount and purpose, with user verification (new, D-132)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core` (confirmation statement, spending-field diff), `packages/node/src/local-ui/**` (presence gate begin and finish), their tests, `docs/foundation/04-security-and-crypto.md` §2.5.3 if the build refines it, its `changelog.d/` fragment and changeset
+- **Depends on:** MONEY-CONFIRM-DESIGN merged (which actions and the backup code decided, D-132; the ceremony rules confirmed by the owner at that merge)
+- **Spec:** 04 §2.5, §2.5.3, §2.3.1; 06 §3; 08 §1; 12 §4.6; D-130, D-132
+- **Invariants:** I-1, I-4, I-5
+- **Scope:**
+  - Begin builds the exact owner flow (proof approval, `policy.set` that changes a spending field) and its confirmation statement; challenge per 04 §2.5.3 rule 2; single use, session-bound, 120 s.
+  - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; `maxFee` never above the statement.
+  - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before.
+  - The backup-code path signs under the same statement binding (kept, D-132), with the three-tries rule. Proofs evaluated `allow` are unchanged (automatic).
+  - Paid items are excluded from batch approval (04 §2.5.3 rule 7): the batch screen does not offer them and the core refuses such a batch (`paid_item_in_batch`). "Remember for this contact" digests both bodies in one challenge (rule 2).
+  - Registration (`REGISTER`) is out of scope here (M2-PAY-CONFIRM-c).
+- **Acceptance:**
+  - Tests first (RED commit): a missing UV flag, a reused or expired challenge, a changed amount, limit or contact after begin, a statement amount other than the pending request's `context.fee.usd`, a "Remember for this contact" `policy.set` not in the challenge, an `approval.decideBatch` containing a paid item, and a statement built from a URL or tool value are each refused; a policy change without a spending field keeps the ordinary prompt; no MCP tool or CLI flag reaches begin or finish; threat note; independent review and Fable audit (S2).
+
+#### M1-PAY-CONFIRM-b · local UI: the confirmation sheet, the credits line and receipt rows (new, D-132)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence UI on a money path) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/**` (approval card, Rules spending fields, Proofs & credits, Activity), `packages/ui` (sheet, ring, check), `docs/design/d1/tokens/tokens.css` (the §14 tokens approved in D-132), tests, its `changelog.d/` fragment
+- **Depends on:** M1-PAY-CONFIRM-a; approved screens for brief §19 recorded in `docs/design/README.md` (D-116)
+- **Spec:** `docs/design/b11-local-app.md` §13 to §15, §19; 08 §1; 11 §5, §10, §11; D-132
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - The sheet (level 4) with platform naming ("Confirm with Touch ID", "Windows Hello", "your passkey"), every §19.3 state and the reduced-motion version; the system prompt is never drawn; no platform or card logos.
+  - Renders only the statement the server returned. Credits line with "Your credits stay yours; 4thTech never holds them."; one receipt row per paid action (Held, Paid, Not charged). Add credits and Withdraw credits keep their flows, restyled to the sheet's look only.
+  - No charts, balance hero or new money features.
+- **Acceptance:**
+  - Tests first (RED commit). Playwright: each variant and state, focus order (no autofocus on Confirm), live-region text, reduced motion; copy passes `lintVocabulary` (no wallet, bank, transaction, gas); no amount or name read from the URL; Fable audit (S2).
+
 ---
 
 ## 4. M2 — Owner console, desktop apps, self-host, design
@@ -7315,6 +7347,17 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
   - A policy setting for a random delay window (off by default) and batching of receipts at the submitter; receipts never held past their deadline, the terms' `validUntil` or a commitment scope's `expiresAt`. Adding the policy key is a schema change (06 §3).
 - **Acceptance:**
   - With the window on, receipt times are spread across the window (statistical test with a fixed seed); deadlines and commitment expiries are always met; off by default.
+
+#### M2-PAY-CONFIRM-c · console, cloud agent and verified registration: the same paid-action confirmation (new, D-132)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path)
+- **Repo/path:** agentlink · `apps/console`, `apps/cloud-agent` (owner pages), the registration flow, tests
+- **Depends on:** M1-PAY-CONFIRM-a, M1-PAY-CONFIRM-b; the verified-registration cards of M2
+- **Spec:** 04 §2.5 (cloud owner presence), §2.5.3; 08 §2, §3; 12 §2, §4.6; D-131, D-132
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - The 04 §2.5.3 ceremony and the brief §19 sheet on the console and on the cloud agent's own pages; verified registration ($5.00) always uses it. The desktop app's native window (D-36) puts the amount and purpose into the OS prompt reason text, never counterparty text (noted for the desktop cards).
+- **Acceptance:**
+  - Tests first as in M1-PAY-CONFIRM-a, per surface; registration cannot be signed without UV bound to its statement; Fable audit (S2).
 
 ### Desktop apps, owner identity, counterparty (D-34…D-36, D-41) (new)
 
