@@ -180,6 +180,9 @@ export const TABLES = {
   // 07 §3. delete_after (M1-1g-i, schema version 4): the `files.deleteAfter` in effect when the
   // file was sent, so a later policy change never applies retroactively. Null on a row stored
   // before version 4: retention keeps it until it expires (I-9).
+  // saved_name (MSG-FILES-IO-b, schema version 6): the single file name fetchFile placed in the
+  // Inbox folder, sealed like `name`; never a path. Null until a fetch saved the file, and on every
+  // row stored before version 6. It goes with the row when retention deletes it.
   files: {
     columns: {
       envelope_id: id,
@@ -193,6 +196,7 @@ export const TABLES = {
       expires_at: int,
       deleted_at: opt('int'),
       delete_after: optOneOf('expiry', 'receipt'),
+      saved_name: opt('enc'),
     },
     primaryKey: ['envelope_id', 'idx'],
   },

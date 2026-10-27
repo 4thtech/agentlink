@@ -12,7 +12,7 @@
 // deleting the object; this row only keeps the key out of the payload column.
 import { FILE_LINK_MAX_EXPIRY_DAYS, type Payload } from '@4thtech-io/types';
 import type { CoreContext } from '../context.js';
-import { nowOf, seal } from '../context.js';
+import { nowOf, open, seal } from '../context.js';
 import type { Row } from '../store/schema.js';
 
 /**
@@ -56,9 +56,22 @@ export async function receivedFileRows(
       deleted_at: null,
       // The receiver deletes its row at expiry (deleteExpiredFiles); no send-time snapshot applies.
       delete_after: null,
+      // MSG-FILES-IO-b: set by fetchFile once the file is saved; null means "not saved yet".
+      saved_name: null,
     });
     const target = stored.files[idx];
     if (target !== undefined) target.fileKey = SHREDDED_FILE_KEY;
   }
   return { payloadText: JSON.stringify(stored), rows };
+}
+
+/**
+ * The name fetchFile saved a received file under (MSG-FILES-IO-b, `files.saved_name`): the single
+ * name it chose directly inside the Inbox folder, never a path. Null when the file was not saved yet
+ * (and on every row stored before schema version 6). A value that does not open fails closed
+ * (`store_unreadable`). Never log the result (I-7).
+ */
+export async function savedNameOf(ctx: CoreContext, row: Row<'files'>): Promise<string | null> {
+  if (row.saved_name === null) return null;
+  return open(ctx, 'files', 'saved_name', [row.envelope_id, row.idx], row.saved_name);
 }

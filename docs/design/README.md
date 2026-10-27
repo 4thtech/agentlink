@@ -90,7 +90,7 @@ Source previews are in `d2/source/screens/<Name>.dc.html`; PNGs as listed. "Card
 - **Copy, fix before building:** Pay "If your exchange asks for a network, choose Base (cheapest)" names a network in the default UI (D-40, 11 §5); verify and proof detail show raw `0x…` record IDs in the default view (move to Advanced or detail); `strings.en.json` needs a full 11 §5 audit (M1-35c); "owner key" and similar hits in the console (`d2/MANIFEST.md`).
 - **Licence:** the Lucide ISC notice is not in the reference bundle and must ship with `packages/ui` (M1-35a). Geist and Geist Mono are SIL OFL 1.1 (`d1/tokens/fonts/OFL.txt`).
 
-**Design briefs.** Briefs for flows the owner has set a direction for, ahead of their design drop: [`topup-ux.md`](topup-ux.md), adding credits on the pay page (D-111, direction only). [`b11-local-app.md`](b11-local-app.md), brief B-11 for the owner: a state-of-the-art local app (Home, live state, motion, "Under the hood"), DESIGN-B11; nothing built until the owner approves the screens (D-116).
+**Design briefs.** Briefs for flows the owner has set a direction for, ahead of their design drop: [`topup-ux.md`](topup-ux.md), adding credits on the pay page (D-111, direction only). [`b11-local-app.md`](b11-local-app.md), brief B-11 for the owner: a state-of-the-art local app (Home, live state, motion, "Under the hood"; v2 decisions taken 2026-10-27, D-132; §19 paying for proof and registration with one confirmation sheet), DESIGN-B11; nothing built until the owner approves the screens (D-116).
 
 When a drop lands, the orchestrator records it here: the date, the links or files, and the delivered or partial status. It then schedules the intake tasks from the backlog.
 
