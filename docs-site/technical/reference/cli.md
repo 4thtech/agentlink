@@ -23,7 +23,7 @@ Commands that are **owner operations** (policies, approvals, backups, storage cr
 - `ui` (0.3.0): opens the local app in your browser from a terminal you opened; `init` also opens the first-run page, where a passkey sets up a new owner. Not yet: the recovery-kit save from the page, and the passkey step for an owner created by 0.2.0 (M1-UX-FIRSTRUN-V2-c)
 - `policy allow-send-folder` (0.3.0, M1-36b-2-c): allows `~/AgentLink/Send` for an agent that already has its card
 - `storage connect`, `backup` (planned, not in the command list yet)
-- `cloud deploy`, `cloud update` (planned for v0.4.0, D-131); `cloud login` later, with the console
+- `cloud deploy`, `cloud update` (planned for v0.5.0, D-131); `cloud login` later, with the console
 - `doctor` (diagnostics)
 - Exit codes and machine-readable output
 
