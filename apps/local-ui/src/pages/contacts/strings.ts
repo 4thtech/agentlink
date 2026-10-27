@@ -22,6 +22,8 @@ export const CONTACTS_STRINGS = {
   safetyExplain:
     'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
   sameName: 'Another contact has the same name.',
+  keepBoth: 'Keep both',
+  removeOlder: 'Remove older',
   codeLoading: 'Loading the safety code…',
   codeUnavailable: "Can't show the safety code right now. Try again in a minute.",
   theyMatch: 'They match',
@@ -74,6 +76,14 @@ export function nudge(name: string): string {
 
 export function mismatchBody(name: string): string {
   return `The invite may have been copied or changed on the way. Remove this contact, then ask ${name} for a new invite through a channel you trust.`;
+}
+
+/**
+ * M1-UX3-DUP-CONTACTS (owner decision 8): shown on the newer of two contacts with the same owner.
+ * `name` is the older contact's name-rule output and `date` its pairing day; rendered as text.
+ */
+export function secondConnection(name: string, date: string): string {
+  return `Looks like a second connection with ${name} (paired ${date}). Keep both, or remove the older one?`;
 }
 
 export function since(date: string): string {

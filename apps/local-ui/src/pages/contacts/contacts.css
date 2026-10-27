@@ -85,3 +85,29 @@
 .ct-same-name {
   display: block;
 }
+/* M1-UX3-DUP-CONTACTS: the second-connection notice is a level-3 banner (b11 §13.1, §16) that
+   slides in 8 px over the base duration; with reduced motion it simply appears. */
+.ct-dup .al-banner {
+  border-color: var(--al-color-border-subtle);
+  box-shadow: var(--al-shadow-3);
+}
+.ct-dup .al-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ct-dup {
+    animation: ct-dup-in var(--al-duration-base) var(--al-easing-enter);
+  }
+  @keyframes ct-dup-in {
+    from {
+      opacity: 0;
+      transform: translateY(var(--al-space-3));
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

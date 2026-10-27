@@ -409,3 +409,136 @@ describe('ContactsPage: duplicate names (UX-031-QUICKWINS)', () => {
     expect(text()).not.toContain(SAME);
   });
 });
+
+describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONTACTS)', () => {
+  const OLD = { ...ana, name: 'oc-test', label: 'self-declared', since: 1_761_350_400 };
+  const NEW = { ...OLD, ref: MARKO, since: 1_761_523_200, olderSameOwner: ANA };
+  const NOTICE_START = 'Looks like a second connection with ';
+  const KEY = 'agentlink.contacts.duplicates-kept.v1';
+  const paired = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(
+    new Date(OLD.since * 1000),
+  );
+
+  beforeEach(() => {
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // no storage in this environment
+    }
+  });
+
+  async function selectNewer(): Promise<void> {
+    const rows = host.querySelectorAll<HTMLButtonElement>('.ct-row');
+    await act(async () => {
+      rows[1]?.click();
+    });
+    await settle();
+  }
+
+  it('shows one calm notice on the newer contact, naming the older one and its date', async () => {
+    await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+    expect(text()).not.toContain(NOTICE_START); // the older one is selected first
+    await selectNewer();
+    expect(text()).toContain(
+      `${NOTICE_START}oc-test (paired ${paired}). Keep both, or remove the older one?`,
+    );
+    expect(host.querySelectorAll('.ct-dup')).toHaveLength(1);
+    button(S.keepBoth);
+    button(S.removeOlder);
+  });
+
+  it('Remove older uses the existing remove route and asks for presence first', async () => {
+    const calls = await mount({
+      [LIST]: { status: 'ok', contacts: [OLD, NEW] },
+      [`POST /api/ui/contacts/${ANA}/remove`]: { status: 'done' },
+    });
+    await selectNewer();
+    await click(S.removeOlder);
+    expect(posts(calls)).toHaveLength(0);
+    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
+    await confirmWithCode();
+    expect(posts(calls).map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/remove`]);
+  });
+
+  it('Cancel at the presence step removes nothing', async () => {
+    const calls = await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+    await selectNewer();
+    await click(S.removeOlder);
+    await click(S.cancel);
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it('Keep both hides the notice and remembers it in this browser only', async () => {
+    const calls = await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+    await selectNewer();
+    await click(S.keepBoth);
+    expect(text()).not.toContain(NOTICE_START);
+    expect(posts(calls)).toHaveLength(0);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+    await selectNewer();
+    expect(text()).not.toContain(NOTICE_START);
+  });
+
+  it('still works when browser storage is blocked', async () => {
+    const get = Storage.prototype.getItem;
+    const set = Storage.prototype.setItem;
+    Storage.prototype.getItem = () => {
+      throw new Error('blocked');
+    };
+    Storage.prototype.setItem = () => {
+      throw new Error('blocked');
+    };
+    try {
+      await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+      await selectNewer();
+      expect(text()).toContain(NOTICE_START);
+      await click(S.keepBoth);
+      expect(text()).not.toContain(NOTICE_START);
+    } finally {
+      Storage.prototype.getItem = get;
+      Storage.prototype.setItem = set;
+    }
+  });
+
+  it('same name but a different owner: only the name hint, no removal suggestion', async () => {
+    await mount({
+      [LIST]: { status: 'ok', contacts: [OLD, { ...OLD, ref: MARKO, since: NEW.since }] },
+    });
+    await selectNewer();
+    expect(text()).toContain(S.sameName);
+    expect(text()).not.toContain(NOTICE_START);
+    expect(host.querySelector('.ct-dup')).toBeNull();
+  });
+
+  it('ignores a link to a contact that is not in the list, or of the wrong shape', async () => {
+    await mount({
+      [LIST]: {
+        status: 'ok',
+        contacts: [OLD, { ...NEW, olderSameOwner: `0x${'9'.repeat(40)}` }],
+      },
+    });
+    await selectNewer();
+    expect(text()).not.toContain(NOTICE_START);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({
+      [LIST]: { status: 'ok', contacts: [OLD, { ...NEW, olderSameOwner: 'ANA' }] },
+    });
+    await selectNewer();
+    expect(text()).not.toContain(NOTICE_START);
+  });
+
+  it('renders the older contact’s name as text, never as markup', async () => {
+    await mount({
+      [LIST]: {
+        status: 'ok',
+        contacts: [{ ...OLD, nameSource: 'counterparty', name: '<img src=x>' }, NEW],
+      },
+    });
+    await selectNewer();
+    expect(host.querySelector('.ct-dup')).not.toBeNull();
+    expect(host.querySelector('.ct-dup img')).toBeNull();
+  });
+});
