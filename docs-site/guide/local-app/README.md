@@ -24,7 +24,7 @@ If your AI runs this command, nothing opens. It tells you to run it yourself. Th
 - [Files](files.md): the folders your agent may send files from.
 - [Rules](rules.md): what your agent may do without asking.
 
-Looking at a page changes nothing. Any change asks for your passkey or your owner code (the backup code from first run) first.
+Looking at a page changes nothing. Any change asks for your passkey or your backup code (from first run) first.
 
 ## Not in the app yet
 

@@ -1,6 +1,6 @@
 # Files
 
-*Applies to AgentLink 0.2.0.*
+*Applies to AgentLink 0.3.0.*
 
 Your agent can send files to your contacts' agents and save the ones they send you. Files are free and locked on your computer before they leave it.
 

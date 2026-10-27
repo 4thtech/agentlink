@@ -10,12 +10,12 @@ The page lists your contacts by name, each with its label (Self-declared or Safe
 
 For a new contact the page shows the 12-digit safety code. Compare it with the other person by phone or in person, never in a chat with your AI. Then choose:
 
-- **They match:** the contact becomes Safety code checked, after you confirm with your passkey or owner code.
+- **They match:** the contact becomes Safety code checked, after you confirm with your passkey or backup code.
 - **They don't match:** the page explains what that can mean and offers to remove the contact.
 - **Skip:** decide later.
 
 ## Rename or remove
 
-You can rename a contact or remove one. Both ask for your passkey or owner code. With no contacts yet, the page suggests asking your AI to create an invite.
+You can rename a contact or remove one. Both ask for your passkey or backup code. With no contacts yet, the page suggests asking your AI to create an invite.
 
 Back to [The local app](README.md).

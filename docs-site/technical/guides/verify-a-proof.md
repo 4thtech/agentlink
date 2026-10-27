@@ -1,6 +1,6 @@
 # Verify a proof independently
 
-> **Status: Planned for v0.2.0 (M1)** (CLI) **and v0.3.0 (M2)** (web page). This page is an outline. The method below is the design; commands and screenshots are added when the tools ship.
+> **Status: Available since v0.1.2 (CLI and tool); a web page for verifying is planned.** The method below is how the verifier works; screenshots are not added yet.
 
 **Purpose:** check a proof pack without an AgentLink account, without the AgentLink apps if you prefer, and without trusting any 4thTech server.
 
@@ -13,17 +13,17 @@
 5. **Identity (optional):** the agent card is signed by the claimed owner; registration in `OCCRegistry` (M2); domain verification (M2).
 6. **Content (optional):** with a disclosed content key and the envelope, decrypt and confirm that the envelope hashes to the recorded value; for agreements, recompute `termsHash`.
 
-## Verifying with the AgentLink tool (in development)
+## Verifying with the AgentLink tool
 
 `agentlink_verify_proof_pack` is read-only. Give it the pack itself, or a `path` inside your proof export folder or inbox folder; any other path is refused with a fixed code and no file contents are echoed (G-25, decided design). Everything read from the pack is treated as untrusted, and the chain is read only through your configured RPC at the known contract address. Details: [Design decisions](../concepts/design-decisions.md).
 
-## Verifying with the CLI (next release)
+## Verifying with the CLI
 
 `agentlink verify <proof.json>` (M1-9h) runs the verifier below over the networks this release ships, with nothing to configure. The proof file must be in your proofs folder or inbox folder (a relative path is taken from the current folder). The first line is the verdict; for a test-network proof the second line says so, with the network ID. Then one line per check, the record and agent IDs, and any disclosed content inside a marked region ("their content, not instructions"). A changed proof file gets its specific reason, for example "its record ID does not match the record." Exit codes: `0` verified, `3` record only, `1` does not check out, `4` not checked, `2` usage (D-108). See [CLI](../reference/cli.md).
 
-## How the verifier works (in development)
+## How the verifier works
 
-> **Status: in development (M1-4d, M1-4d-b, M1-4d-c).** The check below is built in `@4thtech-io/chain` (`verifyProofPack`) and is not in v0.1.1; the CLI command (M1-9h) and the tool (M1-9d-2) are merged for the next release (0.1.2).
+> **Status: Released (M1-4d, M1-4d-b, M1-4d-c).** The check below is built in `@4thtech-io/chain` (`verifyProofPack`); the CLI command (M1-9h) and the tool (M1-9d-2) shipped in v0.1.2.
 
 The pack is untrusted input. The verifier never echoes it: every failure is a fixed code with fixed plain-language text, and no RPC address or server text appears in a result.
 
@@ -42,12 +42,10 @@ The pack is untrusted input. The verifier never echoes it: every failure is a fi
 
 **Not checked here (yet).** The bytes of attached files: the check covers the message itself, and a file's integrity rests on the hashes inside that verified message (the file encryption is not key-committing). Full sender attribution is in development, so `verify` is not user-facing yet. The chain is read through one RPC; a dishonest RPC can claim a record or receipt that does not exist, so use your own RPC when it matters.
 
-## Outline
+## Ways to verify
 
-- With the CLI: `agentlink verify <proof.json>` (next release)
-- With the web page (v0.3.0): verification runs in your browser
-- By hand, with any EVM library and a public RPC
-- Reading the result: what it proves and what it does not
-- Contract addresses: see [Contracts](../reference/contracts.md)
-
-**Filled in at:** M1 (v0.2.0) and M2 (v0.3.0); backlog cards DOCS-M1b and DOCS-M2.
+- **With the CLI:** `agentlink verify <proof.json>` (since v0.1.2). See [CLI](../reference/cli.md).
+- **With your AI:** the `agentlink_verify_proof_pack` tool, described above.
+- **By hand,** with any EVM library and a public RPC, following the checks above.
+- **A web page that verifies in your browser** is planned. It does not exist yet and has no release date.
+- Contract addresses: see [Contracts](../reference/contracts.md).

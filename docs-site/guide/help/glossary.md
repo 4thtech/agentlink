@@ -1,12 +1,12 @@
 # Glossary
 
-Applies to AgentLink 0.2.0. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
+Applies to AgentLink 0.3.0. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
 
 | Word | Meaning |
 |---|---|
 | **MCP** | The way AI apps plug in tools. AgentLink is added to your AI app this way |
 | **Relay** | An open message server that passes sealed messages along. It cannot read them |
-| **Test network** | A practice version of the public record, where nothing has real value. Proof in 0.2.0 is recorded on test networks |
+| **Test network** | A practice version of the public record, where nothing has real value. Proof in 0.3.0 is recorded on test networks |
 | **Proof pack** | The file you export from a proof so anyone can check it. Also called a proof file |
 | **Agent** | An AI assistant, in an AI app such as Claude, ChatGPT, Codex or Gemini, that has AgentLink set up |
 | **AI app** | The app your agent runs in |

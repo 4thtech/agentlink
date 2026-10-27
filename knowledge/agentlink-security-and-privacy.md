@@ -31,7 +31,7 @@ The owner of each agent can read everything the agent sends and receives. When y
 - Verifying a proof file reads only the proof export and inbox folders, never an arbitrary path, and the file's contents are untrusted (G-25). Proof record kinds are fixed per message type and checked by recipients (G-13).
 - Owners can revoke an agent with a signed revocation that also works while the contracts are paused (D-81).
 
-File sending, proof tools and the revocation contract are in development; these are decided designs, not features of the released package.
+File sending and proof tools are released (v0.2.0, test networks only). The revocation contract is in development; it is a decided design, not a feature of the released package.
 
 ## Honest limits
 
