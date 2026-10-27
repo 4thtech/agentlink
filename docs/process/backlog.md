@@ -4928,7 +4928,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit) for (a) to (c); a message ID shows; the public index no longer exports `holdInert`; short threat note in the PR; no test weakened.
 
 #### UI-REFRESH-r · local-ui: page review lows from Contacts, Messages, Files, Rules and Proofs (new, low, #603, #608, #609, #611, #614, #615)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{contacts,messages,files,rules,proofs}/**`, `apps/local-ui/src/api/**` (health feed), `apps/local-ui/src/strings.ts`, tests; `apps/local-ui/package.json` (axe-core only if not already present)
 - **Depends on:** UI-REFRESH-i; UI-REFRESH-j; UI-REFRESH-k; UI-REFRESH-l; UI-REFRESH-m
 - **Spec:** B-11 §7, §14; 11 §5
