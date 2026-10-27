@@ -19,8 +19,14 @@ import {
   ContactName,
   EmptyState,
   Icon,
+  Sheet,
+  Skeleton,
+  SuccessMoment,
+  Surface,
   TextField,
+  UnderTheHood,
   formatContactName,
+  useReducedMotion,
 } from '@4thtech-io/ui';
 import type { IdentityKind } from '@4thtech-io/ui';
 import {
@@ -62,6 +68,7 @@ import {
   secondConnection,
   since,
   waitSeconds,
+  waitingFor,
 } from './strings.js';
 import './contacts.css';
 
@@ -173,7 +180,7 @@ function ContactList({
 }): ReactElement {
   const dupes = duplicateNames(contacts);
   return (
-    <ul className="ct-list" aria-label={S.listLabel}>
+    <Surface as="ul" level={1} className="ct-list" aria-label={S.listLabel}>
       {contacts.map((c) => (
         <li key={c.ref}>
           <button
@@ -199,7 +206,7 @@ function ContactList({
           </button>
         </li>
       ))}
-    </ul>
+    </Surface>
   );
 }
 
@@ -400,6 +407,7 @@ function Detail({
   // PRE-031-FIXES: "Remove older" goes through the same confirm step as Remove.
   const [confirmOlder, setConfirmOlder] = useState(false);
   const dupNoticeId = useId();
+  const reduced = useReducedMotion();
   const [pending, setPending] = useState<Pending | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -503,7 +511,7 @@ function Detail({
     renaming ||
     confirmRemove ||
     confirmOlder ? null : (
-      <div className="ct-dup">
+      <Surface level={3} className="ct-dup">
         <Banner tone="info" icon="users">
           <p className="al-text-body" id={dupNoticeId}>
             {secondConnection(shownName(older), DAY.format(new Date(older.since * 1000)))}
@@ -522,19 +530,30 @@ function Detail({
             </Button>
           </div>
         </Banner>
-      </div>
+      </Surface>
     );
 
   let safety: ReactElement | null = null;
   if (matched || contact.label === 'safety-code-checked') {
     safety = (
-      <p className="al-sc-ok al-text-body">
-        <Icon name="identity-checked" size={16} />
-        {matched ? S.matched : S.checked}
-      </p>
+      <>
+        <p className="al-sc-ok al-text-body">
+          <Icon name="identity-checked" size={16} />
+          {matched ? S.matched : S.checked}
+        </p>
+        {matched ? <SuccessMoment kind="codes" /> : null}
+      </>
     );
   } else if (contact.status === 'active' && contact.pairing === 'pending') {
-    safety = <p className="al-text-body al-muted">{S.waitingDetail}</p>;
+    safety = (
+      <>
+        <p className="ct-waiting al-text-body" data-motion={reduced ? 'reduced' : 'full'}>
+          <Icon name="clock" size={16} />
+          <span>{waitingFor(name)}</span>
+        </p>
+        <p className="al-text-body al-muted">{S.waitingDetail}</p>
+      </>
+    );
   } else if (compare && mismatch) {
     safety = (
       <div className="al-sc-stop al-tone-warning" role="alert">
@@ -693,6 +712,24 @@ function Detail({
   );
 }
 
+/**
+ * Under the hood (B-11 §16): what the list already carries, nothing more. The fingerprint is only
+ * sent for some contacts, so it is left out otherwise; the contact's ref is never shown.
+ */
+function hoodFields(c: ContactRow): unknown[] {
+  return [
+    ...(c.fingerprint === undefined
+      ? []
+      : [{ kind: 'text', label: 'Fingerprint', value: c.fingerprint }]),
+    {
+      kind: 'text',
+      label: 'Identity level',
+      value: c.label === 'safety-code-checked' ? 'Safety code checked' : 'Self-declared',
+    },
+    { kind: 'time', label: 'Paired', value: new Date(c.since * 1000).toISOString().slice(0, 10) },
+  ];
+}
+
 export interface ContactsPageProps {
   /** For tests; the page's own same-origin clients by default. */
   readonly api?: ApiClient;
@@ -711,6 +748,7 @@ export function ContactsPage({
   const [tick, setTick] = useState(0);
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
+  const [sheetOpen, setSheetOpen] = useState(true);
 
   useEffect(() => {
     let live = true;
@@ -749,6 +787,7 @@ export function ContactsPage({
 
   const onChanged = useCallback((what: Pending['what']) => {
     setRemoved(what === 'remove');
+    if (what === 'remove') setSheetOpen(false);
     setTick((n) => n + 1);
   }, []);
 
@@ -766,9 +805,7 @@ export function ContactsPage({
     return (
       <>
         {title}
-        <p className="al-text-body al-muted" aria-busy="true">
-          {S.loading}
-        </p>
+        <Skeleton loading label={S.loading} lines={4} className="ct-loading" />
       </>
     );
   }
@@ -819,8 +856,16 @@ export function ContactsPage({
           onSelect={(ref) => {
             setRemoved(false);
             setSelected(ref);
+            setSheetOpen(true);
           }}
         />
+      </div>
+      <Sheet
+        open={sheetOpen && current !== undefined}
+        title={S.detailTitle}
+        closeLabel={S.closeSheet}
+        onClose={() => setSheetOpen(false)}
+      >
         {current === undefined ? null : (
           <Detail
             key={current.ref}
@@ -835,7 +880,8 @@ export function ContactsPage({
             onChanged={onChanged}
           />
         )}
-      </div>
+      </Sheet>
+      <UnderTheHood fields={current === undefined ? [] : hoodFields(current)} />
     </>
   );
 }

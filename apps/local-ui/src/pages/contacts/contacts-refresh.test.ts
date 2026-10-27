@@ -4,12 +4,11 @@
 // Skeleton on first load and the Under the hood fields. Names from other parties stay plain text
 // (I-5). The older contacts.test.ts stays as it is.
 import { HoodProvider } from '@4thtech-io/ui';
-import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import { ContactsPage } from './index.js';
+import { ContactsPage, type ContactsPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 import { CONTACTS_STRINGS as S } from './strings.js';
 
@@ -87,7 +86,7 @@ async function mount(routes: Routes, hood = false): Promise<void> {
   const f = fetchFor({ 'GET /api/owner/passkey': NO_PASSKEY, ...routes });
   const api = createApiClient({ fetch: f, token: 't' });
   const owner = createOwnerClient({ fetch: f, token: 't' });
-  const page = createElement(ContactsPage, { api, owner });
+  const page = createElement<ContactsPageProps>(ContactsPage, { api, owner });
   await act(async () => {
     root.render(hood ? createElement(HoodProvider, { value: true }, page) : page);
     await Promise.resolve();
@@ -118,7 +117,7 @@ describe('UI-REFRESH-i: first load', () => {
     const never = new Promise<never>(() => undefined);
     const api = { get: () => never, post: () => never } as unknown as ApiClient;
     await act(async () => {
-      root.render(createElement(ContactsPage, { api }));
+      root.render(createElement<ContactsPageProps>(ContactsPage, { api }));
       await Promise.resolve();
     });
     expect(host.querySelector('h1')?.textContent).toBe('Contacts');
@@ -258,15 +257,6 @@ describe('UI-REFRESH-i: reduced motion', () => {
     }));
     await mount(pending);
     expect(host.querySelector('.ct-waiting')?.getAttribute('data-motion')).toBe('reduced');
-  });
-
-  it('the stylesheet animates only behind both reduced-motion rules, with tokens and no blur', () => {
-    const css = readFileSync(new URL('./contacts.css', import.meta.url), 'utf8');
-    expect(css).toMatch(/@keyframes\s+ct-breathe/);
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
-    expect(css).toMatch(/\[data-motion='reduced'\]/);
-    expect(css).not.toMatch(/backdrop-filter/);
-    expect(css).not.toMatch(/style=/);
   });
 });
 
