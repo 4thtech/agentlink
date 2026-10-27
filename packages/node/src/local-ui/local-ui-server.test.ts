@@ -13,7 +13,15 @@
 //   No proof, or a wrong one: 403 before the handler runs (the store is unlocked first, IR-M1-11s-b-1
 //   H-1), and a wrong code counts towards the server's wrong-code backoff. The handler gets a
 //   read-only client view and a one-use `sign` on that session; one that signs nothing is 409.
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -913,4 +921,212 @@ describe('the Files In/Out reads: the server gate (MSG-FILES-IO-d)', () => {
       expect(post.status).toBe(405);
     },
   );
+});
+
+// MSG-FILES-IO-h (D-134): Show in Finder. A POST with no owner presence, behind the same session,
+// CSRF, Origin, fetch-metadata and octet-stream checks as every local UI write. The body carries
+// only `{"id":"<envelopeId>.<idx>"}`; anything else (a name, a path, a second key, an input or
+// presence header, a query) is refused before the store is read or the OS revealer runs.
+describe('Show in Finder: the server gate (MSG-FILES-IO-h)', () => {
+  const ITEM = `${'c3'.repeat(32)}.00`;
+  const PATH = '/api/ui/files/received/reveal';
+
+  interface Reveal {
+    readonly h: Harness;
+    readonly inbox: string;
+    readonly revealed: [string, string][];
+    readonly lookups: string[];
+    readonly ownerStores: number[];
+    post(body: unknown, extra?: Record<string, string>, path?: string): Promise<Response>;
+  }
+
+  async function revealHarness(): Promise<Reveal> {
+    const inbox = join(
+      root,
+      `reveal-inbox-${String(Date.now())}-${String(Math.random()).slice(2)}`,
+    );
+    mkdirSync(inbox, { recursive: true });
+    const real = realpathSync(inbox);
+    writeFileSync(join(real, 'saved.pdf'), 'x');
+    const revealed: [string, string][] = [];
+    const lookups: string[] = [];
+    const ownerStores: number[] = [];
+    const client = {
+      agentId: 'agent-1',
+      getProof: () => Promise.resolve(undefined),
+      ownerActions: {
+        loadPolicy: () =>
+          Promise.resolve({ mode: 'defaults', policy: { files: { inboxFolder: inbox } } }),
+      },
+      filesIo: {
+        received: () => Promise.resolve({ items: [] }),
+        sent: () => Promise.resolve({ items: [] }),
+        savedName: (id: string) => {
+          lookups.push(id);
+          return Promise.resolve(id === ITEM ? 'saved.pdf' : null);
+        },
+      },
+    };
+    const h = await harness({
+      client,
+      internals: {
+        fileRevealer: (file, folder) => {
+          revealed.push([file, folder]);
+          return Promise.resolve(true);
+        },
+        openOwnerStore: (expected) => {
+          ownerStores.push(1);
+          return KeychainOwnerKeyStore.open(keychain, expected);
+        },
+      },
+    });
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    return {
+      h,
+      inbox: real,
+      revealed,
+      lookups,
+      ownerStores,
+      post: (body, extra = {}, path = PATH) =>
+        send(h.port, path, {
+          method: 'POST',
+          headers: {
+            Cookie: cookie,
+            Origin: h.origin,
+            'X-AgentLink-CSRF': csrf,
+            'Content-Type': 'application/octet-stream',
+            'Sec-Fetch-Site': 'same-origin',
+            ...extra,
+          },
+          body: body instanceof Uint8Array ? body : encodeUtf8(JSON.stringify(body)),
+        }),
+    };
+  }
+
+  it('reveals the stored file for an item ID, with no owner presence and no owner store', async () => {
+    const r = await revealHarness();
+    const res = await r.post({ id: ITEM });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ status: 'shown' });
+    expect(r.lookups).toEqual([ITEM]);
+    expect(r.revealed).toEqual([[join(r.inbox, 'saved.pdf'), r.inbox]]);
+    expect(r.ownerStores).toHaveLength(0);
+    expect(res.body).not.toContain('saved.pdf');
+    expect(res.body).not.toContain(r.inbox);
+  });
+
+  it('an unknown item is 404 not_found and reveals nothing', async () => {
+    const r = await revealHarness();
+    const res = await r.post({ id: `${'d4'.repeat(32)}.01` });
+    expect(res.status).toBe(404);
+    expect(JSON.parse(res.body)).toEqual({ error: 'not_found' });
+    expect(r.revealed).toHaveLength(0);
+  });
+
+  it('refuses a body that carries a name or a path, alone or beside the ID', async () => {
+    const r = await revealHarness();
+    const bodies: unknown[] = [
+      { id: ITEM, name: 'saved.pdf' },
+      { id: ITEM, path: '/etc/passwd' },
+      { id: ITEM, savedName: '../../etc/passwd' },
+      { id: ITEM, folder: '/' },
+      { name: 'saved.pdf' },
+      { path: join(r.inbox, 'saved.pdf') },
+      { id: '../../etc/passwd' },
+      { id: '/etc/passwd' },
+      { id: join(r.inbox, 'saved.pdf') },
+      { id: 'saved.pdf' },
+      { id: `${ITEM}/../x` },
+      { id: [ITEM] },
+      { id: 7 },
+      [ITEM],
+      ITEM,
+      null,
+      {},
+    ];
+    for (const body of bodies) {
+      const res = await r.post(body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'invalid' });
+    }
+    for (const raw of ['', 'not json', `{"id":"${ITEM}"`, `{"id":"${ITEM}","id":"x.00"}`]) {
+      const res = await r.post(encodeUtf8(raw));
+      expect(res.status, raw).toBe(400);
+    }
+    expect(r.lookups).toHaveLength(0);
+    expect(r.revealed).toHaveLength(0);
+  });
+
+  it('refuses an input header, a presence header or a query, before anything is read', async () => {
+    const r = await revealHarness();
+    const input = encodeBase64url(encodeUtf8(JSON.stringify({ path: '/etc/passwd' })));
+    for (const [extra, path] of [
+      [{ 'X-AgentLink-Input': input }, PATH],
+      [{ 'X-AgentLink-Presence': 'passkey' }, PATH],
+      [{}, `${PATH}?path=%2Fetc%2Fpasswd`],
+      [{}, `${PATH}?name=saved.pdf`],
+    ] as const) {
+      const res = await r.post({ id: ITEM }, extra, path);
+      expect(res.status, path).toBe(400);
+    }
+    expect(r.lookups).toHaveLength(0);
+    expect(r.revealed).toHaveLength(0);
+  });
+
+  it('needs the session, CSRF, Origin, same-origin metadata and an octet-stream body', async () => {
+    const r = await revealHarness();
+    const cookie = await r.h.cookie();
+    const csrf = await r.h.csrf(cookie);
+    const base = {
+      Cookie: cookie,
+      Origin: r.h.origin,
+      'X-AgentLink-CSRF': csrf,
+      'Content-Type': 'application/octet-stream',
+      'Sec-Fetch-Site': 'same-origin',
+    };
+    const variants: [Record<string, string>, number][] = [
+      [{ ...base, Cookie: '' }, 401],
+      [{ ...base, 'X-AgentLink-CSRF': '' }, 403],
+      [{ ...base, 'X-AgentLink-CSRF': 'x' }, 403],
+      [{ ...base, Origin: '' }, 403],
+      [{ ...base, Origin: 'http://evil.example' }, 403],
+      [{ ...base, 'Sec-Fetch-Site': 'cross-site' }, 403],
+      [{ ...base, 'Sec-Fetch-Site': 'same-site' }, 403],
+      [{ ...base, 'Content-Type': 'text/plain' }, 415],
+      [{ ...base, 'Content-Type': 'application/json' }, 415],
+    ];
+    for (const [headers, status] of variants) {
+      const clean = Object.fromEntries(Object.entries(headers).filter(([, v]) => v !== ''));
+      const res = await send(r.h.port, PATH, {
+        method: 'POST',
+        headers: clean,
+        body: encodeUtf8(JSON.stringify({ id: ITEM })),
+      });
+      expect(res.status, JSON.stringify(headers)).toBe(status);
+    }
+    const get = await send(r.h.port, PATH, {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
+    expect(get.status).toBe(405);
+    expect(r.lookups).toHaveLength(0);
+    expect(r.revealed).toHaveLength(0);
+  });
+
+  it('refuses an oversized body', async () => {
+    const r = await revealHarness();
+    const res = await r.post(encodeUtf8(JSON.stringify({ id: ITEM, pad: 'x'.repeat(4096) })));
+    expect(res.status).toBe(413);
+    expect(r.revealed).toHaveLength(0);
+  });
+
+  it('a link in place of the saved file is refused; the revealer never runs', async () => {
+    const r = await revealHarness();
+    rmSync(join(r.inbox, 'saved.pdf'));
+    symlinkSync('/etc/hosts', join(r.inbox, 'saved.pdf'));
+    const res = await r.post({ id: ITEM });
+    expect(res.status).toBe(403);
+    expect(JSON.parse(res.body)).toEqual({ error: 'refused' });
+    expect(r.revealed).toHaveLength(0);
+  });
 });

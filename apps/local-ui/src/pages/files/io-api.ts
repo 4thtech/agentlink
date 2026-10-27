@@ -2,8 +2,9 @@
 // against the node API of card d with a mocked server in tests; this is the one small module that
 // knows the routes, so a change to the contract touches only this file.
 //
-// Read-only: GET `/api/ui/files/received` and `/api/ui/files/sent`, behind the same cookie and CSRF
-// header as every page call. An answer is read through an allowlist: only the named fields are
+// GET `/api/ui/files/received` and `/api/ui/files/sent`, behind the same cookie and CSRF header as
+// every page call. MSG-FILES-IO-h: the one write, `POST /api/ui/files/received/reveal` (Show in
+// Finder), carries only the item ID; the server finds the file itself (files-api.ts `reveal`). An answer is read through an allowlist: only the named fields are
 // taken, each checked for type and length, so a stray URL, key or path in an answer is never kept
 // or shown (zero access). File names and contact names are untrusted text (I-5): they are cleaned
 // of control and bidi characters here and shown as plain text only.
@@ -11,6 +12,8 @@ import type { Answer } from './files-api.js';
 
 export const RECEIVED_PATH = '/api/ui/files/received';
 export const SENT_PATH = '/api/ui/files/sent';
+/** MSG-FILES-IO-h: Show in Finder (D-134). The body is `{"id":"<item ID>"}` and nothing else. */
+export const REVEAL_PATH = '/api/ui/files/received/reveal';
 export const PAGE_SIZE = 20;
 
 export type ReceivedState = 'saved' | 'not_saved' | 'expired' | 'deleted';
@@ -52,10 +55,13 @@ const HIDDEN = new RegExp(
   'g',
 );
 
-/** Text another party chose, made safe to show: plain, no hidden characters, bounded. */
+/**
+ * Text another party chose, made safe to show: plain, no hidden characters, bounded to `max`
+ * characters (code points, so a surrogate pair is never split).
+ */
 export function plain(value: string, max = 255): string {
-  const cleaned = value.replace(HIDDEN, '').trim();
-  return cleaned.length > max ? `${cleaned.slice(0, max - 1)}…` : cleaned;
+  const chars = [...value.replace(HIDDEN, '').trim()];
+  return chars.length > max ? `${chars.slice(0, max - 1).join('')}…` : chars.join('');
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -139,18 +145,19 @@ function sentItem(raw: unknown): SentItem | undefined {
   };
 }
 
+/**
+ * One page of the node API (`{ items, nextCursor? }`, MSG-FILES-IO-d). An item outside its
+ * allowlist is left out and the rest still shows; a page that is not that shape is undefined.
+ */
 function feedOf<T>(json: unknown, one: (raw: unknown) => T | undefined): Feed<T> | undefined {
   if (!isObject(json) || !Array.isArray(json['items'])) return undefined;
   const items: T[] = [];
   for (const raw of json['items'] as unknown[]) {
     const item = one(raw);
-    if (item === undefined) return undefined;
-    items.push(item);
+    if (item !== undefined) items.push(item);
   }
-  const next = json['next'];
-  if (next !== null && next !== undefined && (typeof next !== 'string' || next.length > 256)) {
-    return undefined;
-  }
+  const next = json['nextCursor'];
+  if (next !== undefined && (typeof next !== 'string' || next.length > 256)) return undefined;
   return { items, next: typeof next === 'string' && next.length > 0 ? next : null };
 }
 

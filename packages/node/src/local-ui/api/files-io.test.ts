@@ -115,7 +115,8 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
     });
   });
 
-  it('the read-only client view carries filesIo with only its two reads', async () => {
+  // MSG-FILES-IO-h adds the third read: one received item's saved name, by item ID (Show in Finder).
+  it('the read-only client view carries filesIo with only its three reads', async () => {
     const calls: string[] = [];
     const full = {
       agentId: 'agent-1',
@@ -129,12 +130,18 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
           calls.push(`sent ${JSON.stringify(q)}`);
           return pageOf([]);
         },
+        savedName: (id: unknown) => {
+          calls.push(`savedName ${JSON.stringify(id)}`);
+          return Promise.resolve(null);
+        },
       },
       fetchFile: () => Promise.reject(new Error('never')),
       sendMessage: () => Promise.reject(new Error('never')),
     };
     const view = readOnlyClient(full as never);
-    expect(Object.keys(view.filesIo).sort()).toEqual(['received', 'sent']);
+    expect(Object.keys(view.filesIo).sort()).toEqual(['received', 'savedName', 'sent']);
+    expect(await view.filesIo.savedName(`${ENV_A}.00`)).toBeNull();
+    calls.length = 0;
     expect(view.filesIo).not.toBe(full.filesIo);
     expect(Object.isFrozen(view.filesIo)).toBe(true);
     expect((view as unknown as Record<string, unknown>)['fetchFile']).toBeUndefined();

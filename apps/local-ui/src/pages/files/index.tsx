@@ -519,7 +519,7 @@ export function FilesPage({
       <p className="al-text-body-sm al-muted">{IO.explainer}</p>
       <FilesTabs tab={tab} onTab={setTab} />
       <div id="fl-tabpanel" role="tabpanel" aria-labelledby={`fl-tab-${tab}`}>
-        {tab === 'received' ? <ReceivedPanel get={api.get} /> : null}
+        {tab === 'received' ? <ReceivedPanel get={api.get} reveal={api.reveal} /> : null}
         {tab === 'sent' ? <SentPanel get={api.get} /> : null}
         {tab === 'folders' ? <SendFolders api={api} /> : null}
       </div>

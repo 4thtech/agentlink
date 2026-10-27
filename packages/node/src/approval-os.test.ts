@@ -2,7 +2,13 @@
 // by absolute path through execFile with `shell: false`, the url as its own argument, and never
 // resolve a program through PATH. A missing program is not run (the opener resolves false).
 import { describe, expect, it } from 'vitest';
-import { OS_PROGRAMS, browserOpenerWith, notifierWith, type OsSeams } from './approval-os.js';
+import {
+  OS_PROGRAMS,
+  browserOpenerWith,
+  fileRevealerWith,
+  notifierWith,
+  type OsSeams,
+} from './approval-os.js';
 
 const URL_ = 'http://localhost:47321/approve/apr_AAAAAAAAAAAAAAAAAAAAAA?t=abc;rm -rf ~ $(x)';
 const ALLOWED = new Set<string>([...Object.values(OS_PROGRAMS), 'D:\\Windows\\explorer.exe']);
@@ -104,5 +110,62 @@ describe('the notifier (L-2, L-4)', () => {
     const win = seams('win32');
     expect(await notifierWith(win.seams)(['AgentLink', 'x'])).toBe(false);
     expect(win.calls).toHaveLength(0);
+  });
+});
+
+// MSG-FILES-IO-h: Show in Finder reveals one checked file with the OS file manager. A fixed program
+// by absolute path, shell false, the checked path as one argument (never joined into a command).
+describe('the file revealer (MSG-FILES-IO-h)', () => {
+  const FILE = '/Users/me/AgentLink/Inbox/a b;$(rm -rf ~) `x`.pdf';
+  const FOLDER = '/Users/me/AgentLink/Inbox';
+
+  it.each([
+    ['darwin', '/usr/bin/open', ['-R', FILE]],
+    ['linux', '/usr/bin/xdg-open', [FOLDER]],
+    ['freebsd', '/usr/bin/xdg-open', [FOLDER]],
+  ] as const)(
+    'on %s runs %s with shell false and the path as its own argument',
+    async (p, program, args) => {
+      const { seams: s, calls } = seams(p);
+      expect(await fileRevealerWith(s)(FILE, FOLDER)).toBe(true);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.file).toBe(program);
+      expect(calls[0]?.args).toEqual(args);
+      expect(calls[0]?.options['shell']).toBe(false);
+    },
+  );
+
+  it('on Windows runs explorer.exe /select, with the path as its own argument (any exit code)', async () => {
+    const file = 'C:\\Users\\me\\AgentLink\\Inbox\\a b & c.pdf';
+    const { seams: s, calls } = seams('win32', {
+      execFile: (file_, args, options, callback) => {
+        calls.push({ file: file_, args: [...args], options: { ...options } });
+        callback(Object.assign(new Error('exit 1'), { code: 1 }));
+      },
+    });
+    expect(await fileRevealerWith(s)(file, 'C:\\Users\\me\\AgentLink\\Inbox')).toBe(true);
+    expect(calls[0]?.file).toBe('C:\\Windows\\explorer.exe');
+    expect(calls[0]?.args).toEqual(['/select,', file]);
+    expect(calls[0]?.options['shell']).toBe(false);
+  });
+
+  it('never runs for a path that is not absolute, or that could read as an option', async () => {
+    for (const [p, file, folder] of [
+      ['darwin', 'Inbox/x.pdf', '/Users/me/Inbox'],
+      ['darwin', '-n', '/Users/me/Inbox'],
+      ['linux', '/home/me/Inbox/x.pdf', '--help'],
+      ['win32', '/select,C:\\x', 'C:\\Inbox'],
+      ['darwin', '/Users/me/Inbox/x\u0000.pdf', '/Users/me/Inbox'],
+    ] as const) {
+      const { seams: s, calls } = seams(p);
+      expect(await fileRevealerWith(s)(file, folder), file).toBe(false);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it('a missing program is not run and resolves false', async () => {
+    const { seams: s, calls } = seams('darwin', { executable: () => false });
+    expect(await fileRevealerWith(s)(FILE, FOLDER)).toBe(false);
+    expect(calls).toHaveLength(0);
   });
 });
