@@ -4437,7 +4437,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests: sidebar on `/` and `/approve/<id>` with a bundle, none without; no token, link or outside address in it; the page gate and the decide gate refuse as before (negative tests); passkey and approval browser tests pass unchanged. Threat note and tests-first evidence (S2).
 
 #### M1-11b-2 · local UI: approvals, and `/` switches to the new app (new, D-118)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including its local `strings.ts`), `packages/node/src/local-ui/api/approvals.ts` and its test, `e2e/test/local-ui-approvals.test.ts`, its `changelog.d/` fragment and changeset; also `approval-page.ts`, `approval-server.ts`, `approval-ui-browser.test.ts`, `approval-review.test.ts`, `approval-ui.fixture.ts`
 - **Depends on:** M1-11b-1, M1-11s-a, M1-11s-b, M1-35c-b; DESIGN-ADJ-1
 - **Spec:** 08 §1; 11 §6.2; D-116, D-118
@@ -4448,6 +4448,18 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Step 1 shipped as M1-11b-2a (the sidebar on the old page). This card also: makes Approvals `routed: true` in `nav.ts`; keeps `/` and `/approve/<id>` working for links from the terminal, notifications and the MCP (served by the app or redirected to it); deletes the sidebar copy and its drift tests with `approval-page.ts`.
 - **Acceptance:**
   - All M1-11a approval flows pass; untrusted strings render as text (XSS fixtures re-run); no external URL in the bundle; Playwright flow for the page; every mutating action requires presence (enforced centrally, `presence: true` in `route-types.ts`); default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; owner confirms fidelity to the adjusted design.
+- **Split:** the server-rendered page is not deleted here. With the app bundled, `/` and `/approve/<id>` serve the app (list, review together, one request, the paid-action sheet, with parity tests); without a bundle the old page stays as the fallback. Its removal, with the sidebar copy and its drift tests, is M1-11b-2c.
+
+#### M1-11b-2c · approval page: delete the server-rendered page once every CLI ships the app (new, split from M1-11b-2)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (with `APP_JS`, `APP_CSS`, `APP_NAV`), `approval-server.ts` (the `/app.js`, `/app.css` and no-bundle page branch), `approval-page.test.ts`, `approval-ui-browser.test.ts`, `approval-pay-confirm-browser.test.ts` (old-page half), `approval-passkey-browser.test.ts`, `apps/local-ui/src/approval-page-nav.test.ts`, `apps/local-ui/src/pages/approvals/strings.test.ts`, `packages/ui/src/components/approval-page-icons.test.ts`, the token drift test, its `changelog.d/` fragment and changeset
+- **Depends on:** M1-11b-2
+- **Spec:** 08 §1; 04 §2.5; D-118
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Decide what a server without the app bundle answers on `/` and `/approve/<id>` (a fixed page that points to `agentlink approve` in the owner's own terminal, or the app made mandatory) and delete the old page, its script, stylesheet, sidebar copy and drift tests. Port the old-page browser flows (passkey set-up on the page, approvals with the passkey, review together) to the app first, or drop them where the app's own tests cover them.
+- **Acceptance:**
+  - No route serves `APP_JS`; the passkey and approval browser flows pass in the app; the page and decide gates refuse as before (negative tests); no test weakened; independent review (S2).
 
 #### M1-11b-3 · local UI: first-run recovery-code step per brief B-3 (new, D-118)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
