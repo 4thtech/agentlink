@@ -32,6 +32,10 @@ function fakeClient(
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
     listActivity: () => Promise.reject(new Error('not used')),
+    messages: {
+      conversations: () => Promise.reject(new Error('not used')),
+      list: () => Promise.reject(new Error('not used')),
+    },
     policy: {
       load: () => Promise.reject(new Error('not used')),
       prepareEdit: () => Promise.reject(new Error('not used')),
