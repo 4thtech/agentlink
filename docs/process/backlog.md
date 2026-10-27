@@ -6352,6 +6352,34 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Tests first (RED commit) for (a) and (b); no test weakened; threat note; independent review (S2).
 - **Notes:** Send-time dev/ino pin: no (Fable IR-M1-36b-2-d-1; the signed realpath is the pin).
 
+#### M1-11c-a3c · local UI Files and Rules: folder checks use the pin helpers; one folder count (new, low, IR-M1-11c-a3-3 #430, IR-M1-11c-a5-3 #432)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` Files and Rules routes) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts`, `packages/node/src/local-ui/api/rules.ts`, tests
+- **Depends on:** M1-36b-2-d (`pinFolder`, `stillPinned`, `pinnedLocation`); M1-11c-shared
+- **Spec:** 04 §2.5, §4 (realpath rules); 08 §1; D-119
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - #430 L1: the Files review-to-commit step uses `pinFolder` / `stillPinned`, so a folder whose real location changed between review and commit is refused.
+  - #430 L2: the Files list uses `pinnedLocation`, so an entry stored as a link shows "not used".
+  - #432 L1: the Rules page folder count and the Files page `resolvedFolders().configured` count the same entries, so the two pages agree.
+  - #430 L3: the Files review store is per server, not per session, and the eight-review cap can evict a pending review; handled together with the cap in M1-11c-shared, not twice.
+  - Not here: the #432 L2 cap on pending reviews (M1-11c-shared).
+- **Acceptance:**
+  - Tests first (RED commit) for each item; the Files and Rules counts match for a link-stored entry; no test weakened; threat note; independent review (S2).
+
+#### M1-11c-a4e · local UI credits: guard test for unsigned money input, top-up e2e (new, low, IR-M1-11c-a4c-2, #435)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` proof service guard tests) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node` (guard 9b test, proof service), `e2e/test/local-ui-proofs-topup.test.ts`, local UI credits route
+- **Depends on:** M1-11c-a4c
+- **Spec:** 04 §2.5.1; 07 §6.2; D-122
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - L-1: guard 9b no longer names the ProofService money methods; add a test that `addReceivedFunds` and `withdrawCredits` refuse unsigned input.
+  - L-3: add the missing Playwright flow `local-ui-proofs-topup.test.ts` (top-up by QR).
+  - L-4: the route answers "refused" when the amount in dollars is missing; return a plain "not available yet" instead (benign).
+- **Acceptance:**
+  - Tests first (RED commit) for L-1 and L-4; the Playwright flow passes; no test weakened; independent review (S2).
+
 #### M1-11a-ux-b · approval page: headline and test lows (new, low, IR-M1-11a-ux-1)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · apps/cli approval page, packages/ui
@@ -6447,6 +6475,104 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Not here: the second touch for passkeys that give PRF only on `get()` (M1-11s-c-c) and the recovery kit step (M1-11b-3).
 - **Acceptance:**
   - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-d · first run: setup lows from the folder-pinning review (new, low, IR-M1-UX-FIRSTRUN-V2-b-1, #547)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` setup and approval server) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts`, `packages/node/src/owner-send-folder.ts`, tests
+- **Depends on:** M1-UX-FIRSTRUN-V2-b
+- **Spec:** 04 §2.5; 08 §1 (first run v2)
+- **Invariants:** I-4, I-7
+- **Scope:**
+  - (a) The folder-refused path of begin removes setup folders without the "an owner exists anywhere" guard; add the guard (negligible, consistency).
+  - (b) A terminal `owner init` running in parallel can lose Send to a page release; it fails closed and is documented; add a plain-words message and a test of the documented behaviour.
+  - (d) `stillReady` repeats the realpath check that `stillPinned` already makes; trim the duplicate without loosening the check.
+  - (c) The manual password-manager check on a Mac is an owner test step and already recorded in M1-UX-FIRSTRUN-V2-b (L-5); not repeated here.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); (d) keeps every existing test green; no test weakened; independent review (S2).
+
+#### M1-UX-OPEN-APP-b · cli opener fence keyed by path; hanging start delays shutdown (new, low, IR-M1-11b-8-1, #549)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (owner-surface boundary; parent M1-UX-OPEN-APP is S2) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/mcp/**` (opener fence, loop), tests
+- **Depends on:** M1-11b-8
+- **Spec:** 06 §2.5; 08 §1
+- **Invariants:** I-4
+- **Scope:**
+  - (a) Key the opener allowance by full path.
+  - (b) A `start()` that never returns delays shutdown (existing behaviour); bound the wait.
+- **Acceptance:**
+  - Tests first (RED commit): the opener allowance is keyed by full path; shutdown completes within the bound with a hanging `start()`; no test weakened; independent review (S2).
+
+#### M1-11b-6-c · cli init: one fixed clause when an AI runs init (new, low, IR-M1-11b-6-1 L-3; copy)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`apps/cli`; fixed text, 11 §5) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts` and its tests
+- **Depends on:** M1-11b-6
+- **Spec:** 11 §5
+- **Scope:**
+  - When `init` is run by an AI, the message appends the fixed clause "or restart your AI app: the setup page opens"; check wording against 11 §5 and add it.
+- **Acceptance:**
+  - A test pins the text for an AI-run `init`; the vocabulary lint passes.
+
+#### CHORE-FLAKY-NEGOTIATE · e2e negotiate-and-agree: "versions arriving together" test times out on a slow runner (new, from a #549 queue run)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 (test only)
+- **Repo/path:** agentlink · `e2e/test/negotiate-and-agree.test.ts`
+- **Depends on:** none
+- **Scope:**
+  - The deterministic e2e test "versions arriving together" hit its 60-second timeout once on a slow Linux runner. Find the slow step, make it event-driven instead of waiting, or give the test an honest budget.
+- **Acceptance:**
+  - Ten consecutive runs on CI pass; the test still fails when versions are lost; no test weakened.
+
+#### CHORE-COPY-AGENT-PROFILE · docs/status.yaml: "agent card" becomes "agent profile" (new, S0 copy)
+- **Status:** backlog · **Size:** XS · **Tier:** Haiku · **Security:** S0 (copy)
+- **Repo/path:** agentlink · `docs/status.yaml`
+- **Depends on:** none
+- **Spec:** 11 §5.1
+- **Scope:**
+  - Older entries in `docs/status.yaml` still say "agent card" (for example "First agent card at owner setup"); 11 §5.1 wants "agent profile". Change the wording only; leave IDs and typed-data names alone.
+  - Check the guide text added in #435 ("confirm with your owner code") against 11 §5.5 ("backup code") at the same time.
+- **Acceptance:**
+  - `grep -i "agent card" docs/status.yaml` finds only code names; the docs-status check passes.
+
+#### CHORE-FILES-WIN-NAME-CASE · Files page on Windows shows a protected folder's name in lower case (new, IR-CHORE-WIN-D99-1, #559)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` Files route; display only, no change to what is refused)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts` (near the protected-folder check), tests
+- **Depends on:** none
+- **Spec:** 04 §4
+- **Invariants:** I-4
+- **Scope:**
+  - The Files page shows the name of a protected folder in lower case on Windows because the path guard returns the parsed form. Build the shown name from the tail of the original root string. Display only: what is refused does not change.
+- **Acceptance:**
+  - Test first: a Windows-style path with capitals shows its original spelling; the refusal result is unchanged; no test weakened.
+
+#### CHORE-DESIGN-B11-MOTION · B-11 signature motion exceeds the 11 §5 motion range (new, owner decision, #560)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S1 (owner decision; may change `docs/foundation/11`; spec change: owner confirms at merge)
+- **Repo/path:** agentlink · `docs/foundation/11-*.md` (§5 motion range) or the B-11 brief
+- **Depends on:** DESIGN-B11 (#560)
+- **Scope:**
+  - The B-11 signature motion moments run 400 to 480 ms and one highlight 1.2 s; 11 §5 allows 120 to 320 ms. The owner either accepts the exceptions (11 is amended, marked "proposed, owner confirms at merge") or the brief is shortened.
+- **Acceptance:**
+  - 11 §5 and B-11 agree; reduced-motion behaviour is stated for both.
+
+#### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)
+- **Repo/path:** agentlink · `apps/cli/src/runtime/agent-name.ts` and the `toContain('codex')` assertion in `apps/cli/src/commands/init.test.ts`
+- **Depends on:** M1-UX-MULTI-AGENT
+- **Scope:**
+  - The comment saying the agent name is never shown in an error is stale now that names are listed; update it.
+  - The `toContain('codex')` assertion always passes; assert the full expected list text.
+- **Acceptance:**
+  - The tightened assertion fails if a name is missing from the list; no test weakened.
+
+#### M1-11b-2b · approval page: skip link and a single brand (new, low, IR-M1-11b-2a-1, #563)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`packages/node/src/approval-page.ts`; audit-rules §2) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (or its current home), tests
+- **Depends on:** M1-11b-2a
+- **Spec:** 08 §1; 11 §6.2.1 (keyboard)
+- **Scope:**
+  - The sidebar comes before `<main>`, so there are seven tab stops before Approve; add a skip link to the main content.
+  - The page header repeats the brand shown in the sidebar; show it once.
+  - Not here: moving Approvals into the React shell (M1-11b-2).
+- **Acceptance:**
+  - A test finds the skip link as the first tab stop and that it lands on `<main>`; axe-core zero violations; no test weakened; independent review (S2).
 
 #### M1-UX-OPEN-APP · cli and MCP: the AI may open the local pages, never with a link or a code (new, D-130 (3))
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`packages/node` opener and approval server; owner-surface boundary) · **Phase:** M1b
@@ -6767,6 +6893,22 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - Miniflare tests: alarm sync picks up a message; a thrown alarm still re-arms; restart is idempotent; the seed never appears in logs or unwrapped in DO storage; the sealed-column vectors pass against the DO store.
   - On a test account: a 24 h alarm loop with its missed-alarm count, and the behaviour after a redeploy, recorded in the PR.
+
+#### M2-3a-b · cloud agent: shared sealed-column vectors, Worker HTTP test, constraint detection, seed bytes (new, low, IR-M2-3a-1, #548)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (`apps/cloud-agent` store and key handling; sealed columns) · **Audit:** Fable · **Phase:** M2
+- **Repo/path:** agentlink · `apps/cloud-agent/src/do-store.ts`, `store-cipher.ts`, `worker-keystore.ts`, `index.ts`, tests, shared vector file
+- **Depends on:** M2-3a
+- **Spec:** 07 §3 (sealed-column format), §1; D-131
+- **Invariants:** I-1, I-2, I-5
+- **Scope:**
+  - L1: the sealed-column vectors are inline in tests; move them to one shared vector file used by the Node store and the Durable Object store.
+  - L2: test the Worker HTTP surface: `GET` and `HEAD` on `/health` answer 200 and every other path answers 404.
+  - L3: `do-store.ts` detects a constraint error by matching the message text; use a typed check or a code instead.
+  - L4: before 0.4.0, run the 24-hour alarm loop on a test account (owner's Cloudflare account); owner step, recorded in the PR.
+  - L5: the sealed seed passes through a hex string that cannot be wiped; give the column cipher a bytes API so the seed stays in a wipeable buffer.
+  - Product questions for the owner, not decided here: keep the nine-day first look-back of the sync engine and fix the wording in 08 §3.1, or change the engine; rotate the relay start index on each run (a card if yes).
+- **Acceptance:**
+  - Tests first (RED commit) for L1, L2, L3 and L5; the Node and Durable Object suites read the same vectors; L4 recorded; no test weakened; threat note; independent review (S2, Fable).
 
 #### M2-3b · cloud agent: remote MCP over streamable HTTP
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
