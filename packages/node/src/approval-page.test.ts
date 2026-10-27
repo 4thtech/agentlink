@@ -287,3 +287,12 @@ describe('what the page is given for an accept-invite request (M1-11a-ux; I-5)',
     expect(ids).toEqual([id(3)]);
   });
 });
+
+describe('PRE-031-FIXES: the paid card note never states an amount of its own', () => {
+  it('the note names no amount, so it can never differ from the signed statement the sheet shows', () => {
+    // The sheet shows statement.amountUsd; the note must not read a second, unsigned source.
+    expect(UI_STRINGS.paidAlone).not.toContain('{cost}');
+    expect(UI_STRINGS.paidAlone).not.toMatch(/\$\d/);
+    expect(APP_JS).not.toMatch(/paidAlone,\s*\{\s*cost/);
+  });
+});

@@ -26,6 +26,7 @@ import type { IdentityKind } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useState,
   type FormEvent,
@@ -396,6 +397,9 @@ function Detail({
   const [alias, setAlias] = useState('');
   const [aliasError, setAliasError] = useState<string | undefined>(undefined);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // PRE-031-FIXES: "Remove older" goes through the same confirm step as Remove.
+  const [confirmOlder, setConfirmOlder] = useState(false);
+  const dupNoticeId = useId();
   const [pending, setPending] = useState<Pending | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
@@ -494,10 +498,14 @@ function Detail({
 
   // The same Remove as above, for the older contact: the existing presence route, nothing new.
   const duplicate =
-    older === undefined || pending !== undefined || renaming || confirmRemove ? null : (
+    older === undefined ||
+    pending !== undefined ||
+    renaming ||
+    confirmRemove ||
+    confirmOlder ? null : (
       <div className="ct-dup">
         <Banner tone="info" icon="users">
-          <p className="al-text-body">
+          <p className="al-text-body" id={dupNoticeId}>
             {secondConnection(shownName(older), DAY.format(new Date(older.since * 1000)))}
           </p>
           <div className="ct-actions">
@@ -507,9 +515,8 @@ function Detail({
             <Button
               variant="danger"
               size="sm"
-              onClick={() =>
-                ask({ what: 'remove', ref: older.ref, summary: SUMMARY.remove(shownName(older)) })
-              }
+              aria-describedby={dupNoticeId}
+              onClick={() => setConfirmOlder(true)}
             >
               {S.removeOlder}
             </Button>
@@ -582,7 +589,7 @@ function Detail({
         <h2 className="al-text-title-2">
           <ContactName {...nameInput(contact)} label={labelKind(contact)} showLabel />
         </h2>
-        {pending === undefined && !renaming && !confirmRemove ? (
+        {pending === undefined && !renaming && !confirmRemove && !confirmOlder ? (
           <div className="ct-actions">
             <Button variant="ghost" size="sm" onClick={() => setRenaming(true)}>
               {S.rename}
@@ -634,21 +641,35 @@ function Detail({
           </div>
         </form>
       ) : null}
-      {confirmRemove && pending === undefined ? (
+      {(confirmRemove || (confirmOlder && older !== undefined)) && pending === undefined ? (
         <div className="ct-confirm">
           <p className="al-text-body">{S.removeExplain}</p>
           <div className="ct-actions">
             <Button
               variant="danger"
-
               onClick={() => {
+                if (confirmOlder && older !== undefined) {
+                  setConfirmOlder(false);
+                  ask({
+                    what: 'remove',
+                    ref: older.ref,
+                    summary: SUMMARY.remove(shownName(older)),
+                  });
+                  return;
+                }
                 setConfirmRemove(false);
                 removeNow();
               }}
             >
               {S.removeContact}
             </Button>
-            <Button variant="ghost" onClick={() => setConfirmRemove(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmRemove(false);
+                setConfirmOlder(false);
+              }}
+            >
               {S.cancel}
             </Button>
           </div>
