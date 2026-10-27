@@ -6801,7 +6801,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Reuses the existing owner operation `POST /api/owner/passkey` (M1-8e `registerOwnerPasskey`: code checked against the `owner` item, wrong-code backoff, `owner` item never written, so the backup code keeps working). No new server route.
   - The "Switch to Touch ID" next step (b11 Home) on every app page and on Approvals (`/`, beside the app sidebar) until a passkey is registered; it links to `/first-run`, where the switch happens. Without the app bundle the approval page keeps its inline passkey set-up.
   - A passkey that gives PRF only on `get()` gets the second touch in the same flow (as the approval page's inline set-up does), so hiding that set-up behind the link loses nothing.
-  - Not here: the recovery kit step (M1-11b-3); Settings › Passkeys (UI-REFRESH-n, Settings and About).
+  - Not here: the recovery kit step (M1-11b-3); Settings › Passkeys (not carded yet).
 - **Acceptance:**
   - Tests first (RED commit): a 0.2.0 owner ends with the same owner identity plus a registered passkey; a wrong code is refused with backoff; the code never reaches a log, tool result or terminal output (canary); threat note; independent review (S2).
 
