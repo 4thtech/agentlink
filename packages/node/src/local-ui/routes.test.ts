@@ -151,6 +151,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // MSG-FILES-IO-c: the Messages reads (api/messages.test.ts).
       '/api/ui/messages',
       '/api/ui/messages/:contactId',
+      // M1-11s-a-d: the status bar's health read (api/health.test.ts).
+      '/api/ui/health',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

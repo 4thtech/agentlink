@@ -93,6 +93,7 @@ function harness(answers: Array<ApiResult<unknown> | 'hang'>) {
   };
   const advance = async (ms: number): Promise<void> => {
     const until = now + ms;
+    await flush();
     for (;;) {
       timers.sort((a, b) => a.at - b.at);
       const t = timers[0];

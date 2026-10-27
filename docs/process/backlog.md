@@ -6077,7 +6077,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Playwright and axe checks pass; the design owner confirms the "checking" dot.
 
 #### M1-11s-a-d · local UI server: health read that sets the connection state (new, IR-M1-11s-a-b-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (health read) and its test
 - **Depends on:** M1-11s-a-b, M1-11s-b
 - **Spec:** 08 §1

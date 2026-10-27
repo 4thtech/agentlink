@@ -24,7 +24,8 @@ function safeHref(href: string | undefined): string {
   return '#';
 }
 
-type Connection = 'connected' | 'offline' | 'paused' | 'checking' | 'disconnected';
+type Connection =
+  'connected' | 'offline' | 'paused' | 'checking' | 'disconnected' | 'not-running' | 'needs-setup';
 
 export interface AppShellProps {
   os?: 'macos' | 'windows' | 'linux';
@@ -44,6 +45,8 @@ const CONNECTION: Readonly<Record<Connection, string>> = {
   paused: 'Paused',
   checking: 'Checking…',
   disconnected: 'Not connected',
+  'not-running': 'Not running',
+  'needs-setup': 'Needs setup',
 };
 
 function Chrome({ os, title }: { os: 'macos' | 'windows' | 'linux'; title: string }): ReactElement {
@@ -116,9 +119,13 @@ export function AppShell({
         <main className="al-shell-content">{children}</main>
       </div>
       <footer className="al-statusbar al-text-code">
-        <span className="al-sb-item">
-          <span className={cx('al-dot', `is-${connection}`)} />
-          {CONNECTION[connection]}
+        {/* One polite live region: announced when the state changes, never per poll (B-11 §15).
+            The key replays the fade (and the pulse on Connected) only on a change (B-11 §6 row 1). */}
+        <span className="al-sb-item" role="status" aria-live="polite" aria-atomic="true">
+          <span key={connection} className="al-sb-state">
+            <span className={cx('al-dot', `is-${connection}`)} aria-hidden="true" />
+            {CONNECTION[connection]}
+          </span>
         </span>
         {(statusItems ?? []).map((s, i) => (
           <span key={i} className="al-sb-item">
