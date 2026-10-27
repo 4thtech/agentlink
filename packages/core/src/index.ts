@@ -375,6 +375,24 @@ export {
   type ApprovalDecision,
   type ActivityMessageStatus,
 } from './activity.js';
+// MSG-FILES-IO-a: the local app's read-only Messages and Files In/Out views (never a read mark).
+export {
+  FilesIoView,
+  MessagesView,
+  type Conversation,
+  type FilesIoViewOptions,
+  type InboxMessage,
+  type MessageBox,
+  type MessageFile,
+  type MessageItem,
+  type ReceivedFileItem,
+  type ReceivedFileState,
+  type SavedNameReader,
+  type SentFileItem,
+  type SentFileState,
+  type SentMessage,
+  type SentStatus,
+} from './ui-messages.js';
 export {
   TOP_UP_CHAIN_IDS,
   TOP_UP_GAS_RESERVE_WEI,

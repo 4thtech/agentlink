@@ -22,6 +22,7 @@ import { SHREDDED_FILE_KEY } from './files/received.js';
 import { MemoryStore } from './store/memory-store.js';
 import { TABLE_NAMES, type Row } from './store/schema.js';
 import { rowKeyOf } from './store/store.js';
+import type { TransportFactory } from './transport.js';
 import { pairWith, type TestAgent, type TestOwner } from './testing/envelopes.js';
 import {
   FakeClock,
@@ -53,9 +54,11 @@ let lines: string[] = [];
 const failing = (): never => {
   throw new Error('NETWORK-MUST-NOT-BE-USED');
 };
-const failingPlatform = new Proxy({} as FilesPlatform, {
-  get: (_t, prop) => (prop === 'then' ? undefined : failing),
-});
+/** An object whose every method throws (`then` absent, so it is not mistaken for a promise). */
+const failingObject = <T extends object>(): T =>
+  new Proxy({} as T, { get: (_t, prop) => (prop === 'then' ? undefined : failing) });
+const failingPlatform = failingObject<FilesPlatform>();
+const failingTransport = () => failingObject<ReturnType<TransportFactory>>();
 
 async function makeAgent(n: number, name: string, offline = false): Promise<TestAgent> {
   const keyStore = new MemoryKeyStore(seed(n));
@@ -70,7 +73,7 @@ async function makeAgent(n: number, name: string, offline = false): Promise<Test
     clock: clock.now,
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     dropOrigins: [DROP_ORIGIN],
-    ...(offline ? { transport: failing, files: failingPlatform } : {}),
+    ...(offline ? { transport: failingTransport, files: failingPlatform } : {}),
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -110,9 +113,7 @@ const ctxOf = (agent: TestAgent): CoreContext => ({
 const newId = (): string => encodeBase64url(randomBytes(16));
 
 const nostrOf = async (agent: TestAgent, contactId: string): Promise<string> =>
-  agent.store.transaction(
-    (tx) => tx.get('contacts', { contact_id: contactId })?.agent_nostr ?? '',
-  );
+  agent.store.transaction((tx) => tx.get('contacts', { contact_id: contactId })?.agent_nostr ?? '');
 
 type Payload = Record<string, unknown>;
 const textPayload = (body: unknown, type = 'text'): Payload => ({
@@ -216,15 +217,15 @@ async function putFileRow(
 
 /** Every row of every table, as text: the views must leave it exactly as it was. */
 const snapshot = (agent: TestAgent = a): Promise<string> =>
-  agent.store.transaction((tx) =>
-    JSON.stringify(TABLE_NAMES.map((t) => [t, tx.select(t)])),
-  );
+  agent.store.transaction((tx) => JSON.stringify(TABLE_NAMES.map((t) => [t, tx.select(t)])));
 
 /** Every sealed value stored in `envelopes` and `files`, and the fixtures' secret values. */
 async function secretsOf(agent: TestAgent = a): Promise<string[]> {
   const sealed = await agent.store.transaction((tx) => [
     ...tx.select('envelopes').flatMap((r) => (r.payload_json === null ? [] : [r.payload_json])),
-    ...tx.select('files').flatMap((r) => [r.name, r.locator, r.file_key, ...(r.url ? [r.url] : [])]),
+    ...tx
+      .select('files')
+      .flatMap((r) => [r.name, r.locator, r.file_key, ...(r.url ? [r.url] : [])]),
   ]);
   return [
     ...sealed.map((s) => (typeof s === 'string' ? s : JSON.stringify(s))),
@@ -238,7 +239,9 @@ async function secretsOf(agent: TestAgent = a): Promise<string[]> {
 async function expectNoSecrets(value: unknown, agent: TestAgent = a): Promise<void> {
   const json = JSON.stringify(value);
   for (const secret of await secretsOf(agent)) expect(json).not.toContain(secret);
-  expect(json).not.toMatch(/"(?:url|fileKey|file_key|locator|envelope_json|salt|\w*sha256\w*)"\s*:/i);
+  expect(json).not.toMatch(
+    /"(?:url|fileKey|file_key|locator|envelope_json|salt|\w*sha256\w*)"\s*:/i,
+  );
 }
 
 const keys = (o: object): string[] => Object.keys(o).sort();
@@ -292,7 +295,11 @@ describe('MessagesView.conversations (plan §4 GET /api/ui/messages)', () => {
 
 describe('MessagesView.list (plan §4 GET /api/ui/messages/:contactId)', () => {
   it('returns Inbox items as plain text, newest first, with an exact key set', async () => {
-    const plain = await put({ contact: b.id, createdAt: T0, payload: textPayload('Hello <b>x</b>') });
+    const plain = await put({
+      contact: b.id,
+      createdAt: T0,
+      payload: textPayload('Hello <b>x</b>'),
+    });
     const json = await put({
       contact: b.id,
       createdAt: T0 + 1,
@@ -341,7 +348,12 @@ describe('MessagesView.list (plan §4 GET /api/ui/messages/:contactId)', () => {
   });
 
   it('returns Sent items with their delivery status, receipt and proof flags', async () => {
-    const queued = await put({ contact: b.id, createdAt: T0, direction: 'out', delivery: 'queued' });
+    const queued = await put({
+      contact: b.id,
+      createdAt: T0,
+      direction: 'out',
+      delivery: 'queued',
+    });
     const acked = await put({ contact: b.id, createdAt: T0 + 1, direction: 'out' });
     const proved = await put({
       contact: b.id,
@@ -353,13 +365,23 @@ describe('MessagesView.list (plan §4 GET /api/ui/messages/:contactId)', () => {
     await put({
       contact: b.id,
       createdAt: T0 + 3,
-      payload: { type: 'ack', body: { kind: 'received', envelopeId: acked }, replyTo: acked, files: [] },
+      payload: {
+        type: 'ack',
+        body: { kind: 'received', envelopeId: acked },
+        replyTo: acked,
+        files: [],
+      },
     });
     // An ack from another contact naming `queued` is not B's receipt.
     await put({
       contact: c.id,
       createdAt: T0 + 3,
-      payload: { type: 'ack', body: { kind: 'received', envelopeId: queued }, replyTo: queued, files: [] },
+      payload: {
+        type: 'ack',
+        body: { kind: 'received', envelopeId: queued },
+        replyTo: queued,
+        files: [],
+      },
     });
     await a.store.transaction((tx) =>
       tx.insert('proofs', {
@@ -395,7 +417,12 @@ describe('MessagesView.list (plan §4 GET /api/ui/messages/:contactId)', () => {
     await put({
       contact: b.id,
       createdAt: T0 + 4,
-      payload: { type: 'ack', body: { kind: 'received', envelopeId: kept }, replyTo: kept, files: [] },
+      payload: {
+        type: 'ack',
+        body: { kind: 'received', envelopeId: kept },
+        replyTo: kept,
+        files: [],
+      },
     });
     await put({ contact: c.id, createdAt: T0 + 5 });
     await a.store.transaction((tx) =>
@@ -604,6 +631,57 @@ describe('FilesIoView.sent (plan §4 GET /api/ui/files/sent)', () => {
     }
     expect(items[3]?.expiresAt).toBe(T0 + 86_400);
     await expectNoSecrets(page);
+  });
+
+  it('flags a sent file whose contact acknowledged the message, and only that one', async () => {
+    const send = (contact: string) =>
+      put({
+        contact,
+        createdAt: T0,
+        direction: 'out',
+        payload: { type: 'file', body: 'x', replyTo: null, files: [fileEntry()] },
+      });
+    const toB = await send(b.id);
+    const toC = await send(c.id);
+    const ack = (id: string) => ({
+      type: 'ack',
+      body: { kind: 'received', envelopeId: id },
+      replyTo: id,
+      files: [],
+    });
+    await put({ contact: b.id, createdAt: T0 + 1, payload: ack(toB) });
+    // C's message is acknowledged by B, not by C: no receipt.
+    await put({ contact: b.id, createdAt: T0 + 1, payload: ack(toC) });
+    const { items } = await a.client.filesIo.sent();
+    const receipt = new Map(items.map((i) => [i.id, i.receipt]));
+    expect(receipt.get(`${toB}.00`)).toBe(true);
+    expect(receipt.get(`${toC}.00`)).toBe(false);
+  });
+
+  it('ends a page with a cursor after the scan cap, and still reaches every file', async () => {
+    const withFile = await put({
+      contact: b.id,
+      createdAt: T0,
+      direction: 'out',
+      payload: { type: 'file', body: 'x', replyTo: null, files: [fileEntry()] },
+    });
+    for (let i = 1; i <= 230; i += 1) {
+      await put({ contact: b.id, createdAt: T0 + i, direction: 'out' });
+    }
+    const first = await a.client.filesIo.sent({ limit: 5 });
+    expect(first.items).toEqual([]);
+    expect(first.nextCursor).toBeDefined();
+    const second = await a.client.filesIo.sent({ limit: 5, cursor: first.nextCursor });
+    expect(second.items.map((i) => i.id)).toEqual([`${withFile}.00`]);
+    expect(second.nextCursor).toBeUndefined();
+  });
+
+  it('refuses a cursor that names no file item', async () => {
+    for (const cursor of ['5~abc', `5~${newId()}.1`, `5~${newId()}.123`]) {
+      const error = await a.client.filesIo.sent({ cursor }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(CoreError);
+      expect((error as CoreError).code).toBe('page_query_invalid');
+    }
   });
 });
 
