@@ -4694,7 +4694,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Router tests (Home, Appearance; redirects unchanged); `startViewTransition` is not called with reduced motion or when missing; solid chrome without `data-os="macos"`; the existing layout and health tests unchanged; contrast numbers in the PR.
 
 #### UI-REFRESH-g · local-ui: Home with five live tiles and the Next step card (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/home/**` (new) and its tests; changelog fragment
 - **Depends on:** UI-REFRESH-c, UI-REFRESH-d, UI-REFRESH-e; merges after UI-REFRESH-f
 - **Spec:** B-11 §4, §16 (Home), §17.4; UX-V3 plan §3; 11 §5

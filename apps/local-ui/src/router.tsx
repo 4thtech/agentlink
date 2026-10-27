@@ -12,6 +12,7 @@ import { BackupPage } from './pages/backup/index.js';
 import { ContactsPage } from './pages/contacts/index.js';
 import { FilesPage } from './pages/files/index.js';
 import { FirstRunPage } from './pages/first-run/index.js';
+import { HomePage } from './pages/home/index.js';
 import { MessagesPage } from './pages/messages/index.js';
 import { ProofsPage } from './pages/proofs/index.js';
 import { RulesPage } from './pages/rules/index.js';
@@ -31,6 +32,7 @@ function PasskeysPage(): ReactElement {
 export const ROUTES: readonly RouteDef[] = [
   { path: '/', page: ApprovalsPage },
   { path: '/first-run', page: FirstRunPage },
+  { path: '/settings/home', page: HomePage },
   { path: '/settings/activity', page: ActivityPage },
   { path: '/settings/messages', page: MessagesPage },
   { path: '/settings/contacts', page: ContactsPage },

@@ -31,6 +31,7 @@ function mountAt(path: string): void {
 const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/', 'Approvals'],
   ['/first-run', 'Set up AgentLink'],
+  ['/settings/home', 'Home'],
   ['/settings/activity', 'Activity'],
   ['/settings/messages', 'Messages'],
   ['/settings/contacts', 'Contacts'],
@@ -52,6 +53,7 @@ describe('routes', () => {
   // M1-11b-2: Approvals (`/`) is a real page now (pages/approvals/approvals.test.ts).
   const BUILT: ReadonlySet<string> = new Set([
     '/',
+    '/settings/home',
     '/settings/activity',
     '/settings/messages',
     '/settings/contacts',

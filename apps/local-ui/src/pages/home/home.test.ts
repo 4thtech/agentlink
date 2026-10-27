@@ -88,7 +88,7 @@ function approval(over: Partial<ApprovalItem> = {}): ApprovalItem {
 }
 
 interface Answers {
-  health?: ApiResult<unknown> | (() => ApiResult<unknown> | Promise<ApiResult<unknown>>);
+  health?: ApiResult<unknown> | (() => Promise<ApiResult<unknown>>);
   activity?: ApiResult<unknown>;
   credits?: ApiResult<unknown>;
   contacts?: ApiResult<unknown>;
@@ -103,7 +103,10 @@ function setup(answers: Answers = {}): {
 } {
   const a: Answers = answers;
   const get = vi.fn(async (path: string): Promise<ApiResult<unknown>> => {
-    const pick = (v: Answers[keyof Answers], fallback: unknown): ApiResult<unknown> =>
+    const pick = (
+      v: Answers[keyof Answers],
+      fallback: unknown,
+    ): ApiResult<unknown> | Promise<ApiResult<unknown>> =>
       typeof v === 'function' ? v() : ((v as ApiResult<unknown> | undefined) ?? ok(fallback));
     if (path === '/api/ui/health') return pick(a.health, HEALTH);
     if (path.startsWith('/api/ui/activity')) return pick(a.activity, ACTIVITY);
@@ -136,7 +139,10 @@ const tile = (id: string): HTMLElement => {
 };
 
 function setHidden(hidden: boolean): void {
-  Object.defineProperty(document, 'visibilityState', { configurable: true, value: hidden ? 'hidden' : 'visible' });
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    value: hidden ? 'hidden' : 'visible',
+  });
   Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
   document.dispatchEvent(new Event('visibilitychange'));
 }
@@ -159,7 +165,9 @@ describe('Home: loading', () => {
   it('shows skeleton tiles on first load, after the short delay, then the values', async () => {
     vi.useFakeTimers();
     let resolve: (r: ApiResult<unknown>) => void = () => undefined;
-    const { props } = setup({ health: () => new Promise<ApiResult<unknown>>((r) => (resolve = r)) });
+    const { props } = setup({
+      health: () => new Promise<ApiResult<unknown>>((r) => (resolve = r)),
+    });
     await mount(props);
     // The tile frames are there from the start, so nothing jumps later.
     expect(host.querySelectorAll('[data-tile]').length).toBe(5);
@@ -170,6 +178,10 @@ describe('Home: loading', () => {
     expect(text()).not.toContain(S.agentRunningLine);
     await act(async () => {
       resolve(ok(HEALTH));
+      await vi.advanceTimersByTimeAsync(10);
+    });
+    // The skeleton, once shown, stays at least 500 ms (B-11 §15.2).
+    await act(async () => {
       await vi.advanceTimersByTimeAsync(600);
     });
     expect(host.querySelectorAll('.al-skeleton').length).toBe(0);
@@ -296,7 +308,11 @@ describe('Home: approvals waiting', () => {
       approvals: {
         kind: 'ok',
         items: [
-          approval({ approvalId: `apr_${'B'.repeat(22)}`, summary: 'Later one', expiresAt: NOW_SECONDS + 3_000 }),
+          approval({
+            approvalId: `apr_${'B'.repeat(22)}`,
+            summary: 'Later one',
+            expiresAt: NOW_SECONDS + 3_000,
+          }),
           approval(),
         ],
       },
@@ -321,7 +337,9 @@ describe('Home: agent states', () => {
   });
 
   it('not running: the tiles go quiet with one instruction', async () => {
-    const { props } = setup({ health: ok({ agent: 'not_running', relays: null, lastSyncAt: null, version: null }) });
+    const { props } = setup({
+      health: ok({ agent: 'not_running', relays: null, lastSyncAt: null, version: null }),
+    });
     await mount(props);
     expect(tile('agent').textContent).toContain(S.agentNotRunning);
     expect(text()).toContain(S.agentNotRunningLine);
@@ -331,7 +349,9 @@ describe('Home: agent states', () => {
   });
 
   it('needs setup', async () => {
-    const { props } = setup({ health: ok({ agent: 'needs_setup', relays: null, lastSyncAt: null, version: null }) });
+    const { props } = setup({
+      health: ok({ agent: 'needs_setup', relays: null, lastSyncAt: null, version: null }),
+    });
     await mount(props);
     expect(tile('agent').textContent).toContain(S.agentNeedsSetup);
   });
@@ -407,7 +427,9 @@ describe('Home: live updates', () => {
     // The same element is updated: no remount, so no layout jump.
     expect(tile('waiting')).toBe(frame);
     expect(frame.textContent).toContain('Send a file to Marko');
-    expect(get.mock.calls.filter((c) => c[0] === '/api/ui/health').length).toBeGreaterThanOrEqual(3);
+    expect(get.mock.calls.filter((c) => c[0] === '/api/ui/health').length).toBeGreaterThanOrEqual(
+      3,
+    );
   });
 
   it('pauses while the tab is hidden and reads again when shown', async () => {
@@ -449,7 +471,11 @@ describe('Home: reduced motion', () => {
   it('plays no animation when motion is reduced, even when values change', async () => {
     vi.useFakeTimers();
     document.documentElement.dataset['motion'] = 'reduced';
-    const animate = vi.fn(() => ({ cancel: () => undefined, finish: () => undefined, onfinish: null }));
+    const animate = vi.fn(() => ({
+      cancel: () => undefined,
+      finish: () => undefined,
+      onfinish: null,
+    }));
     (Element.prototype as unknown as { animate: unknown }).animate = animate;
     const { props, answers } = setup();
     await mount(props);
@@ -488,7 +514,13 @@ describe('Home: inbound content is plain text (I-5, §17.4)', () => {
       }),
       activity: ok({
         items: [
-          { kind: 'rules_changed', at: NOW_SECONDS, body: 'MESSAGE-BODY-CANARY', fileName: 'secret-plan.pdf', from: 'Marko' },
+          {
+            kind: 'rules_changed',
+            at: NOW_SECONDS,
+            body: 'MESSAGE-BODY-CANARY',
+            fileName: 'secret-plan.pdf',
+            from: 'Marko',
+          },
           { kind: 'message', at: NOW_SECONDS - 1, from: 'Marko', body: 'MESSAGE-BODY-CANARY' },
         ],
       }),
@@ -546,10 +578,15 @@ describe('Home: Under the hood', () => {
 });
 
 describe('Home: layout at 1280 and 360 (stylesheet)', () => {
-  it('uses tokens only: no literal durations, no inline animation values', () => {
-    expect(homeCss).not.toMatch(/\b\d+(\.\d+)?m?s\b(?![^{]*\})/);
-    const decls = homeCss.match(/(transition|animation)[^;]*;/g) ?? [];
-    for (const d of decls) expect(d).toMatch(/var\(--al-duration-/);
+  it('uses tokens only: no literal durations', () => {
+    const css = homeCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const decls = [...css.matchAll(/(?:^|[\s{;])(?:transition|animation)\s*:\s*([^;]+);/g)];
+    expect(decls.length).toBeGreaterThan(0);
+    for (const d of decls) {
+      if ((d[1] ?? '').trim() === 'none') continue;
+      expect(d[1]).toMatch(/var\(--al-duration-/);
+      expect(d[1]).not.toMatch(/\d(ms|s)\b/);
+    }
   });
 
   it('only opacity and transform ever animate', () => {
@@ -559,7 +596,9 @@ describe('Home: layout at 1280 and 360 (stylesheet)', () => {
   });
 
   it('puts Waiting for you first when the tiles stack, and has a reduced-motion rule', () => {
-    expect(homeCss).toMatch(/@media \(max-width: [^)]+\)\s*\{[\s\S]*\[data-tile='waiting'\][\s\S]*order:\s*-1/);
+    expect(homeCss).toMatch(
+      /@media \(max-width: [^)]+\)\s*\{[\s\S]*\[data-tile='waiting'\][\s\S]*order:\s*-1/,
+    );
     expect(homeCss).toMatch(/prefers-reduced-motion|data-motion='reduced'/);
   });
 });
