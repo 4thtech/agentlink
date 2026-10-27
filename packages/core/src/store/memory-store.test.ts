@@ -81,7 +81,6 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('own_storage (M1-9i-a, 07 §3.4): id, sealed signed_json, applied_at; at most one row', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(5);
     expect(TABLES.own_storage).toEqual({
       columns: {
         id: { kind: 'id', nullable: false },
@@ -91,6 +90,12 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
       primaryKey: ['id'],
       maxRows: 1,
     });
+  });
+
+  it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(6);
+    expect(TABLES.files.columns.saved_name).toEqual({ kind: 'enc', nullable: true });
+    expect(Object.keys(TABLES.files.columns).at(-1)).toBe('saved_name');
   });
 });
 
