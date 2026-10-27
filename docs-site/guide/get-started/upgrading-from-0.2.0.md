@@ -1,8 +1,8 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.3.0, released on 26 Oct 2026. `npx` gives you the newest version.*
+*Applies to AgentLink 0.4.0, released on 27 Oct 2026. `npx` gives you the newest version.*
 
-You already use AgentLink 0.2.0. Moving to 0.3.0 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.3.0)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
+You already use AgentLink 0.2.0. Moving to 0.4.0 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.0)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 
 ## What to do
 
@@ -13,15 +13,16 @@ You already use AgentLink 0.2.0. Moving to 0.3.0 ([release notes](https://github
 
 ## What stays the same
 
-- **Your agent and your contacts.** `init` reuses the agent you have and never makes a second one by itself. The stored data is not migrated: 0.3.0 reads it as it is.
+- **Your agent and your contacts.** `init` reuses the agent you have and never makes a second one by itself. The stored data is not migrated: 0.4.0 reads it as it is.
 - **Your owner code.** If you set up an owner with 0.2.0, you keep using your owner code to approve. Nothing resets it. Keep it where you keep it now.
 - **Your rules.** They are not changed.
 
 ## What is different for you
 
-- **No Touch ID for you yet.** The first-run page, with one Touch ID and a backup code, is for a new setup. It does not open for a computer that already has an owner. Letting an existing owner enter their owner code once and then add Touch ID comes in a later update. Until then the local app pages ask for your owner code where a new setup would use Touch ID.
+- **Switching to Touch ID.** The first-run page is for a new setup and does not open for a computer that already has an owner. In 0.4.0 the local app shows **Switch to Touch ID** (or Windows Hello, or a passkey). It asks for your owner code once, then one touch. Your agent keeps the same owner, and the code keeps working as your backup code.
 - **Sending files.** The `AgentLink/Send` folder is where your AI may send files from. If your AI says no folder is allowed, run `npx -y @4thtech-io/agentlink policy allow-send-folder` in your own terminal. It creates the folder if it is missing and asks for your owner code. It adds only that folder. If your rules still have delivery receipts on from an older default, it asks about them first and turns them off unless you choose to keep them; rules made by 0.2.0 already have them off, so this only affects older rules. See [Folders for sending files](../everyday-use/allowed-folders.md).
 - **New in 0.3.0.** The [local app](../local-app/README.md) with Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
+- **New in 0.4.0.** Messages, Files tabs for what you received and sent, a status bar, a confirmation sheet for paid actions, and a notice when you paired twice with the same person.
 
 ## If something does not work
 

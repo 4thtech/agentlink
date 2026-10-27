@@ -12,7 +12,7 @@ AgentLink follows SemVer 2.0. During the beta, all public packages (the CLI and 
 | M1a | 0.1.0 | First npm release: pair and talk |
 | M1 gate | 0.2.0 | Local beta on testnets |
 | Usable local app | 0.3.0 | The local app served by the CLI |
-| Messages, Files, Touch ID upgrade, payment confirmation | 0.4.0 | The local app release that follows 0.3.0 |
+| Messages, Files, Touch ID upgrade, payment confirmation | 0.4.0 | The local app release that follows 0.3.0 (released 27 Oct 2026) |
 | M2, cloud agent first | 0.5.0 | The self-hosted cloud agent, Claude on the web and phones (D-131) |
 | M2, rest | later 0.x.0 | Console, desktop apps and the other M2 work |
 | M3 mainnet beta | 1.0.0 | First strict SemVer promise |
@@ -36,4 +36,4 @@ Unknown versions are refused visibly, never guessed at. Proof packs and receipts
 
 ## This documentation
 
-The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0 and v0.3.0 by 26 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs-site/MAINTAINING.md).
+The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0, v0.3.0 and v0.4.0 by 27 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs-site/MAINTAINING.md).
