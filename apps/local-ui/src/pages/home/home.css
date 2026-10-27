@@ -1,0 +1,222 @@
+/* Home (UI-REFRESH-g; B-11 §4, §16): five tiles on level 1 that rise to level 2 on hover and focus,
+   an orange edge on Waiting for you when it is not zero, the Next step card one level above the grid.
+   Tokens only; only opacity and transform animate (the lift is a transform plus a cross-fading
+   shadow layer, never a shadow animation). Reduced motion: no motion, the states keep their words. */
+.hm-head {
+  display: grid;
+  gap: var(--al-space-2);
+  margin-block-end: var(--al-space-6);
+}
+.hm-head h1,
+.hm-greeting {
+  margin: 0;
+}
+.hm-date {
+  color: var(--al-color-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Next step: one card, above the grid, a level up. */
+.hm-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-5);
+  margin-block-end: var(--al-space-6);
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-2);
+}
+.hm-next-text {
+  display: grid;
+  gap: var(--al-space-2);
+  min-inline-size: 0;
+}
+.hm-next-text p,
+.hm-next-text h2 {
+  margin: 0;
+}
+
+.hm-note {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  margin: 0 0 var(--al-space-5);
+  padding: var(--al-space-4) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-status-warning-border);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-status-warning-bg);
+  color: var(--al-color-status-warning-fg);
+}
+
+/* The grid: tiles keep their size, so live values never move the page. */
+.hm-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--al-space-5);
+}
+.hm-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  min-block-size: 172px;
+  padding: var(--al-space-6);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  box-shadow: var(--al-shadow-1);
+  isolation: isolate;
+  transition: transform var(--al-duration-fast) var(--al-easing-standard);
+}
+/* Level 2 sits on a layer of its own that fades in; the tile itself only moves by transform. */
+.hm-tile::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: var(--al-shadow-2);
+  opacity: 0;
+  transition: opacity var(--al-duration-fast) var(--al-easing-standard);
+}
+.hm-tile:hover,
+.hm-tile:focus-within {
+  transform: translateY(-1px);
+}
+.hm-tile:hover::before,
+.hm-tile:focus-within::before {
+  opacity: 1;
+}
+.hm-tile[data-attention='true'] {
+  border-color: var(--al-color-accent-default);
+}
+.hm-tile-title {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+}
+/* The whole tile is the link: the title link stretches over it, buttons stay above. */
+.hm-tile-link {
+  color: inherit;
+  text-decoration: none;
+}
+.hm-tile-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.hm-tile-link:focus-visible {
+  outline: none;
+}
+.hm-tile-link:focus-visible::after {
+  outline: var(--al-focus-ring-width) solid var(--al-color-focus-ring);
+  outline-offset: var(--al-focus-ring-offset);
+}
+.hm-tile-body {
+  display: grid;
+  align-content: start;
+  gap: var(--al-space-3);
+  min-block-size: 0;
+}
+.hm-tile-body p {
+  margin: 0;
+}
+.hm-asof {
+  margin: 0;
+}
+.hm-review {
+  position: relative;
+  z-index: 1;
+  justify-self: start;
+}
+.hm-count {
+  margin: 0;
+}
+.hm-soonest {
+  overflow-wrap: anywhere;
+}
+.hm-events {
+  display: grid;
+  gap: var(--al-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hm-event {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-inline-size: 0;
+}
+.hm-event-text {
+  flex: 1;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hm-event-time {
+  white-space: nowrap;
+}
+
+/* Not running: the tiles go grey, one instruction stays readable. */
+.hm-tiles[data-quiet='true'] .hm-tile:not([data-tile='agent']) {
+  opacity: var(--al-opacity-disabled);
+}
+
+/* Under the hood: the global panel (card e) sits below the tiles. */
+.hm-hood {
+  margin-block-start: var(--al-space-6);
+}
+.hm-hood:empty {
+  display: none;
+}
+
+/* 360: the tiles stack, Waiting for you first. */
+@media (max-width: 40rem) {
+  .hm-tiles {
+    grid-template-columns: 1fr;
+  }
+  .hm-tile[data-tile='waiting'] {
+    order: -1;
+  }
+  .hm-tile {
+    min-block-size: 0;
+    padding: var(--al-space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hm-tile,
+  .hm-tile::before {
+    transition: none;
+  }
+  .hm-tile:hover,
+  .hm-tile:focus-within {
+    transform: none;
+  }
+}
+[data-motion='reduced'] .hm-tile,
+[data-motion='reduced'] .hm-tile::before {
+  transition: none;
+}
+[data-motion='reduced'] .hm-tile:hover,
+[data-motion='reduced'] .hm-tile:focus-within {
+  transform: none;
+}
+
+@media (forced-colors: active), (prefers-contrast: more) {
+  .hm-tile,
+  .hm-next {
+    box-shadow: none;
+  }
+  .hm-tile::before {
+    display: none;
+  }
+}

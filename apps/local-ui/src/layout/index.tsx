@@ -15,7 +15,8 @@ import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
 import type { ApiResult } from '../api/client.js';
-import { readHealth as defaultReadHealth, startHealthPoller, type HealthState } from './health.js';
+import { subscribeHealth } from './health-feed.js';
+import { readHealth as defaultReadHealth, type HealthState } from './health.js';
 
 /**
  * What the status bar shows. "Connected" appears only when the local server's health read says the
@@ -71,15 +72,14 @@ export function useHealth(
   useEffect(() => {
     // A fresh poller starts from "Checking…": an earlier answer is not evidence for this one.
     if (current !== 'offline') setConnectionState('unknown');
-    const stop = startHealthPoller({
-      read,
+    // The poller is shared with Home (health-feed.ts): one read per tick for the whole app.
+    return subscribeHealth(read, {
       onState: (state, reported) => {
         // The browser's own offline signal wins while it lasts.
         if (!browserOffline()) setConnectionState(state);
         setVersion(reported);
       },
     });
-    return stop;
   }, [read]);
   return version;
 }
