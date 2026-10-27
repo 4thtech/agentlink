@@ -550,6 +550,36 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     expect(wrongMethod.status).toBe(405);
   });
 
+  it('gates the Messages reads like every route: session, CSRF, same-origin; GET only (MSG-FILES-IO-c)', async () => {
+    const h = await harness();
+    const paths = ['/api/ui/messages', `/api/ui/messages/0x${'b0'.repeat(20)}?box=in&limit=5`];
+    for (const path of paths) {
+      expect((await send(h.port, path)).status).toBe(401);
+    }
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    for (const path of paths) {
+      expect((await send(h.port, path, { headers: { Cookie: cookie } })).status).toBe(403);
+      for (const site of ['cross-site', 'same-site']) {
+        const res = await send(h.port, path, {
+          headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': site },
+        });
+        expect(res.status).toBe(403);
+      }
+      const res = await send(h.port, path, {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
+      });
+      // The handler ran: this harness has no agent client.
+      expect(res.status).toBe(409);
+      expect(JSON.parse(res.body)).toEqual({ error: 'not_set_up' });
+      const post = await send(h.port, path, {
+        method: 'POST',
+        headers: { Cookie: cookie, Origin: h.origin, 'X-AgentLink-CSRF': csrf },
+      });
+      expect(post.status).toBe(405);
+    }
+  });
+
   /** A presence route whose handler records each call and signs one contact.check. */
   function ownerRoutes(calls: { input: unknown; signed?: OwnerSignature[]; second?: unknown }[]) {
     const routes = createLocalUiRoutes();
@@ -837,12 +867,14 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     expect(res.status).toBe(200);
     expect(client).not.toBe(full);
     // M1-11c-a1 adds the activity feed read, M1-11c-a2 the contacts read, M1-11c-a4 the proofs read (context.ts).
+    // MSG-FILES-IO-c adds the read-only messages view.
     expect(Object.keys(client as object).sort()).toEqual([
       'agentId',
       'contacts',
       'files',
       'getProof',
       'listActivity',
+      'messages',
       'policy',
       'proofs',
     ]);
