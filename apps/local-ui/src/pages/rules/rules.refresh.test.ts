@@ -11,7 +11,7 @@ import { HoodProvider } from '@4thtech-io/ui';
 import { createApiClient } from '../../api/client.js';
 import { createPayConfirmClient } from '../../pay-confirm/index.js';
 import rulesCss from './rules.css?raw';
-import { RulesPage } from './index.js';
+import { RulesPage, type RulesPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 import { RULES_STRINGS as S } from './strings.js';
 
@@ -87,7 +87,7 @@ async function mount(routes: Record<string, unknown>, hood = false): Promise<voi
   const api = createApiClient({ fetch: fetchFn, token: 't0ken' });
   const owner = createOwnerClient({ fetch: fetchFn, token: 't0ken' });
   const payConfirm = createPayConfirmClient({ fetch: fetchFn, token: 't0ken' });
-  const page = createElement(RulesPage, { api, owner, payConfirm });
+  const page = createElement<RulesPageProps>(RulesPage, { api, owner, payConfirm });
   act(() => root.render(hood ? createElement(HoodProvider, { value: true }, page) : page));
   await flush();
 }
@@ -113,7 +113,7 @@ describe('first load: Skeleton', () => {
     vi.useFakeTimers();
     const never = (() => new Promise<Response>(() => undefined)) as unknown as typeof fetch;
     const api = createApiClient({ fetch: never, token: 't0ken' });
-    act(() => root.render(createElement(RulesPage, { api })));
+    act(() => root.render(createElement<RulesPageProps>(RulesPage, { api })));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(450);
     });
