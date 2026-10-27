@@ -4451,7 +4451,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split:** the server-rendered page is not deleted here. With the app bundled, `/` and `/approve/<id>` serve the app (list, review together, one request, the paid-action sheet, with parity tests); without a bundle the old page stays as the fallback. Its removal, with the sidebar copy and its drift tests, is M1-11b-2c.
 
 #### M1-11b-2c · approval page: delete the server-rendered page once every CLI ships the app (new, split from M1-11b-2)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (with `APP_JS`, `APP_CSS`, `APP_NAV`), `approval-server.ts` (the `/app.js`, `/app.css` and no-bundle page branch), `approval-page.test.ts`, `approval-ui-browser.test.ts`, `approval-pay-confirm-browser.test.ts` (old-page half), `approval-passkey-browser.test.ts`, `apps/local-ui/src/approval-page-nav.test.ts`, `apps/local-ui/src/pages/approvals/strings.test.ts`, `packages/ui/src/components/approval-page-icons.test.ts`, the token drift test, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11b-2
 - **Spec:** 08 §1; 04 §2.5; D-118

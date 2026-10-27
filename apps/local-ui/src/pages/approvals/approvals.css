@@ -1,5 +1,5 @@
-/* M1-11b-2: the approvals page layout, from the server-rendered approval page's stylesheet
-   (packages/node approval-page.ts APP_CSS, D1 approval card) for the classes components.css does not
+/* M1-11b-2: the approvals page layout, from the former server-rendered approval page's stylesheet
+   (D1 approval card; that page was removed in M1-11b-2c) for the classes components.css does not
    have. Design tokens only; no url(), no @import, no inline style (08 §4 CSP). The card, the fields,
    the buttons and the untrusted region are components.css's. */
 .al-approvals {
@@ -66,6 +66,11 @@
 }
 .al-approvals .al-toggle {
   flex: none;
+}
+/* M1-11b-2c: the code field is as tall as its large Confirm button (the control-lg token), so the
+   owner code box is never the tiny one of the owner test (M1-11a-ux, 2026-10-25). */
+.al-approvals .al-code .al-input-wrap {
+  height: var(--al-size-control-lg);
 }
 .al-approvals .al-code .al-btn-block {
   margin-top: 8px;

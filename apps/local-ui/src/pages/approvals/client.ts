@@ -1,5 +1,5 @@
-// M1-11b-2: the approvals page's calls. The same routes, headers and bodies as the server-rendered
-// approval page (packages/node approval-page.ts APP_JS), so the server's decision logic, presence
+// M1-11b-2: the approvals page's calls. The same routes, headers and bodies as the former
+// server-rendered approval page (removed in M1-11b-2c), so the server's decision logic, presence
 // checks and gates are untouched (04 §2.5, §2.5.2; D-68, D-118; I-4):
 //
 // - GET /api/approvals, GET /api/approvals/<id>, GET /api/owner/passkey;

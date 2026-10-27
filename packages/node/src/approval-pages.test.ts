@@ -56,8 +56,8 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
 });
 
-/** A server with the given bundle (`undefined`: the CLI embeds no app). */
-async function start(assets: LocalUiAssets | undefined = TEST_APP): Promise<{
+/** A server with the given bundle (`null`: the CLI embeds no app). */
+async function start(assets: LocalUiAssets | null = TEST_APP): Promise<{
   server: ApprovalServer;
   source: FakeSource;
   cookie: () => Promise<string>;
@@ -66,7 +66,7 @@ async function start(assets: LocalUiAssets | undefined = TEST_APP): Promise<{
   const source = fakeSource(world);
   const opened: string[] = [];
   const server = await startApprovalServerWith(
-    assets === undefined ? { source } : { source, localUi: { assets } },
+    assets === null ? { source } : { source, localUi: { assets } },
     {
       keychain: world.keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(world.keychain, expected),
@@ -112,7 +112,7 @@ function expectInert(html: string): void {
 
 describe('the old approval page is gone (M1-11b-2c)', () => {
   it('no route serves its script or stylesheet, with or without the app', async () => {
-    for (const assets of [TEST_APP, undefined]) {
+    for (const assets of [TEST_APP, null]) {
       const { server, cookie } = await start(assets);
       const c = await cookie();
       for (const path of ['/app.js', '/app.css']) {
@@ -136,7 +136,7 @@ describe('the old approval page is gone (M1-11b-2c)', () => {
 
 describe('a server without the app bundle (M1-11b-2c)', () => {
   it('answers / and /approve/<id> with the fixed page that points to the terminal', async () => {
-    const { server, cookie } = await start(undefined);
+    const { server, cookie } = await start(null);
     const c = await cookie();
     for (const path of ['/', `/approve/${id(1)}`]) {
       const res = await send(server.port, path, { headers: { Cookie: c } });
@@ -153,7 +153,7 @@ describe('a server without the app bundle (M1-11b-2c)', () => {
   });
 
   it('keeps the page gate: no session, no page; a link opens once; only GET', async () => {
-    const { server, cookie } = await start(undefined);
+    const { server, cookie } = await start(null);
     for (const path of ['/', `/approve/${id(1)}`]) {
       const res = await send(server.port, path);
       expect(res.status, path).toBe(401);
@@ -170,7 +170,7 @@ describe('a server without the app bundle (M1-11b-2c)', () => {
   });
 
   it('keeps the decide gates: without a page there is no CSRF token, so nothing is decided', async () => {
-    const { server, source, cookie } = await start(undefined);
+    const { server, source, cookie } = await start(null);
     source.add(1);
     const c = await cookie();
     const read = await send(server.port, '/api/approvals', { headers: { Cookie: c } });

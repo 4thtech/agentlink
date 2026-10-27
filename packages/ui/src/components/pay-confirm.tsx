@@ -11,8 +11,8 @@
 // - Done closes itself after about 1.2 s (D-132 decision 3); with reduced motion it waits for Close.
 // - The backup code is a small secondary link (D-132 decision 2).
 //
-// The approval page of @4thtech-io/node draws the same sheet without React (approval-page.ts, the
-// PAY_* strings); a test compares the words.
+// The local app (apps/local-ui) renders it for a paid approval; the server-rendered approval page
+// that drew a copy without React was removed in M1-11b-2c.
 import {
   useEffect,
   useId,
