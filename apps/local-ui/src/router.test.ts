@@ -29,6 +29,7 @@ function mountAt(path: string): void {
 }
 
 const EXPECTED: ReadonlyArray<readonly [string, string]> = [
+  ['/', 'Approvals'],
   ['/first-run', 'Set up AgentLink'],
   ['/settings/activity', 'Activity'],
   ['/settings/messages', 'Messages'],
@@ -48,7 +49,9 @@ describe('routes', () => {
 
   // Built pages test their own content (pages/<page>/*.test.tsx).
   // M1-11b-1: /first-run is a real page now (pages/first-run/first-run.test.ts).
+  // M1-11b-2: Approvals (`/`) is a real page now (pages/approvals/approvals.test.ts).
   const BUILT: ReadonlySet<string> = new Set([
+    '/',
     '/settings/activity',
     '/settings/messages',
     '/settings/contacts',
@@ -186,7 +189,8 @@ describe('nav', () => {
     expect(host.querySelector('main h1')?.textContent).toBe('Backup');
   });
 
-  it('leaves the Approvals link to the browser (the approvals page is not in this app yet)', () => {
+  // M1-11b-2: Approvals lives in this app now; `/approve/<id>` renders inside the same layout.
+  it('routes the Approvals link inside the app, Approvals current', () => {
     mountAt('/settings/activity');
     const link = host.querySelector<HTMLAnchorElement>('nav a[href="/"]');
     expect(link?.textContent).toContain('Approvals');
@@ -194,6 +198,20 @@ describe('nav', () => {
     act(() => {
       link?.dispatchEvent(event);
     });
-    expect(event.defaultPrevented).toBe(false);
+    expect(event.defaultPrevented).toBe(true);
+    expect(location.pathname).toBe('/');
+    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
+  });
+
+  it('marks Approvals current on a deep link to one request', () => {
+    mountAt(`/approve/apr_${'A'.repeat(22)}`);
+    expect(host.querySelector('nav[aria-label="Main"]')).not.toBeNull();
+    expect(host.querySelector('nav a[aria-current="page"]')?.textContent).toContain('Approvals');
+    expect(host.querySelector('main h1')?.textContent).toBe('Approvals');
+  });
+
+  it('shows not-found for an /approve path that is not an approval ID', () => {
+    mountAt('/approve/nope');
+    expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 });

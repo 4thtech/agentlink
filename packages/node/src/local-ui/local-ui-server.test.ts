@@ -401,14 +401,23 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
     expect(res.body).toContain(`<HEAD lang="x"><meta name="agentlink-csrf" content="${csrf}">`);
   });
 
-  it('keeps / and /approve/<id> on the existing approval page', async () => {
+  // M1-11b-2: Approvals moved into the app; `/` and `/approve/<id>` serve the app shell.
+  it('serves the app for / and /approve/<id> too, with the CSRF token injected', async () => {
     const h = await harness();
     const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
     for (const path of ['/', `/approve/apr_${'A'.repeat(22)}`]) {
       const res = await send(h.port, path, { headers: { Cookie: cookie } });
       expect(res.status, path).toBe(200);
-      expect(res.body).toContain('/app.js');
-      expect(res.body).not.toContain('<div id="root"></div>');
+      expect(res.headers['cache-control']).toBe('no-store');
+      expect(res.body).toContain('<div id="root"></div>');
+      expect(res.body).toContain(`<meta name="agentlink-csrf" content="${csrf}">`);
+      expect(res.body).not.toContain('/app.js');
+      expectStrictHeaders(res);
+    }
+    // Only a well-formed approval ID is a page.
+    for (const path of ['/approve/', '/approve/apr_short', `/approve/apr_${'A'.repeat(22)}/x`]) {
+      expect((await send(h.port, path, { headers: { Cookie: cookie } })).status, path).toBe(404);
     }
   });
 
@@ -430,40 +439,30 @@ describe('the app pages and the existing approval page (M1-11s-b)', () => {
     const h = await harness({ assets: { files: new Map() } });
     const cookie = await h.cookie();
     expect((await send(h.port, '/settings', { headers: { Cookie: cookie } })).status).toBe(404);
-    expect((await send(h.port, '/', { headers: { Cookie: cookie } })).status).toBe(200);
+    // Without the app, `/` and `/approve/<id>` keep the server-rendered approval page.
+    for (const path of ['/', `/approve/apr_${'A'.repeat(22)}`]) {
+      const res = await send(h.port, path, { headers: { Cookie: cookie } });
+      expect(res.status, path).toBe(200);
+      expect(res.body).toContain('<script src="/app.js" defer></script>');
+      expect(res.body).not.toContain('<div id="root"></div>');
+    }
   });
 });
 
-// M1-11b-2a (owner feedback 2026-10-26: "if I click on Approvals there is no menu to get back"): the
-// approval page carries the app's sidebar when the app is bundled. Navigation only: the session,
-// CSRF and presence gates of the approval page are unchanged (04 §2.5, I-4).
-describe('the shared app navigation on the approval page (M1-11b-2a)', () => {
-  const NAV_PATHS = [
-    '/',
-    '/settings/activity',
-    '/settings/messages',
-    '/settings/contacts',
-    '/settings/files',
-    '/settings/proofs',
-    '/settings/rules',
-    '/settings/backup',
-  ];
-
-  it('shows the app sidebar on / and /approve/<id> when the app is bundled, Approvals current', async () => {
+// M1-11b-2 (was M1-11b-2a, owner feedback 2026-10-26: "if I click on Approvals there is no menu
+// to get back"): with the app bundled, Approvals renders inside the app shell, so the app's own
+// sidebar is there. Where the UI renders only: the session, CSRF and presence gates are unchanged
+// (04 §2.5, I-4).
+describe('Approvals inside the app (M1-11b-2)', () => {
+  it('serves the app shell, not the old page with a copied sidebar, on / and /approve/<id>', async () => {
     const h = await harness();
     const cookie = await h.cookie();
     for (const path of ['/', `/approve/apr_${'A'.repeat(22)}`]) {
       const res = await send(h.port, path, { headers: { Cookie: cookie } });
       expect(res.status, path).toBe(200);
-      expect(res.body).toContain('<nav class="al-side" aria-label="Main">');
-      const hrefs = [...res.body.matchAll(/<a class="al-nav[^"]*" href="([^"]*)"/g)].map(
-        (m) => m[1],
-      );
-      expect(hrefs, path).toEqual(NAV_PATHS);
-      expect(res.body).toMatch(/<a class="al-nav is-active" href="\/" aria-current="page">/);
-      expect(res.body.split('aria-current').length - 1).toBe(1);
-      // Still the approval page, under the same strict headers.
-      expect(res.body).toContain('<script src="/app.js" defer></script>');
+      expect(res.body).toContain('<div id="root"></div>');
+      expect(res.body).not.toContain('al-side');
+      expect(res.body).not.toContain('/app.js');
       expectStrictHeaders(res);
     }
   });
@@ -477,16 +476,12 @@ describe('the shared app navigation on the approval page (M1-11b-2a)', () => {
     expect(res.body).not.toContain('/settings/');
   });
 
-  it('puts no token, session link or outside address into the navigation', async () => {
+  it('puts no session cookie, link token or request data into the page', async () => {
     const h = await harness();
     const cookie = await h.cookie();
-    const res = await send(h.port, '/', { headers: { Cookie: cookie } });
-    const nav = res.body.slice(res.body.indexOf('<nav'), res.body.indexOf('</nav>'));
-    expect(nav).not.toBe('');
-    expect(nav).not.toContain('?t=');
-    expect(nav).not.toContain('agentlink-csrf');
-    expect(nav).not.toMatch(/:\/\/|javascript:/i);
-    expect(nav).not.toMatch(/<script|style=|\son[a-z]+=/i);
+    const res = await send(h.port, `/approve/apr_${'A'.repeat(22)}`, { headers: { Cookie: cookie } });
+    expect(res.body).not.toContain('?t=');
+    expect(res.body).not.toContain('apr_');
     // The cookie value never reaches the markup.
     expect(res.body).not.toContain(cookie.split('=')[1] ?? 'missing');
   });
