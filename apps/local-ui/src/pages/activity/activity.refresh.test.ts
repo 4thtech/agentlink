@@ -10,8 +10,6 @@
 // - Under the hood: no event IDs are served, so the panel shows its empty text; never an ID.
 // - Reduced motion (attribute and media rule), tokens only in the stylesheet, axe.
 import axe from 'axe-core';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -247,10 +245,13 @@ describe('inbound text and accessibility', () => {
 });
 
 describe('stylesheet', () => {
-  const css = readFileSync(
-    resolve(process.cwd(), 'src/pages/activity/activity.css'),
-    'utf8',
-  ).replace(/\/\*[\s\S]*?\*\//g, '');
+  const raw = import.meta.glob<string>('./activity.css', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  });
+  const css = (Object.values(raw)[0] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+  it('is loaded', () => expect(css.length).toBeGreaterThan(100));
   it('sticks the day headers under the top bar on the solid chrome colour, with no blur', () => {
     const rule = /\.al-activity-day\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
     expect(rule).toMatch(/position:\s*sticky/);
