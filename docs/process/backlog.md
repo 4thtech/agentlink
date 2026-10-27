@@ -4570,7 +4570,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Spec text matches the plan's §4 contract and threat notes; no other behaviour changes; `node tools/docs-status/index.mjs --check` passes.
 
 #### MSG-FILES-IO-h · Show in Finder for a saved received file (new, owner decision 2026-10-27)
-- **Status:** backlog · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/routes.ts`, `route-types.ts`, `approval-server.ts` (the gate for the new route kind), `approval-os.ts` (opener), `local-ui/api/files-io.ts`, `apps/local-ui/src/pages/files/**`, tests; changeset
 - **Depends on:** MSG-FILES-IO-b, MSG-FILES-IO-f
 - **Spec:** 04 §2.5, §4 (realpath); 08 §1; plan §6

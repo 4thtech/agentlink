@@ -329,19 +329,22 @@ function withSuffix(name: string, n: number): string {
   return `${truncateUtf8(stem, room).replace(/\s+$/u, '')}${tail}`;
 }
 
+/** The inbox folder's realpath and the protected roots it was checked against. */
+export interface ResolvedInbox {
+  readonly folder: string;
+  readonly roots: readonly string[];
+}
+
 /**
- * Creates a new file for a download inside the inbox folder (policy `files.inboxFolder`; 04 §4
- * "Downloads"): the untrusted name is sanitised (core's sanitizeFileName), the inbox folder is
- * resolved and must be an existing folder outside every protected root whose own name (as given
- * or resolved) is not hidden, and the file is created exclusively (never overwriting) with mode
- * 0600 without following a symlink. A clash adds ` (1)`, ` (2)`, … within the 255-byte name limit.
- * The caller writes, closes, and removes the file on an integrity failure.
+ * Resolves the inbox folder (policy `files.inboxFolder`, `~/` expanded): its realpath, which must be
+ * an existing folder outside every protected root whose own name (as given or resolved) is not
+ * hidden. Creates nothing. Throws AllowedPathError otherwise (`inbox_unavailable`, or the decision's
+ * reason). Used by createInboxFile and by Show in Finder (MSG-FILES-IO-h).
  */
-export async function createInboxFile(
+export async function resolveInboxFolder(
   inboxFolder: string,
-  untrustedName: unknown,
   options: { readonly home?: string } = {},
-): Promise<{ readonly path: string; readonly name: string; readonly handle: FileHandle }> {
+): Promise<ResolvedInbox> {
   const home = options.home ?? homedir();
   const abs = absolute(inboxFolder, home);
   if (abs === undefined) throw new AllowedPathError('inbox_unavailable');
@@ -362,6 +365,39 @@ export async function createInboxFile(
     });
     if (!inbox.ok) throw new AllowedPathError(inbox.reason);
   }
+  return { folder, roots };
+}
+
+/**
+ * Whether `target` (already joined, not resolved) may name a file directly inside the resolved
+ * inbox `folder`: its parent is exactly the folder, and decidePath allows it (not hidden, outside
+ * every protected root). MSG-FILES-IO-h.
+ */
+export function directlyInsideInbox(target: string, inbox: ResolvedInbox): boolean {
+  if (path.dirname(target) !== inbox.folder) return false;
+  return decidePath({
+    requested: target,
+    resolved: target,
+    allowedFolders: [inbox.folder],
+    protectedRoots: inbox.roots,
+    flavor: FLAVOR,
+  }).ok;
+}
+
+/**
+ * Creates a new file for a download inside the inbox folder (policy `files.inboxFolder`; 04 §4
+ * "Downloads"): the untrusted name is sanitised (core's sanitizeFileName), the inbox folder is
+ * resolved and must be an existing folder outside every protected root whose own name (as given
+ * or resolved) is not hidden, and the file is created exclusively (never overwriting) with mode
+ * 0600 without following a symlink. A clash adds ` (1)`, ` (2)`, … within the 255-byte name limit.
+ * The caller writes, closes, and removes the file on an integrity failure.
+ */
+export async function createInboxFile(
+  inboxFolder: string,
+  untrustedName: unknown,
+  options: { readonly home?: string } = {},
+): Promise<{ readonly path: string; readonly name: string; readonly handle: FileHandle }> {
+  const { folder, roots } = await resolveInboxFolder(inboxFolder, options);
   const base = sanitizeFileName(untrustedName);
   const noFollow = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
   for (let n = 0; n < MAX_NAME_ATTEMPTS; n += 1) {

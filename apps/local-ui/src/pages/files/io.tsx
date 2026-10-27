@@ -2,10 +2,21 @@
 // §17.3; plan docs/process/proposals/MSG-FILES-IO.md §5).
 //
 // Read-only lists of what this computer already holds, decrypted only here. Other people's file
-// names (and contact names) are untrusted (I-5): shown as plain text in a recessed well, never as a
-// link, never in the page title, never used as a path. The app never opens a received file. Under
-// the hood is metadata only: nothing here ever receives or shows a key, a drop link or a token.
-import { Banner, Button, EmptyState, Icon, ProofBadge, StatusChip } from '@4thtech-io/ui';
+// names (and contact names) are untrusted (I-5): shown only inside UntrustedContent as plain text,
+// never as a link, never in the page title, never used as a path. The app never opens a received
+// file. MSG-FILES-IO-h: a saved file has "Show in Finder" ("Show in folder" off macOS, 11 §5.7),
+// which sends only the item ID; the server finds the file in the Inbox folder and asks the OS file
+// manager to show it (D-134, no Touch ID). Nothing here ever receives or shows a key, a drop link,
+// a token or a path.
+import {
+  Banner,
+  Button,
+  EmptyState,
+  Icon,
+  ProofBadge,
+  StatusChip,
+  UntrustedContent,
+} from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -14,6 +25,7 @@ import {
   type KeyboardEvent,
   type ReactElement,
 } from 'react';
+import type { RevealOutcome } from './files-api.js';
 import {
   RECEIVED_PATH,
   SENT_PATH,
@@ -183,21 +195,31 @@ function useFeed<T>(
   };
 }
 
-/** Skeleton rows in the shape of the coming list (b11 §15): a status word, no flash under 400 ms. */
+/** Loading shorter than this shows no skeleton rows (b11 §15: no flash). */
+const SKELETON_DELAY_MS = 400;
+
+/** Skeleton rows in the shape of the coming list (b11 §15): a status word now, rows after 400 ms. */
 function Skeleton(): ReactElement {
+  const [rows, setRows] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setRows(true), SKELETON_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
   return (
     <div className="fl-feed" aria-busy="true">
       <p role="status" className="fl-sr-only">
         {IO.loading}
       </p>
-      <ul className="fl-list" aria-hidden="true">
-        {[0, 1, 2].map((i) => (
-          <li key={i} className="fl-item">
-            <span className="fl-skeleton fl-skeleton-name" />
-            <span className="fl-skeleton fl-skeleton-meta" />
-          </li>
-        ))}
-      </ul>
+      {rows ? (
+        <ul className="fl-list" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="fl-item">
+              <span className="fl-skeleton fl-skeleton-name" />
+              <span className="fl-skeleton fl-skeleton-meta" />
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -299,17 +321,80 @@ function UntrustedNote(): ReactElement | null {
   );
 }
 
-function ReceivedRow({ item }: { readonly item: ReceivedItem }): ReactElement {
+/** Show in Finder for one saved file (MSG-FILES-IO-h): what to tell the owner after a click. */
+export type Reveal = (id: string) => Promise<RevealOutcome>;
+
+const REVEAL_PROBLEM: Readonly<Record<Exclude<RevealOutcome, 'shown'>, string>> = {
+  not_found: IO.revealNotFound,
+  refused: IO.revealRefused,
+  unavailable: IO.revealUnavailable,
+  not_opened: IO.revealFailed,
+  session_expired: IO.revealSessionExpired,
+  offline: IO.revealUnavailable,
+  failed: IO.revealFailed,
+};
+
+/** macOS has Finder; Windows and Linux get "Show in folder" (11 §5.7). */
+function onMac(): boolean {
+  try {
+    return /^Mac/i.test(navigator.platform);
+  } catch {
+    return false;
+  }
+}
+
+function ShowInFinder({
+  id,
+  reveal,
+}: {
+  readonly id: string;
+  readonly reveal: Reveal;
+}): ReactElement {
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | undefined>(undefined);
+  const alive = useRef(true);
+  useEffect(
+    () => () => {
+      alive.current = false;
+    },
+    [],
+  );
+  const click = async (): Promise<void> => {
+    setBusy(true);
+    setProblem(undefined);
+    let outcome: RevealOutcome;
+    try {
+      outcome = await reveal(id);
+    } catch {
+      outcome = 'failed';
+    }
+    if (!alive.current) return;
+    setBusy(false);
+    setProblem(outcome === 'shown' ? undefined : REVEAL_PROBLEM[outcome]);
+  };
+  return (
+    <div className="fl-row-actions">
+      <Button size="sm" icon="folder" disabled={busy} onClick={() => void click()}>
+        {onMac() ? IO.showInFinder : IO.showInFolder}
+      </Button>
+      <p role="status" className="al-text-body-sm al-muted">
+        {problem ?? ''}
+      </p>
+    </div>
+  );
+}
+
+function ReceivedRow({
+  item,
+  reveal,
+}: {
+  readonly item: ReceivedItem;
+  readonly reveal: Reveal;
+}): ReactElement {
   return (
     <li className="fl-item">
-      <div className="fl-item-head">
-        <Icon name="file" size={16} />
-        <Name>{item.name}</Name>
-      </div>
+      <UntrustedContent from={item.from} fileName={item.name} />
       <p className="fl-meta al-text-body-sm al-muted">
-        <span>
-          {IO.from} <bdi>{item.from}</bdi>
-        </span>
         <When at={item.at} />
         <span>{sizeText(item.size)}</span>
         {item.proof ? <ProofBadge state="recorded" /> : null}
@@ -332,10 +417,8 @@ function ReceivedRow({ item }: { readonly item: ReceivedItem }): ReactElement {
       {item.state === 'deleted' ? (
         <p className="fl-state al-text-body-sm al-muted">{IO.deleted}</p>
       ) : null}
-      {item.state === 'saved' ? (
-        // Slot for the Show in Finder action (MSG-FILES-IO-h, a later card). Nothing is rendered
-        // here yet: the app never opens a received file.
-        <div className="fl-row-actions" data-slot="show-in-finder" />
+      {item.state === 'saved' && item.savedName !== null ? (
+        <ShowInFinder id={item.id} reveal={reveal} />
       ) : null}
     </li>
   );
@@ -368,14 +451,17 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
             <Icon name="receipt-delivered" size={14} />
             <span className="al-text-body-sm">{IO.receiptConfirmed}</span>
           </span>
-        ) : (
+        ) : item.status === 'not_delivered' ? null : (
           <span className="fl-receipt al-muted" data-receipt="false">
             <Icon name="clock" size={14} />
             <span className="al-text-body-sm">{IO.receiptNone}</span>
           </span>
         )}
       </p>
-      {item.state === 'available' && item.expiresAt !== null ? (
+      {item.status === 'not_delivered' ? (
+        <p className="fl-state al-text-body-sm al-muted">{IO.sentNotDelivered}</p>
+      ) : null}
+      {item.status !== 'not_delivered' && item.state === 'available' && item.expiresAt !== null ? (
         <p className="fl-state al-text-body-sm al-muted">
           {IO.availableUntil} <When at={item.expiresAt} date />
         </p>
@@ -390,14 +476,20 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
   );
 }
 
-export function ReceivedPanel({ get }: { readonly get: Getter }): ReactElement {
+export function ReceivedPanel({
+  get,
+  reveal,
+}: {
+  readonly get: Getter;
+  readonly reveal: Reveal;
+}): ReactElement {
   const feed = useFeed(get, RECEIVED_PATH, parseReceived);
   return (
     <FeedFrame
       feed={feed}
       empty={{ title: IO.receivedEmptyTitle, hint: IO.receivedEmptyHint, icon: 'inbox' }}
       note={<UntrustedNote />}
-      row={(item) => <ReceivedRow key={item.id} item={item} />}
+      row={(item) => <ReceivedRow key={item.id} item={item} reveal={reveal} />}
     />
   );
 }

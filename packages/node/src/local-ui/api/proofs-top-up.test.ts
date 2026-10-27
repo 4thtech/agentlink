@@ -85,6 +85,7 @@ function fakeClient(topUp: () => Promise<TopUpView>): LocalUiReadClient {
     filesIo: {
       received: () => Promise.reject(new Error('not used')),
       sent: () => Promise.reject(new Error('not used')),
+      savedName: () => Promise.reject(new Error('not used')),
     },
     policy: {
       load: () => Promise.reject(new Error('not used')),

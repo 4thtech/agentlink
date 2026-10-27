@@ -6,7 +6,9 @@
 // checks owner presence before its handler runs, and the handler gets a one-use owner operation that
 // signs with the presence this request carried. No handler ever sees the owner code, the passkey
 // assertion or the session values. M1-11s-c adds a third kind, `presence: 'setup'`, for owner setup
-// on the first-run page: no handler, run by the server's own setup gate.
+// on the first-run page: no handler, run by the server's own setup gate. MSG-FILES-IO-h (D-134) adds
+// a fourth, `presence: 'reveal'`, for Show in Finder only: one fixed POST, no presence, no signing,
+// no store write; its handler gets only the checked item ID.
 import type { JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
@@ -99,8 +101,38 @@ export interface LocalUiPayConfirmRoute {
   readonly step: LocalUiPayConfirmStep;
 }
 
+/**
+ * MSG-FILES-IO-h: the checked reveal a reveal handler may call (local-ui/reveal-file.ts, built by the
+ * server): the Inbox folder from the rules in force and the saved name from the store. It resolves,
+ * opens once without following a link, checks the handle, and only then runs the OS revealer.
+ */
+export type LocalUiRevealFile = (
+  inboxFolder: string,
+  savedName: string,
+) => Promise<'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'>;
+
+/**
+ * MSG-FILES-IO-h (D-134): Show in Finder, the one route kind that changes nothing and needs no owner
+ * presence but is not a read. Only `POST /api/ui/files/received/reveal`, registered once
+ * (routes.ts). The server's reveal gate runs after the same session, CSRF, Origin, fetch-metadata
+ * and octet-stream checks as every write, parses the body itself (exactly `{"id":"<item ID>"}`) and
+ * hands the handler only that checked ID: never the request, a header, a query or a body byte. The
+ * handler signs nothing and writes nothing; the reveal runs one fixed OS action on a file the store
+ * recorded inside the Inbox folder (04 §4).
+ */
+export interface LocalUiRevealRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'reveal';
+  readonly handler: (
+    context: LocalUiContext,
+    itemId: string,
+    reveal: LocalUiRevealFile,
+  ) => Promise<LocalUiResult>;
+}
+
 export type LocalUiRoute =
-  LocalUiReadRoute | LocalUiOwnerRoute | LocalUiSetupRoute | LocalUiPayConfirmRoute;
+  LocalUiReadRoute | LocalUiOwnerRoute | LocalUiSetupRoute | LocalUiPayConfirmRoute | LocalUiRevealRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A

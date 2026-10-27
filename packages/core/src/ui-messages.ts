@@ -164,6 +164,8 @@ const FILES_BATCH = 50;
 /** At most this many envelopes are opened for one files page; the page then ends with a cursor. */
 const FILES_SCAN_CAP = 200;
 const FILE_ID = /^(.{1,64})\.([0-9]{2})$/;
+/** MSG-FILES-IO-h: an item ID as the local app sends it (an envelope ID is base64url or hex). */
+const SAVED_ITEM_ID = /^([A-Za-z0-9_-]{1,64})\.([0-9]{2})$/;
 
 const invalid = (): CoreError =>
   new CoreError('page_query_invalid', 'The page limit or cursor is not valid.');
@@ -507,6 +509,41 @@ export class FilesIoView {
       ),
       ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
     });
+  }
+
+  /**
+   * MSG-FILES-IO-h (Show in Finder, D-134): the saved name of one received file, by its item ID
+   * (`<envelope ID>.<index>`, index as two digits) only. The same selection as `received`: an inbound
+   * message in state `ok` from a contact that is not removed. Null for a malformed ID, an unknown or
+   * outbound item, a file not saved yet, or a saved name that does not open or is not the single
+   * clean name fetchFile chose (fail closed: no path is guessed). Never log the result (I-7).
+   */
+  async savedName(id: string): Promise<string | null> {
+    if (typeof id !== 'string') return null;
+    const m = SAVED_ITEM_ID.exec(id);
+    if (m === null || this.#savedName === undefined) return null;
+    const envelopeId = m[1] as string;
+    const idx = Number(m[2]);
+    const row = await this.#ctx.store.transaction((tx) => {
+      const scope = visibleTx(tx);
+      if (scope.length === 0) return undefined;
+      const message = tx.select(
+        'envelopes',
+        { ...whereOf('in', scope), envelope_id: envelopeId },
+        { limit: 1 },
+      )[0];
+      if (message === undefined) return undefined;
+      return tx.select('files', { envelope_id: envelopeId, idx }, { limit: 1 })[0];
+    });
+    if (row === undefined || row.deleted_at !== null) return null;
+    try {
+      const name = await this.#savedName(row);
+      return typeof name === 'string' && name.length > 0 && sanitizeFileName(name) === name
+        ? name
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   async #saved(row: Row<'files'>): Promise<string | null> {

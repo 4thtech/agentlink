@@ -5,6 +5,9 @@
 //   so no route can reach an owner operation around the central presence gate (approval-server.ts).
 // - M1-11s-c: a `presence: 'setup'` route is only a POST under /api/ui/first-run/, has no handler
 //   and is registered at most once per step (begin, finish); the server's setup gate runs it.
+// - MSG-FILES-IO-h (D-134): a `presence: 'reveal'` route (Show in Finder) is only a POST at
+//   REVEAL_PATH with a handler, registered once; the server's reveal gate runs it. No other path,
+//   method or route can use the kind, and every other mutating route still needs presence.
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
@@ -15,8 +18,8 @@ import { approvalsRoutes } from './api/approvals.js';
 import { backupRoutes } from './api/backup.js';
 import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
-// MSG-FILES-IO-d: Files, Received and Sent (read-only).
-import { filesIoRoutes } from './api/files-io.js';
+// MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
+import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
 import { firstRunRoutes } from './api/first-run.js';
 import { messagesRoutes } from './api/messages.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
@@ -24,7 +27,10 @@ import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 import { storageRoutes } from './api/storage.js';
 import type { LocalUiRoute } from './route-types.js';
+// The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
+import { REVEAL_PATH } from './reveal-path.js';
 
+export { REVEAL_PATH };
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
 const SETUP_PREFIX = '/api/ui/first-run/';
@@ -113,6 +119,14 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'pay-confirm' && e.route.step === step)) {
         throw invalid('this pay-confirm step is already registered');
       }
+    } else if (presence === 'reveal') {
+      // MSG-FILES-IO-h: Show in Finder only; the server's reveal gate runs it (D-134).
+      if (method !== 'POST') throw invalid('a reveal route is a POST');
+      if (route.path !== REVEAL_PATH) throw invalid('a reveal route is only at the reveal path');
+      if (typeof handler !== 'function') throw invalid('a reveal route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'reveal')) {
+        throw invalid('the reveal route is already registered');
+      }
     } else if (typeof handler !== 'function') {
       throw invalid('no handler');
     } else if (method === 'GET') {
@@ -177,6 +191,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     filesRoutes,
     // MSG-FILES-IO-d: Files, Received and Sent (read-only).
     filesIoRoutes,
+    // MSG-FILES-IO-h: Show in Finder (the one reveal route, D-134).
+    [filesRevealRoute],
     storageRoutes,
     proofsRoutes,
     rulesRoutes,

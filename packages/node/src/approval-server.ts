@@ -80,6 +80,11 @@
 //   The handler gets a read-only client view and a one-use `sign` bound to that session (the
 //   allowlist and one gesture, D-68); the session closes and the store locks when it returns, and a
 //   presence route that signed nothing is answered 409 `refused`.
+// - MSG-FILES-IO-h (D-134), Show in Finder: the one `presence: 'reveal'` route is run by
+//   `revealGate`, never by `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and
+//   octet-stream checks, the body must be exactly `{"id":"<item ID>"}` (no query, input or presence
+//   header); the handler gets only that ID and the checked reveal (local-ui/reveal-file.ts). No
+//   owner presence, no owner store, nothing signed or written.
 // - M1-11s-c, owner setup on the first-run page (D-120 (1); proposed, owner confirms at merge): the
 //   two `presence: 'setup'` routes (begin, finish) are run by `setupGate`, never by `ownerGate`
 //   (which is unchanged). After the same session, CSRF, Origin, fetch-metadata and octet-stream
@@ -145,7 +150,15 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
-import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
+import {
+  osBrowserOpener,
+  osFileRevealer,
+  osNotifier,
+  type BrowserOpener,
+  type FileRevealer,
+  type OsNotifier,
+} from './approval-os.js';
+import { revealSavedFile } from './local-ui/reveal-file.js';
 import { APP_CSS, APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
@@ -203,6 +216,7 @@ import type {
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
   LocalUiResult,
+  LocalUiRevealRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
 import {
@@ -290,6 +304,11 @@ const ASSET_CACHE = 'private, max-age=31536000, immutable';
 /** The CSRF meta the app's index.html carries empty, filled per server (apps/local-ui). */
 const CSRF_META = /<meta\s+name="agentlink-csrf"\s+content="([^"]*)"\s*\/?>/gi;
 const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
+/** MSG-FILES-IO-h: the largest Show in Finder body (`{"id":"<64 chars>.<2 digits>"}` fits easily). */
+const MAX_REVEAL_BODY_BYTES = 256;
+/** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
+const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
+
 /** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts. */
 const MAX_INPUT_CHARS = 8192;
 /** M1-11s-c: the setup routes report an expired hold themselves (no sweep before them). */
@@ -596,6 +615,8 @@ export interface ApprovalServerInternals {
   readonly keychain?: KeychainBackend;
   readonly opener?: BrowserOpener;
   readonly notifier?: OsNotifier;
+  /** MSG-FILES-IO-h: the OS file revealer behind Show in Finder. Default: osFileRevealer. */
+  readonly fileRevealer?: FileRevealer;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
@@ -874,6 +895,10 @@ export async function startApprovalServerWith(
     internals.openOwnerStore ??
     ((owner: OwnerPublicKeys) => KeychainOwnerKeyStore.open(keychainOf(), owner));
   const opener = internals.opener ?? osBrowserOpener;
+  // MSG-FILES-IO-h: the checked reveal handed to the reveal route's handler (never the bare opener).
+  const fileRevealer = internals.fileRevealer ?? osFileRevealer;
+  const revealFile = (inboxFolder: string, savedName: string) =>
+    revealSavedFile(inboxFolder, savedName, { opener: fileRevealer });
   const notifier = internals.notifier ?? osNotifier;
   const listen = internals.listen ?? listenOnce;
   const emit = (event: ApprovalServerEvent): void => {
@@ -2396,6 +2421,59 @@ export async function startApprovalServerWith(
     }
   }
 
+  /**
+   * MSG-FILES-IO-h (D-134): the gate of the one reveal route (Show in Finder). The caller checked the
+   * session, CSRF, Origin, fetch metadata and the octet-stream type. The request carries only the
+   * item ID: the body must be exactly `{"id":"<envelopeId>.<idx>"}` (strict JSON, no other member),
+   * with no query, no operation input and no presence header; anything else is 400 `invalid` before
+   * the store is read. No owner presence, no owner store, no signing. The handler gets the checked
+   * ID and the checked reveal only; nothing here logs the ID, a name or a path.
+   */
+  async function revealGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiRevealRoute,
+  ): Promise<void> {
+    const invalid = (): void => {
+      sendJson(res, 400, { error: 'invalid' });
+    };
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      invalid();
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_REVEAL_BODY_BYTES);
+    if (body === undefined) return;
+    let id: unknown;
+    try {
+      const parsed = parseJson(decodeUtf8(body));
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+      const keys = Object.keys(parsed);
+      if (keys.length !== 1 || keys[0] !== 'id') throw new Error();
+      id = (parsed as { id?: unknown }).id;
+    } catch {
+      invalid();
+      return;
+    }
+    if (typeof id !== 'string' || !REVEAL_ITEM_ID.test(id)) {
+      invalid();
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, id, revealFile);
+    } catch {
+      sendJson(res, 500, { status: 'failed' });
+      return;
+    }
+    sendResult(res, result);
+  }
+
   /** M1-11s-b: one /api/ui/ request (route registry, session, CSRF, presence gate). */
   async function handleUi(
     req: IncomingMessage,
@@ -2430,6 +2508,11 @@ export async function startApprovalServerWith(
     }
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return fail(415, 'content_type');
+    if (route.presence === 'reveal') {
+      // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
+      await revealGate(req, res, url, route);
+      return;
+    }
     if (route.presence === 'setup') {
       // M1-11s-c: owner setup has its own gate; ownerGate never runs it.
       await setupGate(req, res, route.step, cookie as string);
