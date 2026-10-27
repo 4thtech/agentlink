@@ -4643,7 +4643,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests at start, middle, done and error with the word, the accessible name and the `progressbar` values; fake-timer tests of the 400 ms and 500 ms rules; reduced motion: the fill jumps and loops become a still state with the word; the indeterminate bar never shows a percentage.
 
 #### UI-REFRESH-d · ui: live state and moments (LiveDot, SuccessMoment, count tick, row motion) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/motion.tsx`, `motion.css` and their tests; changeset
 - **Depends on:** UI-REFRESH-a
 - **Spec:** B-11 §5, §6, §14, §15.1

@@ -198,7 +198,8 @@ describe('useReducedMotion and useVisibilityPause', () => {
     const hid = useVisibilityPause();
     return h('p', { 'data-r': String(r), 'data-h': String(hid) });
   }
-  const attr = (n: string): string | null => (host.querySelector('p') as HTMLElement).getAttribute(n);
+  const attr = (n: string): string | null =>
+    (host.querySelector('p') as HTMLElement).getAttribute(n);
 
   it('follows the media query', () => {
     reducedQuery = true;
@@ -294,8 +295,12 @@ describe('CountBadge (B-11 §5 Counts, §6 row 3)', () => {
   it('shows the number, and 99+ above 99', () => {
     render(h(CountBadge, { count: 7 }));
     expect(text()).toBe('7');
+    act(() => root.unmount());
+    root = createRoot(host);
     render(h(CountBadge, { count: 99 }));
     expect(text()).toBe('99');
+    act(() => root.unmount());
+    root = createRoot(host);
     render(h(CountBadge, { count: 100 }));
     expect(text()).toBe('99+');
   });
