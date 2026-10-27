@@ -68,7 +68,6 @@ function api(conversations: () => unknown, override?: Get): ApiClient {
   const get = vi.fn((path: string) => (override ?? fallback)(path));
   return { get, post: vi.fn(), owner: vi.fn() } as unknown as ApiClient;
 }
-const never: Get = () => new Promise<ApiResult<unknown>>(() => undefined);
 
 async function mount(client: ApiClient, hood = false): Promise<void> {
   await act(async () => {
