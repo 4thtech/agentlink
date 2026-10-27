@@ -123,6 +123,11 @@ describe('first load', () => {
     expect(sk?.getAttribute('role')).toBe('status');
     expect(sk?.getAttribute('aria-busy')).toBe('true');
     expect(host.querySelector('.ms-skeleton')).toBeNull();
+    // The words "Loading messages" remain only as the skeleton's own screen-reader label (the shared
+    // Skeleton needs one), never as visible page text.
+    expect(sk?.querySelector('.al-sr-only')?.textContent).toBe(S.loading);
+    expect(host.textContent?.split(S.loading).length).toBe(2);
+    expect(host.querySelectorAll('.al-skeleton-line').length).toBeGreaterThan(0);
     expect(messagesCss).not.toMatch(/\.ms-skeleton/);
   });
 
