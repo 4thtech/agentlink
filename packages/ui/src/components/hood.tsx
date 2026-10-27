@@ -36,15 +36,26 @@ export type HoodField =
 
 const TEXT_KINDS: ReadonlySet<string> = new Set(['text', 'id', 'size', 'time', 'count']);
 
-/** Public block explorers whose record pages may be linked (host or any subdomain of it). */
+/**
+ * Public block explorers whose record pages may be linked: the exact hosts of the chain config's
+ * `explorer` entries (packages/chain/src/config/testnets.ts; a test keeps them in step) plus the two
+ * mainnet explorers. Exact match only: no subdomain or suffix matching.
+ */
 export const PROOF_LINK_HOSTS: readonly string[] = [
+  'sepolia.basescan.org',
+  'gnosis-chiado.blockscout.com',
   'basescan.org',
-  'etherscan.io',
   'gnosisscan.io',
-  'blockscout.com',
-  'polygonscan.com',
-  'arbiscan.io',
 ];
+const PROOF_PATH = /^\/tx\/0x[0-9a-f]{64}$/;
+
+/** Per-kind shapes: the specific kinds are an allowlist of formats, `text` falls back to the filters. */
+const KIND_SHAPE: Partial<Record<HoodTextKind, RegExp>> = {
+  id: /^[A-Za-z0-9._:-]{1,40}$/,
+  size: /^\d[\d.,]*\s?(B|KB|MB|GB|bytes?)$/,
+  count: /^\d{1,9}( of \d{1,9})?$/,
+  time: /^[\d:.,+\-TZ ]{1,40}$/,
+};
 
 const LABEL_MAX = 40;
 const VALUE_MAX = 120;
@@ -64,9 +75,10 @@ const FORBIDDEN_VALUE: readonly RegExp[] = [
   /\beyJ[A-Za-z0-9_-]{6,}/,
   /\b[A-Z0-9]{4}(-[A-Z0-9]{4}){2,}\b/,
   /x-amz|signature=|token=|secret=|sig=/i,
+  /(^|[\s-])[A-Za-z0-9]{4}([ -][A-Za-z0-9]{4}){2,}($|[\s-])/,
+  /^\s*([a-z]+\s+){11,}[a-z]+\s*$/,
   /#s=|127\.0\.0\.1|localhost/i,
 ];
-const FORBIDDEN_PATH = /upload|download|drop|presign|session|token|secret|signature/i;
 
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -80,7 +92,7 @@ function safeText(s: unknown, max: number): s is string {
 
 function hostAllowed(host: string): boolean {
   const h = host.toLowerCase();
-  return PROOF_LINK_HOSTS.some((d) => h === d || h.endsWith(`.${d}`));
+  return PROOF_LINK_HOSTS.includes(h);
 }
 
 function acceptProofHref(href: unknown): string | null {
@@ -94,7 +106,7 @@ function acceptProofHref(href: unknown): string | null {
   if (u.protocol !== 'https:' || u.username !== '' || u.password !== '' || u.port !== '')
     return null;
   if (u.search !== '' || u.hash !== '' || !hostAllowed(u.hostname)) return null;
-  if (!/^\/[A-Za-z0-9/_.-]*$/.test(u.pathname) || FORBIDDEN_PATH.test(u.pathname)) return null;
+  if (!PROOF_PATH.test(u.pathname)) return null;
   return u.href;
 }
 
@@ -114,6 +126,8 @@ export function acceptHoodField(input: unknown): HoodField | null {
   const value = input['value'];
   if (!safeText(label, LABEL_MAX) || !safeText(value, VALUE_MAX)) return null;
   if (FORBIDDEN_LABEL.test(label)) return null;
+  const shape = KIND_SHAPE[kind as HoodTextKind];
+  if (shape !== undefined && !shape.test(value)) return null;
   if (FORBIDDEN_VALUE.some((re) => re.test(value))) return null;
   return { kind: kind as HoodTextKind, label, value };
 }

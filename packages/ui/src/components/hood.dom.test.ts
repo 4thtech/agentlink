@@ -12,6 +12,7 @@ import {
   acceptHoodField,
   HOOD_STRINGS as S,
   HoodProvider,
+  PROOF_LINK_HOSTS,
   PreviewTile,
   UnderTheHood,
   type HoodField,
@@ -65,6 +66,25 @@ const FORBIDDEN: readonly [string, unknown][] = [
   ['an http explorer link', record('http://basescan.org/tx/1')],
   ['a look-alike host', record('https://basescan.org.evil.example/tx/1')],
   ['a link typed as text', { kind: 'text', label: 'Record', value: PROOF_URL }],
+  ['a look-alike subdomain', record('https://evil.basescan.org/tx/0x' + 'ab'.repeat(32))],
+  ['another blockscout host', record('https://other.blockscout.com/tx/0x' + 'ab'.repeat(32))],
+  ['a suffix host', record('https://notbasescan.org/tx/0x' + 'ab'.repeat(32))],
+  ['a wrong path', record('https://basescan.org/address/0x' + 'ab'.repeat(20))],
+  ['a short tx path', record('https://basescan.org/tx/0xabc')],
+  ['an upper-case tx path', record('https://basescan.org/tx/0x' + 'AB'.repeat(32))],
+  ['a port', record('https://basescan.org:8443/tx/0x' + 'ab'.repeat(32))],
+  ['a backup code with dashes', { kind: 'text', label: 'Note', value: 'k3f9-a82d-77qz-10bc-x9y8' }],
+  ['a backup code with spaces', { kind: 'text', label: 'Note', value: 'k3f9 a82d 77qz 10bc' }],
+  ['a lower-case id code', { kind: 'id', label: 'Reference', value: 'abcd-efgh-jklm' }],
+  [
+    'a recovery phrase',
+    {
+      kind: 'text',
+      label: 'Note',
+      value: 'apple river stone cloud mango tiger lemon piano ocean daisy flame orbit',
+    },
+  ],
+  ['a size that is not a size', { kind: 'size', label: 'Size', value: 'secret-ish text' }],
   ['an unknown kind', { kind: 'secret', label: 'Thing', value: 'odd-kind-value' }],
   ['a non-object', 'https://example.com'],
 ];
@@ -172,6 +192,21 @@ describe('the Under the hood panel', () => {
 
   it('uses plain words (11 §5)', () => {
     expect(lintVocabulary(Object.values(S).join('\n'))).toEqual([]);
+  });
+});
+
+describe('the proof link hosts', () => {
+  it('are exactly the chain config explorers plus the two mainnet explorers', () => {
+    // packages/chain/src/config/testnets.ts `explorer` hosts (a package may not import across; update both).
+    const fromConfig = ['sepolia.basescan.org', 'gnosis-chiado.blockscout.com'];
+    expect([...PROOF_LINK_HOSTS].sort()).toEqual(
+      [...fromConfig, 'basescan.org', 'gnosisscan.io'].sort(),
+    );
+  });
+  it('accept each host with a record path', () => {
+    for (const host of PROOF_LINK_HOSTS) {
+      expect(acceptHoodField(record(`https://${host}/tx/0x${'ab'.repeat(32)}`))).not.toBeNull();
+    }
   });
 });
 

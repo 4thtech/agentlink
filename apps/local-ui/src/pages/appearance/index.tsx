@@ -37,6 +37,7 @@ export function AppearancePage(): ReactElement {
         ]}
         onChange={(v) => setPref('motion', v as MotionPref)}
       />
+      <p className="al-text-caption al-muted">{S.motionHint}</p>
       <Segmented
         label={S.transparency}
         value={prefs.transparency}
