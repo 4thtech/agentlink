@@ -1,6 +1,7 @@
-// M1-PAY-CONFIRM-b in a real browser: the approval page's confirmation sheet for a proof above the
-// owner's limits (b11 §19; 04 §2.5.3; D-132), in Chromium with a CDP virtual authenticator (PRF,
-// user verification). This runs the page script itself (approval-page.ts).
+// M1-PAY-CONFIRM-b in a real browser: the confirmation sheet for a proof above the owner's limits
+// (b11 §19; 04 §2.5.3; D-132), in Chromium with a CDP virtual authenticator (PRF, user
+// verification). M1-11b-2c: the server-rendered page is gone, so this runs the built local app
+// (apps/local-ui, the CLI's bundle), with the passkey registered on its first-run page.
 //
 // - A paid request is never offered for the list's single confirmation: its card has its own
 //   Approve, which opens the sheet (rule 7).
@@ -8,13 +9,12 @@
 //   the platform's check; one live region says Waiting, then Done; the trust lines are shown.
 // - After Done it closes itself (about 1.2 s); with reduced motion it waits for Close.
 //
-// M1-11b-2: the same flows inside the local app, which serves `/` and `/approve/<id>` when
-// the CLI embeds it: the paid card, the sheet, the passkey and the backup code, axe-core clean. That
-// part needs the built app (`pnpm build`); without it, it is skipped locally.
+// - M1-11b-2: the deep link, the backup code with a wrong try first, axe-core clean.
 //
-// CI installs Chromium (ci.yml), so there the test always runs. Locally, without the Playwright
-// browsers, it is skipped; set AGENTLINK_TEST_CHROMIUM to run it.
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+// CI installs Chromium and builds the app (ci.yml), so there the test always runs. Locally, without
+// the Playwright browsers or the build (`pnpm build`), it is skipped; set AGENTLINK_TEST_CHROMIUM to
+// run it.
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -41,7 +41,7 @@ import {
   type ApprovalServer,
   type ApprovalServerSource,
 } from './approval-server.js';
-import { UI_STRINGS } from './approval-page.js';
+import { needBuiltApp, switchToPasskey } from './local-ui-app.fixture.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
 import { initOwnerWith } from './owner-init.js';
@@ -217,20 +217,6 @@ function fakeSource(): ApprovalServerSource & {
   };
 }
 
-const DIST = fileURLToPath(new URL('../../../apps/local-ui/dist/', import.meta.url));
-
-/** The built app as the CLI embeds it (index.html and assets/<name>); undefined when not built. */
-function appAssets(): Map<string, Uint8Array> | undefined {
-  if (!existsSync(join(DIST, 'index.html'))) return undefined;
-  const files = new Map<string, Uint8Array>([
-    ['index.html', new Uint8Array(readFileSync(join(DIST, 'index.html')))],
-  ]);
-  for (const name of readdirSync(join(DIST, 'assets'))) {
-    files.set(`assets/${name}`, new Uint8Array(readFileSync(join(DIST, 'assets', name))));
-  }
-  return files;
-}
-
 const AXE_SOURCE = readFileSync(fileURLToPath(import.meta.resolve('axe-core/axe.min.js')), 'utf8');
 
 /**
@@ -247,7 +233,7 @@ async function axeViolations(page: Page): Promise<string[]> {
   })()`);
 }
 
-async function start(files?: Map<string, Uint8Array>): Promise<{
+async function start(files: Map<string, Uint8Array>): Promise<{
   server: ApprovalServer;
   source: ReturnType<typeof fakeSource>;
   sessionUrl: string;
@@ -255,7 +241,7 @@ async function start(files?: Map<string, Uint8Array>): Promise<{
   const source = fakeSource();
   const opened: string[] = [];
   const server = await startApprovalServerWith(
-    files === undefined ? { source } : { source, localUi: { assets: { files } } },
+    { source, localUi: { assets: { files } } },
     {
       keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(keychain, expected),
@@ -298,30 +284,45 @@ function needBrowser(skip: () => void): void {
   skip();
 }
 
-async function registered(): Promise<{
+/** The words the tests look for (apps/local-ui approvals strings, @4thtech-io/ui PAY_CONFIRM_STRINGS). */
+const T = Object.freeze({
+  paidAlone: 'This costs credits. Approve it on its own.',
+  payTitleProof: 'Record proof',
+  payTrustCredits: 'Your credits stay yours; 4thTech never holds them.',
+  payTrustAi: "Your AI can't confirm this for you.",
+  payDoneProof: 'Done. Your AI records the proof now.',
+  payClose: 'Close',
+  payUseBackup: 'Use backup code instead',
+  payConfirmCode: 'Confirm',
+  payWrongCode: "That backup code didn't match. Nothing was paid.",
+});
+
+/** A server with the built app; the owner registers the passkey on its first-run page. */
+async function registered(ctx: { skip: () => void }): Promise<{
   server: ApprovalServer;
   source: ReturnType<typeof fakeSource>;
   page: Page;
 }> {
-  const { server, source, sessionUrl } = await start();
+  needBrowser(() => ctx.skip());
+  const files = needBuiltApp(() => ctx.skip());
+  const { server, source, sessionUrl } = await start(files);
   const page = await pageWithAuthenticator();
   await page.goto(sessionUrl);
-  await page.getByRole('button', { name: 'Set up a passkey' }).click();
-  await page.locator('input[type=password]').fill(code);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByText('Passkey set up.').waitFor();
+  await switchToPasskey(page, server.origin, code);
   return { server, source, page };
 }
 
 const CONFIRM = /^Confirm with (Touch ID|Windows Hello|your passkey)$/;
 
-describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromium)', () => {
-  it('a paid request is approved on its own, through the sheet, and the sheet closes itself', async (ctx) => {
-    needBrowser(() => ctx.skip());
-    const { server, source, page } = await registered();
+describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromium)', () => {
+  it('a paid request is its own card; Approve opens the sheet; the passkey confirms it; the sheet closes itself', async (ctx) => {
+    const { server, source, page } = await registered(ctx);
     source.addFree(1);
     source.addPaid(2);
     await page.goto(server.origin + '/');
+    await page
+      .locator('nav[aria-label="Main"] a[aria-current="page"]', { hasText: 'Approvals' })
+      .waitFor();
     // Rule 7: the paid request has no list choice; the free one does.
     await page
       .locator(`input[name="choice-${id(1)}"]`)
@@ -329,7 +330,8 @@ describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromiu
       .waitFor();
     expect(await page.locator(`input[name="choice-${id(2)}"]`).count()).toBe(0);
     const paidCard = page.locator(`[data-approval="${id(2)}"]`);
-    await paidCard.getByText(UI_STRINGS.paidAlone).waitFor();
+    await paidCard.getByText(T.paidAlone).waitFor();
+    expect(await axeViolations(page)).toEqual([]);
 
     await paidCard.getByRole('button', { name: 'Approve', exact: true }).click();
     const dialog = page.getByRole('dialog');
@@ -339,14 +341,18 @@ describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromiu
     // Focus starts on the title, never on Confirm (b11 §19.2, §19.5).
     expect(
       await page.evaluate('document.activeElement && document.activeElement.textContent'),
-    ).toBe(UI_STRINGS.payTitleProof);
-    await dialog.getByText(UI_STRINGS.payTrustCredits).waitFor();
-    await dialog.getByText(UI_STRINGS.payTrustAi).waitFor();
+    ).toBe(T.payTitleProof);
+    await dialog.getByText(T.payTrustCredits).waitFor();
+    await dialog.getByText(T.payTrustAi).waitFor();
+    // The sheet slides in (b11 §14): check it once it has settled.
+    await page.waitForTimeout(600);
+    expect(await axeViolations(page)).toEqual([]);
     const confirm = dialog.getByRole('button', { name: CONFIRM });
     expect(await confirm.count()).toBe(1);
     await confirm.click();
-    await dialog.locator('[aria-live="polite"]', { hasText: UI_STRINGS.payDoneProof }).waitFor();
+    await dialog.locator('[aria-live="polite"]', { hasText: T.payDoneProof }).waitFor();
     await dialog.waitFor({ state: 'detached', timeout: 5_000 });
+    await paidCard.getByText('Approved.').waitFor();
     expect(source.applied).toHaveLength(1);
     const signed = source.applied[0];
     if (signed === undefined) throw new Error('unreachable');
@@ -356,8 +362,7 @@ describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromiu
   }, 120_000);
 
   it('with reduced motion, Done waits for Close; Escape cancelled the first try and paid nothing', async (ctx) => {
-    needBrowser(() => ctx.skip());
-    const { server, source, page } = await registered();
+    const { server, source, page } = await registered(ctx);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     source.addPaid(3);
     await page.goto(server.approvalUrl(id(3)));
@@ -372,87 +377,17 @@ describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromiu
     await dialog.waitFor();
     expect(await dialog.getAttribute('data-motion')).toBe('reduced');
     await dialog.getByRole('button', { name: CONFIRM }).click();
-    await dialog.locator('[aria-live="polite"]', { hasText: UI_STRINGS.payDoneProof }).waitFor();
+    await dialog.locator('[aria-live="polite"]', { hasText: T.payDoneProof }).waitFor();
     await page.waitForTimeout(2_000);
     expect(await dialog.count()).toBe(1);
-    await dialog.getByRole('button', { name: UI_STRINGS.payClose }).click();
+    await dialog.getByRole('button', { name: T.payClose }).click();
     await dialog.waitFor({ state: 'detached' });
     expect(source.applied).toHaveLength(1);
     await page.context().close();
   }, 120_000);
-});
-
-// M1-11b-2: parity inside the app. The passkey is registered on the old page (no bundle) in the same
-// browser context and keychain, then a server with the app bundle serves Approvals.
-describe('the confirmation sheet inside the app (M1-11b-2; Chromium)', () => {
-  async function inApp(ctx: { skip: () => void }): Promise<
-    | {
-        server: ApprovalServer;
-        source: ReturnType<typeof fakeSource>;
-        page: Page;
-      }
-    | undefined
-  > {
-    needBrowser(() => ctx.skip());
-    const files = appAssets();
-    if (files === undefined) {
-      if (process.env['CI'] !== undefined) throw new Error('the app is not built');
-      ctx.skip();
-      return undefined;
-    }
-    const { page } = await registered();
-    const { server, source, sessionUrl } = await start(files);
-    await page.goto(sessionUrl);
-    await page.getByRole('heading', { level: 1, name: 'Approvals' }).waitFor();
-    return { server, source, page };
-  }
-
-  it('a paid request is its own card in the app; Approve opens the sheet; the passkey confirms it', async (ctx) => {
-    const got = await inApp(ctx);
-    if (got === undefined) return;
-    const { server, source, page } = got;
-    source.addFree(1);
-    source.addPaid(2);
-    await page.goto(server.origin + '/');
-    await page
-      .locator('nav[aria-label="Main"] a[aria-current="page"]', { hasText: 'Approvals' })
-      .waitFor();
-    await page
-      .locator(`input[name="choice-${id(1)}"]`)
-      .first()
-      .waitFor();
-    expect(await page.locator(`input[name="choice-${id(2)}"]`).count()).toBe(0);
-    const paidCard = page.locator(`[data-approval="${id(2)}"]`);
-    await paidCard.getByText(UI_STRINGS.paidAlone).waitFor();
-    expect(await axeViolations(page)).toEqual([]);
-
-    await paidCard.getByRole('button', { name: 'Approve', exact: true }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.waitFor();
-    expect(await dialog.getAttribute('aria-modal')).toBe('true');
-    await dialog.getByText('$0.10', { exact: true }).waitFor();
-    expect(
-      await page.evaluate('document.activeElement && document.activeElement.textContent'),
-    ).toBe(UI_STRINGS.payTitleProof);
-    // The sheet slides in (b11 §14): check it once it has settled.
-    await page.waitForTimeout(600);
-    expect(await axeViolations(page)).toEqual([]);
-    await dialog.getByRole('button', { name: CONFIRM }).click();
-    await dialog.locator('[aria-live="polite"]', { hasText: UI_STRINGS.payDoneProof }).waitFor();
-    await dialog.waitFor({ state: 'detached', timeout: 5_000 });
-    await paidCard.getByText('Approved.').waitFor();
-    expect(source.applied).toHaveLength(1);
-    const signed = source.applied[0];
-    if (signed === undefined) throw new Error('unreachable');
-    expect(ownerSigValid(signed.body, signed.sig)).toBe(true);
-    expect((signed.body['params'] as Record<string, unknown>)['approvalId']).toBe(id(2));
-    await page.context().close();
-  }, 120_000);
 
   it('the deep link renders in the app; the backup code confirms a paid request', async (ctx) => {
-    const got = await inApp(ctx);
-    if (got === undefined) return;
-    const { server, source, page } = got;
+    const { server, source, page } = await registered(ctx);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     source.addPaid(3);
     await page.goto(server.approvalUrl(id(3)));
@@ -462,15 +397,15 @@ describe('the confirmation sheet inside the app (M1-11b-2; Chromium)', () => {
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
-    await dialog.getByRole('button', { name: UI_STRINGS.payUseBackup }).click();
+    await dialog.getByRole('button', { name: T.payUseBackup }).click();
     await dialog.locator('input[type=password]').fill('WRNG WRNG WRNG');
-    await dialog.getByRole('button', { name: UI_STRINGS.payConfirmCode, exact: true }).click();
-    await dialog.getByText(UI_STRINGS.payWrongCode).waitFor();
+    await dialog.getByRole('button', { name: T.payConfirmCode, exact: true }).click();
+    await dialog.getByText(T.payWrongCode).waitFor();
     expect(source.applied).toHaveLength(0);
     await dialog.locator('input[type=password]').fill(code);
-    await dialog.getByRole('button', { name: UI_STRINGS.payConfirmCode, exact: true }).click();
-    await dialog.locator('[aria-live="polite"]', { hasText: UI_STRINGS.payDoneProof }).waitFor();
-    await dialog.getByRole('button', { name: UI_STRINGS.payClose }).click();
+    await dialog.getByRole('button', { name: T.payConfirmCode, exact: true }).click();
+    await dialog.locator('[aria-live="polite"]', { hasText: T.payDoneProof }).waitFor();
+    await dialog.getByRole('button', { name: T.payClose }).click();
     await dialog.waitFor({ state: 'detached' });
     expect(source.applied).toHaveLength(1);
     expect(await page.content()).not.toContain(code);

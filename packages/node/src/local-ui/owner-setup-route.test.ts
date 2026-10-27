@@ -79,6 +79,7 @@ import {
   type SetupFolders,
 } from '../owner-setup.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
+import { TEST_APP } from '../local-ui-app.fixture.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
 const NOW = 1_800_000_000;
@@ -293,10 +294,12 @@ async function harness(
     {
       source: sourceOf(agent),
       onEvent: (event) => void events.push(event),
+      // M1-11b-2c: the page (and its CSRF token) is the app's; a minimal bundle stands in.
       localUi:
         options.setup === false
-          ? {}
+          ? { assets: TEST_APP }
           : {
+              assets: TEST_APP,
               ownerSetup: {
                 firstCard: options.firstCard ?? firstCardOf(agent),
                 // IR-M1-11s-c-1 L-6: a test home, never the real ~/.agentlink.

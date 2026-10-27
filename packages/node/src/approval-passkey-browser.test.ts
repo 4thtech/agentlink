@@ -1,11 +1,13 @@
-// M1-8e / M1-31 deferred acceptance in a real browser: the local approval page on
-// `http://localhost:<port>` registers a PRF passkey and approves with it, in Chromium with a CDP
-// virtual authenticator (WebAuthn PRF, user verification, resident keys; no hardware). This runs the
-// page script itself (approval-page.ts), not a simulation of it.
+// M1-8e / M1-31 deferred acceptance in a real browser: the local app on `http://localhost:<port>`
+// registers a PRF passkey and approves with it, in Chromium with a CDP virtual authenticator
+// (WebAuthn PRF, user verification, resident keys; no hardware). M1-11b-2c: the server-rendered
+// page is gone, so this runs the built local app (apps/local-ui, the CLI's bundle): the passkey is
+// registered on its first-run page with the backup code once, then approves in Approvals.
 //
-// CI installs Chromium for Playwright (ci.yml), so there the test always runs and a browser that
-// cannot start fails it. Locally, without the Playwright browsers, it is skipped; set
-// AGENTLINK_TEST_CHROMIUM to a Chromium or chrome-headless-shell executable to run it.
+// CI installs Chromium for Playwright and builds the app (ci.yml), so there the test always runs
+// and a browser that cannot start, or a missing build, fails it. Locally, without the Playwright
+// browsers or the build, it is skipped; set AGENTLINK_TEST_CHROMIUM to a Chromium or
+// chrome-headless-shell executable to run it.
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,6 +42,7 @@ import type { KeychainBackend } from './keychain.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { OWNER_PASSKEY_ACCOUNT } from './owner-passkey.js';
+import { USE_PASSKEY, builtApp, switchToPasskey } from './local-ui-app.fixture.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
@@ -80,8 +83,10 @@ let owner: OwnerPublicKeys;
 let code = '';
 let browser: Browser | undefined;
 let launchError: unknown;
+let app: Map<string, Uint8Array> | undefined;
 
 beforeAll(async () => {
+  app = builtApp();
   agentId = await createKeychainAgent(keychain);
   const written: string[] = [];
   const setup: OwnerTerminal = {
@@ -176,8 +181,9 @@ async function start(routes?: LocalUiRouteRegistry): Promise<{
 }> {
   const source = fakeSource();
   const opened: string[] = [];
+  if (app === undefined) throw new Error('unreachable');
   const server = await startApprovalServerWith(
-    { source },
+    { source, localUi: { assets: { files: app } } },
     {
       keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(keychain, expected),
@@ -225,10 +231,12 @@ async function pageWithAuthenticator(hasPrf: boolean): Promise<{
   };
 }
 
-/** Skips locally when no browser could start; in CI that is a failure. */
+/** Skips locally when no browser could start or the app is not built; in CI that is a failure. */
 function needBrowser(skip: () => void): void {
-  if (browser !== undefined) return;
-  if (process.env['CI'] !== undefined) throw launchError;
+  if (browser !== undefined && app !== undefined) return;
+  if (process.env['CI'] !== undefined) {
+    throw browser === undefined ? launchError : new Error('the app is not built (pnpm build)');
+  }
   skip();
 }
 
@@ -280,7 +288,7 @@ const PASSKEY_UI_POST = `(async () => {
   return { status: res.status, body: await res.json() };
 })()`;
 
-describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium)', () => {
+describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => {
   it('registers a passkey on http://localhost:<port> and approves with it', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, sessionUrl } = await start();
@@ -288,10 +296,7 @@ describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium
     const { page, credentials } = await pageWithAuthenticator(true);
 
     await page.goto(sessionUrl);
-    await page.getByRole('button', { name: 'Set up a passkey' }).click();
-    await page.locator('input[type=password]').fill(code);
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByText('Passkey set up.').waitFor();
+    await switchToPasskey(page, server.origin, code);
 
     const blob = await keychain.get(OWNER_PASSKEY_ACCOUNT);
     if (blob === null) throw new Error('no owner-passkey item');
@@ -321,10 +326,10 @@ describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium
     const { page } = await pageWithAuthenticator(false);
 
     await page.goto(sessionUrl);
-    await page.getByRole('button', { name: 'Set up a passkey' }).click();
-    await page.locator('input[type=password]').fill(code);
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByText("This passkey can't protect approvals here.").waitFor();
+    await page.goto(`${server.origin}/first-run`);
+    await page.getByLabel('Backup code').fill(code);
+    await page.getByRole('button', { name: USE_PASSKEY }).click();
+    await page.getByText("This passkey can't protect approvals here.", { exact: false }).waitFor();
     expect(await keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
 
     source.add(1);
@@ -368,13 +373,10 @@ describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium
         };
       },
     });
-    const { sessionUrl } = await start(routes);
+    const { server, sessionUrl } = await start(routes);
     const { page } = await pageWithAuthenticator(true);
     await page.goto(sessionUrl);
-    await page.getByRole('button', { name: 'Set up a passkey' }).click();
-    await page.locator('input[type=password]').fill(code);
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByText('Passkey set up.').waitFor();
+    await switchToPasskey(page, server.origin, code);
 
     // Runs in the page (plain JS: this package is type-checked without DOM types).
     const answer: unknown = await page.evaluate(PASSKEY_UI_POST);
@@ -384,7 +386,7 @@ describe('the localhost approval page with a PRF passkey (M1-8e, M1-31; Chromium
     await page.context().close();
   }, 120_000);
 
-  it('refuses the page at http://127.0.0.1:<port> (one origin, D-79)', async (ctx) => {
+  it('refuses the app at http://127.0.0.1:<port> (one origin, D-79)', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, sessionUrl } = await start();
     const { page } = await pageWithAuthenticator(true);

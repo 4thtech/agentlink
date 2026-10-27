@@ -1,21 +1,19 @@
-// M1-11b-2: the app's approvals use the same words as the server-rendered approval page
-// (packages/node/src/approval-page.ts UI_STRINGS), which stays for a CLI without the app bundle
-// until its removal card. That package does not depend on this one, so this test reads its source:
-// every key here must be there with the same text (`${CLI_COMMAND}` stands for the CLI prefix).
-// The local app says "backup code" where that page says "owner code" (11 §5.5, UX-031-QUICKWINS):
-// those keys must differ in exactly that word.
+// M1-11b-2: the approvals words. M1-11b-2c: the server-rendered approval page they were compared
+// with is gone, so these are the only approvals words; the rules that page's tests held for them
+// (packages/node cli-command.test.ts M1-36a-b, approval-page.test.ts PRE-031-FIXES) are checked
+// here: the CLI prefix is the server's, every owner step names the npx form (never a bare
+// `agentlink ...` or the dead `agentlink ui`), the paid note states no amount of its own, and the
+// local app says "backup code" (11 §5.5, UX-031-QUICKWINS).
 import { lintVocabulary } from '@4thtech-io/ui';
 import { describe, expect, it } from 'vitest';
 import { APPROVAL_STRINGS, BACKUP_CODE_WORDING, CLI_PREFIX } from './strings.js';
 
 // Read through Vite: a relative import would leave the app (boundaries rule).
-const files = import.meta.glob(
-  [
-    '../../../../../packages/node/src/approval-page.ts',
-    '../../../../../packages/node/src/cli-command.ts',
-  ],
-  { query: '?raw', import: 'default', eager: true },
-);
+const files = import.meta.glob(['../../../../../packages/node/src/cli-command.ts'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
 
 function source(name: string): string {
   const entry = Object.entries(files).find(([path]) => path.endsWith(name));
@@ -24,34 +22,48 @@ function source(name: string): string {
   return text;
 }
 
-describe('the approvals words match the approval page (M1-11b-2)', () => {
-  it('uses the same CLI prefix', () => {
+const BARE = /(`|\b[Rr]un |<code>)agentlink [a-z]/;
+
+describe('the approvals words name the command that works (M1-36a-b)', () => {
+  it('uses the same CLI prefix as the server', () => {
     expect(source('cli-command.ts')).toContain(`export const CLI_COMMAND = '${CLI_PREFIX}';`);
   });
 
-  it.each(Object.entries(APPROVAL_STRINGS))('%s', (key, value) => {
-    const page = source('approval-page.ts');
-    const start = page.indexOf(`\n  ${key}:`);
-    expect(start, `UI_STRINGS.${key} missing`).toBeGreaterThan(0);
-    const rest = page.slice(start + key.length + 4);
-    const end = rest.search(/\n {2}(?:\/\/|[a-zA-Z]+:)|\n\}\);/);
-    const entry = rest.slice(0, end < 0 ? undefined : end);
-    const renamed = BACKUP_CODE_WORDING.has(key);
-    const wording = renamed
-      ? value.replace(/backup code/g, 'owner code').replace(/Backup code/g, 'Owner code')
-      : value;
-    expect(wording !== value, `${key}: backup code wording`).toBe(renamed);
-    const templated = wording.split(CLI_PREFIX).join('${CLI_COMMAND}');
-    const forms = [`'${wording}'`, `"${wording}"`, `\`${templated}\``];
-    expect(
-      forms.some((f) => entry.includes(f)),
-      `UI_STRINGS.${key} differs`,
-    ).toBe(true);
+  it('the owner steps name the npx form', () => {
+    expect(APPROVAL_STRINGS.needsOwner).toContain(`${CLI_PREFIX} owner init`);
+    expect(APPROVAL_STRINGS.needsSetup).toContain(`${CLI_PREFIX} owner init`);
+    expect(APPROVAL_STRINGS.notRunning).toContain(`${CLI_PREFIX} approve`);
+    expect(APPROVAL_STRINGS.wait).toContain(`${CLI_PREFIX} approve`);
+  });
+
+  it('has no bare prefix and no dead `ui` command', () => {
+    const texts = Object.values(APPROVAL_STRINGS);
+    expect(texts.filter((t) => BARE.test(t))).toEqual([]);
+    expect(texts.filter((t) => t.includes('agentlink ui'))).toEqual([]);
+  });
+
+  it('the checker itself finds a bare prefix (self-test)', () => {
+    expect(BARE.test('or run agentlink ui.')).toBe(true);
+    expect(BARE.test(`run ${CLI_PREFIX} approve`)).toBe(false);
   });
 });
 
-describe('the approvals words use plain vocabulary (11 §5)', () => {
+describe('the approvals words (11 §5)', () => {
   it('passes lintVocabulary', () => {
     expect(lintVocabulary(Object.values(APPROVAL_STRINGS).join('\n'))).toEqual([]);
+  });
+
+  it('says "backup code", never "owner code", in the renamed keys (11 §5.5)', () => {
+    expect(BACKUP_CODE_WORDING.size).toBeGreaterThan(0);
+    for (const key of BACKUP_CODE_WORDING) {
+      const text = APPROVAL_STRINGS[key as keyof typeof APPROVAL_STRINGS];
+      expect(text, key).toMatch(/[Bb]ackup code/);
+      expect(text, key).not.toMatch(/[Oo]wner code/);
+    }
+  });
+
+  it('PRE-031-FIXES: the paid note names no amount, so it never differs from the signed statement', () => {
+    expect(APPROVAL_STRINGS.paidAlone).not.toContain('{cost}');
+    expect(APPROVAL_STRINGS.paidAlone).not.toMatch(/\$\d/);
   });
 });

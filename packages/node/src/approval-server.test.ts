@@ -48,6 +48,7 @@ import { createKeychainAgent } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
 import { initOwnerWith } from './owner-init.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
+import { TEST_APP } from './local-ui-app.fixture.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
 const execFileAsync = promisify(execFile);
@@ -286,7 +287,8 @@ async function harness(extra: ApprovalServerInternals = {}): Promise<Harness> {
   const notified: string[][] = [];
   const ownerStoresOpened = { count: 0 };
   const server = await startApprovalServerWith(
-    { source, onEvent: (e) => void events.push(e) },
+    // M1-11b-2c: the page (and its CSRF token) is the app's; a minimal bundle stands in.
+    { source, onEvent: (e) => void events.push(e), localUi: { assets: TEST_APP } },
     {
       openOwnerStore: (expected) => {
         ownerStoresOpened.count += 1;
@@ -417,7 +419,8 @@ describe('binding and the session token (08 §1)', () => {
     const cookie = await h.cookie();
     const page = await send(h.port, `/approve/${id(1)}`, { headers: { Cookie: cookie } });
     expect(page.status).toBe(200);
-    expect(page.body).toContain("Your AI can't approve this for you");
+    // M1-11b-2c: the page is the app's shell (the approvals render inside it).
+    expect(page.body).toContain('<div id="root"></div>');
   });
 
   it('sends no-store, no-referrer, no framing and a strict CSP on every answer', async () => {
