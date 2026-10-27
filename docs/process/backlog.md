@@ -4718,7 +4718,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests for new row, filter, empty, offline and loading; reduced motion; a 200-row fixture never animates more than two rows at once.
 
 #### UI-REFRESH-i · local-ui: Contacts refresh (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Contacts), §6 rows 4 and 9
@@ -4751,7 +4751,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - The existing messages tests unchanged; DOM tests per state; reduced motion; the panel shows only message ID, size and proof status with the public proof record link where there is a proof; no key, code, token, session, drop or presigned link.
 
 #### UI-REFRESH-l · local-ui: Proofs & credits refresh (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Proofs & credits), §15.3, §19.4
@@ -4762,7 +4762,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests per state; the panel shows the public record link and no key, code, token, session, drop or presigned link; amounts never animate; reduced motion; the existing proofs tests unchanged.
 
 #### UI-REFRESH-m · local-ui: Rules refresh (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Rules)
@@ -4912,6 +4912,42 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Touches approval-page tests under `packages/node`, so the class is S2. Test files only; no product code changes.
 - **Acceptance:**
   - Tests first (RED commit): `RED (expected): M1-11b-2d ...` shows each restored check failing when its subject is broken on purpose; a short threat note in the PR; no test weakened; no product code changed.
+
+#### UI-REFRESH-e3 · ui: tighten the Under the hood allowlist for encoded and look-alike inputs (new, low, #607, #609, #612)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` (Under the hood, the inert-hold helper), `packages/ui/src/index.ts`, tests; changeset
+- **Depends on:** UI-REFRESH-e2
+- **Spec:** B-11 §7, §14; 04 §4
+- **Invariants:** I-5
+- **Scope:**
+  - (a) Tighten the allowlist for encoded and look-alike inputs: a key-shaped value split across path segments, a scheme written with a single slash, percent-encoded or full-width forms of a refused URL or its fields, a scheme-less host that belongs to the encrypted drop, and bidirectional or DEL control characters (today only characters below 32 are refused). Shared text and path checks get the same treatment. The cases are described in the tests, not in the PR text beyond this list.
+  - (b) The 24-character run rule skips kind `id`, whose 40-character shape already bounds it, so real message IDs (`env_` plus 22 characters) show.
+  - (c) The inert-hold helper (`holdInert`) is marked `@internal` and moves off the public index (it is currently exported through `components/index.ts`). The threat note for UI-REFRESH-f-c records the residual: elements mounted after the hold are only covered once f-c lands.
+  - Each refused kind (keys, codes, tokens, session links, drop, upload and download URLs, presigned links) stays refused; no allowed shape becomes refused except the ones above.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (c); a message ID shows; the public index no longer exports `holdInert`; short threat note in the PR; no test weakened.
+
+#### UI-REFRESH-r · local-ui: page review lows from Contacts, Messages, Files, Rules and Proofs (new, low, #603, #608, #609, #611, #614, #615)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{contacts,messages,files,rules,proofs}/**`, `apps/local-ui/src/api/**` (health feed), `apps/local-ui/src/strings.ts`, tests; `apps/local-ui/package.json` (axe-core only if not already present)
+- **Depends on:** UI-REFRESH-i; UI-REFRESH-j; UI-REFRESH-k; UI-REFRESH-l; UI-REFRESH-m
+- **Spec:** B-11 §7, §14; 11 §5
+- **Invariants:** —
+- **Scope:**
+  - (a) The health-feed poller keeps its state at module level and uses only the first subscriber's read; add a reset for tests so a leftover subscriber cannot leak between tests.
+  - (b) Contacts: the Under the hood fingerprint shows in groups (B-11 §7). Axe tests for Contacts and for Messages (local-ui now has axe-core, #610).
+  - (c) Files: the "Folder N" label moves into the strings file; "N more" shows when there are more than 5 folder paths; a refresh that returns an empty newest page keeps the rows already loaded and marks them "as of".
+  - (d) Rules: the invites summary says "Allowed", like the other rows.
+  - (e) Proofs: the polling merge after "Load more" no longer drops a row; the row key (created time plus direction) cannot collide within one second; the credits ring does not announce 0 to screen readers before it fills.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (e); axe zero violations on Contacts and Messages; no test weakened. If axe-core is not yet a dependency of local-ui, the PR justifies adding it as a devDependency (no `postinstall`).
+
+#### CHORE-GASLESS-NONCE-TIMEOUT · chain: gasless nonce uniqueness test hit the 60 s timeout (new, flake 2026-10-27, #607 push run)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (content rule: touches nonces; path `packages/chain/**` is S1)
+- **Repo/path:** agentlink · `packages/chain/src/fees/gasless.test.ts` (tests only, no product code)
+- **Depends on:** —
+- **Scope:** Seen 2026-10-27 about 19:08Z on the push run of #607: "draws a fresh 32-byte nonce every time (1 000 builds)" hit the 60 s test timeout. Measure where the time goes, then make the test faster or give it a measured per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout.
+- **Acceptance:** the PR names the slow part with its measured duration; the uniqueness check (all 1 000 nonces distinct, 32 bytes each) is unchanged; a short threat note in the PR; no test or gate weakened; no product code changed.
 
 ### Design system from the design (`packages/ui`, D-116)
 

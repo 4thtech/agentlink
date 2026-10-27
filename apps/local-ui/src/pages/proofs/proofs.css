@@ -127,3 +127,17 @@
     fill: var(--al-color-fg-default);
   }
 }
+
+/* UI-REFRESH-l: the credits card is a level-2 surface (depth.css); the older card chrome steps aside
+   and the ring sits at the end of the top row. */
+.pf-side .al-credits.al-surface--l2 {
+  background: var(--al-color-bg-raised);
+  border-color: transparent;
+}
+.pf-side .al-credits-top {
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.pf-waiting {
+  margin: 0;
+}

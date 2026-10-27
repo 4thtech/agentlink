@@ -121,6 +121,11 @@ async function mount(routes: Routes): Promise<Call[]> {
     await Promise.resolve();
   });
   await settle();
+  // The detail opens in a side sheet when a row is chosen (UI-REFRESH-i); choose the first one.
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>('.ct-row')?.click();
+  });
+  await settle();
   return s.calls;
 }
 

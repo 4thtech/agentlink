@@ -6,6 +6,9 @@ export const RULES_STRINGS = {
   eyebrow: 'What your agent may do without asking',
   savingNote: 'Saving asks for your passkey',
   loading: 'Loading your rules…',
+  summaryTitle: 'Rules in force',
+  summaryNote: 'This is what your agent follows right now.',
+  hoodVersion: 'Rules version',
   everyday: 'Everyday',
   moreRules: 'More rules',
 
