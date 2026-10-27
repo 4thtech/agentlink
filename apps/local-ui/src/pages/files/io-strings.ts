@@ -23,6 +23,9 @@ export const FILES_IO_STRINGS = {
   hoodFiles: 'Files listed',
   hoodSize: 'Size listed',
   hoodFolders: 'Folders allowed',
+  hoodFolder: (n: number): string => `Folder ${String(n)}`,
+  hoodMoreFolders: 'More folders',
+  hoodMore: (n: number): string => `${String(n)} more`,
   untrustedNote:
     "File names come from other people. They're shown as plain text, and AgentLink never opens a file for you.",
   gotIt: 'Got it',

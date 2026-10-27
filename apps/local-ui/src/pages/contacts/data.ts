@@ -46,7 +46,10 @@ export type RenameCheck =
 export const LIST_PATH = '/api/ui/contacts';
 const REF = /^0x[0-9a-f]{40}$/;
 const CODE = /^[0-9]{4} [0-9]{4} [0-9]{4}$/;
-const FINGERPRINT = /^[0-9A-F]{4}·[0-9A-F]{4}$/;
+const FINGERPRINT = /^[0-9A-Fa-f]{4}(?:[ ·-]?[0-9A-Fa-f]{4}){1,3}$/;
+/** Shown in groups of four, upper case, joined by the middle dot (B-11 §7). */
+const groupFingerprint = (fp: string): string =>
+  (fp.replace(/[ ·-]/g, '').toUpperCase().match(/.{4}/g) ?? []).join('·');
 const MAX_NAME = 128;
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -78,7 +81,7 @@ function row(v: unknown): ContactRow | undefined {
     status,
     pairing,
     since,
-    ...(fp === null ? {} : { fingerprint: fp }),
+    ...(fp === null ? {} : { fingerprint: groupFingerprint(fp) }),
     ...(older === null ? {} : { olderSameOwner: older }),
   };
 }

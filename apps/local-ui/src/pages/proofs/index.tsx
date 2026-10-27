@@ -75,7 +75,34 @@ function When({ seconds }: { seconds: number }): ReactElement {
   );
 }
 
-const rowKey = (item: ProofRow): string => `${String(item.createdAt)}-${item.direction}`;
+/**
+ * One key per row, unique even when several proofs share a second: time and direction, plus how many
+ * rows before it (from the top) have the same pair.
+ */
+function keysOf(items: readonly ProofRow[]): string[] {
+  const counts = new Map<string, number>();
+  return items.map((item) => {
+    const base = `${String(item.createdAt)}-${item.direction}`;
+    const n = counts.get(base) ?? 0;
+    counts.set(base, n + 1);
+    return `${base}-${String(n)}`;
+  });
+}
+
+/** The newest page from a quiet re-read on top, then the older rows already loaded below it. */
+function mergeNewest(fresh: readonly ProofRow[], old: readonly ProofRow[]): readonly ProofRow[] {
+  if (fresh.length === 0) return old;
+  const oldest = Math.min(...fresh.map((r) => r.createdAt));
+  const sameSecond = fresh.filter((r) => r.createdAt === oldest).length;
+  let skipped = 0;
+  const rest = old.filter((r) => {
+    if (r.createdAt < oldest) return true;
+    if (r.createdAt > oldest) return false;
+    skipped += 1;
+    return skipped > sameSecond;
+  });
+  return [...fresh, ...rest];
+}
 const inFlight = (state: string): boolean => state === 'recording' || state === 'submitted';
 
 function ProofTable({
@@ -85,6 +112,7 @@ function ProofTable({
   items: readonly ProofRow[];
   moments: ReadonlySet<string>;
 }): ReactElement {
+  const keys = keysOf(items);
   return (
     <div className="pf-table-wrap">
       <table className="pf-table">
@@ -98,7 +126,7 @@ function ProofTable({
         </thead>
         <tbody className="al-text-body">
           {items.map((item, i) => (
-            <tr key={`${String(item.createdAt)}-${String(i)}`}>
+            <tr key={keys[i]}>
               <td>
                 <span className="pf-dir">
                   <Icon name={item.direction === 'sent' ? 'arrow-right' : 'inbox'} size={16} />
@@ -110,7 +138,7 @@ function ProofTable({
               </td>
               <td>
                 <ProofBadge state={item.state} />
-                {moments.has(rowKey(item)) ? <SuccessMoment kind="proof" /> : null}
+                {moments.has(keys[i] ?? '') ? <SuccessMoment kind="proof" /> : null}
               </td>
             </tr>
           ))}
@@ -138,14 +166,17 @@ function useFilled(target: number): number {
 
 function CreditsRing({ proofs, balance }: { proofs: number; balance: string }): ReactElement {
   const shown = useFilled(proofs);
+  // Until the ring has filled, its 0 is a drawing step, not an answer: screen readers skip it.
   return (
-    <RingMeter
-      label={S.creditsLabel}
-      value={shown}
-      max={Math.max(RING_FULL_AT, proofs)}
-      text={inCredits(balance)}
-      size="lg"
-    />
+    <span className="pf-ring" {...(shown === proofs ? {} : { 'aria-hidden': true })}>
+      <RingMeter
+        label={S.creditsLabel}
+        value={shown}
+        max={Math.max(RING_FULL_AT, proofs)}
+        text={inCredits(balance)}
+        size="lg"
+      />
+    </span>
   );
 }
 
@@ -255,15 +286,15 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
     void api.get(listPath()).then((res) => {
       const answer = res.kind === 'ok' ? parseList(res.data) : undefined;
       if (answer?.kind !== 'ok') return;
+      const keys = keysOf(answer.items);
       const done = answer.items
-        .filter((r) => r.state === 'recorded' && inFlight(seen.current.get(rowKey(r)) ?? ''))
-        .map(rowKey);
-      for (const r of answer.items) seen.current.set(rowKey(r), r.state);
+        .map((r, i) => [r, keys[i] ?? ''] as const)
+        .filter(([r, k]) => r.state === 'recorded' && inFlight(seen.current.get(k) ?? ''))
+        .map(([, k]) => k);
+      answer.items.forEach((r, i) => seen.current.set(keys[i] ?? '', r.state));
       if (done.length > 0) setMoments((m) => new Set([...m, ...done]));
       setList((old) =>
-        old.phase === 'ok'
-          ? { ...old, items: [...answer.items, ...old.items.slice(answer.items.length)] }
-          : old,
+        old.phase === 'ok' ? { ...old, items: mergeNewest(answer.items, old.items) } : old,
       );
     });
     void api.get(CREDITS_PATH).then((res) => {
@@ -295,7 +326,8 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
       if (!live) return;
       const answer = res.kind === 'ok' ? parseList(res.data) : problem(res);
       if (answer.kind === 'ok') {
-        for (const r of answer.items) seen.current.set(rowKey(r), r.state);
+        const keys = keysOf(answer.items);
+        answer.items.forEach((r, i) => seen.current.set(keys[i] ?? '', r.state));
         setList({
           phase: 'ok',
           items: answer.items,
