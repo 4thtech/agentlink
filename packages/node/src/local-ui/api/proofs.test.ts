@@ -32,9 +32,14 @@ function fakeClient(
     agentId: AGENT,
     getProof: () => Promise.reject(new Error('not used')),
     listActivity: () => Promise.reject(new Error('not used')),
+    messages: {
+      conversations: () => Promise.reject(new Error('not used')),
+      list: () => Promise.reject(new Error('not used')),
+    },
     filesIo: {
       received: () => Promise.reject(new Error('not used')),
       sent: () => Promise.reject(new Error('not used')),
+      savedName: () => Promise.reject(new Error('not used')),
     },
     policy: {
       load: () => Promise.reject(new Error('not used')),
@@ -444,6 +449,7 @@ describe('the read-only client view (context.ts)', () => {
       'filesIo',
       'getProof',
       'listActivity',
+      'messages',
       'policy',
       'proofs',
     ]);

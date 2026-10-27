@@ -95,7 +95,9 @@ const flush = async (): Promise<void> => {
 async function mount(routes: Record<string, Handler>) {
   const s = server(routes);
   await act(async () => {
-    root.render(h<FilesPageProps>(FilesPage, { fetch: s.fetch, token: 'tok' }));
+    root.render(
+      h<FilesPageProps>(FilesPage, { fetch: s.fetch, token: 'tok', initialTab: 'folders' }),
+    );
   });
   await flush();
   return s;
@@ -308,7 +310,9 @@ describe('allow a folder (04 §4, D-119)', () => {
       [`POST ${COMMIT}`]: new Answer(403, { status: 'presence_rejected' }),
     });
     await act(async () => {
-      root.render(h<FilesPageProps>(FilesPage, { fetch: s.fetch, token: 'tok' }));
+      root.render(
+        h<FilesPageProps>(FilesPage, { fetch: s.fetch, token: 'tok', initialTab: 'folders' }),
+      );
     });
     await flush();
     await click(button(S.allowFolder));

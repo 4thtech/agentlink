@@ -1,6 +1,8 @@
 // Files page copy (11 §5: plain words; the owner's settings are "rules", never "policy"; no
 // "wallet", "gas", "seed phrase" or "transaction"; DESIGN-ADJ-1 FI-3; D-99, D-119). Commands in
 // backticks are typed by the owner in their own terminal and are shown exactly.
+export { FILES_IO_STRINGS, asOf } from './io-strings.js';
+
 export const FILES_STRINGS = {
   foldersLabel: 'Folders your AI can send files from',
   folderMissing: "Not found on this computer. Your AI can't send from it.",

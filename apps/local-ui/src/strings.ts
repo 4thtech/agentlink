@@ -14,6 +14,7 @@ export const PAGE_TITLES = {
   approvals: 'Approvals',
   approve: 'Approval',
   activity: 'Activity',
+  messages: 'Messages',
   contacts: 'Contacts',
   files: 'Files',
   storage: 'Storage',

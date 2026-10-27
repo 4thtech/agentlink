@@ -4,6 +4,7 @@
 import { AppShell, type NavItem } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
+import { useUnseenMessages } from '../pages/messages/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
@@ -80,6 +81,8 @@ export interface LayoutProps {
   readonly nextStep?: () => Promise<boolean>;
   /** The platform the next step names. Default: detected from the browser. */
   readonly platform?: Platform;
+  /** Test seam: the Messages badge count. Default: read from the local app. */
+  readonly unseenMessages?: () => Promise<number>;
 }
 
 export function Layout({
@@ -87,8 +90,10 @@ export function Layout({
   children,
   nextStep = needsPasskeySwitch,
   platform: givenPlatform,
+  unseenMessages,
 }: LayoutProps): ReactElement {
   const connection = useConnectionState();
+  const unseen = useUnseenMessages(path, unseenMessages);
   const settings = inSettings(path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [switchNeeded, setSwitchNeeded] = useState(false);
@@ -116,6 +121,7 @@ export function Layout({
     label: item.label,
     href: item.path,
     active: item.routed && (item.label === SETTINGS_LABEL ? settings : item.path === path),
+    ...(item.id === 'messages' && unseen > 0 ? { count: unseen } : {}),
   }));
   return (
     <AppShell nav={nav} connection={SHELL_STATE[connection]}>

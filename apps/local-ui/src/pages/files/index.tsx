@@ -9,8 +9,9 @@
 // Then the owner's passkey gesture or owner code goes to the local server, which signs; the browser
 // never signs. A `?folder=` link (from the AI's "allow a folder" step) only fills the field.
 //
-// Out of scope here: the sent and received file list (no read API yet), inbox folder and link expiry
-// (UX audit 4b "More options"), and Storage (folded in by D-120 later).
+// Three tabs (MSG-FILES-IO-f): Received and Sent (io.tsx, read-only) and this page as Send folders.
+// Out of scope here: inbox folder and link expiry (UX audit 4b "More options"), and Storage
+// (folded in by D-120 later).
 import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
@@ -33,7 +34,9 @@ import {
   type FilesApi,
   type PasskeyInfo,
 } from './files-api.js';
+import { FilesTabs, ReceivedPanel, SentPanel, type FilesTab } from './io.js';
 import {
+  FILES_IO_STRINGS as IO,
   FILES_STRINGS as S,
   WARNING_TEXT,
   opensAt,
@@ -246,6 +249,8 @@ function Confirm({
 }
 
 export interface FilesPageProps {
+  /** The tab to open on; by default Received, or Send folders for a `?folder=` link. */
+  initialTab?: FilesTab;
   /** For tests: the fetch and session token; the page's own same-origin calls by default. */
   readonly fetch?: typeof fetch;
   readonly token?: string;
@@ -260,15 +265,8 @@ const prefill = (): string => {
   }
 };
 
-export function FilesPage({ fetch: givenFetch, token }: FilesPageProps = {}): ReactElement {
-  const api: FilesApi = useMemo(
-    () =>
-      createFilesApi({
-        ...(givenFetch === undefined ? {} : { fetch: givenFetch }),
-        ...(token === undefined ? {} : { token }),
-      }),
-    [givenFetch, token],
-  );
+/** Send folders: the folders the AI may send files from (today's page, unchanged). */
+function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
   const [list, setList] = useState<ListState>({ phase: 'loading' });
   const [initial] = useState(prefill);
   const [step, setStep] = useState<Step>(
@@ -490,14 +488,41 @@ export function FilesPage({ fetch: givenFetch, token }: FilesPageProps = {}): Re
   }
 
   return (
+    <section className="fl-panel" aria-labelledby="fl-folders">
+      <h2 id="fl-folders" className="al-text-label al-muted">
+        {S.foldersLabel}
+      </h2>
+      {content}
+    </section>
+  );
+}
+
+export function FilesPage({
+  fetch: givenFetch,
+  token,
+  initialTab,
+}: FilesPageProps = {}): ReactElement {
+  const api: FilesApi = useMemo(
+    () =>
+      createFilesApi({
+        ...(givenFetch === undefined ? {} : { fetch: givenFetch }),
+        ...(token === undefined ? {} : { token }),
+      }),
+    [givenFetch, token],
+  );
+  const [tab, setTab] = useState<FilesTab>(
+    () => initialTab ?? (prefill().length > 0 ? 'folders' : 'received'),
+  );
+  return (
     <div className="fl-page">
       <h1 className="al-text-title-1">{PAGE_TITLES.files}</h1>
-      <section className="fl-panel" aria-labelledby="fl-folders">
-        <h2 id="fl-folders" className="al-text-label al-muted">
-          {S.foldersLabel}
-        </h2>
-        {content}
-      </section>
+      <p className="al-text-body-sm al-muted">{IO.explainer}</p>
+      <FilesTabs tab={tab} onTab={setTab} />
+      <div id="fl-tabpanel" role="tabpanel" aria-labelledby={`fl-tab-${tab}`}>
+        {tab === 'received' ? <ReceivedPanel get={api.get} reveal={api.reveal} /> : null}
+        {tab === 'sent' ? <SentPanel get={api.get} /> : null}
+        {tab === 'folders' ? <SendFolders api={api} /> : null}
+      </div>
     </div>
   );
 }

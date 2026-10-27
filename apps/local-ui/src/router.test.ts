@@ -31,6 +31,7 @@ function mountAt(path: string): void {
 const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/first-run', 'Set up AgentLink'],
   ['/settings/activity', 'Activity'],
+  ['/settings/messages', 'Messages'],
   ['/settings/contacts', 'Contacts'],
   ['/settings/files', 'Files'],
   ['/settings/proofs', 'Proofs & credits'],
@@ -49,6 +50,7 @@ describe('routes', () => {
   // M1-11b-1: /first-run is a real page now (pages/first-run/first-run.test.ts).
   const BUILT: ReadonlySet<string> = new Set([
     '/settings/activity',
+    '/settings/messages',
     '/settings/contacts',
     '/settings/files',
     '/settings/proofs',
@@ -84,13 +86,14 @@ describe('nav', () => {
     expect(NAV_ITEMS.map((i) => i.label)).toEqual([
       'Approvals',
       'Activity',
+      'Messages',
       'Contacts',
       'Files',
       'Proofs & credits',
       'Rules',
       'Settings',
     ]);
-    expect(NAV_ITEMS).toHaveLength(7);
+    expect(NAV_ITEMS).toHaveLength(8);
   });
 
   it('keeps every nav label in plain words', () => {

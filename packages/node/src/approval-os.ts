@@ -1,5 +1,6 @@
-// M1-8d: the two OS touches of the local approval server (08 §1): opening the owner's browser at the
-// session link, and a fixed OS notification when a new approval request is waiting.
+// M1-8d: the OS touches of the local approval server (08 §1): opening the owner's browser at the
+// session link, and a fixed OS notification when a new approval request is waiting. MSG-FILES-IO-h
+// adds a third: showing one checked, saved received file in the OS file manager (Show in Finder).
 //
 // Both run a fixed program, by absolute path, with fixed arguments through execFile (no shell). The
 // notification text is a constant: no request summary, contact name or other stored or inbound text
@@ -143,6 +144,45 @@ export function notifierWith(seams: OsSeams): OsNotifier {
     }
   };
 }
+
+/**
+ * MSG-FILES-IO-h: shows one checked file in the OS file manager (Show in Finder, D-134). `file` is
+ * the path local-ui/reveal-file.ts checked inside the Inbox folder, `folder` that folder's realpath;
+ * neither ever comes from a request. Resolves false when nothing could be started.
+ */
+export type FileRevealer = (file: string, folder: string) => Promise<boolean>;
+
+/** A full path that cannot read as an option, with no NUL (the paths are checked before; defence in depth). */
+function revealablePath(p: string, platform: NodeJS.Platform): boolean {
+  if (typeof p !== 'string' || p.length === 0 || p.includes('\0')) return false;
+  return platform === 'win32' ? /^[A-Za-z]:\\/.test(p) : p.startsWith('/');
+}
+
+/**
+ * The revealer over `seams`: macOS `open -R <file>` (Finder selects it), Windows
+ * `explorer.exe /select, <file>` (exits 1 even when it worked), elsewhere `xdg-open <folder>` (no
+ * portable "select" exists, so the folder opens). Fixed programs by absolute path, shell false, the
+ * path as its own argument.
+ */
+export function fileRevealerWith(seams: OsSeams): FileRevealer {
+  return (file, folder) => {
+    if (!revealablePath(file, seams.platform) || !revealablePath(folder, seams.platform)) {
+      return Promise.resolve(false);
+    }
+    switch (seams.platform) {
+      case 'darwin':
+        return run(seams, OS_PROGRAMS.darwinOpen, ['-R', file]);
+      case 'win32':
+        return run(seams, windowsExplorer(seams.env), ['/select,', file], true);
+      default:
+        return run(seams, OS_PROGRAMS.linuxOpen, [folder]);
+    }
+  };
+}
+
+/** The platform's file revealer. */
+export const osFileRevealer: FileRevealer = (file, folder) =>
+  fileRevealerWith(nodeSeams())(file, folder);
 
 /** The platform's URL opener: `/usr/bin/open`, `/usr/bin/xdg-open` or `explorer.exe`. */
 export const osBrowserOpener: BrowserOpener = (url) => browserOpenerWith(nodeSeams())(url);
