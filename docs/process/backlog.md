@@ -4490,7 +4490,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Invariants:** I-4, I-5, I-7
 - **Scope:**
   - `MessagesView`: conversations (contacts not removed, last message time, last inbound time) and one page of a contact's Inbox or Sent items, reusing the inbox selection (`INBOX_TYPES`, state `ok`, no requests, refused, held or protocol rows). Body as plain text (a JSON body as indented JSON text; terms types their note); file names and sizes; Sent status and receipt; proof flag.
-  - `FilesIoView`: received and sent file rows with name, contact, time, size, state; `savedName` read when the column exists (b).
+  - `FilesIoView`: received and sent files with name, contact, time, size, state; `savedName` read when the column exists (b). The file list comes from the file entries of each envelope's sealed payload (name, size, `expiresAt`; never `url` or `fileKey`), joined to its `files` row. Retention (`files/retention.ts`) deletes the whole `files` row, key included, at expiry or on receipt; only an inline file's row is kept with `deleted_at`. So a payload entry without a row reads `expired` when `expiresAt` has passed and `deleted` otherwise; an inline file with `deleted_at` reads `deleted`.
   - Never writes: no `read_at`, no other store change. Every item built from an allowlist.
 - **Acceptance (tests first, RED commit):**
   - Exact key set per item; no URL, file key, `envelope_json`, salt or sealed value in any result (scan for the fixture's stored URL and key).
@@ -4506,7 +4506,9 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Scope:**
   - New column `files.saved_name` (`enc`): the single file name `fetchFile` placed in the Inbox folder, sealed like `name`, written after the rename succeeds. Never a full path. Schema 5 → 6; old rows read `null`.
   - A reader for MSG-FILES-IO-a (`savedNameOf`).
+  - Migrations are forward-only: an older build refuses a version-6 store (`store_schema_newer`, `client.ts`). The changeset and the `changelog.d/` fragment say so plainly (after the update, going back to an older version needs a newer one again).
 - **Acceptance (tests first, RED commit):**
+  - A reader at schema 5 refuses a version-6 store with `store_schema_newer`; `memory-store.test.ts` expects version 6 (was `toBe(5)`).
   - Migration from a version-5 fixture keeps every row; a fetch records the name sealed (the raw column is not the plain name); a failed or refused fetch records nothing; retention shredding leaves no readable file key and keeps working.
 
 #### MSG-FILES-IO-c · node: Messages API routes (read-only) (new)
@@ -4530,7 +4532,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Scope:**
   - `GET /api/ui/files/received` and `GET /api/ui/files/sent`, `presence: false`, the plan §4 allowlist (`savedName` only when saved). No file is opened, read or hashed by the server.
 - **Acceptance (tests first, RED commit):**
-  - Same gate and error tests as c; no locator, URL, file key or path in any response; an expired or shredded file reads `expired` / `deleted`; the existing `/api/ui/files` routes behave as before.
+  - Same gate and error tests as c; no locator, URL, file key or path in any response; a file whose row retention deleted reads `expired` or `deleted` from its payload entry (plan §3), and an inline file with `deleted_at` reads `deleted`; the existing `/api/ui/files` routes behave as before.
 
 #### MSG-FILES-IO-e · local-ui: Messages page (new)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet (Opus review: inbound content) · **Security:** S1 · **Phase:** M1b
@@ -4551,7 +4553,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Spec:** 08 §1; 11 §5; design b11 §8, §17.3; plan §5
 - **Invariants:** I-5
 - **Scope:**
-  - The top explainer line; tabs Received (from, when, size, proof badge, saved state, the one-time untrusted-file note), Sent (file, to whom, when, status chips, receipt) and Send folders (today's page, unchanged behaviour). The app never opens a received file. Other people's file names only as untrusted text.
+  - The top explainer line; tabs Received (from, when, size, proof badge, "saved as" name (it may be stale if the person moved the file), the one-time untrusted-file note), Sent (file, to whom, when, status chips, receipt) and Send folders (today's page, unchanged behaviour). The app never opens a received file. Other people's file names only as untrusted text.
 - **Acceptance (tests first):**
   - Tab order and default (Received); a file name with bidi or control characters renders as inert text; no link to a file, URL or path; Send folders tests pass unchanged; empty and offline states; 360 px.
 
@@ -4573,9 +4575,11 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Spec:** 04 §2.5, §4 (realpath); 08 §1; plan §6
 - **Invariants:** I-4, I-7
 - **Scope:**
-  - With option (a): a route kind for one fixed local OS action (POST, no presence, no signing, no store write), still behind the session, CSRF, Origin and octet-stream checks. Resolves the Inbox folder's realpath, refuses links (`lstat`), checks the file is a direct child, and passes it to the OS opener as an argument, never through a shell.
+  - With option (a): a route kind for one fixed local OS action (POST, no presence, no signing, no store write), still behind the session, CSRF, Origin and octet-stream checks.
+  - The request carries only the item ID (`<envelopeId>.<idx>`). The server reads the sealed `saved_name` from the store; it accepts no name or path from the request.
+  - Resolves the Inbox folder's realpath, opens the file once with no-follow and checks that handle (a regular file, a direct child of that folder), then passes that checked path to the OS opener as one argument, never through a shell. Fail closed on any doubt; no separate `lstat`-then-open step (no check-then-use race).
 - **Acceptance (tests first, RED commit):**
-  - Registration still refuses a POST without presence unless it is this kind; a link, `..`, a file outside the Inbox folder or a missing file is refused; the opener gets one argument; a test that no other route can use the kind.
+  - Registration still refuses a POST without presence unless it is this kind; a body that carries a path or name besides the ID is refused and never reaches the opener; a link, `..`, a file outside the Inbox folder or a missing file is refused; the opener gets one argument; a test that no other route can use the kind.
 
 ### Design system from the design (`packages/ui`, D-116)
 
