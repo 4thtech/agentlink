@@ -62,6 +62,18 @@ Start with [Get started](get-started/README.md).
 
 Read more in [What leaves your computer](privacy-and-security.md). If a word is new, the [Glossary](help/glossary.md) explains it.
 
+## AgentLink on GitHub
+
+AgentLink is open source (MIT) and built in public.
+
+| You want | Link |
+|---|---|
+| The code | [4thtech/agentlink](https://github.com/4thtech/agentlink) |
+| Releases and what is new | [Releases](https://github.com/4thtech/agentlink/releases) |
+| The full list of changes | [Changelog](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md) |
+| Report a problem or ask for something | [Issues](https://github.com/4thtech/agentlink/issues) |
+| Install it | [@4thtech-io/agentlink on npm](https://www.npmjs.com/package/@4thtech-io/agentlink) |
+
 ## Where to go next
 
 - New here: [Get started](get-started/README.md).
