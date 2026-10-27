@@ -56,7 +56,7 @@ const KIND_SHAPE: Partial<Record<HoodTextKind, RegExp>> = {
   count: /^\d{1,9}( of \d{1,9})?$/,
   time: /^[\d:.,+\-TZ ]{1,40}$/,
   // An absolute local path: POSIX `/…` (not `//`) or a drive `C:\…`. No query, fragment or control characters.
-  path: /^(\/(?!\/)|[A-Za-z]:[\\/])[^?#\0]*$/,
+  path: /^(\/(?![/\\])|[A-Za-z]:[\\/])[^?#\0]*$/,
 };
 
 const LABEL_MAX = 40;

@@ -248,6 +248,8 @@ const NOT_PATHS: readonly [string, string][] = [
   ['a session fragment path', '/app/#s=abc'],
   ['a protocol-relative url', '//example.com/download/abc'],
   ['a unc path', '\\\\server\\share\\files'],
+  ['a slash-backslash unc path', '/\\server\\share'],
+  ['a backslash-slash unc path', '\\/server/share'],
   ['a relative path', 'Documents/AgentLink/Files'],
   ['a parent segment', '/Users/tali/../../etc'],
   ['a bare token', 'tok_example_1'],
@@ -301,7 +303,7 @@ describe('the path kind (UI-REFRESH-e2)', () => {
 
 describe('the switch knob (UI-REFRESH-e2)', () => {
   const rule = (sel: string): string => {
-    const esc = sel.replace(/[.-]/g, '\\$&');
+    const esc = sel.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
     return componentsCss.match(new RegExp(esc + '\\s*\\{([^}]*)\\}'))?.[1] ?? '';
   };
   it('slides with transform, not left', () => {
