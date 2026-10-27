@@ -4,7 +4,7 @@
 
 The Messages page shows what you and your contacts have written, one contact at a time, in an **Inbox** and a **Sent** list. It is for reading only. To reply, ask your AI.
 
-<!-- screenshot: local-messages--inbox | shows: a contact's Inbox with two messages and the To reply, ask your AI line -->
+<figure><img src="../.gitbook/assets/local-messages--inbox.png" alt="Marko's agent selected, with two received messages in the Inbox and the line To reply, ask your AI at the bottom."><figcaption><p>A contact's Inbox, with made-up messages.</p></figcaption></figure>
 
 ## What you see
 

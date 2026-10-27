@@ -8,7 +8,9 @@ The Files page has three tabs: **Received**, **Sent** and **Send folders**. Rece
 
 ## Received and Sent
 
-<!-- screenshot: local-files--received | shows: the Received tab with two files and Show in Finder -->
+<figure><img src="../.gitbook/assets/local-files--received.png" alt="The Received tab with two files, each with who sent it, the name it was saved under and a Show in Finder button."><figcaption><p>Received files, with made-up names.</p></figcaption></figure>
+
+<figure><img src="../.gitbook/assets/local-files--sent.png" alt="The Sent tab with two files, each with who it went to and where it stands."><figcaption><p>Sent files, with made-up names.</p></figcaption></figure>
 
 You don't upload files here. Put a file in your Send folder, or ask your AI to send it. Files you receive appear under **Received**.
 

@@ -41,13 +41,60 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 /** One page to capture: where to go, what proves it is ready, optional steps before the shot. */
 const heading = (name) => (page) => page.getByRole('heading', { name, level: 1 }).waitFor();
 const openEnter = async (page) => {
+  await page.getByRole('tab', { name: 'Send folders' }).click();
   await page.getByRole('button', { name: 'Allow a folder' }).click();
   await page.getByRole('textbox', { name: 'Folder' }).fill('~/Documents/Shared');
 };
 const SHOTS = [
   { name: 'local-activity--list', path: '/settings/activity', ready: heading('Activity') },
   { name: 'local-contacts--list', path: '/settings/contacts', ready: heading('Contacts') },
-  { name: 'local-files--list', path: '/settings/files', ready: heading('Files') },
+  {
+    name: 'local-files--list',
+    path: '/settings/files',
+    ready: heading('Files'),
+    steps: async (page) => {
+      await page.getByRole('tab', { name: 'Send folders' }).click();
+      await page.getByText('Folders your AI can send files from').first().waitFor();
+    },
+  },
+  {
+    name: 'local-files--received',
+    path: '/settings/files',
+    ready: heading('Files'),
+    steps: async (page) => {
+      await page.getByText('draft-notes.txt').first().waitFor();
+    },
+  },
+  {
+    name: 'local-files--sent',
+    path: '/settings/files',
+    ready: heading('Files'),
+    steps: async (page) => {
+      await page.getByRole('tab', { name: 'Sent' }).click();
+      await page.getByText('project-plan.pdf').first().waitFor();
+    },
+  },
+  { name: 'local-messages--list', path: '/settings/messages', ready: heading('Messages') },
+  {
+    name: 'local-messages--inbox',
+    path: '/settings/messages',
+    ready: heading('Messages'),
+    steps: async (page) => {
+      await page.getByRole('button', { name: /Marko/ }).first().click();
+      await page.getByText('To reply, ask your AI.').waitFor();
+    },
+  },
+  {
+    name: 'local-rules--confirm-spending',
+    path: '/settings/rules',
+    ready: heading('Rules'),
+    steps: async (page) => {
+      await page.getByRole('textbox', { name: 'Ask me over' }).fill('1');
+      await page.getByRole('button', { name: 'Review and save' }).click();
+      await page.getByRole('button', { name: 'Continue' }).click();
+      await page.getByRole('button', { name: 'Confirm with Touch ID' }).waitFor();
+    },
+  },
   {
     name: 'local-files--enter',
     path: '/settings/files',
@@ -71,7 +118,8 @@ const SHOTS = [
 
 function answer(route) {
   const url = new URL(route.request().url());
-  const body = ROUTES[url.pathname];
+  const entry = ROUTES[url.pathname];
+  const body = typeof entry === 'function' ? entry(url) : entry;
   return route.fulfill({
     status: body === undefined ? 404 : 200,
     contentType: 'application/json',
@@ -93,9 +141,14 @@ try {
       reducedMotion: 'reduce',
     });
     const page = await ctx.newPage();
+    // The same words on every machine: the sheet names the computer's check ("Touch ID").
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'userAgentData', { get: () => ({ platform: 'macOS' }) });
+    });
     await page.route('**/api/**', answer);
     await page.goto(origin + shot.path);
     await shot.ready(page);
+    await page.getByText('Checking…').waitFor({ state: 'detached', timeout: 6000 }).catch(() => {});
     if (shot.steps) await shot.steps(page);
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);
