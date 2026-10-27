@@ -4,6 +4,8 @@
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
+<figure><img src="../.gitbook/assets/local-contacts--list.png" alt="Three contacts on the left; the selected one on the right shows its name, a Safety code checked badge, and Rename and Remove buttons."><figcaption><p>Contacts, with made-up people. One contact is still waiting for their agent.</p></figcaption></figure>
+
 ## Check a safety code
 
 For a new contact the page shows the 12-digit safety code. Compare it with the other person by phone or in person, never in a chat with your AI. Then choose:
