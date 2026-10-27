@@ -245,7 +245,11 @@ export const mcpCommand = (version: string): CommandHandler => {
             { now: systemClock },
           );
           // M1-11b-6: the app, and owner setup only while no owner exists anywhere.
-          const localUi = await localUiOptions({ name: agent.name, client: agent.client });
+          // M1-11s-a-d: the version the status bar's health read answers.
+          const localUi = {
+            ...(await localUiOptions({ name: agent.name, client: agent.client })),
+            version,
+          };
           setupWired = firstRunReady(localUi);
           return startApprovalServer({
             source,

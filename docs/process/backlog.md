@@ -6086,7 +6086,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Playwright and axe checks pass; the design owner confirms the "checking" dot.
 
 #### M1-11s-a-d · local UI server: health read that sets the connection state (new, IR-M1-11s-a-b-1)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node`) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (health read) and its test
 - **Depends on:** M1-11s-a-b, M1-11s-b
 - **Spec:** 08 §1
@@ -6667,6 +6667,112 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - The B-11 signature motion moments run 400 to 480 ms and one highlight 1.2 s; 11 §5 allows 120 to 320 ms. The owner either accepts the exceptions (11 is amended, marked "proposed, owner confirms at merge") or the brief is shortened.
 - **Acceptance:**
   - 11 §5 and B-11 agree; reduced-motion behaviour is stated for both.
+
+#### MSG-FILES-IO-i · Messages and Files pages: list robustness and polish lows (new, low, #574, #575, #576, #579)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/core` and `packages/node` read routes; robustness only) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core/src/files/**`, `packages/node/src/local-ui/api/files-io.ts`, `apps/local-ui/src/pages/files/**`, tests
+- **Depends on:** MSG-FILES-IO-d, MSG-FILES-IO-f
+- **Spec:** 08 §1; 11 §5; plan §5, §6
+- **Invariants:** I-5
+- **Scope:**
+  - (a) One unreadable saved-name row must not hide the Received list: the Received route catches a failed saved-name read per row and shows that row as not saved.
+  - (b) The Sent page bounds the acknowledgement rows it opens: a total cap per page instead of the per-contact limit for every contact.
+  - (c) A received item that has a stored file key but no files row reads "not saved"; the unused "deleted" state is either produced or removed from the allowlist (decide and record).
+  - (d) One malformed item skips only that item in the Files tabs, not the whole list; the 400 ms skeleton delay is added; the shared plain-text shortener never splits a character pair; Sent shows a plain "No delivery confirmation yet" wording for items not delivered; add a test of the `?folder=` deep link.
+  - (e) Align the bad-query error code of the new routes with the other local-UI routes.
+  - (f) Plan text fix: plan §6 describes lstat then a direct-child check; the MSG-FILES-IO-h approach (open once, no follow, fail closed) is the rule. Update the plan wording.
+  - Inbound names stay untrusted: no change to how they are rendered.
+- **Acceptance:**
+  - Tests first (RED commit) for (a), (b), (d); no test weakened; threat note; independent review (S2).
+
+#### M1-11s-a-e · local UI status bar and health: follow-ups from the health review (new, low, #583)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` local-ui health read; no change to what is exposed) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (health read), `apps/local-ui/src/**` (status bar, Home tiles), tests
+- **Depends on:** M1-11s-a-d
+- **Spec:** 08 §1; 11 §5
+- **Invariants:** I-4
+- **Scope:**
+  - (a) Wire the relay count and last-sync sources; the Home tiles show an unknown value (no number) when a source is null.
+  - (b) An expired or missing session (401/403 on the health read) shows "Sign in again", not "Not running".
+  - (c) The visibility-triggered poll respects the backoff; reads that hang are aborted after a timeout; an in-flight marker is cleared when the clock read throws.
+  - (d) Update the scope text of M1-11s-a-d where it no longer matches what shipped.
+  - Copy follows 11 §5; no URLs or addresses in the default view.
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (c) with fake timers; no test weakened; independent review (S2).
+
+#### M1-UX-FIRSTRUN-V2-e · first run: passkey leftovers and per-navigation read (new, low, IR-M1-UX-FIRSTRUN-V2-c, #570)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` owner passkey route and setup copy) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (owner passkey route), `apps/local-ui/src/pages/**` (nudge, doctor hint), tests
+- **Depends on:** M1-UX-FIRSTRUN-V2-c
+- **Spec:** 04 §2.5; 08 §1
+- **Invariants:** I-4
+- **Scope:**
+  - (a) A saved passkey item that belongs to a different owner no longer leaves the nudge on screen or an "already protected" dead end: show a plain next step in the doctor hint.
+  - (b) Read the passkey state once and cache it for the session instead of on every page change.
+  - (c) Recorded residual, no code change: a passkey created without the key-derivation output leaves an unused credential; no new check route is added (owner-presence review advises against one).
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); no test weakened; independent review (S2, Fable: owner passkey).
+
+#### M1-PAY-CONFIRM-c · paid-action confirmation hardening: keep-key fallback and item binding (new, low, #581)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/core`, `packages/node/src/local-ui/**` (passkey registration and the confirmation finish), tests
+- **Depends on:** M1-PAY-CONFIRM-a; folds into M1-PAY-CONFIRM-b where the same files change
+- **Spec:** 04 §2.5, §2.5.3; D-132
+- **Invariants:** I-1, I-4
+- **Scope:**
+  - (a) For M1-PAY-CONFIRM-b: when the passkey read at finish falls back to a later derivation, the stored owner-passkey item is kept (the registration response data is sent along so the item is not dropped).
+  - (b) Hardening: bind the stored passkey item to the sealed seed.
+  - (c) The challenge comparison uses a constant-time compare (consistency).
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); an item written by the earlier build still verifies (migration path stated); no test weakened; threat note; independent review (S2, Fable).
+
+#### M2-3a-store6 · cloud agent: store migration from schema 5 to 6 before 0.4.0 (new, from #574)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`apps/cloud-agent` store) · **Phase:** M2
+- **Repo/path:** agentlink · `apps/cloud-agent/src/**` (do-store), tests
+- **Depends on:** MSG-FILES-IO-b; M2-3a
+- **Spec:** 03 §3; 07 §3; 08 §3.1
+- **Invariants:** I-1, I-7
+- **Scope:**
+  - The local store went from schema 5 to 6 (saved name for received files). The cloud agent store needs the same step (a forward-only migration) before the 0.4.0 release, with a test from a version-5 store.
+  - Release checklist note: a forward-only schema bump is a minor version, not a patch.
+- **Acceptance:**
+  - Tests first (RED commit): a version-5 cloud store opens, migrates once and keeps every row; a version-6 store is unchanged; no test weakened; independent review (S2).
+
+#### CHORE-WIN-REVEAL-ARGS · Windows Show in folder: pass file names verbatim (new, low, #582)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` OS opener) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-os.ts`, `packages/node/src/local-ui/reveal-file.ts`, tests
+- **Depends on:** MSG-FILES-IO-h
+- **Spec:** 04 §4
+- **Invariants:** I-4
+- **Scope:**
+  - On Windows some file names are not passed to the file manager as one argument; pass them verbatim and quoted, or open the folder instead. The checked path is still one argument and never reaches a shell.
+  - Optional: at most one reveal in flight per session.
+  - The real-Windows check is an owner step in the 0.3.1 owner steps.
+- **Acceptance:**
+  - Test first: such a name yields one correctly quoted argument; no shell is used; no test weakened; independent review (S2).
+
+#### CHORE-NODEOS-BROWSERS · node-os job: install the test browser so browser tests run on macOS and Windows (new, from #580)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** sensitive (`.github/**`) · **Phase:** M1b
+- **Repo/path:** agentlink · `.github/workflows/ci.yml` (node-os job, near the `--exclude` list), `docs/process/ci-cd.md`
+- **Depends on:** none
+- **Scope:**
+  - Install the Chromium test browser in the node-os job so the browser tests run on macOS and Windows; then drop the `--exclude` entries.
+  - The node-os job is not in the `ci-gate` needs list (existing behaviour): add it, or record why not.
+- **Acceptance:**
+  - The node-os job runs the browser tests on both systems; `ci-gate` needs the job or the reason is recorded; no step skipped; owner says "merge" (sensitive path).
+
+#### DOCS-CURRENCY-1027 · docs currency: wiki lows and spec nits (new, low, wiki #11 GITBOOK-PR2, #572, #573)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (docs/foundation text); S0 for the wiki repo · **Phase:** M1b
+- **Repo/path:** `WIKI-030-wiki` repo (sync script, `home/news.md`, `home/product-family.md`, `CONTRIBUTING`), agentlink `docs/foundation/**`
+- **Depends on:** none
+- **Scope:**
+  - (a) Wiki sync: `updateSummary` drops hand-added children under the protocol page; say so in CONTRIBUTING. The directory walk skips symbolic links. Redirect targets are validated against the source `.gitbook.yaml`.
+  - (b) `home/news.md` and `home/product-family.md` still say 0.3.0 "is releasing"; update to the released wording.
+  - (c) D-133 item 7 (the saved-name schema step) is plan detail rather than an owner decision; move it. The rule "only POST without presence" names the first-run setup routes as an exception.
+  - (d) M1-PAY-CONFIRM-a Finish bullet: "maxFee never above the statement" becomes "statement amount equals the pending request's `context.fee.usd`" if still present.
+  - Spec edits marked "proposed, owner confirms at merge".
+- **Acceptance:**
+  - Each item changed or recorded as already correct; link and docs-status checks pass.
 
 #### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)

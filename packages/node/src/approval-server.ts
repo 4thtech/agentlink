@@ -224,6 +224,7 @@ import {
   LocalUiRouteRegistry,
   createLocalUiRoutes,
 } from './local-ui/routes.js';
+import { createHealthReader } from './local-ui/api/health.js';
 import {
   checkGesture,
   signGesture,
@@ -934,6 +935,13 @@ export async function startApprovalServerWith(
     ownerContext: () => source.context(),
     applyOwnerAction: (signed) => source.apply(signed),
     now: () => now(),
+    // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
+    health: createHealthReader({
+      ...(options.localUi?.health === undefined ? {} : { source: options.localUi.health }),
+      hasClient: options.localUi?.client !== undefined,
+      ...(options.localUi?.version === undefined ? {} : { version: options.localUi.version }),
+      now: () => now(),
+    }),
   });
 
   // One request handler and one session behind both loopback listeners. Until both are bound, a

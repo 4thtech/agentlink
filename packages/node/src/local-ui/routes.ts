@@ -21,6 +21,8 @@ import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
 import { firstRunRoutes } from './api/first-run.js';
+// M1-11s-a-d: the status bar's health read (read-only).
+import { healthRoutes } from './api/health.js';
 import { messagesRoutes } from './api/messages.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { proofsRoutes } from './api/proofs.js';
@@ -183,6 +185,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
   const registry = new LocalUiRouteRegistry();
   for (const routes of [
     firstRunRoutes,
+    // M1-11s-a-d: the status bar's health read.
+    healthRoutes,
     approvalsRoutes,
     activityRoutes,
     // MSG-FILES-IO-c: the Messages page (read-only).

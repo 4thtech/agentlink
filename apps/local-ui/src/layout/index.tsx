@@ -9,20 +9,22 @@ import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
+import type { ApiResult } from '../api/client.js';
+import { readHealth as defaultReadHealth, startHealthPoller, type HealthState } from './health.js';
 
 /**
- * What the status bar shows. "Connected" may appear only when the local server reports healthy. No
- * health read exists yet, so the state stays "unknown" (shown as "Checking…"). The browser's offline
- * event is the one real signal we act on ("Not connected"); the online event only means the browser
- * has a network, not that the server is reachable, so it goes back to "unknown", never "connected".
- * Gap: a server health read should call `setConnectionState('connected')`.
+ * What the status bar shows. "Connected" appears only when the local server's health read says the
+ * agent is running (M1-11s-a-d, health.ts); until the first answer the state is "unknown" (shown as
+ * "Checking…", at most 4 s). The browser's offline event shows "Not connected" and wins over the
+ * health read while the browser stays offline; the online event goes back to "unknown", never
+ * straight to "connected": the next health read decides.
  */
-export type ConnectionState = 'unknown' | 'connected' | 'offline';
+export type ConnectionState = 'unknown' | 'offline' | HealthState;
 
 let current: ConnectionState = 'unknown';
 const listeners = new Set<() => void>();
 
-/** Record the connection state (called by whatever learns it: a server health read). */
+/** Record the connection state (called by whatever learns it: the server health read). */
 export function setConnectionState(next: ConnectionState): void {
   if (next === current) return;
   current = next;
@@ -50,11 +52,41 @@ export function useConnectionState(): ConnectionState {
   return state;
 }
 
+const browserOffline = (): boolean =>
+  typeof navigator !== 'undefined' && navigator.onLine === false;
+
+/**
+ * M1-11s-a-d: polls the health read while mounted and records the state; returns the app version
+ * it reported (a plain version, or undefined).
+ */
+export function useHealth(
+  read: () => Promise<ApiResult<unknown>> = defaultReadHealth,
+): string | undefined {
+  const [version, setVersion] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // A fresh poller starts from "Checking…": an earlier answer is not evidence for this one.
+    if (current !== 'offline') setConnectionState('unknown');
+    const stop = startHealthPoller({
+      read,
+      onState: (state, reported) => {
+        // The browser's own offline signal wins while it lasts.
+        if (!browserOffline()) setConnectionState(state);
+        setVersion(reported);
+      },
+    });
+    return stop;
+  }, [read]);
+  return version;
+}
+
 // "Paused" means the user paused AgentLink, so it is never used for an unknown state.
 const SHELL_STATE = {
   unknown: 'checking',
   connected: 'connected',
   offline: 'disconnected',
+  paused: 'paused',
+  not_running: 'not-running',
+  needs_setup: 'needs-setup',
 } as const;
 
 function inSettings(path: string): boolean {
@@ -83,6 +115,8 @@ export interface LayoutProps {
   readonly platform?: Platform;
   /** Test seam: the Messages badge count. Default: read from the local app. */
   readonly unseenMessages?: () => Promise<number>;
+  /** Test seam: the health read (M1-11s-a-d). Default: GET /api/ui/health. */
+  readonly readHealth?: () => Promise<ApiResult<unknown>>;
 }
 
 export function Layout({
@@ -91,8 +125,10 @@ export function Layout({
   nextStep = needsPasskeySwitch,
   platform: givenPlatform,
   unseenMessages,
+  readHealth,
 }: LayoutProps): ReactElement {
   const connection = useConnectionState();
+  const version = useHealth(readHealth);
   const unseen = useUnseenMessages(path, unseenMessages);
   const settings = inSettings(path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -124,7 +160,11 @@ export function Layout({
     ...(item.id === 'messages' && unseen > 0 ? { count: unseen } : {}),
   }));
   return (
-    <AppShell nav={nav} connection={SHELL_STATE[connection]}>
+    <AppShell
+      nav={nav}
+      connection={SHELL_STATE[connection]}
+      {...(version === undefined ? {} : { version })}
+    >
       {switchNeeded && path !== FIRST_RUN_PATH ? (
         <SwitchToPasskeyBanner platform={platform} />
       ) : null}
