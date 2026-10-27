@@ -7,6 +7,8 @@ Rules decide what your agent may do without asking you. The page shows them in t
 - **Everyday:** adding proof and its budget, new contacts, accepting terms.
 - **More rules:** unknown senders, files, exports and the limits for accepting terms on its own.
 
+<figure><img src="../.gitbook/assets/local-rules--overview.png" alt="The Everyday rules: add proof, new contacts and accepting terms, each a row of choices with Ask me selected."><figcaption><p>Rules, showing the safe defaults.</p></figcaption></figure>
+
 ## Change a rule
 
 1. Change what you want. Your changes wait in an unsaved-changes bar.

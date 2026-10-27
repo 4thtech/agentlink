@@ -4,7 +4,7 @@
 
 Your AI can send a file only from a folder you have allowed. The Files page shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
 
-<!-- screenshot: local-files--list.png | shows: two allowed folders, one opening at another location -->
+<figure><img src="../.gitbook/assets/local-files--list.png" alt="Three allowed folders; the last one opens at another location."><figcaption><p>Files, with made-up folders. The last folder is a link to somewhere else.</p></figcaption></figure>
 
 ## What you see
 
@@ -21,7 +21,7 @@ With no folders yet, the page says **Your AI can't send files yet. Allow a folde
 
 ## Allow a folder
 
-<!-- screenshot: local-files--enter.png | shows: the Folder field with ~/Documents/Shared typed -->
+<figure><img src="../.gitbook/assets/local-files--enter.png" alt="The Folder field with ~/Documents/Shared typed in, and the Check folder button."><figcaption><p>The Folder field after you press Allow a folder.</p></figcaption></figure>
 
 1. Press **Allow a folder**.
 2. In **Folder**, type the full path, for example `~/Documents/Shared`. Press **Check folder**.
@@ -30,7 +30,7 @@ With no folders yet, the page says **Your AI can't send files yet. Allow a folde
 5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use owner code instead** and type your owner code.
 6. The page says **Allowed. Your AI can now send files from this folder.**
 
-<!-- screenshot: local-files--confirm-add.png | shows: the confirm step with the real folder and one ticked warning -->
+<figure><img src="../.gitbook/assets/local-files--confirm-add.png" alt="The confirm step: the folder, one ticked line saying what your AI may do, and the Allow folder button."><figcaption><p>The confirm step. Allow folder stays off until every line is ticked.</p></figcaption></figure>
 
 {% hint style="warning" %}
 **Before you continue:** type your owner code only on this page. Never give it to your AI or paste it into a chat.
