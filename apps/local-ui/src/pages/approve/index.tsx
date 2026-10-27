@@ -3,6 +3,8 @@
 // approval ID before anything is asked of the server; the request itself is the server's (I-5).
 // The card is the same as on Approvals: its own Approve and Deny, then presence; a request that
 // costs credits approves through the confirmation sheet (04 §2.5.3).
+// UI-REFRESH-o (visual only): the shared Skeleton while the request loads.
+import { Skeleton } from '@4thtech-io/ui';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { SingleApproval, Statuses, type SheetOptions } from '../approvals/card.js';
 import {
@@ -82,9 +84,12 @@ export function ApprovePage({
   return (
     <div className="al-approvals">
       <ApprovalsHead />
-      {owner === undefined ? null : (
+      {owner === undefined ? (
+        <Skeleton loading label={S.loading} lines={4} />
+      ) : (
         <>
           <OwnerPanel owner={owner} canPasskey={canPasskey} needsOwnerOnly />
+          {one.kind === 'loading' ? <Skeleton loading label={S.loading} lines={4} /> : null}
           {one.kind === 'gone' ? <Statuses lines={[S.notPending]} /> : null}
           {one.kind === 'offline' ? <Statuses lines={[S.notRunning]} /> : null}
           {one.kind === 'ok' ? (

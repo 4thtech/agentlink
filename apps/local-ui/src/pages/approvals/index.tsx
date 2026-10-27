@@ -12,12 +12,17 @@
 //   the layout's next-step banner (M1-UX-FIRSTRUN-V2-c); where passkeys can't work, the page says
 //   the owner code is the way.
 // - Every server value is React text (I-5). The browser never signs (D-118).
-import { Button, type PayPlatform } from '@4thtech-io/ui';
+// - UI-REFRESH-o (visual only): cards on level 1, the one being decided on level 2; the shared
+//   Skeleton on first load; the approved moment after a review that approved something. What is
+//   sent, when presence is asked and what the owner sees are unchanged (approvals.test.ts).
+import { Button, Skeleton, Surface, UnderTheHood, type PayPlatform } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import {
   ApprovalFacts,
   ApprovalFoot,
+  ApprovedMoment,
+  approvalHoodFields,
   OwnerStep,
   SingleApproval,
   Statuses,
@@ -35,6 +40,8 @@ import {
 } from './client.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 import './approvals.css';
+
+export { APPROVAL_TTL } from './card.js';
 
 const MAX_LIST = 20;
 
@@ -96,22 +103,22 @@ export function OwnerPanel({
 }): ReactElement | null {
   if (!owner.ready) {
     return (
-      <section className="al-card al-panel">
+      <Surface as="section" level={1} className="al-panel">
         <h2>{S.needsOwnerTitle}</h2>
         <p>{S.needsOwner}</p>
-      </section>
+      </Surface>
     );
   }
   if (needsOwnerOnly || owner.passkey !== undefined) return null;
   // A passkey can be set up here: the layout's "Switch to …" banner is the one place to start.
   if (canPasskey && owner.offered) return null;
   return (
-    <section className="al-card al-panel">
+    <Surface as="section" level={1} className="al-panel">
       <h2>{S.firstRunTitle}</h2>
       <p>{S.firstRun}</p>
       <p>{S.noPasskeys}</p>
       <p className="al-note">{S.desktopNote}</p>
-    </section>
+    </Surface>
   );
 }
 
@@ -218,20 +225,20 @@ function ReviewStep({
   owner: OwnerState;
   client: ApprovalsClient;
   onBack: () => void;
-  onFinished: (notice: string) => void;
+  onFinished: (notice: string, approved: number) => void;
 }): ReactElement {
   const [lines, setLines] = useState<readonly string[]>([]);
   const say = (text: string): void => setLines((l) => [...l, text]);
   const answer = (a: DecideAnswer): void => {
     if (a.kind === 'status' && a.status === 'applied') {
-      onFinished(doneText(counts(kept)));
+      onFinished(doneText(counts(kept)), counts(kept).approve);
       return;
     }
     say(listText(a));
-    if (a.kind === 'status' && !RETRY.has(a.status)) onFinished(listText(a));
+    if (a.kind === 'status' && !RETRY.has(a.status)) onFinished(listText(a), 0);
   };
   return (
-    <div className="al-card al-panel">
+    <Surface level={2} className="al-panel">
       <OwnerStep
         passkey={owner.passkey !== undefined}
         passkeyLabel={S.confirmPasskey}
@@ -260,7 +267,7 @@ function ReviewStep({
       <Button variant="ghost" block onClick={onBack}>
         {S.back}
       </Button>
-    </div>
+    </Surface>
   );
 }
 
@@ -285,6 +292,7 @@ function ApprovalsList({
   const [notices, setNotices] = useState<readonly string[]>([]);
   const [checking, setChecking] = useState(false);
   const [kept, setKept] = useState<readonly ReviewPick[] | undefined>(undefined);
+  const [moment, setMoment] = useState(false);
   const notice = (text: string): void => setNotices((n) => [...n, text]);
 
   useEffect(() => {
@@ -306,7 +314,13 @@ function ApprovalsList({
   }, [client, round]);
   const reload = useCallback(() => setRound((r) => r + 1), []);
 
-  if (list.kind === 'loading') return <div className="al-list" />;
+  if (list.kind === 'loading') {
+    return (
+      <div className="al-list">
+        <Skeleton loading label={S.loading} lines={4} />
+      </div>
+    );
+  }
   if (list.kind === 'offline') {
     return (
       <div className="al-list">
@@ -324,6 +338,7 @@ function ApprovalsList({
   const startReview = async (): Promise<void> => {
     if (picked.length === 0) return;
     setNotices([]);
+    setMoment(false);
     setChecking(true);
     const live = await client.list();
     if (live.kind !== 'ok') {
@@ -353,6 +368,7 @@ function ApprovalsList({
   return (
     <>
       <div className="al-notices">
+        {moment ? <ApprovedMoment /> : null}
         <Statuses lines={notices} />
       </div>
       <div className="al-list">
@@ -368,9 +384,11 @@ function ApprovalsList({
               sheet={sheet}
             />
           ) : (
-            <section
+            <Surface
+              as="section"
               key={item.approvalId}
-              className="al-card al-approval"
+              level={choices[item.approvalId] === undefined ? 1 : 2}
+              className="al-approval"
               data-approval={item.approvalId}
             >
               <ApprovalFacts item={item} />
@@ -388,7 +406,8 @@ function ApprovalsList({
                 }
               />
               <ApprovalFoot />
-            </section>
+              <UnderTheHood fields={approvalHoodFields(item)} />
+            </Surface>
           ),
         )}
         {all.length > shown.length ? (
@@ -413,8 +432,9 @@ function ApprovalsList({
                 owner={owner}
                 client={client}
                 onBack={() => setKept(undefined)}
-                onFinished={(text) => {
+                onFinished={(text, approved) => {
                   notice(text);
+                  setMoment(approved > 0);
                   reload();
                 }}
               />
@@ -444,7 +464,9 @@ export function ApprovalsPage({
   return (
     <div className="al-approvals">
       <ApprovalsHead />
-      {owner === undefined ? null : (
+      {owner === undefined ? (
+        <Skeleton loading label={S.loading} lines={4} />
+      ) : (
         <>
           <OwnerPanel owner={owner} canPasskey={canPasskey} />
           <ApprovalsList owner={owner} client={client} sheet={sheet} />
