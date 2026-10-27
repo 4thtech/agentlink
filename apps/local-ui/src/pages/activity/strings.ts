@@ -8,6 +8,14 @@ export const ACTIVITY_STRINGS = {
   colContact: 'Contact',
   colStatus: 'Status',
   loading: 'Loading activity…',
+  // Filters, live state
+  filterLabel: 'Show',
+  filterAll: 'All',
+  filterApprovals: 'Approvals',
+  filterProofs: 'Proofs',
+  filterOther: 'Blocks and rules',
+  filterEmpty: 'Nothing of this kind yet.',
+  asOf: 'As of',
   // Approvals
   approved: 'You approved a request',
   approvedByRules: 'Approved by your rules',
