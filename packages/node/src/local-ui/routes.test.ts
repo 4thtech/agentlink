@@ -150,11 +150,14 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
     const pages = ['approvals', 'activity', 'storage', 'backup', 'advanced'];
     // M1-11s-c: the first-run page's two owner setup routes are covered in owner-setup-route.test.ts.
-    const stubs = registry
-      .routes()
-      .filter(
-        (r) => r.presence !== 'setup' && r.path !== '/api/ui/first-run' && !built.has(r.path),
-      );
+    const stubs = registry.routes().filter(
+      // M1-PAY-CONFIRM-a: the two paid-action confirmation routes are covered in pay-confirm.test.ts.
+      (r) =>
+        r.presence !== 'setup' &&
+        r.presence !== 'pay-confirm' &&
+        r.path !== '/api/ui/first-run' &&
+        !built.has(r.path),
+    );
     expect(stubs.map((r) => r.path).sort()).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
     for (const route of stubs as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');
@@ -165,5 +168,34 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       const result = await route.handler(context, { params: {}, query: new URLSearchParams() });
       expect(result).toEqual({ status: 501, body: { error: 'not_implemented' } });
     }
+  });
+});
+
+describe('pay-confirm routes (M1-PAY-CONFIRM-a, 04 §2.5.3)', () => {
+  const route = (over: Record<string, unknown>) =>
+    ({
+      method: 'POST',
+      path: '/api/ui/pay-confirm/begin',
+      presence: 'pay-confirm',
+      step: 'begin',
+      ...over,
+    }) as unknown as LocalUiRoute;
+
+  it('registers begin and finish, run by the server gate (no handler)', () => {
+    const steps = createLocalUiRoutes()
+      .routes()
+      .filter((r) => r.presence === 'pay-confirm')
+      .map((r) => `${r.method} ${r.path}`);
+    expect(steps).toEqual(['POST /api/ui/pay-confirm/begin', 'POST /api/ui/pay-confirm/finish']);
+  });
+
+  it('refuses a handler, another method, another prefix or a repeated step', () => {
+    const registry = new LocalUiRouteRegistry();
+    expect(() => registry.register(route({ handler: () => undefined }))).toThrow();
+    expect(() => registry.register(route({ method: 'GET' }))).toThrow();
+    expect(() => registry.register(route({ path: '/api/ui/rules/pay' }))).toThrow();
+    expect(() => registry.register(route({ step: 'other' }))).toThrow();
+    registry.register(route({}));
+    expect(() => registry.register(route({ path: '/api/ui/pay-confirm/again' }))).toThrow();
   });
 });
