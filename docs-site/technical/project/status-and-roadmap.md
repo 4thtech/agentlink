@@ -15,7 +15,7 @@
 
 **In progress:** v0.3.0 is on npm `latest` and a GitHub release (26 Oct 2026; v0.2.0 is the one before it). **In 0.3.0:** the local app is in. `agentlink ui` opens it in your browser; `init` opens the first-run page, where one Touch ID or passkey protects your approvals, sets up your agent and allows the `~/AgentLink/Send` folder, then shows your backup code once; while no owner exists, your AI app opens that page once each time it starts AgentLink. The Activity, Proofs and credits, Contacts, Files and Rules pages are in it. Also merged: the terminal approve card shows a plain summary and no link, agents set up earlier get the Send folder with one command, and allowed folders are pinned so a swapped folder is caught. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
 
-**Next:** 0.4.0 is the release now being prepared (Messages, Files, Touch ID upgrade, payment confirmation, status bar, duplicate contacts). The cloud agent follows as 0.5.0 (planned) (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+**Next:** 0.4.0 is the release now being prepared (Messages, Files, Touch ID upgrade, payment confirmation, status bar, duplicate contacts). The cloud agent follows as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 
 ### Components
 
