@@ -9,7 +9,20 @@
 //   through the confirmation sheet (04 §2.5.3 rule 7); its Deny is the plain owner step.
 // - The owner code field keeps any length, is never autocompleted, is hidden until shown, and is
 //   cleared on submit. Neither the code nor any server value is logged.
-import { Button } from '@4thtech-io/ui';
+//
+// UI-REFRESH-o (visual only; B-11 §16, §6 rows 4 and 7, §7): the card sits on level 1 and rises to
+// level 2 while it is being decided; a ring meter shows the time left, from `expiresAt` only; an
+// applied approval draws the check (SuccessMoment), an applied denial fades the decided card; Under
+// the hood shows the kind and the exact expiry. Nothing the agent wrote reaches the ring, the moment
+// or the panel, and every fact stays on the card before, during and after the decision (WYSIWYS).
+import {
+  Button,
+  RingMeter,
+  SuccessMoment,
+  Surface,
+  UnderTheHood,
+  useVisibilityPause,
+} from '@4thtech-io/ui';
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { PayConfirm, type PayConfirmClient } from '../../pay-confirm/index.js';
 import type { PayPlatform } from '@4thtech-io/ui';
@@ -67,6 +80,77 @@ export function decisionText(answer: DecideAnswer): string {
   return RESULT[key] ?? S.refused;
 }
 
+/**
+ * The server's approval lifetime in seconds (packages/types APPROVAL_TTL_SECONDS; a test keeps them
+ * in step): the full ring. A request never has more time than this.
+ */
+export const APPROVAL_TTL = 86_400;
+
+/** The time left in plain words; the server's expiry stays the one that counts. */
+export function timeLeftText(seconds: number): string {
+  if (seconds <= 0) return S.expired;
+  if (seconds < 60) return S.underMinute;
+  if (seconds < 3600) return fmt(S.minutesLeft, { minutes: Math.ceil(seconds / 60) });
+  return fmt(S.hoursLeft, { hours: Math.round(seconds / 3600) });
+}
+
+/** Seconds now, read again once a minute while the tab is visible. */
+function useNowSeconds(): number {
+  const hidden = useVisibilityPause();
+  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    if (hidden) return undefined;
+    setNow(Math.floor(Date.now() / 1000));
+    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 60_000);
+    return () => clearInterval(timer);
+  }, [hidden]);
+  return now;
+}
+
+/** A ring meter for the time left (B-11 §16): the expiry number only, never the agent's words. */
+export function TimeLeft({ expiresAt }: { expiresAt: number }): ReactElement {
+  const now = useNowSeconds();
+  const left = Math.max(0, Math.min(APPROVAL_TTL, Math.floor(expiresAt - now)));
+  return (
+    <RingMeter
+      label={S.timeLeft}
+      value={left}
+      max={APPROVAL_TTL}
+      text={timeLeftText(left)}
+      countdown
+      size="sm"
+    />
+  );
+}
+
+/** Under the hood for one request: its kind and exact expiry (B-11 §16). */
+export function approvalHoodFields(item: ApprovalItem): readonly unknown[] {
+  const fields: unknown[] = [
+    {
+      kind: 'text',
+      label: S.hoodKind,
+      value: item.commitment ? S.kindTerms : item.paid ? S.kindPaid : S.kindRequest,
+    },
+  ];
+  const at = new Date(item.expiresAt * 1000);
+  if (Number.isFinite(at.getTime())) {
+    fields.push({ kind: 'time', label: S.hoodExpiry, value: at.toISOString() });
+  }
+  return fields;
+}
+
+/**
+ * The approved moment, with the shared component's own word ("Approved"). The status line ("Approved.")
+ * stays the one announced and the one the browser tests find, so the moment is not read out.
+ */
+export function ApprovedMoment(): ReactElement {
+  return (
+    <span className="ap-moment" aria-hidden="true">
+      <SuccessMoment kind="approved" />
+    </span>
+  );
+}
+
 /** Status lines, each its own polite live region (as the page's `say`). */
 export function Statuses({ lines }: { lines: readonly string[] }): ReactElement | null {
   if (lines.length === 0) return null;
@@ -86,7 +170,10 @@ export function ApprovalFacts({ item }: { item: ApprovalItem }): ReactElement {
   const d = item.details;
   return (
     <>
-      <p className="al-approval-type">{S.cardTitle}</p>
+      <div className="al-approval-top">
+        <p className="al-approval-type">{S.cardTitle}</p>
+        <TimeLeft expiresAt={item.expiresAt} />
+      </div>
       {d === undefined ? (
         <h2>{item.summary}</h2>
       ) : (
@@ -278,6 +365,7 @@ export function SingleApproval({
   const [actions, setActions] = useState(true);
   const [lines, setLines] = useState<readonly string[]>([]);
   const [paying, setPaying] = useState(false);
+  const [outcome, setOutcome] = useState<'approved' | 'denied' | undefined>(undefined);
   const say = (text: string): void => setLines((l) => [...l, text]);
 
   const answer = (a: DecideAnswer): void => {
@@ -286,6 +374,10 @@ export function SingleApproval({
       return;
     }
     setStep(undefined);
+    if (a.kind === 'status' && a.status === 'applied') {
+      if (a.decision === 'approve') setOutcome('approved');
+      else if (a.decision === 'deny') setOutcome('denied');
+    }
     say(decisionText(a));
     if (a.kind === 'status' && RETRY.has(a.status)) setActions(true);
   };
@@ -301,9 +393,12 @@ export function SingleApproval({
   };
 
   return (
-    <section
-      className="al-card al-approval"
+    <Surface
+      as="section"
+      level={step !== undefined || paying ? 2 : 1}
+      className="al-approval"
       {...(APPROVAL_ID.test(item.approvalId) ? { 'data-approval': item.approvalId } : {})}
+      {...(outcome === undefined ? {} : { 'data-outcome': outcome })}
     >
       <ApprovalFacts item={item} />
       {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
@@ -320,6 +415,7 @@ export function SingleApproval({
             </Button>
           </div>
         ) : null}
+        {outcome === 'approved' ? <ApprovedMoment /> : null}
         <Statuses lines={lines} />
         {step === undefined ? null : (
           <OwnerStep
@@ -336,6 +432,7 @@ export function SingleApproval({
         )}
       </div>
       <ApprovalFoot />
+      <UnderTheHood fields={approvalHoodFields(item)} />
       {paying ? (
         <PayConfirm
           {...(sheet.payConfirm === undefined ? {} : { client: sheet.payConfirm })}
@@ -344,11 +441,12 @@ export function SingleApproval({
           input={{ flow: 'proof', approvalId: item.approvalId }}
           onDone={() => {
             setActions(false);
+            setOutcome('approved');
             say(S.approved);
           }}
           onClose={() => setPaying(false)}
         />
       ) : null}
-    </section>
+    </Surface>
   );
 }

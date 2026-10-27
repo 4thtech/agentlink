@@ -80,6 +80,18 @@ export const APPROVAL_STRINGS = Object.freeze({
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',
   confirmRequired: 'This costs credits. Approve it on its own card. Nothing was changed.',
+  // UI-REFRESH-o: the time-left ring, the first-load skeleton and Under the hood (B-11 §16, §7).
+  loading: 'Loading your approvals',
+  timeLeft: 'Time left',
+  expired: 'Expired',
+  underMinute: 'Less than a minute left',
+  minutesLeft: '{minutes} min left',
+  hoursLeft: 'About {hours} h left',
+  hoodKind: 'Kind',
+  hoodExpiry: 'Expires at',
+  kindRequest: 'Request',
+  kindTerms: 'Terms',
+  kindPaid: 'Costs credits',
 });
 
 /** The keys whose wording differs from the old page in the name of the code only (11 §5.5). */

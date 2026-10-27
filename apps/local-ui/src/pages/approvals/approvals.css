@@ -127,3 +127,61 @@
     border: 2px solid CanvasText;
   }
 }
+
+/* UI-REFRESH-o (B-11 §16, §6 rows 4 and 7; plan §7): cards and panels are Surfaces (level 1; the card
+   being decided and the review step on level 2; depth.css draws the fill, border and shadow). Not
+   frosted. The ring meter and the approved check are the shared components'. A denied card fades:
+   its own chrome (the type line with the ring, and the footer) over a token duration, the facts at
+   once, because content from the agent never animates (I-5). The status line stays at full
+   strength, and no rule here hides anything the owner confirms. Reduced motion: instant. */
+.al-approvals .al-approval,
+.al-approvals .al-panel {
+  width: 100%;
+  box-sizing: border-box;
+}
+.al-approvals .al-panel {
+  padding: var(--al-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.al-approvals .al-panel h2,
+.al-approvals .al-panel p,
+.al-approvals .al-approval-top .al-approval-type {
+  margin: 0;
+}
+.al-approvals .al-approval-top .al-ring {
+  margin-left: auto;
+}
+.al-approvals .al-approval[data-outcome='approved'] {
+  border-color: var(--al-color-status-success-border);
+}
+.al-approvals .al-approval > .al-approval-top,
+.al-approvals .al-approval > .al-approval-foot {
+  transition: opacity var(--al-duration-base) var(--al-easing-exit);
+}
+.al-approvals .al-approval[data-outcome='denied'] > .al-approval-top,
+.al-approvals .al-approval[data-outcome='denied'] > .al-approval-foot,
+.al-approvals .al-approval[data-outcome='denied'] > dl,
+.al-approvals .al-approval[data-outcome='denied'] > .al-terms,
+.al-approvals .al-approval[data-outcome='denied'] > .al-untrusted {
+  opacity: var(--al-opacity-disabled);
+}
+.al-approvals .ap-moment {
+  display: flex;
+}
+@media (prefers-reduced-motion: reduce) {
+  .al-approvals .al-approval > .al-approval-top,
+  .al-approvals .al-approval > .al-approval-foot {
+    transition: none;
+  }
+}
+:root[data-motion='reduced'] .al-approvals .al-approval > .al-approval-top,
+:root[data-motion='reduced'] .al-approvals .al-approval > .al-approval-foot {
+  transition: none;
+}
+@media (forced-colors: active) {
+  .al-approvals .al-approval[data-outcome='approved'] {
+    border-color: CanvasText;
+  }
+}
