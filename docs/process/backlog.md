@@ -4707,7 +4707,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests per state; reduced-motion test; polling pauses while the tab is hidden; no inbound text in any tile (fixture with a message body).
 
 #### UI-REFRESH-h · local-ui: Activity refresh (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Activity), §6 row 3
