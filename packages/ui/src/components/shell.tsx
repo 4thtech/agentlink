@@ -30,6 +30,10 @@ type Connection =
 export interface AppShellProps {
   os?: 'macos' | 'windows' | 'linux';
   title?: string;
+  /** The page title in the top bar (UI-REFRESH-f). Without it the shell draws no top bar. */
+  pageTitle?: string;
+  /** The controls at the right end of the top bar: the Under the hood switch, status chip, theme. */
+  topBarEnd?: ReactNode;
   agent?: string;
   nav?: readonly NavItem[];
   connection?: Connection;
@@ -75,6 +79,8 @@ function Chrome({ os, title }: { os: 'macos' | 'windows' | 'linux'; title: strin
 export function AppShell({
   os,
   title = 'AgentLink',
+  pageTitle,
+  topBarEnd,
   agent,
   nav = [],
   connection = 'connected',
@@ -83,11 +89,12 @@ export function AppShell({
   children,
   className,
 }: AppShellProps): ReactElement {
+  const active = nav.findIndex((item) => item.active === true);
   return (
     <div className={cx('al-shell', className)}>
       {os === undefined ? null : <Chrome os={os} title={title} />}
       <div className="al-shell-main">
-        <nav className="al-side" aria-label="Main">
+        <nav className="al-side al-chrome" aria-label="Main">
           <div className="al-side-brand">
             <Lockup size={18} />
           </div>
@@ -98,27 +105,40 @@ export function AppShell({
               <Icon name="chevron-down" size={14} />
             </button>
           )}
-          <ul>
-            {nav.map((item, i) => (
-              <li key={i}>
-                <a
-                  href={safeHref(item.href)}
-                  className={cx('al-nav', item.active === true && 'is-active')}
-                  aria-current={item.active === true ? 'page' : undefined}
-                >
-                  <Icon name={item.icon} size={16} />
-                  <span className="al-text-body">{item.label}</span>
-                  {item.count === undefined || item.count === 0 ? null : (
-                    <span className="al-nav-count al-text-code">{item.count}</span>
-                  )}
-                </a>
-              </li>
-            ))}
-          </ul>
+          {/* One highlight that slides to the current item (transform only). Its place is the
+              active index, a data attribute the stylesheet maps to a position: no inline style. */}
+          <div className="al-nav-wrap" data-active={active < 0 ? undefined : String(active)}>
+            <span className="al-nav-slider" aria-hidden="true" />
+            <ul>
+              {nav.map((item, i) => (
+                <li key={i}>
+                  <a
+                    href={safeHref(item.href)}
+                    className={cx('al-nav', item.active === true && 'is-active')}
+                    aria-current={item.active === true ? 'page' : undefined}
+                  >
+                    <Icon name={item.icon} size={16} />
+                    <span className="al-text-body">{item.label}</span>
+                    {item.count === undefined || item.count === 0 ? null : (
+                      <span className="al-nav-count al-text-code">{item.count}</span>
+                    )}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </nav>
-        <main className="al-shell-content">{children}</main>
+        <div className="al-shell-body">
+          {pageTitle === undefined ? null : (
+            <header className="al-topbar al-chrome">
+              <span className="al-topbar-title al-text-title-3">{pageTitle}</span>
+              <div className="al-topbar-end">{topBarEnd}</div>
+            </header>
+          )}
+          <main className="al-shell-content">{children}</main>
+        </div>
       </div>
-      <footer className="al-statusbar al-text-code">
+      <footer className="al-statusbar al-chrome al-text-code">
         {/* One polite live region: announced when the state changes, never per poll (B-11 §15).
             The key replays the fade (and the pulse on Connected) only on a change (B-11 §6 row 1). */}
         <span className="al-sb-item" role="status" aria-live="polite" aria-atomic="true">

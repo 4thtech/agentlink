@@ -7,10 +7,17 @@ export const SHELL_STRINGS = {
   notAvailableHint: 'It arrives in an update. Nothing is lost while you wait.',
   notFoundTitle: "This page isn't here.",
   notFoundHint: 'Pick a page from the menu.',
+  themeName: 'Theme',
+  themeChange: 'Change',
+  themeSystem: 'System',
+  themeLight: 'Light',
+  themeDark: 'Dark',
+  offlineChip: 'Not connected',
 } as const;
 
 export const PAGE_TITLES = {
   firstRun: 'Set up AgentLink',
+  home: 'Home',
   approvals: 'Approvals',
   approve: 'Approval',
   activity: 'Activity',
@@ -21,6 +28,7 @@ export const PAGE_TITLES = {
   proofs: 'Proofs & credits',
   rules: 'Rules',
   backup: 'Backup',
+  appearance: 'Appearance',
   advanced: 'Advanced',
 } as const;
 

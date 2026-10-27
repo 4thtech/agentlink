@@ -1,9 +1,14 @@
 // The shared frame: sidebar, content and status bar from the design system's AppShell. Content
-// switches by route; the layout itself never changes (d1/screens/local). Seven sidebar items; the
-// Settings item opens a sub-navigation (Backup, Passkeys, Advanced) above its page (D-120).
+// switches by route; the layout itself never changes (d1/screens/local). Nine sidebar items; the
+// Settings item opens a sub-navigation (Backup, Passkeys, Appearance, Advanced) above its page (D-120).
+// UI-REFRESH-f: a top bar with the page title and the global controls; the preferences reach every
+// page through PrefsHood (the Under the hood switch).
 import { AppShell, type NavItem } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { NAV_ITEMS, SETTINGS_LABEL, SETTINGS_PAGES } from '../nav.js';
+import { PrefsHood } from '../prefs/index.js';
+import { PAGE_TITLES, SHELL_STRINGS } from '../strings.js';
+import { TopBarControls } from './top-bar.js';
 import { useUnseenMessages } from '../pages/messages/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
@@ -93,6 +98,15 @@ function inSettings(path: string): boolean {
   return SETTINGS_PAGES.some((p) => p.path === path);
 }
 
+/** The title in the top bar: the nav or Settings entry of the path, else the app's name. */
+function pageTitleOf(path: string): string {
+  if (path === '/first-run') return PAGE_TITLES.firstRun;
+  const item = NAV_ITEMS.find((i) => i.path === path && i.label !== SETTINGS_LABEL);
+  if (item !== undefined) return item.label;
+  const page = SETTINGS_PAGES.find((p) => p.path === path);
+  return page === undefined ? SHELL_STRINGS.appName : page.label;
+}
+
 /**
  * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the backup code (no
  * passkey) and this browser can make one. Any failure is false: the next step is a nudge, never a
@@ -160,29 +174,33 @@ export function Layout({
     ...(item.id === 'messages' && unseen > 0 ? { count: unseen } : {}),
   }));
   return (
-    <AppShell
-      nav={nav}
-      connection={SHELL_STATE[connection]}
-      {...(version === undefined ? {} : { version })}
-    >
-      {switchNeeded && path !== FIRST_RUN_PATH ? (
-        <SwitchToPasskeyBanner platform={platform} />
-      ) : null}
-      {settings ? (
-        <nav aria-label="Settings" className="al-subnav">
-          {SETTINGS_PAGES.map((p) => (
-            <a
-              key={p.path}
-              href={p.path}
-              className={p.path === path ? 'is-active' : undefined}
-              aria-current={p.path === path ? 'page' : undefined}
-            >
-              {p.label}
-            </a>
-          ))}
-        </nav>
-      ) : null}
-      {children}
-    </AppShell>
+    <PrefsHood>
+      <AppShell
+        nav={nav}
+        pageTitle={pageTitleOf(path)}
+        topBarEnd={<TopBarControls connection={connection} />}
+        connection={SHELL_STATE[connection]}
+        {...(version === undefined ? {} : { version })}
+      >
+        {switchNeeded && path !== FIRST_RUN_PATH ? (
+          <SwitchToPasskeyBanner platform={platform} />
+        ) : null}
+        {settings ? (
+          <nav aria-label="Settings" className="al-subnav al-chrome">
+            {SETTINGS_PAGES.map((p) => (
+              <a
+                key={p.path}
+                href={p.path}
+                className={p.path === path ? 'is-active' : undefined}
+                aria-current={p.path === path ? 'page' : undefined}
+              >
+                {p.label}
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        {children}
+      </AppShell>
+    </PrefsHood>
   );
 }

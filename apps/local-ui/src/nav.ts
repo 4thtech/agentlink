@@ -1,5 +1,5 @@
-// The sidebar, eight items (D-120, D-133): Approvals, Activity, Messages, Contacts, Files, Proofs & credits, Rules and
-// Settings (Backup, Passkeys, Advanced in a sub-navigation). Before: the settings pages (d1/screens/local). M1-11b-2: Approvals
+// The sidebar, nine items (D-120, D-133, UI-REFRESH-f): Home, Approvals, Activity, Messages, Contacts, Files, Proofs & credits, Rules and
+// Settings (Backup, Passkeys, Appearance, Advanced in a sub-navigation). Before: the settings pages (d1/screens/local). M1-11b-2: Approvals
 // (`/`) is a page of this app now.
 import { PAGE_TITLES } from './strings.js';
 
@@ -16,6 +16,8 @@ export interface AppNavItem {
 }
 
 export const NAV_ITEMS: readonly AppNavItem[] = [
+  // Home lives at /settings/home until M1-11b-2 moves it to `/` (D-135).
+  { id: 'home', label: PAGE_TITLES.home, icon: 'agent', path: '/settings/home', routed: true },
   { id: 'approvals', label: PAGE_TITLES.approvals, icon: 'approval', path: '/', routed: true },
   {
     id: 'activity',
@@ -66,6 +68,7 @@ export const NAV_ITEMS: readonly AppNavItem[] = [
 export const SETTINGS_PAGES: readonly { readonly label: string; readonly path: string }[] = [
   { label: PAGE_TITLES.backup, path: '/settings/backup' },
   { label: PASSKEYS_LABEL, path: '/settings/passkeys' },
+  { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
   { label: PAGE_TITLES.advanced, path: '/settings/advanced' },
 ];
 
