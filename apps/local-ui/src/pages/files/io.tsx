@@ -177,6 +177,10 @@ function useFeed<T extends { readonly id: string; readonly at: number }>(
       if (!alive.current) return;
       setState((prev) => {
         if (result.kind === 'ok') {
+          if (cursor === null && prev.phase === 'ok' && result.feed.items.length === 0) {
+            // An empty newest page does not say the rows are gone: keep them, marked "as of".
+            if (prev.items.length > 0) return { ...prev, staleAt: Date.now(), more: false };
+          }
           if (cursor === null && prev.phase === 'ok') {
             // A refresh: the newest page replaces the top; older pages already loaded stay.
             const known = new Set(prev.items.map((i) => i.id));

@@ -373,7 +373,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           </div>
           <div>
             <dt>{S.invitesTitle}</dt>
-            <dd>{view.contacts.acceptInvites === 'auto' ? S.allow : S.askMe}</dd>
+            <dd>{view.contacts.acceptInvites === 'auto' ? S.allowed : S.askMe}</dd>
           </div>
           <div>
             <dt>{S.termsTitle}</dt>

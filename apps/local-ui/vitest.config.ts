@@ -4,8 +4,10 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // messages.test.ts, home.test.ts, contacts-refresh.test.ts and activity.refresh.test.ts read their stylesheet as text (`?raw`); the default config would replace it with "".
-    css: { include: [/messages\.css/, /home\.css/, /contacts\.css/, /activity\.css/] },
+    // Tests that read their stylesheet as text (`?raw`) need it listed here; the default config would replace it with "".
+    css: {
+      include: [/messages\.css/, /home\.css/, /contacts\.css/, /activity\.css/, /about\.css/],
+    },
     testTimeout: 20_000,
   },
 });
