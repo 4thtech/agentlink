@@ -834,7 +834,7 @@ Operational states (e.g. a frozen deploy) aren't user-facing; skip them.
    - Open-licence fonts (e.g. SIL OFL): ≤ 2 families + a monospace; tabular figures.
    - An open-source icon set with a permissive licence, e.g. **Lucide (ISC)**; custom icons on the same grid.
    - SVGs are optimized, with no scripts, external references or embedded raster images.
-6. **Motion:** 120–320 ms, purposeful; nothing loops except progress. With `prefers-reduced-motion`, use fades or nothing, plus text states.
+6. **Motion:** 120–320 ms for transitions, purposeful; nothing loops except progress. Outside that range (D-132, decided by the owner, 2026-10-27): once-only signature moments up to 480 ms (`--al-duration-moment`), progress loops (`--al-duration-ambient`) and the 1200 ms soft highlight on a new row (an opacity fade). With `prefers-reduced-motion`, use fades or nothing, plus text states.
 7. **Tokens and components:** React components in `packages/ui`, shared by the local UI, desktop app and console.
    - **Format:** W3C Design Tokens Community Group JSON (`$value`, `$type`, `$description`), plus generated CSS variables.
    - **Names:** `--al-<category>-<role>[-<variant>][-<state>]`, kebab-case. The JSON path `color.bg.canvas` maps to `--al-color-bg-canvas`.

@@ -479,6 +479,31 @@ Outside those conditions a batch adds no new path and closes none: a modified pa
 
 `policy.set`, `approval.cancel`, `agent.revoke`, `contact.check` and every other owner operation stay one operation per entry of the owner secret, each on its own screen (11 §6).
 
+#### 2.5.3 Confirming paid actions (D-132; decided by the owner, 2026-10-27: the owner confirms paid actions with the computer's own verification; the rule set and details below are proposed, owner confirms at merge)
+
+Only two actions cost anything: a **proof** and **verified registration** (12 §2). AgentLink moves no money between agents, and 4thTech never holds credits (12 §4.1). This section says which paid actions the owner confirms and what that confirmation must be. Design: `docs/design/b11-local-app.md` §19.
+
+**Which actions (§20 decision 1 of the brief; recommended option shown):**
+
+| Action | Confirmation |
+|---|---|
+| A proof whose fee is within the effective per-proof limit and the 24-hour budget, and not set to `approval` (06 §3 evaluation, result `allow`) | **None: automatic.** The signed policy is the owner's standing consent. Each action stays bounded by `perActionMaxUSD` and `dailyBudgetUSD` |
+| A proof whose evaluation gives `approval` (above a limit, or `notarize: approval` globally or for the contact) | The approval, confirmed under the rules below |
+| Verified registration (`REGISTER`, M2) | Always, under the rules below |
+| A `policy.set` that changes a **spending field**: `proofs.notarize`, `proofs.dailyBudgetUSD`, `proofs.perActionMaxUSD`, or `contactRules[].proofs` (including "Remember for this contact", 06 §3) | Always, under the rules below, showing each old and new value. A `policy.set` that changes no spending field keeps the ordinary owner prompt |
+| `credits.deposit`, `credits.withdraw` (§2.5.1) | Unchanged: owner operations with presence as today. Only their confirm screen takes the same look |
+
+**Rules for the confirmation:**
+
+1. **A real user-verification ceremony.** WebAuthn `navigator.credentials.get` with `userVerification: "required"` and `allowCredentials` limited to the owner's passkeys, run in the owner's browser on the owner's page only: the local UI on `localhost` (08 §1), the console, the cloud agent's own pages (§2.5, cloud owner presence), and from M2 the desktop app's native window (D-36). The finish step refuses unless `clientDataJSON` has type `webauthn.get`, the begin's challenge and exactly the page's origin, the `rpIdHash` is the page's RP ID, and the flags UP and **UV** are both set (the localhost check of §2.3.1 already requires UV). A response without UV is refused (`verification_required`); it is never downgraded to presence alone. Whatever the platform shows (Touch ID or another fingerprint reader, Windows Hello face or PIN, a passkey on a phone, a PIN pad) is the platform's own prompt and is never drawn by the page (11 §10).
+2. **What you see is what you sign.** The begin step fixes the exact owner flow to be signed (the `approval.decide` with its proof scope and `maxFee`, the registration, or the `policy.set`) and derives from it a **confirmation statement**: the kind, the amount in USD (the maximum the signature allows, as a USD amount, §2.4.1), a fixed purpose key, the counterparty shown by the 11 §5.2 name rule (owner alias, else the labelled restricted name; never other inbound text) or none, and for a limits change each old and new value. The sheet renders only that statement as the server returned it; it never takes an amount, name or limit from a URL parameter, a tool argument or inbound content (§2.5, "What the AI may cause"). The challenge is `SHA-256("agentlink-pay-confirm-v1" ‖ nonce ‖ SHA-256(JCS(statement)) ‖ SHA-256(JCS(unsigned action body)))` with a fresh 32-byte random nonce, usable once, bound to the page session, valid 120 s.
+3. **Only that is signed.** After a successful finish the gesture unlocks the owner key for exactly the action whose digest is in the challenge (one gesture, one owner operation, §2.5), and the signed `maxFee` never exceeds the statement's amount. Any change (amount, limit, contact, expiry) needs a new begin and a new gesture.
+4. **The AI can never satisfy it.** No MCP tool, CLI flag or URL starts or completes a confirmation (I-4); the AI may at most cause the page to open, under §2.5's rules. The sheet says "Your AI can't confirm this for you."
+5. **Assertion signature.** The build verifies the assertion signature over `authenticatorData ‖ SHA-256(clientDataJSON)` with the credential public key, stored from the registration response. Passkeys registered before that (whose public key was not kept, §2.3.1) keep the PRF-unlock check, with the binding resting on rules 2 and 3; the build card states how they are re-registered.
+6. **Backup code (brief §20 decision 2; recommended: kept).** "Use backup code instead" stays the small secondary path, as on every approval; the owner code unlocks the same single action under rules 2 and 3. The CLI keeps the owner passphrase, since a headless machine has no platform verification.
+
+**Residuals.** In a browser the system prompt does not show the amount, so on a same-user machine a look-alike page on another `localhost` port can show one amount and request a challenge for another flow (G-1, fake prompts, §2.5). The binding stops replay and any swap of the action after the gesture by the genuine server; it does not make the browser show the amount. The desktop app (D-36) puts the amount and purpose into the OS prompt's reason text ("Confirm $0.10 for a proof"), never counterparty text. Automatic proofs inside the limits remain exposed to the existing residual of a same-user process signing with the agent key (§2.5), which the limits do not bound; keeping credits small does.
+
 ### 2.6 Key rotation
 
 - A new `keyEpoch` derives new Nostr and encryption keys (EVM key unchanged) and issues a new agent card. Old epoch keys are re-derivable from the seed, so history stays readable.

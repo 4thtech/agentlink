@@ -1,6 +1,6 @@
 # B-11 · A state-of-the-art local app: Home, live state, motion, under the hood (design brief)
 
-> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17, **pending owner decision**) and the owner decisions this raises (§18).
+> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
 
 ## 1. Why, and what the owner asked for
 
@@ -78,7 +78,7 @@ Design this once as a sheet, extending `d1/screens/local/shared-states--all`, in
 
 ## 6. Motion specification
 
-The motion tokens, their reconciliation with 11 §11 and the proposed additions are in §14; the progress components in §15. Tokens only, no new values unless §18 approves them: durations `--al-duration-fast` 120 ms, `--al-duration-base` 200 ms, `--al-duration-slow` 320 ms; easings `--al-easing-standard`, `-enter` (arrivals), `-exit` (leaving). Nothing runs longer than 320 ms, except the one-time success moments marked below (up to 480 ms). Only `transform` and `opacity` animate. Technique: CSS transitions and keyframes; the Web Animations API for sequenced moments; the View Transitions API for the route fade, which does nothing where unsupported. **No motion library.**
+The motion tokens, their reconciliation with 11 §11 and the proposed additions are in §14; the progress components in §15. Tokens only, plus the additions §18 approved (D-132): durations `--al-duration-fast` 120 ms, `--al-duration-base` 200 ms, `--al-duration-slow` 320 ms; easings `--al-easing-standard`, `-enter` (arrivals), `-exit` (leaving). Nothing runs longer than 320 ms, except the one-time success moments marked below (up to 480 ms). Only `transform` and `opacity` animate. Technique: CSS transitions and keyframes; the Web Animations API for sequenced moments; the View Transitions API for the route fade, which does nothing where unsupported. **No motion library.**
 
 | # | Moment | What moves | Time and easing | Why |
 |---|---|---|---|---|
@@ -172,17 +172,19 @@ A switch in the top bar, label "Under the hood", default **Off**, remembered per
 
 > **B-11 · A state-of-the-art local app.** **Screens:** Home (new: five live tiles for agent, network, approvals waiting, credits and last activity, plus one "Next step" card while setup is incomplete); the top bar with a global "Under the hood" switch (off by default; shows a clearly marked, read-only technical panel per page); the state-indicator sheet (live dot: checking, connected, reconnecting, paused, not running, needs setup, always icon plus word); Files with Send and Received tabs and "Show in Finder"; Contacts with Add contact (create an invite with link and QR; paste an invite and confirm who it is), a guided "Call and compare" safety-code check and a duplicate-contact notice; the shared presence prompt (passkey first, "Use backup code instead" as a small link); Settings with Profile, Passkeys, Backup, Appearance, Advanced and About. **Motion:** calm and exact; 120, 200 and 320 ms with the existing easing tokens; only transform and opacity; status dot cross-fade with one pulse on arrival, skeleton loading, new rows slide in 8 px and highlight, counts tick, the approval check draws in, the proof stamp settles, two safety codes merge into one check, a received file drops into the Inbox card, a 120 ms route fade; nothing loops except progress; no motion library; design the reduced-motion version of each as a still frame plus a text line. **Why:** the owner wants the app to feel alive, to show what is happening, and to hide the technology unless asked. **Constraints:** brand per `brand/README.md` (dark first, graphite, one signal-orange accent, Geist); tokens only; 11 §5 vocabulary (no wallet, gas, seed phrase, transaction, network names or addresses in the default view; "backup code"; amounts in dollars); the OS passkey prompt is never drawn; the app never opens received files; no keys, codes, tokens or links in under-the-hood panels; WCAG 2.1 AA, never colour alone, focus rings, live regions; production uses classes, no inline styles (CSP). **States:** empty, loading, live, error, offline for every tile and screen; light, dark and increased contrast; 1280 and 360 wide.
 >
-> **v2 (owner direction, 27 Oct): make it breathtaking, a native-feeling Mac app.** **Depth:** five elevation levels (canvas, surface, raised, sheet, modal) using the existing shadow-0…4 and background tokens; in dark, a 1 px top highlight and surface tint carry depth where shadows don't show; the sidebar and top bar are translucent (background blur and slight saturation over the content) with a solid fallback for reduced transparency, increased contrast, forced colours, unsupported browsers, and Windows and Linux by default. **Progress:** one family for everything that takes time: determinate bar (file sending, with "2.1 of 8 MB"), indeterminate bar, ring meter (credits, invite and approval time left), live dot, skeleton, success moment, error; nothing shows for waits under 400 ms, and an indicator once shown stays at least 500 ms. **Smooth:** every state change transitions; only transform and opacity animate; no motion library. **Accessibility:** reduced motion and reduced transparency each get a designed still version; every indicator has a word and a screen-reader label. **Pending owner decision (design as a separate set):** a Messages page (per contact, Inbox and Sent, read-only, inbound shown as untrusted plain text, no links or formatting) and Files with Received, Sent and Send folders tabs.
+> **v2 (owner direction, 27 Oct): make it breathtaking, a native-feeling Mac app.** **Depth:** five elevation levels (canvas, surface, raised, sheet, modal) using the existing shadow-0…4 and background tokens; in dark, a 1 px top highlight and surface tint carry depth where shadows don't show; the sidebar and top bar are translucent (background blur and slight saturation over the content) with a solid fallback for reduced transparency, increased contrast, forced colours, unsupported browsers, and Windows and Linux by default. **Progress:** one family for everything that takes time: determinate bar (file sending, with "2.1 of 8 MB"), indeterminate bar, ring meter (credits, invite and approval time left), live dot, skeleton, success moment, error; nothing shows for waits under 400 ms, and an indicator once shown stays at least 500 ms. **Smooth:** every state change transitions; only transform and opacity animate; no motion library. **Accessibility:** reduced motion and reduced transparency each get a designed still version; every indicator has a word and a screen-reader label. **Decided by the owner (27 Oct), design as its own set:** a Messages page (per contact, Inbox and Sent, read-only, inbound shown as untrusted plain text, no links or formatting) and Files with Received, Sent and Send folders tabs.
+>
+> **Paying for proof and registration (27 Oct; §19).** AgentLink is not a finance app; only a proof ($0.10) and verified registration ($5.00) cost anything, paid from credits that stay the user's. Design one polished confirmation sheet (level 4): what it is for, the amount large and still, "Paid from your credits", "Your credits stay yours; 4thTech never holds them.", and "Confirm with Touch ID" (or Windows Hello, or your passkey); the system prompt is never drawn; then a breathing ring while waiting, a sweeping arc while recording, and a ring that closes with a check drawing in 480 ms; every state of §19.3 and a reduced-motion version. Keep credits a calm line with the ring meter, and add a plain receipt row per paid action. No charts, no balance hero, no wallet look, no platform or card logos.
 
 ## 12. What this brief does not decide
 
-Fixed by the owner: the list in §1. Left to the designer: the nav layout at 360, the tile arrangement, the exact icons (Lucide, ISC, from `brand/icons/ui/`). v2 decisions for the owner are in §18. Left to the owner after seeing the design: whether the AI app keeps opening Approvals directly when something waits (the plan says yes), and the build cards (for example Home, motion, under the hood, Files Send, Add contact, Settings), which are written when the design is approved.
+Fixed by the owner: the list in §1. Left to the designer: the nav layout at 360, the tile arrangement, the exact icons (Lucide, ISC, from `brand/icons/ui/`). v2 decisions are in §18 (decided 2026-10-27, D-132); the decisions raised by §19 are in §20. Left to the owner after seeing the design: whether the AI app keeps opening Approvals directly when something waits (the plan says yes), and the build cards (for example Home, motion, under the hood, Files Send, Add contact, Settings), which are written when the design is approved.
 
 ---
 
 # Part 2 · v2 additions (owner direction, 2026-10-27)
 
-Everything below adds to §1 to §12 and changes none of them, except where §18 asks the owner to decide. Tokens named `--al-*` exist today in `d1/tokens/tokens.css`; tokens marked **proposed** do not exist yet and are added only if the owner approves them (§18).
+Everything below adds to §1 to §12 and changes none of them, except as §18 decided. Tokens named `--al-*` exist today in `d1/tokens/tokens.css`; tokens marked **proposed** in §13 and §14 were **approved by the owner on 2026-10-27 (§18 decisions 2 and 3, D-132)** and are added to `tokens.css` by the first build card that uses them, with exactly the values given here.
 
 ## 13. Depth: elevation and materials
 
@@ -235,7 +237,7 @@ Technique: CSS only (`backdrop-filter`, `@supports`, media queries), set by clas
 
 **Easings (exist today):** `--al-easing-standard` `cubic-bezier(0.2, 0, 0, 1)` for things that move within the page; `--al-easing-enter` `cubic-bezier(0, 0, 0, 1)` for arrivals (fast start, soft landing); `--al-easing-exit` `cubic-bezier(0.3, 0, 1, 1)` for leaving (quick, no lingering). No overshoot and no bounce anywhere (§2).
 
-**Proposed additions** (owner decision 2):
+**Additions** (approved, owner decision 2, D-132):
 
 | Token | Value | For | Why |
 |---|---|---|---|
@@ -243,7 +245,7 @@ Technique: CSS only (`backdrop-filter`, `@supports`, media queries), set by clas
 | `--al-duration-ambient` | 1.4 s (shimmer), 2 s (breathing) | Progress loops only: skeleton shimmer, indeterminate bar, the "Waiting for Touch ID" ring, Reconnecting | Loops that cycle every 320 ms feel anxious |
 | `--al-easing-emphasized` | `cubic-bezier(0.05, 0.7, 0.1, 1)` | Signature moments and the ring meter filling | A slower, more deliberate settle than `enter` |
 
-**Conflict to decide; 11 is not changed here.** 11 §11 item 6 says "Motion: 120–320 ms, purposeful; nothing loops except progress." §6 of this brief already allows up to 480 ms for one-time success moments, and the progress loops above take longer than 320 ms per cycle. Two readings are possible: (a) 120–320 ms covers transitions only, while progress loops and once-only moments sit outside it; (b) everything stays within 320 ms. The owner decides (§18, decision 2). Until then, designers draw the 480 ms moments and note a 320 ms fallback for each.
+**Decided (owner decision 2 (a), D-132; 11 §11 item 6 now says so).** 11 §11 item 6 says "Motion: 120–320 ms, purposeful; nothing loops except progress." §6 of this brief already allows up to 480 ms for one-time success moments, and the progress loops above take longer than 320 ms per cycle. Two readings are possible: (a) 120–320 ms covers transitions only, while progress loops and once-only moments sit outside it; (b) everything stays within 320 ms. The owner chose (a): 120–320 ms covers transitions; once-only signature moments (up to 480 ms), progress loops and the 1200 ms soft highlight are outside it.
 
 **Rules for every motion:**
 
@@ -311,9 +313,9 @@ How §13 to §15 apply to each page of §8. The states listed in §4 and §8 sti
 | **Rules** | A recessed well for the signed rules summary | Switches slide; saving shows the presence prompt, then a "Saved" check; nothing else moves | Rules version and who signed it |
 | **Settings** | The sub-navigation on the chrome material; each section on level 1 | Appearance has a live preview tile that shows the motion and transparency choices as they change; Passkeys rows slide in and out | Advanced, per §7 |
 
-## 17. Messages and Files In/Out (pending owner decision)
+## 17. Messages and Files In/Out (decided, 2026-10-27)
 
-> **Pending owner decision: not approved, not designed, not built.** The owner proposed this on 2026-10-27: people should see what their AI sent and received. Design it as a separate set that the owner can accept or drop; nothing else in this brief depends on it.
+> **Decided by the owner (Tali, 2026-10-27, D-132): accepted as sketched here, read-only (§18 decision 1 (a)). Not yet designed or built.** People should see what their AI sent and received. Design it as its own set; nothing else in this brief depends on it.
 
 ### 17.1 Why
 
@@ -341,9 +343,11 @@ The Files page (§8 screens 12 and 13) gets three tabs (owner decision 4): **Rec
 - No message text in logs or error messages: an error says what failed, never what the message said.
 - Under the hood never shows keys, codes, tokens or drop links (§7).
 
-**Design deliverable (only if the owner says yes):** Messages at 1280 and 360 (contact list, Inbox, Sent, a long inbound message clamped, an inbound message containing a link shown as an inert chip, empty, offline) and Files with the three tabs; dark, light and increased contrast.
+**Design deliverable (the owner said yes, 2026-10-27):** Messages at 1280 and 360 (contact list, Inbox, Sent, a long inbound message clamped, an inbound message containing a link shown as an inert chip, empty, offline) and Files with the three tabs; dark, light and increased contrast.
 
-## 18. Owner decisions raised by v2 (recommended first)
+## 18. Owner decisions raised by v2 (decided, 2026-10-27)
+
+> **Decided by the owner (Tali, in chat, 2026-10-27, D-132): every decision below as recommended, option (a) in each.** The other options are kept for the record.
 
 1. **Messages and Files In/Out (§17):** (a) **yes, read-only, as sketched** (recommended); (b) Files In/Out only; (c) not now.
 2. **Motion durations and 11 §11 item 6 (§14):** (a) **120–320 ms is the range for transitions; exempt are once-only signature moments (up to 480 ms), progress loops, and the 1200 ms soft highlight on a new row (§6 row 3, an opacity fade, not movement); add `--al-duration-moment`, `--al-duration-ambient` and `--al-easing-emphasized` to the tokens and clarify 11 §11 in a later spec PR** (recommended); (b) keep everything within 320 ms and shorten the 480 ms moments in §6.
@@ -351,3 +355,80 @@ The Files page (§8 screens 12 and 13) gets three tabs (owner decision 4): **Rec
 4. **Files tabs (§17.3):** (a) **Received · Sent · Send folders** (recommended); (b) keep the two tabs of §1 owner decision 5, Send (folders plus a Sent list) and Received.
 5. **Does reading a message in the app mark it read for the AI?** (a) **No: the app keeps its own "seen" marker, so the AI still gets it as new** (recommended); (b) yes, one shared read state.
 6. **Writing messages from the app:** (a) **not now; "To reply, ask your AI."** (recommended); (b) a compose box in a later version.
+
+---
+
+# Part 3 · Paying for proof and registration (owner direction, 2026-10-27)
+
+## 19. Paying for proof and registration
+
+**Owner direction (Tali, in chat, 2026-10-27; D-132).** AgentLink is not a financial app, not a wallet and not a bank. 4thTech never holds anyone's funds: prepaid credits stay the user's and can be taken back at any time (12 §1, §4.1). Only two actions cost anything: **Proof** ($0.10 per recorded proof, covering up to 3 receipts) and **Verified registration** ($5.00, once per agent; M2) (12 §2). There are no payments to contacts or other agents. When a paid action needs the owner, the owner confirms it with whatever the computer offers (Touch ID or another fingerprint reader, Windows Hello face or PIN, a passkey, or the PIN pad the system shows) through a real WebAuthn user-verification ceremony (04 §2.5.3). The feel is that of paying with a phone at a till: one calm, polished sheet with the amount and what it is for, the system's own prompt, then a crisp progress-to-check moment. Model the pattern, never its marks: no Apple, Google or card-network logos, colours or wording.
+
+**Not in scope.** No balance hero, spending charts, spending breakdowns, dashboards or new money features. Adding credits and Withdraw credits keep their current flows (Proofs & credits page, `topup-ux.md`, M1-11c-a4c); they are already owner operations (04 §2.5), so their existing confirm step uses this sheet's look, nothing more.
+
+### 19.1 When the sheet appears
+
+The rule is in 04 §2.5.3 (proposed, the owner confirms at merge; §20 decision 1). In short:
+
+| Paid action | What the owner sees |
+|---|---|
+| A proof inside the owner's signed limits (per-proof limit and the 24-hour budget, 06 §3) | Nothing at the time; a receipt row afterwards (§19.4). The AI says the cost first (06 instructions) |
+| A proof above the per-proof limit or the 24-hour budget, or for a contact whose rule says "Ask me" | The approval card (§8 screen 4); its main button opens this sheet |
+| Verified registration ($5.00, M2) | This sheet |
+| Changing the spending limits (24-hour budget, per-proof limit, "Ask me" for proofs, a contact's per-proof limit) | This sheet, showing old and new values |
+| Adding credits from funds the agent received, and Withdraw credits (existing) | Their existing confirm step, in this sheet's look |
+
+### 19.2 The confirmation sheet
+
+A **level-4 modal** (§13.1) over the blurred overlay. At 1280 it is centred, about 400 px wide; at 360 it rises from the bottom edge as a full-width sheet with a grab handle. Anatomy, top to bottom:
+
+1. **What it is for**, as the title: "Record proof", "Get the Registered label", "Change your spending limits", "Withdraw credits".
+2. **The amount**, large (`--al-text-display-*`, tabular figures of Geist): "$0.10". It never animates and never rolls (§6: amounts are never revealed piecemeal). For a limits change: "24-hour budget $5 → $10" with the `--al-color-diff-*` tokens.
+3. **Detail rows** (label left, value right, `--al-text-body-sm-*`): "For" (a proof of the message to Marko, using the contact's owner alias per 11 §5.2, never counterparty text); "Paid from" "Your credits · $4.80"; "After" "$4.70". Registration adds "Once for this agent".
+4. **The trust line** in muted text: "Your credits stay yours; 4thTech never holds them." and "Your AI can't confirm this for you."
+5. **The main button**, named for the platform (as 08 §1 does for approvals): **"Confirm with Touch ID"** on a Mac with Touch ID, **"Confirm with Windows Hello"** on Windows, otherwise **"Confirm with your passkey"**. Icon from `brand/icons/ui/` (Lucide `fingerprint`, `scan-face` or `key-round`), never a platform logo. Not focused by default (§9); focus starts on the title.
+6. **Cancel**, and the small link "Use backup code instead" where §20 decision 2 keeps it.
+
+**The system prompt is never drawn.** After the click, the browser or OS shows its own Touch ID, Windows Hello, passkey or PIN dialog; the sheet only waits beside it.
+
+### 19.3 States and motion
+
+| State | What shows | Motion (tokens from §14) | Reduced motion |
+|---|---|---|---|
+| **Opening** | The sheet | Rises 16 px (360: from the bottom edge) and fades in, `--al-duration-slow`, `--al-easing-emphasized`; the overlay fades in `--al-duration-base` | 120 ms fade |
+| **Ready** | As §19.2 | Still | Still |
+| **Waiting** | The button becomes a ring around the platform icon, "Waiting for Touch ID" (or "Windows Hello", "your passkey"), Cancel | Breathing ring (§6 row 12), `--al-duration-ambient` 2 s | A still ring with the words |
+| **Recording** | The ring turns into an arc that sweeps; "Recording proof…" ("Saving your limits…", "Registering…") | Indeterminate arc, `--al-duration-ambient` 1.4 s per turn; shown only after 400 ms (§15.2) | A still half arc with the words |
+| **Done** | The arc closes into a full ring, a check draws inside it, the amount stays; "Done · $0.10 paid from your credits" | Ring closes and the check draws (`stroke-dashoffset`), together `--al-duration-moment` 480 ms, `--al-easing-emphasized`; then one soft pulse ring (§6 row 1); the sheet closes itself after about 1.2 s (§20 decision 3) and the receipt row slides in (§6 row 3) | An instant check and "Done"; the sheet waits for "Close" |
+| **Cancelled** (the person dismissed the system prompt) | Back to Ready; "Not confirmed. Nothing was paid." | Cross-fade, `--al-duration-fast` | Same, no fade |
+| **Couldn't confirm** (verification failed or timed out after 60 s) | "Couldn't confirm it was you. Try again." | Text change only; no nudge (presence failures only change text, §6 row 13) | Same |
+| **Expired or decided elsewhere** | "This request expired" or "Already decided on another screen" with Close | Cross-fade | Same |
+| **Not enough credits** | "You need $0.10 more in credits." with "Add credits" (the existing flow) | None | None |
+| **Still working** (the network is slow after confirming) | "Still recording. Your AI will let you know when it's done. You can close this." | The arc keeps sweeping | Still arc |
+| **Failed after confirming** | Red edge and icon: "Couldn't record the proof. Your credits are unchanged." with "Try again" | Error per §15.1 (no nudge on the sheet) | Same, no motion |
+
+Rules: never claim "nothing was paid" while a held amount may still be charged (06 §3: a failed submission alone does not release it); show **Still working** instead until the outcome is known. At most two things move at once (the arc and the check count as one moment). All art is vector (SVG strokes at `--al-border-width-thick`), crisp at 1x to 3x, and animates only `transform`, `opacity` and `stroke-dashoffset`, so it stays at 60 fps on a five-year-old laptop.
+
+### 19.4 Credits line and receipt rows
+
+- **Credits** stay as they are today: the Home tile and the Proofs & credits card show "$4.80 · about 48 proofs" with the ring meter (§15.1), plus "Used in the last 24 hours: $0.30 of $5" (06 §3). The meter fills over `--al-duration-slow` when the value changes; nothing counts up and there is no chart. Under it, small: "Your credits stay yours; 4thTech never holds them."
+- **A receipt row per paid action** in Activity and in the proof list: icon (proof stamp or Registered label), "Proof · message to Marko" or "Verified registration", "$0.10", time, and a status word: **Held** (reserved while the proof is being recorded), **Paid**, or **Not charged** (the hold was released, 06 §3). Selecting it opens the existing proof detail; Under the hood (§7) adds the record ID and public record link. Inbound text and others' file names never appear in the row (§17.4).
+
+### 19.5 Accessibility
+
+- The sheet is a modal dialog (`role="dialog"`, `aria-modal`, labelled by its title, described by the amount and "For" row); focus is trapped; Escape cancels except while Recording; focus returns to the control that opened it.
+- One polite live region announces Waiting, Recording, Done, Cancelled; errors are assertive. The amount is read as words ("ten cents").
+- Never colour only: every state has an icon shape and a word. Contrast per `d1/design-system/contrast.md`, in dark, light and increased contrast; forced colours keep the ring and check visible as strokes.
+- Touch targets at least 44 px at 360; the sheet scrolls if text is enlarged to 200 %.
+
+### 19.6 Copy (11 §5)
+
+Never "wallet", "bank", "transaction", "gas", "deposit", "payment method" or "balance top-up" in the default view; say "credits", "proof", "proof fee", "Add credits", "Withdraw credits", "Confirm with Touch ID". Sample strings: "Record proof · $0.10"; "Paid from your credits"; "Your credits stay yours; 4thTech never holds them."; "Your AI can't confirm this for you."; "Done · $0.10 paid from your credits"; "Not confirmed. Nothing was paid."
+
+**Design deliverable:** the confirmation sheet in each §19.1 variant and each §19.3 state, at 1280 and 360, dark, light and increased contrast, with reduced motion; the motion as a short prototype or annotated frames (Opening, Waiting, Recording, Done); the credits line with its trust line; the receipt row in its three statuses.
+
+## 20. Owner decisions raised by §19 (recommended first)
+
+1. **Which paid actions use the confirmation sheet** (spec: 04 §2.5.3): (a) **verified registration, a proof above the signed limits (or for a contact set to "Ask me"), and any change to the spending limits; proofs inside the signed limits stay automatic** (recommended); (b) as (a), but limits changes keep today's ordinary approval prompt; (c) every proof, including those inside the limits.
+2. **Backup code on the sheet:** (a) **keep "Use backup code instead" as the small secondary link, as on every approval** (recommended: no new friction, and a lost passkey never blocks proofs); (b) paid actions accept only the platform check.
+3. **After Done:** (a) **the sheet closes itself after about 1.2 s** (recommended; with reduced motion it waits for Close); (b) it always waits for Close.
