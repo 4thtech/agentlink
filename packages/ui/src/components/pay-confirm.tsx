@@ -16,12 +16,14 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
 } from 'react';
 import { Button, TextField } from './forms.js';
+import { holdInert } from './surface.js';
 
 /** Every word the sheet shows (11 §5; b11 §19.6). `{name}` and the like are filled in. */
 export const PAY_CONFIRM_STRINGS = Object.freeze({
@@ -341,6 +343,14 @@ export function PayConfirmSheet(props: PayConfirmSheetProps): ReactElement {
   const limits = view?.kind === 'limits';
   const onClose = useRef(props.onClose);
   onClose.current = props.onClose;
+
+  // UI-REFRESH-f-b: while the sheet is mounted the page behind it is inert (no click, Tab or
+  // scripted focus reaches it). A layout effect, so the page is inert before the first paint and
+  // released (on close, unmount or Done closing itself) before focus goes back to the opener below.
+  useLayoutEffect(() => {
+    if (sheetRef.current === null) return undefined;
+    return holdInert(sheetRef.current);
+  }, []);
 
   // Focus starts on the title (never Confirm) and returns to the opener when the sheet goes.
   useEffect(() => {
