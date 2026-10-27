@@ -383,6 +383,51 @@ describe('a conversation', () => {
   });
 });
 
+describe('contacts with no messages yet (card c sends null times)', () => {
+  it('keeps a contact whose lastAt is null and shows the per-contact empty state', async () => {
+    await mount(
+      mockApi((path) =>
+        path === '/api/ui/messages'
+          ? ok({
+              conversations: [{ contactId: 'c-new', name: 'Nia', lastAt: null, lastInAt: null }],
+            })
+          : ok({ items: [] }),
+      ),
+    );
+    expect(button('Nia')).toBeDefined();
+    await click(button('Nia'));
+    expect(text()).toContain(S.nothingYet('Nia'));
+  });
+
+  it('keeps a message when one file entry is bad, and accepts long names', async () => {
+    await mount(
+      mockApi((path) =>
+        path === '/api/ui/messages'
+          ? ok(CONVERSATIONS)
+          : ok({
+              items: [
+                {
+                  ...INBOX.items[1],
+                  id: 'env-7',
+                  text: 'kept-text',
+                  files: [{ name: 'a'.repeat(1000), size: 1 }, { name: 5 }, { name: '', size: 2 }],
+                },
+              ],
+            }),
+      ),
+    );
+    await click(button('Marko'));
+    expect(text()).toContain('kept-text');
+    expect(text()).toContain('Unnamed file');
+  });
+
+  it('puts focus back on the contact row after "All contacts"', async () => {
+    await openMarko();
+    await click(button(S.back));
+    expect(document.activeElement?.textContent).toContain('Marko');
+  });
+});
+
 describe('the seen marker (this browser only)', () => {
   it('records the newest inbound time per contact, with no message text', async () => {
     await openMarko();

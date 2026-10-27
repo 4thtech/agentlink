@@ -9,7 +9,8 @@ import type { ApiClient, ApiResult } from '../../api/client.js';
 export const PAGE_SIZE = 20;
 const ID_RE = /^[A-Za-z0-9._:~-]{1,128}$/;
 const MAX_TEXT = 100_000;
-const MAX_NAME = 255;
+const MAX_NAME = 1024;
+const UNNAMED_FILE = 'Unnamed file';
 const MAX_FILES = 50;
 const STATUSES: ReadonlySet<string> = new Set(['queued', 'sent', 'not_delivered']);
 
@@ -54,18 +55,17 @@ function parseConversation(raw: unknown): Conversation | undefined {
   if (!isRecord(raw)) return undefined;
   const { contactId, name, lastAt, lastInAt } = raw;
   if (typeof contactId !== 'string' || !ID_RE.test(contactId)) return undefined;
-  if (typeof name !== 'string' || name.length === 0 || name.length > 100) return undefined;
-  if (!isTime(lastAt)) return undefined;
+  if (typeof name !== 'string' || name.length === 0 || name.length > 128) return undefined;
+  if (lastAt !== null && !isTime(lastAt)) return undefined;
   if (lastInAt !== undefined && lastInAt !== null && !isTime(lastInAt)) return undefined;
-  return { contactId, name, lastAt, lastInAt: lastInAt ?? 0 };
+  return { contactId, name, lastAt: lastAt ?? 0, lastInAt: lastInAt ?? 0 };
 }
 
 function parseFile(raw: unknown): MessageFile | undefined {
   if (!isRecord(raw)) return undefined;
   const { name, size } = raw;
-  if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME) return undefined;
-  if (!isTime(size)) return undefined;
-  return { name, size };
+  if (typeof name !== 'string' || name.length > MAX_NAME) return undefined;
+  return { name: name === '' ? UNNAMED_FILE : name, size: isTime(size) ? size : 0 };
 }
 
 function parseItem(raw: unknown): MessageItem | undefined {
@@ -74,12 +74,11 @@ function parseItem(raw: unknown): MessageItem | undefined {
   if (typeof id !== 'string' || !ID_RE.test(id)) return undefined;
   if (!isTime(at) || !isTime(size)) return undefined;
   if (typeof text !== 'string' || text.length > MAX_TEXT) return undefined;
-  if (!Array.isArray(files) || files.length > MAX_FILES) return undefined;
+  if (!Array.isArray(files)) return undefined;
   const parsedFiles: MessageFile[] = [];
-  for (const f of files as unknown[]) {
+  for (const f of (files as unknown[]).slice(0, MAX_FILES)) {
     const file = parseFile(f);
-    if (file === undefined) return undefined;
-    parsedFiles.push(file);
+    if (file !== undefined) parsedFiles.push(file);
   }
   if (status !== undefined && (typeof status !== 'string' || !STATUSES.has(status)))
     return undefined;

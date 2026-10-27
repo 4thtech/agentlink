@@ -353,6 +353,8 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [seen, setSeen] = useState<Seen>(() => loadSeen());
   const live = useRef(true);
+  const listRef = useRef<HTMLUListElement>(null);
+  const lastOpened = useRef<string | undefined>(undefined);
 
   const loadList = useCallback(async (): Promise<void> => {
     const result = await messages.current.conversations();
@@ -377,6 +379,13 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
   const opened = useCallback((contactId: string, lastInAt: number): void => {
     setSeen(markSeen(contactId, lastInAt));
   }, []);
+
+  // Back to the list: focus returns to the row the person came from.
+  useEffect(() => {
+    if (selected !== undefined || lastOpened.current === undefined) return;
+    const rows = listRef.current?.querySelectorAll<HTMLElement>('button[data-contact]') ?? [];
+    for (const row of rows) if (row.dataset['contact'] === lastOpened.current) row.focus();
+  }, [selected]);
 
   const current =
     view.state === 'ready' ? view.list.find((c) => c.contactId === selected) : undefined;
@@ -410,23 +419,29 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
                 {S.refresh}
               </Button>
             </div>
-            <ul className="ms-list" aria-label={S.listLabel}>
+            <ul className="ms-list" aria-label={S.listLabel} ref={listRef}>
               {view.list.map((c) => {
                 const isNew = c.lastInAt > (seen[c.contactId] ?? 0);
-                const date = new Date(c.lastAt * 1000);
+                const date = c.lastAt > 0 ? new Date(c.lastAt * 1000) : undefined;
                 return (
                   <li key={c.contactId}>
                     <button
                       type="button"
                       className="ms-row"
+                      data-contact={c.contactId}
                       aria-current={c.contactId === selected ? 'true' : undefined}
-                      onClick={() => setSelected(c.contactId)}
+                      onClick={() => {
+                        lastOpened.current = c.contactId;
+                        setSelected(c.contactId);
+                      }}
                     >
                       <span className="ms-row-main">
                         <span className={isNew ? 'al-text-body ms-new' : 'al-text-body'}>
                           {c.name}
                         </span>
-                        <span className="al-text-body-sm al-muted">{DAY.format(date)}</span>
+                        <span className="al-text-body-sm al-muted">
+                          {date === undefined ? '' : DAY.format(date)}
+                        </span>
                       </span>
                       {isNew ? (
                         <span className="al-chip al-tone-info al-text-label">{S.newMessages}</span>
