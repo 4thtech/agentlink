@@ -1,1 +1,297 @@
-/* UI-REFRESH-c: ProgressBar, RingMeter and Skeleton (B-11 §15). Empty until that card. */
+/* UI-REFRESH-c: ProgressBar, RingMeter, Skeleton and InlineError (B-11 §15). Tokens only. Fills move
+   by stroke-dashoffset; loops and the arrival nudge animate transform and opacity only. The
+   recording proof chip no longer spins: its word stays and the stepped bar shows the work. */
+
+/* ProgressBar */
+.al-pb {
+  display: grid;
+  gap: var(--al-space-3);
+}
+.al-pb-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--al-space-4);
+}
+.al-pb-label {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--al-color-fg-default);
+}
+.al-pb-amount {
+  color: var(--al-color-fg-muted);
+  white-space: nowrap;
+}
+.al-pb-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  color: var(--al-color-status-success-fg);
+}
+.al-pb-track {
+  position: relative;
+  block-size: 4px;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-sunken);
+  overflow: hidden;
+}
+.al-pb-track.is-stepped {
+  block-size: auto;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+.al-pb-svg {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.al-pb-fill {
+  stroke: var(--al-color-accent-default);
+  stroke-width: 4;
+  transition: stroke-dashoffset var(--al-duration-base) var(--al-easing-standard);
+}
+.al-pb.is-done .al-pb-fill {
+  stroke: var(--al-color-status-success-icon);
+}
+.al-pb.is-error .al-pb-fill {
+  stroke: var(--al-color-status-danger-icon);
+}
+.al-pb.is-error .al-pb-track {
+  box-shadow: 0 0 0 1px var(--al-color-status-danger-border);
+}
+
+/* Indeterminate: a short soft segment glides; still and half-filled when motion is reduced. */
+.al-pb-seg-glide {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 50%;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-accent-default);
+  opacity: 0.85;
+  animation: al-pb-glide var(--al-duration-ambient) var(--al-easing-standard) infinite;
+}
+@keyframes al-pb-glide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}
+
+/* Stepped: up to four named segments that fill in turn. */
+.al-pb-steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--al-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.al-pb-step {
+  display: grid;
+  gap: var(--al-space-2);
+  color: var(--al-color-fg-muted);
+}
+.al-pb-seg {
+  position: relative;
+  display: block;
+  block-size: 4px;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-sunken);
+  overflow: hidden;
+}
+.al-pb-step[data-state='current'] {
+  color: var(--al-color-fg-default);
+}
+.al-pb-step[data-state='done'] .al-pb-fill {
+  stroke: var(--al-color-status-success-icon);
+}
+.al-pb-step[data-state='error'] {
+  color: var(--al-color-status-danger-fg);
+}
+.al-pb-step[data-state='error'] .al-pb-seg {
+  background: var(--al-color-status-danger-icon);
+}
+.al-pb-step.is-unknown .al-pb-seg::after {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  inline-size: 50%;
+  background: var(--al-color-accent-default);
+  opacity: 0.85;
+  animation: al-pb-glide var(--al-duration-ambient) var(--al-easing-standard) infinite;
+}
+
+/* RingMeter */
+.al-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.al-ring-dial {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  inline-size: 56px;
+  block-size: 56px;
+}
+.al-ring.is-sm .al-ring-dial {
+  inline-size: 32px;
+  block-size: 32px;
+}
+.al-ring.is-lg .al-ring-dial {
+  inline-size: 80px;
+  block-size: 80px;
+}
+.al-ring-dial svg {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+}
+.al-ring-track,
+.al-ring-fill {
+  fill: none;
+  stroke-width: 3;
+}
+.al-ring-track {
+  stroke: var(--al-color-bg-sunken);
+}
+.al-ring-fill {
+  stroke: var(--al-color-accent-default);
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 18px 18px;
+  transition: stroke-dashoffset var(--al-duration-slow) var(--al-easing-standard);
+}
+.al-ring.is-low .al-ring-fill {
+  stroke: var(--al-color-status-warning-icon);
+}
+.al-ring-center {
+  position: relative;
+  color: var(--al-color-fg-default);
+  font-variant-numeric: tabular-nums;
+}
+.al-ring-text {
+  color: var(--al-color-fg-muted);
+}
+
+/* Skeleton: low-contrast blocks; one soft band sweeps across by transform only. */
+.al-skeleton {
+  display: grid;
+  gap: var(--al-space-3);
+}
+.al-skeleton-line {
+  position: relative;
+  display: block;
+  block-size: 12px;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+  overflow: hidden;
+}
+.al-skeleton-line:nth-last-child(2) {
+  inline-size: 60%;
+}
+.al-skeleton-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--al-color-bg-raised), transparent);
+  opacity: 0.5;
+  transform: translateX(-100%);
+  animation: al-skeleton-sweep var(--al-duration-ambient) var(--al-easing-standard) infinite;
+}
+@keyframes al-skeleton-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.al-skeleton-reveal {
+  animation: al-skeleton-fade var(--al-duration-fast) var(--al-easing-enter) both;
+}
+@keyframes al-skeleton-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Error: a red edge, an icon, one sentence, one 4 px nudge. */
+.al-inline-error {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-space-4);
+  border-inline-start: 3px solid var(--al-color-status-danger-icon);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-status-danger-bg);
+  color: var(--al-color-status-danger-fg);
+  animation: al-inline-error-nudge var(--al-duration-base) var(--al-easing-emphasized) both;
+}
+.al-inline-error > .al-icon {
+  flex: none;
+  color: var(--al-color-status-danger-icon);
+}
+.al-inline-error-act {
+  margin-inline-start: auto;
+}
+@keyframes al-inline-error-nudge {
+  0% {
+    transform: translateX(0);
+  }
+  40% {
+    transform: translateX(4px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Loops pause while the tab is hidden. */
+.al-pb[data-paused='true'] .al-pb-seg-glide,
+.al-pb[data-paused='true'] .al-pb-seg::after,
+.al-skeleton[data-paused='true'] .al-skeleton-line::after {
+  animation-play-state: paused;
+}
+
+/* Reduced motion (system setting and the app's own): fills jump, loops become still states with the
+   word, the content swaps without a fade, the error has no nudge. */
+@media (prefers-reduced-motion: reduce) {
+  .al-pb-fill,
+  .al-ring-fill {
+    transition: none;
+  }
+  .al-pb.is-indeterminate .al-pb-seg-glide,
+  .al-pb-step.is-unknown .al-pb-seg::after,
+  .al-skeleton-line::after,
+  .al-skeleton-reveal,
+  .al-inline-error {
+    animation: none;
+  }
+  .al-skeleton-line::after {
+    opacity: 0;
+  }
+}
+:root[data-motion='reduced'] .al-pb-fill,
+:root[data-motion='reduced'] .al-ring-fill {
+  transition: none;
+}
+:root[data-motion='reduced'] .al-pb.is-indeterminate .al-pb-seg-glide,
+:root[data-motion='reduced'] .al-pb-step.is-unknown .al-pb-seg::after,
+:root[data-motion='reduced'] .al-skeleton-line::after,
+:root[data-motion='reduced'] .al-skeleton-reveal,
+:root[data-motion='reduced'] .al-inline-error {
+  animation: none;
+}
+:root[data-motion='reduced'] .al-skeleton-line::after {
+  opacity: 0;
+}
