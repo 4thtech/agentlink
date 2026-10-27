@@ -32,11 +32,16 @@ describe('refresh scaffold', () => {
     expect(Object.keys(sheets).sort()).toEqual(NAMES.map((n) => `./components/${n}.css`).sort());
   });
 
-  it('motion.css carries the global switch; the others are filled by their cards (progress: UI-REFRESH-c)', () => {
-    const rulesOf = (n: string): string =>
-      (sheets[`./components/${n}.css`] as string).replace(/\/\*[\s\S]*?\*\//g, '').trim();
-    expect(rulesOf('motion')).toContain('{');
-    expect(rulesOf('progress')).toContain('.al-pb');
+  it('motion, depth, chrome and progress carry rules; the others are filled by their cards', () => {
+    for (const n of NAMES) {
+      const text = sheets[`./components/${n}.css`] as string;
+      const rules = text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+      if (n === 'motion' || n === 'depth' || n === 'chrome' || n === 'progress') {
+        expect(rules, n).toContain('{');
+      } else expect(rules, n).toBe('');
+    }
+    const progress = (sheets['./components/progress.css'] as string).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(progress).toContain('.al-pb');
   });
 
   it('exports each stylesheet and ships it in "files"', () => {
