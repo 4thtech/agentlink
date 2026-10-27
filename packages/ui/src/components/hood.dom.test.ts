@@ -7,6 +7,7 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { lintVocabulary } from '../strings/lint.js';
+import componentsCss from './components.css?raw';
 import hoodCss from './hood.css?raw';
 import {
   acceptHoodField,
@@ -228,5 +229,86 @@ describe('hood.css', () => {
     expect(hoodCss.replace(/\/\*[\s\S]*?\*\//g, '')).not.toMatch(/\d(ms|s)\b/);
     expect(hoodCss).toMatch(/var\(--al-duration-base\)/);
     expect(hoodCss).not.toMatch(/transition:[^;]*\b(height|width|top|left|margin|padding|all)\b/);
+  });
+});
+
+// UI-REFRESH-e2: the path kind. Absolute local paths only; nothing that is a link, key, code or token.
+const PATHS: readonly string[] = [
+  '/Users/talirezun/Documents/AgentLink/Files/Contracts and Agreements/2026/October',
+  'C:\\Users\\Tali\\Documents\\AgentLink\\Files',
+  '/home/tali/.local/share/agentlink/files',
+];
+const NOT_PATHS: readonly [string, string][] = [
+  ['an https url', 'https://drop.4th.tech/d/abc123'],
+  ['a file url', 'file:///Users/tali/Files'],
+  ['an upload url in a path', '/upload/https://example.com/up'],
+  ['a presigned url', '/tmp/x?X-Amz-Signature=abc'],
+  ['a presigned path', '/tmp/x/signature=abcdef'],
+  ['a session link', 'http://127.0.0.1:4318/#s=abc'],
+  ['a session fragment path', '/app/#s=abc'],
+  ['a protocol-relative url', '//example.com/download/abc'],
+  ['a unc path', '\\\\server\\share\\files'],
+  ['a relative path', 'Documents/AgentLink/Files'],
+  ['a parent segment', '/Users/tali/../../etc'],
+  ['a bare token', 'tok_example_1'],
+  ['a bearer value', 'Bearer zzzzzzzzzzzzzzzzzzzzzzzz'],
+  ['a hex key as a path segment', '/' + 'a'.repeat(64)],
+  ['a base64 key as a path segment', '/keys/Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFy'],
+  ['a code as a path segment', '/tmp/ABCD-EFGH-JKLM-NPQR'],
+  ['a token value in a path', '/tmp/tok_example_1'],
+  ['a jwt in a path', '/tmp/eyJhbGciOiJIUzI1'],
+  ['a query string', '/Users/tali/Files?token=abc'],
+  ['a javascript scheme', 'javascript:alert(1)'],
+  ['a data scheme', 'data:text/plain,hi'],
+  ['a path with a newline', '/Users/tali/\nFiles'],
+];
+
+describe('the path kind (UI-REFRESH-e2)', () => {
+  it.each(PATHS)('accepts the local folder path %s', (value) => {
+    expect(acceptHoodField({ kind: 'path', label: 'Files folder', value })).toEqual({
+      kind: 'path',
+      label: 'Files folder',
+      value,
+    });
+    render([{ kind: 'path', label: 'Files folder', value }]);
+    expect(host.textContent).toContain(value);
+    expect(host.querySelectorAll('a').length).toBe(0);
+  });
+
+  it.each(NOT_PATHS)('refuses %s typed as a path', (_n, value) => {
+    expect(acceptHoodField({ kind: 'path', label: 'Files folder', value })).toBeNull();
+    render([
+      { kind: 'path', label: 'Files folder', value },
+      { kind: 'id', label: 'ID', value: 'm-1' },
+    ]);
+    expect(host.innerHTML).not.toContain(value);
+    expect(host.textContent).toContain('m-1');
+  });
+
+  it.each(['Key', 'Session link', 'Upload folder', 'Download URL', 'Access token', 'Backup code'])(
+    'refuses a path labelled %s',
+    (label) => {
+      expect(acceptHoodField({ kind: 'path', label, value: '/Users/tali/Files' })).toBeNull();
+    },
+  );
+
+  it('does not let a long path unlock the other kinds', () => {
+    const long = '/Users/talirezun/Documents/AgentLink/Files/Contracts and Agreements/2026';
+    expect(acceptHoodField({ kind: 'text', label: 'Folder', value: long })).toBeNull();
+    expect(acceptHoodField({ kind: 'id', label: 'Folder', value: long })).toBeNull();
+  });
+});
+
+describe('the switch knob (UI-REFRESH-e2)', () => {
+  const rule = (sel: string): string => {
+    const esc = sel.replace(/[.\-]/g, '\\$&');
+    return componentsCss.match(new RegExp(esc + '\\s*\\{([^}]*)\\}'))?.[1] ?? '';
+  };
+  it('slides with transform, not left', () => {
+    const knob = rule('.al-switch-knob');
+    expect(knob).toMatch(/transition:\s*transform /);
+    expect(knob).not.toMatch(/transition[^;]*left/);
+    expect(rule('.al-switch.is-on .al-switch-knob')).toMatch(/transform:\s*translateX\(/);
+    expect(rule('.al-switch.is-on .al-switch-knob')).not.toMatch(/\bleft:/);
   });
 });
