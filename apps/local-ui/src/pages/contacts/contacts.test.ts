@@ -454,6 +454,11 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     });
     await selectNewer();
     await click(S.removeOlder);
+    // PRE-031-FIXES: the same confirm step as Remove comes first, then presence.
+    expect(posts(calls)).toHaveLength(0);
+    expect(host.querySelector('.ct-confirm')?.textContent).toContain(S.removeExplain);
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    await click(S.removeContact);
     expect(posts(calls)).toHaveLength(0);
     expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
     await confirmWithCode();
@@ -464,8 +469,34 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     const calls = await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
     await selectNewer();
     await click(S.removeOlder);
+    await click(S.removeContact);
+    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
+  });
+
+  it('PRE-031-FIXES: Remove older asks "Remove this contact?" first; Cancel there asks for nothing', async () => {
+    const calls = await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+    await selectNewer();
+    await click(S.removeOlder);
+    expect(text()).toContain(S.removeExplain);
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(host.querySelector('.ct-dup')).toBeNull(); // one step at a time
+    await click(S.cancel);
+    expect(text()).not.toContain(S.removeExplain);
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(text()).toContain(NOTICE_START); // back to the notice
+    expect(posts(calls)).toHaveLength(0);
+  });
+
+  it('PRE-031-FIXES: the Remove older button is described by the notice text', async () => {
+    await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
+    await selectNewer();
+    const id = button(S.removeOlder).getAttribute('aria-describedby');
+    expect(id).toBeTruthy();
+    const described = host.querySelector(`[id="${id ?? ''}"]`);
+    expect(described?.textContent).toContain(NOTICE_START);
+    expect(host.querySelector('.ct-dup')?.contains(described ?? null)).toBe(true);
   });
 
   it('Keep both hides the notice and remembers it in this browser only', async () => {

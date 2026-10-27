@@ -294,7 +294,7 @@ describe('the confirmation sheet on the approval page (M1-PAY-CONFIRM-b; Chromiu
       .waitFor();
     expect(await page.locator(`input[name="choice-${id(2)}"]`).count()).toBe(0);
     const paidCard = page.locator(`[data-approval="${id(2)}"]`);
-    await paidCard.getByText(UI_STRINGS.paidAlone.replace('{cost}', '$0.10')).waitFor();
+    await paidCard.getByText(UI_STRINGS.paidAlone).waitFor();
 
     await paidCard.getByRole('button', { name: 'Approve', exact: true }).click();
     const dialog = page.getByRole('dialog');

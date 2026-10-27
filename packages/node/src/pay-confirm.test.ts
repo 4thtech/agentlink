@@ -946,6 +946,29 @@ describe('M1-PAY-CONFIRM-b: a passkey whose PRF works only on use keeps its key 
     extra.set([0, 9, 1], body.length); // claims 9 bytes, has 1
     expect(() => parsePasskeyRegistration(extra)).toThrow();
   });
+
+  it('PRE-031-FIXES: bytes after a well-formed fifth field are refused (presence_required)', () => {
+    const a = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+    const created = a.create(world.owner.ownerNostr, salt);
+    const body = encodePasskeyRegistration(encodeUtf8('code'), a.get(salt), {
+      creationAuthenticatorData: created.authenticatorData,
+    });
+    expect(parsePasskeyRegistration(body).creationAuthenticatorData).toEqual(
+      created.authenticatorData,
+    );
+    for (const tail of [[0], [0, 0], [0, 1, 7], [1, 2, 3, 4]]) {
+      const extra = new Uint8Array(body.length + tail.length);
+      extra.set(body);
+      extra.set(tail, body.length);
+      let code: unknown;
+      try {
+        parsePasskeyRegistration(extra);
+      } catch (error) {
+        code = (error as { code?: unknown }).code;
+      }
+      expect(code, `tail ${tail.join(',')}`).toBe('presence_required');
+    }
+  });
 });
 
 describe('M1-PAY-CONFIRM-b: "Remember for this contact" in one gesture (06 §3; rule 2)', () => {
