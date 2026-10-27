@@ -174,7 +174,7 @@ A switch in the top bar, label "Under the hood", default **Off**, remembered per
 >
 > **v2 (owner direction, 27 Oct): make it breathtaking, a native-feeling Mac app.** **Depth:** five elevation levels (canvas, surface, raised, sheet, modal) using the existing shadow-0…4 and background tokens; in dark, a 1 px top highlight and surface tint carry depth where shadows don't show; the sidebar and top bar are translucent (background blur and slight saturation over the content) with a solid fallback for reduced transparency, increased contrast, forced colours, unsupported browsers, and Windows and Linux by default. **Progress:** one family for everything that takes time: determinate bar (file sending, with "2.1 of 8 MB"), indeterminate bar, ring meter (credits, invite and approval time left), live dot, skeleton, success moment, error; nothing shows for waits under 400 ms, and an indicator once shown stays at least 500 ms. **Smooth:** every state change transitions; only transform and opacity animate; no motion library. **Accessibility:** reduced motion and reduced transparency each get a designed still version; every indicator has a word and a screen-reader label. **Decided by the owner (27 Oct), design as its own set:** a Messages page (per contact, Inbox and Sent, read-only, inbound shown as untrusted plain text, no links or formatting) and Files with Received, Sent and Send folders tabs.
 >
-> **Paying for proof and registration (27 Oct; §19).** AgentLink is not a finance app; only a proof ($0.10) and verified registration ($5.00) cost anything, paid from credits that stay the user's. Design one polished confirmation sheet (level 4): what it is for, the amount large and still, "Paid from your credits", "Your credits stay yours; 4thTech never holds them.", and "Confirm with Touch ID" (or Windows Hello, or your passkey); the system prompt is never drawn; then a breathing ring while waiting, a sweeping arc while recording, and a ring that closes with a check drawing in 480 ms; every state of §19.3 and a reduced-motion version. Keep credits a calm line with the ring meter, and add a plain receipt row per paid action. No charts, no balance hero, no wallet look, no platform or card logos.
+> **Paying for proof and registration (27 Oct; §19).** AgentLink is not a finance app; only a proof ($0.10) and verified registration ($5.00) cost anything, paid from credits that stay the user's. Design one polished confirmation sheet (level 4): what it is for, the amount large and still, "Paid from your credits", "Your credits stay yours; 4thTech never holds them.", and "Confirm with Touch ID" (or Windows Hello, or your passkey), with "Use backup code instead" as a small link; the system prompt is never drawn; then a breathing ring while waiting, a sweeping arc while recording, and a ring that closes with a check drawing in 480 ms; every state of §19.3 and a reduced-motion version. Keep credits a calm line with the ring meter, and add a plain receipt row per paid action. No charts, no balance hero, no wallet look, no platform or card logos.
 
 ## 12. What this brief does not decide
 
@@ -368,7 +368,7 @@ The Files page (§8 screens 12 and 13) gets three tabs (owner decision 4): **Rec
 
 ### 19.1 When the sheet appears
 
-The rule is in 04 §2.5.3 (proposed, the owner confirms at merge; §20 decision 1). In short:
+The rule is in 04 §2.5.3 (decided by the owner, 2026-10-27, §20 decision 1 (a)). In short:
 
 | Paid action | What the owner sees |
 |---|---|
@@ -427,7 +427,9 @@ Never "wallet", "bank", "transaction", "gas", "deposit", "payment method" or "ba
 
 **Design deliverable:** the confirmation sheet in each §19.1 variant and each §19.3 state, at 1280 and 360, dark, light and increased contrast, with reduced motion; the motion as a short prototype or annotated frames (Opening, Waiting, Recording, Done); the credits line with its trust line; the receipt row in its three statuses.
 
-## 20. Owner decisions raised by §19 (recommended first)
+## 20. Owner decisions raised by §19 (decided, 2026-10-27)
+
+> **Decided by the owner (Tali, in chat, 2026-10-27, D-132): option (a) of each decision below.** The other options are kept for the record.
 
 1. **Which paid actions use the confirmation sheet** (spec: 04 §2.5.3): (a) **verified registration, a proof above the signed limits (or for a contact set to "Ask me"), and any change to the spending limits; proofs inside the signed limits stay automatic** (recommended); (b) as (a), but limits changes keep today's ordinary approval prompt; (c) every proof, including those inside the limits.
 2. **Backup code on the sheet:** (a) **keep "Use backup code instead" as the small secondary link, as on every approval** (recommended: no new friction, and a lost passkey never blocks proofs); (b) paid actions accept only the platform check.

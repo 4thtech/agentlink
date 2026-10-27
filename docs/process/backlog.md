@@ -6549,14 +6549,14 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 #### M1-PAY-CONFIRM-a · core and node: paid-action confirmation bound to amount and purpose, with user verification (new, D-132)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (confirmation statement, spending-field diff), `packages/node/src/local-ui/**` (presence gate begin and finish), their tests, `docs/foundation/04-security-and-crypto.md` §2.5.3 if the build refines it, its `changelog.d/` fragment and changeset
-- **Depends on:** the owner's confirmation of 04 §2.5.3 (decisions 1 and 2 of brief §20) at the MONEY-CONFIRM-DESIGN merge
+- **Depends on:** MONEY-CONFIRM-DESIGN merged (which actions and the backup code decided, D-132; the ceremony rules confirmed by the owner at that merge)
 - **Spec:** 04 §2.5, §2.5.3, §2.3.1; 06 §3; 08 §1; 12 §4.6; D-130, D-132
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
   - Begin builds the exact owner flow (proof approval, `policy.set` that changes a spending field) and its confirmation statement; challenge per 04 §2.5.3 rule 2; single use, session-bound, 120 s.
   - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; `maxFee` never above the statement.
   - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before.
-  - The backup-code path signs under the same statement binding (if decision 2 keeps it), with the three-tries rule. Proofs evaluated `allow` are unchanged (automatic).
+  - The backup-code path signs under the same statement binding (kept, D-132), with the three-tries rule. Proofs evaluated `allow` are unchanged (automatic).
   - Paid items are excluded from batch approval (04 §2.5.3 rule 7): the batch screen does not offer them and the core refuses such a batch (`paid_item_in_batch`). "Remember for this contact" digests both bodies in one challenge (rule 2).
   - Registration (`REGISTER`) is out of scope here (M2-PAY-CONFIRM-c).
 - **Acceptance:**
