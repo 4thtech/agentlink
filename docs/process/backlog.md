@@ -4899,8 +4899,8 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit) for (a) to (d); axe zero violations; no test weakened.
 
 #### M1-11b-2d · local-ui: test hardening for the app-shell approvals (new, low, #605)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/**/*.test.*`, `apps/local-ui/e2e/**` (tests only, no product code)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-ui-browser.test.ts` (the weakened exact background checks, the dropped desktop-note assertion, and the locator widened from `section[data-approval]` to `[data-approval]`), `apps/local-ui/**/*.test.*`, `apps/local-ui/e2e/**` (tests only, no product code)
 - **Depends on:** M1-11b-2
 - **Spec:** B-11 §13.1; 06 (approvals)
 - **Invariants:** —
@@ -4909,9 +4909,9 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - (b) Narrow the browser locators that were widened from the card to the whole page back to the card.
   - (c) Restore the assertion that the desktop app protects approvals more strongly.
   - (d) Add a test that the app CSS contains no `url()` and no `@import` (the old stylesheet test was deleted; the content-security policy still blocks them at runtime).
-  - Test files only; any product-code change makes it S2.
+  - Touches approval-page tests under `packages/node`, so the class is S2. Test files only; no product code changes.
 - **Acceptance:**
-  - Each restored check fails when its subject is broken on purpose (shown in the PR); no test weakened; no product code changed.
+  - Tests first (RED commit): `RED (expected): M1-11b-2d ...` shows each restored check failing when its subject is broken on purpose; a short threat note in the PR; no test weakened; no product code changed.
 
 ### Design system from the design (`packages/ui`, D-116)
 
