@@ -32,11 +32,11 @@ describe('refresh scaffold', () => {
     expect(Object.keys(sheets).sort()).toEqual(NAMES.map((n) => `./components/${n}.css`).sort());
   });
 
-  it('motion, depth, chrome and progress carry rules; the others are filled by their cards', () => {
+  it('motion, depth, chrome, progress and hood carry rules; the others are filled by their cards', () => {
     for (const n of NAMES) {
       const text = sheets[`./components/${n}.css`] as string;
       const rules = text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-      if (n === 'motion' || n === 'depth' || n === 'chrome' || n === 'progress') {
+      if (['motion', 'depth', 'chrome', 'progress', 'hood'].includes(n)) {
         expect(rules, n).toContain('{');
       } else expect(rules, n).toBe('');
     }
