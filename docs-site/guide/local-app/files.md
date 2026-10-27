@@ -18,7 +18,7 @@ You don't upload files here. Put a file in your Send folder, or ask your AI to s
 |---|---|
 | **From** or **To**, with a contact's name | Who sent the file, or who you sent it to |
 | **Saved as** … | The name the file has in your Inbox folder. **You may have moved or renamed it since, so it might not be there now.** |
-| **Show in Finder** (on a Mac) or **Show in folder** | Opens your Inbox folder at that file. The file is only shown, never opened |
+| **Show in Finder** (on a Mac) or **Show in folder** | Opens your Inbox folder at that file. On Windows it opens File Explorer with the file selected. The file is only shown, never opened |
 | **Not saved yet. Ask your AI to fetch it.** | The file arrived but is not on your computer yet |
 | **Expired. It can no longer be fetched.** | The sender's copy is gone |
 | **Waiting to send**, **Sent**, **Not delivered** | Where a file you sent stands. For **Not delivered**, ask your AI to send it again |

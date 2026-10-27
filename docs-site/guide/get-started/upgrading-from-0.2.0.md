@@ -24,6 +24,10 @@ You already use AgentLink 0.2.0. Moving to 0.4.0 ([release notes](https://github
 - **New in 0.3.0.** The [local app](../local-app/README.md) with Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
 - **New in 0.4.0.** Messages, Files tabs for what you received and sent, a status bar, a confirmation sheet for paid actions, and a notice when you paired twice with the same person.
 
+## Upgrading to 0.4.0
+
+The first time 0.4.0 runs, it upgrades your local data. After that, older versions can't open it, so you can't go back to 0.3.x. Your contacts, messages and files are kept.
+
 ## If something does not work
 
 Run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest. More help: [Troubleshooting](../help/troubleshooting.md).
