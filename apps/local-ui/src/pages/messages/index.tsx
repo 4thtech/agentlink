@@ -13,8 +13,12 @@ import {
   EmptyState,
   ProofBadge,
   Segmented,
+  Skeleton,
   StatusChip,
+  Surface,
+  UnderTheHood,
   UntrustedContent,
+  useRowPresence,
 } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
@@ -96,39 +100,18 @@ function ProblemView({
   }
 }
 
-function Skeleton(): ReactElement {
-  return (
-    <div aria-busy="true">
-      <p className="al-sr-only" role="status">
-        {S.loading}
-      </p>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="ms-skeleton" aria-hidden="true" />
-      ))}
-    </div>
-  );
-}
-
-function Hood({ item }: { item: MessageItem }): ReactElement {
-  return (
-    <details className="ms-hood al-text-body-sm">
-      <summary>{S.underTheHood}</summary>
-      <dl>
-        <dt>{S.idLabel}</dt>
-        <dd className="al-text-code">{item.id}</dd>
-        <dt>{S.sizeLabel}</dt>
-        <dd>{sizeText(item.size)}</dd>
-        <dt>{S.proofLabel}</dt>
-        <dd>{item.proof ? S.proofYes : S.proofNo}</dd>
-        {item.status === undefined ? null : (
-          <>
-            <dt>{S.receiptLabel}</dt>
-            <dd>{item.receipt ? S.receiptYes : S.receiptNo}</dd>
-          </>
-        )}
-      </dl>
-    </details>
-  );
+/** Technical details, metadata only; a field the panel does not accept is dropped there. */
+function hoodFields(item: MessageItem): readonly unknown[] {
+  return [
+    { kind: 'id', label: S.idLabel, value: item.id },
+    { kind: 'size', label: S.sizeLabel, value: sizeText(item.size) },
+    { kind: 'text', label: S.proofLabel, value: item.proof ? S.proofYes : S.proofNo },
+    ...(item.status === undefined
+      ? []
+      : [
+          { kind: 'text', label: S.receiptLabel, value: item.receipt ? S.receiptYes : S.receiptNo },
+        ]),
+  ];
 }
 
 function Message({
@@ -144,7 +127,7 @@ function Message({
   const long = isLong(item.text);
   const date = new Date(item.at * 1000);
   return (
-    <li className="ms-item">
+    <Surface as="li" level={1} className="ms-item">
       <div className="ms-meta al-text-body-sm">
         <time dateTime={date.toISOString()}>{DAY.format(date)}</time>
         {item.status === undefined ? null : SENT_CHIP[item.status]}
@@ -180,8 +163,8 @@ function Message({
           </Button>
         )}
       </div>
-      <Hood item={item} />
-    </li>
+      <UnderTheHood fields={hoodFields(item)} />
+    </Surface>
   );
 }
 
@@ -295,7 +278,7 @@ function Conversation_({
         {note}
       </p>
       {detail.state === 'loading' ? (
-        <Skeleton />
+        <Skeleton loading label={S.loading} lines={3} />
       ) : detail.state === 'failed' ? (
         <ProblemView problem={detail.problem} onRetry={() => void load()} />
       ) : detail.items.length === 0 && detail.next === undefined ? (
@@ -342,6 +325,45 @@ type ListState =
       readonly stale?: Problem;
     };
 
+function ContactRow({
+  c,
+  isNew,
+  fresh,
+  selected,
+  onOpen,
+}: {
+  c: Conversation;
+  /** Something newer than this browser has seen. */
+  isNew: boolean;
+  /** The contact arrived after the first load: the row enters. */
+  fresh: boolean;
+  selected: boolean;
+  onOpen: () => void;
+}): ReactElement {
+  const presence = useRowPresence<HTMLLIElement>(true, { isNew: fresh });
+  const date = c.lastAt > 0 ? new Date(c.lastAt * 1000) : undefined;
+  return (
+    <li ref={presence.ref} className="ms-row-item">
+      {presence.highlight}
+      <button
+        type="button"
+        className="ms-row"
+        data-contact={c.contactId}
+        aria-current={selected ? 'true' : undefined}
+        onClick={onOpen}
+      >
+        <span className="ms-row-main">
+          <span className={isNew ? 'al-text-body ms-new' : 'al-text-body'}>{c.name}</span>
+          <span className="al-text-body-sm al-muted">
+            {date === undefined ? '' : DAY.format(date)}
+          </span>
+        </span>
+        {isNew ? <span className="al-chip al-tone-info al-text-label">{S.newMessages}</span> : null}
+      </button>
+    </li>
+  );
+}
+
 export interface MessagesPageProps {
   /** The API client; the app's default one when absent (tests pass their own). */
   readonly api?: ApiClient;
@@ -355,10 +377,20 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
   const live = useRef(true);
   const listRef = useRef<HTMLUListElement>(null);
   const lastOpened = useRef<string | undefined>(undefined);
+  // Contacts that showed up after the first load (they enter); the first list never animates.
+  const known = useRef<Set<string> | undefined>(undefined);
+  const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
 
   const loadList = useCallback(async (): Promise<void> => {
     const result = await messages.current.conversations();
     if (!live.current) return;
+    if (result.ok) {
+      const before = known.current;
+      known.current = new Set(result.value.map((c) => c.contactId));
+      if (before !== undefined) {
+        setFresh(new Set(result.value.map((c) => c.contactId).filter((id) => !before.has(id))));
+      }
+    }
     setView((prev) =>
       result.ok
         ? { state: 'ready', list: result.value, at: new Date() }
@@ -396,7 +428,7 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
         <h1 className="al-text-title-1">{S.title}</h1>
       </div>
       {view.state === 'loading' ? (
-        <Skeleton />
+        <Skeleton loading label={S.loading} lines={3} />
       ) : view.state === 'failed' ? (
         <ProblemView problem={view.problem} onRetry={() => void loadList()} />
       ) : view.list.length === 0 ? (
@@ -419,38 +451,23 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
                 {S.refresh}
               </Button>
             </div>
-            <ul className="ms-list" aria-label={S.listLabel} ref={listRef}>
-              {view.list.map((c) => {
-                const isNew = c.lastInAt > (seen[c.contactId] ?? 0);
-                const date = c.lastAt > 0 ? new Date(c.lastAt * 1000) : undefined;
-                return (
-                  <li key={c.contactId}>
-                    <button
-                      type="button"
-                      className="ms-row"
-                      data-contact={c.contactId}
-                      aria-current={c.contactId === selected ? 'true' : undefined}
-                      onClick={() => {
-                        lastOpened.current = c.contactId;
-                        setSelected(c.contactId);
-                      }}
-                    >
-                      <span className="ms-row-main">
-                        <span className={isNew ? 'al-text-body ms-new' : 'al-text-body'}>
-                          {c.name}
-                        </span>
-                        <span className="al-text-body-sm al-muted">
-                          {date === undefined ? '' : DAY.format(date)}
-                        </span>
-                      </span>
-                      {isNew ? (
-                        <span className="al-chip al-tone-info al-text-label">{S.newMessages}</span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <Surface level={1} className="ms-list-surface">
+              <ul className="ms-list" aria-label={S.listLabel} ref={listRef}>
+                {view.list.map((c) => (
+                  <ContactRow
+                    key={c.contactId}
+                    c={c}
+                    isNew={c.lastInAt > (seen[c.contactId] ?? 0)}
+                    fresh={fresh.has(c.contactId)}
+                    selected={c.contactId === selected}
+                    onOpen={() => {
+                      lastOpened.current = c.contactId;
+                      setSelected(c.contactId);
+                    }}
+                  />
+                ))}
+              </ul>
+            </Surface>
           </div>
           {current === undefined ? null : (
             <Conversation_
