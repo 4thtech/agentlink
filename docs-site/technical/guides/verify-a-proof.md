@@ -42,12 +42,10 @@ The pack is untrusted input. The verifier never echoes it: every failure is a fi
 
 **Not checked here (yet).** The bytes of attached files: the check covers the message itself, and a file's integrity rests on the hashes inside that verified message (the file encryption is not key-committing). Full sender attribution is in development, so `verify` is not user-facing yet. The chain is read through one RPC; a dishonest RPC can claim a record or receipt that does not exist, so use your own RPC when it matters.
 
-## Outline
+## Ways to verify
 
-- With the CLI: `agentlink verify <proof.json>` (next release)
-- With the web page (v0.3.0): verification runs in your browser
-- By hand, with any EVM library and a public RPC
-- Reading the result: what it proves and what it does not
-- Contract addresses: see [Contracts](../reference/contracts.md)
-
-**Filled in at:** M1 (v0.2.0) and M2 (v0.3.0); backlog cards DOCS-M1b and DOCS-M2.
+- **With the CLI:** `agentlink verify <proof.json>` (since v0.1.2). See [CLI](../reference/cli.md).
+- **With your AI:** the `agentlink_verify_proof_pack` tool, described above.
+- **By hand,** with any EVM library and a public RPC, following the checks above.
+- **A web page that verifies in your browser** is planned. It does not exist yet and has no release date.
+- Contract addresses: see [Contracts](../reference/contracts.md).
