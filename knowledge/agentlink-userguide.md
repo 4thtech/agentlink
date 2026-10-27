@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.3.0 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
+How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.4.0 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
 
 ## What do I need?
 
@@ -43,7 +43,7 @@ Approving needs you, present, with your **owner code**. Your AI can ask for an a
 
 **Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink owner change-code` in a terminal you opened yourself (since v0.1.1). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
 
-Since v0.3.0 the setup page that `init` opens (and `agentlink ui`) lets you protect approvals with Touch ID, Windows Hello or a passkey and shows a backup code once; in the terminal you still approve with the owner code.
+Since v0.3.0 the setup page that `init` opens (and `agentlink ui`) lets you protect approvals with Touch ID, Windows Hello or a passkey and shows a backup code once (from v0.4.0, an owner set up earlier can switch to Touch ID in the local app, and paid actions above your limits ask for it); in the terminal you still approve with the owner code.
 
 ## How do I check it works?
 
