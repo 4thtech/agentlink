@@ -148,6 +148,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/proofs/credits',
       '/api/ui/proofs/top-up',
       '/api/ui/proofs/withdraw',
+      // MSG-FILES-IO-c: the Messages reads (api/messages.test.ts).
+      '/api/ui/messages',
+      '/api/ui/messages/:contactId',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
