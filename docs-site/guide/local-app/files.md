@@ -1,10 +1,34 @@
 # Files page
 
-*Applies to AgentLink 0.3.0 (released 26 Oct 2026).*
+*The Send folders tab applies to AgentLink 0.3.0 (released 26 Oct 2026). The Received and Sent tabs are in 0.3.1 and later.*
 
-Your AI can send a file only from a folder you have allowed. The Files page shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
+The Files page has three tabs: **Received**, **Sent** and **Send folders**. Received and Sent list your files. Send folders is where you allow a folder. Your AI can send a file only from a folder you have allowed, and that tab shows those folders and lets you allow a new one or stop one. Looking changes nothing. Every change needs your [passkey](../help/glossary.md) or your [owner code](../help/glossary.md).
 
 <figure><img src="../.gitbook/assets/local-files--list.png" alt="Three allowed folders; the last one opens at another location."><figcaption><p>Files, with made-up folders. The last folder is a link to somewhere else.</p></figcaption></figure>
+
+## Received and Sent
+
+<!-- screenshot: local-files--received | shows: the Received tab with two files and Show in Finder -->
+
+You don't upload files here. Put a file in your Send folder, or ask your AI to send it. Files you receive appear under **Received**.
+
+| What you see | What it means |
+|---|---|
+| **From** or **To**, with a contact's name | Who sent the file, or who you sent it to |
+| **Saved as** … | The name the file has in your Inbox folder. **You may have moved or renamed it since, so it might not be there now.** |
+| **Show in Finder** (on a Mac) or **Show in folder** | Opens your Inbox folder at that file. The file is only shown, never opened |
+| **Not saved yet. Ask your AI to fetch it.** | The file arrived but is not on your computer yet |
+| **Expired. It can no longer be fetched.** | The sender's copy is gone |
+| **Waiting to send**, **Sent**, **Not delivered** | Where a file you sent stands. For **Not delivered**, ask your AI to send it again |
+| **Delivery confirmed** | The contact confirmed the file arrived |
+
+{% hint style="warning" %}
+**Before you continue:** file names come from other people. They are shown as plain text, and AgentLink never opens a file for you. Open a received file only if you trust the sender. Your AI can't change anything on these tabs, and looking changes nothing.
+{% endhint %}
+
+## Send folders
+
+The rest of this page is about the **Send folders** tab.
 
 ## What you see
 

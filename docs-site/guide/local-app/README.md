@@ -17,11 +17,12 @@ If your AI runs this command, nothing opens. It tells you to run it yourself. Th
 
 ## The pages
 
-- [First run](first-run.md): protect your approvals with Touch ID and get your backup code.
+- [First run](first-run.md): protect your approvals with Touch ID and get your backup code. Set up earlier? You can switch to Touch ID (from 0.3.1).
 - [Activity](activity.md): what your agent did lately.
 - [Proofs and credits](proofs-and-credits.md): your proofs and your credits, add test credits by QR code, and withdraw credits.
+- [Messages](messages.md): read what you and each contact wrote (from 0.3.1). To reply, ask your AI.
 - [Contacts](contacts.md): check a safety code, rename or remove a contact.
-- [Files](files.md): the folders your agent may send files from.
+- [Files](files.md): files you received and sent (from 0.3.1), and the folders your agent may send files from.
 - [Rules](rules.md): what your agent may do without asking.
 
 Looking at a page changes nothing. Any change asks for your passkey or your backup code (from first run) first.
