@@ -211,7 +211,11 @@ describe('the list (D-68): parity with the approval page', () => {
         ok({
           approvals: [
             item('A', {
-              details: { ...item('A').details, headline: evil, fromAi: [{ name: evil, value: evil }] },
+              details: {
+                ...item('A').details,
+                headline: evil,
+                fromAi: [{ name: evil, value: evil }],
+              },
             }),
           ],
         }),
@@ -276,15 +280,21 @@ describe('a request that costs credits (M1-PAY-CONFIRM-b parity)', () => {
       ],
     });
     await click(buttonNamed(S.approve, cardOf('C') as ParentNode));
-    const input = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]');
+    const input = document.querySelector<HTMLInputElement>(
+      '[role="dialog"] input[type="password"]',
+    );
     setValue(input, 'ABCD-EFGH');
-    await click(buttonNamed(P.confirmCode, document.querySelector('[role="dialog"]') as ParentNode));
+    await click(
+      buttonNamed(P.confirmCode, document.querySelector('[role="dialog"]') as ParentNode),
+    );
     const finish = srv.calls.find((c) => c.url === FINISH);
     expect(finish?.headers.get('x-agentlink-presence')).toBeNull();
     expect(new TextDecoder().decode(finish?.body)).toBe('ABCD-EFGH');
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(P.wrongCode);
     setValue(input, 'WXYZ-0000');
-    await click(buttonNamed(P.confirmCode, document.querySelector('[role="dialog"]') as ParentNode));
+    await click(
+      buttonNamed(P.confirmCode, document.querySelector('[role="dialog"]') as ParentNode),
+    );
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain(P.triesUsed);
   });
 
@@ -299,7 +309,9 @@ describe('a request that costs credits (M1-PAY-CONFIRM-b parity)', () => {
       document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]'),
       'ABCD-EFGH',
     );
-    await click(buttonNamed(P.confirmCode, document.querySelector('[role="dialog"]') as ParentNode));
+    await click(
+      buttonNamed(P.confirmCode, document.querySelector('[role="dialog"]') as ParentNode),
+    );
     await click(buttonNamed(P.close));
     expect(cardOf('C')?.textContent).toContain(S.approved);
     expect(buttonNamed(S.approve, cardOf('C') as ParentNode)).toBeUndefined();

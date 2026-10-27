@@ -1,9 +1,12 @@
 // A small History-API router: the app has a handful of fixed routes, so no router dependency. Same-
 // origin clicks on a link to a routed path change the page without a reload; everything else is left
-// to the browser (the Approvals link, which is still the approval page at `/`).
+// to the browser. M1-11b-2: Approvals (`/`) and one request (`/approve/<id>`, the deep link from
+// the terminal, notifications and the MCP) are pages of this app; the sidebar marks Approvals.
 import { useEffect, useSyncExternalStore, type ComponentType, type ReactElement } from 'react';
 import { Layout } from './layout/index.js';
 import { ActivityPage } from './pages/activity/index.js';
+import { ApprovalsPage } from './pages/approvals/index.js';
+import { ApprovePage, approvalIdOf } from './pages/approve/index.js';
 import { AdvancedPage } from './pages/advanced/index.js';
 import { BackupPage } from './pages/backup/index.js';
 import { ContactsPage } from './pages/contacts/index.js';
@@ -26,6 +29,7 @@ function PasskeysPage(): ReactElement {
 }
 
 export const ROUTES: readonly RouteDef[] = [
+  { path: '/', page: ApprovalsPage },
   { path: '/first-run', page: FirstRunPage },
   { path: '/settings/activity', page: ActivityPage },
   { path: '/settings/messages', page: MessagesPage },
@@ -66,8 +70,15 @@ function usePath(): string {
   return normalize(useSyncExternalStore(subscribe, () => location.pathname));
 }
 
+const APPROVALS = '/';
+
 function isRouted(path: string): boolean {
-  return path === SETTINGS || path in REDIRECTS || ROUTES.some((r) => r.path === path);
+  return (
+    path === SETTINGS ||
+    path in REDIRECTS ||
+    ROUTES.some((r) => r.path === path) ||
+    approvalIdOf(path) !== undefined
+  );
 }
 
 /** Turn a plain left-click on a link to a routed path of this app into a navigation. */
@@ -95,11 +106,13 @@ export function AppRoutes(): ReactElement {
     else if (path in REDIRECTS) navigate(REDIRECTS[path] as string, true);
   }, [path]);
   const shown = path === SETTINGS ? SETTINGS_HOME : (REDIRECTS[path] ?? path);
+  // One request belongs to Approvals: the same sidebar item is current.
+  const oneRequest = approvalIdOf(shown) !== undefined;
   const route = ROUTES.find((r) => r.path === shown);
-  const Page = route?.page ?? NotFoundPage;
+  const Page = oneRequest ? ApprovePage : (route?.page ?? NotFoundPage);
   return (
-    <Layout path={shown}>
-      <Page />
+    <Layout path={oneRequest ? APPROVALS : shown}>
+      <Page key={shown} />
     </Layout>
   );
 }

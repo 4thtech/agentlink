@@ -2,12 +2,18 @@
 // (packages/node/src/approval-page.ts UI_STRINGS), which stays for a CLI without the app bundle
 // until its removal card. That package does not depend on this one, so this test reads its source:
 // every key here must be there with the same text (`${CLI_COMMAND}` stands for the CLI prefix).
+// The local app says "backup code" where that page says "owner code" (11 §5.5, UX-031-QUICKWINS):
+// those keys must differ in exactly that word.
+import { lintVocabulary } from '@4thtech-io/ui';
 import { describe, expect, it } from 'vitest';
-import { APPROVAL_STRINGS, CLI_PREFIX } from './strings.js';
+import { APPROVAL_STRINGS, BACKUP_CODE_WORDING, CLI_PREFIX } from './strings.js';
 
 // Read through Vite: a relative import would leave the app (boundaries rule).
 const files = import.meta.glob(
-  ['../../../../../packages/node/src/approval-page.ts', '../../../../../packages/node/src/cli-command.ts'],
+  [
+    '../../../../../packages/node/src/approval-page.ts',
+    '../../../../../packages/node/src/cli-command.ts',
+  ],
   { query: '?raw', import: 'default', eager: true },
 );
 
@@ -30,11 +36,22 @@ describe('the approvals words match the approval page (M1-11b-2)', () => {
     const rest = page.slice(start + key.length + 4);
     const end = rest.search(/\n {2}(?:\/\/|[a-zA-Z]+:)|\n\}\);/);
     const entry = rest.slice(0, end < 0 ? undefined : end);
-    const templated = value.split(CLI_PREFIX).join('${CLI_COMMAND}');
-    const forms = [`'${value}'`, `"${value}"`, `\`${templated}\``];
+    const renamed = BACKUP_CODE_WORDING.has(key);
+    const wording = renamed
+      ? value.replace(/backup code/g, 'owner code').replace(/Backup code/g, 'Owner code')
+      : value;
+    expect(wording !== value, `${key}: backup code wording`).toBe(renamed);
+    const templated = wording.split(CLI_PREFIX).join('${CLI_COMMAND}');
+    const forms = [`'${wording}'`, `"${wording}"`, `\`${templated}\``];
     expect(
       forms.some((f) => entry.includes(f)),
       `UI_STRINGS.${key} differs`,
     ).toBe(true);
+  });
+});
+
+describe('the approvals words use plain vocabulary (11 §5)', () => {
+  it('passes lintVocabulary', () => {
+    expect(lintVocabulary(Object.values(APPROVAL_STRINGS).join('\n'))).toEqual([]);
   });
 });

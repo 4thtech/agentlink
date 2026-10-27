@@ -1,0 +1,124 @@
+/* M1-11b-2: the approvals page layout, from the server-rendered approval page's stylesheet
+   (packages/node approval-page.ts APP_CSS, D1 approval card) for the classes components.css does not
+   have. Design tokens only; no url(), no @import, no inline style (08 §4 CSP). The card, the fields,
+   the buttons and the untrusted region are components.css's. */
+.al-approvals {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.al-approvals h1 {
+  margin: 0;
+}
+.al-approvals .al-lede,
+.al-approvals .al-note,
+.al-approvals .al-or {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+.al-approvals .al-list,
+.al-approvals .al-notices,
+.al-approvals .al-slot,
+.al-approvals .al-step,
+.al-approvals .al-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.al-approvals .al-step:focus {
+  outline: none;
+}
+.al-approvals .al-step:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.al-approvals .al-notices:empty {
+  display: none;
+}
+.al-approvals .al-section-title {
+  margin: 0;
+  font-family: var(--al-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--al-color-fg-muted);
+}
+.al-approvals .al-status {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--al-color-bg-sunken);
+  border: 1px solid var(--al-color-border-default);
+}
+.al-approvals .al-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.al-approvals .al-mono {
+  font-family: var(--al-font-family-mono);
+}
+.al-approvals .al-toggle {
+  flex: none;
+}
+.al-approvals .al-code .al-btn-block {
+  margin-top: 8px;
+}
+
+/* Review together: Approve, Deny or Later per card (components.css .al-seg) */
+.al-approvals .al-choices {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--al-color-border-strong);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--al-color-bg-sunken);
+}
+.al-approvals .al-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 500;
+  border-left: 1px solid var(--al-color-border-default);
+}
+.al-approvals .al-choice:first-child {
+  border-left: 0;
+}
+.al-approvals .al-choice input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.al-approvals .al-choice:has(input:checked) {
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-default);
+  box-shadow: inset 0 -2px 0 var(--al-color-accent-default);
+}
+.al-approvals .al-choice:has(input:focus-visible) {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: -2px;
+}
+.al-approvals .al-lines {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (forced-colors: active) {
+  .al-approvals .al-choice:has(input:checked) {
+    border: 2px solid CanvasText;
+  }
+}

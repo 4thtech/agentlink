@@ -479,7 +479,9 @@ describe('Approvals inside the app (M1-11b-2)', () => {
   it('puts no session cookie, link token or request data into the page', async () => {
     const h = await harness();
     const cookie = await h.cookie();
-    const res = await send(h.port, `/approve/apr_${'A'.repeat(22)}`, { headers: { Cookie: cookie } });
+    const res = await send(h.port, `/approve/apr_${'A'.repeat(22)}`, {
+      headers: { Cookie: cookie },
+    });
     expect(res.body).not.toContain('?t=');
     expect(res.body).not.toContain('apr_');
     // The cookie value never reaches the markup.
