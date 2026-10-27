@@ -1087,6 +1087,10 @@ const SCRIPT = String.raw`
     document.addEventListener('keydown', onKey, true);
 
     function isLimits() { return st.statement && st.statement.kind === 'limits'; }
+    /** The passkey can confirm only when the server offers it (its key is kept, rule 5). */
+    function payPasskey() {
+      return hasPasskey() && !!st.publicKey && (st.publicKey.allowCredentials || []).length > 0;
+    }
     function confirmLabel() { return S['payConfirm' + platform]; }
     function waitingLabel() { return S['payWaiting' + platform]; }
     function liveText() {
@@ -1174,12 +1178,12 @@ const SCRIPT = String.raw`
         closeB.setAttribute('data-key', 'close');
         closeB.addEventListener('click', close);
         actions.appendChild(closeB);
-      } else if (st.phase === 'ready' && v && hasPasskey() && !st.backup) {
+      } else if (st.phase === 'ready' && v && payPasskey() && !st.backup) {
         var go = button(confirmLabel(), 'al-btn-primary al-btn-lg al-btn-block');
         go.setAttribute('data-key', 'confirm');
         go.addEventListener('click', usePasskey);
         actions.appendChild(go);
-      } else if (st.phase === 'backup' || (st.phase === 'ready' && v && !hasPasskey())) {
+      } else if (st.phase === 'backup' || (st.phase === 'ready' && v && !payPasskey())) {
         st.phase = 'backup';
         var form = codeForm(S.payCodeLabel, S.payConfirmCode, function (code) { return useCode(code); });
         actions.appendChild(form);
@@ -1190,7 +1194,7 @@ const SCRIPT = String.raw`
         cancel.addEventListener('click', close);
         actions.appendChild(cancel);
       }
-      if (!st.closed && st.phase === 'ready' && v && hasPasskey()) {
+      if (!st.closed && st.phase === 'ready' && v && payPasskey()) {
         var link = button(S.payUseBackup, 'al-btn-ghost al-btn-sm al-pay-link');
         link.setAttribute('data-key', 'backup');
         link.addEventListener('click', function () { st.backup = true; st.phase = 'backup'; st.error = null; render(); });
