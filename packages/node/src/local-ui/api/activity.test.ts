@@ -254,6 +254,7 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       'agentId',
       'contacts',
       'files',
+      'filesIo',
       'getProof',
       'listActivity',
       'messages',

@@ -135,6 +135,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/files',
       '/api/ui/files/review',
       '/api/ui/files/folders',
+      // MSG-FILES-IO-d: Files, Received and Sent (api/files-io.test.ts).
+      '/api/ui/files/received',
+      '/api/ui/files/sent',
       '/api/ui/contacts',
       '/api/ui/contacts/:ref/safety-code',
       '/api/ui/contacts/:ref/rename-check',
