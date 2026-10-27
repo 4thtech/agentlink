@@ -271,7 +271,8 @@ body {
   height: 16px;
   border-radius: var(--al-radius-xs);
   background: var(--al-color-fg-muted);
-  transition: left var(--al-duration-fast) var(--al-easing-standard);
+  transform: translateX(0);
+  transition: transform var(--al-duration-fast) var(--al-easing-standard);
 }
 .al-switch-state {
   position: absolute;
@@ -283,7 +284,7 @@ body {
   border-color: var(--al-color-accent-fg);
 }
 .al-switch.is-on .al-switch-knob {
-  left: 43px;
+  transform: translateX(40px);
   background: var(--al-color-accent-default);
 }
 .al-switch.is-on .al-switch-state {

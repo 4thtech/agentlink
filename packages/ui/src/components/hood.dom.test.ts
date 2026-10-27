@@ -301,7 +301,7 @@ describe('the path kind (UI-REFRESH-e2)', () => {
 
 describe('the switch knob (UI-REFRESH-e2)', () => {
   const rule = (sel: string): string => {
-    const esc = sel.replace(/[.\-]/g, '\\$&');
+    const esc = sel.replace(/[.-]/g, '\\$&');
     return componentsCss.match(new RegExp(esc + '\\s*\\{([^}]*)\\}'))?.[1] ?? '';
   };
   it('slides with transform, not left', () => {
