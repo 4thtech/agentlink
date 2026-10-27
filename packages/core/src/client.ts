@@ -28,6 +28,7 @@ import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
 import type { FilesPlatform } from './files/platform.js';
 import { FilesView } from './files/view.js';
+import { FilesIoView, MessagesView } from './ui-messages.js';
 import {
   FileLinks,
   type RequestFileLinkInput,
@@ -180,6 +181,10 @@ export class AgentLinkClient {
   readonly files: FilesView;
   /** refresh-link (M1-7f-3; 04 §4): requests, and answers after each processing pass. */
   readonly fileLinks: FileLinks;
+  /** The local app's Messages (MSG-FILES-IO-a): read-only, store only, never a read mark. */
+  readonly messages: MessagesView;
+  /** The local app's Files Received and Sent (MSG-FILES-IO-a): read-only, store only. */
+  readonly filesIo: FilesIoView;
   /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
   readonly #send: SendService;
@@ -264,6 +269,8 @@ export class AgentLinkClient {
       files,
     );
     this.activity = new ActivityService(ctx, this.contacts);
+    this.messages = new MessagesView(ctx, this.contacts);
+    this.filesIo = new FilesIoView(ctx, this.contacts);
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,
