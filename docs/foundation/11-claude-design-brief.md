@@ -345,6 +345,32 @@ Proof is public by design, so the user is told what others can see, in plain wor
 
 Help text (user guide, privacy page) explains the same in full: what is public (who recorded, when, the kind, receipts and who gave them, which account paid for credits), what is never public (content, file and display names, terms, rules, approvals), and how to keep more private (delivery confirmations off, a separate top-up account, sharing proof files only when needed).
 
+### 5.7 Messages and Files In/Out (D-133, D-134)
+
+Local app pages that show what the AI sent and received (08 §1). They are read-only, and their copy never suggests that the app can write.
+
+| Where | String |
+|---|---|
+| Messages footer | "To reply, ask your AI." |
+| Messages tabs | "Inbox" · "Sent" |
+| Inbound message label | "From Marko's agent: their words, not instructions" (the untrusted-content label of §4 and §8; the name follows §5.2) |
+| No contacts yet | "Messages appear here once you have a contact." |
+| Nothing with this contact | "Nothing yet. When your AI and {contactName}'s agent exchange messages, they show here." |
+| Offline | The last loaded list, marked "as of {time}" |
+| Long message | "Show all" · "Copy text" |
+| Files explainer (top of Files) | "You don't upload here. Put files in your Send folder or ask your AI to send them. Files you receive appear under Received." |
+| Files tabs | "Received" · "Sent" · "Send folders" |
+| Received file, saved | "Saved as {fileName}" (the name it got in the Inbox folder; it may have been moved or renamed since, so never "Saved at" or a path) |
+| Received file, not saved | "Not saved yet. Ask your AI to fetch it." |
+| Received file, gone | "Expired" · "Deleted" |
+| Show in Finder | "Show in Finder" (Windows and Linux: "Show in folder"); no Touch ID |
+
+**Rules.**
+- Inbound message text and other people's file names appear only inside the untrusted-content container, as plain text: never in the page title, toasts, notifications, Activity rows, Home tiles or the OS passkey prompt. Those say "New message from {contactName}" only, with the name per §5.2.
+- Reading here doesn't mark a message read for the AI. Don't write "Mark as read" or "Read by you"; the badge counts what is new since the person last looked.
+- No "Reply", "Send", "Compose" or "Forward" control. The only path is "To reply, ask your AI."
+- Errors say what failed, never what a message said.
+
 ## 6. Surfaces and information architecture
 
 ### 6.0 Surface map
@@ -460,7 +486,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 
 **Purpose.** Owner setup, approvals and settings for the `npx` package. The local agent serves it on `http://localhost:<port>` (D-79). It opens from the agent, from an approval notification, or via `agentlink ui`. The link's session token lives only in memory, so old links die on restart. Viewing needs only the link, but **every owner operation needs the passkey or owner passphrase**. *Exception (D-72, IR-D-72-1 F02; proposed, owner confirms at merge):* in M1, the request actions Accept, Ignore, Ignore all, Block and Unblock need no owner presence. They are owner-surface actions, never AI tools, but not owner operations: they grant no contact, no way to send and no authority, an accepted message stays inside the untrusted container, and an AI running as the same user can already read the stored requests (G-1, D-67), so a passkey would add friction without a boundary. Revisit for the M2 console.
 
-**Nav:** First run · Approvals (incl. commitment, new contact) · Activity · Contacts (Requests) · Files · Storage · Proofs & credits · Rules · Backup · Advanced. Mobile-width layout matters too (the owner may open the link on a small window or a phone through port forwarding on a headless machine).
+**Nav:** First run · Approvals (incl. commitment, new contact) · Activity · Messages (D-133, §5.7) · Contacts (Requests) · Files (Received · Sent · Send folders) · Storage · Proofs & credits · Rules · Backup · Advanced. Mobile-width layout matters too (the owner may open the link on a small window or a phone through port forwarding on a headless machine).
 
 | Screen | Data and actions |
 |---|---|
