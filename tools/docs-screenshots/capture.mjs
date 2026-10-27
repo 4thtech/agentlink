@@ -12,7 +12,7 @@ import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 /* global document */
 import { chromium } from 'playwright';
-import { ROUTES } from './fixtures.mjs';
+import { CONTACTS_DUPLICATE, ROUTES } from './fixtures.mjs';
 
 const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
 const OUT = fileURLToPath(new URL('../../docs-site/guide/.gitbook/assets/', import.meta.url));
@@ -74,6 +74,16 @@ const SHOTS = [
       await page.getByText('project-plan.pdf').first().waitFor();
     },
   },
+  {
+    name: 'local-contacts--duplicate',
+    path: '/settings/contacts',
+    ready: heading('Contacts'),
+    routes: { '/api/ui/contacts': CONTACTS_DUPLICATE },
+    steps: async (page) => {
+      await page.getByRole('button', { name: /Ana/ }).first().click();
+      await page.getByText('Looks like a second connection').waitFor();
+    },
+  },
   { name: 'local-messages--list', path: '/settings/messages', ready: heading('Messages') },
   {
     name: 'local-messages--inbox',
@@ -116,9 +126,9 @@ const SHOTS = [
   { name: 'local-rules--overview', path: '/settings/rules', ready: heading('Rules') },
 ];
 
-function answer(route) {
+function answer(route, overrides = {}) {
   const url = new URL(route.request().url());
-  const entry = ROUTES[url.pathname];
+  const entry = overrides[url.pathname] ?? ROUTES[url.pathname];
   const body = typeof entry === 'function' ? entry(url) : entry;
   return route.fulfill({
     status: body === undefined ? 404 : 200,
@@ -145,7 +155,7 @@ try {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'userAgentData', { get: () => ({ platform: 'macOS' }) });
     });
-    await page.route('**/api/**', answer);
+    await page.route('**/api/**', (route) => answer(route, shot.routes));
     await page.goto(origin + shot.path);
     await shot.ready(page);
     await page

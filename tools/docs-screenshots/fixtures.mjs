@@ -44,6 +44,24 @@ export const CONTACTS = {
   ],
 };
 
+/** The same list with a second, older connection of "Ana's agent" (same owner): the duplicate notice. */
+export const CONTACTS_DUPLICATE = {
+  status: 'ok',
+  contacts: [
+    ...CONTACTS.contacts.map((c) => (c.ref === ref(2) ? { ...c, olderSameOwner: ref(4) } : c)),
+    {
+      ref: ref(4),
+      name: "Ana's agent",
+      nameSource: 'owner',
+      fingerprint: '2D3E·4F5A',
+      label: 'self-declared',
+      status: 'active',
+      pairing: 'complete',
+      since: NOW - 20 * DAY,
+    },
+  ],
+};
+
 export const SAFETY_CODE = { status: 'ok', code: '4821 7390 1564' };
 
 export const ACTIVITY = {
