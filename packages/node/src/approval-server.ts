@@ -187,6 +187,7 @@ import {
   parsePasskeyAssertion,
   parsePasskeyRegistration,
   readOwnerPasskeyHeader,
+  readOwnerPasskeyKey,
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
@@ -544,6 +545,8 @@ export type ApprovalServerEvent =
         | 'presence_required'
         | 'presence_rejected'
         | 'verification_required'
+        /** Rule 5: the passkey has no stored credential key; use the backup code. */
+        | 'passkey_update_needed'
         | 'tries_exhausted'
         | 'refused'
         | 'failed';
@@ -1854,10 +1857,17 @@ export async function startApprovalServerWith(
         return;
       }
       const hold = payHolds.begin(session, built.target, built.flow, built.requests);
+      // Rule 5: the passkey is offered only when its credential key is kept; otherwise the page
+      // offers the backup code (and setting the passkey up again).
       let credentialId: string | undefined;
       try {
         const stored = await readOwnerPasskeyHeader(keychainOf());
-        if (stored !== null) credentialId = encodeBase64url(stored.credentialId);
+        if (
+          stored !== null &&
+          (await readOwnerPasskeyKey(keychainOf(), stored.credentialId)) !== null
+        ) {
+          credentialId = encodeBase64url(stored.credentialId);
+        }
       } catch {
         credentialId = undefined;
       }
@@ -1941,6 +1951,7 @@ export async function startApprovalServerWith(
               challenge: hold.challenge,
               origin,
               passkey: stored,
+              publicKey: await readOwnerPasskeyKey(keychainOf(), stored.credentialId),
               owner: context.owner,
             });
           }
@@ -1949,6 +1960,11 @@ export async function startApprovalServerWith(
         }
         if (check === 'verification_required') {
           finishPay(res, 403, 'verification_required');
+          return;
+        }
+        if (check === 'key_missing') {
+          // Rule 5: this passkey has no stored key; the backup code (or setting it up again) works.
+          finishPay(res, 409, 'passkey_update_needed');
           return;
         }
         if (check !== 'ok') {
@@ -2329,6 +2345,7 @@ export async function startApprovalServerWith(
             keys: held.keys,
             credentialId: registration.credentialId,
             prfOutput: registration.prfOutput,
+            authenticatorData: registration.authenticatorData,
             firstCard: setup.firstCard,
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },

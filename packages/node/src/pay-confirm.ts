@@ -28,13 +28,15 @@
 // - I-7: no challenge, nonce, assertion, owner code or credential is logged, put in an event or an
 //   error. Holds live in memory only and are wiped when used, expired, dropped or closed.
 //
-// Rule 5 (the assertion signature over authenticatorData ‖ SHA-256(clientDataJSON), with the
-// credential public key stored at registration) is NOT verified here: the stored passkey item keeps
-// no public key (04 §2.3.1) and no P-256 verify exists in @4thtech-io/crypto yet. Every passkey today
-// is in the "registered before" class of rule 5: the PRF unlock is the presence proof, and the
-// binding rests on rules 2 and 3 (the genuine server signs only the bodies in its own challenge).
-// The wire format already carries the signature, so the follow-up (store the key at registration,
-// verify via @4thtech-io/crypto) changes no page code. Threat note: docs in the PR; G-1 (04 §2.5).
+// Rule 5: the assertion signature over authenticatorData ‖ SHA-256(clientDataJSON) is verified
+// (@4thtech-io/crypto verifyWebauthnSignature) with the credential public key kept at registration
+// (owner-passkey.ts `owner-passkey-key`, bound to the credential ID). Without it a same-user process
+// could send any clientDataJSON with the UV flag set; with it, only the authenticator can answer
+// this challenge. A passkey registered before keys were kept (or with an unsupported key) has no
+// stored key: its passkey path answers `key_missing` (the page offers the backup code and setting
+// the passkey up again); it is never accepted on the PRF unlock alone. signCount is not checked
+// (platform passkeys report 0; replay is stopped by the single-use challenge). The stored key is
+// writable by the same OS user: the G-1 residual of 04 §2.5, unchanged.
 import {
   canonicalize,
   decodeUtf8,
@@ -43,6 +45,7 @@ import {
   equalBytes,
   randomBytes,
   sha256,
+  verifyWebauthnSignature,
   wipe,
   type OwnerPublicKeys,
   type PasskeyBlobHeader,
@@ -90,7 +93,12 @@ export interface PayConfirmAssertion {
 }
 
 /** Why a finish is refused. Fixed codes (I-7). */
-export type PayConfirmAssertionCheck = 'ok' | 'verification_required' | 'presence_rejected';
+export type PayConfirmAssertionCheck =
+  | 'ok'
+  | 'verification_required'
+  | 'presence_rejected'
+  /** No credential public key is kept for this passkey (rule 5): never accepted without it. */
+  | 'key_missing';
 
 function u16(value: number): Uint8Array {
   return new Uint8Array([value >> 8, value & 0xff]);
@@ -171,6 +179,8 @@ export function checkPayConfirmAssertion(
     readonly challenge: Uint8Array;
     readonly origin: string;
     readonly passkey: PasskeyBlobHeader;
+    /** The stored credential public key (COSE_Key) for that passkey, or null (rule 5). */
+    readonly publicKey: Uint8Array | null;
     readonly owner: OwnerPublicKeys;
   },
 ): PayConfirmAssertionCheck {
@@ -203,6 +213,18 @@ export function checkPayConfirmAssertion(
     !equalBytes(expected.passkey.ownerNostr, expected.owner.ownerNostr) ||
     !equalBytes(assertion.userHandle, expected.owner.ownerNostr) ||
     assertion.prfOutput.length !== PRF_LENGTH
+  ) {
+    return 'presence_rejected';
+  }
+  // Rule 5: the authenticator's own signature over exactly this response.
+  if (expected.publicKey === null) return 'key_missing';
+  if (
+    !verifyWebauthnSignature(
+      expected.publicKey,
+      assertion.authenticatorData,
+      assertion.clientDataJSON,
+      assertion.signature,
+    )
   ) {
     return 'presence_rejected';
   }

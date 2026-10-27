@@ -25,6 +25,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from '@4thtech-io/crypto';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   MAX_PRESENCE_BACKOFF_S,
@@ -43,7 +44,12 @@ import {
   type OwnerWorld,
   type RawResponse,
 } from './approval-ui.fixture.js';
-import { OWNER_PASSKEY_ACCOUNT, registerOwnerPasskey } from './owner-passkey.js';
+import {
+  OWNER_PASSKEY_ACCOUNT,
+  OWNER_PASSKEY_KEY_ACCOUNT,
+  readOwnerPasskeyKey,
+  registerOwnerPasskey,
+} from './owner-passkey.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
 import {
@@ -64,7 +70,7 @@ let auth: VirtualPrfAuthenticator;
 
 beforeAll(async () => {
   world = await ownerWorld('agentlink-pay-confirm-');
-  auth = new VirtualPrfAuthenticator();
+  auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
   await registerOwnerPasskey(
     world.keychain,
     world.owner,
@@ -75,6 +81,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await world.keychain.delete(OWNER_PASSKEY_ACCOUNT);
+  await world.keychain.delete(OWNER_PASSKEY_KEY_ACCOUNT);
   world.cleanup();
 });
 
@@ -286,9 +293,18 @@ async function begin(h: Harness, page: Record<string, string>, input: JsonValue)
 /** What the page sends after navigator.credentials.get for `challenge` (the virtual passkey). */
 function gesture(
   challenge: string,
-  over: { origin?: string; type?: string; uv?: boolean; challenge?: string } = {},
+  over: {
+    origin?: string;
+    type?: string;
+    uv?: boolean;
+    challenge?: string;
+    /** `forged`: a random signature; `absent`: none; another authenticator signs (and answers). */
+    signature?: 'forged' | 'absent';
+    by?: VirtualPrfAuthenticator;
+  } = {},
 ): PayConfirmAssertion {
-  const got = auth.get(salt);
+  const signer = over.by ?? auth;
+  const got = signer.get(salt);
   const authenticatorData = got.authenticatorData.slice();
   if (over.uv === false) authenticatorData[32] = (authenticatorData[32] as number) & ~0x04;
   const clientData = {
@@ -297,11 +313,19 @@ function gesture(
     origin: over.origin ?? '',
     crossOrigin: false,
   };
+  const clientDataJSON = encodeUtf8(JSON.stringify(clientData));
+  // The authenticator signs exactly what it returns (a response without UV is signed without it).
+  const signature =
+    over.signature === 'forged'
+      ? randomBytes(70)
+      : over.signature === 'absent'
+        ? new Uint8Array(0)
+        : signer.sign(authenticatorData, clientDataJSON);
   return {
     credentialId: got.credentialId,
     authenticatorData,
-    clientDataJSON: encodeUtf8(JSON.stringify(clientData)),
-    signature: randomBytes(70),
+    clientDataJSON,
+    signature,
     userHandle: got.userHandle,
     prfOutput: got.prfOutput,
   };
@@ -348,10 +372,41 @@ describe('the assertion checks (rule 1)', () => {
   const challenge = randomBytes(32);
   const origin = 'http://localhost:4321';
   const check = (a: PayConfirmAssertion) =>
-    checkPayConfirmAssertion(a, { challenge, origin, passkey: header(), owner: world.owner });
+    checkPayConfirmAssertion(a, {
+      challenge,
+      origin,
+      passkey: header(),
+      publicKey: auth.coseKey ?? null,
+      owner: world.owner,
+    });
 
   it('accepts webauthn.get for this challenge and origin with UP and UV', () => {
     expect(check(gesture(encodeBase64url(challenge), { origin }))).toBe('ok');
+  });
+
+  it('refuses a forged response: valid JSON and UV set, but a wrong or absent signature (rule 5)', () => {
+    const c = encodeBase64url(challenge);
+    expect(check(gesture(c, { origin, signature: 'forged' }))).toBe('presence_rejected');
+    expect(check(gesture(c, { origin, signature: 'absent' }))).toBe('presence_rejected');
+  });
+
+  it('refuses another credential, and any passkey without a stored key (rule 5)', () => {
+    const c = encodeBase64url(challenge);
+    const other = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+    other.create(world.owner.ownerNostr, salt);
+    expect(check(gesture(c, { origin, by: other }))).toBe('presence_rejected');
+    // The other key signing a response that names our credential is still refused.
+    const swapped = { ...gesture(c, { origin, by: other }), credentialId: auth.credentialId };
+    expect(check(swapped)).toBe('presence_rejected');
+    expect(
+      checkPayConfirmAssertion(gesture(c, { origin }), {
+        challenge,
+        origin,
+        passkey: header(),
+        publicKey: null,
+        owner: world.owner,
+      }),
+    ).toBe('key_missing');
   });
 
   it('refuses a response without UV as verification_required, never presence alone', () => {
@@ -522,6 +577,66 @@ describe('a proof above the limits, confirmed on the page (04 §2.5.3)', () => {
     );
     expect(json(again)['status']).toBe('unknown');
     expect(h.source.applied).toHaveLength(0);
+  });
+
+  it('refuses a forged response (UV set, wrong or absent signature) and another credential', async () => {
+    const h = await harness();
+    const page = await h.page();
+    addPaid(h.source, 1);
+    for (const signature of ['forged', 'absent'] as const) {
+      pastBackoff(h);
+      const b = await begin(h, page, { flow: 'proof', approvalId: approvalId(1) });
+      const res = await finishPasskey(
+        h,
+        page,
+        b.ceremony,
+        gesture(b.challenge, { origin: h.origin, signature }),
+      );
+      expect(json(res)['status']).toBe('presence_rejected');
+    }
+    pastBackoff(h);
+    const other = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+    other.create(world.owner.ownerNostr, salt);
+    const c = await begin(h, page, { flow: 'proof', approvalId: approvalId(1) });
+    const res = await finishPasskey(
+      h,
+      page,
+      c.ceremony,
+      gesture(c.challenge, { origin: h.origin, by: other }),
+    );
+    expect(json(res)['status']).toBe('presence_rejected');
+    expect(h.source.applied).toHaveLength(0);
+  });
+
+  it('a passkey without a stored key is never accepted; the backup code still works (rule 5)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    addPaid(h.source, 1);
+    const kept = await world.keychain.get(OWNER_PASSKEY_KEY_ACCOUNT);
+    await world.keychain.delete(OWNER_PASSKEY_KEY_ACCOUNT);
+    try {
+      const b = await begin(h, page, { flow: 'proof', approvalId: approvalId(1) });
+      expect(json(b.response)['publicKey']).toMatchObject({ allowCredentials: [] });
+      const res = await finishPasskey(
+        h,
+        page,
+        b.ceremony,
+        gesture(b.challenge, { origin: h.origin }),
+      );
+      expect(json(res)['status']).toBe('passkey_update_needed');
+      expect(h.source.applied).toHaveLength(0);
+      const c = await begin(h, page, { flow: 'proof', approvalId: approvalId(1) });
+      expect(json(await finishCode(h, page, c.ceremony, world.code))).toEqual({
+        status: 'applied',
+      });
+    } finally {
+      if (kept !== null) await world.keychain.set(OWNER_PASSKEY_KEY_ACCOUNT, kept);
+    }
+  });
+
+  it('registration keeps the credential public key, bound to the credential ID', async () => {
+    expect(await readOwnerPasskeyKey(world.keychain, auth.credentialId)).toEqual(auth.coseKey);
+    expect(await readOwnerPasskeyKey(world.keychain, randomBytes(16))).toBeNull();
   });
 
   it('refuses a reused challenge', async () => {

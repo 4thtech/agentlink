@@ -385,3 +385,12 @@ export {
   type Alf1TransformStream,
   type Alf1Writable,
 } from './stream.js';
+// M1-PAY-CONFIRM-a (04 §2.5.3 rule 5): the passkey assertion signature of a paid-action confirmation.
+export {
+  WEBAUTHN_ALG_EDDSA,
+  WEBAUTHN_ALG_ES256,
+  decodeWebauthnPublicKey,
+  verifyWebauthnSignature,
+  webauthnPublicKeyFromAuthenticatorData,
+  type WebauthnPublicKey,
+} from './webauthn.js';
