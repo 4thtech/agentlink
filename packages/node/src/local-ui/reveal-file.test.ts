@@ -21,7 +21,9 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { revealSavedFile, type RevealSeams } from './reveal-file.js';
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'agentlink-reveal-')));
+// The native realpath, as the code under test uses: on Windows it also expands 8.3 short names
+// (RUNNER~1) and fixes casing, which the JS realpathSync does not (CHORE-MAIN-NODEOS-040).
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'agentlink-reveal-')));
 afterAll(() => {
   rmSync(root, { recursive: true, force: true });
 });
@@ -91,6 +93,25 @@ describe('Show in Finder: the checked file (MSG-FILES-IO-h)', () => {
     expect(await revealSavedFile(folder, 'outside-link.pdf', s)).toBe('refused');
     expect(await revealSavedFile(folder, 'dangling.pdf', s)).toBe('refused');
     expect(calls).toHaveLength(0);
+  });
+
+  it('where the open cannot refuse a final link (Windows has no O_NOFOLLOW), a link is still refused', async () => {
+    // CHORE-MAIN-NODEOS-040: simulates win32 on every OS. The open follows the link; a link to a
+    // file fails the handle re-check, and a dangling link is `refused`, never `not_found`.
+    const folder = inbox();
+    writeFileSync(join(folder, 'real.pdf'), 'x');
+    const outside = join(root, `case-${String(n)}`, 'secret.txt');
+    writeFileSync(outside, 'secret');
+    symlinkSync(join(folder, 'real.pdf'), join(folder, 'inside-link.pdf'));
+    symlinkSync(outside, join(folder, 'outside-link.pdf'));
+    symlinkSync(join(folder, 'nowhere'), join(folder, 'dangling.pdf'));
+    const { seams: s, calls } = seams({ openFollowsLinks: true });
+    expect(await revealSavedFile(folder, 'inside-link.pdf', s)).toBe('refused');
+    expect(await revealSavedFile(folder, 'outside-link.pdf', s)).toBe('refused');
+    expect(await revealSavedFile(folder, 'dangling.pdf', s)).toBe('refused');
+    expect(await revealSavedFile(folder, 'gone.pdf', s)).toBe('not_found');
+    expect(await revealSavedFile(folder, 'real.pdf', s)).toBe('shown');
+    expect(calls).toEqual([[join(folder, 'real.pdf'), folder]]);
   });
 
   it('refuses a folder with the saved name', async () => {
