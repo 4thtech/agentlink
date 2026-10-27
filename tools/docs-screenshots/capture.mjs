@@ -1,11 +1,16 @@
-// Regenerates the dark-theme screenshots of the local app for the user guide (docs model §5).
+// Regenerates the screenshots of the local app for the user guide (docs model §5).
 //
 //   pnpm docs:screenshots   (builds the app first; needs `pnpm exec playwright install chromium` once)
+//   node tools/docs-screenshots/capture.mjs --qa <folder>
+//                           the owner's visual QA set (UI-REFRESH plan §10), not published: every page
+//                           at 1280 and 360, dark, light and increased contrast, with Under the hood
+//                           off and on. Write it outside the repo.
 //
 // How: the built app (apps/local-ui/dist) is served from a throwaway localhost server, and every
 // /api/** call is answered in the browser by Playwright (page.route) from fixtures.mjs. There is no
 // agent, no key store, no owner code and no network: only made-up data can appear on a page.
-// Output: docs-site/guide/.gitbook/assets/<name>.png (1280 x 800, scale 2, dark, UTC, en-US).
+// Output: docs-site/guide/.gitbook/assets/<name>.png (1280 x 800, scale 2, UTC, en-US; dark unless a
+// shot says light, or phone width, which is 360 x 800).
 import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
@@ -16,6 +21,7 @@ import { CONTACTS_DUPLICATE, ROUTES } from './fixtures.mjs';
 
 const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
 const OUT = fileURLToPath(new URL('../../docs-site/guide/.gitbook/assets/', import.meta.url));
+const QA_DIR = process.argv.includes('--qa') ? process.argv[process.argv.indexOf('--qa') + 1] : undefined;
 const MAX_BYTES = 400 * 1024;
 const TYPES = {
   '.html': 'text/html',
@@ -124,7 +130,65 @@ const SHOTS = [
   },
   { name: 'local-proofs--list', path: '/settings/proofs', ready: heading('Proofs & credits') },
   { name: 'local-rules--overview', path: '/settings/rules', ready: heading('Rules') },
+  // The refreshed local app (UI-REFRESH): Home, Approvals, Appearance, About, Under the hood.
+  { name: 'local-home--overview', path: '/settings/home', ready: heading('Home') },
+  {
+    name: 'local-home--overview-light',
+    path: '/settings/home',
+    ready: heading('Home'),
+    theme: 'light',
+  },
+  {
+    name: 'local-home--overview-phone',
+    path: '/settings/home',
+    ready: heading('Home'),
+    width: 360,
+  },
+  {
+    name: 'local-home--under-the-hood',
+    path: '/settings/home',
+    ready: heading('Home'),
+    hood: true,
+  },
+  { name: 'local-approvals--waiting', path: '/', ready: heading('Approvals') },
+  { name: 'local-appearance--choices', path: '/settings/appearance', ready: heading('Appearance') },
+  {
+    name: 'local-appearance--choices-light',
+    path: '/settings/appearance',
+    ready: heading('Appearance'),
+    theme: 'light',
+  },
+  { name: 'local-about--page', path: '/settings/about', ready: heading('About') },
 ];
+
+/** The QA set: every page, both widths, three looks, Under the hood off and on (plan §10). */
+const QA_PAGES = [
+  ['home', '/settings/home', 'Home'],
+  ['approvals', '/', 'Approvals'],
+  ['activity', '/settings/activity', 'Activity'],
+  ['messages', '/settings/messages', 'Messages'],
+  ['contacts', '/settings/contacts', 'Contacts'],
+  ['files', '/settings/files', 'Files'],
+  ['proofs', '/settings/proofs', 'Proofs & credits'],
+  ['rules', '/settings/rules', 'Rules'],
+  ['appearance', '/settings/appearance', 'Appearance'],
+  ['about', '/settings/about', 'About'],
+];
+const QA_SHOTS = QA_PAGES.flatMap(([page, path, title]) =>
+  [1280, 360].flatMap((width) =>
+    ['dark', 'light', 'contrast'].flatMap((look) =>
+      [false, true].map((hood) => ({
+        name: `qa-${page}--${width}-${look}-hood-${hood ? 'on' : 'off'}`,
+        path,
+        ready: heading(title),
+        width,
+        hood,
+        theme: look === 'light' ? 'light' : 'dark',
+        contrast: look === 'contrast' ? 'more' : 'no-preference',
+      })),
+    ),
+  ),
+);
 
 function answer(route, overrides = {}) {
   const url = new URL(route.request().url());
@@ -137,15 +201,17 @@ function answer(route, overrides = {}) {
   });
 }
 
-mkdirSync(OUT, { recursive: true });
+const OUTDIR = QA_DIR ?? OUT;
+mkdirSync(OUTDIR, { recursive: true });
 const browser = await chromium.launch();
 let failed = false;
 try {
-  for (const shot of SHOTS) {
+  for (const shot of QA_DIR ? QA_SHOTS : SHOTS) {
     const ctx = await browser.newContext({
-      viewport: { width: 1280, height: 800 },
+      viewport: { width: shot.width ?? 1280, height: 800 },
       deviceScaleFactor: 2,
-      colorScheme: 'dark',
+      colorScheme: shot.theme ?? 'dark',
+      ...(shot.contrast ? { contrast: shot.contrast } : {}),
       locale: 'en-US',
       timezoneId: 'UTC',
       reducedMotion: 'reduce',
@@ -155,6 +221,11 @@ try {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, 'userAgentData', { get: () => ({ platform: 'macOS' }) });
     });
+    if (shot.hood) {
+      await page.addInitScript(() => {
+        localStorage.setItem('agentlink.prefs', JSON.stringify({ hood: true }));
+      });
+    }
     await page.route('**/api/**', (route) => answer(route, shot.routes));
     await page.goto(origin + shot.path);
     await shot.ready(page);
@@ -165,10 +236,10 @@ try {
     if (shot.steps) await shot.steps(page);
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(0, 0);
-    const file = join(OUT, `${shot.name}.png`);
+    const file = join(OUTDIR, `${shot.name}.png`);
     await page.screenshot({ path: file, animations: 'disabled' });
     const size = statSync(file).size;
-    const flag = size > MAX_BYTES ? '  TOO BIG (docs model §5: 400 KB)' : '';
+    const flag = !QA_DIR && size > MAX_BYTES ? '  TOO BIG (docs model §5: 400 KB)' : '';
     if (flag) failed = true;
     console.log(`${shot.name}.png  ${Math.round(size / 1024)} KB${flag}`);
     await ctx.close();

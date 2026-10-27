@@ -142,7 +142,55 @@ export const FILES_REVIEW = {
 export const FIRST_RUN = { owner: 'missing' };
 
 /** The status bar's health read: the agent is running (08 §1; apps/local-ui layout/health.ts). */
-export const HEALTH = { agent: 'running', version: '0.3.1' };
+export const HEALTH = {
+  agent: 'running',
+  version: '0.4.0',
+  relays: { connected: 3, total: 3 },
+  lastSyncAt: NOW - 2 * MIN,
+};
+
+/** Two waiting approvals; the expiry is read at answer time so the time-left ring has a real clock. */
+export const APPROVALS = () => {
+  const soon = Math.floor(Date.now() / 1000);
+  return {
+    approvals: [
+      {
+        approvalId: 'apr_' + 'A'.repeat(22),
+        summary: "Send project-plan.pdf to Marko's agent",
+        actionDigest: 'a'.repeat(64),
+        expiresAt: soon + 95,
+        commitment: false,
+        paid: false,
+        details: {
+          who: "Marko's agent",
+          what: 'Send the file project-plan.pdf',
+          cost: 'Free',
+          expires: 'in about 2 minutes',
+          rule: 'Your rule: ask me before sending files',
+          fromAi: [{ name: 'File', value: 'project-plan.pdf' }],
+        },
+      },
+      {
+        approvalId: 'apr_' + 'B'.repeat(22),
+        summary: "Add a proof of the agreement with Ana's agent",
+        actionDigest: 'b'.repeat(64),
+        expiresAt: soon + 170,
+        commitment: false,
+        paid: true,
+        details: {
+          who: "Ana's agent",
+          what: 'Add a public proof of your agreement',
+          cost: 'About $0.05 (1 proof)',
+          expires: 'in about 3 minutes',
+          rule: 'Your rule: ask me before adding proof',
+          fromAi: [],
+        },
+      },
+    ],
+  };
+};
+export const OWNER_PASSKEY = { passkey: { rpId: 'localhost', registered: false } };
+export const NO_APPROVALS = { approvals: [] };
 
 export const MESSAGE_CONVERSATIONS = {
   conversations: [
@@ -285,6 +333,8 @@ export const ROUTES = {
   '/api/ui/files/review': FILES_REVIEW,
   '/api/ui/first-run': FIRST_RUN,
   '/api/ui/health': HEALTH,
+  '/api/approvals': APPROVALS,
+  '/api/owner/passkey': OWNER_PASSKEY,
   '/api/ui/messages': MESSAGE_CONVERSATIONS,
   [`/api/ui/messages/${ref(1)}`]: (url) =>
     url.searchParams.get('box') === 'out' ? MESSAGES_OUT : MESSAGES_IN,

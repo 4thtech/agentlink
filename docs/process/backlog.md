@@ -4795,7 +4795,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - All M1-11a and M1-11b-2 approval flows unchanged; DOM and reduced-motion tests; threat note (S2).
 
 #### UI-REFRESH-p · docs: screenshots, QA set, guide and README (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `tools/docs-screenshots/**`, `docs-site/guide/**`, `README.md` Status, `docs/status.yaml`; changelog fragment
 - **Depends on:** UI-REFRESH-g to UI-REFRESH-n
 - **Spec:** plan §10; docs-model §5
