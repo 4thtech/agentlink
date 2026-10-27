@@ -100,6 +100,8 @@ const TEST_SEAM = [
   'MemoryOwnerKeyStore',
   // M1-27a: a drop request signed with a raw test drop key (drop Worker tests and vectors).
   'signDropAuthorization',
+  // M1-PAY-CONFIRM-a: a WebAuthn ES256 credential standing in for an authenticator's key.
+  'newWebauthnTestCredential',
   // M1-1d: the ALF1 sealer with a fixed nonce prefix and chunk size.
   'sealAlf1WithNoncePrefix',
   'createAlf1SealerWithNoncePrefix',
