@@ -47,6 +47,8 @@ import {
 import {
   OWNER_PASSKEY_ACCOUNT,
   OWNER_PASSKEY_KEY_ACCOUNT,
+  encodePasskeyRegistration,
+  parsePasskeyRegistration,
   readOwnerPasskeyKey,
   registerOwnerPasskey,
 } from './owner-passkey.js';
@@ -144,7 +146,9 @@ function policyClient(state: PolicyClient) {
       preparePolicyEdit: (patch: Record<string, Record<string, unknown>>) => {
         const next = JSON.parse(canonicalize(state.current)) as Record<string, JsonObject>;
         for (const [section, fields] of Object.entries(patch)) {
-          next[section] = { ...next[section], ...(fields as JsonObject) };
+          next[section] = Array.isArray(fields)
+            ? (fields as unknown as JsonObject)
+            : { ...next[section], ...(fields as JsonObject) };
         }
         const now = Math.floor(Date.now() / 1000);
         const body: JsonObject = {
@@ -867,6 +871,183 @@ describe('a change to the spending limits (04 §2.5.3 table)', () => {
     const other = await review(h, page, { files: { maxSendSizeMB: 12 } });
     const b = await begin(h, page, { flow: 'limits', review: other, acknowledged: [] });
     expect(json(b.response)['status']).toBe('not_paid');
+  });
+});
+
+// --- M1-PAY-CONFIRM-b: what the confirmation sheet needs from the server -----------------------
+
+describe('M1-PAY-CONFIRM-b: a passkey whose PRF works only on use keeps its key (#581 audit Medium)', () => {
+  it('the registration body may carry the create() authenticator data; the key is kept from it', async () => {
+    const w = await ownerWorld('agentlink-pay-confirm-b-');
+    try {
+      const a = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+      const created = a.create(w.owner.ownerNostr, salt);
+      // PRF only on use: the page asks once more, and that get() carries no attested data.
+      const used = a.get(salt);
+      const body = encodePasskeyRegistration(encodeUtf8(w.code), used, {
+        creationAuthenticatorData: created.authenticatorData,
+      });
+      const parsed = parsePasskeyRegistration(body);
+      expect(parsed.creationAuthenticatorData).toEqual(created.authenticatorData);
+      await registerOwnerPasskey(w.keychain, w.owner, parsed.ownerSecret, parsed.assertion, {
+        ...(parsed.creationAuthenticatorData === undefined
+          ? {}
+          : { creationAuthenticatorData: parsed.creationAuthenticatorData }),
+      });
+      expect(await readOwnerPasskeyKey(w.keychain, a.credentialId)).toEqual(a.coseKey);
+    } finally {
+      w.cleanup();
+    }
+  }, 60_000);
+
+  it('the four-field body still parses (no creation data) and keeps no key from a get()', async () => {
+    const w = await ownerWorld('agentlink-pay-confirm-b-');
+    try {
+      const a = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+      a.create(w.owner.ownerNostr, salt);
+      const parsed = parsePasskeyRegistration(
+        encodePasskeyRegistration(encodeUtf8(w.code), a.get(salt)),
+      );
+      expect(parsed.creationAuthenticatorData).toBeUndefined();
+      await registerOwnerPasskey(w.keychain, w.owner, parsed.ownerSecret, parsed.assertion);
+      expect(await readOwnerPasskeyKey(w.keychain, a.credentialId)).toBeNull();
+    } finally {
+      w.cleanup();
+    }
+  }, 60_000);
+
+  it('creation data for another credential or another site keeps no key', async () => {
+    const w = await ownerWorld('agentlink-pay-confirm-b-');
+    try {
+      const a = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+      a.create(w.owner.ownerNostr, salt);
+      const other = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+      const foreign = other.create(w.owner.ownerNostr, salt).authenticatorData;
+      const site = a.create(w.owner.ownerNostr, salt).authenticatorData.slice();
+      site[0] = (site[0] as number) ^ 1; // the rpIdHash of another site
+      for (const creation of [foreign, site]) {
+        await w.keychain.delete(OWNER_PASSKEY_ACCOUNT);
+        await registerOwnerPasskey(w.keychain, w.owner, encodeUtf8(w.code), a.get(salt), {
+          creationAuthenticatorData: creation,
+        });
+        expect(await readOwnerPasskeyKey(w.keychain, a.credentialId)).toBeNull();
+      }
+    } finally {
+      w.cleanup();
+    }
+  }, 60_000);
+
+  it('a malformed fifth field is refused like any malformed body', () => {
+    const a = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+    a.create(world.owner.ownerNostr, salt);
+    const body = encodePasskeyRegistration(encodeUtf8('code'), a.get(salt));
+    const extra = new Uint8Array(body.length + 3);
+    extra.set(body);
+    extra.set([0, 9, 1], body.length); // claims 9 bytes, has 1
+    expect(() => parsePasskeyRegistration(extra)).toThrow();
+  });
+});
+
+describe('M1-PAY-CONFIRM-b: "Remember for this contact" in one gesture (06 §3; rule 2)', () => {
+  const remembered = (usd: string, triggers: string[]): JsonObject => {
+    const action = paidAction(usd);
+    (action['context'] as Record<string, JsonValue>)['triggers'] = triggers;
+    return action;
+  };
+  const addAction = (h: Harness, n: number, action: JsonObject) =>
+    h.source.add(n, {
+      action,
+      actionDigest: digestOf(action),
+      storedDigest: digestOf(action),
+      summary: 'Record a proof',
+      details: DETAILS,
+    });
+
+  it('begin says when it is offered; with it the statement shows the contact rule and finish signs both', async () => {
+    const h = await harness();
+    const page = await h.page();
+    addAction(h, 1, remembered('0.123', ['proofs.perActionMaxUSD']));
+    const plain = await begin(h, page, { flow: 'proof', approvalId: approvalId(1) });
+    expect(json(plain.response)['rememberOffered']).toBe(true);
+    const b = await begin(h, page, { flow: 'proof', approvalId: approvalId(1), remember: true });
+    expect(b.response.status).toBe(200);
+    expect(b.statement).toMatchObject({
+      kind: 'proof_remember',
+      amountUsd: '0.123',
+      counterparty: DETAILS.who,
+      changes: [{ field: 'contactRules.proofs.perActionMaxUSD', old: null, new: '0.13' }],
+    });
+    const res = await finishPasskey(
+      h,
+      page,
+      b.ceremony,
+      gesture(b.challenge, { origin: h.origin }),
+    );
+    expect(json(res)).toEqual({ status: 'applied' });
+    expect(h.applied.map((body) => body['op'])).toEqual(['approval.decide', 'policy.set']);
+    expect(h.policy.current['contactRules']).toEqual([
+      { contact: CONTACT, proofs: { perActionMaxUSD: '0.13' } },
+    ]);
+  });
+
+  it('is not offered when the 24-hour budget asked; begin with it is refused and signs nothing', async () => {
+    const h = await harness();
+    const page = await h.page();
+    addAction(h, 1, remembered('0.1', ['proofs.dailyBudgetUSD']));
+    const plain = await begin(h, page, { flow: 'proof', approvalId: approvalId(1) });
+    expect(json(plain.response)['rememberOffered']).toBe(false);
+    const b = await begin(h, page, { flow: 'proof', approvalId: approvalId(1), remember: true });
+    expect(b.response.status).toBe(409);
+    expect(json(b.response)['status']).toBe('not_offered');
+    expect(h.applied).toHaveLength(0);
+  });
+
+  it('refuses a contact rule changed after begin (a new begin and gesture are needed)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    addAction(h, 1, remembered('0.123', ['proofs.perActionMaxUSD']));
+    const b = await begin(h, page, { flow: 'proof', approvalId: approvalId(1), remember: true });
+    (h.policy.current as Record<string, JsonValue>)['contactRules'] = [
+      { contact: CONTACT, proofs: { notarize: 'deny' } },
+    ];
+    const res = await finishPasskey(
+      h,
+      page,
+      b.ceremony,
+      gesture(b.challenge, { origin: h.origin }),
+    );
+    expect(json(res)['status']).toBe('changed');
+    expect(h.applied).toHaveLength(0);
+  });
+
+  it('remember must be exactly true, and only with a proof flow', async () => {
+    const h = await harness();
+    const page = await h.page();
+    addAction(h, 1, remembered('0.123', ['proofs.perActionMaxUSD']));
+    for (const input of [
+      { flow: 'proof', approvalId: approvalId(1), remember: 'yes' },
+      { flow: 'limits', review: 'ab'.repeat(32), acknowledged: [], remember: true },
+    ]) {
+      const b = await begin(h, page, input as JsonValue);
+      expect(b.response.status).toBe(400);
+    }
+  });
+});
+
+describe('M1-PAY-CONFIRM-b: the page knows which requests cost credits (rule 7)', () => {
+  it('a request carries `paid`, in the list and on its own', async () => {
+    const h = await harness();
+    const page = await h.page();
+    h.source.add(1);
+    addPaid(h.source, 2);
+    const list = json(await send(h.port, '/api/approvals', { headers: page }));
+    const byId = new Map(
+      (list['approvals'] as Record<string, unknown>[]).map((a) => [a['approvalId'], a['paid']]),
+    );
+    expect(byId.get(approvalId(1))).toBe(false);
+    expect(byId.get(approvalId(2))).toBe(true);
+    const one = json(await send(h.port, `/api/approvals/${approvalId(2)}`, { headers: page }));
+    expect((one['approval'] as Record<string, unknown>)['paid']).toBe(true);
   });
 });
 

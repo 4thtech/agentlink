@@ -284,11 +284,15 @@ export async function createUpgradePasskey(
     if (second.length !== 32) return { kind: 'unsupported' };
     return {
       kind: 'ok',
+      // M1-PAY-CONFIRM-b: this get() carries no credential key, so the create() authenticator
+      // data goes along as a fifth field; the server keeps the key from it for paid actions
+      // (04 §2.5.3 rule 5). Without it such an owner could confirm paid actions only by code.
       body: encodeRegistration([
         new Uint8Array(used.rawId),
         new Uint8Array(asserted.authenticatorData),
         asserted.userHandle === null ? userId : new Uint8Array(asserted.userHandle),
         second,
+        new Uint8Array(created.getAuthenticatorData()),
       ]),
     };
   } finally {

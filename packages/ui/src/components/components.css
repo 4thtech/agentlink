@@ -1808,3 +1808,304 @@ body {
   margin: 0;
   min-width: 0;
 }
+
+/* M1-PAY-CONFIRM-b: the confirmation sheet (b11 §13.1 level 4, §14 motion, §19). The approval page
+   of @4thtech-io/node uses the same classes. Only transform, opacity and stroke-dashoffset animate. */
+.al-pay-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--al-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--al-color-bg-overlay);
+  animation: al-pay-fade var(--al-duration-base) ease-out both;
+}
+@supports (backdrop-filter: blur(1px)) {
+  .al-pay-overlay {
+    backdrop-filter: blur(8px);
+  }
+}
+.al-pay-sheet {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--al-color-border-subtle);
+  border-radius: 16px;
+  background: var(--al-color-bg-raised);
+  box-shadow: var(--al-shadow-4);
+  animation: al-pay-rise var(--al-duration-slow) var(--al-easing-emphasized) both;
+}
+.al-pay-sheet:focus {
+  outline: none;
+}
+.al-pay-grab {
+  display: none;
+}
+.al-pay-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.al-pay-title:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.al-pay-amount {
+  margin: 0 0 16px;
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.al-pay-rows {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 18px;
+}
+.al-pay-rows dt {
+  color: var(--al-color-fg-muted);
+}
+.al-pay-rows dd {
+  margin: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.al-pay-old {
+  color: var(--al-color-diff-removed-fg);
+  text-decoration: line-through;
+}
+.al-pay-new {
+  color: var(--al-color-diff-added-fg);
+  font-weight: 600;
+}
+.al-pay-arrow {
+  color: var(--al-color-fg-subtle);
+}
+.al-pay-trust {
+  margin: 0 0 16px;
+  color: var(--al-color-fg-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+.al-pay-trust p {
+  margin: 0 0 4px;
+}
+.al-pay-remember {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 16px;
+}
+.al-pay-remember .al-field-hint {
+  display: block;
+}
+.al-pay-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  min-height: 20px;
+}
+.al-pay-live {
+  margin: 0;
+  text-align: center;
+}
+.al-pay-alert {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--al-color-status-danger-fg);
+  color: var(--al-color-status-danger-fg);
+  align-self: stretch;
+}
+.al-pay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.al-pay-actions .al-btn {
+  min-height: 44px;
+}
+.al-pay-link {
+  align-self: center;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--al-color-fg-muted);
+}
+.al-pay-ring {
+  width: 48px;
+  height: 48px;
+  overflow: visible;
+}
+.al-pay-ring circle,
+.al-pay-ring path {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.al-pay-ring-track {
+  stroke: var(--al-color-border-default);
+}
+.al-pay-ring-arc {
+  stroke: var(--al-color-accent-default);
+  stroke-dasharray: 100;
+  stroke-dashoffset: 75;
+  transform-origin: 24px 24px;
+}
+.al-pay-ring[data-state='waiting'] .al-pay-ring-arc {
+  stroke-dashoffset: 100;
+}
+.al-pay-ring[data-state='waiting'] {
+  animation: al-pay-breathe var(--al-duration-ambient) ease-in-out infinite;
+}
+.al-pay-ring[data-state='recording'] .al-pay-ring-arc {
+  animation: al-pay-sweep var(--al-duration-ambient-sweep) linear infinite;
+}
+.al-pay-ring[data-state='done'] .al-pay-ring-arc {
+  stroke: var(--al-color-status-success-fg);
+  stroke-dashoffset: 0;
+  animation: al-pay-close var(--al-duration-moment) var(--al-duration-moment) both;
+  animation-timing-function: var(--al-easing-emphasized);
+}
+.al-pay-check {
+  stroke: var(--al-color-status-success-fg);
+  stroke-dasharray: 100;
+  stroke-dashoffset: 0;
+  animation: al-pay-draw var(--al-duration-moment) var(--al-easing-emphasized) both;
+}
+@keyframes al-pay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes al-pay-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes al-pay-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes al-pay-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes al-pay-close {
+  from {
+    stroke-dashoffset: 75;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes al-pay-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (max-width: 599px) {
+  .al-pay-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .al-pay-sheet {
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+    max-height: 100vh;
+  }
+  .al-pay-grab {
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: -12px auto 12px;
+    border-radius: 2px;
+    background: var(--al-color-border-default);
+  }
+}
+.al-pay-sheet[data-motion='reduced'],
+.al-pay-sheet[data-motion='reduced'] *,
+.al-pay-overlay:has(.al-pay-sheet[data-motion='reduced']) {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .al-pay-overlay,
+  .al-pay-sheet,
+  .al-pay-sheet * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .al-pay-ring[data-state='recording'] .al-pay-ring-arc {
+    stroke-dashoffset: 50;
+  }
+  .al-pay-ring[data-state='waiting'] .al-pay-ring-arc {
+    stroke-dashoffset: 100;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .al-pay-overlay {
+    backdrop-filter: none;
+  }
+}
+@media (forced-colors: active) {
+  .al-pay-sheet {
+    border: 1px solid CanvasText;
+  }
+  .al-pay-ring circle,
+  .al-pay-ring path {
+    stroke: CanvasText;
+  }
+}
+.al-pay-row {
+  display: contents;
+}
+.al-pay-code {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.al-pay-link {
+  border: 0;
+  background: none;
+  padding: 0 8px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.al-pay-link:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}

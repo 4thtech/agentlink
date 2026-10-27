@@ -65,9 +65,13 @@
   --al-duration-fast: 120ms;
   --al-duration-base: 200ms;
   --al-duration-slow: 320ms;
+  --al-duration-moment: 480ms;
+  --al-duration-ambient: 2000ms;
+  --al-duration-ambient-sweep: 1400ms;
   --al-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --al-easing-enter: cubic-bezier(0, 0, 0, 1);
   --al-easing-exit: cubic-bezier(0.3, 0, 1, 1);
+  --al-easing-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
   --al-layout-gutter-mobile: 16px;
   --al-layout-gutter-desktop: 24px;
   --al-layout-max-content: 720px;

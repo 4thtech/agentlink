@@ -335,3 +335,21 @@ describe('package contents', () => {
     );
   });
 });
+
+// M1-PAY-CONFIRM-b: the motion additions approved in D-132 (b11 §14), in the D1 source, the
+// module and both stylesheets.
+describe('the D-132 motion tokens (b11 §14)', () => {
+  const added = {
+    'al-duration-moment': '480ms',
+    'al-duration-ambient': '2000ms',
+    'al-duration-ambient-sweep': '1400ms',
+    'al-easing-emphasized': 'cubic-bezier(0.05, 0.7, 0.1, 1)',
+  } as const;
+  it('are in the module and in tokens.css, as in the D1 files', () => {
+    for (const [name, value] of Object.entries(added)) {
+      expect((scalarTokens as Record<string, string>)[name], name).toBe(value);
+      expect(css, name).toContain(`--${name}: ${value};`);
+      expect(d1Css, name).toContain(`--${name}: ${value};`);
+    }
+  });
+});

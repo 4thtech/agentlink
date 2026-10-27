@@ -30,6 +30,8 @@ const SAMPLES: Record<string, string> = {
   'encryption key': 'Decrypt the file',
   'loopback address': 'Open 127.0.0.1',
   address: 'Your address',
+  bank: 'Send it from your bank',
+  'payment method': 'Choose a payment method',
 };
 
 describe('lintVocabulary (11 §5.1)', () => {

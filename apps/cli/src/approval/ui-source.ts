@@ -18,6 +18,7 @@
 //
 // I-4: nothing here decides. `apply` is core's `ownerActions.apply`, which verifies the owner
 // signature and applies the decision in one store transaction.
+import { isPaidPendingAction } from '@4thtech-io/core';
 import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
 import type {
   ApprovalDetails,
@@ -162,6 +163,8 @@ export function createUiApprovalSource(
           actionDigest: full.actionDigest,
           expiresAt: full.expiresAt,
           commitment: full.commitment,
+          // M1-PAY-CONFIRM-b: whether it carries a fee (never a list item, 04 §2.5.3 rule 7).
+          paid: isPaidPendingAction(full.action),
           ...(full.details === undefined ? {} : { details: full.details }),
         });
       }

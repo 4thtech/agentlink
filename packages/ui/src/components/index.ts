@@ -10,6 +10,7 @@ export * from './brand.js';
 export * from './feedback.js';
 export * from './forms.js';
 export * from './identity.js';
+export * from './pay-confirm.js';
 export * from './proof.js';
 export * from './review.js';
 export * from './shell.js';

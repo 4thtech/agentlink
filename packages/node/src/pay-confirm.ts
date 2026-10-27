@@ -235,7 +235,12 @@ export function checkPayConfirmAssertion(
 
 /** How the server rebuilds a hold's flow from the store at finish (rule 3). */
 export type PayConfirmTarget =
-  | { readonly kind: 'proof'; readonly approvalId: string }
+  | {
+      readonly kind: 'proof';
+      readonly approvalId: string;
+      /** M1-PAY-CONFIRM-b: with the contact's proof rule of "Remember for this contact". */
+      readonly remember?: boolean;
+    }
   | {
       readonly kind: 'limits';
       /** The version the policy.set signs. */
