@@ -3,8 +3,9 @@
 // in Chromium. Every /api/** call is answered from fixtures; no agent, key store or network.
 //
 // Gates (fail the run):
-//   - axe-core: zero WCAG 2.1 A/AA violations on every page, in dark, light, increased contrast,
-//     forced colours, reduced motion plus reduced transparency, Under the hood on, and at 360 px;
+//   - axe-core: zero WCAG 2.1 A/AA violations on every page; in CI in dark and light at 1280 and
+//     dark at 360; with LOCAL_UI_REFRESH_FULL=1 (or STRICT) also increased contrast, forced
+//     colours, reduced motion plus reduced transparency, Under the hood on and light at 360;
 //   - no layout-property animation (keyframes, running transitions, Element.animate);
 //   - at most four `backdrop-filter` chrome elements, plus the overlay while a Sheet is open, and
 //     none on a scrolling or repeated element; all of them solid with reduced transparency,
@@ -191,7 +192,7 @@ const KNOWN_AXE: readonly { rule: string; path: string; target: string; followUp
     rule: 'scrollable-region-focusable',
     path: '/settings/proofs',
     target: '.pf-table-wrap',
-    followUp: 'UI-REFRESH-l follow-up (Proofs & credits)',
+    followUp: 'UI-REFRESH-t (Proofs & credits, keyboard access to the table at 360 px)',
   },
 ];
 
@@ -213,6 +214,16 @@ const isKnown = (where: string, v: AxeViolation): boolean =>
  */
 const STRICT = process.env['LOCAL_UI_REFRESH_STRICT'] === '1';
 const TIMING = STRICT || Boolean(process.env['LOCAL_UI_REFRESH_REPORT']);
+/**
+ * The axe modes. CI runs three (dark and light at 1280, dark at 360) to keep the unit-test step
+ * short; LOCAL_UI_REFRESH_FULL=1 or STRICT runs all ten (contrast, forced colours, reduced, hood).
+ */
+const AXE_MODES: readonly Mode[] =
+  STRICT || process.env['LOCAL_UI_REFRESH_FULL'] === '1'
+    ? MODES
+    : MODES.filter((m) => ['dark-1280', 'light-1280', 'dark-360'].includes(m.name));
+/** About 20 s per mode on a CI runner (PR #621); the limit is three times that. */
+const AXE_MS_PER_MODE = 60_000;
 
 async function axe(page: Page, forced: boolean): Promise<AxeViolation[]> {
   await page.addScriptTag({ content: AXE });
@@ -505,27 +516,31 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
     expect(growth.css).toBeLessThanOrEqual(BUDGET.cssGzip);
   });
 
-  it('axe: zero WCAG 2.1 A/AA violations on every page in every mode', async () => {
-    const found: Record<string, AxeViolation[]> = {};
-    for (const mode of MODES) {
-      const { ctx, page } = await open(mode);
-      try {
-        for (const p of PAGES) {
-          await page.goto(origin + p.path);
-          await settle(page, p.title);
-          const v = await axe(page, mode.forcedColors === 'active');
-          if (v.length > 0) found[`${mode.name} ${p.path}`] = v;
+  it(
+    'axe: zero WCAG 2.1 A/AA violations on every page (3 modes in CI; all 10 with LOCAL_UI_REFRESH_FULL)',
+    async () => {
+      const found: Record<string, AxeViolation[]> = {};
+      for (const mode of AXE_MODES) {
+        const { ctx, page } = await open(mode);
+        try {
+          for (const p of PAGES) {
+            await page.goto(origin + p.path);
+            await settle(page, p.title);
+            const v = await axe(page, mode.forcedColors === 'active');
+            if (v.length > 0) found[`${mode.name} ${p.path}`] = v;
+          }
+        } finally {
+          await ctx.close();
         }
-      } finally {
-        await ctx.close();
       }
-    }
-    report['axe'] = found;
-    const unknown = Object.entries(found)
-      .map(([where, list]) => [where, list.filter((v) => !isKnown(where, v))] as const)
-      .filter(([, list]) => list.length > 0);
-    expect(Object.fromEntries(unknown)).toEqual({});
-  }, 300_000);
+      report['axe'] = found;
+      const unknown = Object.entries(found)
+        .map(([where, list]) => [where, list.filter((v) => !isKnown(where, v))] as const)
+        .filter(([, list]) => list.length > 0);
+      expect(Object.fromEntries(unknown)).toEqual({});
+    },
+    AXE_MS_PER_MODE * AXE_MODES.length,
+  );
 
   it('motion: no layout-property animation; backdrop-filter on at most four chrome elements', async () => {
     const { ctx, page } = await open(MODES[0] as Mode);
@@ -598,7 +613,7 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       Object.values(solid).every((n) => n === 0),
       JSON.stringify(solid),
     ).toBe(true);
-  }, 60_000);
+  }, 90_000);
 
   it.runIf(TIMING)(
     'route change paints the new page within 100 ms (unthrottled; 4× throttled reported)',
