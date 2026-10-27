@@ -156,7 +156,7 @@ areas:
       - name: "Multipart upload, cleanup and streaming"
         state: in-progress
         prs: [254, 260]
-        summary: "Large files upload to your own S3-compatible storage in parts and are encrypted on the fly as they upload and decrypted as they download, with a quarantine step before a streamed download is released (D-84); an interrupted upload is always cancelled and leftovers can be cleaned up (M1-6b). Tested against MinIO on every pull request and Cloudflare R2 every day (M1-6a-2). In development: no tool uses it yet."
+        summary: "Large files upload to your own S3-compatible storage in parts and are encrypted on the fly as they upload and decrypted as they download, with a quarantine step before a streamed download is released (D-84); an interrupted upload is always cancelled and leftovers can be cleaned up (M1-6b). Tested against MinIO on every pull request and Cloudflare R2 every day (M1-6a-2). Not available through the tools yet: files use the encrypted drop (since v0.2.0), and choosing your own storage is not available."
       - name: "Storage status and warnings"
         state: done
         prs: [485, 501, 498]

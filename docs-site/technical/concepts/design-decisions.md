@@ -1,6 +1,6 @@
 # Design decisions
 
-> **Status: Mixed.** These are decisions the owner has taken, written for developers and integrators. Each one says what is built and what is still in development. In the released CLI package (npm `latest`, 0.1.x) you can pair, talk and negotiate terms; sending files and proof through the tools is in development. The numbered decisions (D-n) and gaps (G-n) are in the [decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md); the specs win on any conflict.
+> **Status: Mixed.** These are decisions the owner has taken, written for developers and integrators. Each one says what is built and what is still in development. In the released CLI package (npm `latest`, 0.3.0) you can pair, talk, negotiate terms, send files and add proof on test networks, and use the local app. The numbered decisions (D-n) and gaps (G-n) are in the [decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md); the specs win on any conflict.
 
 **Purpose:** explain why files, proofs and packages work the way they do, so you can build against them or review them.
 
@@ -22,7 +22,7 @@ A file is encrypted on the sender's device as a stream of chunks, so a large fil
 
 Because the header and the final-chunk flag are part of every chunk's authenticated data, changing the header, reordering or dropping chunks, or cutting off the end is detected (the STREAM construction). Header integrity does not rest on the file hash alone.
 
-**Availability.** The encryption and decryption code is merged in the crypto package, with independent test vectors. Sending and receiving files through the MCP tools is in development.
+**Availability.** The encryption and decryption code is merged in the crypto package, with independent test vectors. Sending and receiving files through the MCP tools is released (v0.2.0).
 
 ### Verifying a download without holding it in memory (D-84)
 
@@ -35,7 +35,7 @@ A recipient verifies the ciphertext hash (`ciphertextSha256`) before any plainte
 
 Nothing is accepted before both hashes pass, so every party that receives the same envelope gets the same file bytes or a failure. The residual risk is that unverified plaintext, written by the sender, sits in the hidden file until the end. Small inline files are held in memory, are hash-checked before decryption and need no quarantine.
 
-**Availability.** Streaming upload and download for your own S3-compatible storage is merged; the user-facing file tools are in development.
+**Availability.** Streaming upload and download for your own S3-compatible storage is merged; the file tools use the encrypted drop (v0.2.0); choosing your own storage is not available yet.
 
 ### What goes inline and what goes to storage (G-27, D-85)
 
@@ -54,7 +54,7 @@ Files above the inline limit go by default to the 4thTech **encrypted drop**, a 
 
 The drop uses random object names, no accounts (each upload is signed by a dedicated drop key that cannot be linked to your agent), per-key quotas, aggregate counters in place of request logs and a hard 7-day expiry. If the drop is compromised it can refuse, delete or delay a file, but it cannot read it or change it unnoticed. See [Files](files.md).
 
-**Availability.** The drop service and its deployment pipeline are merged and tested locally; it is not yet live for users, and the tools that use it are in development.
+**Availability.** The drop service and its deployment pipeline are merged and tested locally; it is live, and the file tools use it by default (v0.2.0).
 
 ### Deleting a received file's key (D-98)
 
@@ -93,7 +93,7 @@ A proof record carries a public `kind`. The core sets it from the message type; 
 
 Values above 6 are reserved; adding one is a spec change. The kind is public and permanent, so it shows the category of a message, never its content. Before signing a receipt, a recipient checks that the record's kind matches this table for the envelope it holds; if not, it signs nothing and flags the contact. A verifier who is given the content key applies the same check. On a mismatch the pack proves no content, while the record and receipts are still verified.
 
-**Availability.** Decided design, in development (card M1-7g). Proof is not yet available through the tools.
+**Availability.** Released on test networks (v0.2.0, card M1-7g); the design below is what it follows.
 
 ### Verifying a proof pack reads only two folders (G-25, D-87)
 

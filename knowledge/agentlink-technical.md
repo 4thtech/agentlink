@@ -22,7 +22,7 @@ flowchart LR
 
 | Name | Role | Status (18 Oct 2026) |
 |---|---|---|
-| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.3.0), not published on its own; STREAM file encryption (1 MiB chunks, header bound into every chunk) is merged but in development: no tool uses it yet |
+| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.3.0), not published on its own; STREAM file encryption (1 MiB chunks, header bound into every chunk) is used for file transfer since v0.2.0 |
 | `@4thtech-io/types` | Shared schemas for policies, approvals, proof packs and tool results | Built into the released CLI package, not published on its own |
 | `@4thtech-io/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Built into the released CLI package, not published on its own |
 | `@4thtech-io/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Built into the released CLI package, not published on its own |
