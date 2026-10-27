@@ -118,6 +118,11 @@ describe('first load: Skeleton', () => {
       await vi.advanceTimersByTimeAsync(450);
     });
     expect(host.querySelector('.al-skeleton')).not.toBeNull();
+    // Original property kept: the sentence is not shown. Only the Skeleton's screen-reader label
+    // (an sr-only span) may carry it, so the text is read with that span removed.
+    const copy = host.cloneNode(true) as HTMLElement;
+    for (const el of copy.querySelectorAll('.al-sr-only')) el.remove();
+    expect(copy.textContent).not.toContain('Loading your rules…');
     expect(host.querySelector('p[aria-busy]')).toBeNull();
   });
 });
