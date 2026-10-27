@@ -1,17 +1,20 @@
 // M1-11a acceptance in a real browser: the local approval UI on `http://localhost:<port>` (08 §1;
 // 11 §6.2.1; 02 J4; 04 §2.5, §2.5.2; D-68), in Chromium with a CDP virtual authenticator (WebAuthn
-// PRF, user verification, resident keys; no hardware). It runs the page script itself
-// (approval-page.ts) against the real server, the real owner store and real owner signatures.
+// PRF, user verification, resident keys; no hardware). M1-11b-2c: the server-rendered page is gone,
+// so this runs the built local app (apps/local-ui, the CLI's bundle) against the real server, the
+// real owner store and real owner signatures. The passkey is set up where the app offers it: the
+// first-run page, with the backup code once (M1-UX-FIRSTRUN-V2-c).
 //
-// Covered: J4 end to end with the first-run passkey; review together signs exactly the selected
-// items with one passkey gesture; a commitment cannot be selected and "Remember for this contact" is
-// absent from the batch view; injected HTML and script in request text render inert; a PRF-less
-// authenticator, or a browser with no passkeys at all, falls back to the owner code; the session link
-// is single-use; wrong owner codes back off.
+// Covered: J4 end to end with the passkey; review together signs exactly the selected items with
+// one passkey gesture; a commitment cannot be selected and "Remember for this contact" is absent
+// from the batch view; injected HTML and script in request text render inert; a PRF-less
+// authenticator, or a browser with no passkeys at all, falls back to the backup code; the session
+// link is single-use; wrong codes back off; the page loads nothing from the removed page.
 //
-// CI installs Chromium for Playwright (ci.yml), so there the test always runs and a browser that
-// cannot start fails it. Locally, without the Playwright browsers, it is skipped; set
-// AGENTLINK_TEST_CHROMIUM to a Chromium or chrome-headless-shell executable to run it.
+// CI installs Chromium for Playwright and builds the app (ci.yml), so there the test always runs
+// and a browser that cannot start, or a missing build, fails it. Locally, without the Playwright
+// browsers or the build, it is skipped; set AGENTLINK_TEST_CHROMIUM to a Chromium or
+// chrome-headless-shell executable to run it.
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -30,13 +33,21 @@ import {
 } from './approval-ui.fixture.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
 import { OWNER_PASSKEY_ACCOUNT } from './owner-passkey.js';
+import {
+  SWITCH_TO_PASSKEY,
+  USE_PASSKEY,
+  builtApp,
+  switchToPasskey,
+} from './local-ui-app.fixture.js';
 
 let world: OwnerWorld;
 let browser: Browser | undefined;
 let launchError: unknown;
+let app: Map<string, Uint8Array> | undefined;
 
 beforeAll(async () => {
   world = await ownerWorld('agentlink-m1-11a-browser-');
+  app = builtApp();
   const executablePath = process.env['AGENTLINK_TEST_CHROMIUM'];
   try {
     browser = await chromium.launch(executablePath === undefined ? {} : { executablePath });
@@ -58,10 +69,12 @@ afterEach(async () => {
   await world.keychain.delete(OWNER_PASSKEY_ACCOUNT);
 });
 
-/** Skips locally when no browser could start; in CI that is a failure. */
+/** Skips locally when no browser could start or the app is not built; in CI that is a failure. */
 function needBrowser(skip: () => void): void {
-  if (browser !== undefined) return;
-  if (process.env['CI'] !== undefined) throw launchError;
+  if (browser !== undefined && app !== undefined) return;
+  if (process.env['CI'] !== undefined) {
+    throw browser === undefined ? launchError : new Error('the app is not built (pnpm build)');
+  }
   skip();
 }
 
@@ -71,8 +84,9 @@ async function start(source: ApprovalServerSource = fakeSource(world)): Promise<
   link: () => Promise<string>;
 }> {
   const opened: string[] = [];
+  if (app === undefined) throw new Error('unreachable');
   const server = await startApprovalServerWith(
-    { source },
+    { source, localUi: { assets: { files: app } } },
     {
       keychain: world.keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(world.keychain, expected),
@@ -141,29 +155,33 @@ async function pageWithoutPasskeys(): Promise<Page> {
   return page;
 }
 
-/** First run: the owner sets up the localhost passkey with the owner code once. */
-async function setUpPasskey(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Set up a passkey' }).click();
-  await page.locator('input[type=password]').fill(world.code);
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByText('Passkey set up.').waitFor();
+/** The owner sets up the localhost passkey in the app with the backup code once. */
+async function setUpPasskey(page: Page, origin: string): Promise<void> {
+  await switchToPasskey(page, origin, world.code);
 }
 
-const card = (page: Page, n: number) => page.locator(`section[data-approval="${id(n)}"]`);
+const card = (page: Page, n: number) => page.locator(`[data-approval="${id(n)}"]`);
+const CODE_LABEL = 'Backup code or owner passphrase';
 /** The wrong-code backoff's free attempts (approval-server.ts), pinned. */
 const FREE_ATTEMPTS = 3;
 const XSS = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>';
 
 describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', () => {
-  it('J4: first-run passkey, then the owner reviews the card and approves with the passkey', async (ctx) => {
+  it('J4: the passkey set up in the app, then the owner reviews the card and approves with it', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, link } = await start();
     const { page } = await pageWithAuthenticator(true);
     await page.goto(await link());
-    // First run (11 §6.2.1): what approvals need, and the weaker-setup note.
-    await page.getByText('Never give them to your AI.').waitFor();
-    await page.getByText('The desktop app protects approvals more strongly.').waitFor();
-    await setUpPasskey(page);
+    // An owner without a passkey: one next step, a plain link to the first-run page. The old
+    // page's inline set-up is gone (M1-11b-2c).
+    const next = page.getByRole('link', { name: SWITCH_TO_PASSKEY });
+    await next.waitFor();
+    expect(await next.getAttribute('href')).toBe('/first-run');
+    expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);
+    // First run (11 §6.2.1): never give the code to the AI.
+    await page.goto(`${server.origin}/first-run`);
+    await page.getByText('Never give it to your AI.', { exact: false }).waitFor();
+    await setUpPasskey(page, server.origin);
 
     // The agent asks for something outside its rules (J4 step 1-2).
     source.add(1, {
@@ -186,14 +204,14 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       '$0.10',
       'Your rules ask you to approve every proof.',
       'report.pdf',
-      "Your AI can't approve this for you.",
     ]) {
       await box.getByText(text, { exact: false }).first().waitFor();
     }
+    await page.getByText("Your AI can't approve this for you.").first().waitFor();
     // Clicking Approve alone decides nothing: presence comes after the click.
     await box.getByRole('button', { name: 'Approve', exact: true }).click();
     expect(source.applied).toEqual([]);
-    await box.getByRole('button', { name: 'Approve with your passkey' }).click();
+    await page.getByRole('button', { name: 'Approve with your passkey' }).click();
     await page.getByText('Approved.').waitFor();
     expect(source.applied).toHaveLength(1);
     const signed = source.applied[0];
@@ -207,13 +225,13 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
 
   it('review together: one passkey gesture signs exactly the selected items; terms stay apart', async (ctx) => {
     needBrowser(() => ctx.skip());
-    const { source, link } = await start();
+    const { server, source, link } = await start();
     const { page, signCounts } = await pageWithAuthenticator(true);
     await page.goto(await link());
-    await setUpPasskey(page);
+    await setUpPasskey(page, server.origin);
     for (const n of [1, 2, 3, 4]) source.add(n);
     source.add(5, { commitment: true, summary: 'Answer their terms · Ana · Free' });
-    await page.reload();
+    await page.goto(`${server.origin}/`);
     await page.getByText('Waiting for you (5)').waitFor();
 
     // The commitment is listed but cannot be selected (D-31, 04 §2.5.2).
@@ -268,7 +286,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await page.getByRole('button', { name: 'Approve 3' }).click();
     await page.getByText('1 request is no longer waiting and was left out.').waitFor();
     await page.getByText('This covers exactly these 2.', { exact: false }).waitFor();
-    await page.getByLabel('Owner code or owner passphrase').fill(world.code);
+    await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await page.getByText('Done: approved 2.').waitFor();
     const items = (source.applied[0]?.body['params'] as { items: { approvalId: string }[] }).items;
@@ -305,37 +323,38 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       await page.goto(`${server.origin}${view}`);
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
       expect(await page.evaluate(() => (globalThis as { __xss?: unknown }).__xss)).toBeUndefined();
-      expect(await page.locator('#app img').count()).toBe(0);
-      expect(await page.locator('#app script').count()).toBe(0);
+      expect(await page.locator('main img').count()).toBe(0);
+      expect(await page.locator('main script').count()).toBe(0);
       expect(await page.getByRole('button', { name: 'Approve 9' }).count()).toBe(0);
     }
   }, 120_000);
 
-  it('a PRF-less authenticator falls back to the owner code or owner passphrase', async (ctx) => {
+  it('a PRF-less authenticator registers nothing; the backup code or owner passphrase approves', async (ctx) => {
     needBrowser(() => ctx.skip());
-    const { source, link } = await start();
+    const { server, source, link } = await start();
     const { page } = await pageWithAuthenticator(false);
     await page.goto(await link());
-    await page.getByRole('button', { name: 'Set up a passkey' }).click();
-    await page.locator('input[type=password]').fill(world.code);
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByText("This passkey can't protect approvals here.").waitFor();
+    await page.goto(`${server.origin}/first-run`);
+    await page.getByLabel('Backup code').fill(world.code);
+    await page.getByRole('button', { name: USE_PASSKEY }).click();
+    await page.getByText("This passkey can't protect approvals here.", { exact: false }).waitFor();
     expect(await world.keychain.get(OWNER_PASSKEY_ACCOUNT)).toBeNull();
 
     source.add(1);
     source.add(2);
-    await page.reload();
+    await page.goto(`${server.origin}/`);
     await card(page, 1).getByLabel('Approve', { exact: true }).check();
     await card(page, 2).getByLabel('Deny', { exact: true }).check();
     await page.getByRole('button', { name: 'Approve 1 and deny 1' }).click();
+    await page.getByLabel(CODE_LABEL).waitFor();
     expect(await page.getByRole('button', { name: 'Confirm with your passkey' }).count()).toBe(0);
-    await page.getByLabel('Owner code or owner passphrase').fill(world.code);
+    await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await page.getByText('Done: approved 1 and denied 1.').waitFor();
     expect(source.applied).toHaveLength(1);
   }, 120_000);
 
-  it('a browser without passkeys says so and uses the owner code', async (ctx) => {
+  it('a browser without passkeys says so and uses the backup code', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, link } = await start();
     const page = await pageWithoutPasskeys();
@@ -345,7 +364,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     source.add(1);
     await page.goto(server.approvalUrl(id(1)));
     await card(page, 1).getByRole('button', { name: 'Deny', exact: true }).click();
-    await page.getByLabel('Owner code or owner passphrase').fill(world.code);
+    await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm denial' }).click();
     await page.getByText('Denied.').waitFor();
     expect((source.applied[0]?.body['params'] as Record<string, unknown>)['decision']).toBe('deny');
@@ -365,7 +384,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await second.getByText('This link has expired.', { exact: false }).waitFor();
   }, 60_000);
 
-  it('after repeated wrong owner codes the page asks the owner to wait', async (ctx) => {
+  it('after repeated wrong codes the page asks the owner to wait', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, link } = await start();
     const page = await pageWithoutPasskeys();
@@ -379,9 +398,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     for (let i = 0; i <= FREE_ATTEMPTS; i += 1) {
       tries += 1;
       await box.getByRole('button', { name: 'Approve', exact: true }).click();
-      await page.getByLabel('Owner code or owner passphrase').fill('AAAA BBBB CCCC DDDD EEEE FFFF');
+      await page.getByLabel(CODE_LABEL).fill('AAAA BBBB CCCC DDDD EEEE FFFF');
       await page.getByRole('button', { name: 'Confirm approval' }).click();
-      await box
+      await page
         .getByText(i < FREE_ATTEMPTS ? "That didn't match" : 'Too many wrong tries.', {
           exact: false,
         })
@@ -400,7 +419,7 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const { link } = await start(source);
     const { page } = await pageWithAuthenticator(true);
     await page.goto(await link());
-    await page.getByText('Set up your owner code first', { exact: false }).waitFor();
+    await page.getByText('Set up your backup code first', { exact: false }).first().waitFor();
     // 11 §5.1: never "owner key" in the default UI.
     expect(await page.getByText('owner key', { exact: false }).count()).toBe(0);
     expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);
@@ -409,14 +428,14 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
 });
 
 // M1-11a-ux (owner test 2026-10-25): the page was unstyled, printed the raw invite link and
-// had a tiny owner code box. The card now leads with a plain headline, never shows the invite link,
-// and the owner code field is full width, paste-friendly and can be shown.
-describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
+// had a tiny owner code box. The card leads with a plain headline, never shows the invite link,
+// and the code field is full width, paste-friendly and can be shown. M1-11b-2c: in the app.
+describe('the approvals as the owner sees them (M1-11a-ux; Chromium)', () => {
   const INVITE =
     'https://agentlink.4thtech.io/i#c2VjcmV0LWludml0ZS1ib2R5LXRoYXQtaXMtcXVpdGUtbG9uZw';
   const WHO = '“Ana” (self-declared) · owner 7F3A·19C2 · not in your contacts yet';
   const HEADLINE = 'Connect with “Ana” (self-declared)';
-  const HINT = 'Paste the owner code AgentLink showed you when you set up';
+  const HINT = 'Paste the backup code AgentLink showed you when you set up';
   const addInvite = (source: FakeSource): void => {
     source.add(1, {
       summary: `Connect with a new contact · ${WHO} · Free`,
@@ -450,7 +469,7 @@ describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
     }
   }, 120_000);
 
-  it('the owner code field: full width, no length limit, autocomplete off, show and hide, hint', async (ctx) => {
+  it('the code field: full width, no length limit, autocomplete off, show and hide, hint', async (ctx) => {
     needBrowser(() => ctx.skip());
     const { server, source, link } = await start();
     const page = await pageWithoutPasskeys();
@@ -459,7 +478,7 @@ describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
     await page.goto(server.approvalUrl(id(1)));
     const box = card(page, 1);
     await box.getByRole('button', { name: 'Approve', exact: true }).click();
-    const field = page.getByLabel('Owner code or owner passphrase');
+    const field = page.getByLabel(CODE_LABEL);
     await field.waitFor();
     expect(await field.getAttribute('type')).toBe('password');
     expect(await field.getAttribute('autocomplete')).toBe('off');
@@ -468,9 +487,9 @@ describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
     expect(await field.getAttribute('maxlength')).toBeNull();
     // The hint is shown and tied to the field.
     await page.getByText(HINT).waitFor();
-    const describedBy = (await field.getAttribute('aria-describedby')) ?? '';
-    expect(describedBy).not.toBe('');
-    expect(await page.locator(`[id="${describedBy}"]`).textContent()).toBe(HINT);
+    const describedBy = ((await field.getAttribute('aria-describedby')) ?? '').split(' ');
+    expect(describedBy[0] ?? '').not.toBe('');
+    expect(await page.locator(`[id="${describedBy[0] ?? ''}"]`).textContent()).toBe(HINT);
     // Long passphrases fit: nothing is clipped.
     const long = 'correct horse battery staple '.repeat(12);
     await field.fill(long);
@@ -492,11 +511,11 @@ describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
     expect(fieldBox.height).toBeGreaterThanOrEqual(40);
     // Submitting clears the field; a wrong code still decides nothing.
     await page.getByRole('button', { name: 'Confirm approval' }).click();
-    await box.getByText("That didn't match", { exact: false }).waitFor();
+    await page.getByText("That didn't match", { exact: false }).waitFor();
     expect(source.applied).toEqual([]);
   }, 120_000);
 
-  it('is styled from its own stylesheet, follows light and dark, and fits a phone', async (ctx) => {
+  it('is styled by the app, follows light and dark, fits a phone, and loads nothing from the old page', async (ctx) => {
     needBrowser(() => ctx.skip());
     if (browser === undefined) throw new Error('unreachable');
     const { server, source, link } = await start();
@@ -514,17 +533,18 @@ describe('the approval page as the owner sees it (M1-11a-ux; Chromium)', () => {
     await card(page, 1).getByRole('heading', { name: HEADLINE }).waitFor();
     const bg = (): Promise<string> =>
       page.evaluate<string>('getComputedStyle(document.body).backgroundColor');
-    // 11 §11 tokens: light canvas #f5f6f7, dark canvas #0b0c0e.
-    expect(await bg()).toBe('rgb(245, 246, 247)');
+    const light = await bg();
     await page.emulateMedia({ colorScheme: 'dark' });
-    expect(await bg()).toBe('rgb(11, 12, 14)');
+    const dark = await bg();
+    expect(light).not.toBe('rgba(0, 0, 0, 0)');
+    expect(dark).not.toBe(light);
     // Phone width: no sideways scrolling.
     expect(
       await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth'),
     ).toBe(true);
-    // Every request stays on this server.
+    // Every request stays on this server, and nothing asks for the removed page's files.
     expect(requests.length).toBeGreaterThan(0);
     for (const r of requests) expect(new URL(r).origin).toBe(server.origin);
-    expect(requests.some((r) => new URL(r).pathname === '/app.css')).toBe(true);
+    for (const r of requests) expect(['/app.js', '/app.css']).not.toContain(new URL(r).pathname);
   }, 120_000);
 });

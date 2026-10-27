@@ -4,10 +4,12 @@
 // the terminal, notifications and the MCP) are pages of this app; the sidebar marks Approvals.
 import { useEffect, useSyncExternalStore, type ComponentType, type ReactElement } from 'react';
 import { Layout } from './layout/index.js';
+import { withRouteTransition } from './layout/transition.js';
 import { ActivityPage } from './pages/activity/index.js';
 import { ApprovalsPage } from './pages/approvals/index.js';
 import { ApprovePage, approvalIdOf } from './pages/approve/index.js';
 import { AdvancedPage } from './pages/advanced/index.js';
+import { AppearancePage } from './pages/appearance/index.js';
 import { BackupPage } from './pages/backup/index.js';
 import { ContactsPage } from './pages/contacts/index.js';
 import { FilesPage } from './pages/files/index.js';
@@ -31,8 +33,8 @@ function PasskeysPage(): ReactElement {
 
 export const ROUTES: readonly RouteDef[] = [
   { path: '/', page: ApprovalsPage },
-  { path: '/first-run', page: FirstRunPage },
   { path: '/settings/home', page: HomePage },
+  { path: '/first-run', page: FirstRunPage },
   { path: '/settings/activity', page: ActivityPage },
   { path: '/settings/messages', page: MessagesPage },
   { path: '/settings/contacts', page: ContactsPage },
@@ -41,6 +43,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/settings/rules', page: RulesPage },
   { path: '/settings/backup', page: BackupPage },
   { path: '/settings/passkeys', page: PasskeysPage },
+  { path: '/settings/appearance', page: AppearancePage },
   { path: '/settings/advanced', page: AdvancedPage },
 ];
 
@@ -54,9 +57,16 @@ function normalize(pathname: string): string {
 
 /** Go to a path of this app without a reload. */
 export function navigate(to: string, replace = false): void {
+  const target = normalize(new URL(to, location.href).pathname);
+  const changesPage = target !== normalize(location.pathname);
+  // The address changes at once; only the re-render may sit inside a view transition.
   if (replace) history.replaceState(null, '', to);
   else history.pushState(null, '', to);
-  window.dispatchEvent(new Event(CHANGE));
+  const notify = (): void => {
+    window.dispatchEvent(new Event(CHANGE));
+  };
+  if (replace || !changesPage) notify();
+  else withRouteTransition(notify);
 }
 
 function subscribe(onChange: () => void): () => void {

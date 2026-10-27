@@ -58,18 +58,19 @@
 //   in the owner's own terminal is a separate process and is never held back by it (IR-M1-11a-1
 //   L-3), so a process that keeps the page waiting cannot lock the owner out.
 //
-// - M1-11a-ux: `/app.css` is the approval page's fixed stylesheet (approval-page.ts), served
-//   like `/app.js` under the same headers and CSP. The card view drops the AI argument `inviteUrl`
-//   (the invite's capability link) and carries an optional plain `headline`, checked like every
-//   other card field.
+// - M1-11a-ux: the card view drops the AI argument `inviteUrl` (the invite's capability link) and
+//   carries an optional plain `headline`, checked like every other card field.
 // - M1-11s-b, the local UI shell (D-118): the React app (apps/local-ui) is served from an in-memory
 //   bundle the caller passes in (`localUi.assets`; the CLI embeds it), never from a file path.
 //   Only `index.html` and `assets/<one file name>` with a known type are accepted, checked before the
 //   server listens. `/assets/<name>` is an exact map lookup (no decoding, no path join), served with
 //   its fixed content type, nosniff, the strict CSP (plus `font-src 'self'`) and immutable caching;
 //   anything else is 404. The app's index.html, with this server's CSRF token filled in, is served
-//   for `/first-run` and `/settings[/...]`, and (M1-11b-2) for `/` and `/approve/<id>`; without a
-//   bundle those two keep the server-rendered approval page.
+//   for `/first-run` and `/settings[/...]`, and (M1-11b-2) for `/` and `/approve/<id>`.
+// - M1-11b-2c: the server-rendered approval page, its `/app.js` and `/app.css`, are gone (404).
+//   Without a bundle, `/` and `/approve/<id>` answer the fixed NO_APP_HTML (approval-pages.ts):
+//   no script, no form, no CSRF token, so nothing can be decided in the browser; it points to
+//   `approve` in the owner's own terminal. Every gate is unchanged.
 //   The session cookie gates the app pages, the assets and every /api/ui/ route.
 // - M1-11s-b, the /api/ui/ routes (local-ui/routes.ts): each declares `presence`; a mutating route
 //   must declare `presence: true`. Every route needs the session cookie, the CSRF header and
@@ -161,7 +162,7 @@ import {
   type OsNotifier,
 } from './approval-os.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
-import { APP_CSS, APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
+import { EXPIRED_HTML, NO_APP_HTML } from './approval-pages.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
 import {
@@ -2695,17 +2696,6 @@ export async function startApprovalServerWith(
     const method = req.method ?? 'GET';
     if (!path.startsWith(SETUP_PATH_PREFIX)) sweepSetup();
 
-    if (path === '/app.js') {
-      if (method !== 'GET') return reject(res, 405, 'method');
-      sendText(res, 200, 'text/javascript; charset=utf-8', APP_JS);
-      return;
-    }
-    if (path === '/app.css') {
-      if (method !== 'GET') return reject(res, 405, 'method');
-      sendText(res, 200, 'text/css; charset=utf-8', APP_CSS);
-      return;
-    }
-
     if (path.startsWith(ASSETS_PREFIX)) {
       if (method !== 'GET') return reject(res, 405, 'method');
       if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
@@ -2745,19 +2735,20 @@ export async function startApprovalServerWith(
         return;
       }
       if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
-      // M1-11b-2: with the app bundled, Approvals (`/`) and one request (`/approve/<id>`) render
-      // inside it too. Where the UI renders only: the session gate above, and the CSRF, Origin,
-      // fetch-metadata and presence gates of the approval API below, are unchanged.
-      if (appPage || localUi.shell !== undefined) {
-        const shell = localUi.shell;
-        if (shell === undefined) return reject(res, 404, 'not_found');
-        // The token is base64url, so it needs no escaping.
-        const meta = `<meta name="agentlink-csrf" content="${csrf}">`;
-        sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
+      // M1-11b-2: Approvals (`/`) and one request (`/approve/<id>`) render inside the app. Where
+      // the UI renders only: the session gate above, and the CSRF, Origin, fetch-metadata and
+      // presence gates of the approval API below, are unchanged.
+      const shell = localUi.shell;
+      if (shell === undefined) {
+        if (appPage) return reject(res, 404, 'not_found');
+        // M1-11b-2c: no app bundle, no approval page: fixed text that points to the terminal, with
+        // no script and no CSRF token (approval-pages.ts).
+        sendText(res, 503, 'text/html; charset=utf-8', NO_APP_HTML);
         return;
       }
-      // No app bundle: the server-rendered approval page (removed by its follow-up card).
-      sendText(res, 200, 'text/html; charset=utf-8', pageHtml(csrf));
+      // The token is base64url, so it needs no escaping.
+      const meta = `<meta name="agentlink-csrf" content="${csrf}">`;
+      sendText(res, 200, 'text/html; charset=utf-8', `${shell.before}${meta}${shell.after}`);
       return;
     }
 

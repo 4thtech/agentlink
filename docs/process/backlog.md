@@ -4451,7 +4451,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split:** the server-rendered page is not deleted here. With the app bundled, `/` and `/approve/<id>` serve the app (list, review together, one request, the paid-action sheet, with parity tests); without a bundle the old page stays as the fallback. Its removal, with the sidebar copy and its drift tests, is M1-11b-2c.
 
 #### M1-11b-2c · approval page: delete the server-rendered page once every CLI ships the app (new, split from M1-11b-2)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (with `APP_JS`, `APP_CSS`, `APP_NAV`), `approval-server.ts` (the `/app.js`, `/app.css` and no-bundle page branch), `approval-page.test.ts`, `approval-ui-browser.test.ts`, `approval-pay-confirm-browser.test.ts` (old-page half), `approval-passkey-browser.test.ts`, `apps/local-ui/src/approval-page-nav.test.ts`, `apps/local-ui/src/pages/approvals/strings.test.ts`, `packages/ui/src/components/approval-page-icons.test.ts`, the token drift test, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11b-2
 - **Spec:** 08 §1; 04 §2.5; D-118
@@ -4667,7 +4667,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests per LiveDot state (shape, word, tone, live region); with reduced motion (app setting and media query) no `Element.animate` call and an instant state plus a text line; interrupted motion continues without a restart; amounts and codes never animate.
 
 #### UI-REFRESH-e · ui + local-ui: preferences, the Under the hood switch and panel, Settings › Appearance (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/hood.tsx`, `hood.css` and their tests; `apps/local-ui/src/prefs/**` (new), `apps/local-ui/src/pages/appearance/**` (new) and their tests; changeset, changelog fragment
 - **Depends on:** UI-REFRESH-a
 - **Spec:** B-11 §7, §13.2, §14 (reduced motion); UX-V3 plan §3; 11 §5
@@ -4680,7 +4680,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Off by default; remembered per browser; storage that throws still renders; a fixture test asserts exactly the allowlist: the public proof record link renders, while keys, codes, tokens, the session link and drop, upload, download and presigned URLs never reach the DOM; each setting sets its root attribute.
 
 #### UI-REFRESH-f · ui + local-ui: shell with top bar, Mac materials and route transitions (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/shell.tsx`, `chrome.css`, the `.al-shell*` blocks of `components.css` and their tests; `apps/local-ui/src/layout/**`, `router.tsx`, `nav.ts`, `strings.ts` and their tests; changeset, changelog fragment
 - **Depends on:** UI-REFRESH-b, UI-REFRESH-d, UI-REFRESH-e
 - **Spec:** B-11 §3, §6 row 11, §13.2, §16 (Settings); UX-V3 plan §3; plan §5
@@ -4815,6 +4815,103 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Playwright across every page in dark, light, increased contrast, forced colours, reduced motion and reduced transparency: axe; no layout-property animation in computed styles; at most four `backdrop-filter` elements plus the overlay; a route change painted within 100 ms; an automated frame-time check (Playwright performance trace, CPU throttled 4×, scrolling Activity with 200 rows and every route change: no frame over 33 ms, no long task over 50 ms from motion code); bundle growth within budget against 0.4.0. The owner's 60 fps check on the reference Mac stays manual. Hand the plan §10 checklist to the owner.
 - **Acceptance:**
   - The e2e test green in CI; budget numbers in the PR; the owner's go-ahead on the checklist recorded before the release.
+
+#### UI-REFRESH-s · ui: motion lint and token completeness follow-ups (new, low, #594)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/motion-lint.test.ts`, `packages/ui/src/tokens/**`, `docs/design/d1/tokens/**`; changeset
+- **Depends on:** UI-REFRESH-a
+- **Spec:** B-11 §13.1, §14
+- **Invariants:** —
+- **Scope:**
+  - (a) Each `LEGACY_EXCEPTIONS` entry names its owning card: the primary button and switch knob in UI-REFRESH-b or UI-REFRESH-c, the files tab in UI-REFRESH-j, the shimmer in UI-REFRESH-c. A page card may delete its own exception line (an allowed exception to card ownership).
+  - (b) The global reduced-motion blocks may keep fades up to 120 ms; the lint says so.
+  - (c) The lint rejects `calc()` without a token and literal delays.
+  - (d) The DTCG theme files carry the depth tokens that `tokens.css` has.
+- **Acceptance:**
+  - Tests first (RED commit): fixtures for (c) fail the lint; (d) both token copies equal; the current stylesheets still pass; no test weakened.
+
+#### UI-REFRESH-c-b · ui: progress components accessibility and lifecycle lows (new, low, #597)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/progress.tsx`, `progress.css`, tests; changeset
+- **Depends on:** UI-REFRESH-c
+- **Spec:** B-11 §13, §14; 11 §11
+- **Invariants:** —
+- **Scope:**
+  - (a) The static refresh icon on the recording proof chip reads as a retry; use a neutral icon.
+  - (b) A live region must not announce every amount tick: announce settled values only.
+  - (c) The 500 ms minimum for a delayed bar still holds when the caller unmounts it early.
+  - (d) Items keyed by name do not collide; the progress bar does not carry an invalid-state attribute; the skeleton "was shown" marker resets when loading restarts.
+- **Acceptance:**
+  - Tests first (RED commit) for (b) to (d) with fake timers; axe zero violations; reduced motion unchanged; no test weakened.
+
+#### UI-REFRESH-b-b · ui: Sheet and chrome material hardening (new, low, #598)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/surface.tsx`, `depth.css`, `chrome.css`, tests; `apps/local-ui` shell (card f wiring); changeset
+- **Depends on:** UI-REFRESH-b
+- **Spec:** B-11 §13.1, §13.2
+- **Invariants:** I-4 (the approval sheet stays reachable only as before)
+- **Scope:**
+  - (a) While a modal Sheet or dialog is open, the page behind it is inert for pointer, keyboard and programmatic focus.
+  - (b) Remove the border-colour rule on the pseudo-element that has no effect; the overlay blur uses a token and the increased-contrast setting turns it off.
+  - (c) Sheet and dialog frame render in a portal so a transformed ancestor cannot break fixed positioning.
+  - (d) For UI-REFRESH-f: the shell sets the OS marker for the chrome material and a test measures chrome text contrast against WCAG AA.
+  - This card does not change approval behaviour; any change to approval logic makes it S2.
+- **Acceptance:**
+  - Tests first (RED commit): focus cannot leave an open modal by click or script; fixed positioning holds inside a transformed parent; contrast check green; no test weakened.
+
+#### UI-REFRESH-e2 · ui: switch knob motion and a path kind in the Under the hood allowlist (new, low)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` (switch, Under the hood), `packages/ui/src/motion-lint.test.ts`, tests; changeset
+- **Depends on:** UI-REFRESH-e; #599 merged
+- **Spec:** B-11 §7, §14
+- **Invariants:** I-5
+- **Scope:**
+  - (a) The switch knob moves with `transform` instead of `left`; its motion-lint exception is removed.
+  - (b) The Under the hood allowlist gets a `path` kind so long local folder paths show. Keys, codes, tokens, session links, drop, upload and download URLs and presigned links stay refused.
+- **Acceptance:**
+  - Tests first (RED commit): the lint passes without the knob exception; a folder path is accepted and each refused kind above still is; no test weakened.
+
+#### UI-REFRESH-f-b · local-ui: paid-action sheet modal behaviour (new, low, #604)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pay-confirm/**`, `packages/ui/src/components/surface.tsx`, tests; changeset
+- **Depends on:** UI-REFRESH-f; UI-REFRESH-b-b
+- **Spec:** B-11 §13.2; 06 (approvals); 04 §2.5
+- **Invariants:** I-4
+- **Scope:**
+  - (a) The paid-action confirmation sheet (`PayConfirmSheet`) behaves as a modal: the page behind it is inert for pointer, keyboard and programmatic focus, focus returns to the opener on close, and Escape and outside-click keep today's meaning.
+  - (b) The sheet's copy, buttons, amounts and the owner-presence step do not change; no approval or payment logic changes.
+- **Acceptance:**
+  - Tests first (RED commit): focus cannot leave the open sheet by click, Tab or script; the confirm and cancel paths behave as before; threat note in the PR; no test weakened.
+
+#### UI-REFRESH-f-c · local-ui: shell inert, tab order and token lows (new, low, #604)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/layout/**`, `apps/local-ui/src/app.css`, tests; changeset
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §13.1, §13.2, §14
+- **Invariants:** —
+- **Scope:**
+  - (a) The shell's inert-hold helper (`holdInert`) takes its snapshot when it is called; siblings mounted later while it is held are also made inert and restored on release.
+  - (b) At 360 px width the keyboard tab order follows the visual order (bottom bar first as drawn), and the switch has an accessible label.
+  - (c) The remaining literal 360 CSS pixel values use tokens.
+  - (d) A test measures the text-on-accent contrast of the active nav item against WCAG AA in light and dark.
+  - Does not touch approvals or paid actions; if it must, move that part to UI-REFRESH-f-b (S2).
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (d); axe zero violations; no test weakened.
+
+#### M1-11b-2d · local-ui: test hardening for the app-shell approvals (new, low, #605)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-ui-browser.test.ts` (the weakened exact background checks, the dropped desktop-note assertion, and the locator widened from `section[data-approval]` to `[data-approval]`), `apps/local-ui/**/*.test.*`, `apps/local-ui/e2e/**` (tests only, no product code)
+- **Depends on:** M1-11b-2
+- **Spec:** B-11 §13.1; 06 (approvals)
+- **Invariants:** —
+- **Scope:**
+  - (a) Restore the exact light and dark background colour checks that were weakened to "not transparent and different".
+  - (b) Narrow the browser locators that were widened from the card to the whole page back to the card.
+  - (c) Restore the assertion that the desktop app protects approvals more strongly.
+  - (d) Add a test that the app CSS contains no `url()` and no `@import` (the old stylesheet test was deleted; the content-security policy still blocks them at runtime).
+  - Touches approval-page tests under `packages/node`, so the class is S2. Test files only; no product code changes.
+- **Acceptance:**
+  - Tests first (RED commit): `RED (expected): M1-11b-2d ...` shows each restored check failing when its subject is broken on purpose; a short threat note in the PR; no test weakened; no product code changed.
 
 ### Design system from the design (`packages/ui`, D-116)
 
@@ -6998,6 +7095,91 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Spec edits marked "proposed, owner confirms at merge".
 - **Acceptance:**
   - Each item changed or recorded as already correct; link and docs-status checks pass.
+
+#### MSG-FILES-IO-j · Files tabs: inbound names through the untrusted-content component (new, low, #576)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (inbound content rendering) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`, tests
+- **Depends on:** MSG-FILES-IO-f
+- **Spec:** plan §5; 04 §4; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Other people's file names in the Received and Sent tabs render through the shared `UntrustedContent` component instead of a local one. The other Files-tab robustness items are in MSG-FILES-IO-i.
+- **Acceptance:**
+  - A name with bidi and control characters renders as inert text through the shared component; existing Files tests unchanged; no test weakened.
+
+#### M1-UI-HOOD-FIELDS · local-ui read routes return the Under the hood fields (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` local-ui read routes; allowlisted fields only) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/**`, tests
+- **Depends on:** M1-11b-2
+- **Spec:** B-11 §7; 08 §1
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - Add the fields the page cards need, from B-11 §7: event IDs (Activity); record ID, network and public record link (Proofs); rules version and signer (Rules); storage and size used, and real folder paths (Files).
+  - Every field comes from an explicit allowlist; no key, code, token, session link, drop URL or presigned link is added. The routes stay read-only.
+- **Acceptance:**
+  - Tests first (RED commit): exact key set per route; a scan of each response for stored secrets and URLs of the fixture finds none; no store change after a call; no test weakened; independent review (S2).
+
+#### M1-11b-2-b · approvals in the app shell: accessibility and prop lows (new, low, #595)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (approvals: how the approve page gets the request id) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**`, tests
+- **Depends on:** M1-11b-2
+- **Spec:** 08 §1; 11 §5
+- **Invariants:** I-4
+- **Scope:**
+  - The radio group on the review page has an accessible name. The approve page takes the request id as a prop instead of reading it itself. The wording matches the catalogue (checked, no change expected).
+- **Acceptance:**
+  - Tests first (RED commit) for the name and the prop; axe zero violations; approval behaviour unchanged; no test weakened.
+
+#### M1-UX3-DUP-CONTACTS-b · duplicate contacts: test and panel-state lows (new, low, #587, #589)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`packages/node` test file; paid approval card) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`, `packages/node/src/local-ui/api/contacts.test.ts`, tests
+- **Depends on:** M1-UX3-DUP-CONTACTS, PRE-031-FIXES
+- **Spec:** 08 §1; 11 §5
+- **Invariants:** I-4
+- **Scope:**
+  - (a) A test that uses real contact cards (not hand-built ones) to prove the grouping by owner fingerprint.
+  - (b) When the older contact stops being listed, the open "Remove older" confirmation is reset so no hidden panel stays behind.
+  - (c) The Cost row on the paid approval card uses the same digits as the confirmation sheet (check after PRE-031-FIXES; record "already correct" if so).
+- **Acceptance:**
+  - Tests first (RED commit) for (a) and (b); no test weakened.
+
+#### DOCS-SCREENSHOTS-b · screenshot capture: offline guard and gaps (new, low, #566)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs tooling; test data only) · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/docs-screenshots/**`, `docs-site/guide/.gitbook/assets/`
+- **Depends on:** DOCS-SCREENSHOTS, M1-11s-a-d
+- **Spec:** docs-model §5
+- **Invariants:** —
+- **Scope:**
+  - (a) The capture blocks every request that is not to the local test server.
+  - (b) The footer status line is captured settled once the health read exists; re-capture the affected figures.
+  - (c) The first-run shot is captured (the browser's passkey step needs a stand-in) and its step list is checked for missing styling; if the page is unstyled, record an app card.
+- **Acceptance:**
+  - A test shows a non-local request is refused; no figure shows "Checking"; no real key, code, name or user path in any image.
+
+#### DOCS-SWEEP-1027 · docs: stale release wording and "in development" claims (new, low, #569)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation text, `docs/status.yaml`) · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/status.yaml`, `docs/foundation/00-README.md` (design-decisions text), `docs-site/**`, `knowledge/**`
+- **Depends on:** none
+- **Spec:** docs-model; 00 (decision log)
+- **Invariants:** —
+- **Scope:**
+  - (a) `docs/status.yaml`: "Released in 0.1.2" lines that belong to 0.2.0 (check the npm history), and "Merged for the next release" rows that have since been released.
+  - (b) Unverified "in development" wording in the design-decisions text, the security-model drop key note, the sdk-packages submitter note, `contracts.md` and `versioning.md`: verify against `main` and fix or record as correct.
+  - (c) The knowledge user-guide sections written for 0.1.2; the files page no longer says "owner code" (after #566).
+  - Spec edits marked "proposed, owner confirms at merge".
+- **Acceptance:**
+  - Each item changed or recorded as correct; `node tools/docs-status/index.mjs --check` green.
+
+#### DOCS-050-RENUMBER · docs: cloud agent 0.4.0 becomes 0.5.0 in the specs and card texts (new, D-135)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (docs/foundation) · **Phase:** M2
+- **Repo/path:** agentlink · `docs/foundation/` (D-131, 03, 06, 07, 08, 10; 04 already says 0.5.0), `docs/process/backlog.md` (cloud card texts)
+- **Depends on:** DOCS-040-RELEASED
+- **Spec:** D-131, D-135
+- **Invariants:** —
+- **Scope:**
+  - Where a spec or card says the cloud agent ships in 0.4.0, say 0.5.0 (D-135). Keep D-131's history readable. Do not touch text about the local app's 0.4.0.
+- **Acceptance:**
+  - A search for cloud-agent mentions of 0.4.0 finds none that is not history; links and docs-status checks pass; edits marked "proposed, owner confirms at merge".
 
 #### M1-UX-MULTI-AGENT-b · cli agent choice: stale comment and a loose assertion (new, low, IR-M1-UX-MULTI-AGENT-1, #562)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (comment and test only)

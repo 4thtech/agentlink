@@ -212,7 +212,7 @@ Two places get a translucent, frosted material, the way a Mac sidebar and toolba
 
 | Material | Where | Look (proposed tokens) |
 |---|---|---|
-| **Chrome** | Left sidebar, top bar, the 360 bottom bar, sticky day headers | `--al-material-chrome-bg` (the surface colour at about 72 % opacity) with a background blur of about 20 px and saturation 1.4 (`--al-material-blur`); hairline border on the content side |
+| **Chrome** | Left sidebar, top bar, the 360 bottom bar, sticky day headers | `--al-material-chrome-bg` (the surface colour at 85 % opacity: raised from the proposed 72 % after the contrast measurement of UI-REFRESH-f, owner approved 85% on 2026-10-27 (Decision 16)) with a background blur of about 20 px and saturation 1.4 (`--al-material-blur`); hairline border on the content side |
 | **Overlay** | Behind the presence prompt and dialogs | `--al-color-bg-overlay` plus a light blur (about 8 px) |
 
 Cards, rows, messages and anything a person reads at length stay **solid**. The chrome itself carries short text (sidebar labels and badges, the page title, the top bar controls, sticky day headers), so: **chrome text must meet WCAG 2.1 AA contrast against the worst-case content that can scroll under it** (the brightest and the busiest); if it does not, raise the chrome opacity until it does. The solid fallbacks below always meet it.

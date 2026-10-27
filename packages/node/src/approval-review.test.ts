@@ -31,6 +31,7 @@ import {
   type RawResponse,
 } from './approval-ui.fixture.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
+import { TEST_APP } from './local-ui-app.fixture.js';
 
 let world: OwnerWorld;
 beforeAll(async () => {
@@ -63,7 +64,8 @@ async function harness(): Promise<Harness> {
   const ownerStoresOpened = { count: 0 };
   const clock = { ms: Date.now() };
   const server = await startApprovalServerWith(
-    { source, onEvent: (e) => void events.push(e) },
+    // M1-11b-2c: the page (and its CSRF token) is the app's; a minimal bundle stands in.
+    { source, onEvent: (e) => void events.push(e), localUi: { assets: TEST_APP } },
     {
       keychain: world.keychain,
       openOwnerStore: (expected) => {

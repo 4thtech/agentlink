@@ -1,1 +1,159 @@
-/* UI-REFRESH-b: the al-chrome material and its solid fallbacks (B-11 §13.2). Empty until that card. */
+/* The al-chrome material (UI-REFRESH-b, B-11 §13.2): sidebar, top bar, bottom bar and sticky day
+   headers. Solid by default. Translucent and blurred only on macOS (the app sets data-os at
+   start-up) and only where the browser can blur. Every fallback is solid: reduced transparency,
+   increased contrast, forced colours, no blur support, Windows and Linux. The solid overrides come
+   last so they win at equal specificity plus one attribute. */
+
+.al-chrome {
+  background: var(--al-color-bg-surface);
+  border: 0 solid var(--al-color-border-subtle);
+  border-color: var(--al-color-border-subtle);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  :root[data-os='macos'] .al-chrome {
+    background: var(--al-material-chrome-bg);
+    backdrop-filter: var(--al-material-blur);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-os='macos'] .al-chrome {
+    background: var(--al-color-bg-surface);
+    backdrop-filter: none;
+  }
+}
+:root[data-os='macos'][data-transparency='reduced'] .al-chrome {
+  background: var(--al-color-bg-surface);
+  backdrop-filter: none;
+}
+@media (prefers-contrast: more) {
+  :root[data-os='macos'] .al-chrome {
+    background: var(--al-color-bg-surface);
+    backdrop-filter: none;
+    border-color: var(--al-color-border-default);
+  }
+}
+:root[data-os='macos'][data-contrast='more'] .al-chrome {
+  background: var(--al-color-bg-surface);
+  backdrop-filter: none;
+  border-color: var(--al-color-border-default);
+}
+@media (forced-colors: active) {
+  :root[data-os='macos'] .al-chrome {
+    background: Canvas;
+    backdrop-filter: none;
+    border-color: CanvasText;
+  }
+}
+
+/* The shell (UI-REFRESH-f, B-11 §3, §13.2, §6 row 11). */
+
+/* The material resets the border shorthand, so each part names its hairline here, on the content
+   side: sidebar right, top bar bottom, status bar top, sub-navigation bottom. */
+.al-side.al-chrome {
+  border-right-width: var(--al-border-width-thin);
+}
+.al-topbar.al-chrome {
+  border-bottom-width: var(--al-border-width-thin);
+}
+.al-statusbar.al-chrome {
+  border-top-width: var(--al-border-width-thin);
+}
+
+/* Settings sub-navigation: sticky chrome under the top bar, content scrolls beneath it. */
+.al-subnav {
+  position: sticky;
+  top: var(--al-size-control-lg);
+  z-index: 1;
+  display: flex;
+  gap: var(--al-space-2);
+  margin: calc(-1 * var(--al-space-6)) calc(-1 * var(--al-space-6)) 0;
+  padding: var(--al-space-3) var(--al-space-6);
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+.al-subnav.al-chrome {
+  border-bottom-width: var(--al-border-width-thin);
+}
+.al-subnav a {
+  flex: none;
+  padding: var(--al-space-2) var(--al-space-4);
+  border-radius: var(--al-radius-md);
+  color: var(--al-color-fg-muted);
+  text-decoration: none;
+}
+.al-subnav a:hover {
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-default);
+}
+.al-subnav a.is-active {
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-fg);
+}
+
+/* The top bar controls. */
+.al-topbar-theme {
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  /* The sidebar is the bottom bar: its hairline moves from the right edge to the top. */
+  .al-side.al-chrome {
+    border-right-width: 0;
+    border-top-width: var(--al-border-width-thin);
+  }
+  .al-subnav {
+    margin: calc(-1 * var(--al-space-4)) calc(-1 * var(--al-space-4)) 0;
+    padding: var(--al-space-3) var(--al-space-4);
+  }
+  /* The switch and the theme control keep their names for assistive technology; the words give way. */
+  .al-topbar .al-switch-text,
+  .al-topbar-theme-text {
+    display: none;
+  }
+}
+
+/* Route change: only the page fades in with a 4 px rise; the chrome does not flash. The browser
+   draws these only where View Transitions exist, and the app never starts one with reduced motion. */
+.al-shell-content {
+  view-transition-name: al-page;
+}
+@keyframes al-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes al-page-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-old(al-page) {
+  animation: al-page-out var(--al-duration-fast) var(--al-easing-exit) both;
+}
+::view-transition-new(al-page) {
+  animation: al-page-in var(--al-duration-fast) var(--al-easing-enter) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(al-page),
+  ::view-transition-new(al-page) {
+    animation: none;
+  }
+}
+:root[data-motion='reduced']::view-transition-old(al-page),
+:root[data-motion='reduced']::view-transition-new(al-page) {
+  animation: none;
+}

@@ -41,6 +41,8 @@ const EXPECTED: ReadonlyArray<readonly [string, string]> = [
   ['/settings/backup', 'Backup'],
   ['/settings/passkeys', 'Passkeys'],
   ['/settings/advanced', 'Advanced'],
+  // UI-REFRESH-f: Appearance (Home sits at /settings/home until M1-11b-2 moves it to /, D-135).
+  ['/settings/appearance', 'Appearance'],
 ];
 
 describe('routes', () => {
@@ -60,6 +62,7 @@ describe('routes', () => {
     '/settings/files',
     '/settings/proofs',
     '/settings/rules',
+    '/settings/appearance',
   ]);
   const STUBS = EXPECTED.filter(([p]) => p !== '/first-run');
   it.each(STUBS)('%s renders its page inside the layout', (path, title) => {
@@ -87,8 +90,9 @@ describe('routes', () => {
 });
 
 describe('nav', () => {
-  it('lists Approvals first, then the settings pages', () => {
+  it('lists Home first, then Approvals and the settings pages', () => {
     expect(NAV_ITEMS.map((i) => i.label)).toEqual([
+      'Home',
       'Approvals',
       'Activity',
       'Messages',
@@ -98,12 +102,18 @@ describe('nav', () => {
       'Rules',
       'Settings',
     ]);
-    expect(NAV_ITEMS).toHaveLength(8);
+    expect(NAV_ITEMS).toHaveLength(9);
   });
 
   it('keeps every nav label in plain words', () => {
     // 11 §5: no wallet, gas, seed phrase or transaction words in the default UI.
-    const text = [...NAV_ITEMS.map((i) => i.label), 'Backup', 'Passkeys', 'Advanced'].join(' ');
+    const text = [
+      ...NAV_ITEMS.map((i) => i.label),
+      'Backup',
+      'Passkeys',
+      'Appearance',
+      'Advanced',
+    ].join(' ');
     expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
   });
 
@@ -113,13 +123,14 @@ describe('nav', () => {
     expect(host.querySelector('main h1')?.textContent).toBe('Files');
   });
 
-  it('shows a Settings sub-navigation with Backup, Passkeys and Advanced', () => {
+  it('shows a Settings sub-navigation with Backup, Passkeys, Appearance and Advanced', () => {
     mountAt('/settings/passkeys');
     const sub = host.querySelector('nav[aria-label="Settings"]');
     expect(sub).not.toBeNull();
     expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Backup',
       'Passkeys',
+      'Appearance',
       'Advanced',
     ]);
     expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Passkeys');
