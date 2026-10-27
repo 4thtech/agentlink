@@ -979,7 +979,11 @@ const SCRIPT = String.raw`
     var parts = String(v).split('.');
     var dollars = parts[0];
     var frac = ((parts[1] || '') + '00');
-    var cents = String(Number(frac.slice(0, 2))) + (frac.length > 4 && frac.slice(2).replace(/0+$/, '') ? '.' + frac.slice(2).replace(/0+$/, '') : '');
+    var rest = frac.slice(2);
+    var end = rest.length;
+    while (end > 0 && rest.charAt(end - 1) === '0') end -= 1;
+    rest = rest.slice(0, end);
+    var cents = String(Number(frac.slice(0, 2))) + (rest ? '.' + rest : '');
     if (dollars === '0') return fmt(S.payCents, { cents: cents });
     if (cents === '0') return fmt(S.payDollars, { dollars: dollars });
     return fmt(S.payDollarsCents, { dollars: dollars, cents: cents });

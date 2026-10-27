@@ -176,11 +176,18 @@ export function formatUsd(value: string): string {
   return `$${whole ?? '0'}.${frac.padEnd(2, '0')}`;
 }
 
+/** Drops trailing '0' characters (a loop, not a regular expression). */
+function trimTrailingZeros(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === '0') end -= 1;
+  return text.slice(0, end);
+}
+
 /** The amount in words for screen readers ("10 cents", "5 dollars and 50 cents"). */
 export function spokenUsd(value: string): string {
   const [dollars = '0', frac = ''] = value.split('.');
   const padded = frac.padEnd(2, '0');
-  const rest = padded.slice(2).replace(/0+$/, '');
+  const rest = trimTrailingZeros(padded.slice(2));
   const cents = `${String(Number(padded.slice(0, 2)))}${rest === '' ? '' : `.${rest}`}`;
   if (dollars === '0') return fill(P.cents, { cents });
   if (cents === '0') return fill(P.dollars, { dollars });
