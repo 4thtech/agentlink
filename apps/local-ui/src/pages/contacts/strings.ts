@@ -67,6 +67,15 @@ export const CONTACTS_STRINGS = {
   failed: "That didn't work. Nothing was changed. Try again in a minute.",
 } as const;
 
+/** Under the hood labels and values (B-11 §16). */
+export const HOOD = {
+  fingerprint: 'Fingerprint',
+  identity: 'Identity level',
+  paired: 'Paired',
+  checked: 'Safety code checked',
+  selfDeclared: 'Self-declared',
+} as const;
+
 export function countLine(n: number): string {
   return n === 1 ? '1 contact' : `${String(n)} contacts`;
 }

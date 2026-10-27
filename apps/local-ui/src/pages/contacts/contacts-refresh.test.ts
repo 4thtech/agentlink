@@ -82,7 +82,7 @@ async function settle(): Promise<void> {
   }
 }
 
-async function mount(routes: Routes, hood = false): Promise<void> {
+async function mount(routes: Routes, hood = false, open = true): Promise<void> {
   const f = fetchFor({ 'GET /api/owner/passkey': NO_PASSKEY, ...routes });
   const api = createApiClient({ fetch: f, token: 't' });
   const owner = createOwnerClient({ fetch: f, token: 't' });
@@ -92,6 +92,12 @@ async function mount(routes: Routes, hood = false): Promise<void> {
     await Promise.resolve();
   });
   await settle();
+  if (open) {
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('.ct-row')?.click();
+    });
+    await settle();
+  }
 }
 
 const text = (): string => host.textContent ?? '';
@@ -140,6 +146,12 @@ describe('UI-REFRESH-i: rows and the detail sheet', () => {
     const list = host.querySelector('ul.ct-list');
     expect(list?.getAttribute('data-level')).toBe('1');
     expect(list?.classList.contains('al-surface')).toBe(true);
+  });
+
+  it('opens no sheet at load, so the page and the navigation stay usable', async () => {
+    await mount(routes, false, false);
+    expect(host.querySelector('aside.al-sheet')).toBeNull();
+    expect(host.querySelectorAll('.ct-row')).toHaveLength(2);
   });
 
   it('shows the selected contact in a level 3 sheet with a named close button', async () => {
@@ -257,6 +269,23 @@ describe('UI-REFRESH-i: reduced motion', () => {
     }));
     await mount(pending);
     expect(host.querySelector('.ct-waiting')?.getAttribute('data-motion')).toBe('reduced');
+  });
+});
+
+const sheets = import.meta.glob<string>('./contacts.css', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+});
+
+describe('UI-REFRESH-i: the stylesheet', () => {
+  it('animates only behind both reduced-motion rules, with tokens and no blur', () => {
+    const css = sheets['./contacts.css'] ?? '';
+    expect(css).toMatch(/@keyframes\s+ct-breathe/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+    expect(css).toMatch(/\[data-motion='reduced'\]/);
+    expect(css).not.toMatch(/backdrop-filter/);
+    expect(css).not.toMatch(/style=/);
   });
 });
 

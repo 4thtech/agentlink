@@ -61,6 +61,7 @@ import {
 } from './owner.js';
 import {
   CONTACTS_STRINGS as S,
+  HOOD,
   SUMMARY,
   countLine,
   mismatchBody,
@@ -720,13 +721,17 @@ function hoodFields(c: ContactRow): unknown[] {
   return [
     ...(c.fingerprint === undefined
       ? []
-      : [{ kind: 'text', label: 'Fingerprint', value: c.fingerprint }]),
+      : [{ kind: 'text', label: HOOD.fingerprint, value: c.fingerprint }]),
     {
       kind: 'text',
-      label: 'Identity level',
-      value: c.label === 'safety-code-checked' ? 'Safety code checked' : 'Self-declared',
+      label: HOOD.identity,
+      value: c.label === 'safety-code-checked' ? HOOD.checked : HOOD.selfDeclared,
     },
-    { kind: 'time', label: 'Paired', value: new Date(c.since * 1000).toISOString().slice(0, 10) },
+    {
+      kind: 'time',
+      label: HOOD.paired,
+      value: new Date(c.since * 1000).toISOString().slice(0, 10),
+    },
   ];
 }
 
@@ -748,7 +753,7 @@ export function ContactsPage({
   const [tick, setTick] = useState(0);
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
-  const [sheetOpen, setSheetOpen] = useState(true);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     let live = true;
