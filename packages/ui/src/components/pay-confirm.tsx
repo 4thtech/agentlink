@@ -23,7 +23,7 @@ import {
   type ReactElement,
 } from 'react';
 import { Button, TextField } from './forms.js';
-import { holdInert } from './surface.js';
+import { holdInert } from './inert.js';
 
 /** Every word the sheet shows (11 §5; b11 §19.6). `{name}` and the like are filled in. */
 export const PAY_CONFIRM_STRINGS = Object.freeze({
