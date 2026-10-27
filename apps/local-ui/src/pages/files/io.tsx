@@ -11,11 +11,18 @@
 import {
   Banner,
   Button,
+  CountBadge,
   EmptyState,
   Icon,
+  ProgressBar,
   ProofBadge,
+  Skeleton,
   StatusChip,
+  Surface,
+  SuccessMoment,
+  UnderTheHood,
   UntrustedContent,
+  useRowPresence,
 } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -24,6 +31,7 @@ import {
   useState,
   type KeyboardEvent,
   type ReactElement,
+  type ReactNode,
 } from 'react';
 import type { RevealOutcome } from './files-api.js';
 import {
@@ -51,9 +59,12 @@ const TABS: readonly (readonly [FilesTab, string])[] = [
 export function FilesTabs({
   tab,
   onTab,
+  counts,
 }: {
   readonly tab: FilesTab;
   readonly onTab: (next: FilesTab) => void;
+  /** Files waiting (to be saved, to be sent): a ticking badge when above zero. */
+  readonly counts?: Readonly<Partial<Record<FilesTab, number>>>;
 }): ReactElement {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const move = (e: KeyboardEvent<HTMLButtonElement>): void => {
@@ -89,6 +100,9 @@ export function FilesTabs({
           onKeyDown={move}
         >
           {label}
+          {(counts?.[id] ?? 0) > 0 ? (
+            <CountBadge count={counts?.[id] ?? 0} label={IO.waitingLabel[id]} />
+          ) : null}
         </button>
       ))}
     </div>
@@ -138,10 +152,12 @@ type FeedState<T> =
       /** Set when the last refresh failed: the list is the one loaded at this time. */
       readonly staleAt: number | null;
       readonly more: boolean;
+      /** IDs of rows that arrived on a refresh while the page was open (at most two). */
+      readonly arrived: readonly string[];
     };
 
 /** Loads the first page on mount; "Show more" appends; a failed refresh keeps what is on screen. */
-function useFeed<T>(
+function useFeed<T extends { readonly id: string; readonly at: number }>(
   get: Getter,
   base: string,
   parse: (json: unknown) => Feed<T> | undefined,
@@ -161,6 +177,25 @@ function useFeed<T>(
       if (!alive.current) return;
       setState((prev) => {
         if (result.kind === 'ok') {
+          if (cursor === null && prev.phase === 'ok') {
+            // A refresh: the newest page replaces the top; older pages already loaded stay.
+            const known = new Set(prev.items.map((i) => i.id));
+            const top = result.feed.items;
+            const topIds = new Set(top.map((i) => i.id));
+            const oldest = top.length === 0 ? 0 : Math.min(...top.map((i) => i.at));
+            const rest = prev.items.filter((i) => !topIds.has(i.id) && i.at < oldest);
+            return {
+              phase: 'ok',
+              items: [...top, ...rest],
+              next: rest.length > 0 ? prev.next : result.feed.next,
+              staleAt: null,
+              more: false,
+              arrived: top
+                .filter((i) => !known.has(i.id))
+                .slice(0, 2)
+                .map((i) => i.id),
+            };
+          }
           const before = cursor !== null && prev.phase === 'ok' ? prev.items : [];
           return {
             phase: 'ok',
@@ -168,6 +203,7 @@ function useFeed<T>(
             next: result.feed.next,
             staleAt: null,
             more: false,
+            arrived: cursor !== null && prev.phase === 'ok' ? prev.arrived : [],
           };
         }
         if (prev.phase === 'ok') return { ...prev, staleAt: Date.now(), more: false };
@@ -179,6 +215,15 @@ function useFeed<T>(
 
   useEffect(() => {
     void run(null);
+  }, [run]);
+
+  // Coming back to the page looks for anything new (no timer, no stream).
+  useEffect(() => {
+    const onShown = (): void => {
+      if (document.visibilityState === 'visible') void run(null);
+    };
+    document.addEventListener('visibilitychange', onShown);
+    return () => document.removeEventListener('visibilitychange', onShown);
   }, [run]);
 
   return {
@@ -195,48 +240,36 @@ function useFeed<T>(
   };
 }
 
-/** Loading shorter than this shows no skeleton rows (b11 §15: no flash). */
-const SKELETON_DELAY_MS = 400;
-
-/** Skeleton rows in the shape of the coming list (b11 §15): a status word now, rows after 400 ms. */
-function Skeleton(): ReactElement {
-  const [rows, setRows] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setRows(true), SKELETON_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, []);
+/** The shared Skeleton (nothing for 400 ms, b11 §15) with the status word kept for screen readers. */
+export function FilesSkeleton({ word }: { readonly word: string }): ReactElement {
   return (
     <div className="fl-feed" aria-busy="true">
       <p role="status" className="fl-sr-only">
-        {IO.loading}
+        {word}
       </p>
-      {rows ? (
-        <ul className="fl-list" aria-hidden="true">
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="fl-item">
-              <span className="fl-skeleton fl-skeleton-name" />
-              <span className="fl-skeleton fl-skeleton-meta" />
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div aria-hidden="true">
+        <Skeleton loading lines={3} className="fl-skeleton" />
+      </div>
     </div>
   );
 }
 
-function FeedFrame<T>({
+function FeedFrame<T extends { readonly id: string; readonly at: number }>({
   feed,
   empty,
   row,
   note,
+  card = false,
 }: {
   readonly feed: ReturnType<typeof useFeed<T>>;
   readonly empty: { readonly title: string; readonly hint: string; readonly icon: string };
-  readonly row: (item: T) => ReactElement;
+  readonly row: (item: T, arrived: boolean) => ReactElement;
   readonly note?: ReactElement;
+  /** The list sits on a raised card (Received: where files land). */
+  readonly card?: boolean;
 }): ReactElement {
   const { state } = feed;
-  if (state.phase === 'loading') return <Skeleton />;
+  if (state.phase === 'loading') return <FilesSkeleton word={IO.loading} />;
   if (state.phase === 'not_set_up') return <Banner tone="info">{IO.notSetUp}</Banner>;
   if (state.phase === 'error') {
     return (
@@ -263,7 +296,17 @@ function FeedFrame<T>({
         <Banner tone="warning">{asOf(CLOCK.format(new Date(state.staleAt)))}</Banner>
       )}
       {note}
-      <ul className="fl-list">{state.items.map((item) => row(item))}</ul>
+      {card ? (
+        <Surface level={2} className="fl-card">
+          <ul className="fl-list">
+            {state.items.map((item) => row(item, state.arrived.includes(item.id)))}
+          </ul>
+        </Surface>
+      ) : (
+        <ul className="fl-list">
+          {state.items.map((item) => row(item, state.arrived.includes(item.id)))}
+        </ul>
+      )}
       {state.next === null ? null : (
         <div className="fl-actions">
           <Button disabled={state.more} onClick={feed.more}>
@@ -384,21 +427,46 @@ function ShowInFinder({
   );
 }
 
+/** A list row on Surface 1; a row that just arrived enters with the shared entrance. */
+function Row({
+  arrived,
+  children,
+}: {
+  readonly arrived: boolean;
+  readonly children: ReactNode;
+}): ReactElement {
+  const presence = useRowPresence<HTMLLIElement>(true, { isNew: arrived });
+  return (
+    <li ref={presence.ref} className="fl-row-li">
+      {presence.highlight}
+      <Surface level={1} className="fl-item">
+        {children}
+      </Surface>
+    </li>
+  );
+}
+
 function ReceivedRow({
   item,
   reveal,
+  arrived,
 }: {
   readonly item: ReceivedItem;
   readonly reveal: Reveal;
+  readonly arrived: boolean;
 }): ReactElement {
   return (
-    <li className="fl-item">
+    <Row arrived={arrived}>
       <UntrustedContent from={item.from} fileName={item.name} />
       <p className="fl-meta al-text-body-sm al-muted">
         <When at={item.at} />
         <span>{sizeText(item.size)}</span>
         {item.proof ? <ProofBadge state="recorded" /> : null}
       </p>
+      {arrived ? <SuccessMoment kind="file" /> : null}
+      {item.state === 'not_saved' ? (
+        <ProgressBar label={IO.progressArriving} steps={IO.arrivingSteps} current={0} />
+      ) : null}
       {item.state === 'saved' && item.savedName !== null ? (
         <p className="fl-state al-text-body-sm">
           {IO.savedAs} <Name>{item.savedName}</Name>
@@ -420,13 +488,13 @@ function ReceivedRow({
       {item.state === 'saved' && item.savedName !== null ? (
         <ShowInFinder id={item.id} reveal={reveal} />
       ) : null}
-    </li>
+    </Row>
   );
 }
 
 function SentRow({ item }: { readonly item: SentItem }): ReactElement {
   return (
-    <li className="fl-item">
+    <Row arrived={false}>
       <div className="fl-item-head">
         <Icon name="file" size={16} />
         <Name>{item.name}</Name>
@@ -438,6 +506,12 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
         <When at={item.at} />
         <span>{sizeText(item.size)}</span>
       </p>
+      {item.status === 'queued' ? (
+        <ProgressBar label={IO.progressSending} steps={IO.sendingSteps} current={0} />
+      ) : null}
+      {item.status === 'sent' && !item.receipt && item.state === 'available' ? (
+        <ProgressBar label={IO.progressSending} steps={IO.sendingSteps} current={1} />
+      ) : null}
       <p className="fl-chips">
         {item.status === 'sent' ? <StatusChip status="sent">{IO.statusSent}</StatusChip> : null}
         {item.status === 'queued' ? (
@@ -472,35 +546,90 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
       {item.state === 'deleted' ? (
         <p className="fl-state al-text-body-sm al-muted">{IO.sentDeleted}</p>
       ) : null}
-    </li>
+    </Row>
   );
+}
+
+/** What the Under the hood panel may say about a list: how many rows and how big, nothing else. */
+function listHood(count: number, bytes: number): unknown[] {
+  return [
+    { kind: 'count', label: IO.hoodFiles, value: String(count) },
+    { kind: 'size', label: IO.hoodSize, value: sizeText(bytes) },
+  ];
+}
+
+/** Tells the tab strip how many rows wait, whenever the loaded list changes. */
+function useWaiting<T>(
+  state: FeedState<T>,
+  waiting: (item: T) => boolean,
+  report?: (n: number) => void,
+): void {
+  const n = state.phase === 'ok' ? state.items.filter(waiting).length : null;
+  useEffect(() => {
+    if (n !== null) report?.(n);
+  }, [n, report]);
 }
 
 export function ReceivedPanel({
   get,
   reveal,
+  onWaiting,
 }: {
   readonly get: Getter;
   readonly reveal: Reveal;
+  readonly onWaiting?: (n: number) => void;
 }): ReactElement {
   const feed = useFeed(get, RECEIVED_PATH, parseReceived);
+  useWaiting(feed.state, (i: ReceivedItem) => i.state === 'not_saved', onWaiting);
+  const items = feed.state.phase === 'ok' ? feed.state.items : [];
   return (
-    <FeedFrame
-      feed={feed}
-      empty={{ title: IO.receivedEmptyTitle, hint: IO.receivedEmptyHint, icon: 'inbox' }}
-      note={<UntrustedNote />}
-      row={(item) => <ReceivedRow key={item.id} item={item} reveal={reveal} />}
-    />
+    <>
+      <FeedFrame
+        feed={feed}
+        card
+        empty={{ title: IO.receivedEmptyTitle, hint: IO.receivedEmptyHint, icon: 'inbox' }}
+        note={<UntrustedNote />}
+        row={(item, arrived) => (
+          <ReceivedRow key={item.id} item={item} reveal={reveal} arrived={arrived} />
+        )}
+      />
+      {feed.state.phase === 'ok' ? (
+        <UnderTheHood
+          fields={listHood(
+            items.length,
+            items.reduce((n, i) => n + i.size, 0),
+          )}
+        />
+      ) : null}
+    </>
   );
 }
 
-export function SentPanel({ get }: { readonly get: Getter }): ReactElement {
+export function SentPanel({
+  get,
+  onWaiting,
+}: {
+  readonly get: Getter;
+  readonly onWaiting?: (n: number) => void;
+}): ReactElement {
   const feed = useFeed(get, SENT_PATH, parseSent);
+  useWaiting(feed.state, (i: SentItem) => i.status === 'queued', onWaiting);
+  const items = feed.state.phase === 'ok' ? feed.state.items : [];
   return (
-    <FeedFrame
-      feed={feed}
-      empty={{ title: IO.sentEmptyTitle, hint: IO.sentEmptyHint, icon: 'arrow-right' }}
-      row={(item) => <SentRow key={item.id} item={item} />}
-    />
+    <>
+      <FeedFrame
+        feed={feed}
+        empty={{ title: IO.sentEmptyTitle, hint: IO.sentEmptyHint, icon: 'arrow-right' }}
+        row={(item) => <SentRow key={item.id} item={item} />}
+      />
+      {feed.state.phase === 'ok' ? (
+        <UnderTheHood
+          fields={listHood(
+            items.length,
+            items.reduce((n, i) => n + i.size, 0),
+          )}
+        />
+      ) : null}
+    </>
   );
 }

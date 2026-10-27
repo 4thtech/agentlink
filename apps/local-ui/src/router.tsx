@@ -14,11 +14,11 @@ import { BackupPage } from './pages/backup/index.js';
 import { ContactsPage } from './pages/contacts/index.js';
 import { FilesPage } from './pages/files/index.js';
 import { FirstRunPage } from './pages/first-run/index.js';
+import { HomePage } from './pages/home/index.js';
 import { MessagesPage } from './pages/messages/index.js';
 import { ProofsPage } from './pages/proofs/index.js';
 import { RulesPage } from './pages/rules/index.js';
 import { PASSKEYS_LABEL, REDIRECTS } from './nav.js';
-import { PAGE_TITLES } from './strings.js';
 import { NotAvailablePage, NotFoundPage } from './states/index.js';
 
 export interface RouteDef {
@@ -29,11 +29,6 @@ export interface RouteDef {
 /** Passkeys has no page card yet: a plain stub, replaced when its card lands. */
 function PasskeysPage(): ReactElement {
   return <NotAvailablePage title={PASSKEYS_LABEL} />;
-}
-
-/** Home has no page yet (UI-REFRESH-g builds it): a plain stub at its address, D-135. */
-function HomePage(): ReactElement {
-  return <NotAvailablePage title={PAGE_TITLES.home} />;
 }
 
 export const ROUTES: readonly RouteDef[] = [
