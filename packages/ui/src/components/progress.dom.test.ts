@@ -125,7 +125,13 @@ describe('ProgressBar, stepped', () => {
     expect(states()).toEqual(['done', 'done', 'done']);
     expect(q('.al-pb')?.classList.contains('is-done')).toBe(true);
     render(
-      h(ProgressBar, { label: 'Adding proof', steps, current: 1, state: 'error', error: 'Try again.' }),
+      h(ProgressBar, {
+        label: 'Adding proof',
+        steps,
+        current: 1,
+        state: 'error',
+        error: 'Try again.',
+      }),
     );
     expect(states()).toEqual(['done', 'error', 'todo']);
   });
@@ -234,7 +240,11 @@ describe('useDelayedShow (§15.2)', () => {
 
 describe('Skeleton', () => {
   const sk = (loading: boolean) =>
-    h(Skeleton, { loading, label: 'Loading your files', lines: 3 }, h('p', { id: 'real' }, 'Content'));
+    h(
+      Skeleton,
+      { loading, label: 'Loading your files', lines: 3 },
+      h('p', { id: 'real' }, 'Content'),
+    );
 
   it('renders nothing for 400 ms, then blocks with a word; content replaces it after 500 ms', () => {
     render(sk(true));

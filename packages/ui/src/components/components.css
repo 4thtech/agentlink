@@ -854,9 +854,6 @@ body {
 .al-proof-time {
   color: var(--al-color-fg-muted);
 }
-.al-proof.is-recording .al-icon {
-  animation: al-spin 1.2s linear infinite;
-}
 .al-proof.is-failed {
   background: var(--al-color-status-danger-bg);
   color: var(--al-color-status-danger-fg);
@@ -873,15 +870,7 @@ body {
 .al-proof.is-waiting .al-icon {
   color: var(--al-color-accent-fg);
 }
-@keyframes al-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .al-proof.is-recording .al-icon {
-    animation: none;
-  }
   * {
     transition: none !important;
   }

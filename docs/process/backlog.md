@@ -4631,7 +4631,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - DOM tests per level and state; increased contrast and forced colours give every level a 1 px border; `data-transparency="reduced"`, `@supports not`, Windows and Linux give solid chrome; Sheet focus and Escape tests.
 
 #### UI-REFRESH-c · ui: progress components (bars, ring meter, skeleton) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/progress.tsx`, `progress.css` and their tests; the `al-spin` block of `components.css` and its lint exception; changeset
 - **Depends on:** UI-REFRESH-a
 - **Spec:** B-11 §15.1, §15.2, §15.3; 11 §11
