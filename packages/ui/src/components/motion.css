@@ -1,0 +1,18 @@
+/* Motion (B-11 §14, UI-REFRESH-a). One reduced-motion switch for the whole app: the system setting
+   and the app's own setting (Settings, Appearance, UI-REFRESH-e) both land here. Only opacity,
+   transform and stroke-dashoffset animate (packages/ui/src/motion-lint.test.ts). Cards add their
+   keyframes below this block, never above it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation: none !important;
+  transition: none !important;
+}

@@ -25,6 +25,11 @@
     },
     "./tokens.css": "./src/tokens/tokens.css",
     "./components.css": "./src/components/components.css",
+    "./depth.css": "./src/components/depth.css",
+    "./progress.css": "./src/components/progress.css",
+    "./motion.css": "./src/components/motion.css",
+    "./hood.css": "./src/components/hood.css",
+    "./chrome.css": "./src/components/chrome.css",
     "./fonts/*": "./fonts/*"
   },
   "files": [
@@ -32,6 +37,11 @@
     "!dist/tsconfig.tsbuildinfo",
     "src/tokens/tokens.css",
     "src/components/components.css",
+    "src/components/depth.css",
+    "src/components/progress.css",
+    "src/components/motion.css",
+    "src/components/hood.css",
+    "src/components/chrome.css",
     "fonts",
     "THIRD-PARTY-NOTICES.md"
   ],

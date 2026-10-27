@@ -538,6 +538,35 @@ export const shadowTokens = {
 } as const satisfies Record<string, ThemeValues>;
 export type ShadowTokenName = keyof typeof shadowTokens;
 
+/** Elevation highlights and the chrome material (B-11 §13, UI-REFRESH-a): per-theme values. */
+export const depthTokens = {
+  'al-highlight-top': {
+    dark: 'rgba(255, 255, 255, 0.05)',
+    light: 'transparent',
+    'dark-contrast': 'transparent',
+    'light-contrast': 'transparent',
+  },
+  'al-highlight-top-raised': {
+    dark: 'rgba(255, 255, 255, 0.07)',
+    light: 'transparent',
+    'dark-contrast': 'transparent',
+    'light-contrast': 'transparent',
+  },
+  'al-material-chrome-bg': {
+    dark: 'rgba(17, 19, 22, 0.72)',
+    light: 'rgba(255, 255, 255, 0.72)',
+    'dark-contrast': '#060708',
+    'light-contrast': '#ffffff',
+  },
+  'al-material-blur': {
+    dark: 'blur(20px) saturate(1.4)',
+    light: 'blur(20px) saturate(1.4)',
+    'dark-contrast': 'none',
+    'light-contrast': 'none',
+  },
+} as const satisfies Record<string, ThemeValues>;
+export type DepthTokenName = keyof typeof depthTokens;
+
 /** Theme-independent tokens: space, radius, size, border width, weight, opacity, z-index, motion, layout. */
 export const scalarTokens = {
   'al-space-0': '0px',

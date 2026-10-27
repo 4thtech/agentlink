@@ -53,7 +53,7 @@ const LIGHT_CONTRAST: Row = {
 function blockAt(css0: string, opener: string): string {
   const start = css0.indexOf(compact(opener));
   expect(start, opener).toBeGreaterThanOrEqual(0);
-  return css0.slice(start, css0.indexOf('}', start));
+  return css0.slice(start, css0.indexOf('}', start + 1));
 }
 
 const CASES: { name: string; opener: string; row: Row }[] = [
