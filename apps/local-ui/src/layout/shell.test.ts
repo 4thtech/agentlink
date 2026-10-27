@@ -204,6 +204,7 @@ describe('navigation', () => {
       'Passkeys',
       'Appearance',
       'Advanced',
+      'About',
     ]);
     expect(sub.classList.contains('al-chrome')).toBe(true);
     expect(sub.classList.contains('al-subnav')).toBe(true);

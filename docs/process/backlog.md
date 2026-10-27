@@ -4773,7 +4773,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - The existing rules and warnings tests unchanged; DOM tests for saved and error; reduced motion.
 
 #### UI-REFRESH-n · local-ui: Settings pages refresh and About (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**`, `advanced/**`, `storage/**`, `about/**` (new); after UI-REFRESH-f has merged: one `ROUTES` line in `router.tsx`, one `SETTINGS_PAGES` line in `nav.ts` and one `PAGE_TITLES.about` entry in `apps/local-ui/src/strings.ts` (UI-REFRESH-f owns those files until it merges; no other wave-4 card edits them)
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Settings), §7 (Advanced); UX-V3 plan §3

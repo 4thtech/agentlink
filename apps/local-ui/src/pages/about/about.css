@@ -1,0 +1,26 @@
+/* About (UI-REFRESH-n): stacked sections on Surface 1. Tokens only; nothing moves. */
+.ab-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-width: var(--al-layout-max-content);
+}
+.ab-page h1,
+.ab-page h2,
+.ab-page p {
+  margin: 0;
+}
+.ab-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+}
+.ab-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
