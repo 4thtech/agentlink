@@ -495,7 +495,12 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
       {content}
       {list.phase === 'ok' ? (
         <UnderTheHood
-          fields={[{ kind: 'count', label: IO.hoodFolders, value: String(list.folders.length) }]}
+          fields={[
+            { kind: 'count', label: IO.hoodFolders, value: String(list.folders.length) },
+            ...list.folders
+              .slice(0, 5)
+              .map((row, i) => ({ kind: 'path', label: `Folder ${i + 1}`, value: row.path })),
+          ]}
         />
       ) : null}
     </section>

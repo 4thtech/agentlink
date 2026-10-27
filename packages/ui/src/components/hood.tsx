@@ -28,13 +28,13 @@ export const HOOD_STRINGS = {
   previewMoved: 'The sample has moved. With reduced motion it jumps instead of gliding.',
 } as const;
 
-export type HoodTextKind = 'text' | 'id' | 'size' | 'time' | 'count';
+export type HoodTextKind = 'text' | 'id' | 'size' | 'time' | 'count' | 'path';
 
 export type HoodField =
   | { readonly kind: HoodTextKind; readonly label: string; readonly value: string }
   | { readonly kind: 'proofLink'; readonly label?: string; readonly href: string };
 
-const TEXT_KINDS: ReadonlySet<string> = new Set(['text', 'id', 'size', 'time', 'count']);
+const TEXT_KINDS: ReadonlySet<string> = new Set(['text', 'id', 'size', 'time', 'count', 'path']);
 
 /**
  * Public block explorers whose record pages may be linked: the exact hosts of the chain config's
@@ -55,21 +55,25 @@ const KIND_SHAPE: Partial<Record<HoodTextKind, RegExp>> = {
   size: /^\d[\d.,]*\s?(B|KB|MB|GB|bytes?)$/,
   count: /^\d{1,9}( of \d{1,9})?$/,
   time: /^[\d:.,+\-TZ ]{1,40}$/,
+  // An absolute local path: POSIX `/…` (not `//`) or a drive `C:\…`. No query, fragment or control characters.
+  path: /^(\/(?![/\\])|[A-Za-z]:[\\/])[^?#\0]*$/,
 };
 
 const LABEL_MAX = 40;
 const VALUE_MAX = 120;
+const PATH_MAX = 300;
 const LINK_MAX = 300;
 
 /** A label that names something secret or private is refused, whatever its value looks like. */
 const FORBIDDEN_LABEL =
   /key|code|token|secret|passphrase|password|passkey|seed|session|link|url|presign|signature|upload|download|\bdrop\b|credential|cookie|authori[sz]/i;
+const BLOB_RULE = /[A-Za-z0-9_\-+/=]{24,}/;
 /** Values that look like a link, a scheme, a key or blob, a code, a token or a signed URL. */
 const FORBIDDEN_VALUE: readonly RegExp[] = [
   /[a-z][a-z0-9+.-]*:\/\//i,
   /^\s*(javascript|data|blob|file|vbscript):/i,
   /\bwww\./i,
-  /[A-Za-z0-9_\-+/=]{24,}/,
+  BLOB_RULE,
   /\bbearer\s/i,
   /\b(tok|sk|pk|key)_[A-Za-z0-9]/i,
   /\beyJ[A-Za-z0-9_-]{6,}/,
@@ -79,6 +83,16 @@ const FORBIDDEN_VALUE: readonly RegExp[] = [
   /^\s*([a-z]+\s+){11,}[a-z]+\s*$/,
   /#s=|127\.0\.0\.1|localhost/i,
 ];
+
+const SEGMENT_BLOB = BLOB_RULE;
+
+/** A path is checked piece by piece: a key, code or token hiding in one folder name is refused. */
+function pathAllowed(value: string): boolean {
+  const segments = value.split(/[\\/]/);
+  if (segments.some((seg) => seg === '..' || SEGMENT_BLOB.test(seg))) return false;
+  // Same filters as any value, except the long-blob rule, which is applied per segment above.
+  return !FORBIDDEN_VALUE.some((re) => re !== BLOB_RULE && re.test(value));
+}
 
 function isRecord(x: unknown): x is Record<string, unknown> {
   return typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -124,11 +138,13 @@ export function acceptHoodField(input: unknown): HoodField | null {
   if (typeof kind !== 'string' || !TEXT_KINDS.has(kind)) return null;
   const label = input['label'];
   const value = input['value'];
-  if (!safeText(label, LABEL_MAX) || !safeText(value, VALUE_MAX)) return null;
+  if (!safeText(label, LABEL_MAX) || !safeText(value, kind === 'path' ? PATH_MAX : VALUE_MAX))
+    return null;
   if (FORBIDDEN_LABEL.test(label)) return null;
   const shape = KIND_SHAPE[kind as HoodTextKind];
   if (shape !== undefined && !shape.test(value)) return null;
-  if (FORBIDDEN_VALUE.some((re) => re.test(value))) return null;
+  if (kind === 'path' ? !pathAllowed(value) : FORBIDDEN_VALUE.some((re) => re.test(value)))
+    return null;
   return { kind: kind as HoodTextKind, label, value };
 }
 

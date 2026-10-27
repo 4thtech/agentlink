@@ -183,8 +183,6 @@ const LEGACY_EXCEPTIONS: Record<string, string> = {
     'legacy',
   'packages/ui/src/components/components.css | transition-property | .al-btn | border-color':
     'legacy',
-  'packages/ui/src/components/components.css | transition-property | .al-switch-knob | left':
-    'legacy',
 };
 
 /** Stylesheet text by repo-relative path, from the two places the app's CSS lives. */

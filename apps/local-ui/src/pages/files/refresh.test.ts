@@ -12,7 +12,8 @@
 // - A file that arrives while the page is open gets the file-received moment and the row entrance;
 //   the first load plays none. Reduced motion (media query and the app's own attribute): no animate
 //   call, the words still say it.
-// - Under the hood: counts and sizes of what is listed only; never a folder path, name, key or link.
+// - Under the hood: counts and sizes of what is listed and the folder paths (path kind); never a
+//   file name, key or link.
 // - Others' names stay plain text inside UntrustedContent.
 import { HoodProvider } from '@4thtech-io/ui';
 import { act, createElement as h } from 'react';
@@ -317,7 +318,7 @@ describe('Under the hood', () => {
     expect(text).not.toMatch(/https?:|\/Users|\/home|~\//);
   });
 
-  it('on Send folders shows the number of folders and no folder path', async () => {
+  it('on Send folders shows the number of folders and each real folder path (the path kind)', async () => {
     await mount(
       {
         [RECEIVED]: page([]),
@@ -331,8 +332,8 @@ describe('Under the hood', () => {
     );
     const hoodText = host.querySelector('.al-hood')?.textContent ?? '';
     expect(hoodText).toContain('Under the hood');
-    expect(hoodText).toContain('1');
-    expect(hoodText).not.toContain('/Users/ana');
+    expect(hoodText).toContain('Folders allowed');
+    expect(hoodText).toContain('/Users/ana/Send');
   });
 });
 
