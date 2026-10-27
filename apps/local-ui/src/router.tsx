@@ -8,6 +8,7 @@ import { withRouteTransition } from './layout/transition.js';
 import { ActivityPage } from './pages/activity/index.js';
 import { ApprovalsPage } from './pages/approvals/index.js';
 import { ApprovePage, approvalIdOf } from './pages/approve/index.js';
+import { AboutPage } from './pages/about/index.js';
 import { AdvancedPage } from './pages/advanced/index.js';
 import { AppearancePage } from './pages/appearance/index.js';
 import { BackupPage } from './pages/backup/index.js';
@@ -50,6 +51,7 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/settings/passkeys', page: PasskeysPage },
   { path: '/settings/appearance', page: AppearancePage },
   { path: '/settings/advanced', page: AdvancedPage },
+  { path: '/settings/about', page: AboutPage },
 ];
 
 const CHANGE = 'agentlink:navigate';

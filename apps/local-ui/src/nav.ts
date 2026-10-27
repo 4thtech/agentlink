@@ -70,6 +70,7 @@ export const SETTINGS_PAGES: readonly { readonly label: string; readonly path: s
   { label: PASSKEYS_LABEL, path: '/settings/passkeys' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
   { label: PAGE_TITLES.advanced, path: '/settings/advanced' },
+  { label: PAGE_TITLES.about, path: '/settings/about' },
 ];
 
 /** Old paths that still work and where they now go. Storage lives inside Files. */

@@ -1,8 +1,6 @@
 // UI-REFRESH-n: the About page's own stylesheet uses tokens only and animates nothing (08 §4).
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-
-const css = readFileSync(new URL('./about.css', import.meta.url), 'utf8');
+import css from './about.css?raw';
 
 describe('about.css', () => {
   it('uses tokens only: no literal colours or durations', () => {
