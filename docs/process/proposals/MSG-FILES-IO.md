@@ -36,7 +36,7 @@ People see what their AI did, in the local app, without asking the AI.
 
 - **No new store and no new copies.** Messages come from `envelopes` (in and out); files from `files`. Sent bodies are already kept, sealed, for as long as their envelope row exists (today: not pruned, except refused and request rows, D-72).
 - One small schema addition (MSG-FILES-IO-b): `files.saved_name` (`enc`, sealed like `name`), the single file name `fetchFile` placed in the Inbox folder. Store schema version 5 → 6; old rows read `null` ("not saved yet").
-- Retention is unchanged: file rows follow `delete_after` (04 §4). The file list comes from the file entries of each envelope's sealed payload (name, size, `expiresAt`; never `url` or `fileKey`), joined to its `files` row. Retention (`files/retention.ts`) deletes the whole `files` row, key included, at expiry or on receipt; only an inline file's row is kept with `deleted_at`. So a payload entry without a row reads `expired` when `expiresAt` has passed and `deleted` otherwise; an inline file with `deleted_at` reads `deleted`. A removed contact's conversation is hidden, as in the AI's inbox. Owner question 2 asks whether message history should get a limit.
+- Retention is unchanged: file rows follow `delete_after` (04 §4). The file list comes from the file entries of each envelope's sealed payload (name, size, `expiresAt`; never `url` or `fileKey`), joined to its `files` row. Retention (`files/retention.ts`) deletes the whole `files` row, key included, at expiry or on receipt; only an inline file's row is kept with `deleted_at`. So a payload entry without a row reads `expired` when `expiresAt` has passed and `deleted` otherwise; an inline file with `deleted_at` reads `deleted`. A removed contact's conversation is hidden, as in the AI's inbox. Message history is kept as today (owner decision 2 (a), §8).
 - Only types in `INBOX_TYPES` from a contact that is not removed are listed. Unknown senders (requests), refused, held and protocol envelopes are never listed (11 §5: requests stay in Contacts).
 
 ## 4. Local API (read-only, owner browser session only)
@@ -60,14 +60,14 @@ Built from existing components and D1 styling (D-116): the contact list styling 
 
 - **Messages** (`/settings/messages` until M1-11b-2 moves the app to `/`; then `/messages`), between Activity and Contacts. Contacts list with time and a dot for new; Inbox and Sent tabs; long messages clamped with "Show all"; **Copy text**; footer "To reply, ask your AI."; empty, nothing-yet and offline ("as of 14:02") states; Under the hood: message ID, size, proof.
 - **Files**: top line "You don't upload here. Put files in your Send folder or ask your AI to send them; files you receive appear under Received." Tabs Received (from, when, size, proof badge, "saved as" name, the one-time untrusted-file note), Sent (file, to whom, when, status chips, receipt) and Send folders (today's page). The app never opens a received file.
-- **Show in Finder** is a separate card (MSG-FILES-IO-h) because it needs a new kind of route (owner question 1).
+- **Show in Finder** is a separate card (MSG-FILES-IO-h) because it needs a new kind of route (owner decision 1 (a), §8).
 
 ## 6. Threat notes (04)
 
 - **I-5, inbound content.** Message text and other people's file names are untrusted. Only inside `UntrustedContent`, as plain text; never in the page title, notifications, toasts, Activity rows, Home tiles or the OS passkey prompt ("New message from Marko" only). File names may hold control, bidi or look-alike characters: rendered as text in the untrusted container, never used as a path by the page. A test feeds a body with HTML, Markdown, a `javascript:` link and an image tag and asserts the DOM has no element, attribute or link from it.
 - **I-4, no new authority.** GET only; no store write; no MCP tool (the tool-list snapshot test stays unchanged); no compose. Reading never marks a message read for the AI (a test asserts `read_at` is unchanged after every route).
 - **I-7 and zero access.** The server reads the local store only: no relay, drop or chain request (a test with a failing transport and storage still answers). No URL, file key, drop link, `envelope_json` or sealed value in any response (exact-key-set tests, and a test that scans responses for the stored URL and key). Logs carry counts only; error responses never carry message text.
-- **Session.** Same gate as every `/api/ui/` route. Residual risk (`approval-server.ts`, G-1, D-67): cookies are not isolated by port, so another local server the owner's browser visits could receive the cookie, and "viewing only" now includes message text: a leaked cookie would newly expose Inbox and Sent plaintext to another local process. This is not new to the AI, which already reads both through its own tools. Owner question 3.
+- **Session.** Same gate as every `/api/ui/` route. Residual risk (`approval-server.ts`, G-1, D-67): cookies are not isolated by port, so another local server the owner's browser visits could receive the cookie, and "viewing only" now includes message text: a leaked cookie would newly expose Inbox and Sent plaintext to another local process. This is not new to the AI, which already reads both through its own tools. Accepted for 0.3.x and revisited before M3 (owner decision 3 (a), §8).
 - **SSRF and realpath (04 §4).** No URL is fetched. `saved_name` is the single checked segment `fetchFile` already chose; it is stored as a name, never as a path. Show in Finder (card h) resolves the Inbox folder's realpath again, refuses links (`lstat`), checks the file is a direct child, and passes it to the OS opener as an argument, never through a shell.
 - **Crypto.** Sealing and opening only through core's `seal`/`open` (the store cipher from `@4thtech-io/crypto`, key in the `KeyStore`). No new primitive, no new key.
 
@@ -82,12 +82,14 @@ Built from existing components and D1 styling (D-116): the contact list styling 
 | MSG-FILES-IO-e | local-ui: Messages page | S1 | Sonnet, Opus review | c (builds against §4 with a mocked API) |
 | MSG-FILES-IO-f | local-ui: Files tabs Received · Sent · Send folders | S1 | Sonnet, Opus review | d (same) |
 | MSG-FILES-IO-g | spec: 08 §1 pages and routes, 11 §5 strings, decision log | S1 | Opus | — |
-| MSG-FILES-IO-h | Show in Finder for a saved received file | S2 (sensitive: route registry) | Opus, Fable audit | b, f; owner question 1 |
+| MSG-FILES-IO-h | Show in Finder for a saved received file | S2 (sensitive: route registry) | Opus, Fable audit | b, f |
 
-Order: **a, b, g in parallel**; then **c and d** in parallel (both add one line to `routes.ts` and `context.ts`: merge main before review); **e and f** can start with a, b (mocked API, disjoint folders) and merge after c and d. h waits for the owner.
+Order: **a, b, g in parallel**; then **c and d** in parallel (both add one line to `routes.ts` and `context.ts`: merge main before review); **e and f** can start with a, b (mocked API, disjoint folders) and merge after c and d. h follows b and f.
 
-## 8. Owner questions (recommended first)
+## 8. Owner decisions (Tali, 27 Oct 2026, in chat: decided)
 
-1. **Show in Finder.** (a) A new route kind for local OS actions: POST, no presence, no signing, no store write, one fixed action; changes the registry rule "every POST needs presence" (recommended, card h); (b) no button: show the Inbox folder path with Copy; (c) presence (Touch ID) on each click.
-2. **Message history retention.** (a) Keep as today (until the contact is removed), the app changes nothing (recommended); (b) a limit such as 90 days, as a new rule (a later card).
-3. **Message text and the session cookie.** (a) Accept the documented residual for 0.3.x and revisit before M3 (recommended); (b) require presence once per session before Messages shows any text.
+All three recommended options were chosen.
+
+1. **Show in Finder.** (a) A new route kind for local OS actions: POST, no presence, no signing, no store write, one fixed action; changes the registry rule "every POST needs presence" **Decided (a)** (card h): the request carries only the item ID; the server opens only the store-recorded file, realpath-confined to the Inbox folder. Not chosen: (b) no button: show the Inbox folder path with Copy; (c) presence (Touch ID) on each click.
+2. **Message history retention.** (a) Keep as today (until the contact is removed), the app changes nothing. **Decided (a).** Not chosen: (b) a limit such as 90 days, as a new rule (a later card).
+3. **Message text and the session cookie.** (a) Accept the documented residual for 0.3.x and revisit before M3. **Decided (a).** Not chosen: (b) require presence once per session before Messages shows any text.

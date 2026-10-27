@@ -4480,7 +4480,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 
 #### MSG-FILES-IO · Messages and Files In/Out: people see what their AI did (new, owner decision 2026-10-27)
 
-Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 6 (a)): a read-only **Messages** page (Inbox and Sent per contact) and **Files** tabs Received · Sent · Send folders. Decrypted only on this computer, nothing new sent to any 4thTech service, inbound content as untrusted plain text, no new AI authority, the app's own "seen" marker. Plan, API contract and threat notes: [`docs/process/proposals/MSG-FILES-IO.md`](proposals/MSG-FILES-IO.md). Design: `docs/design/b11-local-app.md` §17. These cards replace the 0.3.1 plan items M1-UX3-FILES-EXPLAIN and the Sent list of M1-UX3-FILES-SEND (never carded; the folder picker stays a later card). PR titles: `CHORE: MSG-FILES-IO-<x> …`. Order: a, b, g in parallel; then c and d; e and f start early against the plan's §4 contract with a mocked API and merge after c and d; h waits for owner question 1.
+Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 6 (a)): a read-only **Messages** page (Inbox and Sent per contact) and **Files** tabs Received · Sent · Send folders. Decrypted only on this computer, nothing new sent to any 4thTech service, inbound content as untrusted plain text, no new AI authority, the app's own "seen" marker. Plan, API contract and threat notes: [`docs/process/proposals/MSG-FILES-IO.md`](proposals/MSG-FILES-IO.md). Design: `docs/design/b11-local-app.md` §17. These cards replace the 0.3.1 plan items M1-UX3-FILES-EXPLAIN and the Sent list of M1-UX3-FILES-SEND (never carded; the folder picker stays a later card). PR titles: `CHORE: MSG-FILES-IO-<x> …`. Order: a, b, g in parallel; then c and d; e and f start early against the plan's §4 contract with a mocked API and merge after c and d; h follows b and f. Owner decisions of 27 Oct on the plan's three questions: Show in Finder with no Touch ID (card h), message history kept as today, the session-cookie residual accepted for 0.3.x and revisited before M3 (plan §8).
 
 #### MSG-FILES-IO-a · core: read-only messages and files views for the local app, no read mark (new)
 - **Status:** backlog · **Size:** M · **Tier:** Opus (Fable audit: opens sealed payloads at the zero-access boundary) · **Security:** S2 · **Phase:** M1b
@@ -4568,14 +4568,14 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Acceptance:**
   - Spec text matches the plan's §4 contract and threat notes; no other behaviour changes; `node tools/docs-status/index.mjs --check` passes.
 
-#### MSG-FILES-IO-h · Show in Finder for a saved received file (new, needs owner decision)
-- **Status:** backlog (owner question 1 in the plan) · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
+#### MSG-FILES-IO-h · Show in Finder for a saved received file (new, owner decision 2026-10-27)
+- **Status:** backlog · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/routes.ts`, `route-types.ts`, `approval-server.ts` (the gate for the new route kind), `approval-os.ts` (opener), `local-ui/api/files-io.ts`, `apps/local-ui/src/pages/files/**`, tests; changeset
-- **Depends on:** MSG-FILES-IO-b, MSG-FILES-IO-f; owner question 1
+- **Depends on:** MSG-FILES-IO-b, MSG-FILES-IO-f
 - **Spec:** 04 §2.5, §4 (realpath); 08 §1; plan §6
 - **Invariants:** I-4, I-7
 - **Scope:**
-  - With option (a): a route kind for one fixed local OS action (POST, no presence, no signing, no store write), still behind the session, CSRF, Origin and octet-stream checks.
+  - Owner decision (Tali, 27 Oct, in chat; plan §8 1 (a)): Show in Finder with no Touch ID. A new route kind for this one fixed local OS action (POST, no presence, no signing, no store write), still behind the session, CSRF, Origin and octet-stream checks.
   - The request carries only the item ID (`<envelopeId>.<idx>`). The server reads the sealed `saved_name` from the store; it accepts no name or path from the request.
   - Resolves the Inbox folder's realpath, opens the file once with no-follow and checks that handle (a regular file, a direct child of that folder), then passes that checked path to the OS opener as one argument, never through a shell. Fail closed on any doubt; no separate `lstat`-then-open step (no check-then-use race).
 - **Acceptance (tests first, RED commit):**
