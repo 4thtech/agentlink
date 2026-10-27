@@ -9,11 +9,15 @@ export * from './approval.js';
 export * from './brand.js';
 export * from './feedback.js';
 export * from './forms.js';
+export * from './hood.js';
 export * from './identity.js';
+export * from './motion.js';
 export * from './pay-confirm.js';
+export * from './progress.js';
 export * from './proof.js';
 export * from './review.js';
 export * from './shell.js';
+export * from './surface.js';
 export * from './trust.js';
 export type {
   ApprovalState,

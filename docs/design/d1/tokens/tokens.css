@@ -217,6 +217,10 @@
   --al-shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45);
   --al-shadow-3: 0 12px 32px rgba(0, 0, 0, 0.55);
   --al-shadow-4: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --al-highlight-top: rgba(255, 255, 255, 0.05);
+  --al-highlight-top-raised: rgba(255, 255, 255, 0.07);
+  --al-material-chrome-bg: rgba(17, 19, 22, 0.72);
+  --al-material-blur: blur(20px) saturate(1.4);
   color-scheme: dark;
 }
 
@@ -308,6 +312,10 @@
   --al-shadow-2: 0 4px 12px rgba(14, 16, 19, 0.08);
   --al-shadow-3: 0 12px 32px rgba(14, 16, 19, 0.12);
   --al-shadow-4: 0 24px 64px rgba(14, 16, 19, 0.16);
+  --al-highlight-top: transparent;
+  --al-highlight-top-raised: transparent;
+  --al-material-chrome-bg: rgba(255, 255, 255, 0.72);
+  --al-material-blur: blur(20px) saturate(1.4);
   color-scheme: light;
 }
 
@@ -380,6 +388,10 @@
   --al-shadow-2: none;
   --al-shadow-3: none;
   --al-shadow-4: none;
+  --al-highlight-top: transparent;
+  --al-highlight-top-raised: transparent;
+  --al-material-chrome-bg: #060708;
+  --al-material-blur: none;
 }
 
 [data-theme="light"][data-contrast="more"], [data-theme="light-contrast"] {
@@ -450,6 +462,10 @@
   --al-shadow-2: none;
   --al-shadow-3: none;
   --al-shadow-4: none;
+  --al-highlight-top: transparent;
+  --al-highlight-top-raised: transparent;
+  --al-material-chrome-bg: #ffffff;
+  --al-material-blur: none;
 }
 
 @media (prefers-color-scheme: light) {
@@ -541,6 +557,10 @@
     --al-shadow-2: 0 4px 12px rgba(14, 16, 19, 0.08);
     --al-shadow-3: 0 12px 32px rgba(14, 16, 19, 0.12);
     --al-shadow-4: 0 24px 64px rgba(14, 16, 19, 0.16);
+    --al-highlight-top: transparent;
+    --al-highlight-top-raised: transparent;
+    --al-material-chrome-bg: rgba(255, 255, 255, 0.72);
+    --al-material-blur: blur(20px) saturate(1.4);
     color-scheme: light;
   }
 }
@@ -615,6 +635,10 @@
     --al-shadow-2: none;
     --al-shadow-3: none;
     --al-shadow-4: none;
+    --al-highlight-top: transparent;
+    --al-highlight-top-raised: transparent;
+    --al-material-chrome-bg: #060708;
+    --al-material-blur: none;
   }
 }
 @media (prefers-contrast: more) and (prefers-color-scheme: light) {
@@ -704,11 +728,19 @@
     --al-shadow-2: none;
     --al-shadow-3: none;
     --al-shadow-4: none;
+    --al-highlight-top: transparent;
+    --al-highlight-top-raised: transparent;
+    --al-material-chrome-bg: #ffffff;
+    --al-material-blur: none;
   }
 }
 
 @media (forced-colors: active) {
   :root {
+    --al-highlight-top: transparent;
+    --al-highlight-top-raised: transparent;
+    --al-material-chrome-bg: Canvas;
+    --al-material-blur: none;
     --al-color-focus-ring: Highlight;
     --al-color-accent-default: Highlight;
     --al-color-fg-on-accent: HighlightText;

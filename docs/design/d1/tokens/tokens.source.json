@@ -1152,6 +1152,51 @@
    }
   ]
  },
+ "depth": {
+  "note": "Depth and materials of the local app refresh (B-11 v2 s13, decision 3). Added by UI-REFRESH-a; shadows and backgrounds are unchanged.",
+  "tokens": [
+   {
+    "name": "al-highlight-top",
+    "value": {
+     "dark": "rgba(255, 255, 255, 0.05)",
+     "light": "transparent",
+     "dark-contrast": "transparent",
+     "light-contrast": "transparent"
+    },
+    "usage": "Level 1 (surface): the 1 px top highlight, white at about 5 % in dark (B-11 s13.1: 4 to 6 %). Transparent in light, increased contrast and forced colours."
+   },
+   {
+    "name": "al-highlight-top-raised",
+    "value": {
+     "dark": "rgba(255, 255, 255, 0.07)",
+     "light": "transparent",
+     "dark-contrast": "transparent",
+     "light-contrast": "transparent"
+    },
+    "usage": "Levels 2 to 4 (raised, sheet, modal): the 1 px top highlight, white at about 7 % in dark (B-11 s13.1: 6 to 8 %). Name proposed, owner confirms at merge (UI-REFRESH-a). Transparent in light, increased contrast and forced colours."
+   },
+   {
+    "name": "al-material-chrome-bg",
+    "value": {
+     "dark": "rgba(17, 19, 22, 0.72)",
+     "light": "rgba(255, 255, 255, 0.72)",
+     "dark-contrast": "#060708",
+     "light-contrast": "#ffffff"
+    },
+    "usage": "Chrome material (sidebar, top bar, status bar, sticky headers): the surface colour at 72 % in dark and light; the solid surface in increased contrast and forced colours (B-11 s13.2). Translucent only on macOS with blur support; solid everywhere else."
+   },
+   {
+    "name": "al-material-blur",
+    "value": {
+     "dark": "blur(20px) saturate(1.4)",
+     "light": "blur(20px) saturate(1.4)",
+     "dark-contrast": "none",
+     "light-contrast": "none"
+    },
+    "usage": "Chrome material backdrop filter, used with the chrome background and its solid fallbacks (B-11 s13.2). None in increased contrast and forced colours."
+   }
+  ]
+ },
  "size": {
   "tokens": [
    {
