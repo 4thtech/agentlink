@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/mcp-tools",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "The runtime-agnostic MCP tool handlers (registry, handlers, result helpers). Imported by the CLI and, later, by the cloud agent Worker.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/invite",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "Invite host: static how-to-install page that reads the invite in the browser (08 §4, D-53).",
   "license": "MIT",

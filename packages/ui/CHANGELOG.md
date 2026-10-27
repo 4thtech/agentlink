@@ -1,5 +1,16 @@
 # @4thtech-io/ui
 
+## 0.4.0
+
+### Minor Changes
+
+- 7bab3f5: M1-11s-a-d: the local app's health read, `GET /api/ui/health`, answering a fixed shape (agent running, paused, not running or needs setup; relay counts; last sync time; app version), cached for 3 s and bounded, behind the owner's browser session. The app's status bar polls it (with backoff, paused while hidden) and shows Connected, Paused, Not running or Needs setup in a polite live region, instead of "Checking…" forever. `AppShell` gains the `not-running` and `needs-setup` states.
+
+### Patch Changes
+
+- de6a30f: UI-REFRESH-a: design-token foundation for the local app refresh. Elevation highlight and chrome material tokens in every theme, five empty stylesheets and four stub modules for the later cards, one reduced-motion switch (`data-motion="reduced"` and the system setting), and a lint that fails when anything animates other than opacity or transform.
+- f2f0a7b: UX-031-QUICKWINS: the Rules navigation icon and five other icons now draw their lines (their line coordinates were missing).
+
 ## 0.3.0
 
 No changes in this release.

@@ -1,5 +1,25 @@
 # @4thtech-io/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 662785b: M1-PAY-CONFIRM-a: confirming paid actions with the computer's own verification (04 §2.5.3, D-132). Core builds the confirmation statement and the challenge from stored data (`buildPayConfirmFlow`, `payConfirmChallenge`, `spendingChanges`) and refuses a paid item in `approval.decideBatch` (`paid_item_in_batch`). The local approval server adds `POST /api/ui/pay-confirm/begin` and `/finish`: user verification required, single use, bound to the page session, 120 s; the passkey's own signature is verified with the credential key kept at registration (crypto `verifyWebauthnSignature`, ES256 and EdDSA); the backup code keeps the three-tries rule. Approving a paid proof or changing a spending limit through an ordinary owner route now answers `confirm_required`; `agentlink approve` with no ID lists a paid request but sends it to `approve <id>` on its own.
+- 64dab44: MSG-FILES-IO-a: read-only `MessagesView` (`client.messages`: conversations, and one contact's Inbox or Sent) and `FilesIoView` (`client.filesIo`: received and sent files) for the local app. Store only, decrypted on this computer, never a read mark for the AI; every item is built from an allowlist with no URL, file key or sealed value.
+- a6846b5: MSG-FILES-IO-h: Show in Finder for a saved received file in the local app ("Show in folder" on Windows and Linux), with no Touch ID (D-134). The page sends only the item's ID; the local server reads the saved name from the store (core `filesIo.savedName`), opens the file once inside the Inbox folder without following a link, checks it, and asks the OS file manager to show it (no shell). New route kind `presence: 'reveal'` for `POST /api/ui/files/received/reveal` only. The Received and Sent tabs now read the real file lists: other people's file names sit in the untrusted-content box, a malformed item is skipped instead of hiding the list, and a file that was not delivered says so.
+
+### Patch Changes
+
+- f4d0c03: When your AI fetches a received file, the local store now remembers the name it was saved under in your Inbox folder, encrypted like the file's other details (MSG-FILES-IO-b), so the local app can show which received files are saved. Store schema version 6 adds `files.saved_name`; the SQLite store migrates automatically and existing files read "not saved yet". Migrations are forward-only: once a store is at version 6, an older AgentLink refuses to open it (`store_schema_newer` / `store_too_new`), so you cannot roll the package back after upgrading.
+- c5425de: The local app's server can now list the files you received and sent (MSG-FILES-IO-d): two read-only routes, `GET /api/ui/files/received` and `GET /api/ui/files/sent`, for the owner's browser session only. Each item shows who, when, the file name, size and state; a received file you saved shows only the single name it was saved under. No file key, link, storage location, hash or folder path is ever returned, nothing is written, and no AI tool changes. Core's `client.filesIo` now reads that saved name; a saved name that cannot be read shows that one file without it instead of hiding the list.
+- Updated dependencies [662785b]
+  - @4thtech-io/crypto@0.4.0
+  - @4thtech-io/chain@0.4.0
+  - @4thtech-io/storage@0.4.0
+  - @4thtech-io/transport-nostr@0.4.0
+  - @4thtech-io/log@0.4.0
+  - @4thtech-io/types@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
