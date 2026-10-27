@@ -1432,6 +1432,67 @@ body {
   background: transparent;
   border: var(--al-border-width-thin) dashed var(--al-color-status-neutral-icon);
 }
+/* M1-11s-a-c (B-11 §5): Not running is a hollow dot with a slash (warning); Needs setup is a dot
+   with a small mark (accent). Shape and word, never colour alone. */
+.al-dot.is-not-running {
+  border: var(--al-border-width-thin) solid var(--al-color-status-warning-icon);
+  background: linear-gradient(
+    135deg,
+    transparent 42%,
+    var(--al-color-status-warning-icon) 42% 58%,
+    transparent 58%
+  );
+}
+.al-dot.is-needs-setup {
+  border: var(--al-border-width-thin) solid var(--al-color-accent-default);
+  background: radial-gradient(circle, var(--al-color-accent-default) 30%, transparent 34%);
+}
+/* B-11 §6 row 1: the new state fades in (200 ms standard); arriving at Connected, one pulse ring
+   grows 1x to 2.2x and fades, once, over 480 ms (B-11 §14 moment). Only transform and opacity
+   animate. */
+.al-sb-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  animation: al-sb-fade var(--al-duration-base) var(--al-easing-standard);
+}
+.al-sb-state .al-dot {
+  position: relative;
+}
+.al-sb-state .al-dot.is-connected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--al-radius-full);
+  border: var(--al-border-width-thin) solid var(--al-color-status-success-icon);
+  opacity: 0;
+  animation: al-sb-pulse calc(var(--al-duration-slow) * 1.5) var(--al-easing-enter) 1;
+}
+@keyframes al-sb-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes al-sb-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* A still shape and word: no pulse, no fade (B-11 §6 reduced motion). */
+  .al-sb-state,
+  .al-sb-state .al-dot.is-connected::after {
+    animation: none;
+  }
+}
 @media (max-width: 600px) {
   .al-side {
     display: none;

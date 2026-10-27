@@ -33,6 +33,7 @@ import type {
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
+import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -55,6 +56,15 @@ export interface LocalUiOptions {
    * LocalUiContext. Absent: the setup routes answer 503 `unavailable`.
    */
   readonly ownerSetup?: LocalUiOwnerSetup;
+  /**
+   * M1-11s-a-d: the agent's in-process health state for `GET /api/ui/health` (api/health.ts): agent
+   * running or paused, relay counts and the last sync time. Read at most once per cache window and
+   * within a time limit; only the allowlisted fields are answered. Absent: an opened agent answers
+   * `running`.
+   */
+  readonly health?: LocalUiHealthSource;
+  /** M1-11s-a-d: the app version the health read answers (a plain version, else nothing). */
+  readonly version?: string;
 }
 
 /** M1-11s-c: what owner setup needs from the caller (the CLI). Keychain machines only. */
@@ -232,4 +242,9 @@ export interface LocalUiContext {
   }): Promise<OwnerActionOutcome>;
   /** The clock in milliseconds. */
   now(): number;
+  /**
+   * M1-11s-a-d: the bounded, cached health read (api/health.ts createHealthReader). Fixed fields
+   * only; never rejects.
+   */
+  readonly health?: () => Promise<LocalUiHealthBody>;
 }
