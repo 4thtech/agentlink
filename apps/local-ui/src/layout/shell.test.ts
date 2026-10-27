@@ -37,7 +37,7 @@ function mount(path: string, children?: unknown): void {
           path,
           nextStep: async () => false,
           unseenMessages: async () => 0,
-          readHealth: () => new Promise(() => undefined),
+          readHealth: () => new Promise<never>(() => undefined),
         },
         (children ?? h('p', null, 'page')) as never,
       ),
@@ -75,8 +75,12 @@ describe('top bar', () => {
     ];
     for (const p of parts) expect(p).not.toBeNull();
     const [a, b, c] = parts as Element[];
-    expect((a as Element).compareDocumentPosition(b as Element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect((b as Element).compareDocumentPosition(c as Element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      (a as Element).compareDocumentPosition(b as Element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      (b as Element).compareDocumentPosition(c as Element) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('the top bar is chrome and has no second heading', () => {
@@ -204,9 +208,9 @@ describe('navigation', () => {
     expect(sub.classList.contains('al-chrome')).toBe(true);
     expect(sub.classList.contains('al-subnav')).toBe(true);
     expect(sub.querySelector('a[aria-current="page"]')?.textContent).toBe('Appearance');
-    expect(host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent).toContain(
-      'Settings',
-    );
+    expect(
+      host.querySelector('nav[aria-label="Main"] a[aria-current="page"]')?.textContent,
+    ).toContain('Settings');
   });
 
   it('keeps the status bar: Connected and the version live in the footer', () => {

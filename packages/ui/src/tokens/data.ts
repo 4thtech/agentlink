@@ -553,8 +553,8 @@ export const depthTokens = {
     'light-contrast': 'transparent',
   },
   'al-material-chrome-bg': {
-    dark: 'rgba(17, 19, 22, 0.72)',
-    light: 'rgba(255, 255, 255, 0.72)',
+    dark: 'rgba(17, 19, 22, 0.85)',
+    light: 'rgba(255, 255, 255, 0.85)',
     'dark-contrast': '#060708',
     'light-contrast': '#ffffff',
   },

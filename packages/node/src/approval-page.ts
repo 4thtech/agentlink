@@ -253,6 +253,7 @@ export function pageHtml(csrf: string, options: PageHtmlOptions = {}): string {
  * paths only: no token, no request data. Goes away when M1-11b-2 moves Approvals into the app.
  */
 export const APP_NAV: readonly AppNavLink[] = Object.freeze([
+  { label: 'Home', icon: 'agent', path: '/settings/home' },
   { label: 'Approvals', icon: 'approval', path: '/' },
   { label: 'Activity', icon: 'activity', path: '/settings/activity' },
   { label: 'Messages', icon: 'inbox', path: '/settings/messages' },
@@ -272,6 +273,8 @@ export interface AppNavLink {
 
 /** The sidebar icons (@4thtech-io/ui icon-data.ts, 24-unit stroke icons) as fixed SVG markup. */
 const NAV_ICONS: Readonly<Record<string, string>> = {
+  agent:
+    '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m7 9.5 3 2.5-3 2.5"/><path d="M12.5 15H17"/>',
   approval:
     '<path d="M6.5 5.2A8 8 0 0 1 20 11v2"/><path d="M4 11a8 8 0 0 1 .6-3"/><path d="M4 15v-2"/><path d="M8 20v-7a4 4 0 0 1 8 0v2"/><path d="M12 13v8"/><path d="M16 19v2"/>',
   activity:

@@ -13,6 +13,7 @@ const files = import.meta.glob(['../../../../packages/node/src/approval-page.ts'
 });
 
 const SIDEBAR_ICONS = [
+  'agent',
   'approval',
   'activity',
   'inbox',

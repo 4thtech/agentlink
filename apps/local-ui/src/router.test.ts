@@ -106,7 +106,13 @@ describe('nav', () => {
 
   it('keeps every nav label in plain words', () => {
     // 11 §5: no wallet, gas, seed phrase or transaction words in the default UI.
-    const text = [...NAV_ITEMS.map((i) => i.label), 'Backup', 'Passkeys', 'Appearance', 'Advanced'].join(' ');
+    const text = [
+      ...NAV_ITEMS.map((i) => i.label),
+      'Backup',
+      'Passkeys',
+      'Appearance',
+      'Advanced',
+    ].join(' ');
     expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
   });
 

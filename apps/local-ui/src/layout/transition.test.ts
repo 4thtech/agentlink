@@ -10,7 +10,7 @@ import { navigate, AppRoutes } from '../router.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-type Doc = Document & { startViewTransition?: unknown };
+type Doc = { startViewTransition?: unknown };
 let host: HTMLElement;
 let root: Root;
 let svt: ReturnType<typeof vi.fn>;
@@ -35,9 +35,13 @@ beforeEach(() => {
   root = createRoot(host);
   svt = vi.fn((cb: () => void) => {
     cb();
-    return { finished: Promise.resolve(), ready: Promise.resolve(), skipTransition: () => undefined };
+    return {
+      finished: Promise.resolve(),
+      ready: Promise.resolve(),
+      skipTransition: () => undefined,
+    };
   });
-  (document as Doc).startViewTransition = svt;
+  (document as unknown as Doc).startViewTransition = svt;
   mediaReduce(false);
   history.replaceState(null, '', '/settings/rules');
   act(() => root.render(h(AppRoutes)));
@@ -45,7 +49,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
-  delete (document as Doc).startViewTransition;
+  delete (document as unknown as Doc).startViewTransition;
   document.documentElement.removeAttribute('data-motion');
   window.matchMedia = realMatchMedia;
 });
@@ -81,7 +85,7 @@ describe('route transitions', () => {
   });
 
   it('is not called when the browser has no startViewTransition (instant change)', () => {
-    delete (document as Doc).startViewTransition;
+    delete (document as unknown as Doc).startViewTransition;
     act(() => navigate('/settings/files'));
     expect(title()).toBe('Files');
   });

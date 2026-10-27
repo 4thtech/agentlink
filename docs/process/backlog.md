@@ -4680,7 +4680,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Off by default; remembered per browser; storage that throws still renders; a fixture test asserts exactly the allowlist: the public proof record link renders, while keys, codes, tokens, the session link and drop, upload, download and presigned URLs never reach the DOM; each setting sets its root attribute.
 
 #### UI-REFRESH-f · ui + local-ui: shell with top bar, Mac materials and route transitions (new)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/shell.tsx`, `chrome.css`, the `.al-shell*` blocks of `components.css` and their tests; `apps/local-ui/src/layout/**`, `router.tsx`, `nav.ts`, `strings.ts` and their tests; changeset, changelog fragment
 - **Depends on:** UI-REFRESH-b, UI-REFRESH-d, UI-REFRESH-e
 - **Spec:** B-11 §3, §6 row 11, §13.2, §16 (Settings); UX-V3 plan §3; plan §5

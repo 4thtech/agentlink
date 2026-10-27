@@ -27,13 +27,13 @@ type Row = Record<(typeof NAMES)[number], string>;
 const DARK: Row = {
   'al-highlight-top': 'rgba(255, 255, 255, 0.05)',
   'al-highlight-top-raised': 'rgba(255, 255, 255, 0.07)',
-  'al-material-chrome-bg': 'rgba(17, 19, 22, 0.72)',
+  'al-material-chrome-bg': 'rgba(17, 19, 22, 0.85)',
   'al-material-blur': BLUR,
 };
 const LIGHT: Row = {
   'al-highlight-top': 'transparent',
   'al-highlight-top-raised': 'transparent',
-  'al-material-chrome-bg': 'rgba(255, 255, 255, 0.72)',
+  'al-material-chrome-bg': 'rgba(255, 255, 255, 0.85)',
   'al-material-blur': BLUR,
 };
 const DARK_CONTRAST: Row = {

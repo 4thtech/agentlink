@@ -17,9 +17,12 @@ function rule(css: string, selector: string, within = ''): string {
   const hay = within === '' ? text : text.slice(text.indexOf(within));
   const re = /([^{}]+)\{([^{}]*)\}/g;
   for (let m = re.exec(hay); m !== null; m = re.exec(hay)) {
-    const sels = (m[1] as string)
-      .split(',')
-      .map((s) => s.trim().replace(/^@media[^{]*\{/, '').trim());
+    const sels = (m[1] as string).split(',').map((s) =>
+      s
+        .trim()
+        .replace(/^@media[^{]*\{/, '')
+        .trim(),
+    );
     if (sels.includes(selector)) return m[2] as string;
   }
   return '';
@@ -45,7 +48,9 @@ describe('nav highlight', () => {
 
   it('drops the old per-link bar, the slider carries it', () => {
     expect(squash(all)).not.toContain('.al-nav.is-active::before');
-    expect(rule(all, '.al-nav.is-active')).not.toContain('background: var(--al-color-accent-subtle)');
+    expect(rule(all, '.al-nav.is-active')).not.toContain(
+      'background: var(--al-color-accent-subtle)',
+    );
   });
 
   it('stops sliding under reduced motion (system and app setting)', () => {
@@ -78,13 +83,18 @@ describe('top bar, status bar and sub-navigation', () => {
 });
 
 describe('360 px: the sidebar becomes the bottom bar', () => {
+  // Every `@media (max-width: 600px)` block of the shell sheets (components.css and chrome.css).
   const small = (): string => {
     const t = squash(all);
-    const at = t.lastIndexOf('@media (max-width: 600px)');
-    return at < 0 ? '' : t.slice(at);
+    const parts = t.split('@media (max-width: 600px)').slice(1);
+    return parts
+      .map((x) => x.slice(0, x.indexOf('@media') < 0 ? undefined : x.indexOf('@media')))
+      .join(' ');
   };
   it('is no longer hidden', () => {
-    expect(squash(components)).not.toMatch(/@media \(max-width: 600px\) \{ \.al-side \{ display: none/);
+    expect(squash(components)).not.toMatch(
+      /@media \(max-width: 600px\) \{ \.al-side \{ display: none/,
+    );
     expect(small()).not.toMatch(/\.al-side \{[^}]*display: none/);
   });
   it('lays out as a row under the content, with a hairline on top', () => {
@@ -97,7 +107,7 @@ describe('360 px: the sidebar becomes the bottom bar', () => {
   it('scrolls sideways instead of squeezing eight labels, and hides the brand', () => {
     const t = small();
     expect(t).toMatch(/overflow-x: auto/);
-    expect(t).toMatch(/\.al-side-brand \{[^}]*display: none/);
+    expect(t).toMatch(/\.al-side-brand(, [^{]*)? \{[^}]*display: none/);
   });
   it('shows the current page without the slider', () => {
     const t = small();
@@ -110,7 +120,9 @@ describe('route transition (View Transitions)', () => {
   it('fades the page in with a 4 px rise over --al-duration-fast, content only', () => {
     const t = squash(chrome);
     expect(t).toMatch(/\.al-shell-content \{[^}]*view-transition-name: al-page/);
-    expect(t).toMatch(/::view-transition-new\(al-page\) \{[^}]*animation: [^;]*var\(--al-duration-fast\)/);
+    expect(t).toMatch(
+      /::view-transition-new\(al-page\) \{[^}]*animation: [^;]*var\(--al-duration-fast\)/,
+    );
     const kf = /@keyframes al-page-in \{([\s\S]*?)\} \}/.exec(t);
     expect(kf, 'al-page-in keyframes').not.toBeNull();
     expect(kf?.[1]).toContain('translateY(4px)');
@@ -122,7 +134,9 @@ describe('route transition (View Transitions)', () => {
   });
   it('is switched off under reduced motion in both ways', () => {
     const t = squash(chrome);
-    expect(t).toMatch(/@media \(prefers-reduced-motion: reduce\) \{[^@]*::view-transition-new\(al-page\)/);
+    expect(t).toMatch(
+      /@media \(prefers-reduced-motion: reduce\) \{[^@]*::view-transition-new\(al-page\)/,
+    );
     expect(t).toContain(":root[data-motion='reduced']::view-transition-new(al-page)");
   });
 });
@@ -140,7 +154,11 @@ describe('chrome text contrast (WCAG 2.1 AA, B-11 §13.2)', () => {
     '#' + c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
   const over = (theme: 'dark' | 'light', under: [number, number, number]): string => {
     const [r, g, b, a] = rgba(depthTokens['al-material-chrome-bg'][theme]);
-    return toHex([r * a + under[0] * (1 - a), g * a + under[1] * (1 - a), b * a + under[2] * (1 - a)]);
+    return toHex([
+      r * a + under[0] * (1 - a),
+      g * a + under[1] * (1 - a),
+      b * a + under[2] * (1 - a),
+    ]);
   };
   const CASES = [
     ['dark', [255, 255, 255]],

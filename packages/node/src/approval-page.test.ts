@@ -162,9 +162,10 @@ describe('the shared app navigation (M1-11b-2a)', () => {
     expect(html).not.toContain('/settings/');
   });
 
-  it('lists the eight app pages in the app order, Approvals current, as plain same-origin links', () => {
+  it('lists the nine app pages in the app order, Approvals current, as plain same-origin links', () => {
     const html = pageHtml('abc', { appNav: true });
     expect(APP_NAV.map((i) => i.path)).toEqual([
+      '/settings/home',
       '/',
       '/settings/activity',
       '/settings/messages',
@@ -175,6 +176,7 @@ describe('the shared app navigation (M1-11b-2a)', () => {
       '/settings/backup',
     ]);
     expect(APP_NAV.map((i) => i.label)).toEqual([
+      'Home',
       'Approvals',
       'Activity',
       'Messages',

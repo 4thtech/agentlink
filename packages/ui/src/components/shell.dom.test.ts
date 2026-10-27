@@ -119,9 +119,7 @@ describe('AppShell nav highlight', () => {
   });
 
   it('has no active index when nothing is current, and keeps aria-current on the link only', () => {
-    render(
-      h(AppShell, { nav: NAV.map((n) => ({ ...n, active: false })), pageTitle: 'Not found' }),
-    );
+    render(h(AppShell, { nav: NAV.map((n) => ({ ...n, active: false })), pageTitle: 'Not found' }));
     expect((host.querySelector('.al-nav-wrap') as HTMLElement).dataset['active']).toBeUndefined();
     expect(host.querySelectorAll('[aria-current="page"]').length).toBe(0);
     render(h(AppShell, { nav: NAV, pageTitle: 'Approvals' }));
