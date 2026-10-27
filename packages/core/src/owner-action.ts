@@ -55,6 +55,7 @@ export type OwnerActionRefusal =
   | 'digest_mismatch'
   | 'outlives_request'
   | 'commitment_in_batch'
+  | 'paid_item_in_batch'
   | 'item_refused'
   | 'contact_unknown'
   | 'contact_revoked'
@@ -79,7 +80,8 @@ export type ItemRefusal =
   | 'not_pending'
   | 'request_expired'
   | 'digest_mismatch'
-  | 'commitment_in_batch';
+  | 'commitment_in_batch'
+  | 'paid_item_in_batch';
 
 export interface ItemRefusalReport {
   readonly approvalId: string;
@@ -94,6 +96,12 @@ export interface ApprovalRequestView {
   readonly expiresAt: number;
   /** The request carries a commitment scope (04 §3.4.2): never a batch item. */
   readonly commitment: boolean;
+  /**
+   * M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): the request carries a fee (`action.context.fee`). It is
+   * never a batch item: each takes its own confirmation. Absent is read as not paid only by callers
+   * that build views without a stored action (none in core).
+   */
+  readonly paid?: boolean;
   /** Status `pending`. A decided, cancelled or void request is never decided again. */
   readonly pending: boolean;
 }
@@ -243,6 +251,7 @@ function matchItem(
   if (ctx.now > request.expiresAt) return { reason: 'request_expired' };
   if (request.actionDigest !== item.actionDigest) return { reason: 'digest_mismatch' };
   if (inBatch && request.commitment) return { reason: 'commitment_in_batch' };
+  if (inBatch && request.paid === true) return { reason: 'paid_item_in_batch' };
   return { request };
 }
 

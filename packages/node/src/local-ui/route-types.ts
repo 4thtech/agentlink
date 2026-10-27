@@ -83,7 +83,24 @@ export interface LocalUiSetupRoute {
   readonly step: LocalUiSetupStep;
 }
 
-export type LocalUiRoute = LocalUiReadRoute | LocalUiOwnerRoute | LocalUiSetupRoute;
+/** M1-PAY-CONFIRM-a: the two steps of a paid-action confirmation (04 §2.5.3). */
+export type LocalUiPayConfirmStep = 'begin' | 'finish';
+
+/**
+ * M1-PAY-CONFIRM-a: a paid-action confirmation route (04 §2.5.3, D-132). Like a setup route it has
+ * no page handler: the approval server's own payConfirmGate runs the step (approval-server.ts,
+ * pay-confirm.ts), so no page file ever touches the challenge, the assertion, the backup code or
+ * the owner key. Only POST, only under /api/ui/pay-confirm/, one route per step (routes.ts).
+ */
+export interface LocalUiPayConfirmRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'pay-confirm';
+  readonly step: LocalUiPayConfirmStep;
+}
+
+export type LocalUiRoute =
+  LocalUiReadRoute | LocalUiOwnerRoute | LocalUiSetupRoute | LocalUiPayConfirmRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A

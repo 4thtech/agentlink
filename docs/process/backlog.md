@@ -6779,20 +6779,32 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 ### Confirming paid actions (new, D-132)
 
 #### M1-PAY-CONFIRM-a · core and node: paid-action confirmation bound to amount and purpose, with user verification (new, D-132)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/core` (confirmation statement, spending-field diff), `packages/node/src/local-ui/**` (presence gate begin and finish), their tests, `docs/foundation/04-security-and-crypto.md` §2.5.3 if the build refines it, its `changelog.d/` fragment and changeset
 - **Depends on:** MONEY-CONFIRM-DESIGN merged (which actions and the backup code decided, D-132; the ceremony rules confirmed by the owner at that merge)
 - **Spec:** 04 §2.5, §2.5.3, §2.3.1; 06 §3; 08 §1; 12 §4.6; D-130, D-132
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
   - Begin builds the exact owner flow (proof approval, `policy.set` that changes a spending field) and its confirmation statement; challenge per 04 §2.5.3 rule 2; single use, session-bound, 120 s.
-  - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; `maxFee` never above the statement.
-  - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before.
+  - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; the statement amount equals the pending request's `context.fee.usd`, bound to what is signed via `actionDigest` (04 §2.5.3 rule 2).
+  - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before. *Build note (proposed, owner confirms at merge):* split out to M1-PAY-CONFIRM-a2, because the verify belongs in `@4thtech-io/crypto` (no P-256 verify there yet) and the stored passkey item keeps no public key; until then every passkey is in the "registered before" class (PRF unlock, binding by rules 2 and 3). The finish body already carries the signature, so a2 changes no page code.
   - The backup-code path signs under the same statement binding (kept, D-132), with the three-tries rule. Proofs evaluated `allow` are unchanged (automatic).
   - Paid items are excluded from batch approval (04 §2.5.3 rule 7): the batch screen does not offer them and the core refuses such a batch (`paid_item_in_batch`). "Remember for this contact" digests both bodies in one challenge (rule 2).
   - Registration (`REGISTER`) is out of scope here (M2-PAY-CONFIRM-c).
 - **Acceptance:**
   - Tests first (RED commit): a missing UV flag, a reused or expired challenge, a changed amount, limit or contact after begin, a statement amount other than the pending request's `context.fee.usd`, a "Remember for this contact" `policy.set` not in the challenge, an `approval.decideBatch` containing a paid item, and a statement built from a URL or tool value are each refused; a policy change without a spending field keeps the ordinary prompt; no MCP tool or CLI flag reaches begin or finish; threat note; independent review and Fable audit (S2).
+
+#### M1-PAY-CONFIRM-a2 · crypto and node: verify the passkey assertion signature for paid actions (new, D-132; split from M1-PAY-CONFIRM-a)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, crypto) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/crypto` (WebAuthn assertion verify: ES256 and EdDSA through @noble/curves), `packages/node` (keep the credential public key at passkey registration and setup; verify in the pay-confirm finish), their tests, its changeset and `changelog.d/` fragment
+- **Depends on:** M1-PAY-CONFIRM-a
+- **Spec:** 04 §2.5.3 rule 5, §2.3.1; D-132
+- **Invariants:** I-1, I-4, I-8
+- **Scope:**
+  - Store the credential public key (COSE) from the registration response at setup and at "Switch to Touch ID"; verify the signature over `authenticatorData ‖ SHA-256(clientDataJSON)` in the pay-confirm finish when a key is stored.
+  - A passkey without a stored key is re-registered on the page with the backup code and one touch (M1-UX-FIRSTRUN-V2-c switch); until then the PRF unlock stays its presence proof.
+- **Acceptance:**
+  - Tests first (RED commit): a wrong or missing signature with a stored key is refused; vectors for ES256 and EdDSA; Fable audit (S2).
 
 #### M1-PAY-CONFIRM-b · local UI: the confirmation sheet, the credits line and receipt rows (new, D-132)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence UI on a money path) · **Phase:** M1b
