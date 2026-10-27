@@ -4598,6 +4598,212 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
 - **Acceptance (tests first, RED commit):**
   - Registration still refuses a POST without presence unless it is this kind; a body that carries a path or name besides the ID is refused and never reaches the opener; a link, `..`, a file outside the Inbox folder or a missing file is refused; the opener gets one argument; a test that no other route can use the kind.
 
+### Local app visual refresh (UI-REFRESH, B-11 v2) (new, owner decision 2026-10-27)
+
+#### UI-REFRESH · the B-11 v2 visual refresh of the local app (new, owner decision 2026-10-27)
+
+Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved brief `docs/design/b11-local-app.md` (§13 elevation and materials, §14 motion tokens, §15 progress and state components, §16 per-page notes, §18 decisions; §19 already built in #584) and the UX-V3 plan §3 (Home with five tiles, one global Under the hood switch, Settings sub-navigation); no motion library (UX-V3 decision 8). The owner reviews the result on his Mac before it ships. Plan, build order, performance budget, fallbacks and the owner's QA checklist: [`docs/process/proposals/UI-REFRESH.md`](proposals/UI-REFRESH.md). PR titles: `CHORE: UI-REFRESH-<x> …`. Order: a; then b, c, d, e in parallel; then f; then g to n in parallel (o after M1-11b-2); then p and q. Every card: tests first (`RED (expected): UI-REFRESH-<x> …`), the motion lint of card a green, reduced motion and reduced transparency covered, axe-core zero WCAG 2.1 AA violations in dark, light and increased contrast, default views pass `lintVocabulary`, no new dependency, no inline styles (08 §4). Files a card does not list are read-only to it; a page card that needs a component change reports it instead of editing `packages/ui`.
+
+#### UI-REFRESH-a · ui: elevation and material tokens, refresh scaffold, motion lint (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/tokens/**`, `docs/design/d1/tokens/tokens.css` and `tokens.json`, `packages/ui/package.json` (exports and files for the new stylesheets), `packages/ui/src/components/index.ts`, new empty `depth.css`, `progress.css`, `motion.css`, `hood.css`, `chrome.css` and stub `surface.tsx`, `progress.tsx`, `motion.tsx`, `hood.tsx`, `apps/local-ui/src/main.tsx` (imports), new `packages/ui/src/motion-lint.test.ts`; changeset
+- **Depends on:** —
+- **Spec:** B-11 §13.1, §13.2, §14, §18 decision 3; plan §4, §9; 11 §11; 08 §4
+- **Invariants:** —
+- **Scope:**
+  - Add `--al-highlight-top`, `--al-material-chrome-bg` and `--al-material-blur` with the approved values per theme; increased contrast and forced colours: solid material, transparent highlight. Pin the existing §14 motion tokens.
+  - The scaffold of plan §4, so wave-2 cards never share a file.
+  - Motion lint: transitions and keyframes animate only `opacity`, `transform` and `stroke-dashoffset` (named exception: the row-leave height collapse); durations from tokens; every animation has a reduced-motion rule (`@media (prefers-reduced-motion: reduce)` and `:root[data-motion="reduce"]`).
+- **Acceptance (tests first, RED commit):**
+  - Token tests: exact values in every theme, both token copies equal. The lint fails on a fixture that animates `width` or uses a literal duration, and passes on the current stylesheets (existing offenders fixed, or listed in the PR as named exceptions).
+
+#### UI-REFRESH-b · ui: Surface levels, Sheet and the chrome material (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/surface.tsx`, `depth.css` and their tests; changeset
+- **Depends on:** UI-REFRESH-a
+- **Spec:** B-11 §13; plan §4, §8
+- **Invariants:** —
+- **Scope:**
+  - `Surface`: levels 0 to 4 and recessed; `interactive` rises one level on hover and focus through a pseudo-element's opacity (optional 1 px lift), never two levels.
+  - `Sheet` (level-3 side sheet, a full page at 360) and the level-4 dialog frame over the blurred overlay: focus trap, Escape, focus return, one level-4 layer at a time.
+  - `al-chrome` material: translucent only with `:root[data-os="macos"]`, blur support and no reduced transparency or contrast; every §13.2 fallback is solid.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per level and state; increased contrast and forced colours give every level a 1 px border; `data-transparency="reduce"`, `@supports not`, Windows and Linux give solid chrome; Sheet focus and Escape tests.
+
+#### UI-REFRESH-c · ui: progress components (bars, ring meter, skeleton) (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/progress.tsx`, `progress.css` and their tests; changeset
+- **Depends on:** UI-REFRESH-a
+- **Spec:** B-11 §15.1, §15.2, §15.3; 11 §11
+- **Invariants:** —
+- **Scope:**
+  - `ProgressBar` (determinate with label and amount; stepped, up to four named steps; indeterminate), `RingMeter` (a value against a limit; a countdown variant), `Skeleton` (slow, low-contrast shimmer; content replaces it with a 120 ms fade and no layout jump).
+  - `useDelayedShow`: nothing under 400 ms, at least 500 ms once shown. Loops pause while the tab is hidden.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests at start, middle, done and error with the word, the accessible name and the `progressbar` values; fake-timer tests of the 400 ms and 500 ms rules; reduced motion: the fill jumps and loops become a still state with the word; the indeterminate bar never shows a percentage.
+
+#### UI-REFRESH-d · ui: live state and moments (LiveDot, SuccessMoment, count tick, row motion) (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/motion.tsx`, `motion.css` and their tests; changeset
+- **Depends on:** UI-REFRESH-a
+- **Spec:** B-11 §5, §6, §14, §15.1
+- **Invariants:** —
+- **Scope:**
+  - `LiveDot` (the six §5 states: shape plus word, one pulse on Connected), `SuccessMoment` (check draw, proof stamp, codes merge, file drop), `CountBadge` tick ("99+"), `useRowPresence` (enter with the 1.2 s highlight; leave with the height collapse), the error nudge, `useReducedMotion`, `useVisibilityPause`. Web Animations API for sequences; at most two moves at once.
+  - The paid-action sheet keeps its tested behaviour; its ring and check move here only if its tests stay unchanged.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per LiveDot state (shape, word, tone, live region); with reduced motion (app setting and media query) no `Element.animate` call and an instant state plus a text line; interrupted motion continues without a restart; amounts and codes never animate.
+
+#### UI-REFRESH-e · ui + local-ui: preferences, the Under the hood switch and panel, Settings › Appearance (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/hood.tsx`, `hood.css` and their tests; `apps/local-ui/src/prefs/**` (new), `apps/local-ui/src/pages/appearance/**` (new) and their tests; changeset, changelog fragment
+- **Depends on:** UI-REFRESH-a
+- **Spec:** B-11 §7, §13.2, §14 (reduced motion); UX-V3 plan §3; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - One preference store (`localStorage` in try/catch; works without storage): Under the hood (default off), reduce motion (follow system, on, off), transparency (follow system, reduce), theme (system, light, dark). It sets `data-motion`, `data-transparency` and `data-theme` on the root.
+  - `UnderTheHood` panel: `terminal` icon, mono type, recessed, collapsible, in over 200 ms, empty text "Nothing technical to show here yet."; accepts only typed, allowlisted fields.
+  - The Appearance page with a live preview tile. Its route and nav entry come with UI-REFRESH-f.
+- **Acceptance (tests first, RED commit):**
+  - Off by default; remembered per browser; storage that throws still renders; the panel never renders a key, code, token, drop or presigned link or the session link (fixtures); each setting sets its root attribute.
+
+#### UI-REFRESH-f · ui + local-ui: shell with top bar, Mac materials and route transitions (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/shell.tsx`, `chrome.css`, the `.al-shell*` blocks of `components.css` and their tests; `apps/local-ui/src/layout/**`, `router.tsx`, `nav.ts`, `strings.ts` and their tests; changeset, changelog fragment
+- **Depends on:** UI-REFRESH-b, UI-REFRESH-d, UI-REFRESH-e
+- **Spec:** B-11 §3, §6 row 11, §13.2, §16 (Settings); UX-V3 plan §3; plan §5
+- **Invariants:** I-5
+- **Scope:**
+  - Top bar: the page title; the Under the hood switch, the live status chip and the theme control. Sidebar, top bar, status bar and the Settings sub-navigation on the chrome material on Mac (`data-os` set at start-up), solid elsewhere.
+  - The nav highlight slides; route changes use the View Transitions API where present, change instantly otherwise and with reduced motion, and never delay navigation.
+  - Home (at the address chosen in plan open question 1) and Settings › Appearance join the nav and the router.
+  - Measure the chrome text contrast over the worst-case fixture page; raise the material opacity token if needed; record the numbers in the PR.
+- **Acceptance (tests first, RED commit):**
+  - Router tests (Home, Appearance; redirects unchanged); `startViewTransition` is not called with reduced motion or when missing; solid chrome without `data-os="macos"`; the existing layout and health tests unchanged; contrast numbers in the PR.
+
+#### UI-REFRESH-g · local-ui: Home with five live tiles and the Next step card (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/home/**` (new) and its tests; changelog fragment
+- **Depends on:** UI-REFRESH-c, UI-REFRESH-d, UI-REFRESH-e; merges after UI-REFRESH-f
+- **Spec:** B-11 §4, §16 (Home), §17.4; UX-V3 plan §3; 11 §5
+- **Invariants:** I-5
+- **Scope:**
+  - Tiles Agent, Network, Waiting for you, Credits and Last activity, each a link; the Next step card while setup is incomplete, one at a time. Reads existing routes only (plan §6); no new server route (if one is needed, stop and ask: `packages/node` is S2).
+  - Every §4 state: first visit, fine, approvals waiting, paused, not running, offline ("as of"), loading (skeleton), read error (old values kept); at 360 the tiles stack with Waiting for you first; Under the hood per §7.
+  - Last activity says "New message from Marko" only: never message text or others' file names (§17.4).
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per state; reduced-motion test; polling pauses while the tab is hidden; no inbound text in any tile (fixture with a message body).
+
+#### UI-REFRESH-h · local-ui: Activity refresh (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/activity/**`
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §16 (Activity), §6 row 3
+- **Invariants:** I-5
+- **Scope:**
+  - Day headers stick on the chrome material; new rows enter with the highlight; filter chips cross-fade without a layout jump; a live dot in the header; a skeleton on first load; Under the hood: event IDs.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests for new row, filter, empty, offline and loading; reduced motion; a 200-row fixture never animates more than two rows at once.
+
+#### UI-REFRESH-i · local-ui: Contacts refresh (new)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §16 (Contacts), §6 rows 4 and 9
+- **Invariants:** I-5
+- **Scope:**
+  - Rows on level 1; a contact's detail as a level-3 Sheet (a full page at 360); online dots; the invite countdown ring and a breathing "Waiting for {name}"; the codes-match moment; the duplicate notice as a level-3 banner. Owner actions keep their server-side presence unchanged. Under the hood: fingerprint, identity level, pairing date.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per state; reduced motion; the existing contacts tests unchanged; codes and fingerprints never animate letter by letter.
+
+#### UI-REFRESH-j · local-ui: Files refresh (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §16 (Files), §15.3, §17.3, §6 row 10
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - Stepped and determinate bars on rows that are sending or arriving; the Received card slightly raised; the file-received moment; tab badges tick. Under the hood: real folder paths, storage, size used. Show in Finder unchanged.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per row state; reduced motion; others' file names only inside `UntrustedContent`; the existing files and io tests unchanged.
+
+#### UI-REFRESH-k · local-ui: Messages refresh (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/**`
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §17.2, §13.1 (recessed), §15
+- **Invariants:** I-5
+- **Scope:**
+  - The contact list on level 1, the conversation solid; a skeleton on first load; new items enter; its own Under the hood panel moves to the shared `UnderTheHood` component. Inbound text stays plain text in `UntrustedContent` and never animates.
+- **Acceptance (tests first, RED commit):**
+  - The existing messages tests unchanged; DOM tests per state; reduced motion; the panel shows only message ID, size and proof.
+
+#### UI-REFRESH-l · local-ui: Proofs & credits refresh (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §16 (Proofs & credits), §15.3, §19.4
+- **Invariants:** I-5
+- **Scope:**
+  - Credits as a ring meter on a level-2 card, filling on load and after a top-up; "Waiting for your credits…" after a top-up; the proof stamp on new proofs. Add credits and Withdraw credits flows unchanged; no charts, no counting-up amounts. Under the hood: record ID, network name, public record link.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per state; amounts never animate; reduced motion; the existing proofs tests unchanged.
+
+#### UI-REFRESH-m · local-ui: Rules refresh (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/rules/**`
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §16 (Rules)
+- **Invariants:** I-4
+- **Scope:**
+  - The signed rules summary in a recessed well; switches slide; a "Saved" check after the existing presence step; nothing else moves. Saving and presence unchanged. Under the hood: rules version and who signed it.
+- **Acceptance (tests first, RED commit):**
+  - The existing rules and warnings tests unchanged; DOM tests for saved and error; reduced motion.
+
+#### UI-REFRESH-n · local-ui: Settings pages refresh and About (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/backup/**`, `advanced/**`, `storage/**`, `about/**` (new); one `ROUTES` line in `router.tsx` and one `SETTINGS_PAGES` line in `nav.ts` for About
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §16 (Settings), §7 (Advanced); UX-V3 plan §3
+- **Invariants:** I-7
+- **Scope:**
+  - Each section on level 1; writing the backup uses the determinate bar; About shows the version from the health read. Profile and Passkeys stay with M1-UX3-SETTINGS. Backup's presence step and secret display unchanged.
+- **Acceptance (tests first, RED commit):**
+  - DOM tests per state; reduced motion; the recovery kit appears only inside `SecretDisplay`.
+
+#### UI-REFRESH-o · local-ui: Approvals refresh in the shell (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**`, `apps/local-ui/src/pages/approve/**`
+- **Depends on:** UI-REFRESH-f, M1-11b-2
+- **Spec:** B-11 §16 (Approvals), §6 rows 4, 7 and 12; 08 §1; 04 §2.5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - Cards on level 1, the card being decided on level 2; a ring meter for time left; on approve the check draws and the card collapses out, on deny it fades; the badge ticks down. Visual only: no change to presence, signing or the decide calls; no autofocus on Approve.
+- **Acceptance (tests first, RED commit):**
+  - All M1-11a and M1-11b-2 approval flows unchanged; DOM and reduced-motion tests; threat note (S2).
+
+#### UI-REFRESH-p · docs: screenshots, QA set, guide and README (new)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `tools/docs-screenshots/**`, `docs-site/guide/**`, `README.md` Status, `docs/status.yaml`; changelog fragment
+- **Depends on:** UI-REFRESH-g to UI-REFRESH-n
+- **Spec:** plan §10; docs-model §5
+- **Invariants:** —
+- **Scope:**
+  - Re-capture the guide screenshots; add the QA set of plan §10 (not published); guide text for Home, Under the hood and Appearance; the README Status line.
+- **Acceptance:**
+  - Screenshots within the size limit; fixtures only, no real data; `node tools/docs-status/index.mjs --check` green.
+
+#### UI-REFRESH-q · e2e: performance and accessibility audit, the owner's visual QA (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `e2e/test/local-ui-refresh.test.ts` (new); fixes go to the owning card's files as follow-up cards
+- **Depends on:** UI-REFRESH-g to UI-REFRESH-n
+- **Spec:** plan §7, §8, §10
+- **Invariants:** —
+- **Scope:**
+  - Playwright across every page in dark, light, increased contrast, forced colours, reduced motion and reduced transparency: axe; no layout-property animation in computed styles; at most four `backdrop-filter` elements plus the overlay; a route change painted within 100 ms; bundle growth within budget against 0.4.0. Hand the plan §10 checklist to the owner.
+- **Acceptance:**
+  - The e2e test green in CI; budget numbers in the PR; the owner's go-ahead on the checklist recorded before the release.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
