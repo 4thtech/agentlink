@@ -73,6 +73,24 @@ export function useVisibilityPause(): boolean {
   return hidden;
 }
 
+/**
+ * The text of a polite live region, set one tick after mount and on every change. A region that
+ * already holds its text when it appears is often not announced (VoiceOver), so the region is
+ * created empty and filled afterwards.
+ */
+function useAnnouncement(text: string, on: boolean): string {
+  const [said, setSaid] = useState('');
+  useEffect(() => {
+    if (!on) {
+      setSaid('');
+      return undefined;
+    }
+    const t = setTimeout(() => setSaid(text), 0);
+    return () => clearTimeout(t);
+  }, [text, on]);
+  return said;
+}
+
 function token(name: string): string {
   try {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -154,11 +172,13 @@ export interface LiveDotProps {
   state: LiveDotState;
   /** Replaces the default word (for example "Agent connected"). */
   label?: string;
+  /** Announce changes in a polite live region. Off by default (lists stay quiet); the status bar opts in. */
+  live?: boolean;
   className?: string;
 }
 
-/** A state shape, a word and a tone, in a polite live region. Never colour alone. */
-export function LiveDot({ state, label, className }: LiveDotProps): ReactElement {
+/** A state shape, a word and a tone. Never colour alone. */
+export function LiveDot({ state, label, live = false, className }: LiveDotProps): ReactElement {
   const reduced = useReducedMotion();
   const hidden = useVisibilityPause();
   const [timedOut, setTimedOut] = useState(false);
@@ -171,6 +191,7 @@ export function LiveDot({ state, label, className }: LiveDotProps): ReactElement
   const shown: LiveDotState = state === 'checking' && timedOut ? 'not-running' : state;
   const [tone, shape, word] = LIVE_DOT[shown] ?? LIVE_DOT['not-running'];
 
+  const said = useAnnouncement(label ?? word, live);
   const pulseRef = useRef<SVGCircleElement | null>(null);
   const arcRef = useRef<SVGCircleElement | null>(null);
   const prev = useRef<LiveDotState | null>(null);
@@ -209,8 +230,6 @@ export function LiveDot({ state, label, className }: LiveDotProps): ReactElement
       className={cx('al-livedot', `al-tone-${tone}`, className)}
       data-state={shown}
       data-paused={hidden ? '' : undefined}
-      role="status"
-      aria-live="polite"
     >
       <svg
         className="al-ld-shape"
@@ -269,7 +288,14 @@ export function LiveDot({ state, label, className }: LiveDotProps): ReactElement
           </>
         ) : null}
       </svg>
-      <span className="al-ld-word al-text-label">{label ?? word}</span>
+      <span className="al-ld-word al-text-label" aria-hidden={live ? 'true' : undefined}>
+        {label ?? word}
+      </span>
+      {live ? (
+        <span className="al-visually-hidden al-ld-live" role="status" aria-live="polite">
+          {said}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -299,6 +325,9 @@ export function SuccessMoment({ kind, label, className }: SuccessMomentProps): R
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLSpanElement | null>(null);
   const known = kind in MOMENT;
+  const said = useAnnouncement(label ?? (known ? MOMENT[kind] : ''), known);
+  const blocks =
+    !reduced && typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function';
   useEffect(() => {
     const root = rootRef.current;
     if (root === null || !known) return;
@@ -366,8 +395,6 @@ export function SuccessMoment({ kind, label, className }: SuccessMomentProps): R
       className={cx('al-moment', className)}
       data-kind={kind}
       data-motion={reduced ? 'reduced' : 'full'}
-      role="status"
-      aria-live="polite"
     >
       <span className="al-moment-art" aria-hidden="true">
         {kind === 'approved' ? (
@@ -418,8 +445,12 @@ export function SuccessMoment({ kind, label, className }: SuccessMomentProps): R
             >
               <path d={CHECK_PATH} />
             </svg>
-            <span className="al-moment-code al-moment-left" data-a="left" />
-            <span className="al-moment-code al-moment-right" data-a="right" />
+            {blocks ? (
+              <>
+                <span className="al-moment-code al-moment-left" data-a="left" />
+                <span className="al-moment-code al-moment-right" data-a="right" />
+              </>
+            ) : null}
           </>
         ) : null}
         {kind === 'file' ? (
@@ -440,7 +471,12 @@ export function SuccessMoment({ kind, label, className }: SuccessMomentProps): R
           </svg>
         ) : null}
       </span>
-      <span className="al-moment-text al-text-body-sm">{label ?? MOMENT[kind]}</span>
+      <span className="al-moment-text al-text-body-sm" aria-hidden="true">
+        {label ?? MOMENT[kind]}
+      </span>
+      <span className="al-visually-hidden al-moment-live" role="status" aria-live="polite">
+        {said}
+      </span>
     </span>
   );
 }
@@ -469,8 +505,19 @@ export function CountBadge({ count, label, className }: CountBadgeProps): ReactE
   last.current = shown;
   const inRef = useRef<HTMLSpanElement | null>(null);
   const outRef = useRef<HTMLSpanElement | null>(null);
+  const tick = useRef(0);
+  const outAnim = useRef<Animation | null>(null);
+  useEffect(
+    () => () => {
+      tick.current += 1; // a late finish after unmount is ignored
+      outAnim.current?.cancel();
+    },
+    [],
+  );
   useEffect(() => {
     if (leaving === null) return;
+    const id = (tick.current += 1);
+    outAnim.current?.cancel();
     const duration = tokenMs('--al-duration-base', 200);
     play(
       inRef.current,
@@ -494,14 +541,17 @@ export function CountBadge({ count, label, className }: CountBadgeProps): ReactE
       setLeaving(null);
       return;
     }
-    out.onfinish = () => setLeaving(null);
+    outAnim.current = out;
+    out.onfinish = () => {
+      if (id === tick.current) setLeaving(null); // an older tick's finish is ignored
+    };
   }, [leaving, reduced]);
   if (n === 0) return null;
   return (
-    <span
-      className={cx('al-count', className)}
-      aria-label={label === undefined ? undefined : `${shown} ${label}`}
-    >
+    <span className={cx('al-count', className)}>
+      {label === undefined ? null : (
+        <span className="al-visually-hidden">{`${shown} ${label}`}</span>
+      )}
       <span
         ref={inRef}
         className="al-count-in"
@@ -529,6 +579,8 @@ export interface RowPresenceOptions {
 
 export interface RowPresence<T extends HTMLElement> {
   ref: RefObject<T | null>;
+  /** Render this inside the row: the soft highlight, owned by React (null when not showing). */
+  highlight: ReactElement | null;
   /** Render the row while this is true (it stays true during the leave motion). */
   mounted: boolean;
 }
@@ -549,11 +601,49 @@ export function useRowPresence<T extends HTMLElement>(
     setPrevPresent(present);
     if (!present && !reduced) setLeaving(true);
   }
+  const [hlOn, setHlOn] = useState(false);
+  const hlRef = useRef<HTMLSpanElement | null>(null);
+  const enterAnim = useRef<Animation | null>(null);
   const first = useRef(true);
   const was = useRef(present);
   const leave = useRef<Animation | null>(null);
   const live = useRef({ present, onGone: options.onGone });
   live.current = { present, onGone: options.onGone };
+
+  // Unmounting stops the row's own motion; nothing is left running or inserted.
+  useEffect(
+    () => () => {
+      for (const a of [enterAnim.current, leave.current]) {
+        if (a !== null) {
+          a.onfinish = null;
+          a.cancel();
+        }
+      }
+      enterAnim.current = null;
+      leave.current = null;
+    },
+    [],
+  );
+
+  // The highlight is a span React renders; it fades out and is then dropped.
+  useEffect(() => {
+    if (!hlOn) return undefined;
+    const a = play(
+      hlRef.current,
+      [{ opacity: 0.7 }, { opacity: 0 }],
+      { duration: HIGHLIGHT_MS, easing: 'linear' },
+      false,
+    );
+    if (a === null) {
+      setHlOn(false);
+      return undefined;
+    }
+    a.onfinish = () => setHlOn(false);
+    return () => {
+      a.onfinish = null;
+      a.cancel();
+    };
+  }, [hlOn]);
 
   useLayoutEffect(() => {
     const isFirst = first.current;
@@ -569,7 +659,7 @@ export function useRowPresence<T extends HTMLElement>(
       const entering = isFirst ? options.isNew === true : !before;
       if (!entering || el === null) return;
       el.classList.add('al-row-presence');
-      play(
+      enterAnim.current = play(
         el,
         [
           { opacity: 0, transform: 'translateY(-8px)' },
@@ -581,20 +671,7 @@ export function useRowPresence<T extends HTMLElement>(
         },
         reduced,
       );
-      if (!reduced && typeof el.animate === 'function') {
-        const hl = document.createElement('span');
-        hl.className = 'al-row-hl';
-        hl.setAttribute('aria-hidden', 'true');
-        el.append(hl);
-        const a = play(
-          hl,
-          [{ opacity: 0.7 }, { opacity: 0 }],
-          { duration: HIGHLIGHT_MS, easing: 'linear' },
-          reduced,
-        );
-        if (a === null) hl.remove();
-        else a.onfinish = () => hl.remove();
-      }
+      if (!reduced && typeof el.animate === 'function') setHlOn(true);
       return;
     }
     if (isFirst || !before) return;
@@ -636,5 +713,6 @@ export function useRowPresence<T extends HTMLElement>(
     };
   }, [present]);
 
-  return { ref, mounted: present || leaving };
+  const highlight = hlOn ? <span ref={hlRef} className="al-row-hl" aria-hidden="true" /> : null;
+  return { ref, highlight, mounted: present || leaving };
 }

@@ -104,17 +104,39 @@ describe('LiveDot (B-11 §5)', () => {
 
   for (const [state, want] of Object.entries(SPEC)) {
     it(`${state}: shape, word, tone and a polite live region`, () => {
-      render(h(LiveDot, { state: state as LiveDotState }));
+      render(h(LiveDot, { state: state as LiveDotState, live: true }));
       const el = host.querySelector('.al-livedot') as HTMLElement;
       expect(el.getAttribute('data-state')).toBe(state);
       expect(el.classList.contains(`al-tone-${want.tone}`)).toBe(true);
-      expect(el.getAttribute('role')).toBe('status');
-      expect(el.getAttribute('aria-live') ?? 'polite').toBe('polite');
+      const region = el.querySelector('[role="status"]') as HTMLElement;
+      expect(region.getAttribute('aria-live')).toBe('polite');
       expect(el.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
       expect(el.querySelector('svg')?.getAttribute('data-shape')).toBe(want.shape);
       expect(text()).toContain(want.word);
     });
   }
+
+  it('is not a live region unless asked (lists stay quiet)', () => {
+    render(h(LiveDot, { state: 'connected' }));
+    expect(host.querySelector('[role="status"], [aria-live]')).toBeNull();
+    expect(text()).toContain('Connected');
+  });
+
+  it('a live LiveDot creates its region empty and announces after mount', () => {
+    vi.useFakeTimers();
+    render(h(LiveDot, { state: 'connected', live: true }));
+    const region = host.querySelector('[role="status"]') as HTMLElement;
+    expect(region.textContent).toBe('');
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(region.textContent).toBe('Connected');
+    render(h(LiveDot, { state: 'paused', live: true }));
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(region.textContent).toBe('Paused');
+  });
 
   it('Connected gives one soft pulse on arrival and then stays still', () => {
     render(h(LiveDot, { state: 'reconnecting' }));
@@ -247,7 +269,7 @@ describe('SuccessMoment (B-11 §6 rows 7 to 10)', () => {
       render(h(SuccessMoment, { kind }));
       const el = host.querySelector('.al-moment') as HTMLElement;
       expect(el.getAttribute('data-kind')).toBe(kind);
-      expect(el.getAttribute('role')).toBe('status');
+      expect(el.querySelector('[role="status"]')).not.toBeNull();
       expect(text()).toContain(line);
       expect(calls.length).toBeGreaterThan(0);
       expect(calls.length).toBeLessThanOrEqual(2);
@@ -261,6 +283,24 @@ describe('SuccessMoment (B-11 §6 rows 7 to 10)', () => {
       expect(text()).toContain(line);
     });
   }
+
+  it('the live region exists empty first and gets the line after mount', () => {
+    vi.useFakeTimers();
+    render(h(SuccessMoment, { kind: 'approved' }));
+    const region = host.querySelector('[role="status"]') as HTMLElement;
+    expect(region.textContent).toBe('');
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(region.textContent).toBe('Approved');
+  });
+
+  it('reduced motion leaves no code blocks covering the check', () => {
+    reducedQuery = true;
+    render(h(SuccessMoment, { kind: 'codes' }));
+    expect(host.querySelector('.al-moment-code')).toBeNull();
+    expect(host.querySelector('svg path')).not.toBeNull();
+  });
 
   it('the check draws with stroke-dashoffset and nothing else but transform and opacity moves', () => {
     render(h(SuccessMoment, { kind: 'approved' }));
@@ -305,6 +345,28 @@ describe('CountBadge (B-11 §5 Counts, §6 row 3)', () => {
     expect(text()).toBe('99+');
   });
 
+  it('a label is visually hidden text, not an aria-label', () => {
+    render(h(CountBadge, { count: 5, label: 'new messages' }));
+    const badge = host.querySelector('.al-count') as HTMLElement;
+    expect(badge.hasAttribute('aria-label')).toBe(false);
+    const hidden = badge.querySelector('.al-visually-hidden') as HTMLElement;
+    expect(hidden.textContent).toBe('5 new messages');
+    expect(badge.querySelector('[aria-hidden="true"]')?.textContent).toBe('5');
+  });
+
+  it('ignores a stale finish from an older tick', () => {
+    render(h(CountBadge, { count: 3 }));
+    render(h(CountBadge, { count: 4 }));
+    const first = calls.filter((c) => scale(c).includes('-60%'));
+    render(h(CountBadge, { count: 5 }));
+    expect(text()).toContain('4');
+    act(() => first[0]?.anim.finish());
+    expect(text()).toContain('4'); // the older tick's finish does not clear the newer one
+    const second = calls.filter((c) => scale(c).includes('-60%'));
+    act(() => second[1]?.anim.finish());
+    expect(text()).toBe('5');
+  });
+
   it('renders nothing for zero', () => {
     render(h(CountBadge, { count: 0 }));
     expect(host.querySelector('.al-count')).toBeNull();
@@ -340,11 +402,11 @@ describe('CountBadge (B-11 §5 Counts, §6 row 3)', () => {
 
 describe('useRowPresence (B-11 §6 rows 3 and 4)', () => {
   function Row(p: { present: boolean; isNew?: boolean; gone?: () => void }): ReactElement | null {
-    const { ref, mounted } = useRowPresence<HTMLLIElement>(p.present, {
+    const { ref, mounted, highlight } = useRowPresence<HTMLLIElement>(p.present, {
       isNew: p.isNew,
       onGone: p.gone,
     });
-    return mounted ? h('li', { ref, 'data-row': '1' }, 'row') : null;
+    return mounted ? h('li', { ref, 'data-row': '1' }, 'row', highlight) : null;
   }
   const row = (): HTMLElement | null => host.querySelector('[data-row]');
 
@@ -365,6 +427,14 @@ describe('useRowPresence (B-11 §6 rows 3 and 4)', () => {
     expect(calls).toHaveLength(2);
     act(() => hl?.anim.finish());
     expect(row()?.querySelector('.al-row-hl')).toBeNull();
+  });
+
+  it('unmounting cancels the row motion and leaves no highlight', () => {
+    render(h(Row, { present: true, isNew: true }));
+    const live = [...calls];
+    render(h('i'));
+    for (const c of live) expect(c.anim.cancel).toHaveBeenCalled();
+    expect(host.querySelector('.al-row-hl')).toBeNull();
   });
 
   it('a row coming back (false to true) enters', () => {
