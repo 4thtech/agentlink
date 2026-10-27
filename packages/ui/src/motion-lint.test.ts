@@ -188,8 +188,6 @@ const LEGACY_EXCEPTIONS: Record<string, string> = {
     'legacy',
   'packages/ui/src/components/components.css | transition-property | .al-btn | border-color':
     'legacy',
-  'packages/ui/src/components/components.css | transition-property | .al-switch-knob | left':
-    'legacy',
   'apps/local-ui/src/pages/files/files.css | transition-property | .fl-tab | color': 'legacy',
   'apps/local-ui/src/pages/files/files.css | transition-property | .fl-tab | border-color':
     'legacy',

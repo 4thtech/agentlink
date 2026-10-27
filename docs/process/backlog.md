@@ -4860,7 +4860,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit): focus cannot leave an open modal by click or script; fixed positioning holds inside a transformed parent; contrast check green; no test weakened.
 
 #### UI-REFRESH-e2 · ui: switch knob motion and a path kind in the Under the hood allowlist (new, low)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` (switch, Under the hood), `packages/ui/src/motion-lint.test.ts`, tests; changeset
 - **Depends on:** UI-REFRESH-e; #599 merged
 - **Spec:** B-11 §7, §14
