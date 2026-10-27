@@ -7,8 +7,19 @@
 // "Withdraw credits" returns credits to the agent's own account; both changes are owner operations
 // behind a confirm screen and the owner code (top-up.tsx). Elsewhere the not-available line stays.
 // On load the page only reads.
-import { Button, EmptyState, Icon, PAY_CONFIRM_STRINGS, ProofBadge } from '@4thtech-io/ui';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import {
+  Button,
+  EmptyState,
+  Icon,
+  PAY_CONFIRM_STRINGS,
+  ProofBadge,
+  RingMeter,
+  Skeleton,
+  Surface,
+  SuccessMoment,
+  UnderTheHood,
+} from '@4thtech-io/ui';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { AddCreditsPanel, ConfirmMove, type Move } from './top-up.js';
 import { PAGE_TITLES } from '../../strings.js';
@@ -39,6 +50,13 @@ type ListState =
       readonly more: 'idle' | 'loading' | 'error';
     };
 
+/** The ring is full at this many proofs left; the words carry the exact numbers. */
+const RING_FULL_AT = 100;
+/** While a proof is on its way or credits are expected, the page looks again this often. */
+const POLL_MS = 5000;
+/** Stop waiting for credits after this many looks (about two minutes). */
+const MAX_POLLS = 24;
+
 type CreditsState = { readonly kind: 'loading' } | CreditsAnswer;
 
 const TIME = new Intl.DateTimeFormat(undefined, {
@@ -57,7 +75,16 @@ function When({ seconds }: { seconds: number }): ReactElement {
   );
 }
 
-function ProofTable({ items }: { items: readonly ProofRow[] }): ReactElement {
+const rowKey = (item: ProofRow): string => `${String(item.createdAt)}-${item.direction}`;
+const inFlight = (state: string): boolean => state === 'recording' || state === 'submitted';
+
+function ProofTable({
+  items,
+  moments,
+}: {
+  items: readonly ProofRow[];
+  moments: ReadonlySet<string>;
+}): ReactElement {
   return (
     <div className="pf-table-wrap">
       <table className="pf-table">
@@ -83,12 +110,42 @@ function ProofTable({ items }: { items: readonly ProofRow[] }): ReactElement {
               </td>
               <td>
                 <ProofBadge state={item.state} />
+                {moments.has(rowKey(item)) ? <SuccessMoment kind="proof" /> : null}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** The ring fills after the first paint (and glides on later changes); reduced motion: CSS. */
+function useFilled(target: number): number {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    let inner = 0;
+    const outer = requestAnimationFrame(() => {
+      inner = requestAnimationFrame(() => setShown(target));
+    });
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+    };
+  }, [target]);
+  return shown;
+}
+
+function CreditsRing({ proofs, balance }: { proofs: number; balance: string }): ReactElement {
+  const shown = useFilled(proofs);
+  return (
+    <RingMeter
+      label={S.creditsLabel}
+      value={shown}
+      max={Math.max(RING_FULL_AT, proofs)}
+      text={inCredits(balance)}
+      size="lg"
+    />
   );
 }
 
@@ -102,22 +159,30 @@ function CreditsCard({
 }): ReactElement {
   if (credits.kind === 'loading') {
     return (
-      <section className="al-credits" aria-label={S.creditsLabel} aria-busy="true">
+      <Surface
+        as="section"
+        level={2}
+        className="al-credits"
+        aria-label={S.creditsLabel}
+        aria-busy="true"
+      >
         <div className="al-text-label al-muted">{S.creditsLabel}</div>
-        <p className="al-text-body-sm al-muted">{S.loading}</p>
-      </section>
+        <Skeleton loading lines={3} />
+      </Surface>
     );
   }
   if (credits.kind !== 'ok') {
     return (
-      <section className="al-credits" aria-label={S.creditsLabel}>
+      <Surface as="section" level={2} className="al-credits" aria-label={S.creditsLabel}>
         <div className="al-text-label al-muted">{S.creditsLabel}</div>
         <p className="al-text-body-sm al-muted">{S.creditsUnavailable}</p>
-      </section>
+      </Surface>
     );
   }
   return (
-    <section
+    <Surface
+      as="section"
+      level={2}
       className={credits.proofsLeft === 0 ? 'al-credits is-empty' : 'al-credits'}
       aria-label={S.creditsLabel}
     >
@@ -128,7 +193,7 @@ function CreditsCard({
           </div>
           <div className="al-credits-bal al-text-title-1">{proofsLeft(credits.proofsLeft)}</div>
         </div>
-        <div className="al-text-body-sm al-muted">{inCredits(credits.balance)}</div>
+        <CreditsRing proofs={credits.proofsLeft} balance={credits.balance} />
       </div>
       {credits.partial ? <p className="al-text-caption al-muted">{S.creditsPartial}</p> : null}
       {credits.test ? <p className="al-text-caption al-muted">{S.testCredits}</p> : null}
@@ -140,7 +205,7 @@ function CreditsCard({
       {/* X-6 until a network takes funds at the agent's address (M1-11c-a4c, D-123). */}
       {actions ?? <p className="al-text-caption al-muted">{S.addCreditsNotAvailable}</p>}
       {/* No free test credits button: the agent claims them once by itself (D-120 (3), M1-36i). */}
-    </section>
+    </Surface>
   );
 }
 
@@ -164,6 +229,11 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
   const [notice, setNotice] = useState<string | undefined>(undefined);
   // IR-M1-11c-a4c-1 L-1 (owner, 11 §14 Q7): Withdraw credits lives under Advanced.
   const [advanced, setAdvanced] = useState(false);
+  // UI-REFRESH-l: proofs that just finished (success moment) and credits we are waiting for.
+  const [moments, setMoments] = useState<ReadonlySet<string>>(new Set());
+  const [waiting, setWaiting] = useState<{ readonly from: number } | undefined>(undefined);
+  const seen = useRef<Map<string, string>>(new Map());
+  const polls = useRef(0);
 
   const readMoney = useCallback(() => {
     void api.get(CREDITS_PATH).then((res) => {
@@ -180,12 +250,52 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
     });
   }, [api]);
 
+  /** A quiet re-read: an answer that is not ok changes nothing (old values stay). */
+  const look = useCallback(() => {
+    void api.get(listPath()).then((res) => {
+      const answer = res.kind === 'ok' ? parseList(res.data) : undefined;
+      if (answer?.kind !== 'ok') return;
+      const done = answer.items
+        .filter((r) => r.state === 'recorded' && inFlight(seen.current.get(rowKey(r)) ?? ''))
+        .map(rowKey);
+      for (const r of answer.items) seen.current.set(rowKey(r), r.state);
+      if (done.length > 0) setMoments((m) => new Set([...m, ...done]));
+      setList((old) =>
+        old.phase === 'ok'
+          ? { ...old, items: [...answer.items, ...old.items.slice(answer.items.length)] }
+          : old,
+      );
+    });
+    void api.get(CREDITS_PATH).then((res) => {
+      const answer = res.kind === 'ok' ? parseCredits(res.data) : undefined;
+      if (answer?.kind === 'ok') setCredits(answer);
+    });
+  }, [api]);
+
+  const pending =
+    waiting !== undefined || (list.phase === 'ok' && list.items.some((r) => inFlight(r.state)));
+  useEffect(() => {
+    if (!pending) return undefined;
+    const timer = setInterval(() => {
+      polls.current += 1;
+      if (waiting !== undefined && polls.current > MAX_POLLS) setWaiting(undefined);
+      look();
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [pending, waiting, look]);
+  useEffect(() => {
+    if (waiting !== undefined && credits.kind === 'ok' && credits.proofsLeft > waiting.from) {
+      setWaiting(undefined);
+    }
+  }, [credits, waiting]);
+
   useEffect(() => {
     let live = true;
     void api.get(listPath()).then((res) => {
       if (!live) return;
       const answer = res.kind === 'ok' ? parseList(res.data) : problem(res);
       if (answer.kind === 'ok') {
+        for (const r of answer.items) seen.current.set(rowKey(r), r.state);
         setList({
           phase: 'ok',
           items: answer.items,
@@ -233,6 +343,20 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
       );
     });
   }, [api, list]);
+
+  // Under the hood: only what this page already receives (no record ID, network or record link yet).
+  const hoodFields: unknown[] = [];
+  if (list.phase === 'ok') {
+    hoodFields.push({ kind: 'count', label: 'Proofs shown', value: String(list.items.length) });
+  }
+  if (credits.kind === 'ok') {
+    hoodFields.push({ kind: 'text', label: 'Proof fee', value: credits.price });
+    hoodFields.push({
+      kind: 'text',
+      label: 'Credits type',
+      value: credits.test ? S.testCreditsLabel : S.creditsLabel,
+    });
+  }
 
   const title = <h1 className="al-text-title-1">{PAGE_TITLES.proofs}</h1>;
 
@@ -305,34 +429,32 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
       {title}
       <div className="pf-layout">
         <div className="pf-list">
-          {list.phase === 'loading' ? (
-            <p className="al-text-body al-muted" aria-busy="true">
-              {S.loading}
-            </p>
-          ) : list.phase === 'error' ? (
-            <EmptyState icon="circle-alert" title={S.listUnavailable} />
-          ) : list.items.length === 0 ? (
-            <EmptyState icon="proof-seal" title={S.emptyTitle} prompt={S.emptyPrompt} />
-          ) : (
-            <>
-              <ProofTable items={list.items} />
-              {list.more === 'error' ? (
-                <p className="al-text-body-sm al-muted" role="status">
-                  {S.listUnavailable}
-                </p>
-              ) : null}
-              {list.next === undefined ? null : (
-                <Button
-                  className="pf-more"
-                  size="sm"
-                  disabled={list.more === 'loading'}
-                  onClick={loadMore}
-                >
-                  {S.loadMore}
-                </Button>
-              )}
-            </>
-          )}
+          <Skeleton loading={list.phase === 'loading'} lines={5}>
+            {list.phase === 'error' ? (
+              <EmptyState icon="circle-alert" title={S.listUnavailable} />
+            ) : list.phase === 'ok' && list.items.length === 0 ? (
+              <EmptyState icon="proof-seal" title={S.emptyTitle} prompt={S.emptyPrompt} />
+            ) : list.phase === 'ok' ? (
+              <>
+                <ProofTable items={list.items} moments={moments} />
+                {list.more === 'error' ? (
+                  <p className="al-text-body-sm al-muted" role="status">
+                    {S.listUnavailable}
+                  </p>
+                ) : null}
+                {list.next === undefined ? null : (
+                  <Button
+                    className="pf-more"
+                    size="sm"
+                    disabled={list.more === 'loading'}
+                    onClick={loadMore}
+                  >
+                    {S.loadMore}
+                  </Button>
+                )}
+              </>
+            ) : null}
+          </Skeleton>
         </div>
         <aside className="pf-side">
           <CreditsCard credits={credits} actions={actions} />
@@ -347,6 +469,10 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
               move={move}
               onClose={() => setMove(undefined)}
               onDone={(line) => {
+                if (move.kind === 'deposit' && line === S.pending) {
+                  polls.current = 0;
+                  setWaiting({ from: credits.kind === 'ok' ? credits.proofsLeft : 0 });
+                }
                 setMove(undefined);
                 setPanel('none');
                 setNotice(line);
@@ -364,11 +490,17 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
               onCheckAgain={readMoney}
             />
           ) : null}
+          {waiting === undefined ? null : (
+            <p className="pf-waiting al-text-body-sm al-muted" role="status">
+              {S.waiting}
+            </p>
+          )}
           {credits.kind === 'ok' ? (
             <p className="al-text-body-sm al-muted">{priceLine(credits.price)}</p>
           ) : null}
         </aside>
       </div>
+      <UnderTheHood fields={hoodFields} />
     </>
   );
 }

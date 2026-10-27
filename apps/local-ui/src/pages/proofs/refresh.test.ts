@@ -15,7 +15,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../api/client.js';
 import proofsCss from './proofs.css?raw';
-import { ProofsPage } from './index.js';
+import { ProofsPage, type ProofsPageProps } from './index.js';
 import { PROOFS_STRINGS, priceLine } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -83,7 +83,7 @@ function server(routes: Routes, hang = false): typeof fetch {
 
 async function mount(routes: Routes, opts: { hood?: boolean; hang?: boolean } = {}): Promise<void> {
   const api = createApiClient({ fetch: server(routes, opts.hang === true), token: 't' });
-  const page = h(ProofsPage, { api });
+  const page = h<ProofsPageProps>(ProofsPage, { api });
   await act(async () => {
     root.render(opts.hood === true ? h(HoodProvider, { value: true }, page) : page);
     await vi.advanceTimersByTimeAsync(0);
@@ -102,6 +102,7 @@ const button = (label: string): HTMLButtonElement | undefined =>
 describe('credits card', () => {
   it('sits on a level-2 surface with a ring meter, and keeps the words', async () => {
     await mount(EMPTY);
+    await tick(100);
     const c = card();
     expect(c?.classList.contains('al-surface--l2')).toBe(true);
     expect(c?.getAttribute('data-level')).toBe('2');
@@ -123,7 +124,7 @@ describe('credits card', () => {
     });
     obs.observe(host, { subtree: true, attributes: true, childList: true });
     await act(async () => {
-      root.render(h(ProofsPage, { api }));
+      root.render(h<ProofsPageProps>(ProofsPage, { api }));
       await vi.advanceTimersByTimeAsync(0);
     });
     await tick(50);
@@ -194,7 +195,7 @@ describe('new proofs and waiting for credits', () => {
       .spyOn(api, 'owner')
       .mockResolvedValue({ kind: 'ok', status: 202, data: {} } as never);
     await act(async () => {
-      root.render(h(ProofsPage, { api }));
+      root.render(h<ProofsPageProps>(ProofsPage, { api }));
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(PROOFS_STRINGS.waiting).toBe('Waiting for your credits…');
@@ -221,6 +222,7 @@ describe('new proofs and waiting for credits', () => {
     expect(waiting).toBeDefined();
     routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 68, balance: '$6.80' };
     await tick(11_000);
+    await tick(100);
     expect(host.textContent).not.toContain(PROOFS_STRINGS.waiting);
     expect(meter()).toBe('68');
   });

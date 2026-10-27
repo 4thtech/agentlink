@@ -4751,7 +4751,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - The existing messages tests unchanged; DOM tests per state; reduced motion; the panel shows only message ID, size and proof status with the public proof record link where there is a proof; no key, code, token, session, drop or presigned link.
 
 #### UI-REFRESH-l · local-ui: Proofs & credits refresh (new)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`
 - **Depends on:** UI-REFRESH-f
 - **Spec:** B-11 §16 (Proofs & credits), §15.3, §19.4
