@@ -26,6 +26,7 @@ import type { TransportFactory } from './transport.js';
 import { DeliveryAcks } from './acks.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
+import { savedNameOf } from './files/received.js';
 import type { FilesPlatform } from './files/platform.js';
 import { FilesView } from './files/view.js';
 import { FilesIoView, MessagesView } from './ui-messages.js';
@@ -270,7 +271,11 @@ export class AgentLinkClient {
     );
     this.activity = new ActivityService(ctx, this.contacts);
     this.messages = new MessagesView(ctx, this.contacts);
-    this.filesIo = new FilesIoView(ctx, this.contacts);
+    // MSG-FILES-IO-d: "saved as" from the sealed files.saved_name; a value that does not open shows
+    // that one item without it (FilesIoView catches per row).
+    this.filesIo = new FilesIoView(ctx, this.contacts, {
+      savedName: (row) => savedNameOf(ctx, row),
+    });
     this.inbox = new InboxService(ctx, this.contacts, this.requests, { dropOrigins });
     this.proofs = new ProofService(
       ctx,

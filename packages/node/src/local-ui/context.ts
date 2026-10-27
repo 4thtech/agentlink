@@ -22,7 +22,9 @@ import type {
   PreparedOwnerAction,
   PreparedPolicyEdit,
   ProofListItem,
+  ReceivedFileItem,
   ResolvedFolders,
+  SentFileItem,
   TopUpView,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
@@ -122,6 +124,14 @@ export interface LocalUiReadClient {
   };
   /** M1-11c-a1: one page of core's activity feed (`ActivityService.list`); store only, no write. */
   listActivity(query: PageQuery): Promise<Page<ActivityEntry>>;
+  /**
+   * MSG-FILES-IO-d (Files, Received and Sent): one page of core's `FilesIoView`, store only. Never
+   * fetches, opens or hashes a file and never writes (I-4); not `fetchFile`, not the store.
+   */
+  readonly filesIo: {
+    received(query: PageQuery): Promise<Page<ReceivedFileItem>>;
+    sent(query: PageQuery): Promise<Page<SentFileItem>>;
+  };
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -154,6 +164,10 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       topUp: () => client.proofs.receiveOptions(),
     }),
     listActivity: (query) => client.activity.list(query),
+    filesIo: Object.freeze({
+      received: (query: PageQuery) => client.filesIo.received(query),
+      sent: (query: PageQuery) => client.filesIo.sent(query),
+    }),
   });
 }
 

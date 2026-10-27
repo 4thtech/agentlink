@@ -210,6 +210,8 @@ async function putFileRow(
     expires_at: T0 + 86_400,
     deleted_at: null,
     delete_after: 'expiry',
+    // Store schema 6 (MSG-FILES-IO-b): not saved yet.
+    saved_name: null,
     ...over,
   };
   await agent.store.transaction((tx) => tx.insert('files', row));
