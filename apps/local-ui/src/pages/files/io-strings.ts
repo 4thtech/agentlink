@@ -35,6 +35,17 @@ export const FILES_IO_STRINGS = {
   availableUntil: 'Available until',
   sentExpired: 'Expired. It can no longer be fetched.',
   sentDeleted: 'Removed after delivery.',
+  // A sent file the outbox gave up on: no receipt will come and nothing waits for it.
+  sentNotDelivered: 'Not delivered. Ask your AI to send it again.',
+  // MSG-FILES-IO-h, Show in Finder (11 §5.7): "Show in Finder" on macOS, "Show in folder" elsewhere.
+  showInFinder: 'Show in Finder',
+  showInFolder: 'Show in folder',
+  revealNotFound:
+    "This file isn't in your Inbox folder any more. You may have moved or renamed it.",
+  revealRefused: "This file can't be shown. It isn't a plain file in your Inbox folder.",
+  revealUnavailable: "Your Inbox folder can't be opened right now. Try again in a minute.",
+  revealFailed: "The folder didn't open. Try again.",
+  revealSessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
 } as const;
 
 /** For a list that could not be refreshed: the time it was last loaded, e.g. "14:02". */

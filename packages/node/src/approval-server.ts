@@ -80,6 +80,11 @@
 //   The handler gets a read-only client view and a one-use `sign` bound to that session (the
 //   allowlist and one gesture, D-68); the session closes and the store locks when it returns, and a
 //   presence route that signed nothing is answered 409 `refused`.
+// - MSG-FILES-IO-h (D-134), Show in Finder: the one `presence: 'reveal'` route is run by
+//   `revealGate`, never by `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and
+//   octet-stream checks, the body must be exactly `{"id":"<item ID>"}` (no query, input or presence
+//   header); the handler gets only that ID and the checked reveal (local-ui/reveal-file.ts). No
+//   owner presence, no owner store, nothing signed or written.
 // - M1-11s-c, owner setup on the first-run page (D-120 (1); proposed, owner confirms at merge): the
 //   two `presence: 'setup'` routes (begin, finish) are run by `setupGate`, never by `ownerGate`
 //   (which is unchanged). After the same session, CSRF, Origin, fetch-metadata and octet-stream
@@ -115,7 +120,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
-import type { OwnerActionOutcome } from '@4thtech-io/core';
+import {
+  PayConfirmError,
+  buildPayConfirmFlow,
+  isPaidPendingAction,
+  policySetSpendingChanges,
+  type OwnerActionOutcome,
+  type PayConfirmFlow,
+} from '@4thtech-io/core';
 import {
   KeyStoreError,
   canonicalizeToBytes,
@@ -138,11 +150,34 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
-import { osBrowserOpener, osNotifier, type BrowserOpener, type OsNotifier } from './approval-os.js';
+import {
+  osBrowserOpener,
+  osFileRevealer,
+  osNotifier,
+  type BrowserOpener,
+  type FileRevealer,
+  type OsNotifier,
+} from './approval-os.js';
+import { revealSavedFile } from './local-ui/reveal-file.js';
 import { APP_CSS, APP_JS, EXPIRED_HTML, pageHtml } from './approval-page.js';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
-import { decideReviewedWith, type ApprovalContext } from './owner-approval.js';
+import {
+  buildApprovalOperation,
+  decideReviewedWith,
+  type ApprovalContext,
+} from './owner-approval.js';
+import {
+  MAX_PAY_CONFIRM_ASSERTION_BYTES,
+  PAY_CONFIRM_TTL_MS,
+  PayConfirmHolds,
+  checkPayConfirmAssertion,
+  parsePayConfirmAssertion,
+  type PayConfirmAssertion,
+  type PayConfirmHold,
+  type PayConfirmTarget,
+} from './pay-confirm.js';
+import { takeReviewedRules } from './local-ui/api/rules.js';
 import { grouped } from './owner-init.js';
 import { KeychainOwnerKeyStore, newOwnerSeed, ownerFingerprintText } from './owner-keystore.js';
 import {
@@ -165,6 +200,7 @@ import {
   parsePasskeyAssertion,
   parsePasskeyRegistration,
   readOwnerPasskeyHeader,
+  readOwnerPasskeyKey,
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
@@ -178,7 +214,9 @@ import {
 } from './local-ui/context.js';
 import type {
   LocalUiOwnerOperation,
+  LocalUiPayConfirmStep,
   LocalUiResult,
+  LocalUiRevealRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
 import {
@@ -187,7 +225,12 @@ import {
   createLocalUiRoutes,
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
-import { checkGesture, signGesture, type PromptingOwnerKeyStore } from './owner-operation.js';
+import {
+  checkGesture,
+  signGesture,
+  type OwnerSignRequest,
+  type PromptingOwnerKeyStore,
+} from './owner-operation.js';
 import type { OwnerTerminal } from './owner-terminal.js';
 
 /** 08 §1 (M1-31, D-79): the local UI's host name; its origin is `http://localhost:<port>`. */
@@ -262,6 +305,11 @@ const ASSET_CACHE = 'private, max-age=31536000, immutable';
 /** The CSRF meta the app's index.html carries empty, filled per server (apps/local-ui). */
 const CSRF_META = /<meta\s+name="agentlink-csrf"\s+content="([^"]*)"\s*\/?>/gi;
 const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
+/** MSG-FILES-IO-h: the largest Show in Finder body (`{"id":"<64 chars>.<2 digits>"}` fits easily). */
+const MAX_REVEAL_BODY_BYTES = 256;
+/** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
+const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
+
 /** Longest `X-AgentLink-Input` (base64url JSON) a /api/ui/ owner route accepts. */
 const MAX_INPUT_CHARS = 8192;
 /** M1-11s-c: the setup routes report an expired hold themselves (no sweep before them). */
@@ -421,6 +469,10 @@ export type ApprovalServerEvent =
         | 'invalid'
         /** M1-11a: a commitment was in a review list (decided alone, D-31). */
         | 'commitment'
+        /** M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a paid item was in a review list. */
+        | 'paid_item_in_batch'
+        /** M1-PAY-CONFIRM-a: approving a paid item takes its own confirmation (begin, finish). */
+        | 'confirm_required'
         /** M1-11a: wrong-code backoff in force. */
         | 'wait'
         | 'refused'
@@ -451,6 +503,8 @@ export type ApprovalServerEvent =
       readonly kind: 'owner_operation';
       readonly outcome:
         | 'done'
+        /** M1-PAY-CONFIRM-a: a spending change or a paid approval goes through the confirmation. */
+        | 'confirm_required'
         | 'wait'
         | 'invalid'
         | 'presence_required'
@@ -489,6 +543,33 @@ export type ApprovalServerEvent =
       readonly fingerprint?: string;
       /** M1-UX-FIRSTRUN-V2: with `done`, the first policy's fixed outcome (never the path). */
       readonly sendFolder?: SetupSendFolder;
+    }
+  /**
+   * M1-PAY-CONFIRM-a: the outcome of a paid-action confirmation step (fixed values only: never the
+   * challenge, the statement, an amount, a name, the assertion or the backup code; I-7).
+   */
+  | {
+      readonly kind: 'pay_confirm';
+      readonly outcome:
+        | 'ready'
+        | 'applied'
+        | 'invalid'
+        | 'wait'
+        | 'busy'
+        | 'needs_setup'
+        | 'not_pending'
+        | 'not_paid'
+        | 'unknown'
+        | 'expired'
+        | 'changed'
+        | 'presence_required'
+        | 'presence_rejected'
+        | 'verification_required'
+        /** Rule 5: the passkey has no stored credential key; use the backup code. */
+        | 'passkey_update_needed'
+        | 'tries_exhausted'
+        | 'refused'
+        | 'failed';
     }
   | { readonly kind: 'closed' };
 
@@ -535,6 +616,8 @@ export interface ApprovalServerInternals {
   readonly keychain?: KeychainBackend;
   readonly opener?: BrowserOpener;
   readonly notifier?: OsNotifier;
+  /** MSG-FILES-IO-h: the OS file revealer behind Show in Finder. Default: osFileRevealer. */
+  readonly fileRevealer?: FileRevealer;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
@@ -591,6 +674,15 @@ type PasskeyOutcome = Extract<ApprovalServerEvent, { kind: 'passkey' }>['outcome
 type RejectReason = Extract<ApprovalServerEvent, { kind: 'rejected' }>['reason'];
 type OwnerOperationOutcome = Extract<ApprovalServerEvent, { kind: 'owner_operation' }>['outcome'];
 type OwnerSetupOutcome = Extract<ApprovalServerEvent, { kind: 'owner_setup' }>['outcome'];
+type PayConfirmOutcome = Extract<ApprovalServerEvent, { kind: 'pay_confirm' }>['outcome'];
+
+/** M1-PAY-CONFIRM-a: an ordinary owner route tried to sign what only the confirmation signs. */
+class ConfirmRequired extends Error {
+  constructor() {
+    super('This needs the paid-action confirmation.');
+    this.name = 'ConfirmRequired';
+  }
+}
 
 /** M1-11s-c: the owner seed `begin` holds for `finish`, in memory only. */
 interface PendingSetup {
@@ -804,6 +896,10 @@ export async function startApprovalServerWith(
     internals.openOwnerStore ??
     ((owner: OwnerPublicKeys) => KeychainOwnerKeyStore.open(keychainOf(), owner));
   const opener = internals.opener ?? osBrowserOpener;
+  // MSG-FILES-IO-h: the checked reveal handed to the reveal route's handler (never the bare opener).
+  const fileRevealer = internals.fileRevealer ?? osFileRevealer;
+  const revealFile = (inboxFolder: string, savedName: string) =>
+    revealSavedFile(inboxFolder, savedName, { opener: fileRevealer });
   const notifier = internals.notifier ?? osNotifier;
   const listen = internals.listen ?? listenOnce;
   const emit = (event: ApprovalServerEvent): void => {
@@ -1147,6 +1243,20 @@ export async function startApprovalServerWith(
             return;
           }
         }
+        // M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a request that carries a fee is never part of a
+        // review list, and approving one takes its own confirmation (POST /api/ui/pay-confirm/…).
+        // Denying it costs nothing and keeps the ordinary prompt.
+        const paid = picks.filter((_p, i) =>
+          isPaidPendingAction((live[i] as ApprovalForDecision).action),
+        );
+        if (review && paid.length > 0) {
+          finishDecision(res, 409, 'paid_item_in_batch', { items: paid.map((p) => p.approvalId) });
+          return;
+        }
+        if (!review && paid.some((p) => p.decision === 'approve')) {
+          finishDecision(res, 409, 'confirm_required');
+          return;
+        }
         const changed = picks
           .filter((pick, i) => {
             const entry = live[i] as ApprovalForDecision;
@@ -1468,12 +1578,17 @@ export async function startApprovalServerWith(
                   );
                 }
                 used = true;
-                return signGesture(session, checkGesture(review, requests));
+                const frozen = checkGesture(review, requests);
+                // M1-PAY-CONFIRM-a (04 §2.5.3): a spending change or a paid approval is signed
+                // only through the confirmation, never by an ordinary owner route.
+                await refuseUnconfirmedPaid(frozen);
+                return signGesture(session, frozen);
               },
             });
             result = await run(owner);
           } catch (error) {
-            if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
+            if (error instanceof ConfirmRequired) finishOwner(res, 409, 'confirm_required');
+            else if (error instanceof NodeKeyStoreError) finishOwner(res, 409, 'refused');
             else finishOwner(res, 500, 'failed');
             return;
           } finally {
@@ -1495,6 +1610,481 @@ export async function startApprovalServerWith(
       }
     } finally {
       wipe(body, assertion?.prfOutput);
+    }
+  }
+
+  // --- M1-PAY-CONFIRM-a: confirming paid actions (04 §2.5.3; pay-confirm.ts) ---------------------
+
+  const payHolds = new PayConfirmHolds(() => now());
+
+  const finishPay = (
+    res: ServerResponse,
+    status: number,
+    outcome: PayConfirmOutcome,
+    extra: Record<string, unknown> = {},
+  ): void => {
+    // Fixed values only in the event: never the challenge, statement, assertion or code (I-7).
+    emit({ kind: 'pay_confirm', outcome });
+    sendJson(res, status, { status: outcome, ...extra });
+  };
+
+  /** The policy in force, or undefined when it fails closed or cannot be read (fail closed). */
+  const policyInForce = async (): Promise<{ policy: unknown; version: number } | undefined> => {
+    const client = options.localUi?.client;
+    if (client === undefined) return undefined;
+    try {
+      const effective = await client.ownerActions.loadPolicy();
+      if (effective.mode === 'fail_closed') return undefined;
+      return {
+        policy: effective.policy,
+        version: effective.mode === 'signed' ? effective.version : 0,
+      };
+    } catch {
+      return undefined;
+    }
+  };
+
+  /**
+   * 04 §2.5.3: refuses, before anything is signed, an ordinary owner route's object that only the
+   * confirmation may sign: a `policy.set` that changes a spending field (or cannot be compared with
+   * the policy in force), and an approval of a request that carries a fee.
+   */
+  const refuseUnconfirmedPaid = async (frozen: readonly OwnerSignRequest[]): Promise<void> => {
+    for (const request of frozen) {
+      if (request.kind !== 'owner-action') continue;
+      const op = request.action['op'];
+      if (op === 'policy.set') {
+        const current = await policyInForce();
+        const changes =
+          current === undefined
+            ? 'invalid'
+            : policySetSpendingChanges(current.policy, request.action);
+        if (changes === 'invalid' || changes.length > 0) throw new ConfirmRequired();
+      } else if (op === 'approval.decide' || op === 'approval.decideBatch') {
+        const params = request.action['params'] as Record<string, unknown> | undefined;
+        const items: unknown[] =
+          op === 'approval.decide'
+            ? [params]
+            : Array.isArray(params?.['items'])
+              ? (params['items'] as unknown[])
+              : [];
+        for (const item of items) {
+          const fields = (item ?? {}) as Record<string, unknown>;
+          if (op === 'approval.decide' && fields['decision'] !== 'approve') continue;
+          const approvalId = fields['approvalId'];
+          const entry = typeof approvalId === 'string' ? await source.get(approvalId) : undefined;
+          if (entry === undefined || isPaidPendingAction(entry.action)) {
+            throw new ConfirmRequired();
+          }
+        }
+      }
+    }
+  };
+
+  /** The flow a begin builds, or a fixed refusal. Every value comes from the store (I-5). */
+  type BuiltFlow =
+    | {
+        readonly target: PayConfirmTarget;
+        readonly flow: PayConfirmFlow;
+        readonly requests: readonly OwnerSignRequest[];
+      }
+    | PayConfirmOutcome;
+
+  /** A proof approval's flow from the live pending request (rule 2). */
+  const proofFlow = async (
+    approvalId: string,
+    context: ApprovalContext,
+    decideBody?: JsonObject,
+  ): Promise<BuiltFlow> => {
+    const entry = await source.get(approvalId);
+    if (entry === undefined || entry.approvalId !== approvalId || decided.has(approvalId)) {
+      return 'not_pending';
+    }
+    let recomputed: string;
+    try {
+      recomputed = encodeHex(sha256(canonicalizeToBytes(entry.action)));
+    } catch {
+      return 'changed';
+    }
+    if (recomputed !== entry.storedDigest) return 'changed';
+    if (!isPaidPendingAction(entry.action)) return 'not_paid';
+    const facts = (entry.action as Record<string, unknown> | null)?.['context'];
+    const counterparty =
+      typeof facts === 'object' && facts !== null
+        ? (facts as Record<string, unknown>)['counterparty']
+        : undefined;
+    const hasCounterparty = typeof counterparty === 'object' && counterparty !== null;
+    // The 11 §5.2 name the core built from the stored contact (never inbound text).
+    const who = entry.details?.who;
+    if (hasCounterparty && (who === undefined || who.length === 0)) return 'refused';
+    let flow: PayConfirmFlow;
+    try {
+      flow = buildPayConfirmFlow({
+        kind: 'proof',
+        pendingAction: entry.action,
+        counterpartyName: hasCounterparty ? (who as string) : null,
+      });
+    } catch (error) {
+      return error instanceof PayConfirmError && error.reason === 'not_paid'
+        ? 'not_paid'
+        : 'refused';
+    }
+    let body = decideBody;
+    if (body === undefined) {
+      try {
+        body = buildApprovalOperation(
+          context,
+          [
+            {
+              approvalId,
+              action: entry.action,
+              storedDigest: entry.storedDigest,
+              decision: 'approve',
+              commitment: entry.commitment,
+              summary: entry.summary,
+              requestExpiresAt: entry.expiresAt,
+            },
+          ],
+          { nowSeconds: () => Math.floor(now() / 1000) },
+        ).body;
+      } catch {
+        return 'changed';
+      }
+    }
+    return {
+      target: { kind: 'proof', approvalId },
+      flow,
+      requests: [{ kind: 'owner-action', action: body }],
+    };
+  };
+
+  /** A limits change's flow from the policy in force and the body the page reviewed. */
+  const limitsFlow = async (
+    policySet: JsonObject,
+    keepDeliveryReceipts: boolean,
+  ): Promise<BuiltFlow> => {
+    const current = await policyInForce();
+    if (current === undefined) return 'refused';
+    let flow: PayConfirmFlow;
+    try {
+      flow = buildPayConfirmFlow({
+        kind: 'limits',
+        before: current.policy as never,
+        policySet,
+      });
+    } catch (error) {
+      return error instanceof PayConfirmError && error.reason === 'no_spending_change'
+        ? 'not_paid'
+        : 'refused';
+    }
+    const params = policySet['params'] as Record<string, unknown> | undefined;
+    const version = typeof params?.['version'] === 'number' ? params['version'] : -1;
+    return {
+      target: { kind: 'limits', version, keepDeliveryReceipts },
+      flow,
+      requests: [{ kind: 'owner-action', action: policySet }],
+    };
+  };
+
+  const onlyKeys = (value: unknown, keys: readonly string[]): value is Record<string, unknown> =>
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).every((k) => keys.includes(k));
+
+  /** Begin: the input names the flow only; the statement is built here from stored data. */
+  const buildBegin = async (
+    input: JsonValue | undefined,
+    context: ApprovalContext,
+  ): Promise<BuiltFlow> => {
+    if (onlyKeys(input, ['flow', 'approvalId']) && input['flow'] === 'proof') {
+      const approvalId = input['approvalId'];
+      if (typeof approvalId !== 'string' || !APPROVAL_ID.test(approvalId)) return 'invalid';
+      return proofFlow(approvalId, context);
+    }
+    if (onlyKeys(input, ['flow', 'review', 'acknowledged']) && input['flow'] === 'limits') {
+      const reviewed = takeReviewedRules(uiContext, input['review'], input['acknowledged']);
+      if (reviewed === undefined) return 'not_pending';
+      return limitsFlow(reviewed.body, reviewed.keepDeliveryReceipts);
+    }
+    return 'invalid';
+  };
+
+  /** Rule 3: the flow rebuilt from the store now, for comparison with the hold. */
+  const rebuild = async (hold: PayConfirmHold, context: ApprovalContext): Promise<BuiltFlow> => {
+    const signed = hold.requests[0];
+    if (signed?.kind !== 'owner-action') return 'changed';
+    if (hold.target.kind === 'proof') {
+      return proofFlow(hold.target.approvalId, context, signed.action);
+    }
+    return limitsFlow(signed.action, hold.target.keepDeliveryReceipts);
+  };
+
+  async function payConfirmGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    step: LocalUiPayConfirmStep,
+    cookie: string,
+  ): Promise<void> {
+    const wait = waitSeconds();
+    if (wait > 0) {
+      req.resume();
+      res.setHeader('Retry-After', String(wait));
+      finishPay(res, 429, 'wait', { retryAfter: wait });
+      return;
+    }
+    const input = operationInput(req);
+    const mode = header(req, 'x-agentlink-presence');
+    const passkey = mode === 'passkey';
+    if (input === 'invalid' || (mode !== undefined && !passkey)) {
+      req.resume();
+      finishPay(res, 400, 'invalid');
+      return;
+    }
+    const body = await boundedBody(
+      req,
+      res,
+      passkey ? MAX_PAY_CONFIRM_ASSERTION_BYTES : MAX_SECRET_BYTES,
+    );
+    if (body === undefined) return;
+    try {
+      payHolds.sweep((held) => sessions.some((s) => equalBytes(s, held)));
+      const sessionAt = matchIndex(cookie, sessions);
+      if (sessionAt < 0) {
+        finishPay(res, 409, 'unknown');
+        return;
+      }
+      const session = sessions[sessionAt] as Uint8Array;
+      if (step === 'begin') await payBegin(res, input, body, session, passkey);
+      else await payFinish(res, input, body, session, passkey);
+    } finally {
+      wipe(body);
+    }
+  }
+
+  async function payBegin(
+    res: ServerResponse,
+    input: JsonValue | undefined,
+    body: Uint8Array,
+    session: Uint8Array,
+    passkey: boolean,
+  ): Promise<void> {
+    if (body.length !== 0 || passkey) {
+      finishPay(res, 400, 'invalid');
+      return;
+    }
+    if (busy) {
+      finishPay(res, 409, 'busy');
+      return;
+    }
+    busy = true;
+    try {
+      const context = await source.context();
+      if (context === undefined) {
+        finishPay(res, 503, 'needs_setup');
+        return;
+      }
+      const built = await buildBegin(input, context);
+      if (typeof built === 'string') {
+        finishPay(res, built === 'invalid' ? 400 : 409, built);
+        return;
+      }
+      const hold = payHolds.begin(session, built.target, built.flow, built.requests);
+      // Rule 5: the passkey is offered only when its credential key is kept; otherwise the page
+      // offers the backup code (and setting the passkey up again).
+      let credentialId: string | undefined;
+      try {
+        const stored = await readOwnerPasskeyHeader(keychainOf());
+        if (
+          stored !== null &&
+          (await readOwnerPasskeyKey(keychainOf(), stored.credentialId)) !== null
+        ) {
+          credentialId = encodeBase64url(stored.credentialId);
+        }
+      } catch {
+        credentialId = undefined;
+      }
+      finishPay(res, 200, 'ready', {
+        ceremony: hold.id,
+        statement: hold.statement as unknown as JsonValue,
+        expiresInMs: PAY_CONFIRM_TTL_MS,
+        publicKey: {
+          rpId: PASSKEY_RP_ID,
+          challenge: encodeBase64url(hold.challenge),
+          allowCredentials: credentialId === undefined ? [] : [credentialId],
+          userVerification: 'required',
+          timeoutMs: PAY_CONFIRM_TTL_MS,
+          prfSalt: encodeBase64url(ownerPrfSalt()),
+        },
+      });
+    } catch {
+      finishPay(res, 500, 'failed');
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function payFinish(
+    res: ServerResponse,
+    input: JsonValue | undefined,
+    body: Uint8Array,
+    session: Uint8Array,
+    passkey: boolean,
+  ): Promise<void> {
+    if (!onlyKeys(input, ['ceremony']) || typeof input['ceremony'] !== 'string') {
+      finishPay(res, 400, 'invalid');
+      return;
+    }
+    if (body.length === 0) {
+      finishPay(res, 403, 'presence_required');
+      return;
+    }
+    if (busy) {
+      finishPay(res, 409, 'busy');
+      return;
+    }
+    // A passkey finish takes the hold before any await: single use, whatever happens below.
+    const found = payHolds.get(input['ceremony'], session, passkey);
+    if (found === 'unknown' || found === 'expired') {
+      finishPay(res, 409, found);
+      return;
+    }
+    const hold = found;
+    let assertion: PayConfirmAssertion | undefined;
+    let consumed = passkey;
+    busy = true;
+    try {
+      if (passkey) {
+        assertion = parsePayConfirmAssertion(body);
+        if (assertion === undefined) {
+          finishPay(res, 403, 'presence_required');
+          return;
+        }
+      }
+      const context = await source.context();
+      if (context === undefined) {
+        finishPay(res, 503, 'needs_setup');
+        return;
+      }
+      // Rule 3: anything changed since begin (fee, limit, contact, expiry) needs a new begin.
+      const current = await rebuild(hold, context);
+      if (typeof current === 'string' || !PayConfirmHolds.sameFlow(hold, current.flow)) {
+        payHolds.drop(hold.id);
+        consumed = true;
+        finishPay(res, 409, 'changed');
+        return;
+      }
+      let presence: OwnerPresence;
+      if (assertion !== undefined) {
+        let check: ReturnType<typeof checkPayConfirmAssertion> = 'presence_rejected';
+        try {
+          const stored = await readOwnerPasskeyHeader(keychainOf());
+          if (stored !== null) {
+            check = checkPayConfirmAssertion(assertion, {
+              challenge: hold.challenge,
+              origin,
+              passkey: stored,
+              publicKey: await readOwnerPasskeyKey(keychainOf(), stored.credentialId),
+              owner: context.owner,
+            });
+          }
+        } catch {
+          check = 'presence_rejected';
+        }
+        if (check === 'verification_required') {
+          finishPay(res, 403, 'verification_required');
+          return;
+        }
+        if (check === 'key_missing') {
+          // Rule 5: this passkey has no stored key; the backup code (or setting it up again) works.
+          finishPay(res, 409, 'passkey_update_needed');
+          return;
+        }
+        if (check !== 'ok') {
+          presenceFailed();
+          finishPay(res, 403, 'presence_rejected');
+          return;
+        }
+        presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+      } else {
+        presence = { kind: 'passphrase', secret: body };
+      }
+      let store: PromptingOwnerKeyStore;
+      try {
+        store = await openOwnerStore(context.owner);
+      } catch {
+        finishPay(res, 503, 'needs_setup');
+        return;
+      }
+      let signatures: Awaited<ReturnType<typeof signGesture>>;
+      try {
+        let ownerSession: OwnerSession;
+        try {
+          // unlock wipes the presented bytes, whether or not they unlock.
+          ownerSession = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
+        } catch (error) {
+          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+            presenceFailed();
+            if (!passkey && payHolds.backupFailed(hold)) {
+              consumed = true;
+              finishPay(res, 403, 'tries_exhausted');
+            } else {
+              finishPay(res, 403, 'presence_rejected');
+            }
+          } else {
+            finishPay(res, 500, 'failed');
+          }
+          return;
+        }
+        presenceSucceeded();
+        if (!passkey) {
+          payHolds.get(hold.id, session, true);
+          consumed = true;
+        }
+        try {
+          // Rule 3: exactly the objects frozen at begin; nothing from this request.
+          signatures = await signGesture(ownerSession, hold.requests);
+        } finally {
+          await ownerSession.close().catch(() => undefined);
+        }
+      } finally {
+        await store.lock().catch(() => undefined);
+        await store.close().catch(() => undefined);
+      }
+      let applied = true;
+      for (const signature of signatures) {
+        if (signature.kind !== 'owner-action') {
+          applied = false;
+          continue;
+        }
+        const outcome = await source.apply(signature.signed);
+        if (outcome.status !== 'applied') applied = false;
+      }
+      if (!applied) {
+        finishPay(res, 409, 'refused');
+        return;
+      }
+      if (hold.target.kind === 'proof') decided.add(hold.target.approvalId);
+      else if (hold.target.keepDeliveryReceipts) {
+        await options.localUi?.client?.ownerActions
+          .recordReceiptsKept(hold.target.version)
+          .catch(() => false);
+      }
+      emit({ kind: 'owner_operation', outcome: 'done' });
+      finishPay(res, 200, 'applied');
+    } catch {
+      finishPay(res, 500, 'failed');
+    } finally {
+      busy = false;
+      if (consumed) PayConfirmHolds.wipe(hold);
+      if (assertion !== undefined) {
+        wipe(
+          assertion.prfOutput,
+          assertion.clientDataJSON,
+          assertion.signature,
+          assertion.authenticatorData,
+        );
+      }
     }
   }
 
@@ -1788,6 +2378,7 @@ export async function startApprovalServerWith(
             keys: held.keys,
             credentialId: registration.credentialId,
             prfOutput: registration.prfOutput,
+            authenticatorData: registration.authenticatorData,
             firstCard: setup.firstCard,
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
@@ -1838,6 +2429,59 @@ export async function startApprovalServerWith(
     }
   }
 
+  /**
+   * MSG-FILES-IO-h (D-134): the gate of the one reveal route (Show in Finder). The caller checked the
+   * session, CSRF, Origin, fetch metadata and the octet-stream type. The request carries only the
+   * item ID: the body must be exactly `{"id":"<envelopeId>.<idx>"}` (strict JSON, no other member),
+   * with no query, no operation input and no presence header; anything else is 400 `invalid` before
+   * the store is read. No owner presence, no owner store, no signing. The handler gets the checked
+   * ID and the checked reveal only; nothing here logs the ID, a name or a path.
+   */
+  async function revealGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiRevealRoute,
+  ): Promise<void> {
+    const invalid = (): void => {
+      sendJson(res, 400, { error: 'invalid' });
+    };
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      invalid();
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_REVEAL_BODY_BYTES);
+    if (body === undefined) return;
+    let id: unknown;
+    try {
+      const parsed = parseJson(decodeUtf8(body));
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+      const keys = Object.keys(parsed);
+      if (keys.length !== 1 || keys[0] !== 'id') throw new Error();
+      id = (parsed as { id?: unknown }).id;
+    } catch {
+      invalid();
+      return;
+    }
+    if (typeof id !== 'string' || !REVEAL_ITEM_ID.test(id)) {
+      invalid();
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, id, revealFile);
+    } catch {
+      sendJson(res, 500, { status: 'failed' });
+      return;
+    }
+    sendResult(res, result);
+  }
+
   /** M1-11s-b: one /api/ui/ request (route registry, session, CSRF, presence gate). */
   async function handleUi(
     req: IncomingMessage,
@@ -1872,9 +2516,19 @@ export async function startApprovalServerWith(
     }
     const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
     if (type !== 'application/octet-stream') return fail(415, 'content_type');
+    if (route.presence === 'reveal') {
+      // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
+      await revealGate(req, res, url, route);
+      return;
+    }
     if (route.presence === 'setup') {
       // M1-11s-c: owner setup has its own gate; ownerGate never runs it.
       await setupGate(req, res, route.step, cookie as string);
+      return;
+    }
+    if (route.presence === 'pay-confirm') {
+      // M1-PAY-CONFIRM-a: the paid-action confirmation has its own gate (04 §2.5.3).
+      await payConfirmGate(req, res, route.step, cookie as string);
       return;
     }
     const input = operationInput(req);
@@ -2092,6 +2746,7 @@ export async function startApprovalServerWith(
     },
     close: async () => {
       dropSetup();
+      payHolds.clear();
       await folderRemoval;
       await Promise.all(listeners.map(closeServer));
       emit({ kind: 'closed' });

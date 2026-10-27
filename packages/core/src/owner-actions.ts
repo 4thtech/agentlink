@@ -37,6 +37,7 @@ import {
   type SignedOwnerAction,
 } from '@4thtech-io/types';
 import { isCommitmentAction } from './commitments.js';
+import { isPaidPendingAction } from './pay-confirm.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
@@ -609,6 +610,9 @@ export class OwnerActions {
       });
       let actionDigest: string;
       let scoped = false;
+      // 04 §2.5.3 rule 7: a request whose action carries a fee is never a batch item. An
+      // unreadable action is treated as paid (fail closed; its digest cannot match anyway).
+      let paid = true;
       try {
         const text = await open(
           this.#ctx,
@@ -622,6 +626,7 @@ export class OwnerActions {
         // A scope, or `commitments.accept` among the triggers (an accepted/rejected acknowledgement
         // has no scope but is a commitment, D-31): never a batch item (D-68, M1-20).
         scoped = isCommitmentAction(action);
+        paid = isPaidPendingAction(action);
       } catch {
         // An unreadable stored action can never match a signed digest (fail closed).
         actionDigest = '';
@@ -631,6 +636,7 @@ export class OwnerActions {
         actionDigest,
         expiresAt: row.expires_at,
         commitment: row.scope_json !== null || scoped,
+        paid,
         pending: row.status === 'pending',
       });
     }

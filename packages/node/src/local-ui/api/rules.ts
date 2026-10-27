@@ -316,6 +316,39 @@ async function reviewEdit(
   };
 }
 
+// --- M1-PAY-CONFIRM-a: a reviewed body for the paid-action confirmation ---------------------------
+
+/** A reviewed rules body, taken for the confirmation sheet's begin (04 §2.5.3). */
+export interface ReviewedRulesEdit {
+  readonly body: JsonObject;
+  readonly version: number;
+  readonly keepDeliveryReceipts: boolean;
+}
+
+/**
+ * Takes the body this server prepared and the page reviewed, under the same rules as a save
+ * (D-119): named by its hash, before it expires, once, and only when `acknowledged` is exactly its
+ * warning codes. Undefined otherwise (the owner reviews again). It signs nothing: the
+ * paid-action confirmation signs it after the owner's verification (approval-server.ts).
+ */
+export function takeReviewedRules(
+  context: LocalUiContext,
+  review: unknown,
+  acknowledged: unknown,
+): ReviewedRulesEdit | undefined {
+  if (typeof review !== 'string' || !HASH.test(review)) return undefined;
+  const pending = take(context, review);
+  if (pending === undefined) return undefined;
+  if (pending.expiresAt <= nowSeconds(context)) return undefined;
+  if (!acknowledgedExactly(pending.codes, acknowledged)) return undefined;
+  if (bodyHash(canonicalize(pending.body)) !== review) return undefined;
+  return {
+    body: pending.body,
+    version: pending.version,
+    keepDeliveryReceipts: pending.keepDeliveryReceipts,
+  };
+}
+
 // --- POST /api/ui/rules ---------------------------------------------------------------------------
 
 /** What the owner's presence prompt context shows (fixed text, I-5; the page was the review). */

@@ -149,10 +149,13 @@ export interface LocalUiReadClient {
   /**
    * MSG-FILES-IO-d (Files, Received and Sent): one page of core's `FilesIoView`, store only. Never
    * fetches, opens or hashes a file and never writes (I-4); not `fetchFile`, not the store.
+   * MSG-FILES-IO-h: `savedName`, one received item's saved name by item ID (core
+   * `FilesIoView.savedName`), for Show in Finder only; never log it (I-7).
    */
   readonly filesIo: {
     received(query: PageQuery): Promise<Page<ReceivedFileItem>>;
     sent(query: PageQuery): Promise<Page<SentFileItem>>;
+    savedName(itemId: string): Promise<string | null>;
   };
 }
 
@@ -195,6 +198,7 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
     filesIo: Object.freeze({
       received: (query: PageQuery) => client.filesIo.received(query),
       sent: (query: PageQuery) => client.filesIo.sent(query),
+      savedName: (itemId: string) => client.filesIo.savedName(itemId),
     }),
   });
 }

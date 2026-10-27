@@ -364,6 +364,21 @@ describe('approval.decideBatch (D-68, 04 §2.5.2)', () => {
     expect(v.items).toEqual([{ approvalId: commitment.approvalId, reason: 'commitment_in_batch' }]);
   });
 
+  it('refuses a paid item in a batch (04 §2.5.3 rule 7, M1-PAY-CONFIRM-a)', async () => {
+    const plain = request();
+    const paid = request({ paid: true });
+    const s = await sign(body('approval.decideBatch', batchParams([plain, paid])));
+    const v = refused(verifyOwnerAction(s, context([plain, paid])));
+    expect(v.stage).toBe('match');
+    expect(v.items).toEqual([{ approvalId: paid.approvalId, reason: 'paid_item_in_batch' }]);
+  });
+
+  it('a paid request decided alone is not refused for being paid', async () => {
+    const r = request({ paid: true });
+    const s = await sign(body('approval.decide', decideParams(r)));
+    expect(verifyOwnerAction(s, context([r])).ok).toBe(true);
+  });
+
   it('expiresAt at the earliest item request expiry is accepted; one later is refused', async () => {
     const early = request({ expiresAt: NOW + 400 });
     const late = request({ expiresAt: NOW + 5_000 });

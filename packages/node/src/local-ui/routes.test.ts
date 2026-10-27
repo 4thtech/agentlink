@@ -9,7 +9,12 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalUiContext } from './context.js';
 import type { LocalUiRoute } from './route-types.js';
-import { LOCAL_UI_API_PREFIX, LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
+import {
+  LOCAL_UI_API_PREFIX,
+  LocalUiRouteRegistry,
+  REVEAL_PATH,
+  createLocalUiRoutes,
+} from './routes.js';
 
 const ok = () => Promise.resolve({ status: 200, body: { ok: true } });
 const context = {} as LocalUiContext;
@@ -153,16 +158,21 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/messages/:contactId',
       // M1-11s-a-d: the status bar's health read (api/health.test.ts).
       '/api/ui/health',
+      // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
+      '/api/ui/files/received/reveal',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
     const pages = ['approvals', 'activity', 'storage', 'backup', 'advanced'];
     // M1-11s-c: the first-run page's two owner setup routes are covered in owner-setup-route.test.ts.
-    const stubs = registry
-      .routes()
-      .filter(
-        (r) => r.presence !== 'setup' && r.path !== '/api/ui/first-run' && !built.has(r.path),
-      );
+    const stubs = registry.routes().filter(
+      // M1-PAY-CONFIRM-a: the two paid-action confirmation routes are covered in pay-confirm.test.ts.
+      (r) =>
+        r.presence !== 'setup' &&
+        r.presence !== 'pay-confirm' &&
+        r.path !== '/api/ui/first-run' &&
+        !built.has(r.path),
+    );
     expect(stubs.map((r) => r.path).sort()).toEqual(pages.map((p) => `/api/ui/${p}`).sort());
     for (const route of stubs as readonly LocalUiRoute[]) {
       expect(route.method).toBe('GET');
@@ -172,6 +182,108 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       if (route.path === '/api/ui/activity') continue;
       const result = await route.handler(context, { params: {}, query: new URLSearchParams() });
       expect(result).toEqual({ status: 501, body: { error: 'not_implemented' } });
+    }
+  });
+});
+
+describe('pay-confirm routes (M1-PAY-CONFIRM-a, 04 §2.5.3)', () => {
+  const route = (over: Record<string, unknown>) =>
+    ({
+      method: 'POST',
+      path: '/api/ui/pay-confirm/begin',
+      presence: 'pay-confirm',
+      step: 'begin',
+      ...over,
+    }) as unknown as LocalUiRoute;
+
+  it('registers begin and finish, run by the server gate (no handler)', () => {
+    const steps = createLocalUiRoutes()
+      .routes()
+      .filter((r) => r.presence === 'pay-confirm')
+      .map((r) => `${r.method} ${r.path}`);
+    expect(steps).toEqual(['POST /api/ui/pay-confirm/begin', 'POST /api/ui/pay-confirm/finish']);
+  });
+
+  it('refuses a handler, another method, another prefix or a repeated step', () => {
+    const registry = new LocalUiRouteRegistry();
+    expect(() => registry.register(route({ handler: () => undefined }))).toThrow();
+    expect(() => registry.register(route({ method: 'GET' }))).toThrow();
+    expect(() => registry.register(route({ path: '/api/ui/rules/pay' }))).toThrow();
+    expect(() => registry.register(route({ step: 'other' }))).toThrow();
+    registry.register(route({}));
+    expect(() => registry.register(route({ path: '/api/ui/pay-confirm/again' }))).toThrow();
+  });
+});
+
+// MSG-FILES-IO-h (D-134): the one route kind with no presence that is not a read. It is a POST for a
+// single fixed local OS action (Show in Finder), signs nothing and writes nothing; only that one
+// path may use it, once. Every other mutating route still needs presence.
+describe('the reveal route kind (MSG-FILES-IO-h, D-134, I-4)', () => {
+  const reveal = () => Promise.resolve({ status: 200, body: { status: 'shown' } });
+
+  it('the default registry has exactly one reveal route, a POST at the fixed path', () => {
+    const kinds = createLocalUiRoutes()
+      .routes()
+      .filter((r) => r.presence === 'reveal');
+    expect(kinds.map((r) => `${r.method} ${r.path}`)).toEqual([`POST ${REVEAL_PATH}`]);
+    expect(REVEAL_PATH).toBe('/api/ui/files/received/reveal');
+  });
+
+  it('no other path, method or second route can use the kind', () => {
+    for (const path of [
+      '/api/ui/files/received/open',
+      '/api/ui/files/reveal',
+      '/api/ui/rules/set',
+      '/api/ui/files/received/reveal/x',
+    ]) {
+      const registry = new LocalUiRouteRegistry();
+      expect(
+        () =>
+          registry.register({ method: 'POST', path, presence: 'reveal', handler: reveal } as never),
+        path,
+      ).toThrow(/reveal/);
+      expect(registry.routes()).toHaveLength(0);
+    }
+    for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) {
+      const registry = new LocalUiRouteRegistry();
+      expect(
+        () =>
+          registry.register({
+            method,
+            path: REVEAL_PATH,
+            presence: 'reveal',
+            handler: reveal,
+          } as never),
+        method,
+      ).toThrow(/reveal/);
+    }
+    const registry = new LocalUiRouteRegistry();
+    expect(() =>
+      registry.register({ method: 'POST', path: REVEAL_PATH, presence: 'reveal' } as never),
+    ).toThrow(/handler/);
+    registry.register({
+      method: 'POST',
+      path: REVEAL_PATH,
+      presence: 'reveal',
+      handler: reveal,
+    } as never);
+    expect(() =>
+      registry.register({
+        method: 'POST',
+        path: REVEAL_PATH,
+        presence: 'reveal',
+        handler: reveal,
+      } as never),
+    ).toThrow();
+    expect(registry.routes()).toHaveLength(1);
+  });
+
+  it('still refuses a POST without presence at the reveal path and anywhere else', () => {
+    for (const path of [REVEAL_PATH, '/api/ui/files/received/open']) {
+      const registry = new LocalUiRouteRegistry();
+      expect(() =>
+        registry.register({ method: 'POST', path, presence: false, handler: reveal } as never),
+      ).toThrow(/presence/);
     }
   });
 });

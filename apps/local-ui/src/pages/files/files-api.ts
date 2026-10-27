@@ -7,6 +7,11 @@
 // body: the passkey assertion (credential ID, authenticator data, user handle and PRF output, each
 // after a 16-bit big-endian length, `X-AgentLink-Presence: passkey`), or the owner code as UTF-8.
 // The server checks presence, then signs. Bodies, the token and the owner code are never logged.
+//
+// MSG-FILES-IO-h: `reveal` (Show in Finder, D-134) needs no presence: an octet-stream POST whose
+// body is only `{"id":"<item ID>"}`. Never a file name or a path; the server finds the file itself.
+import { REVEAL_PATH } from './io-api.js';
+
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 const PASSKEY_PATH = '/api/owner/passkey';
 
@@ -28,6 +33,17 @@ export interface PasskeyInfo {
 export type Presence =
   | { readonly kind: 'passkey'; readonly body: Uint8Array }
   | { readonly kind: 'code'; readonly code: string };
+
+/** MSG-FILES-IO-h: what Show in Finder came to, as the page explains it (io-strings.ts). */
+export type RevealOutcome =
+  | 'shown'
+  | 'not_found'
+  | 'refused'
+  | 'unavailable'
+  | 'not_opened'
+  | 'session_expired'
+  | 'offline'
+  | 'failed';
 
 /** What a confirm came to, as the page explains it (strings.ts). */
 export type CommitOutcome =
@@ -93,7 +109,16 @@ export interface FilesApi {
     input: { readonly review: string; readonly acknowledged: readonly string[] },
     presence: Presence,
   ): Promise<CommitOutcome>;
+  /** MSG-FILES-IO-h: Show in Finder for one received item, by its ID only. */
+  reveal(id: string): Promise<RevealOutcome>;
 }
+
+const REVEAL_ERRORS: readonly RevealOutcome[] = [
+  'not_found',
+  'refused',
+  'unavailable',
+  'not_opened',
+];
 
 export function createFilesApi(options: FilesApiOptions = {}): FilesApi {
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
@@ -168,6 +193,21 @@ export function createFilesApi(options: FilesApiOptions = {}): FilesApi {
       if (error === 'changed' || error === 'expired') return { kind: error };
       if (status === 'refused' || answer.status === 409) return { kind: 'refused' };
       return { kind: 'failed' };
+    },
+
+    async reveal(id) {
+      const headers = new Headers({
+        [CSRF_HEADER]: token(),
+        'content-type': 'application/octet-stream',
+      });
+      const body = new TextEncoder().encode(JSON.stringify({ id }));
+      const answer = await call(REVEAL_PATH, { method: 'POST', headers, body: body as BodyInit });
+      if (answer.kind === 'offline') return 'offline';
+      if (answer.status === 401) return 'session_expired';
+      const json = isObject(answer.json) ? answer.json : {};
+      if (answer.status === 200 && json['status'] === 'shown') return 'shown';
+      const error = json['error'];
+      return REVEAL_ERRORS.find((e) => e === error) ?? 'failed';
     },
   };
 }

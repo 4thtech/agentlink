@@ -4570,7 +4570,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Spec text matches the plan's §4 contract and threat notes; no other behaviour changes; `node tools/docs-status/index.mjs --check` passes.
 
 #### MSG-FILES-IO-h · Show in Finder for a saved received file (new, owner decision 2026-10-27)
-- **Status:** backlog · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus (Fable audit: route registry and OS opener) · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/routes.ts`, `route-types.ts`, `approval-server.ts` (the gate for the new route kind), `approval-os.ts` (opener), `local-ui/api/files-io.ts`, `apps/local-ui/src/pages/files/**`, tests; changeset
 - **Depends on:** MSG-FILES-IO-b, MSG-FILES-IO-f
 - **Spec:** 04 §2.5, §4 (realpath); 08 §1; plan §6
@@ -6779,15 +6779,15 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 ### Confirming paid actions (new, D-132)
 
 #### M1-PAY-CONFIRM-a · core and node: paid-action confirmation bound to amount and purpose, with user verification (new, D-132)
-- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/core` (confirmation statement, spending-field diff), `packages/node/src/local-ui/**` (presence gate begin and finish), their tests, `docs/foundation/04-security-and-crypto.md` §2.5.3 if the build refines it, its `changelog.d/` fragment and changeset
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (owner presence, money path) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/crypto` (WebAuthn assertion signature verify, rule 5), `packages/core` (confirmation statement, spending-field diff), `packages/node/src/local-ui/**` (presence gate begin and finish), their tests, `docs/foundation/04-security-and-crypto.md` §2.5.3 if the build refines it, its `changelog.d/` fragment and changeset
 - **Depends on:** MONEY-CONFIRM-DESIGN merged (which actions and the backup code decided, D-132; the ceremony rules confirmed by the owner at that merge)
 - **Spec:** 04 §2.5, §2.5.3, §2.3.1; 06 §3; 08 §1; 12 §4.6; D-130, D-132
 - **Invariants:** I-1, I-4, I-5
 - **Scope:**
   - Begin builds the exact owner flow (proof approval, `policy.set` that changes a spending field) and its confirmation statement; challenge per 04 §2.5.3 rule 2; single use, session-bound, 120 s.
-  - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; `maxFee` never above the statement.
-  - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before.
+  - Finish requires `webauthn.get`, the challenge, the exact origin, `rpIdHash`, UP and UV; refuses `verification_required` without UV; signs only the action whose digest is in the challenge; the statement amount equals the pending request's `context.fee.usd`, bound to what is signed via `actionDigest` (04 §2.5.3 rule 2).
+  - Store the credential public key at passkey registration and verify the assertion signature (rule 5); state the path for passkeys registered before. *Build (proposed, owner confirms at merge):* `@4thtech-io/crypto` `verifyWebauthnSignature` (ES256 and EdDSA through @noble/curves); the key is kept as keychain item `owner-passkey-key`, bound to the credential ID, at setup and at passkey registration; a passkey without a kept key (registered before, or an RS256 key) is never accepted for a paid action: the sheet offers the backup code and setting the passkey up again.
   - The backup-code path signs under the same statement binding (kept, D-132), with the three-tries rule. Proofs evaluated `allow` are unchanged (automatic).
   - Paid items are excluded from batch approval (04 §2.5.3 rule 7): the batch screen does not offer them and the core refuses such a batch (`paid_item_in_batch`). "Remember for this contact" digests both bodies in one challenge (rule 2).
   - Registration (`REGISTER`) is out of scope here (M2-PAY-CONFIRM-c).

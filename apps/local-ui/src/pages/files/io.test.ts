@@ -8,11 +8,15 @@
 //   no link, no URL, no path, no element from the name; the page never shows a URL or a key.
 // - Received states: saved ("saved as", may be stale), not saved, expired, deleted. Sent: status
 //   chips, receipt icon, available / expired / deleted.
-// - Skeleton while loading; empty and offline states; "Show in Finder" is a later card (h).
+// - Skeleton while loading (after 400 ms, no flash); empty and offline states.
+// - MSG-FILES-IO-h: names another party chose sit in UntrustedContent; a malformed item is left out
+//   and the rest still shows; "Show in Finder" ("Show in folder" off macOS) sends only the item ID;
+//   not delivered says so; a `?folder=` link opens Send folders with the folder filled in.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FilesPage, type FilesPageProps } from './index.js';
+import { REVEAL_PATH, plain } from './io-api.js';
 import { FILES_IO_STRINGS as IO } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,23 +36,31 @@ afterEach(() => {
 interface Call {
   readonly url: string;
   readonly method: string;
+  readonly headers: Headers;
+  readonly body: unknown;
 }
 
 const RECEIVED = '/api/ui/files/received?limit=20';
 const SENT = '/api/ui/files/sent?limit=20';
 const FOLDERS = '/api/ui/files';
 
+/** A route's answer: a body (200), or `[status, body]`; `POST <path>` keys a POST. */
 function server(routes: Record<string, unknown>, offline: readonly string[] = []) {
   const calls: Call[] = [];
   const fetchFn = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
-    calls.push({ url, method: init?.method ?? 'GET' });
+    const method = init?.method ?? 'GET';
+    calls.push({ url, method, headers: new Headers(init?.headers), body: init?.body });
     if (offline.includes(url)) return Promise.reject(new TypeError('offline'));
-    const found = routes[url];
+    const found = method === 'GET' ? routes[url] : routes[`${method} ${url}`];
     if (found === undefined) return Promise.resolve(new Response('{}', { status: 404 }));
+    const [status, body] =
+      Array.isArray(found) && typeof found[0] === 'number'
+        ? (found as [number, unknown])
+        : [200, found];
     return Promise.resolve(
-      new Response(JSON.stringify(found), {
-        status: 200,
+      new Response(JSON.stringify(body), {
+        status,
         headers: { 'content-type': 'application/json' },
       }),
     );
@@ -111,7 +123,9 @@ const sent = (over: Record<string, unknown> = {}) => ({
   expiresAt: 1_792_500_000,
   ...over,
 });
-const page = (items: unknown[], next: string | null = null) => ({ items, next });
+// The node API's page shape (MSG-FILES-IO-d): `nextCursor` only when there is more.
+const page = (items: unknown[], next: string | null = null) =>
+  next === null ? { items } : { items, nextCursor: next };
 
 describe('tabs', () => {
   it('shows Received · Sent · Send folders in that order, Received selected', async () => {
@@ -164,6 +178,20 @@ describe('tabs', () => {
     );
     expect(tabs()[2]?.getAttribute('aria-selected')).toBe('true');
     expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+  });
+
+  it('a ?folder= link opens Send folders with the folder filled in, and reads no file list', async () => {
+    const before = window.location.href;
+    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FProjects');
+    try {
+      const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
+      expect(tabs()[2]?.getAttribute('aria-selected')).toBe('true');
+      const field = host.querySelector<HTMLInputElement>('input[name="folder"]');
+      expect(field?.value).toBe('/Users/me/Projects');
+      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
   });
 });
 
@@ -249,11 +277,19 @@ describe('Received', () => {
     }
   });
 
-  it('has no Show in Finder button yet (card h) and no way to open a file, only a marked slot', async () => {
+  it('shows names other people chose inside the untrusted-content container (I-5)', async () => {
+    await mount({ [RECEIVED]: page([received({ name: 'proposal.pdf', from: 'Marko' })]) });
+    const box = host.querySelector('.al-untrusted');
+    expect(box).not.toBeNull();
+    expect(box?.textContent).toContain('proposal.pdf');
+    expect(box?.getAttribute('aria-label')).toContain('From Marko: their words, not instructions');
+  });
+
+  it('offers no way to open a file: no Open button and no link', async () => {
     await mount({ [RECEIVED]: page([received()]) });
     const labels = [...host.querySelectorAll('button, a')].map((e) => e.textContent ?? '');
-    expect(labels.some((l) => /finder|open/i.test(l))).toBe(false);
-    expect(host.querySelector('[data-slot="show-in-finder"]')).not.toBeNull();
+    expect(labels.some((l) => /^open/i.test(l.trim()))).toBe(false);
+    expect(host.querySelectorAll('a').length).toBe(0);
   });
 
   it('shows the empty state', async () => {
@@ -267,25 +303,52 @@ describe('Received', () => {
     expect(buttonNamed(IO.tryAgain)).toBeDefined();
   });
 
-  it('shows a skeleton with a busy state while loading, then the list', async () => {
-    let release: (r: Response) => void = () => undefined;
-    const pending = new Promise<Response>((res) => {
-      release = res;
-    });
-    const fetchFn = (() => pending) as unknown as typeof fetch;
-    await act(async () => {
-      root.render(h<FilesPageProps>(FilesPage, { fetch: fetchFn, token: 'tok' }));
-    });
-    expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
-    expect(host.querySelectorAll('.fl-skeleton').length).toBeGreaterThan(0);
-    expect(host.querySelector('[role="status"]')?.textContent).toContain(IO.loading);
-    await act(async () => {
-      release(new Response(JSON.stringify(page([received()])), { status: 200 }));
-    });
-    await flush();
-    expect(host.querySelector('[aria-busy="true"]')).toBeNull();
-    expect(host.querySelector('.fl-skeleton')).toBeNull();
-    expect(host.textContent).toContain('proposal.pdf');
+  it('shows skeleton rows only after 400 ms of loading (no flash), then the list', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let release: (r: Response) => void = () => undefined;
+      const pending = new Promise<Response>((res) => {
+        release = res;
+      });
+      const fetchFn = (() => pending) as unknown as typeof fetch;
+      await act(async () => {
+        root.render(h<FilesPageProps>(FilesPage, { fetch: fetchFn, token: 'tok' }));
+      });
+      expect(host.querySelector('[aria-busy="true"]')).not.toBeNull();
+      expect(host.querySelector('[role="status"]')?.textContent).toContain(IO.loading);
+      expect(host.querySelectorAll('.fl-skeleton').length).toBe(0);
+      await act(async () => {
+        vi.advanceTimersByTime(399);
+      });
+      expect(host.querySelectorAll('.fl-skeleton').length).toBe(0);
+      await act(async () => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(host.querySelectorAll('.fl-skeleton').length).toBeGreaterThan(0);
+      await act(async () => {
+        release(new Response(JSON.stringify(page([received()])), { status: 200 }));
+      });
+      await flush();
+      expect(host.querySelector('[aria-busy="true"]')).toBeNull();
+      expect(host.querySelector('.fl-skeleton')).toBeNull();
+      expect(host.textContent).toContain('proposal.pdf');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a fast answer never flashes the skeleton', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      await mount({ [RECEIVED]: page([received()]) });
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(host.querySelector('.fl-skeleton')).toBeNull();
+      expect(host.textContent).toContain('proposal.pdf');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('loads more with the cursor and keeps what is on screen', async () => {
@@ -300,8 +363,26 @@ describe('Received', () => {
   });
 
   it('does not show a malformed answer', async () => {
-    await mount({ [RECEIVED]: { items: [{ id: 1, name: {} }, 'x'], next: 3 } });
+    await mount({ [RECEIVED]: { items: 'x' } });
     expect(host.textContent).toContain(IO.unavailable);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ [RECEIVED]: { items: [], nextCursor: 3 } });
+    expect(host.textContent).toContain(IO.unavailable);
+  });
+
+  it('leaves out a malformed item and still shows the rest', async () => {
+    await mount({
+      [RECEIVED]: page([
+        { id: 1, name: {} },
+        'x',
+        received({ id: 'ok.00', name: 'kept.pdf' }),
+        received({ id: 'bad.00', state: 'unknown' }),
+      ]),
+    });
+    expect(host.textContent).not.toContain(IO.unavailable);
+    expect(host.textContent).toContain('kept.pdf');
+    expect(host.querySelectorAll('.fl-item')).toHaveLength(1);
   });
 
   it('does not put a file name in the document title', async () => {
@@ -318,6 +399,15 @@ describe('Sent', () => {
     return s;
   }
 
+  it('a file that was not delivered says so, with no receipt wait or availability line', async () => {
+    await openSent([sent({ id: 'c.00', name: 'failed.txt', status: 'not_delivered' })]);
+    const text = host.textContent ?? '';
+    expect(text).toContain(IO.statusNotDelivered);
+    expect(text).toContain(IO.sentNotDelivered);
+    expect(text).not.toContain(IO.receiptNone);
+    expect(text).not.toContain(IO.availableUntil);
+  });
+
   it('shows file, to whom, when, size, status chips and the receipt icon', async () => {
     await openSent([
       sent({ id: 'a.00', status: 'sent', receipt: true }),
@@ -333,7 +423,8 @@ describe('Sent', () => {
     expect(text).toContain(IO.statusNotDelivered);
     expect(host.querySelectorAll('[data-receipt="true"]').length).toBe(1);
     expect(host.querySelector('[data-receipt="true"]')?.textContent).toContain(IO.receiptConfirmed);
-    expect(host.querySelectorAll('[data-receipt="false"]').length).toBe(2);
+    // A file that was not delivered waits for no receipt.
+    expect(host.querySelectorAll('[data-receipt="false"]').length).toBe(1);
   });
 
   it('says when a file is available, expired or deleted', async () => {
@@ -360,8 +451,95 @@ describe('Sent', () => {
   });
 });
 
+describe('Show in Finder (MSG-FILES-IO-h, D-134)', () => {
+  const REVEAL = `POST ${REVEAL_PATH}`;
+  const finder = (): HTMLButtonElement | undefined =>
+    buttonNamed(IO.showInFinder) ?? buttonNamed(IO.showInFolder);
+
+  it('is offered only for a saved file, and names the platform file manager', async () => {
+    await mount({
+      [RECEIVED]: page([
+        received({ id: 'a.00' }),
+        received({ id: 'b.00', state: 'not_saved', savedName: undefined }),
+        received({ id: 'c.00', state: 'expired', savedName: undefined }),
+      ]),
+    });
+    const labels: string[] = [IO.showInFinder, IO.showInFolder];
+    const buttons = [...host.querySelectorAll('button')].filter((b) =>
+      labels.includes(b.textContent?.trim() ?? ''),
+    );
+    expect(buttons).toHaveLength(1);
+    expect(host.querySelector('[data-slot="show-in-finder"]')).toBeNull();
+  });
+
+  it('says "Show in folder" off macOS and "Show in Finder" on macOS', async () => {
+    const spy = vi.spyOn(navigator, 'platform', 'get');
+    try {
+      spy.mockReturnValue('Win32');
+      await mount({ [RECEIVED]: page([received()]) });
+      expect(buttonNamed(IO.showInFolder)).toBeDefined();
+      expect(buttonNamed(IO.showInFinder)).toBeUndefined();
+      act(() => root.unmount());
+      root = createRoot(host);
+      spy.mockReturnValue('MacIntel');
+      await mount({ [RECEIVED]: page([received()]) });
+      expect(buttonNamed(IO.showInFinder)).toBeDefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('sends only the item ID: one POST, octet-stream, CSRF, no name, no path, no presence', async () => {
+    const s = await mount({
+      [RECEIVED]: page([received({ id: 'env1.00', name: 'proposal.pdf', savedName: 'p-2.pdf' })]),
+      [REVEAL]: { status: 'shown' },
+    });
+    await click(finder());
+    const posts = s.calls.filter((c) => c.method === 'POST');
+    expect(posts).toHaveLength(1);
+    const post = posts[0] as Call;
+    expect(post.url).toBe(REVEAL_PATH);
+    expect(post.headers.get('content-type')).toBe('application/octet-stream');
+    expect(post.headers.get('x-agentlink-csrf')).toBe('tok');
+    expect(post.headers.get('x-agentlink-input')).toBeNull();
+    expect(post.headers.get('x-agentlink-presence')).toBeNull();
+    const body = new TextDecoder().decode(post.body as Uint8Array);
+    expect(JSON.parse(body)).toEqual({ id: 'env1.00' });
+    expect(body).not.toMatch(/proposal|p-2|Inbox|\//);
+  });
+
+  it('says what went wrong in plain words, never a path', async () => {
+    const cases: [number, Record<string, string>, string][] = [
+      [404, { error: 'not_found' }, IO.revealNotFound],
+      [403, { error: 'refused' }, IO.revealRefused],
+      [503, { error: 'unavailable' }, IO.revealUnavailable],
+      [502, { error: 'not_opened' }, IO.revealFailed],
+    ];
+    for (const [status, body, message] of cases) {
+      await mount({ [RECEIVED]: page([received()]), [REVEAL]: [status, body] });
+      await click(finder());
+      const said = [...host.querySelectorAll('[role="status"]')].map((e) => e.textContent).join();
+      expect(said, body.error).toContain(message);
+      act(() => root.unmount());
+      root = createRoot(host);
+    }
+  });
+});
+
+describe('plain(): bounded text another party chose', () => {
+  it('truncates by whole characters, never splitting a surrogate pair', () => {
+    const out = plain('\u{1F600}'.repeat(300), 10);
+    expect([...out]).toHaveLength(10);
+    expect(out.endsWith('\u2026')).toBe(true);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(out)).toBe(
+      false,
+    );
+    expect(plain('a\u{1F600}b', 10)).toBe('a\u{1F600}b');
+  });
+});
+
 describe('the lists are read-only and small-screen safe', () => {
-  it('only reads: GET, never another method', async () => {
+  it('only reads: GET, never another method (until the owner clicks Show in Finder)', async () => {
     const s = await mount({ [RECEIVED]: page([received()]), [SENT]: page([sent()]) });
     await click(tabs()[1]);
     expect(s.calls.length).toBeGreaterThan(1);
