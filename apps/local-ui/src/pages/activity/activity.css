@@ -1,45 +1,126 @@
-/* Activity table (M1-11c-a1): the layout of d1 Local-activity (docs/design/d2/source/screens/
-   Local-activity.dc.html) as classes, because the CSP allows no inline styles (08 §4). Tokens only:
-   the same borders, radius, surfaces and spacing the design uses. */
+/* Activity (M1-11c-a1, UI-REFRESH-h): the layout of d1 Local-activity (docs/design/d2/source/screens/
+   Local-activity.dc.html) as classes, because the CSP allows no inline styles (08 §4). Tokens only.
+   Day headers stick under the top bar on the solid chrome colour: no blur on a repeated element (B-11 §7). */
 .al-activity-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--al-space-5);
 }
 .al-activity-head h1 {
   margin: 0;
 }
-.al-activity-wrap {
-  overflow-x: auto;
+.al-activity-asof {
+  margin-inline-start: auto;
+}
+.al-activity-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+  margin: var(--al-space-5) 0;
+}
+.al-activity-chip {
+  min-height: var(--al-size-control-md);
+  padding: 0 var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-surface);
+  color: var(--al-color-fg-default);
+  cursor: pointer;
+}
+.al-activity-chip[aria-pressed='true'] {
+  border-color: var(--al-color-accent-default);
+  background: var(--al-color-accent-subtle);
+}
+.al-activity-chip:focus-visible {
+  outline: var(--al-border-width-thick) solid var(--al-color-focus-ring);
+  outline-offset: var(--al-space-1);
+}
+/* The stage keeps its place while the list inside it is swapped and fades in. */
+.al-activity-stage {
+  min-block-size: var(--al-size-control-lg);
+}
+.al-activity-list {
+  animation: al-activity-fade var(--al-duration-base) var(--al-easing-enter) both;
+}
+@keyframes al-activity-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .al-activity-list {
+    animation: none;
+  }
+}
+[data-motion='reduced'] .al-activity-list {
+  animation: none;
+}
+.al-activity-none {
+  margin: var(--al-space-5) 0;
+}
+.al-activity-section {
+  margin-block-end: var(--al-space-5);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-lg);
   background: var(--al-color-bg-surface);
 }
-.al-activity-table {
-  width: 100%;
-  min-width: 640px;
-  border-collapse: collapse;
-}
-.al-activity-table th {
-  padding: 10px var(--al-space-5);
+.al-activity-day {
+  position: sticky;
+  top: var(--al-size-control-lg);
+  z-index: 1;
+  margin: 0;
+  padding: var(--al-space-3) var(--al-space-5);
   border-bottom: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg) var(--al-radius-lg) 0 0;
+  /* The chrome tint over the surface colour: the same look as the chrome, but opaque. */
+  background-color: var(--al-color-bg-surface);
+  background-image: linear-gradient(var(--al-material-chrome-bg), var(--al-material-chrome-bg));
   color: var(--al-color-fg-muted);
   font-weight: var(--al-font-weight-medium);
-  text-align: left;
+}
+.al-activity-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 .al-activity-table td {
   padding: var(--al-space-4) var(--al-space-5);
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 .al-activity-table tbody tr + tr td {
   border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
 }
 .al-activity-time {
+  width: 5.5em;
   color: var(--al-color-fg-muted);
   white-space: nowrap;
 }
 .al-activity-more {
   display: flex;
   justify-content: center;
+}
+@media (max-width: 480px) {
+  /* 360: each row becomes a short stack instead of four squeezed columns. */
+  .al-activity-table,
+  .al-activity-table tbody,
+  .al-activity-table tr,
+  .al-activity-table td {
+    display: block;
+    width: auto;
+  }
+  .al-activity-table td {
+    padding: var(--al-space-1) var(--al-space-5);
+    border-top: 0;
+  }
+  .al-activity-table tr {
+    padding-block: var(--al-space-3);
+  }
+  .al-activity-table tbody tr + tr {
+    border-top: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  }
 }
