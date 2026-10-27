@@ -7,7 +7,7 @@
 // spending change through an ordinary owner route, and a backup code entered wrong three times. A
 // policy change without a spending field keeps the ordinary prompt. No MCP tool or CLI file reaches
 // the confirmation (rule 4).
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -778,12 +778,11 @@ describe('no MCP tool or CLI flag reaches begin or finish (rule 4, I-4)', () => 
     const roots = [join(repo, 'packages', 'mcp-tools', 'src'), join(repo, 'apps', 'cli', 'src')];
     const hits: string[] = [];
     const walk = (dir: string): void => {
-      for (const name of readdirSync(dir)) {
-        const path = join(dir, name);
-        if (statSync(path).isDirectory()) walk(path);
-        else if (/\.(ts|mts|js|mjs)$/.test(name)) {
-          const text = readFileSync(path, 'utf8');
-          if (/pay-confirm|payConfirm|PayConfirm/.test(text)) hits.push(path);
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else if (entry.isFile() && /\.(ts|mts|js|mjs)$/.test(entry.name)) {
+          if (/pay-confirm|payConfirm|PayConfirm/.test(readFileSync(path, 'utf8'))) hits.push(path);
         }
       }
     };
