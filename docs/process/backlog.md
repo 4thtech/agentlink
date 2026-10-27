@@ -4858,6 +4858,18 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Acceptance:**
   - Tests first (RED commit): focus cannot leave an open modal by click or script; fixed positioning holds inside a transformed parent; contrast check green; no test weakened.
 
+#### UI-REFRESH-e2 · ui: switch knob motion and a path kind in the Under the hood allowlist (new, low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` (switch, Under the hood), `packages/ui/src/motion-lint.test.ts`, tests; changeset
+- **Depends on:** UI-REFRESH-e; #599 merged
+- **Spec:** B-11 §7, §14
+- **Invariants:** I-5
+- **Scope:**
+  - (a) The switch knob moves with `transform` instead of `left`; its motion-lint exception is removed.
+  - (b) The Under the hood allowlist gets a `path` kind so long local folder paths show. Keys, codes, tokens, session links, drop, upload and download URLs and presigned links stay refused.
+- **Acceptance:**
+  - Tests first (RED commit): the lint passes without the knob exception; a folder path is accepted and each refused kind above still is; no test weakened.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
@@ -7051,6 +7063,18 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Other people's file names in the Received and Sent tabs render through the shared `UntrustedContent` component instead of a local one. The other Files-tab robustness items are in MSG-FILES-IO-i.
 - **Acceptance:**
   - A name with bidi and control characters renders as inert text through the shared component; existing Files tests unchanged; no test weakened.
+
+#### M1-UI-HOOD-FIELDS · local-ui read routes return the Under the hood fields (new)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` local-ui read routes; allowlisted fields only) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/**`, tests
+- **Depends on:** M1-11b-2
+- **Spec:** B-11 §7; 08 §1
+- **Invariants:** I-5, I-7
+- **Scope:**
+  - Add the fields the page cards need, from B-11 §7: event IDs (Activity); record ID, network and public record link (Proofs); rules version and signer (Rules); storage and size used (Files).
+  - Every field comes from an explicit allowlist; no key, code, token, session link, drop URL or presigned link is added. The routes stay read-only.
+- **Acceptance:**
+  - Tests first (RED commit): exact key set per route; a scan of each response for stored secrets and URLs of the fixture finds none; no store change after a call; no test weakened; independent review (S2).
 
 #### M1-11b-2-b · approvals in the app shell: accessibility and prop lows (new, low, #595)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (approval UI, no data-flow change) · **Phase:** M1b
