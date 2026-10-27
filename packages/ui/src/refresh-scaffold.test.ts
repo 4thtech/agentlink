@@ -36,13 +36,7 @@ describe('refresh scaffold', () => {
     for (const n of NAMES) {
       const text = sheets[`./components/${n}.css`] as string;
       const rules = text.replace(/\/\*[\s\S]*?\*\//g, '').trim();
-      if (
-        n === 'motion' ||
-        n === 'depth' ||
-        n === 'chrome' ||
-        n === 'progress' ||
-        n === 'hood'
-      ) {
+      if (n === 'motion' || n === 'depth' || n === 'chrome' || n === 'progress' || n === 'hood') {
         expect(rules, n).toContain('{');
       } else expect(rules, n).toBe('');
     }
