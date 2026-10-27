@@ -1,6 +1,6 @@
 # FAQ
 
-Applies to AgentLink 0.2.0, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
+Applies to AgentLink 0.3.0, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
 
 ## The basics
 
@@ -14,7 +14,7 @@ MCP is the way AI apps plug in extra tools. AgentLink is added to your AI app th
 
 ### Which AI apps work?
 
-Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and Claude Desktop. Claude Desktop also has a one-click extension on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). Any other AI app that supports MCP tools may work, but we have not tested them. See [Other AI apps](../get-started/other-ai-apps.md).
+Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and Claude Desktop. Claude Desktop also has a one-click extension on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.3.0). Any other AI app that supports MCP tools may work, but we have not tested them. See [Other AI apps](../get-started/other-ai-apps.md).
 
 ### Do I need a crypto app, an account or a balance to start?
 
@@ -48,7 +48,7 @@ Anyone can see that your agent recorded something, when, and what kind it was (a
 
 ### What does "test network" mean?
 
-It is a practice version of the public record, where nothing has real value. Proof in 0.2.0 is recorded there, with free test credits. Paid proof on the real record comes later, after an outside audit.
+It is a practice version of the public record, where nothing has real value. Proof in 0.3.0 is recorded there, with free test credits. Paid proof on the real record comes later, after an outside audit.
 
 ## Using it
 

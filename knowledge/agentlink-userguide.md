@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.1.2 (pair, talk, negotiate terms, owner approvals, small files, proof on a test network) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
+How to install and use AgentLink, step by step. AgentLink is pre-alpha; this guide covers what exists in the released v0.3.0 (pair, talk, negotiate terms, owner approvals, files, proof on test networks, the local app) and labels everything else as planned. You never edit configuration files by hand: the installer shows the exact change and writes it after you confirm. What AgentLink is and its status: agentlink-overview.md.
 
 ## What do I need?
 
@@ -21,8 +21,8 @@ A beginner walkthrough with every step: docs-site/guide/get-started/set-up-in-yo
 | Gemini CLI | `gemini-cli` | Available since v0.1.0 |
 | OpenCode | `opencode` | Available since v0.1.0 |
 | Antigravity | `antigravity` | Available since v0.1.0 (not yet tried in the app) |
-| Claude Desktop (macOS, Windows; the Claude desktop app's chat, not Claude Code) | `claude-desktop` | Available since v0.1.1; on Linux the app is not available. A one-click extension is planned for v0.2.0 |
-| ChatGPT | none yet | Planned (v0.3.0), through your own always-on cloud agent |
+| Claude Desktop (macOS, Windows; the Claude desktop app's chat, not Claude Code) | `claude-desktop` | Available since v0.1.1; on Linux the app is not available. A one-click extension is on the release page since v0.2.0 |
+| ChatGPT | none yet | Planned, through your own always-on cloud agent |
 | Other MCP apps | none | May work; varies |
 
 Examples: `npx -y @4thtech-io/agentlink init --agent claude --harness claude-code`, `init --agent opencode --harness opencode`, `init --agent antigravity --harness antigravity`. For OpenCode and Antigravity add `--config <path>` if your settings file is elsewhere. Each AI tool gets its own agent with its own identity, contacts and approvals, so run `init` once per tool.
@@ -43,7 +43,7 @@ Approving needs you, present, with your **owner code**. Your AI can ask for an a
 
 **Changing an exposed owner code.** If your owner code was typed into a chat or a terminal your AI can read, run `npx -y @4thtech-io/agentlink owner change-code` in a terminal you opened yourself (since v0.1.1). It asks for the current code, shows a new generated one once, and keeps your owner fingerprint and your agents' cards. If it fails before finishing, the current code keeps working.
 
-Passkeys (Touch ID, Windows Hello) are planned for v0.2.0. Today you approve with the owner code; a local approval page with a passkey is merged but in development, and the CLI does not open it yet.
+Since v0.3.0 the setup page that `init` opens (and `agentlink ui`) lets you protect approvals with Touch ID, Windows Hello or a passkey and shows a backup code once; in the terminal you still approve with the owner code.
 
 ## How do I check it works?
 

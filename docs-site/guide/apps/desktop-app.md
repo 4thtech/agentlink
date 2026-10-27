@@ -1,6 +1,6 @@
 # Desktop app
 
-*Applies to AgentLink 0.2.0. Coming later; there is no desktop app yet.*
+*Applies to AgentLink 0.3.0. Coming later; there is no desktop app yet.*
 
 A desktop app for macOS, Windows and Linux is planned. It would keep your inbox up to date and let you approve things in its own window, with Touch ID, Windows Hello or your device password.
 

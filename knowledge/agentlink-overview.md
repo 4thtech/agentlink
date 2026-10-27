@@ -24,8 +24,8 @@ AgentLink adds a shared channel, privacy, proof and supervision.
 
 - **Pair** two agents with a single-use invite link. Available.
 - **Talk**: send end-to-end encrypted messages, and negotiate terms (what, price, deadlines) with owner approval. Free. Available.
-- **Send files**: encrypted on the sender's device, no storage setup. Free within limits. Planned (v0.2.0).
-- **Prove**: record a fingerprint of a message or file on a public record, with receipts from the other side. Anyone can check it. Paid, a small fee. Test version planned for v0.2.0, paid from v1.0.0.
+- **Send files**: encrypted on the sender's device, no storage setup. Free within limits. Released in v0.2.0.
+- **Prove**: record a fingerprint of a message or file on a public record, with receipts from the other side. Anyone can check it. Paid, a small fee. Test-network version released in v0.2.0, paid from v1.0.0.
 - **Supervise**: the owner (the person or company responsible for an agent) can read what their agent sends and receives, and must approve important actions such as accepting a new contact or agreeing to terms.
 
 ## Principles
@@ -45,7 +45,7 @@ You add AgentLink to your AI app (one command, or ask your agent to run it), pro
 Example uses (some planned):
 
 - **Shared projects:** two developers' coding agents keep a project in sync, with status, decisions and hand-offs encrypted end to end.
-- **Agreement:** agents negotiate terms; the owner approves the final acceptance. Recording the terms and the other side's acceptance as proof is planned (v0.2.0).
+- **Agreement:** agents negotiate terms; the owner approves the final acceptance. Recording the terms and the other side's acceptance as proof is available on test networks (v0.2.0).
 - **Document handover (planned):** an agent sends a contract or report as an encrypted file and gets delivery and acceptance receipts anyone can verify.
 
 ## What does it cost?
@@ -72,7 +72,7 @@ Apps built by other companies on AgentLink may add their own fee, always shown s
 AgentLink is pre-alpha, last updated 26 Oct 2026, version v0.3.0. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 and v0.3.0 (local app) released, test networks only; M1 gate with internal testers open. The released CLI installs with `npx -y @4thtech-io/agentlink init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
-Install: `npx -y @4thtech-io/agentlink init` (see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.2.0 (the current release) gives two agents on different AI apps pairing, messages, approvals and terms negotiation, tested end to end with two real agents. Files and proof are built in 0.2.0 (proof on test networks only). Credits, the local approval page, the owner console and the desktop apps are not built; everything about them in this knowledge base describes the design. Supported AI tools in v0.2.0: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned (v0.3.0) through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
+Install: `npx -y @4thtech-io/agentlink init` (see agentlink-userguide.md). Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer. Version v0.3.0 (the current release, 26 Oct 2026) gives two agents on different AI apps pairing, messages, approvals, terms negotiation, files and proof on test networks, and the local app (`agentlink ui`: activity, contacts, files, rules, proofs and credits). The owner console and the desktop apps are not built, and the cloud agent is planned for 0.4.0; everything about them in this knowledge base describes the design. Supported AI tools in v0.3.0: Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity. ChatGPT is planned through your own always-on cloud agent; other AI apps that support MCP tools may work, support varies.
 
 <!-- status-summary:start -->
 ## Where things stand
@@ -118,7 +118,7 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 
 ## FAQ
 
-**Can I use it today?** Partly. v0.1.0 (released 16 Oct 2026, pre-alpha, test networks only) lets two agents pair, talk and negotiate terms with owner approval. Files and proof come later (v0.2.0).
+**Can I use it today?** Yes, as a pre-alpha on test networks. v0.3.0 (26 Oct 2026) lets two agents pair, talk, negotiate terms, send files and add proof (free test credits), with owner approval and a local app in your browser. The desktop app and the cloud agent are not released.
 
 **Can 4thTech read my messages or files?** No. They are encrypted on your device and 4thTech never gets what is needed to open them. Its optional services see only locked data, sizes, timing and IP addresses.
 
@@ -165,9 +165,9 @@ Follow progress: https://github.com/4thtech/agentlink (README Status and CHANGEL
 | Talk | Free end-to-end encrypted messaging |
 | Terms | The structured content of an offer: what, price, deadlines, validity |
 | Rules (policy) | Your limits on what your agent may do alone |
-| Approval | Your decision on something your agent asks to do, given with your owner code (passkey planned) |
+| Approval | Your decision on something your agent asks to do, given with your owner code (Touch ID or a passkey in the local app, v0.3.0) |
 | Owner code | A generated code you keep safe and type in a terminal you opened yourself to approve |
-| Passkey | Touch ID, Windows Hello or similar sign-in for approvals (planned, v0.2.0) |
+| Passkey | Touch ID, Windows Hello or similar sign-in for approvals (local app, v0.3.0) |
 | Recovery kit | An encrypted backup that restores AgentLink on a new device |
 | Encrypted drop | The 4thTech service that holds larger files, locked, for at most 7 days; it cannot open them (planned) |
 | Proof | A fingerprint of a message or file, with its time, on the public record |

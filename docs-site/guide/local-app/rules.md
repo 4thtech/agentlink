@@ -11,7 +11,7 @@ Rules decide what your agent may do without asking you. The page shows them in t
 
 1. Change what you want. Your changes wait in an unsaved-changes bar.
 2. Before saving, the page lists in plain words everything the change lets your agent do without asking. Tick each one.
-3. Approve once with your passkey or owner code.
+3. Approve once with your passkey or backup code.
 
 If you turn selling on, an extra warning appears while you do. Your agent cannot change your rules.
 
