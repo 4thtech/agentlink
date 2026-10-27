@@ -11,9 +11,12 @@ import type {
   ActivityEntry,
   AgentLinkClient,
   ContactView,
+  Conversation,
   CreditsMoveResult,
   CreditsView,
   EffectivePolicy,
+  MessageBox,
+  MessageItem,
   OwnerActionOutcome,
   OwnerSafetyCode,
   Page,
@@ -122,6 +125,15 @@ export interface LocalUiReadClient {
   };
   /** M1-11c-a1: one page of core's activity feed (`ActivityService.list`); store only, no write. */
   listActivity(query: PageQuery): Promise<Page<ActivityEntry>>;
+  /**
+   * MSG-FILES-IO-c (Messages, D-133): core's read-only MessagesView (MSG-FILES-IO-a): the contact
+   * list and one contact's Inbox or Sent. Store only; it writes nothing and never sets `read_at`, so
+   * the app never marks a message read for the AI (I-4). Nothing else of the view or the inbox.
+   */
+  readonly messages: {
+    conversations(): Promise<readonly Conversation[]>;
+    list(contactId: string, box: MessageBox, query: PageQuery): Promise<Page<MessageItem>>;
+  };
 }
 
 /** The read-only view of `client` (a fresh frozen object, nothing else of the client). */
@@ -154,6 +166,12 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       topUp: () => client.proofs.receiveOptions(),
     }),
     listActivity: (query) => client.activity.list(query),
+    // MSG-FILES-IO-c: the Messages reads only.
+    messages: Object.freeze({
+      conversations: () => client.messages.conversations(),
+      list: (contactId: string, box: MessageBox, query: PageQuery) =>
+        client.messages.list(contactId, box, query),
+    }),
   });
 }
 

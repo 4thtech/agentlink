@@ -138,8 +138,7 @@ const SENT: MessageItem[] = [
 const IN_KEYS = ['at', 'files', 'id', 'proof', 'size', 'text', 'type'];
 const OUT_KEYS = [...IN_KEYS, 'receipt', 'status'].sort();
 
-const bodyOf = (res: LocalUiResult): Record<string, unknown> =>
-  res.body as Record<string, unknown>;
+const bodyOf = (res: LocalUiResult): Record<string, unknown> => res.body as Record<string, unknown>;
 
 describe('the Messages routes (MSG-FILES-IO-c)', () => {
   it('are two GET routes without presence, in the default registry, with no other method', () => {
@@ -169,7 +168,9 @@ describe('the Messages routes (MSG-FILES-IO-c)', () => {
 
 describe('GET /api/ui/messages (MSG-FILES-IO-c)', () => {
   it('lists conversations with exactly contactId, name, lastAt and lastInAt', async () => {
-    const res = await callList(contextWith({ conversations: () => Promise.resolve(CONVERSATIONS) }));
+    const res = await callList(
+      contextWith({ conversations: () => Promise.resolve(CONVERSATIONS) }),
+    );
     expect(res.status).toBe(200);
     expect(Object.keys(bodyOf(res))).toEqual(['conversations']);
     expect(res.body).toEqual({
@@ -328,7 +329,13 @@ describe('GET /api/ui/messages/:contactId (MSG-FILES-IO-c)', () => {
       const res = await callBox(context, BOB, query);
       expect(res, query).toEqual({ status: 400, body: { error: 'bad_request' } });
     }
-    for (const contact of ['', 'bob', `0x${'B0'.repeat(20)}`, `0x${'b0'.repeat(19)}`, CANARY_TEXT]) {
+    for (const contact of [
+      '',
+      'bob',
+      `0x${'B0'.repeat(20)}`,
+      `0x${'b0'.repeat(19)}`,
+      CANARY_TEXT,
+    ]) {
       const res = await callBox(context, contact, 'box=in');
       expect(res, contact).toEqual({ status: 400, body: { error: 'bad_request' } });
     }

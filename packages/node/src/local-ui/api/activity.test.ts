@@ -256,6 +256,7 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       'files',
       'getProof',
       'listActivity',
+      'messages',
       'policy',
       'proofs',
     ]);

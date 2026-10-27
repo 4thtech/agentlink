@@ -439,6 +439,7 @@ describe('the read-only client view (context.ts)', () => {
       'files',
       'getProof',
       'listActivity',
+      'messages',
       'policy',
       'proofs',
     ]);

@@ -4512,7 +4512,7 @@ Owner decision (Tali, 27 Oct, in chat; B-11 §18 decisions 1 (a), 4 (a), 5 (a), 
   - Migration from a version-5 fixture keeps every row; a fetch records the name sealed (the raw column is not the plain name); a failed or refused fetch records nothing; retention shredding leaves no readable file key and keeps working.
 
 #### MSG-FILES-IO-c · node: Messages API routes (read-only) (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/messages.ts` (new) and its test, one line each in `local-ui/routes.ts` and `local-ui/context.ts` (`readOnlyClient` gets `messages`); changeset
 - **Depends on:** MSG-FILES-IO-a
 - **Spec:** 08 §1; 04 §2.5; plan §4
