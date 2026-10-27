@@ -15,6 +15,7 @@ const files = import.meta.glob(['../../../../packages/node/src/approval-page.ts'
 const SIDEBAR_ICONS = [
   'approval',
   'activity',
+  'inbox',
   'users',
   'folder',
   'proof-seal',

@@ -433,6 +433,7 @@ describe('the shared app navigation on the approval page (M1-11b-2a)', () => {
   const NAV_PATHS = [
     '/',
     '/settings/activity',
+    '/settings/messages',
     '/settings/contacts',
     '/settings/files',
     '/settings/proofs',
