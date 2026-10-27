@@ -84,7 +84,11 @@ async function editPayload(
   envelopeId: string,
   edit: (payload: JsonObject) => void,
 ): Promise<void> {
-  const context = { table: 'envelopes' as const, column: 'payload_json', rowKey: rowKeyOf([envelopeId]) };
+  const context = {
+    table: 'envelopes' as const,
+    column: 'payload_json',
+    rowKey: rowKeyOf([envelopeId]),
+  };
   const row = await agent.store.transaction((tx) =>
     tx.get('envelopes', { envelope_id: envelopeId }),
   );

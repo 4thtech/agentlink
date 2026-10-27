@@ -11,6 +11,8 @@
 //   name only after the final chunk and both hashes verified; on any failure it is removed;
 // - the name is sanitised (file-name.ts), never overwrites an existing entry (a suffix is added),
 //   and must be a single visible segment directly inside the resolved inbox folder;
+// - once the file is saved, that single name (never the path, never the sender's raw name) is
+//   recorded sealed in the receiver row's `saved_name` (MSG-FILES-IO-b); it is never logged;
 // - nothing is ever executed.
 import { decodeBase64url, wipe } from '@4thtech-io/crypto';
 import {
@@ -24,7 +26,7 @@ import {
   type TempFileOps,
 } from '@4thtech-io/storage';
 import { payloadSchema } from '@4thtech-io/types';
-import { nowOf, open, type CoreContext } from '../context.js';
+import { nowOf, open, seal, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
 import { checkFetchUrl } from '../fetch-url.js';
 import { sanitizeFileName, withNameSuffix } from '../file-name.js';
@@ -277,6 +279,7 @@ export class FileFetcher {
         maxPlaintextBytes: limits.maxReceiveBytes,
       });
       ctx.log.info('file saved', { size: done.plaintextSize });
+      if (keyRow !== undefined) await this.#recordSavedName(envelopeId, index, keyRow.sha256, name);
       return { status: 'ok', savedTo, name, size: done.plaintextSize, integrity: 'verified' };
     } catch (error) {
       // decryptDownload has discarded the quarantine file. Fixed codes only (I-7).
@@ -289,6 +292,32 @@ export class FileFetcher {
       throw new CoreError('file_download_failed', 'The file could not be downloaded.');
     } finally {
       wipe(fileKey);
+    }
+  }
+
+  /**
+   * Records where the file was saved (MSG-FILES-IO-b): `name` is the single segment placeIn checked
+   * inside the inbox folder's realpath, sealed like `name` (store key, AAD bound to table, column
+   * and row key). Only into the same receiver row (same ciphertext hash) if retention has not
+   * deleted it meanwhile. The file is already saved, so a store failure only leaves the record
+   * unset: a fixed warning, never the name (I-7).
+   */
+  async #recordSavedName(
+    envelopeId: string,
+    index: number,
+    sha256: string,
+    name: string,
+  ): Promise<void> {
+    const ctx = this.#ctx;
+    try {
+      const sealed = await seal(ctx, 'files', 'saved_name', [envelopeId, index], name);
+      await ctx.store.transaction((tx) => {
+        const key = { envelope_id: envelopeId, idx: index };
+        if (tx.get('files', key)?.sha256 !== sha256) return;
+        tx.update('files', key, { saved_name: sealed });
+      });
+    } catch {
+      ctx.log.warn('saved name not recorded', { code: 'store_failed' });
     }
   }
 }
