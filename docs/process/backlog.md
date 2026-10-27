@@ -4871,6 +4871,48 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Acceptance:**
   - Tests first (RED commit): the lint passes without the knob exception; a folder path is accepted and each refused kind above still is; no test weakened.
 
+#### UI-REFRESH-f-b · local-ui: paid-action sheet modal behaviour (new, low, #604)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pay-confirm/**`, `packages/ui/src/components/surface.tsx`, tests; changeset
+- **Depends on:** UI-REFRESH-f; UI-REFRESH-b-b
+- **Spec:** B-11 §13.2; 06 (approvals); 04 §2.5
+- **Invariants:** I-4
+- **Scope:**
+  - (a) The paid-action confirmation sheet (`PayConfirmSheet`) behaves as a modal: the page behind it is inert for pointer, keyboard and programmatic focus, focus returns to the opener on close, and Escape and outside-click keep today's meaning.
+  - (b) The sheet's copy, buttons, amounts and the owner-presence step do not change; no approval or payment logic changes.
+- **Acceptance:**
+  - Tests first (RED commit): focus cannot leave the open sheet by click, Tab or script; the confirm and cancel paths behave as before; threat note in the PR; no test weakened.
+
+#### UI-REFRESH-f-c · local-ui: shell inert, tab order and token lows (new, low, #604)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/layout/**`, `apps/local-ui/src/app.css`, tests; changeset
+- **Depends on:** UI-REFRESH-f
+- **Spec:** B-11 §13.1, §13.2, §14
+- **Invariants:** —
+- **Scope:**
+  - (a) The shell's inert-hold helper (`holdInert`) takes its snapshot when it is called; siblings mounted later while it is held are also made inert and restored on release.
+  - (b) At 360 px width the keyboard tab order follows the visual order (bottom bar first as drawn), and the switch has an accessible label.
+  - (c) The remaining literal 360 CSS pixel values use tokens.
+  - (d) A test measures the text-on-accent contrast of the active nav item against WCAG AA in light and dark.
+  - Does not touch approvals or paid actions; if it must, move that part to UI-REFRESH-f-b (S2).
+- **Acceptance:**
+  - Tests first (RED commit) for (a) to (d); axe zero violations; no test weakened.
+
+#### M1-11b-2d · local-ui: test hardening for the app-shell approvals (new, low, #605)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/approval-ui-browser.test.ts` (the weakened exact background checks, the dropped desktop-note assertion, and the locator widened from `section[data-approval]` to `[data-approval]`), `apps/local-ui/**/*.test.*`, `apps/local-ui/e2e/**` (tests only, no product code)
+- **Depends on:** M1-11b-2
+- **Spec:** B-11 §13.1; 06 (approvals)
+- **Invariants:** —
+- **Scope:**
+  - (a) Restore the exact light and dark background colour checks that were weakened to "not transparent and different".
+  - (b) Narrow the browser locators that were widened from the card to the whole page back to the card.
+  - (c) Restore the assertion that the desktop app protects approvals more strongly.
+  - (d) Add a test that the app CSS contains no `url()` and no `@import` (the old stylesheet test was deleted; the content-security policy still blocks them at runtime).
+  - Touches approval-page tests under `packages/node`, so the class is S2. Test files only; no product code changes.
+- **Acceptance:**
+  - Tests first (RED commit): `RED (expected): M1-11b-2d ...` shows each restored check failing when its subject is broken on purpose; a short threat note in the PR; no test weakened; no product code changed.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
