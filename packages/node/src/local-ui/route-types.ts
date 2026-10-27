@@ -132,7 +132,11 @@ export interface LocalUiRevealRoute {
 }
 
 export type LocalUiRoute =
-  LocalUiReadRoute | LocalUiOwnerRoute | LocalUiSetupRoute | LocalUiPayConfirmRoute | LocalUiRevealRoute;
+  | LocalUiReadRoute
+  | LocalUiOwnerRoute
+  | LocalUiSetupRoute
+  | LocalUiPayConfirmRoute
+  | LocalUiRevealRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A
