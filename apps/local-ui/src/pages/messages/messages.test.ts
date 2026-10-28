@@ -522,7 +522,7 @@ describe('the sidebar item', () => {
     const link = [...host.querySelectorAll('nav[aria-label="Main"] a')].find((a) =>
       a.textContent?.includes('Messages'),
     );
-    expect(link?.querySelector('.al-nav-count')?.textContent).toBe('2');
+    expect(link?.querySelector('.al-nav-count .al-count-in')?.textContent).toBe('2');
     await act(async () => {
       root.render(
         h(Layout, { path: '/settings/messages', nextStep: none, unseenMessages: async () => 0 }),
