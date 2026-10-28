@@ -10,11 +10,23 @@ const QUIET = 4;
 export interface QrCodeProps {
   /** The text to encode (here: the agent's address, already checked by the caller). */
   readonly value: string;
-  /** The accessible name. */
+  /** The accessible name. Never the encoded value when that is a secret (b11 §21.6). */
   readonly label: string;
+  /**
+   * Mirror the value into `data-value` (Add credits: a public receiving address, read by tests).
+   * Off by default: an invite link must never sit in an attribute (UX2-d2, b11 §21.5).
+   */
+  readonly exposeValue?: boolean;
+  /** An extra class for the page's own sizing. */
+  readonly className?: string;
 }
 
-export function QrCode({ value, label }: QrCodeProps): ReactElement {
+export function QrCode({
+  value,
+  label,
+  exposeValue = false,
+  className,
+}: QrCodeProps): ReactElement {
   const cells = useMemo(() => {
     const qr = qrcode(0, 'M');
     qr.addData(value);
@@ -29,10 +41,10 @@ export function QrCode({ value, label }: QrCodeProps): ReactElement {
   const size = cells.n + QUIET * 2;
   return (
     <svg
-      className="pf-qr"
+      className={className === undefined ? 'pf-qr' : `pf-qr ${className}`}
       role="img"
       aria-label={label}
-      data-value={value}
+      data-value={exposeValue ? value : undefined}
       viewBox={`0 0 ${String(size)} ${String(size)}`}
       shapeRendering="crispEdges"
       xmlns="http://www.w3.org/2000/svg"

@@ -92,7 +92,7 @@ export function AddCreditsPanel({
         <dt className="al-muted">{S.coinLabel}</dt>
         <dd>{S.coin}</dd>
       </dl>
-      <QrCode value={net.address} label={S.qrLabel} />
+      <QrCode value={net.address} label={S.qrLabel} exposeValue />
       <div className="al-text-caption al-muted">{S.addressLabel}</div>
       <code className="pf-address al-text-code">{net.address}</code>
       <Button size="sm" onClick={copyAddress}>

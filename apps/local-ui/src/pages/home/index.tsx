@@ -56,6 +56,7 @@ import {
   type HealthSnapshot,
   type WaitingView,
 } from './data.js';
+import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
 import './home.css';
 import {
   HOME_STRINGS as S,
@@ -280,7 +281,7 @@ function stepFor(
       title: S.nextContactTitle,
       body: S.nextContactBody,
       action: S.nextContactAction,
-      href: '/settings/contacts',
+      href: ADD_CONTACT_HREF,
     };
   }
   return null;

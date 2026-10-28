@@ -19,6 +19,7 @@ import {
   ContactName,
   EmptyState,
   Icon,
+  RingMeter,
   Sheet,
   Skeleton,
   SuccessMoment,
@@ -34,12 +35,16 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactElement,
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
-import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
+import { PAGE_TITLES } from '../../strings.js';
+import { AddContactSheet } from './add-contact.js';
+import { ADD_CONTACT_MARKER } from './add-contact-link.js';
+import { ADD_STRINGS as A, connectingTo, daysLeft, waitingToAccept } from './add-strings.js';
 import {
   LIST_PATH,
   contactPath,
@@ -50,15 +55,17 @@ import {
   type CodeAnswer,
   type ContactRow,
 } from './data.js';
+import { createInviteApi, type InviteApi } from './invite-api.js';
 import { isKept, keep, loadKept } from './kept.js';
 import {
   createOwnerClient,
-  passkeyProof,
   type OwnerClient,
   type OwnerResult,
   type PasskeyInfo,
   type PresenceProof,
 } from './owner.js';
+import { addPendingInvite, pendingInvites, type PendingInvite } from './pending-invites.js';
+import { PresencePrompt } from './presence-prompt.js';
 import {
   CONTACTS_STRINGS as S,
   HOOD,
@@ -208,96 +215,6 @@ function ContactList({
         </li>
       ))}
     </Surface>
-  );
-}
-
-function PresencePrompt({
-  summary,
-  passkey,
-  busy,
-  error,
-  onSubmit,
-  onCancel,
-}: {
-  summary: string;
-  passkey: PasskeyInfo | undefined;
-  busy: boolean;
-  error: string | undefined;
-  onSubmit: (proof: PresenceProof) => void;
-  onCancel: () => void;
-}): ReactElement {
-  const [code, setCode] = useState('');
-  const [useCode, setUseCode] = useState(passkey === undefined);
-  const [notUsed, setNotUsed] = useState(false);
-
-  const submitCode = (event: FormEvent): void => {
-    event.preventDefault();
-    if (code === '' || busy) return;
-    const proof: PresenceProof = { kind: 'code', code };
-    setCode('');
-    onSubmit(proof);
-  };
-  const usePasskey = (): void => {
-    if (passkey === undefined || busy) return;
-    setNotUsed(false);
-    void passkeyProof(passkey).then((proof) => {
-      if (proof === undefined) setNotUsed(true);
-      else onSubmit(proof);
-    });
-  };
-
-  return (
-    <section className="ct-presence" aria-label={S.presenceIntro}>
-      <p className="al-text-body">
-        <strong>{summary}</strong>
-      </p>
-      <p className="al-text-body-sm al-muted">{S.presenceIntro}</p>
-      {useCode ? (
-        <form className="ct-presence-form" onSubmit={submitCode}>
-          <TextField
-            label={S.ownerCode}
-            hint={EARLIER_OWNER_CODE_HINT}
-            name="owner-code"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            mono
-            value={code}
-            onChange={(e) => setCode(e.currentTarget.value)}
-          />
-          <div className="ct-actions">
-            <Button type="submit" variant="primary" disabled={busy || code === ''}>
-              {S.confirm}
-            </Button>
-            <Button variant="ghost" onClick={onCancel} disabled={busy}>
-              {S.cancel}
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div className="ct-actions">
-          <Button variant="primary" icon="approval" onClick={usePasskey} disabled={busy}>
-            {S.usePasskey}
-          </Button>
-          <Button variant="ghost" onClick={() => setUseCode(true)} disabled={busy}>
-            {S.useCode}
-          </Button>
-          <Button variant="ghost" onClick={onCancel} disabled={busy}>
-            {S.cancel}
-          </Button>
-        </div>
-      )}
-      {notUsed ? (
-        <p className="al-text-body-sm al-muted" role="status">
-          {S.passkeyNotUsed}
-        </p>
-      ) : null}
-      {error === undefined ? null : (
-        <p className="al-text-body-sm ct-error" role="alert">
-          {error}
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -735,18 +652,71 @@ function hoodFields(c: ContactRow): unknown[] {
   ];
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * UX2-d2 (b11 §21.3, Closing): the invites created here, as pending rows: the name and the days
+ * left, never the link. The newest gets the 1.2 s highlight as the sheet leaves (a colour fade only).
+ */
+function PendingInvites({
+  rows,
+  highlight,
+  now,
+}: {
+  rows: readonly PendingInvite[];
+  highlight: number | undefined;
+  now: number;
+}): ReactElement | null {
+  if (rows.length === 0) return null;
+  return (
+    <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={A.pendingLabel}>
+      {rows.map((r) => {
+        const total = Math.max(1, Math.ceil((r.expiresAt - r.createdAt) / DAY_MS));
+        const left = Math.max(0, Math.ceil((r.expiresAt - now) / DAY_MS));
+        return (
+          <li key={r.id} className={`ct-invite${r.id === highlight ? ' is-new' : ''}`}>
+            <span className="al-avatar al-text-label" aria-hidden="true">
+              <Icon name="clock" size={14} />
+            </span>
+            <span className="ct-invite-main al-text-body">{waitingToAccept(r.name)}</span>
+            <RingMeter
+              label={A.daysLeftLabel}
+              value={left}
+              max={total}
+              text={daysLeft(left)}
+              countdown
+              size="sm"
+            />
+          </li>
+        );
+      })}
+    </Surface>
+  );
+}
+
 export interface ContactsPageProps {
   /** For tests; the page's own same-origin clients by default. */
   readonly api?: ApiClient;
   readonly owner?: OwnerClient;
+  readonly invites?: InviteApi;
+}
+
+/** True once, when the page was opened through the Add contact link (b11 §21.1). */
+function openedForAdd(): boolean {
+  if (typeof location === 'undefined' || location.search !== `?${ADD_CONTACT_MARKER}`) return false;
+  // Drop the marker at once: the address holds nothing about the sheet afterwards.
+  history.replaceState(history.state, '', location.pathname + location.hash);
+  return true;
 }
 
 export function ContactsPage({
   api: givenApi,
   owner: givenOwner,
+  invites: givenInvites,
 }: ContactsPageProps = {}): ReactElement {
   const api = useMemo(() => givenApi ?? createApiClient(), [givenApi]);
   const owner = useMemo(() => givenOwner ?? createOwnerClient(), [givenOwner]);
+  const invites = useMemo(() => givenInvites ?? createInviteApi(), [givenInvites]);
   const [list, setList] = useState<ListState>({ phase: 'loading' });
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [passkey, setPasskey] = useState<PasskeyInfo | undefined>(undefined);
@@ -754,6 +724,13 @@ export function ContactsPage({
   const [removed, setRemoved] = useState(false);
   const [kept, setKept] = useState(loadKept);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [adding, setAdding] = useState(openedForAdd);
+  const [rows, setRows] = useState<readonly PendingInvite[]>(() => pendingInvites());
+  const [highlight, setHighlight] = useState<number | undefined>(undefined);
+  const [lastCreated, setLastCreated] = useState<number | undefined>(undefined);
+  const [notice, setNotice] = useState<string | undefined>(undefined);
+  const addButtonId = useId();
+  const returnFocus = useRef(false);
 
   useEffect(() => {
     let live = true;
@@ -790,103 +767,187 @@ export function ContactsPage({
     };
   }, [owner]);
 
+  // Focus goes back to Add contact when the sheet closes (b11 §21.6).
+  useEffect(() => {
+    if (adding || !returnFocus.current) return;
+    returnFocus.current = false;
+    document.getElementById(addButtonId)?.focus();
+  }, [adding]);
+
+  // The highlight lasts 1.2 s (b11 §21.3); only its colour fades, so it is the same when reduced.
+  useEffect(() => {
+    if (highlight === undefined) return undefined;
+    const t = setTimeout(() => setHighlight(undefined), 1200);
+    return () => clearTimeout(t);
+  }, [highlight]);
+
   const onChanged = useCallback((what: Pending['what']) => {
     setRemoved(what === 'remove');
     if (what === 'remove') setSheetOpen(false);
     setTick((n) => n + 1);
   }, []);
 
-  const title = <h1 className="al-text-title-1">{PAGE_TITLES.contacts}</h1>;
+  const openAdd = (): void => {
+    setSheetOpen(false);
+    setNotice(undefined);
+    setAdding(true);
+  };
+  const closeAdd = (): void => {
+    returnFocus.current = true;
+    setAdding(false);
+    setHighlight(lastCreated);
+    setLastCreated(undefined);
+  };
 
-  if (list.phase === 'not_set_up') {
-    return (
-      <>
-        {title}
-        <EmptyState icon="info" title={S.notSetUp} />
-      </>
+  const ready = list.phase === 'ok';
+  const empty = ready && list.contacts.length === 0;
+  const title = (
+    <div className="ct-title-row">
+      <h1 className="al-text-title-1">{PAGE_TITLES.contacts}</h1>
+      {ready ? (
+        <Button
+          id={addButtonId}
+          variant={empty && rows.length === 0 ? 'primary' : 'secondary'}
+          icon="user-plus"
+          onClick={openAdd}
+        >
+          {A.addContact}
+        </Button>
+      ) : null}
+    </div>
+  );
+  const sheet = adding ? (
+    <AddContactSheet
+      invites={invites}
+      passkey={passkey}
+      onCreated={(name, expiresAt) => {
+        const row = addPendingInvite(name, expiresAt);
+        setRows(pendingInvites());
+        setLastCreated(row.id);
+      }}
+      onConnected={(name) => {
+        returnFocus.current = true;
+        setAdding(false);
+        setNotice(connectingTo(name));
+        setTick((n) => n + 1);
+      }}
+      onClose={closeAdd}
+    />
+  ) : null;
+  const status =
+    notice === undefined ? null : (
+      <p className="al-text-body" role="status">
+        {notice}
+      </p>
     );
-  }
-  if (list.phase === 'loading') {
+  const invitesList = <PendingInvites rows={rows} highlight={highlight} now={Date.now()} />;
+
+  const page = ((): ReactElement => {
+    if (list.phase === 'not_set_up') {
+      return (
+        <>
+          {title}
+          <EmptyState icon="info" title={S.notSetUp} />
+        </>
+      );
+    }
+    if (list.phase === 'loading') {
+      return (
+        <>
+          {title}
+          <Skeleton loading label={S.loading} lines={4} className="ct-loading" />
+        </>
+      );
+    }
+    if (list.phase === 'error') {
+      return (
+        <>
+          {title}
+          <EmptyState icon="circle-alert" title={S.listUnavailable} />
+        </>
+      );
+    }
+    if (list.contacts.length === 0) {
+      return (
+        <>
+          {title}
+          {removed ? (
+            <p className="al-text-body" role="status">
+              {S.removed}
+            </p>
+          ) : null}
+          {status}
+          {rows.length === 0 ? (
+            <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
+          ) : (
+            <div className="ct-layout">{invitesList}</div>
+          )}
+        </>
+      );
+    }
+    const current = list.contacts.find((c) => c.ref === selected) ?? list.contacts[0];
+    // M1-UX3-DUP-CONTACTS: the server links a newer contact to an older one with the same owner by
+    // ref only; the notice shows on the newer one unless "Keep both" was chosen in this browser.
+    const olderRef = current?.olderSameOwner;
+    const older =
+      current === undefined || olderRef === undefined || isKept(kept, current.ref, olderRef)
+        ? undefined
+        : list.contacts.find(
+            (c) => c.ref === olderRef && c.ref !== current.ref && c.status === 'active',
+          );
     return (
       <>
-        {title}
-        <Skeleton loading label={S.loading} lines={4} className="ct-loading" />
-      </>
-    );
-  }
-  if (list.phase === 'error') {
-    return (
-      <>
-        {title}
-        <EmptyState icon="circle-alert" title={S.listUnavailable} />
-      </>
-    );
-  }
-  if (list.contacts.length === 0) {
-    return (
-      <>
+        <p className="al-text-label al-muted ct-count">{countLine(list.contacts.length)}</p>
         {title}
         {removed ? (
           <p className="al-text-body" role="status">
             {S.removed}
           </p>
         ) : null}
-        <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
+        {status}
+        <div className="ct-layout">
+          {invitesList}
+          <ContactList
+            contacts={list.contacts}
+            selected={current?.ref}
+            onSelect={(ref) => {
+              setRemoved(false);
+              setSelected(ref);
+              setAdding(false);
+              setSheetOpen(true);
+            }}
+          />
+        </div>
+        <Sheet
+          open={sheetOpen && current !== undefined}
+          title={S.detailTitle}
+          closeLabel={S.closeSheet}
+          onClose={() => setSheetOpen(false)}
+        >
+          {current === undefined ? null : (
+            <Detail
+              key={current.ref}
+              contact={current}
+              api={api}
+              owner={owner}
+              passkey={passkey}
+              older={older}
+              onKeepBoth={() => {
+                if (olderRef !== undefined) setKept(keep(kept, current.ref, olderRef));
+              }}
+              onChanged={onChanged}
+            />
+          )}
+        </Sheet>
+        <UnderTheHood fields={current === undefined ? [] : hoodFields(current)} />
       </>
     );
-  }
-  const current = list.contacts.find((c) => c.ref === selected) ?? list.contacts[0];
-  // M1-UX3-DUP-CONTACTS: the server links a newer contact to an older one with the same owner by
-  // ref only; the notice shows on the newer one unless "Keep both" was chosen in this browser.
-  const olderRef = current?.olderSameOwner;
-  const older =
-    current === undefined || olderRef === undefined || isKept(kept, current.ref, olderRef)
-      ? undefined
-      : list.contacts.find(
-          (c) => c.ref === olderRef && c.ref !== current.ref && c.status === 'active',
-        );
+  })();
+
   return (
     <>
-      <p className="al-text-label al-muted ct-count">{countLine(list.contacts.length)}</p>
-      {title}
-      {removed ? (
-        <p className="al-text-body" role="status">
-          {S.removed}
-        </p>
-      ) : null}
-      <div className="ct-layout">
-        <ContactList
-          contacts={list.contacts}
-          selected={current?.ref}
-          onSelect={(ref) => {
-            setRemoved(false);
-            setSelected(ref);
-            setSheetOpen(true);
-          }}
-        />
-      </div>
-      <Sheet
-        open={sheetOpen && current !== undefined}
-        title={S.detailTitle}
-        closeLabel={S.closeSheet}
-        onClose={() => setSheetOpen(false)}
-      >
-        {current === undefined ? null : (
-          <Detail
-            key={current.ref}
-            contact={current}
-            api={api}
-            owner={owner}
-            passkey={passkey}
-            older={older}
-            onKeepBoth={() => {
-              if (olderRef !== undefined) setKept(keep(kept, current.ref, olderRef));
-            }}
-            onChanged={onChanged}
-          />
-        )}
-      </Sheet>
-      <UnderTheHood fields={current === undefined ? [] : hoodFields(current)} />
+      {page}
+      {sheet}
     </>
   );
 }

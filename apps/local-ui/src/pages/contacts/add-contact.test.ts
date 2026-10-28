@@ -81,6 +81,7 @@ afterEach(() => {
   act(() => root.unmount());
   host.remove();
   document.documentElement.removeAttribute('data-motion');
+  stubShare(undefined);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -176,7 +177,9 @@ async function click(target: string | HTMLElement): Promise<void> {
 async function type(el: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
   await act(async () => {
     const proto =
-      el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      el instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
@@ -355,7 +358,10 @@ describe('UX2-d2: Invite someone', () => {
 
   it('never puts the link in an attribute, the address, the title or the console', async () => {
     stubClipboard();
-    stubShare(() => Promise.resolve(), () => true);
+    stubShare(
+      () => Promise.resolve(),
+      () => true,
+    );
     await createFor('Marko');
     expect(attributesWithLink()).toEqual([]);
     await click(A.showQr);
@@ -369,7 +375,10 @@ describe('UX2-d2: Invite someone', () => {
   });
 
   it('has no email button and no mailto anywhere', async () => {
-    stubShare(() => Promise.resolve(), () => true);
+    stubShare(
+      () => Promise.resolve(),
+      () => true,
+    );
     await createFor('Marko');
     expect(document.querySelector('a[href^="mailto:" i]')).toBeNull();
     expect(text()).not.toMatch(/\bemail it\b|\bsend by email\b/i);
@@ -395,7 +404,10 @@ describe('UX2-d2: Invite someone', () => {
     expect(buttons(A.share)).toEqual([]);
     act(() => root.unmount());
     root = createRoot(host);
-    stubShare(() => Promise.resolve(), () => false);
+    stubShare(
+      () => Promise.resolve(),
+      () => false,
+    );
     await createFor('Marko');
     expect(buttons(A.share)).toEqual([]);
   });
@@ -547,10 +559,7 @@ describe('UX2-d2: I have an invite', () => {
     await click(A.checkInvite);
     expect(document.querySelector('input[name="owner-code"]')).toBeNull();
     await click(A.connect);
-    await type(
-      document.querySelector('input[name="owner-code"]') as HTMLInputElement,
-      'ABCD-EFGH',
-    );
+    await type(document.querySelector('input[name="owner-code"]') as HTMLInputElement, 'ABCD-EFGH');
     await click(S.confirm);
     const accepts = posts(calls, ACCEPT);
     expect(accepts.length).toBe(1);
@@ -615,7 +624,10 @@ describe('UX2-d2: axe', () => {
     expect((await run()).violations.map((v) => v.id)).toEqual([]);
   });
   it('finds no violation on the ready invite with the QR code shown', async () => {
-    stubShare(() => Promise.resolve(), () => true);
+    stubShare(
+      () => Promise.resolve(),
+      () => true,
+    );
     await createFor('Marko');
     await click(A.showQr);
     expect((await run()).violations.map((v) => v.id)).toEqual([]);
@@ -649,7 +661,7 @@ describe('UX2-d2: the copy (11 §5)', () => {
   it('uses none of the never-say words', async () => {
     const { lintVocabulary } = await import('@4thtech-io/ui');
     const all = [
-      ...Object.values(A).filter((v): v is string => typeof v === 'string'),
+      ...(Object.values(A) as readonly string[]),
       inviteReady('Marko'),
       safetyLine('Marko'),
       safetyLine(undefined),
