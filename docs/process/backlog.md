@@ -4997,7 +4997,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit): a new row arriving in the same second and direction leaves the other rows' keys and animations unchanged; reduced-motion unchanged; no test weakened.
 
 #### UI-REFRESH-u · local-ui: lazy-load the Settings pages and the Under the hood panel (new, post-release UI performance, owner decision 17, 2026-10-28)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/router.tsx` (test: `router.test.ts`), `apps/local-ui/src/pages/{backup,advanced,storage,about,appearance}/**` (import sites only), the Under the hood panel mount, `apps/local-ui/vite.config.*`, tests
 - **Depends on:** UI-REFRESH-t
 - **Spec:** plan §7 (`docs/process/proposals/UI-REFRESH.md`); B-11 §7
