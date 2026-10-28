@@ -107,7 +107,7 @@ export const SETUP_MESSAGES = {
   // b11 §28.3.
   cancelled: 'Not protected yet. Try again.',
   label_invalid:
-    "That name can't be used. Use letters, numbers and single spaces, up to 32 characters.",
+    "That name can't be used. Use letters, numbers, single spaces and . ' - up to 32 characters.",
   expired: 'This step took too long. Nothing changed. Try again.',
   not_pending: 'This step took too long. Nothing changed. Try again.',
   busy: 'Another setup or approval is running. Wait a moment, then try again.',

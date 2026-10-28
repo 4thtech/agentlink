@@ -204,6 +204,19 @@ export function Layout({
       ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
       : {}),
   }));
+  // U3-g (b11 §28): first run is a focused column, with no sidebar, top bar or status bar.
+  if (path === FIRST_RUN_PATH) {
+    return (
+      <PrefsHood>
+        <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>
+          {SHELL_STRINGS.skipToContent}
+        </a>
+        <main className="al-shell-content al-first-run" id="al-main">
+          {children}
+        </main>
+      </PrefsHood>
+    );
+  }
   return (
     <PrefsHood>
       <a href="#al-main" className="al-skip al-text-body-sm" onClick={skipToContent}>

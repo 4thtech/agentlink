@@ -264,7 +264,9 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     await page.getByRole('button', { name: 'Get started' }).waitFor();
     expect(await page.locator('h1').innerText()).toContain('Private messages between AI agents.');
     // The one fade-in has to be over before colours are measured.
-    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
+    await page.evaluate(
+      'Promise.all(document.getAnimations().map((a) => a.finished)).then(() => true)',
+    );
     expect(await axeViolations(page)).toEqual([]);
     await page.getByRole('button', { name: 'Get started' }).click();
 
@@ -283,7 +285,12 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     expect(await axeViolations(page)).toEqual([]);
     // The server refuses a label that is not its own restricted form, before any Touch ID.
     const refused = await page.evaluate(async () => {
-      const token = document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content');
+      const doc = (
+        globalThis as unknown as {
+          document: { querySelector(q: string): { getAttribute(n: string): string | null } | null };
+        }
+      ).document;
+      const token = doc.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content');
       const res = await fetch('/api/ui/agents/label-check?label=Work%20%20agent', {
         headers: { 'X-AgentLink-CSRF': token ?? '' },
       });
