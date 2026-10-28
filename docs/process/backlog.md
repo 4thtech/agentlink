@@ -5031,7 +5031,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Both sections merged and approved by the owner before UX2-a and UX2-b start; they use only existing components and tokens.
 
 #### UX2-a · local-ui: Approvals responsive grid and Grid/List control (new, 0.4.2, UX-WAVE-2 item 7)
-- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including `approvals.css`), tests
 - **Depends on:** UX2-brief-0
 - **Spec:** B-11 §26; UX-WAVE-2 §9.1; 08 §1

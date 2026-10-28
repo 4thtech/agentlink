@@ -1,11 +1,13 @@
-// UI-REFRESH-e (S1): the one preference store (B-11 §7, §14). Four per-browser settings kept in
+// UI-REFRESH-e (S1): the one preference store (B-11 §7, §14). Per-browser settings kept in
 // localStorage (reads and writes in try/catch: private windows, blocked or full storage still work for
 // the session). The three display settings also land on <html> as data attributes; "system" means no
 // attribute, so the system's own light/dark, reduced-motion and reduced-transparency settings decide.
 // Nothing here is secret: values come from fixed lists, anything else in storage is ignored.
+// UX2-a: the Approvals Grid/List layout (B-11 §26.2) is a view choice, kept here too; default Grid.
 export type MotionPref = 'system' | 'on' | 'off';
 export type TransparencyPref = 'system' | 'reduce';
 export type ThemePref = 'system' | 'light' | 'dark';
+export type ApprovalsLayoutPref = 'grid' | 'list';
 
 export interface Prefs {
   /** Under the hood: the global switch and its default (off). */
@@ -13,6 +15,8 @@ export interface Prefs {
   motion: MotionPref;
   transparency: TransparencyPref;
   theme: ThemePref;
+  /** Approvals: cards in a grid, or today's single column (B-11 §26). */
+  approvalsLayout: ApprovalsLayoutPref;
 }
 
 export const PREFS_KEY = 'agentlink.prefs';
@@ -21,12 +25,14 @@ export const DEFAULT_PREFS: Prefs = {
   motion: 'system',
   transparency: 'system',
   theme: 'system',
+  approvalsLayout: 'grid',
 };
 
 const CHOICES = {
   motion: ['system', 'on', 'off'],
   transparency: ['system', 'reduce'],
   theme: ['system', 'light', 'dark'],
+  approvalsLayout: ['grid', 'list'],
 } as const;
 
 function parse(raw: string | null): Prefs {
@@ -46,6 +52,9 @@ function parse(raw: string | null): Prefs {
     out.transparency = d['transparency'] as TransparencyPref;
   }
   if (CHOICES.theme.includes(d['theme'] as ThemePref)) out.theme = d['theme'] as ThemePref;
+  if (CHOICES.approvalsLayout.includes(d['approvalsLayout'] as ApprovalsLayoutPref)) {
+    out.approvalsLayout = d['approvalsLayout'] as ApprovalsLayoutPref;
+  }
   return out;
 }
 

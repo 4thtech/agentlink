@@ -84,7 +84,10 @@ describe('preferences', () => {
   });
 
   it('ignores a damaged or hostile stored value', () => {
-    localStorage.setItem(PREFS_KEY, '{"hood":"yes","motion":"<script>","theme":"neon","approvalsLayout":"masonry","extra":1}');
+    localStorage.setItem(
+      PREFS_KEY,
+      '{"hood":"yes","motion":"<script>","theme":"neon","approvalsLayout":"masonry","extra":1}',
+    );
     resetPrefsForTests();
     expect(getPrefs()).toEqual(DEFAULT_PREFS);
     localStorage.setItem(PREFS_KEY, 'not json');

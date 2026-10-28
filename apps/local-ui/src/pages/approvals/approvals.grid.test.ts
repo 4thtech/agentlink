@@ -281,7 +281,10 @@ describe('Grid is the default and holds only the cards (B-11 §26.1)', () => {
 
   it('"{n} more waiting" stays below the grid, outside it', async () => {
     const many = Array.from({ length: 22 }, (_, i) =>
-      item(String.fromCharCode(97 + i), 1 + i / 100),
+      item(String.fromCharCode(97 + i), 1, {
+        expiresAt: NOW_S + 3600 + i,
+        actionDigest: i.toString(16).padStart(64, '0'),
+      }),
     );
     await mount({ [LIST]: [ok({ approvals: many })] });
     expect(grid()?.children.length).toBe(20);
@@ -522,6 +525,12 @@ describe('the stylesheet (B-11 §26.1, §26.3, §22.3)', () => {
         /overflow\s*:\s*hidden|max-height|display\s*:\s*none|visibility\s*:\s*hidden/,
       );
     }
+  });
+
+  it('what the AI wrote wraps, keeping every space and line break (found in the 360 px shots)', () => {
+    const pre = rules.find((r) => /\.al-untrusted\s+pre/.test(r.sel));
+    expect(pre?.body).toMatch(/white-space\s*:\s*pre-wrap/);
+    expect(pre?.body).toMatch(/overflow-wrap\s*:\s*anywhere/);
   });
 
   it('the control is hidden while only one column fits (under 1008 px)', () => {

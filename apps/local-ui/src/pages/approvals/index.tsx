@@ -18,9 +18,22 @@
 // - UI-REFRESH-o-b: an approved card collapses out and leaves its result as a line of text; the
 //   sidebar badge is told how many still wait (a number only; badge.ts).
 // - UI-REFRESH-o-c: a denied card leaves the same way and leaves "Denied: <summary>".
-import { Button, Skeleton, Surface, type PayPlatform } from '@4thtech-io/ui';
+// - UX2-a (B-11 §26): the cards sit in a grid (default) or today's single column, chosen with the
+//   "Layout" control in the title row and remembered in the prefs store. Layout only: the cards'
+//   content and order, presence, the decide calls and the leave after a decision are unchanged.
+import { Button, Segmented, Skeleton, Surface, type PayPlatform } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
+import { setPref, usePrefs, type ApprovalsLayoutPref } from '../../prefs/index.js';
 import { announceDecided, announceWaiting } from './badge.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import {
@@ -156,13 +169,55 @@ export function Results({ lines }: { lines: readonly string[] }): ReactElement |
   );
 }
 
-/** The page head every approvals view shares. */
-export function ApprovalsHead(): ReactElement {
+/**
+ * The page head every approvals view shares. `end` sits at the end of the title row (the Approvals
+ * page's Layout control, B-11 §26.2); without it the head is unchanged.
+ */
+export function ApprovalsHead({ end }: { end?: ReactNode } = {}): ReactElement {
   return (
     <>
-      <h1 className="al-text-title-1">{S.appTitle}</h1>
+      {end === undefined ? (
+        <h1 className="al-text-title-1">{S.appTitle}</h1>
+      ) : (
+        <div className="ap-title-row">
+          <h1 className="al-text-title-1">{S.appTitle}</h1>
+          {end}
+        </div>
+      )}
       <p className="al-lede">{S.cannotApprove}</p>
     </>
+  );
+}
+
+/**
+ * Grid or List (B-11 §26.2, §22): a radiogroup labelled "Layout". The stylesheet hides it while
+ * only one column fits; the remembered choice is kept. Changing it moves nothing and leaves the
+ * focus on the control.
+ */
+function LayoutControl({
+  value,
+  onChange,
+}: {
+  value: ApprovalsLayoutPref;
+  onChange: (next: ApprovalsLayoutPref) => void;
+}): ReactElement {
+  const labelId = useId();
+  return (
+    <div className="ap-layout">
+      <span id={labelId} className="al-text-body-sm ap-layout-label">
+        {S.layout}
+      </span>
+      <Segmented
+        label={S.layout}
+        labelledBy={labelId}
+        options={[
+          { value: 'grid', label: S.layoutGrid },
+          { value: 'list', label: S.layoutList },
+        ]}
+        value={value}
+        onChange={(next) => onChange(next === 'list' ? 'list' : 'grid')}
+      />
+    </div>
   );
 }
 
@@ -426,43 +481,48 @@ function ApprovalsList({
       <div className="al-list">
         <h2 className="al-section-title">{fmt(S.waiting, { count: all.length })}</h2>
         {all.length === 0 ? <Statuses lines={[S.nothingWaiting]} /> : null}
-        {shown.map((item) =>
-          item.commitment || item.paid || !owner.ready ? (
-            <SingleApproval
-              key={`${round}-${item.approvalId}`}
-              item={item}
-              owner={owner}
-              client={client}
-              sheet={sheet}
-              onDecided={() => onDecided(item.approvalId)}
-              onLeft={(line) => onLeft(item.approvalId, line)}
-            />
-          ) : (
-            <Surface
-              as="section"
-              key={item.approvalId}
-              level={choices[item.approvalId] === undefined ? 1 : 2}
-              className="al-approval"
-              data-approval={item.approvalId}
-            >
-              <ApprovalFacts item={item} />
-              <Choices
-                item={item}
-                value={choices[item.approvalId]}
-                disabled={locked}
-                onChange={(next) =>
-                  setChoices((c) => {
-                    const copy = { ...c };
-                    if (next === undefined) delete copy[item.approvalId];
-                    else copy[item.approvalId] = next;
-                    return copy;
-                  })
-                }
-              />
-              <ApprovalFoot />
-              <UnderTheHood fields={approvalHoodFields(item)} />
-            </Surface>
-          ),
+        {/* B-11 §26: only the cards sit in the grid, in DOM order (soonest expiry first). */}
+        {shown.length === 0 ? null : (
+          <div className="ap-cards">
+            {shown.map((item) =>
+              item.commitment || item.paid || !owner.ready ? (
+                <SingleApproval
+                  key={`${round}-${item.approvalId}`}
+                  item={item}
+                  owner={owner}
+                  client={client}
+                  sheet={sheet}
+                  onDecided={() => onDecided(item.approvalId)}
+                  onLeft={(line) => onLeft(item.approvalId, line)}
+                />
+              ) : (
+                <Surface
+                  as="section"
+                  key={item.approvalId}
+                  level={choices[item.approvalId] === undefined ? 1 : 2}
+                  className="al-approval"
+                  data-approval={item.approvalId}
+                >
+                  <ApprovalFacts item={item} />
+                  <Choices
+                    item={item}
+                    value={choices[item.approvalId]}
+                    disabled={locked}
+                    onChange={(next) =>
+                      setChoices((c) => {
+                        const copy = { ...c };
+                        if (next === undefined) delete copy[item.approvalId];
+                        else copy[item.approvalId] = next;
+                        return copy;
+                      })
+                    }
+                  />
+                  <ApprovalFoot />
+                  <UnderTheHood fields={approvalHoodFields(item)} />
+                </Surface>
+              ),
+            )}
+          </div>
         )}
         {all.length > shown.length ? (
           <Statuses lines={[fmt(S.moreWaiting, { count: all.length - shown.length })]} />
@@ -511,14 +571,22 @@ export function ApprovalsPage({
   const client = useMemo(() => given ?? createApprovalsClient(), [given]);
   const canPasskey = givenCanPasskey ?? browserPasskeys();
   const owner = useOwner(client, canPasskey);
+  const { approvalsLayout } = usePrefs();
   const sheet: SheetOptions = {
     ...(payConfirm === undefined ? {} : { payConfirm }),
     ...(platform === undefined ? {} : { platform }),
     ...(reducedMotion === undefined ? {} : { reducedMotion }),
   };
   return (
-    <div className="al-approvals">
-      <ApprovalsHead />
+    <div className="al-approvals" data-layout={approvalsLayout}>
+      <ApprovalsHead
+        end={
+          <LayoutControl
+            value={approvalsLayout}
+            onChange={(next) => setPref('approvalsLayout', next)}
+          />
+        }
+      />
       {owner === undefined ? (
         <Skeleton loading label={S.loading} lines={4} />
       ) : (

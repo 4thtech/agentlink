@@ -9,6 +9,70 @@
   flex-direction: column;
   gap: 16px;
 }
+
+/* UX2-a (B-11 §26): the Approvals page is as wide as the page allows; everything that is not a card
+   (title, lede, owner panel, notices, "Waiting for you", "{n} more waiting", the Review bar and step)
+   keeps today's 480 px measure, aligned left. Only the cards widen: in Grid they fill the width by
+   themselves, in List they keep today's single 480 px column. DOM order is the visual order (no
+   order, no dense packing), so Tab and screen readers run row by row. A narrower card never cuts,
+   clamps or hides a fact: its text wraps. Nothing about the layout moves (§26.2, §14). */
+.al-approvals[data-layout] {
+  max-width: var(--al-layout-max-page);
+}
+.al-approvals[data-layout] > :not(.ap-title-row):not(.al-list),
+.al-approvals[data-layout] .al-list > :not(.ap-cards) {
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+}
+.al-approvals .ap-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
+  gap: var(--al-space-5);
+  align-items: start;
+}
+.al-approvals[data-layout='list'] .ap-cards {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  max-width: 480px;
+}
+.al-approvals .ap-cards > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* What the AI wrote is a <pre>, which by default never wraps; inside the region's hidden overflow a
+   long line was cut off, in List as well. Every space and line break is kept, and long lines wrap,
+   so the owner sees all of it (WYSIWYS). */
+.al-approvals .al-untrusted pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.al-approvals .ap-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3) var(--al-space-5);
+}
+.al-approvals .ap-layout {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.al-approvals .ap-layout-label {
+  color: var(--al-color-fg-muted);
+}
+/* The chosen option carries the orange tint (§22.3) as well as its check icon (never colour alone). */
+.al-approvals .ap-layout .al-seg-opt.is-on {
+  background: var(--al-color-accent-subtle);
+}
+/* Two columns need 736 px of content (2 x 360 + 16), from a window of about 1008 px; under that
+   both views look the same, so the control is hidden and the remembered choice is kept. */
+@media (max-width: 1007px) {
+  .al-approvals .ap-layout {
+    display: none;
+  }
+}
 .al-approvals h1 {
   margin: 0;
 }
