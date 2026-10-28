@@ -5262,6 +5262,98 @@ Low-severity findings from the independent reviews of #619, #620, #616, #627, #6
 - **Acceptance:**
   - The uniqueness check (all 1 000 nonces distinct, 32 bytes each) is unchanged; no timeout lowered; no product code changed; short threat note; no test weakened.
 
+### Follow-ups from the UX wave 2 and release-check reviews (CARDS-1028D)
+
+Low-severity findings from the independent reviews of #637, #638, #647, #649, #653 and #654, plus two docs items. Phrased neutrally on this public repo: the cases live in the tests.
+
+#### CHORE-LOCALUI-EMBED-EACH-KIND · embed check: every asset kind must be non-empty, not just one (new, low, from #637)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain) · **Audit:** Fable (review of #637) · **Phase:** M1b
+- **Repo/path:** agentlink · the embed check added by CHORE-LOCALUI-EMBED-NONEMPTY and its test
+- **Depends on:** CHORE-LOCALUI-EMBED-NONEMPTY (#637)
+- **Spec:** release-and-deployment; 08 §1
+- **Invariants:** —
+- **Scope:**
+  - The check uses `some()` per kind, so one empty JS chunk among several passes. Require every file of each kind to be non-empty; the whole-UI case stays as the main guard.
+- **Acceptance:**
+  - Tests first (RED commit): one empty chunk among non-empty ones fails, a full embed passes; no check loosened.
+
+#### UX2-c-b · local-ui: Sent follows delivery, two low test and polling follow-ups (new, low, from #638)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · the Files Sent state code and polling from UX2-c, tests
+- **Depends on:** UX2-c (#638)
+- **Spec:** UX-WAVE-2 item 6, decision 6.1
+- **Invariants:** —
+- **Scope:**
+  - (a) Add a test exactly at the 24 h boundary. (b) Polls can overlap when a request takes longer than 5 s: do not start a poll while one is in flight.
+- **Acceptance:**
+  - Tests first (RED commit) for both; no test weakened.
+
+#### UX2-a-b · local-ui: Approvals grid, leave option and two layout lows (new, from #647)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI for the leave option; visual and state handling only) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**`, `useRowPresence`, tests
+- **Depends on:** UX2-a (#647)
+- **Spec:** B-11 §26.3, §26; 08 §1; 04 §2.5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - (a) Add a fade-only (opacity) leave option to `useRowPresence` for the Grid view (§26.3); reduced motion removes without animation; no change to presence, signing or decide calls. (b) Low: with a non-overlay scrollbar the Grid can show one column at about 1008 to 1025 px while the control is visible. (c) Low: a remembered List view shows 480 px cards at 768 to 1008 px.
+- **Acceptance:**
+  - Tests first (RED commit); the count and badge tick down only after a successful decision; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
+
+#### UX2-f1-b · node: activity pulse route, three low follow-ups (new, low, from #649)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build · **Security:** S2 (`packages/node/**` by path) · **Audit:** Fable (review of #649) · **Phase:** M1b
+- **Repo/path:** agentlink · the pulse read route and store query from UX2-f1, tests; changeset
+- **Depends on:** UX2-f1 (#649)
+- **Spec:** UX-WAVE-2 item 4, decision 4.1; B-11 §24
+- **Invariants:** I-5
+- **Scope:**
+  - (a) The inbound scan counts rows with no contact or a removed contact toward its cap: count only rows that can appear in the result. (b) Remove the dead min-with-midnight logic. (c) Measure the query; add an index on `envelopes.created_at` only if it is slow (schema change then needs its own migration and test).
+- **Acceptance:**
+  - Tests first (RED commit); the response still carries counts and times only; no test weakened; short threat note (S2).
+
+#### UX2-d2-b · local-ui, node: invites and Add contact, follow-ups (new, from #654)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (touches the invite routes in `packages/node/**`) · **Audit:** Fable for the server read and the "already used" signal · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/**` (Start here, AddContactAction, empty states, Add contact sheet), `packages/node/src/**` (invite read), tests; changeset
+- **Depends on:** UX2-d1, UX2-d2 (#654), UX2-g (#650)
+- **Spec:** UX-WAVE-2 item 1, decisions 1.1, 2.1; B-11 §21, §27; 06 §2.1
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - (a) Point Start here step 2, AddContactAction and the Contacts, Messages and Files empty states at `ADD_CONTACT_HREF`. (b) A server read of open invites, so a pending row survives a reload, and an "already used" signal; the invite text itself is never returned to or logged by any 4thTech service. (c) The "Connecting to X…" notice must clear when the contact appears or the attempt ends. (d) Measure the sheet at 360 px in a real browser and record it in the PR.
+- **Acceptance:**
+  - Tests first (RED commit); no wallet, address or hash words in default copy; axe and keyboard tests; threat note (S2); no test weakened.
+
+#### UX2-e2-b · local-ui: Add credits tracker, retry the arm read (new, low, from #653)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus build · **Security:** S2 (money) · **Audit:** Fable · **Phase:** M1b
+- **Repo/path:** agentlink · the Add credits tracker from UX2-e2, tests
+- **Depends on:** UX2-e2 (#653)
+- **Spec:** UX-WAVE-2 item 3; B-11 §23
+- **Invariants:** I-4
+- **Scope:**
+  - If Add is pressed before the fresh `creditsBefore` read lands, the tracker stays on "Adding…" until stopped. Retry the arm read while on Arrived so the tracker settles. No change to how credits are added or to any amount.
+- **Acceptance:**
+  - Tests first (RED commit) with a slow first read; no amount, link or payment code changed; short threat note (S2); no test weakened.
+
+#### DOCS-UPGRADING-0.2.0-FIX · docs: upgrading-from-0.2.0 contradicts itself on local data (new, low)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs-site/guide/get-started/upgrading-from-0.2.0.md`
+- **Depends on:** —
+- **Spec:** `docs/process/versioning.md`; 07 (schema)
+- **Invariants:** —
+- **Scope:**
+  - Line 16 says local data is "not migrated" while line 29 says the upgrade "upgrades your local data". Settle both against the versioning and schema facts and make the page say one true thing.
+- **Acceptance:**
+  - `node tools/docs-status/index.mjs --check` passes; a changelog fragment if user-visible.
+
+#### DOCS-0.4.2-RELEASE-NOTES · docs: fix stale 0.4.2 CHANGELOG lines and README Status/Roadmap (new, after 0.4.2)
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `CHANGELOG.md`, `README.md`
+- **Depends on:** the 0.4.2 release
+- **Spec:** `docs/process/versioning.md`
+- **Invariants:** —
+- **Scope:**
+  - The UX2-brief-0 line ("waiting for owner approval, nothing built") and the UX2-brief line ("waiting for owner approval") are stale: both were approved and UX2-a and UX2-b are built. Update them, and update README Status and Roadmap for 0.4.2. Claim only what shipped.
+- **Acceptance:**
+  - Docs checks pass; no unimplemented feature claimed.
+
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
