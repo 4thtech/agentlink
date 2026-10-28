@@ -5186,7 +5186,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
 Low-severity findings from the independent reviews of #619, #620, #616, #627, #628, #629 and #630. Phrased neutrally on this public repo: the cases live in the tests.
 
 #### CHORE-LOCALUI-EMBED-NONEMPTY · release-time check that the CLI's embedded local-ui bundle is not empty (new, low, from the refresh follow-ups)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Audit:** Fable · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/test/local-ui-embed.test.ts`, the release/pack workflow step or script that builds the CLI (`.github/**` if needed), tests
 - **Depends on:** —
 - **Spec:** release-and-deployment; 08 §1
