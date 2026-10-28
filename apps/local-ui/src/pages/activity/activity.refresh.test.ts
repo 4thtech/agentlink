@@ -98,21 +98,21 @@ describe('header, day groups and chips', () => {
     expect(qa(ROWS)).toHaveLength(4);
   });
 
-  it('filters with chips: pressed state, only matching rows, chips stay the same nodes', async () => {
+  it('filters with a segmented control: checked state, only matching rows, options stay the same nodes', async () => {
     await mount(apiWith(async () => ok({ items: MIXED })));
-    const group = q(`[role="group"][aria-label="${S.filterLabel}"]`) as HTMLElement;
-    const chips = [...group.querySelectorAll('button.al-activity-chip')] as HTMLButtonElement[];
-    expect(chips.map((c) => c.textContent)).toEqual([
+    const group = q(`[role="radiogroup"][aria-label="${S.filterLabel}"]`) as HTMLElement;
+    const chips = [...group.querySelectorAll('button[role="radio"]')] as HTMLButtonElement[];
+    expect(chips.map((c) => c.textContent?.trim())).toEqual([
       S.filterAll,
       S.filterApprovals,
       S.filterProofs,
       S.filterOther,
     ]);
-    expect(chips[0]?.getAttribute('aria-pressed')).toBe('true');
+    expect(chips[0]?.getAttribute('aria-checked')).toBe('true');
     const wrapper = q('.al-activity-list');
     act(() => chips[2]?.click());
-    expect(chips[2]?.getAttribute('aria-pressed')).toBe('true');
-    expect(chips[0]?.getAttribute('aria-pressed')).toBe('false');
+    expect(chips[2]?.getAttribute('aria-checked')).toBe('true');
+    expect(chips[0]?.getAttribute('aria-checked')).toBe('false');
     expect(qa(ROWS)).toHaveLength(1);
     expect(host.textContent).toContain(S.proofSent);
     // The chip row is never rebuilt; only the list wrapper is swapped (it carries the fade).
@@ -124,7 +124,7 @@ describe('header, day groups and chips', () => {
 
   it('says so when a filter has no rows, and All brings them back', async () => {
     await mount(apiWith(async () => ok({ items: [MIXED[3]] })));
-    const chips = qa('button.al-activity-chip') as HTMLButtonElement[];
+    const chips = qa('[role="radiogroup"] button[role="radio"]') as HTMLButtonElement[];
     act(() => chips[2]?.click());
     expect(host.textContent).toContain(S.filterEmpty);
     act(() => chips[0]?.click());
