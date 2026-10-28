@@ -1309,3 +1309,81 @@ mark. No lines are drawn.
 - **Hover preview:** none ships. If the owner later chooses it (decision 8, option 3), it must come from the Messages read as plain text in the untrusted container.
 
 New strings: "Live connections", "List", "Map", "Show quiet", "+{n} more", "+{n} more agents", "{agents} agents, {contacts} contacts. {name} is talking with {agent} now.", "Sending", "Receiving", "Sending to {name}", "No one to talk to yet.", "Nothing has moved in the last 24 hours.", "Couldn't load what's moving.", "{name} is sending a file to {agent}", "Reply from {name}", "Open conversation", "now". Existing: "Active now", "Today", "Quiet", "Add contact", "Try again", "Not connected to an AI app".
+
+## 33. Join from an invite link
+
+**Idea.** A friend without AgentLink opens an invite link from WhatsApp, a text or an email. The page says who invites them, in plain words, and offers **one step**: copy one command, or copy one sentence for their AI. Either way the local app opens, first run v3 (§28) runs, and the last screen is the invite already waiting: "Accept {name}'s invite?". Then they compare the safety code and can exchange messages and files. **Owner decision (Tali, 2026-10-29, invite join).** Spec: 08 §4 "One step from an invite link", 06 §7.1 and §8 (`agentlink join`); card U3-invite. Pattern: Zoom and Slack "join" links (one sentence, one obvious action), Signal's safety number after connecting. **Styled from the D2 invite landing** (`d2/screens/invite/invite-landing--default--light--360.png`, D-116): its header, the inviter card with "Self-declared" and the fingerprint row, the bordered copy panel with its orange **Copy** button and monospaced text, the "No AI agent?" card and the footer stay; the "I use…" tabs become the two-way switch below. The app end reuses the §21.4 "Who it is" layout and the §28 first-run shell.
+
+### 33.1 The invite page (public, `{inviteHost}/i#…`)
+
+```text
+360 (light; D2 invite landing)                 1280 (centred column, 560 px)
+┌──────────────────────────────┐               ┌────────────────────────────────────────┐
+│ [•] AgentLink   {inviteHost} │               │ [•] AgentLink              {inviteHost}│
+│ INVITE                       │               │ INVITE                                 │
+│ Marko invites you to connect │               │ Marko invites you to connect your AI   │
+│ your AI agents.              │               │ agents.                                │
+│ Takes about 2 minutes.       │               │ Takes about 2 minutes.                 │
+│ ┌──────────────────────────┐ │               │ ┌────────────────────────────────────┐ │
+│ │ "Marko's agent" Self-decl│ │               │ │ "Marko's agent"  Self-declared     │ │
+│ │ FINGERPRINT  7F3A·19C2   │ │               │ │ FINGERPRINT 7F3A·19C2              │ │
+│ │ Works once, until 19 Oct │ │               │ │ Works once, until 19 Oct           │ │
+│ └──────────────────────────┘ │               │ └────────────────────────────────────┘ │
+│ Set up in 2 minutes          │               │ Set up in 2 minutes                    │
+│ [✓ Copy a command|Ask your AI]│              │ [✓ Copy a command | Ask your AI ]      │
+│ ┌ TERMINAL ──────── [Copy] ┐ │               │ ┌ TERMINAL ───────────────── [Copy] ┐ │
+│ │ npx -y @4thtech-io/agent │ │               │ │ npx -y @4thtech-io/agentlink join  │ │
+│ │ link join 'https://…'    │ │               │ │ 'https://{inviteHost}/i#…'         │ │
+│ │ Paste it into Terminal   │ │               │ │ Paste it into Terminal and press   │ │
+│ │ and press Return.        │ │               │ │ Return. Needs Node.js 22 or later. │ │
+│ └──────────────────────────┘ │               │ └────────────────────────────────────┘ │
+│ No AI agent? View and accept │               │ No AI agent? View and accept in browser│
+│ Invites never ask for        │               │ Invites never ask for passwords, codes │
+│ passwords, codes or money.   │               │ or money.                              │
+└──────────────────────────────┘               └────────────────────────────────────────┘
+```
+
+- **Heading** (`al-text-title-1`, in place of D2's "An agent wants to connect with yours"): "{name} invites you to connect your AI agents." and under it, muted, "Takes about 2 minutes." `{name}` is the name-rule output (06 §2.1) set as text; on the rule's fallback the heading is "Someone invites you to connect your AI agents." The inviter card below keeps D2's layout: the quoted name with **Self-declared**, FINGERPRINT, "Works once, until {date}." and D2's note "Name chosen by its owner. You'll compare a safety code after accepting."
+- **"What this is"** from D2 stays, shortened to its first paragraph, below the step section. One column at every width.
+- **The step.** Heading "Set up in 2 minutes", then a `Segmented` (§22, tab semantics) with **Copy a command** (default) and **Ask your AI**, then D2's bordered copy panel with its label row (TERMINAL, or COPY THIS TO YOUR AI) and the orange **Copy** button. The text is monospaced, wraps at any character (the link has no spaces), never scrolls sideways, and is selectable. Help line under it, `al-text-body-sm`, muted:
+  - Command: "Paste it into Terminal and press Return. Needs Node.js 22 or later."
+  - Sentence: "For an AI app that can run commands on this computer, like Claude Code or Codex. It shows you the change before it makes it."
+- **Copied:** §6 row 6 (check icon and "Copied" for 1.6 s; polite announcement "Copied"); no toast. If copying fails: "Copy didn't work. Select the text and copy it."
+- **What happens next** (one muted line under the panel): "AgentLink opens in your browser. Set it up, then accept {name}'s invite."
+- **States** (one sentence each in the inviter card's place, with no step section): loading ("Checking the invite in your browser…"), expired ("This invite has expired. Ask {name} for a new one."; with the fallback name, "Ask the person who sent it for a new one."), damaged ("This invite is damaged or not supported. Ask the person who sent it for a new one."), oversized and no invite (today's strings). Too long for a command (08 §4): the switch is not shown and only **Ask your AI** appears.
+- **Never shown:** the link outside the copy panel, the relays, the label, the card or anything else from the payload. The page sends nothing anywhere (08 §4 CSP).
+
+### 33.2 The app end: "Accept {name}'s invite?"
+
+After first run v3 (§28.1 to §28.4, unchanged), or at once when AgentLink is already set up, the app opens on this screen in the §28 first-run shell (centred card, 520 px, level 2). It reuses §21.4 "Who it is".
+
+```text
+1440 (centred card, 520 px)                       360
+┌────────────────────────────────────────┐        ┌────────────────────────┐
+│ Accept Marko's invite?                 │        │ Accept Marko's invite? │
+│ "Marko's agent"  Self-declared         │        │ "Marko's agent"        │
+│ FINGERPRINT 7F3A·19C2 · until 19 Oct   │        │ Self-declared          │
+│ Is this who you expected?              │        │ 7F3A·19C2 · 19 Oct     │
+│ For: Claude Code agent                 │        │ Is this who you        │
+│ After you connect, compare the safety  │        │ expected?              │
+│ code with Marko.                       │        │ [Accept with Touch ID] │
+│ [   Accept with Touch ID   ]  Not now  │        │ Not now                │
+└────────────────────────────────────────┘        └────────────────────────┘
+```
+
+| State | What shows |
+|---|---|
+| **Waiting** | As drawn. **Accept with Touch ID** (platform word as §28.3) is the only primary; **Not now** (text) forgets the invite and goes to Home. "For: {agent}" names the open agent's label (generation rule, 08 §1) |
+| **Accepting** | The button becomes the indeterminate bar "Connecting to {name}…" |
+| **Waiting for them** | "Waiting for {name}'s agent to answer." with the breathing "Waiting for {name}" of Contacts (§16); after 10 minutes also "If nothing happens, the invite may have been used already or {name}'s AI app isn't running. Ask {name} to check, or for a new invite." **Go to Home** (secondary) |
+| **Connected** | "Connected with {name}." then the safety-code step (§8 screen 10): "Compare the safety code with {name}" and **They match** (Touch ID, signs `contact.check`). Then Home, with Start here's invite step ticked and Messages ready |
+| **Can't use it** | "This invite has expired. Ask {name} for a new one.", "You already accepted this invite." (with **Open {name}** when connected), "This is your own invite.", "Your rules don't allow new contacts." Each with **Go to Home** |
+| **Touch ID cancelled** | "Not accepted yet. Try again." The card stays |
+
+- **Order on a first run:** Welcome → Which AI app will you use? → Set up your agent (name and Touch ID) → Connect your AI app (or Later; shown as connected when the AI already did it) → **Accept {name}'s invite?** → Connected and safety code → Home. Home's steps are ticked on the way, as in §28.
+- **Where the invite may appear:** nowhere in the app but the name, label, fingerprint and expiry on this card; never the link, and never in the address bar, a title, a toast, a notification, Activity or an error (§21.5 applies).
+- **Accessibility and motion:** focus moves to the title; the inviter block is a labelled region; live region (polite) "Connected with {name}" and the error sentence; reduced motion as §21.6; 44 px targets at 360.
+
+### 33.3 Copy (11 §5)
+
+New strings: "{name} invites you to connect your AI agents.", "Someone invites you to connect your AI agents.", "Takes about 2 minutes.", "Copy a command", "Ask your AI", "TERMINAL", "Paste it into Terminal and press Return. Needs Node.js 22 or later.", "For an AI app that can run commands on this computer, like Claude Code or Codex. It shows you the change before it makes it.", "AgentLink opens in your browser. Set it up, then accept {name}'s invite.", "Copy didn't work. Select the text and copy it.", "This invite has expired. Ask {name} for a new one.", "This invite is damaged or not supported. Ask the person who sent it for a new one.", "Accept {name}'s invite?", "For: {agent}", "After you connect, compare the safety code with {name}.", "Accept with Touch ID", "Not now", "Waiting for {name}'s agent to answer.", the 10-minute line, "Go to Home", "Connected with {name}.", "You already accepted this invite.", "Open {name}", "Your rules don't allow new contacts.", "Not accepted yet. Try again.", and the `join` terminal line "This isn't a complete AgentLink invite. Open the link again and copy the command." Existing: "Set up in 2 minutes" and "COPY THIS TO YOUR AI" (D2), "Self-declared", "Works once, until {date}.", "Is this who you expected?", "This is your own invite.", "Connecting to {name}…", "Compare the safety code with {name}", "They match", "Copied". `{name}` is always the name-rule output, rendered as text. No "wallet", "key", "address", "transaction", "relay" or "harness".
