@@ -31,6 +31,8 @@ import {
   type MessagesApi,
   type Problem,
 } from './api.js';
+import { AddContactAction, useInviteFirst } from '../home/start-here-empty.js';
+import { START_STRINGS } from '../home/strings.js';
 import './messages.css';
 import { countUnseen, loadSeen, markSeen, type Seen } from './seen.js';
 import { MESSAGES_STRINGS as S } from './strings.js';
@@ -376,6 +378,7 @@ export interface MessagesPageProps {
 
 export function MessagesPage({ api }: MessagesPageProps): ReactElement {
   const messages = useRef<MessagesApi>(createMessagesApi(api ?? createApiClient()));
+  const inviteFirst = useInviteFirst();
   const [view, setView] = useState<ListState>({ state: 'loading' });
   const [selected, setSelected] = useState<string | undefined>(undefined);
   const [seen, setSeen] = useState<Seen>(() => loadSeen());
@@ -437,7 +440,11 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
       ) : view.state === 'failed' ? (
         <ProblemView problem={view.problem} onRetry={() => void loadList()} />
       ) : view.list.length === 0 ? (
-        <EmptyState icon="inbox" title={S.noContacts} />
+        <EmptyState
+          icon="inbox"
+          title={inviteFirst ? START_STRINGS.emptyMessages : S.noContacts}
+          {...(inviteFirst ? { action: <AddContactAction /> } : {})}
+        />
       ) : (
         <div className={`ms-layout${current === undefined ? '' : ' has-selection'}`}>
           <div className="ms-list-wrap">

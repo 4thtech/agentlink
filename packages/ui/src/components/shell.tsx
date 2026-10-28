@@ -18,6 +18,11 @@ export interface NavItem {
   active?: boolean;
   /** Where the link goes; the app routes it. */
   href?: string;
+  /**
+   * A small dot for "not finished" (UX2-g, B-11 §27.4). The value is the item's whole accessible
+   * name ("Home, setup not finished"); the dot itself is decoration.
+   */
+  dotLabel?: string;
 }
 
 /** A nav link goes to this app (`/…`), a fragment (`#…`) or an https address; anything else is `#`. */
@@ -122,9 +127,13 @@ export function AppShell({
                     href={safeHref(item.href)}
                     className={cx('al-nav', item.active === true && 'is-active')}
                     aria-current={item.active === true ? 'page' : undefined}
+                    aria-label={item.dotLabel}
                   >
                     <Icon name={item.icon} size={16} />
                     <span className="al-text-body">{item.label}</span>
+                    {item.dotLabel === undefined ? null : (
+                      <span className="al-nav-dot" aria-hidden="true" />
+                    )}
                     {item.count === undefined || item.count === 0 ? null : item.countLabel !==
                       undefined ? (
                       <CountBadge

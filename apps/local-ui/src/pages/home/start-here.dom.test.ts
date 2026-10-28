@@ -40,7 +40,12 @@ afterEach(() => {
 
 const ok = (data: unknown): ApiResult<unknown> => ({ kind: 'ok', status: 200, data });
 const NOW = new Date(2026, 9, 28, 10, 0, 0);
-const HEALTH = { agent: 'running', relays: { connected: 3, total: 3 }, lastSyncAt: 1, version: '0.4.1' };
+const HEALTH = {
+  agent: 'running',
+  relays: { connected: 3, total: 3 },
+  lastSyncAt: 1,
+  version: '0.4.1',
+};
 
 function contact(over: Partial<ContactRow> = {}): ContactRow {
   return {
@@ -79,7 +84,14 @@ function props(startHere: StartHereReads): HomePageProps {
     if (path === '/api/ui/health') return ok(HEALTH);
     if (path.startsWith('/api/ui/activity')) return ok({ items: [] });
     if (path === '/api/ui/proofs/credits') {
-      return ok({ status: 'ok', proofsLeft: 5, balance: '$0.50', price: '$0.10', test: false, partial: false });
+      return ok({
+        status: 'ok',
+        proofsLeft: 5,
+        balance: '$0.50',
+        price: '$0.10',
+        test: false,
+        partial: false,
+      });
     }
     if (path === '/api/ui/contacts') return ok({ status: 'ok', contacts: [] });
     return { kind: 'error', status: 404 };
@@ -128,7 +140,9 @@ describe('Start here: the card', () => {
     expect(c).not.toBeNull();
     expect(c?.querySelector('h2')?.textContent).toBe('Start here');
     const grid = host.querySelector('[data-tiles]') as HTMLElement;
-    expect((c as HTMLElement).compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      (c as HTMLElement).compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(host.querySelector('[data-next-step]')).toBeNull();
   });
 
@@ -193,7 +207,9 @@ describe('Start here: the card', () => {
     expect(step('send').getAttribute('data-state')).toBe('next');
     expect(step('send').textContent).toContain('Ask your AI to say hello.');
     expect(step('send').textContent).toContain('Say hello to Marko on AgentLink.');
-    const copy = [...step('send').querySelectorAll('button')].find((b) => /copy/i.test(b.textContent ?? ''));
+    const copy = [...step('send').querySelectorAll('button')].find((b) =>
+      /copy/i.test(b.textContent ?? ''),
+    );
     await act(async () => {
       copy?.click();
     });
@@ -286,7 +302,11 @@ describe('Start here: leaving', () => {
     );
     act(() => root.unmount());
     root = createRoot(host);
-    await mount(props(reads({ protect: undefined, contacts: undefined, sent: undefined, kitSaved: undefined })));
+    await mount(
+      props(
+        reads({ protect: undefined, contacts: undefined, sent: undefined, kitSaved: undefined }),
+      ),
+    );
     expect(card()?.textContent).toContain('2 of 4');
   });
 
@@ -380,7 +400,12 @@ describe('Start here: loading and failed reads', () => {
   });
 
   it('a read that fails and was never known adds nothing alarming', async () => {
-    const live: Live = { protect: undefined, contacts: undefined, sent: undefined, kitSaved: undefined };
+    const live: Live = {
+      protect: undefined,
+      contacts: undefined,
+      sent: undefined,
+      kitSaved: undefined,
+    };
     await mount(props(reads(live)));
     expect(card()).toBeNull();
     expect(host.querySelector('[role="alert"]')).toBeNull();
@@ -395,7 +420,17 @@ describe('Start here: loading and failed reads', () => {
 
 describe('Start here: copy and accessibility', () => {
   it('uses none of the never-say words (11 §5.1) in its strings', () => {
-    const words = ['wallet', 'gas', 'seed phrase', 'transaction', 'private key', 'blockchain', 'on-chain', 'nostr', 'relay'];
+    const words = [
+      'wallet',
+      'gas',
+      'seed phrase',
+      'transaction',
+      'private key',
+      'blockchain',
+      'on-chain',
+      'nostr',
+      'relay',
+    ];
     const strings = Object.values(START_STRINGS).map((v) => String(v));
     expect(strings.length).toBeGreaterThan(8);
     for (const s of strings) for (const w of words) expect(s.toLowerCase()).not.toContain(w);

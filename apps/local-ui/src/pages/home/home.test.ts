@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import homeCss from './home.css?raw';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ApprovalItem, ListAnswer } from '../approvals/client.js';
+import type { ContactRow } from '../contacts/data.js';
 import { PAGE_PARTS } from '../../lazy/pages.js';
 import { ROUTES } from '../../router.js';
 import { HoodProvider, HOOD_STRINGS } from '@4thtech-io/ui';
@@ -77,6 +78,7 @@ const CONTACT = {
   since: NOW_SECONDS - 86_400,
 };
 const CONTACTS = { status: 'ok', contacts: [CONTACT] };
+const CONTACT_ROW = { ...CONTACT, since: NOW_SECONDS - 86_400 } as ContactRow;
 
 function approval(over: Partial<ApprovalItem> = {}): ApprovalItem {
   return {
@@ -123,7 +125,7 @@ function setup(answers: Answers = {}): {
     approvals: { list },
     startHere: {
       protect: async () => true,
-      contacts: async () => [],
+      contacts: async () => [CONTACT_ROW],
       sent: async () => true,
       kitSaved: () => true,
     },
@@ -204,7 +206,7 @@ describe('Home: loading', () => {
     await mount(props);
     const paths = get.mock.calls.map((c) => String(c[0]).split('?')[0]);
     expect(new Set(paths)).toEqual(
-      new Set(['/api/ui/health', '/api/ui/activity', '/api/ui/proofs/credits', '/api/ui/contacts']),
+      new Set(['/api/ui/health', '/api/ui/activity', '/api/ui/proofs/credits']),
     );
     expect(list).toHaveBeenCalled();
   });
@@ -552,7 +554,12 @@ describe('Home: one health poller with the shell', () => {
             path: '/settings/home',
             readHealth: shellRead,
             nextStep: async () => false,
-            startHere: { protect: async () => true, contacts: async () => [], sent: async () => true, kitSaved: () => true },
+            startHere: {
+              protect: async () => true,
+              contacts: async () => [CONTACT_ROW],
+              sent: async () => true,
+              kitSaved: () => true,
+            },
             unseenMessages: async () => 0,
           },
           h(HomePage, props),

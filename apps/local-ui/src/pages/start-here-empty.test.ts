@@ -70,7 +70,7 @@ async function mount(which: Which, ctx: StartHereModel | null): Promise<void> {
       ? h(ContactsPage, { api } as never)
       : which === 'messages'
         ? h(MessagesPage, { api })
-        : h(FilesPage, { fetch: fetcher, token: 't', initialTab: 'received' });
+        : h(FilesPage, { fetch: fetcher, token: 't', initialTab: 'received' } as never);
   await act(async () => {
     root.render(h(StartHereContext.Provider, { value: ctx }, page));
   });

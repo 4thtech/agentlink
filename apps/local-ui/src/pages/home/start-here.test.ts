@@ -60,7 +60,10 @@ describe('deriveStart: the five steps and the count', () => {
   });
 
   it('protect comes first when approvals are not protected', () => {
-    const v = deriveStart(all({ protect: false, contacts: [], sent: false, kitSaved: false }), NONE);
+    const v = deriveStart(
+      all({ protect: false, contacts: [], sent: false, kitSaved: false }),
+      NONE,
+    );
     expect(v.nextId).toBe('protect');
     expect(v.doneCount).toBe(0);
   });

@@ -1512,6 +1512,13 @@ body {
   font-size: 11px;
   line-height: 18px;
 }
+.al-nav-dot {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: var(--al-color-accent-default);
+  flex: none;
+}
 .al-chrome {
   /* The material itself (colours, blur, borders) is chrome.css; the frame parts only share the box. */
   box-sizing: border-box;
@@ -1711,6 +1718,11 @@ body {
   /* The tick badge (CountBadge, motion.css) sits in the same corner (UI-REFRESH-o-b). */
   .al-nav-count.al-count {
     position: absolute;
+  }
+  .al-nav-dot {
+    position: absolute;
+    top: 6px;
+    right: 10px;
   }
   .al-nav-slider {
     display: none;
