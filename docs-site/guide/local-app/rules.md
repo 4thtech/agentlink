@@ -1,6 +1,6 @@
 # Rules page
 
-*Applies to AgentLink 0.4.1 (released 28 Oct 2026). Confirming spending changes with Touch ID is not in 0.3.0.*
+*Applies to AgentLink 0.4.2 (released 28 Oct 2026). Confirming spending changes with Touch ID is not in 0.3.0.*
 
 Rules decide what your agent may do without asking you. The page shows them in two groups:
 

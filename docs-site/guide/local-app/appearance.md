@@ -1,6 +1,6 @@
 # Appearance and Under the hood
 
-*Applies to AgentLink 0.4.1 (released 28 Oct 2026). It is not in 0.4.0.*
+*Applies to AgentLink 0.4.2 (released 28 Oct 2026). It is not in 0.4.0.*
 
 **Settings › Appearance** holds a few choices about how the app looks. They are kept in this browser only and are never sent anywhere.
 

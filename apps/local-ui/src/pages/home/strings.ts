@@ -74,7 +74,7 @@ export const START_STRINGS = {
   protect: 'Protect approvals',
   protectBody: 'Approve with a quick touch instead of a code.',
   invite: 'Invite your first contact',
-  inviteBody: 'Ask your AI to create an invite and send it to someone you work with.',
+  inviteBody: 'Create an invite and send it to someone you work with.',
   check: 'Check the safety code with them',
   recommended: '(recommended)',
   compare: 'Compare safety code',

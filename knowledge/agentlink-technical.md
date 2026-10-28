@@ -22,7 +22,7 @@ flowchart LR
 
 | Name | Role | Status (18 Oct 2026) |
 |---|---|---|
-| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.4.1), not published on its own; STREAM file encryption (1 MiB chunks, header bound into every chunk) is used for file transfer since v0.2.0 |
+| `@4thtech-io/crypto` | Key derivation, HPKE key wrapping, AES-256-GCM, signatures, hashing, key-store interfaces | Built into the released CLI package (v0.4.2), not published on its own; STREAM file encryption (1 MiB chunks, header bound into every chunk) is used for file transfer since v0.2.0 |
 | `@4thtech-io/types` | Shared schemas for policies, approvals, proof packs and tool results | Built into the released CLI package, not published on its own |
 | `@4thtech-io/transport-nostr` | Gift wrap and unwrap, relay pool, delivery outbox, inbox sync, the default relay set | Built into the released CLI package, not published on its own |
 | `@4thtech-io/core` | Identity, signed agent card, contacts, envelopes, invites and pairing, owner-signed actions and policies, approvals, the send pipeline, inbox, terms negotiation | Built into the released CLI package, not published on its own |
@@ -31,7 +31,7 @@ flowchart LR
 | Storage and chain client | Encrypted drop and own-storage adapters; proof client | Released (v0.2.0, test networks): the encrypted drop is the default for files above about 12 KB and the proof client is built into the CLI. The S3-compatible adapter (multipart upload, streaming encryption; tested against MinIO and Cloudflare R2) is merged, but choosing your own storage is not available yet |
 | Desktop apps, owner console, cloud agent | Native approvals and dashboard; web supervision; always-on agent in the user's own Cloudflare account | Planned (M2) |
 
-Only the CLI package `@4thtech-io/agentlink` is published (current v0.4.1, 28 Oct 2026, with provenance; v0.1.0 was the first, on 16 Oct 2026); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
+Only the CLI package `@4thtech-io/agentlink` is published (current v0.4.2, 28 Oct 2026, with provenance; v0.1.0 was the first, on 16 Oct 2026); the libraries are private workspace packages bundled into it. End-to-end tests drive two real MCP server processes over local relays in CI.
 
 ## MCP server
 
@@ -64,7 +64,7 @@ A submitter (sends signed proof records and pays network fees, recovered from th
 
 ## Packagings
 
-Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0; current v0.4.1); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
+Local `npx` package with keys in the OS keychain (M1a, released as v0.1.0; current v0.4.2); desktop apps with OS-biometric approvals (M2); self-hosted cloud agent with a remote MCP endpoint (M2); hosted approval-mode MCP (M4, after design review).
 
 ## Protocol OCC v2
 
