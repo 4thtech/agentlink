@@ -8,7 +8,7 @@ import axe from 'axe-core';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { FilesPage } from './index.js';
+import { FilesPage, type FilesPageProps } from './index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -80,7 +80,7 @@ async function mount(items: unknown[]) {
     );
   };
   await act(async () => {
-    root.render(h(FilesPage, { fetch: fetchFn as typeof fetch, token: 'tok' }));
+    root.render(h<FilesPageProps>(FilesPage, { fetch: fetchFn as typeof fetch, token: 'tok' }));
   });
   await tick(0);
   const tab = [...host.querySelectorAll<HTMLElement>('[role="tab"]')][1];
