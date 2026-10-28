@@ -228,7 +228,10 @@ describe('agentlink ui never asks which agent (U3-b)', () => {
 
   it.each([[[]], [['solo']], [FOUR]])('with %j nothing is asked', async (agents) => {
     const p = probe(TTY);
-    const { deps } = fakeDeps({ agents, start: agents.length === 0 ? 'none' : undefined });
+    const { deps } = fakeDeps({
+      agents,
+      ...(agents.length === 0 ? { start: 'none' as const } : {}),
+    });
     await uiStep(p.context, deps, PREFIX);
     expect(p.out.join('\n')).not.toMatch(/Which one|Type its number|1\. /);
     expect(p.err.join('\n')).not.toMatch(/more than one|--agent <name>/);
