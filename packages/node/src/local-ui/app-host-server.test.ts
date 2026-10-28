@@ -126,7 +126,19 @@ function agents(): Agents {
     name,
     label: entries.get(name)?.label ?? name,
     source: source(name),
-    localUi: {},
+    // U3-d: `work` has a verified label in its store ("Work verified"); config.json says
+    // "Work's agent". `default` has none.
+    localUi:
+      name === 'work'
+        ? {
+            client: {
+              agentId: '0x' + '42'.repeat(20),
+              ownerActions: {
+                loadLabel: () => Promise.resolve({ status: 'verified', label: 'Work verified' }),
+              },
+            } as never,
+          }
+        : {},
     close: () => {
       log.push(`close ${name}`);
       return Promise.resolve();
@@ -263,7 +275,9 @@ describe('the app host: generation and label on every answer (U3-c, 08 §1)', ()
     expect(shell.status).toBe(200);
     expect(shell.body).toContain('<meta name="agentlink-generation" content="1">');
     expect(shell.headers['x-agentlink-generation']).toBe('1');
-    expect(shell.headers['x-agentlink-agent']).toBe('Personal');
+    // U3-d (04 §2.5.1): the open agent is named by its verified label, else its folder name; the
+    // label in config.json ("Personal") is never the open agent's name.
+    expect(shell.headers['x-agentlink-agent']).toBe('default');
     const list = await send(h.port, '/api/approvals', {
       headers: { Cookie: cookie, 'X-AgentLink-CSRF': await h.csrf(cookie) },
     });
@@ -299,11 +313,12 @@ describe('GET /api/ui/agents (U3-c)', () => {
       switchable: true,
       generation: 1,
       current: 'default',
-      label: 'Personal',
+      label: 'default',
       agents: [
         {
           name: 'default',
-          label: 'Personal',
+          // U3-d: the open agent's row shows its verified label, else its folder name.
+          label: 'default',
           current: true,
           available: true,
           removing: false,
@@ -334,7 +349,7 @@ describe('GET /api/ui/agents (U3-c)', () => {
       ],
     });
     // The label is percent-encoded plain text in the header.
-    expect(res.headers['x-agentlink-agent']).toBe('Personal');
+    expect(res.headers['x-agentlink-agent']).toBe('default');
     const query = await send(h.port, '/api/ui/agents?x=1', {
       headers: { Cookie: cookie, 'X-AgentLink-CSRF': await h.csrf(cookie) },
     });
@@ -453,13 +468,8 @@ describe('U3 route stubs (U3-c review note c)', () => {
     ]) {
       expect(registered, route).toContain(route);
     }
-    for (const path of [
-      '/api/ui/agents',
-      '/api/ui/agents/label',
-      '/api/ui/agents/remove',
-      '/api/ui/apps/apply',
-      '/api/ui/apps/disconnect',
-    ]) {
+    // U3-d replaced the stubs of POST /api/ui/agents and /api/ui/agents/label.
+    for (const path of ['/api/ui/agents/remove', '/api/ui/apps/apply', '/api/ui/apps/disconnect']) {
       const res = await send(h.port, path, {
         method: 'POST',
         headers: h.write(cookie, csrf, { 'X-AgentLink-Generation': '1' }),
@@ -499,7 +509,8 @@ describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
     });
     expect(list.status).toBe(200);
     expect(h.world.log).toContain('list work');
-    expect(list.headers['x-agentlink-agent']).toBe(encodeURIComponent("Work's agent"));
+    // U3-d: the open agent's verified label from its store, never config.json's text.
+    expect(list.headers['x-agentlink-agent']).toBe(encodeURIComponent('Work verified'));
     const shell = await send(h.port, '/settings/activity', { headers: { Cookie: cookie } });
     expect(shell.body).toContain('<meta name="agentlink-generation" content="2">');
     // The page built against generation 1 is refused from now on.

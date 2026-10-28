@@ -77,6 +77,24 @@ async function setupAllowed(
   }
 }
 
+/**
+ * U3-d (04 §2.8 "From the local app"): the card parts of an agent the app just created, with its own
+ * core owner actions for the first policy and the first label. The server signs them only for an
+ * agent it created itself, with the owner's one gesture; nothing here signs.
+ */
+export function newAgentFirstCard(
+  agent: LocalUiAgent,
+  deps: Pick<LocalUiWiringDeps, 'cardRelays'> = nodeLocalUiWiring(),
+): FirstAgentCard {
+  return {
+    agent: agent.client.agentId,
+    name: agent.name,
+    relays: deps.cardRelays(),
+    identity: agent.client.identity,
+    firstPolicy: { actions: agent.client.ownerActions },
+  };
+}
+
 /** The `localUi` options for the approval server of `agent` (see the header). */
 export async function localUiOptions(
   agent: LocalUiAgent,
