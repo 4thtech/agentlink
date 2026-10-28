@@ -4806,7 +4806,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Screenshots within the size limit; fixtures only, no real data; `node tools/docs-status/index.mjs --check` green.
 
 #### UI-REFRESH-q · e2e: performance and accessibility audit, the owner's visual QA (new)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `e2e/test/local-ui-refresh.test.ts` (new); fixes go to the owning card's files as follow-up cards
 - **Depends on:** UI-REFRESH-g to UI-REFRESH-n
 - **Spec:** plan §7, §8, §10
