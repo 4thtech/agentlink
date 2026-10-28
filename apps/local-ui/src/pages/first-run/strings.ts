@@ -106,6 +106,8 @@ export const FIRST_RUN = {
   readyPrompt: 'Create an AgentLink invite for a colleague.',
   readyPromptTitle: 'Say this to your AI',
   readyClose: 'You can close this tab.',
+  // U3-a (D-138; 08 §1): the end of first run lands on Home.
+  toHome: 'Go to Home',
   readyRestart: "If your AI app doesn't see AgentLink yet, restart it first.",
 
   alreadyTitle: 'Approvals are already protected on this computer',
@@ -192,7 +194,8 @@ export const UPGRADE = {
   doneTitle: (platform: Platform): string => ON_TITLE[platform],
   doneBody: (sensor: string): string =>
     `Next time, approve with ${sensor}. Your backup code still works if ${sensor} isn't available, so keep it saved.`,
-  toApprovals: 'Go to Approvals',
+  // U3-a (D-138): the end of the first-run page lands on Home.
+  toHome: 'Go to Home',
   // The next step on every app page (b11 Home "Next step"; the d1 shared-states banner).
   bannerTitle: (platform: Platform): string => APPROVE_WITH[platform],
   bannerBody: 'Enter your backup code once to switch. It keeps working as your backup.',

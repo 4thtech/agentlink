@@ -1,7 +1,7 @@
 // M1-11b-9: `agentlink ui` opens the local app on demand (08 §1; 04 §2.5).
 //
 // - In the owner's own interactive terminal: the approval server starts, the OS browser opens the
-//   one-shot session link at the Activity page, or at the first-run page while no owner exists. The
+//   one-shot session link at Home (U3-a, D-138), or at the first-run page while no owner exists. The
 //   command serves until Ctrl+C or a time limit. The link is never printed or logged.
 // - Run by an agent (no TTY, or a harness marker): one fixed line telling the user to run the command
 //   themselves, built with the CLI prefix; no agent is opened, no server, no browser.
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../dispatch.js';
 import type { TerminalContext } from '../runtime/guards.js';
-import { UI_TEXT, UI_WAIT_MS, uiStep, type UiDeps, type UiPage } from './ui.js';
+import { UI_TEXT, UI_WAIT_MS, openUiPage, uiStep, type UiDeps, type UiPage } from './ui.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const AGENT: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
@@ -64,7 +64,7 @@ function fakeDeps(script: Script) {
       if (script.start === 'throws') return Promise.reject(new Error('keychain locked'));
       if (script.start === 'none') return Promise.resolve(undefined);
       return Promise.resolve({
-        page: script.page ?? 'activity',
+        page: script.page ?? 'home',
         open: () => {
           calls.opened += 1;
           if (script.opens === 'throws') return Promise.reject(new Error('opener'));
@@ -98,7 +98,7 @@ function expectNoLink(p: { out: string[]; err: string[] }): void {
 }
 
 describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
-  it.each(['activity', 'first-run'] as const)(
+  it.each(['home', 'first-run'] as const)(
     'opens the %s page, serves until Ctrl+C, then closes',
     async (page) => {
       const p = probe(TTY);
@@ -106,7 +106,7 @@ describe('agentlink ui in the owner terminal (M1-11b-9)', () => {
       await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
       expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1 });
       expect(calls.unsubscribed).toBeGreaterThan(0);
-      expect(p.out).toEqual([page === 'activity' ? UI_TEXT.opened : UI_TEXT.openedSetup]);
+      expect(p.out).toEqual([page === 'home' ? UI_TEXT.opened : UI_TEXT.openedSetup]);
       expect(p.err).toEqual([]);
       expectNoLink(p);
     },
@@ -164,6 +164,47 @@ describe('agentlink ui run by an agent (M1-11b-9)', () => {
   });
 });
 
+describe('agentlink ui opens on Home (U3-a, D-138; 08 §1)', () => {
+  function fakeServer() {
+    const calls: string[] = [];
+    const server = {
+      openHome: (...args: unknown[]) => {
+        calls.push(`home:${args.length}`);
+        return Promise.resolve(true);
+      },
+      openFirstRun: (...args: unknown[]) => {
+        calls.push(`first-run:${args.length}`);
+        return Promise.resolve(true);
+      },
+    };
+    return { server, calls };
+  }
+
+  it('with an owner, the browser opens Home through openHome, with no argument', async () => {
+    const { server, calls } = fakeServer();
+    await expect(openUiPage('home', server)).resolves.toBe(true);
+    expect(calls).toEqual(['home:0']);
+  });
+
+  it('while no owner exists, first run still opens the first-run page', async () => {
+    const { server, calls } = fakeServer();
+    await expect(openUiPage('first-run', server)).resolves.toBe(true);
+    expect(calls).toEqual(['first-run:0']);
+  });
+
+  it('the production step uses openUiPage and no longer opens Activity', async () => {
+    const text = await readFile(fileURLToPath(new URL('./ui.ts', import.meta.url)), 'utf8');
+    const code = text.replace(/^\s*\/\/.*$/gm, '');
+    expect(code).toMatch(/openUiPage\(page, server\)/);
+    expect(code).not.toMatch(/openActivity|'activity'/);
+  });
+
+  it('the terminal line names Home, never a link', () => {
+    expect(UI_TEXT.opened).toContain('Home');
+    expect(UI_TEXT.opened).not.toMatch(/activity|https?:\/\//i);
+  });
+});
+
 describe('agentlink ui is not an MCP tool (M1-11b-9)', () => {
   it('no tool source mentions the ui command or the opener', async () => {
     const dir = join(
@@ -174,7 +215,7 @@ describe('agentlink ui is not an MCP tool (M1-11b-9)', () => {
     for (const file of await readdir(dir)) {
       if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
       const text = await readFile(join(dir, file), 'utf8');
-      expect(text).not.toMatch(/openActivity|openFirstRun|commands\/ui/);
+      expect(text).not.toMatch(/openActivity|openHome|openFirstRun|commands\/ui/);
     }
   });
 });

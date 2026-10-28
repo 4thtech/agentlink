@@ -2,9 +2,9 @@
 // local app on demand, in the owner's own interactive terminal.
 //
 // - In that terminal: the agent is opened, the local approval server starts, and the OS browser
-//   opens the one-shot session link at the Activity page, or at the first-run page while no owner
-//   exists (the same owner-setup rule as `init`, local-ui-wiring.ts). The link goes only to the OS
-//   opener (`openActivity` / `openFirstRun`): it is never printed, logged, returned or put in an
+//   opens the one-shot session link at Home (U3-a, D-138; 08 §1), or at the first-run page while no
+//   owner exists (the same owner-setup rule as `init`, local-ui-wiring.ts). The link goes only to the
+//   OS opener (`openHome` / `openFirstRun`): it is never printed, logged, returned or put in an
 //   event. The command serves until Ctrl+C or UI_WAIT_MS, then closes the server and the agent.
 // - Run by an agent (no TTY, or a harness marker): one fixed line tells the user to run the command
 //   in their own terminal, named with the CLI prefix (M1-36e). No agent is opened, no server starts,
@@ -35,7 +35,7 @@ export const UI_WAIT_MS = 30 * 60_000;
 /** Fixed text (11 §5 plain words). Nothing from a file, the page or the user is inserted. */
 export const UI_TEXT = Object.freeze({
   opened:
-    "Your browser opened your AgentLink activity page. Keep this window open while you use it; press Ctrl+C when you're done.",
+    "Your browser opened AgentLink on Home. Keep this window open while you use it; press Ctrl+C when you're done.",
   openedSetup:
     "Your browser opened the AgentLink setup page. Protect approvals there with a passkey. Keep this window open while you use the page; press Ctrl+C when you're done.",
   noBrowser: "AgentLink couldn't open your browser.",
@@ -49,11 +49,22 @@ export const UI_TEXT = Object.freeze({
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
 
-export type UiPage = 'activity' | 'first-run';
+export type UiPage = 'home' | 'first-run';
+
+/** The two openers `ui` uses (ApprovalServer): each hands the OS opener a fixed one-shot link. */
+export interface UiOpeners {
+  openHome(): Promise<boolean>;
+  openFirstRun(): Promise<boolean>;
+}
+
+/** U3-a (D-138): Home with an owner, first run while no owner exists. Nothing reaches the link. */
+export function openUiPage(page: UiPage, server: UiOpeners): Promise<boolean> {
+  return page === 'first-run' ? server.openFirstRun() : server.openHome();
+}
 
 /** The running pages: the approval server and the agent it serves. */
 export interface UiServer {
-  /** Which page `open` goes to: first-run while no owner exists, otherwise Activity. */
+  /** Which page `open` goes to: first-run while no owner exists, otherwise Home. */
   readonly page: UiPage;
   /** Opens the browser at a one-shot link to `page`; false when no browser could be started. */
   open(): Promise<boolean>;
@@ -149,7 +160,7 @@ export function nodeUiDeps(): UiDeps {
           await agent.close();
           return undefined;
         }
-        const page: UiPage = localUi.ownerSetup === undefined ? 'activity' : 'first-run';
+        const page: UiPage = localUi.ownerSetup === undefined ? 'home' : 'first-run';
         const source = createUiApprovalSource(
           // This step owns the agent's lifetime; the source never closes it.
           { ...agent, close: () => Promise.resolve() },
@@ -166,7 +177,7 @@ export function nodeUiDeps(): UiDeps {
         });
         return Object.freeze<UiServer>({
           page,
-          open: () => (page === 'first-run' ? server.openFirstRun() : server.openActivity()),
+          open: () => openUiPage(page, server),
           close: async () => {
             await server.close().catch(() => undefined);
             await agent.close();

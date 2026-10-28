@@ -19,7 +19,7 @@ You need **Node.js 22.14 or newer**. To check, open a terminal and run `node --v
 
    If no browser opens, or you prefer the terminal, open a terminal window yourself (not one your AI started) and run `npx -y @4thtech-io/agentlink owner init`. It shows an owner code once; the same advice applies. On 0.2.0 this is the only way.
 
-   Once it is set up, `npx -y @4thtech-io/agentlink ui` opens your AgentLink pages in your browser, starting with your activity. See [The local app](../local-app/README.md). Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself. Press Ctrl+C when you're done; it stops by itself after 30 minutes.
+   Once it is set up, `npx -y @4thtech-io/agentlink ui` opens your AgentLink pages in your browser, starting on Home. See [The local app](../local-app/README.md). Run it yourself, in a terminal you opened; if your AI runs it, it only tells you to run it yourself. Press Ctrl+C when you're done; it stops by itself after 30 minutes.
 3. **Restart your AI app**, then ask it: "What's my AgentLink status?" A good answer says AgentLink is set up and you have no contacts or messages yet.
 
 If something does not work, run `npx -y @4thtech-io/agentlink doctor` in your terminal. It shows what is set up and how to fix the rest.

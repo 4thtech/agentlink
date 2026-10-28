@@ -899,32 +899,44 @@ describe('the agent-visible approval url (M1-11a-b, 06 §2.5, I-4)', () => {
     await expect(server.openFirstRun()).resolves.toBe(false);
   });
 
-  it('M1-11b-9: openActivity hands the opener a one-shot link to /settings/activity and nothing else', async () => {
+  it('U3-a: openHome hands the opener a one-shot link to Home (/settings/home) and nothing else', async () => {
     const h = await harness();
     const at = h.opened.length;
-    await expect(h.server.openActivity()).resolves.toBe(true);
+    await expect(h.server.openHome()).resolves.toBe(true);
     expect(h.opened.length).toBe(at + 1);
     const link = new URL(h.opened[at] ?? '');
     expect(link.origin).toBe(h.origin);
-    expect(link.pathname).toBe('/settings/activity');
+    expect(link.pathname).toBe('/settings/home');
     expect([...link.searchParams.keys()]).toEqual(['t']);
     const token = link.searchParams.get('t') ?? '';
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     const first = await send(h.port, `${link.pathname}${link.search}`);
     expect(first.status).toBe(303);
-    expect(first.headers.location).toBe('/settings/activity');
+    expect(first.headers.location).toBe('/settings/home');
+    expect(first.headers['set-cookie']?.[0]).toContain('HttpOnly; SameSite=Strict');
     const again = await send(h.port, `${link.pathname}${link.search}`);
     expect(again.status).toBe(401);
+    expect(again.headers['set-cookie']).toBeUndefined();
     expect(JSON.stringify(h.events)).not.toContain(token);
   });
 
-  it('M1-11b-9: openActivity resolves false when no browser could be opened', async () => {
+  it('U3-a: openHome takes no argument and replaces openActivity', async () => {
+    const h = await harness();
+    expect(h.server.openHome.length).toBe(0);
+    expect('openActivity' in h.server).toBe(false);
+    // The first-run opener is unchanged: it still goes to /first-run.
+    const at = h.opened.length;
+    await expect(h.server.openFirstRun()).resolves.toBe(true);
+    expect(new URL(h.opened[at] ?? '').pathname).toBe('/first-run');
+  });
+
+  it('U3-a: openHome resolves false when no browser could be opened', async () => {
     const server = await startApprovalServerWith(
       { source: fakeSource() },
       { opener: () => Promise.reject(new Error('no opener')) },
     );
     servers.push(server);
-    await expect(server.openActivity()).resolves.toBe(false);
+    await expect(server.openHome()).resolves.toBe(false);
   });
 
   it('the one-shot link the opener gets for a request works once, then lands on the same url', async () => {
