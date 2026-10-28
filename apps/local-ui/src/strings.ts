@@ -6,6 +6,8 @@ export const SHELL_STRINGS = {
   skipToContent: 'Skip to content',
   /** Read after the Approvals badge's number: "3 waiting for you" (UI-REFRESH-o-b). */
   approvalsWaiting: 'waiting for you',
+  /** Read after the Messages badge's number: "3 new" (UI-REFRESH-o-d). */
+  messagesNew: 'new',
   notAvailableTitle: "This page isn't available yet.",
   notAvailableHint: 'It arrives in an update. Nothing is lost while you wait.',
   notFoundTitle: "This page isn't here.",

@@ -185,7 +185,10 @@ export function Layout({
     label: item.label,
     href: item.path,
     active: item.routed && (item.label === SETTINGS_LABEL ? settings : item.path === path),
-    ...(item.id === 'messages' && unseen > 0 ? { count: unseen } : {}),
+    // UI-REFRESH-o-d: the same shared tick badge as Approvals, read as "3 new".
+    ...(item.id === 'messages' && unseen > 0
+      ? { count: unseen, countLabel: SHELL_STRINGS.messagesNew }
+      : {}),
     // UI-REFRESH-o-b: the shared tick badge; it counts down as requests are decided.
     ...(item.id === 'approvals' && waiting > 0
       ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
