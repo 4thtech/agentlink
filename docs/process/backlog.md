@@ -5219,7 +5219,7 @@ Low-severity findings from the independent reviews of #619, #620, #616, #627, #6
   - Tests first (RED commit); each refused kind stays refused; no allowed shape becomes refused except the ones above; no test weakened.
 
 #### UI-REFRESH-o-c · local-ui: denied approval cards leave like approved ones (new, low, from #629)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (approval UI) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, tests
 - **Depends on:** UI-REFRESH-o-b (#629)
 - **Spec:** B-11 §16, §6 row 4; 08 §1; 04 §2.5

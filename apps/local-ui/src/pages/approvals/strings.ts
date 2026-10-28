@@ -95,6 +95,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   // UI-REFRESH-o-b: the approval ID under the hood, and the line left after a card collapses out.
   hoodId: 'Approval ID',
   approvedLine: 'Approved: {summary}',
+  // UI-REFRESH-o-c: the line left after a denied card collapses out.
+  deniedLine: 'Denied: {summary}',
 });
 
 /** The keys whose wording differs from the old page in the name of the code only (11 §5.5). */

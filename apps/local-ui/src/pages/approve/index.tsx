@@ -5,7 +5,7 @@
 // costs credits approves through the confirmation sheet (04 §2.5.3).
 // UI-REFRESH-o (visual only): the shared Skeleton while the request loads.
 // UI-REFRESH-o-b: an applied decision counts the sidebar badge down; an approved card collapses out
-// and leaves its result as a line of text.
+// and leaves its result as a line of text. UI-REFRESH-o-c: a denied card does the same.
 import { Skeleton } from '@4thtech-io/ui';
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { announceDecided } from '../approvals/badge.js';
