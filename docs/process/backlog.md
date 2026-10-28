@@ -4451,7 +4451,7 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Split:** the server-rendered page is not deleted here. With the app bundled, `/` and `/approve/<id>` serve the app (list, review together, one request, the paid-action sheet, with parity tests); without a bundle the old page stays as the fallback. Its removal, with the sidebar copy and its drift tests, is M1-11b-2c.
 
 #### M1-11b-2c · approval page: delete the server-rendered page once every CLI ships the app (new, split from M1-11b-2)
-- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Status:** done (4thtech/agentlink#605, IR-M1-11b-2c-1 PASS at 15f22bbc, merged 2026-10-27) · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-page.ts` (with `APP_JS`, `APP_CSS`, `APP_NAV`), `approval-server.ts` (the `/app.js`, `/app.css` and no-bundle page branch), `approval-page.test.ts`, `approval-ui-browser.test.ts`, `approval-pay-confirm-browser.test.ts` (old-page half), `approval-passkey-browser.test.ts`, `apps/local-ui/src/approval-page-nav.test.ts`, `apps/local-ui/src/pages/approvals/strings.test.ts`, `packages/ui/src/components/approval-page-icons.test.ts`, the token drift test, its `changelog.d/` fragment and changeset
 - **Depends on:** M1-11b-2
 - **Spec:** 08 §1; 04 §2.5; D-118
@@ -5014,6 +5014,253 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Depends on:** —
 - **Scope:** Seen 2026-10-27 about 19:08Z on the push run of #607: "draws a fresh 32-byte nonce every time (1 000 builds)" hit the 60 s test timeout. Measure where the time goes, then make the test faster or give it a measured per-test timeout under the test timeout policy (`repo-reference.md`, M0-10e). No retries; never lower a timeout.
 - **Acceptance:** the PR names the slow part with its measured duration; the uniqueness check (all 1 000 nonces distinct, 32 bytes each) is unchanged; a short threat note in the PR; no test or gate weakened; no product code changed.
+
+### Local app UX wave 2 (UX2, owner feedback of 2026-10-28; all recommended decisions accepted by Tali 2026-10-28)
+
+Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 decisions). Chosen options: **1.1** invites: creating needs no presence as a new named route kind, accepting requires presence (amends 08 §1); **2.1** Copy, Share… and QR; **3.1** one brand exception, only the diamond turns while waiting for funds; **4.1** 24-hour pulse plus Active now / Today / Quiet; **5.1** compact view now, widget in the desktop app, M2-11a framework decision pulled forward; **6.1** "Sent · no receipt yet" after a day, no API change; **7.1** Start here checklist, not dismissible; **8.1** 0.4.2 holds UX2-brief-0, UX2-a, UX2-b and UX2-c only. Group order: 1 (0.4.2) UX2-brief-0 → UX2-a, UX2-b, with UX2-c in parallel; 2 UX2-brief → UX2-d1 → UX2-d2 → UX2-g, UX2-e1 → UX2-e2; 3 UX2-f1 → UX2-f2 → UX2-h; 4 UX2-i inside M2-11. New visuals follow an approved brief (D-116, D-135); no new dependency in any card.
+
+#### UX2-brief-0 · design brief: b11 §22 (control map) and §26 (Approvals grid) for 0.4.2 (new, owner decision 8.1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/design/b11-local-app.md` (§22, §26 only)
+- **Depends on:** — (decisions 7 and 8 not needed)
+- **Spec:** D-116, D-135; UX-WAVE-2 §4, §9.1
+- **Invariants:** —
+- **Scope:**
+  - Short notes for the two 0.4.2 cards: §22 which control goes where (switch for an on/off setting that takes effect at once, segmented control for two to four views, button for an action) with states and focus; §26 Approvals grid breakpoints (one column at 360, two at 1024, three at 1440 and wider) and the Grid/List control. Owner approves; no final visuals invented.
+- **Acceptance:**
+  - Both sections merged and approved by the owner before UX2-a and UX2-b start; they use only existing components and tokens.
+
+#### UX2-a · local-ui: Approvals responsive grid and Grid/List control (new, 0.4.2, UX-WAVE-2 item 7)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/approvals/**` (including `approvals.css`), tests
+- **Depends on:** UX2-brief-0
+- **Spec:** B-11 §26; UX-WAVE-2 §9.1; 08 §1
+- **Invariants:** —
+- **Scope:**
+  - CSS grid with `repeat(auto-fill, minmax(360px, 1fr))`; a Grid/List segmented control in the page header, remembered per browser (storage failing still works). Keyboard order runs row by row; the card being decided still rises one level; no autofocus on any Approve; at most one presence prompt at a time. No data change, no change to presence, signing or the decide calls.
+- **Acceptance:**
+  - Tests first (RED commit); one, two and three columns at 360, 1024 and 1440; reduced-motion and axe tests unchanged; all approval flows unchanged; no test weakened.
+
+#### UX2-b · local-ui, ui: control map, switches for settings and segmented controls for views (new, 0.4.2, UX-WAVE-2 item 2)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/**` (Rules, Appearance, notification and receipt settings, Messages, Files, Activity, Proofs), `packages/ui/src/components/forms.tsx` only where a style is shared, tests; changeset if `packages/ui` changes
+- **Depends on:** UX2-brief-0
+- **Spec:** B-11 §22; UX-WAVE-2 §4
+- **Invariants:** —
+- **Scope:**
+  - Apply the control map page by page: switches for binary settings (Rules on/off, binary Appearance choices, notification and receipt settings); segmented controls in the switch's visual language for Messages Inbox/Sent, Files Received/Sent/Send folders, the Activity filter and Proofs/Credits views; Approve, Add contact, Add credits and Copy stay buttons. Saving Rules still goes through the owner-presence prompt; a switch there shows "Unsaved" until saved, never a state that is not in force.
+- **Acceptance:**
+  - Tests first (RED commit); role and keyboard behaviour per control; Rules shows "Unsaved" until saved; vocabulary lint, axe and reduced-motion tests green; no test weakened.
+
+#### UX2-c · local-ui: Files Sent follows the real delivery, with Sent as a final state where receipts are off (new, 0.4.2, UX-WAVE-2 item 6, decision 6.1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (S2 split if the receipts-expected field is later chosen: decision 6 (b), not chosen) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/**`, tests
+- **Depends on:** —
+- **Spec:** B-11 §15.3; UX-WAVE-2 §8; D-109
+- **Invariants:** —
+- **Scope:**
+  - While any row is `queued`, or `sent` without a receipt and still available, re-read the first page every 5 seconds while the tab is visible, with backoff after 2 minutes and a stop after 30 minutes (the pattern Proofs uses). A row that moves plays the existing step transition once; with reduced motion the word changes.
+  - A row sent more than a day ago without a receipt ends at "Sent · no receipt yet" (decision 6.1, no API change). No upload byte count and no new route.
+- **Acceptance:**
+  - Tests first (RED commit): rows move without a reload, polling stops when hidden, after backoff and at 30 minutes; no step advances on a timer alone; reduced-motion and axe tests; no test weakened.
+
+#### UX2-brief · design brief: b11 §21, §23, §24, §25 and §27 (new, UX-WAVE-2 §10)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
+- **Repo/path:** agentlink · `docs/design/b11-local-app.md`
+- **Depends on:** UX2-brief-0; owner decisions of 2026-10-28 (recorded above)
+- **Spec:** D-116, D-135; UX-WAVE-2 §3, §5, §6, §7, §9.2
+- **Invariants:** —
+- **Scope:**
+  - §21 Add contact sheet (both choices, the share options, the "Send it only to {name}. Anyone with this link can connect once." line, pending-row hand-off; 1280 and 360). §23 Waiting for funds (three steps, the diamond's motion about its own centre, reduced-motion still, the 10-minute message, and the brand guideline exception text, decision 3.1). §24 Activity pulse (sparkline size and scale, the three activity words and marker shapes, the heartbeat, at 50+ contacts). §25 Compact view and §25.2 menu-bar popover (content order, sizes, states fine/waiting/paused/offline, many-agent overflow, a reserved agent row). §27 Start here (steps, ticking, not dismissible per decision 7.1, the Home dot).
+  - Order inside the card: §21, §23 and §27 first (they unblock group 2), then §24 and §25.
+- **Acceptance:**
+  - Owner approves each section; sections follow 11 §5 words (no wallet, gas or transaction words); the brand exception is written once and used in one place.
+
+#### UX2-d1 · node: local API routes to create and accept an invite (new, UX-WAVE-2 item 1, decision 1.1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new routes `POST /api/ui/invites`, `POST /api/ui/invites/accept`, `route-types.ts`), tests; changeset; 08 §1 and 06 §7.1 edits marked "proposed, owner confirms at merge"
+- **Depends on:** —
+- **Spec:** 04 §3.6, §3.6.1, §4; 06 §2.1, §7.1; 08 §1; D-69
+- **Invariants:** I-1, I-4, I-5
+- **Scope:**
+  - Create: one fixed POST under a new named route kind (for example `presence: 'invite'`: session, CSRF, Origin and fetch-metadata gate, no signing, no owner presence), returning the same data as `agentlink_create_invite`. The optional name is stored as the invite label and stays a suggested alias until the pairing approval confirms it.
+  - Accept: requires owner presence like every other write route; goes through the one D-69 codec and the relay-URL SSRF rules of 04 §4; still ends in the owner's pairing approval under `contacts.acceptInvites`.
+  - The invite secret never appears in a URL of the local app, a title, a notification, a toast, Activity, a log or an error. Nothing goes through a 4thTech service. Spec edits: 08 §1 (two routes and the new route kind), 06 §7.1, 11 §6.1.
+- **Acceptance:**
+  - Tests first (RED commit); create works without presence and refuses without session, CSRF or Origin; accept refuses without presence; malformed and SSRF-shaped invites are refused; no secret in any log or error; full threat note; owner "merge" and independent review (S2); no test weakened.
+
+#### UX2-d2 · local-ui: Add contact sheet, create, copy, share, QR and paste an invite (new, UX-WAVE-2 item 1, decisions 1.1 and 2.1)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`, `apps/local-ui/src/pages/home/**` (Next step action), `pages/proofs/qr.tsx` reused, tests
+- **Depends on:** UX2-d1; B-11 §21
+- **Spec:** B-11 §21; UX-WAVE-2 §3; 11 §5, §6.1
+- **Invariants:** —
+- **Scope:**
+  - Add contact button on Contacts and as the Home Next step action; a level-3 side sheet (full page at 360) with "Invite someone" (optional name, Create invite, then Copy invite as primary, Share… through `navigator.share` only where supported, and Show QR code) and "I have an invite" (paste field to the accept route). After creation the sheet closes into the pending row.
+  - The sheet says: "Send it only to {name}. Anyone with this link can connect once." No email button and no `mailto:` (decision 2.1). The invite is shown only in the sheet and leaves only through Copy, Share or QR.
+- **Acceptance:**
+  - Tests first (RED commit); the invite is absent from the URL, title, toast, Activity and logs; Share is hidden where unsupported; pending row appears; vocabulary lint, axe and reduced-motion tests; owner confirms fidelity to §21.
+
+#### UX2-e1 · ui: brand exception and the waiting mark component (new, UX-WAVE-2 item 3, decision 3.1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` (waiting mark), brand guidelines text, tests; changeset
+- **Depends on:** B-11 §23; owner decision 3.1
+- **Spec:** Brand guidelines; B-11 §15.3, §23; UX-WAVE-2 §5
+- **Invariants:** —
+- **Scope:**
+  - One exception to the "don't rotate" rule, written once: only the diamond turns, about its own centre, in the waiting state only, at the ambient duration; the brackets never move; not used for any other loading state. Reduced motion: the diamond is still and the step word carries the meaning.
+- **Acceptance:**
+  - Tests first (RED commit); the brackets never move; reduced-motion still; the component is used in no other loading state; axe tests; no test weakened.
+
+#### UX2-e2 · local-ui: Add credits three-step tracker (new, UX-WAVE-2 item 3)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/top-up.tsx` and its tests
+- **Depends on:** UX2-e1; B-11 §23
+- **Spec:** B-11 §15.3, §23; 04 §2.5.1; D-122, D-123; UX-WAVE-2 §5
+- **Invariants:** —
+- **Scope:**
+  - Waiting for your funds (the mark, "Usually takes about a minute", after 10 minutes "Still waiting. Check that you sent it to this account." with Show details again); Arrived · $X (only when the top-up read returns `received` above what it was when the panel opened, then one Add to credits button under owner presence, `credits.deposit`); Added to credits (after the owner operation succeeded and the credits read shows the new value).
+  - Server-driven only: no timer advances a step and no amount shows before the read that proves it; a failed read keeps the step with "Couldn't check. Trying again." Polls the existing top-up read while the panel is open and the tab is visible (capped). No new route. Words: funds, account, credits.
+- **Acceptance:**
+  - Tests first (RED commit): no step advances on a timer or before a read; failed read keeps the step; reduced-motion; vocabulary lint and axe tests; no test weakened.
+
+#### UX2-f1 · node: per-contact activity pulse route (new, UX-WAVE-2 item 4, decision 4.1)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (by path; read-only) · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new `GET /api/ui/messages/pulse`), tests; changeset; 08 §1 edit marked "proposed, owner confirms at merge"
+- **Depends on:** —
+- **Spec:** 07 §3; 08 §1; B-11 §17.4
+- **Invariants:** I-1, I-5
+- **Scope:**
+  - One aggregated read: per contact, counts per two-hour bucket for 24 hours and the last exchange time. Counts and times only, from columns the store already keeps in clear; no text, file names or sizes. The route caps contacts and the window; no per-conversation reads.
+- **Acceptance:**
+  - Tests first (RED commit); no message text, file name or size in the response; the caps hold at 10 000 contacts with a measured time recorded in the PR; session gate as the other read routes; short threat note; independent review (S2); no test weakened.
+
+#### UX2-f2 · local-ui: pulse and activity word in Messages and Contacts, "Most active" sort (new, UX-WAVE-2 item 4)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{messages,contacts}/**`, `packages/ui/src/**` (sparkline, only if shared), tests
+- **Depends on:** UX2-f1; B-11 §24
+- **Spec:** B-11 §24; UX-WAVE-2 §6
+- **Invariants:** —
+- **Scope:**
+  - A 24-hour sparkline of 12 two-hour bars with an accessible summary ("14 messages in the last 24 hours"); an activity word with a shaped marker: Active now (exchange in the last 5 minutes; filled dot with a slow heartbeat), Today (hollow dot), Quiet (no dot); never colour only; the heartbeat stops with reduced motion; sort option "Most active" next to "Recent". We say "Active now", never "Online".
+- **Acceptance:**
+  - Tests first (RED commit); markers differ by shape; heartbeat stops under reduced motion; 50+ contacts render without frame drops under the UI-REFRESH-q gate; vocabulary lint and axe tests; no test weakened.
+
+#### UX2-g · local-ui: Start here card on Home, empty states point to it (new, UX-WAVE-2 item 8, decision 7.1)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{home,contacts,messages,files}/**`, `apps/local-ui/src/shell/**` (Home dot), tests
+- **Depends on:** UX2-d2; B-11 §27
+- **Spec:** B-11 §8 screen 3, §27; brief §4; UX-WAVE-2 §9.2
+- **Invariants:** —
+- **Scope:**
+  - A "Start here" card at the top of Home while setup is incomplete: protect approvals (done after first run), invite your first contact (the Add contact sheet), check the safety code with them, send your first message ("Ask your AI to say hello to {name}." with a copyable prompt); optional fifth step: save your recovery kit. Each step ticks itself from existing reads (health, contacts, backup state, messages); one primary button, on the next step; progress shown ("2 of 4").
+  - Not dismissible: it goes when done (decision 7.1, as b11 §8 screen 3 says today). The Home nav item carries a dot until done; empty states on Contacts, Messages and Files point to step 2. Changes brief §4's single Next step card rule. Supersedes M1-37b item 13.
+- **Acceptance:**
+  - Tests first (RED commit); steps tick only from real reads; no dismiss control; the card disappears when done; vocabulary lint and axe tests; no test weakened.
+
+#### UX2-h · local-ui: compact view and "Open compact window" (new, UX-WAVE-2 item 5, option A, decision 5.1)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/compact/**`, router and shell entry, tests
+- **Depends on:** UX2-f1, UX2-f2; B-11 §25
+- **Spec:** B-11 §25; UX-WAVE-2 §7; 08 §1; D-79
+- **Invariants:** —
+- **Scope:**
+  - A `/compact` route with a dense layout, opened as a small browser window from a click, in the same session (no PWA, no token on disk). Content, which is also the future popover's: live status word and dot; Waiting for you count with the soonest item and Review; the top five contacts by activity with their pulse and "+12 more"; credits left; Open AgentLink. "Needs you" first, then by activity, never more than one screen. A reserved agent row at the top for a later second agent. This computer's agent only.
+- **Acceptance:**
+  - Tests first (RED commit); no message text anywhere in the view; fits one screen at 50+ contacts; vocabulary lint, axe and reduced-motion tests; no test weakened.
+
+#### UX2-i · desktop: menu-bar / tray popover added to M2-11b, M2-11c, M2-11d (new, UX-WAVE-2 item 5, decision 5.1)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/desktop` (popover scope inside M2-11b, M2-11c, M2-11d)
+- **Depends on:** M2-11a (framework decision pulled forward by decision 5.1), UX2-h; B-11 §25.2
+- **Spec:** D-36, D-41; 08 §1, §8; 04 §2.5; B-11 §17.4, §25.2; G-1, G-42
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - The popover shows the compact view's content (counts, names under the contact-name rule, pulses), never message text. It never approves on its own: Review opens the native approval window. No wallet words (D-39); no chain picker (D-40). Tray icon status variants per the brand guidelines.
+  - Tracked as scope bullets in M2-11b (macOS), M2-11c (Windows) and M2-11d (Linux); this card is the shared requirement.
+- **Acceptance:**
+  - Tests first (RED commit); no message text in the popover; Review opens the native approval window and nothing is decided in the popover; same-user script test unchanged; threat note per M2-11a; independent review (S2).
+
+### Follow-ups from the 28 Oct refresh reviews (CARDS-1028C)
+
+Low-severity findings from the independent reviews of #619, #620, #616, #627, #628, #629 and #630. Phrased neutrally on this public repo: the cases live in the tests.
+
+#### CHORE-LOCALUI-EMBED-NONEMPTY · release-time check that the CLI's embedded local-ui bundle is not empty (new, low, from the refresh follow-ups)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/cli/test/local-ui-embed.test.ts`, the release/pack workflow step or script that builds the CLI (`.github/**` if needed), tests
+- **Depends on:** —
+- **Spec:** release-and-deployment; 08 §1
+- **Invariants:** —
+- **Scope:**
+  - `local-ui-embed.test.ts` accepts an empty embed; an empty embed in a published CLI would silently fall back to the 503 page. Add a release-time check (in the pack or publish job, and a test for it) that fails when the embedded local-ui bundle is empty or missing its entry page, without relaxing the existing test.
+- **Acceptance:**
+  - Tests first (RED commit): an empty embed fails the check, a real embed passes; the release job runs it before publishing; no test or gate weakened.
+
+#### UI-REFRESH-r-c · local-ui: Proofs row key test gaps (new, low, from #626)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**` tests (and the smallest fix if a test finds a defect)
+- **Depends on:** UI-REFRESH-r-b (#626)
+- **Spec:** B-11 §14, §15, §16
+- **Invariants:** —
+- **Scope:**
+  - Three missing cases for the r-b fix: (a) an old row that finishes after a row has landed below it still gets the success moment; (b) an existing success moment is dropped when the group changes; (c) a cut-off oldest group with a next cursor keeps stable keys.
+- **Acceptance:**
+  - Each case has a test; if a case fails, the fix is made here with tests first (RED commit); reduced-motion unchanged; no test weakened.
+
+#### UI-REFRESH-e5 · ui: Under the hood filter hardening, two low follow-ups (new, low, from #627)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `packages/ui/src/components/**` (Under the hood filter), tests; changeset
+- **Depends on:** UI-REFRESH-e4 (#627)
+- **Spec:** B-11 §7; 04 §4
+- **Invariants:** I-5
+- **Scope:**
+  - (a) Split values on the complement of the chunk character class instead of a fixed list of separators. (b) Widen the table of look-alike spellings of the sensitive labels, or use a confusables data source (justify any new dependency in the PR; none preferred). The cases are described in the tests, not in the PR text.
+- **Acceptance:**
+  - Tests first (RED commit); each refused kind stays refused; no allowed shape becomes refused except the ones above; no test weakened.
+
+#### UI-REFRESH-o-c · local-ui: denied approval cards leave like approved ones (new, low, from #629)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, tests
+- **Depends on:** UI-REFRESH-o-b (#629)
+- **Spec:** B-11 §16, §6 row 4; 08 §1; 04 §2.5
+- **Invariants:** I-4, I-5
+- **Scope:**
+  - After a deny, the card collapses out as an approved one does (reduced motion: removed without animation) and the result stays reachable by the screen reader. Visual and state handling only; no change to presence, signing or the decide calls.
+- **Acceptance:**
+  - Tests first (RED commit); the approvals count and badge tick down only after a successful deny; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
+
+#### UI-REFRESH-o-d · local-ui: Messages nav badge uses the shared CountBadge (new, low, from #629)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/shell/**` (Messages badge), tests
+- **Depends on:** UI-REFRESH-o-b (#629)
+- **Spec:** B-11 §7
+- **Invariants:** —
+- **Scope:**
+  - The Messages nav badge has a different tint from the Approvals badge; move it onto the shared tick `CountBadge` so both look and tick the same ("99+").
+- **Acceptance:**
+  - Tests first (RED commit); same component and tint as Approvals; reduced-motion and axe tests; no test weakened.
+
+#### UI-REFRESH-u-b · local-ui: two low performance follow-ups after the lazy-loading change (new, low, from #630)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Repo/path:** agentlink · `apps/local-ui/src/router.tsx`, shell and prefetch code, `e2e/test/local-ui-refresh.test.ts` (strict run), tests
+- **Depends on:** UI-REFRESH-u (#630)
+- **Spec:** plan §7 (`docs/process/proposals/UI-REFRESH.md`)
+- **Invariants:** —
+- **Scope:**
+  - (a) The strict 4× frame gate of the UI-REFRESH-q test already fails on main, because the route walk happens before the idle prefetch finishes: make the walk wait for the prefetch or move the prefetch earlier, and bring the strict run (`LOCAL_UI_REFRESH_STRICT=1`) back to green without loosening it. (b) A stale timer on rapid navigation causes one extra, harmless re-render: clear it on navigation.
+- **Acceptance:**
+  - Tests first (RED commit) for (b); the strict run passes plan §7 with the measured numbers in the PR; no gate loosened; no test weakened.
+
+#### CHORE-GASLESS-NONCE-TEST-POLISH · chain: gasless nonce test, two optional improvements (new, optional, low, from #628)
+- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (test-only; content rule: nonces)
+- **Repo/path:** agentlink · `packages/chain/src/fees/gasless.test.ts` (tests only, no product code)
+- **Depends on:** CHORE-GASLESS-NONCE-TIMEOUT (#628)
+- **Spec:** test timeout policy (`repo-reference.md`, M0-10e)
+- **Invariants:** —
+- **Scope:**
+  - Count the memo hits and assert 1 000, so the test proves the memo is exercised; reset the memo in a `finally` so a failure does not leak state into later tests.
+- **Acceptance:**
+  - The uniqueness check (all 1 000 nonces distinct, 32 bytes each) is unchanged; no timeout lowered; no product code changed; short threat note; no test weakened.
 
 ### Design system from the design (`packages/ui`, D-116)
 
@@ -6211,7 +6458,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - 10 (3b and 3c): safety-code nudge with They match, Don't match and Skip; a sender "waiting for Marko" row.
   - 11 (6a to 6c): Rules in two groups, selling warning only when turning it on, unsaved-changes bar (record as a D-116 deviation).
   - 12 (5c): one-time first-proof disclosure banner.
-  - 13 (10b): getting-started checklist (deviation note).
+  - 13 (10b): getting-started checklist (deviation note). Moved to UX2-g (Start here card on Home, 2026-10-28; see UX-WAVE-2 §9.2).
   - 14 (7b, 8a, 8b): Backup simplified with B-3, passkeys under Settings, Copy diagnostics, network change confirm.
 - **Acceptance:**
   - Each item has a Playwright step; default views pass `lintVocabulary`; axe-core zero WCAG 2.1 AA violations; deviations from D-116 recorded in the PR.
@@ -7816,6 +8063,220 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 - **Acceptance:**
   - An external tester follows the guide end to end from a phone.
 
+### Business agents (BIZ, Decision 20, 0.5.0)
+
+Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions). Part of the 0.5.0 milestone with the cloud agent (D-131, D-135); the business slice ships behind a pilot switch. **Owner decisions 1–10 and 12 accepted by Tali, 2026-10-28 (every recommended option):** 1.1 the company hosts the business agent in its own Cloudflare account (4thTech hosts no keys); 2.1 one tool surface (remote MCP) plus invokers, 15-minute token per conversation; 3.1 Claude invoker for the pilot, then OpenAI, then webhook and A2A; 4.1 0.5.0 carries the foundations behind a pilot switch, general availability in 0.5.x; 5.1 monthly Business plan, proofs at the standard fee paid by the company, users free; 6.1 pilot free, billing when D-111 and D-15 exist; 7.1 only answers inside a conversation the person started, for 14 days after their last message; 8.1 verified domain required; 9.1 keep 60-second sync and measure; 10.1 invoker-driven answers in business mode only (amends 08 §3.4); 12.1 invoker grants at most 30 days (D-131 (m)). **Open: decision 11, the pilot company, to be named by the owner** (one travel or booking company). **Fable audits (keys, owner presence, money), per the proposal §9:** BIZ-b, BIZ-e and BIZ-m (named in the card owner's request), plus BIZ-a, BIZ-f and BIZ-j, which the proposal also marks; BIZ-AUDIT is the independent Fable audit of the whole slice. Order: BIZ-0 alongside M2-3b and M2-3c; BIZ-SPEC → BIZ-a, BIZ-b, BIZ-e in parallel → BIZ-d → BIZ-f → BIZ-g and BIZ-j → BIZ-c, BIZ-k, BIZ-l → BIZ-AUDIT → BIZ-PILOT. BIZ-h, BIZ-i and BIZ-m may follow in 0.5.x. Nothing here blocks the person-facing 0.5.0 cloud release.
+
+#### BIZ-0 · spikes for business agents (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S0 (spike notes)
+- **Repo/path:** agentlink · `docs/process/` (spike notes)
+- **Depends on:** M2-3a, M2-3b
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5, §6
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Which vendor APIs accept a remote MCP server per call (Claude, OpenAI); A2A support; one-Durable-Object throughput and store size at 10 000 contacts; alarm cost at shorter intervals (decision 9 revisit).
+- **Acceptance:**
+  - A notes file per question with measured numbers and a recommendation; feeds BIZ-SPEC, BIZ-g and BIZ-h.
+
+#### BIZ-SPEC · spec text for business agents and D-136 (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2 (04)
+- **Repo/path:** agentlink · `docs/foundation` (00, 02, 03, 04, 06, 07, 08, 10, 11 §5, 12), `docs/process/versioning.md`
+- **Depends on:** BIZ-0; decisions of 2026-10-28
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §8, §10
+- **Invariants:** I-1 to I-10 (no change)
+- **Scope:**
+  - The spec impact table of §8 and the D-136 text; threat rows; the Workers form of the DNS-rebinding rule and public-only fetch (§6.5); the public-suffix list source (§4.2); the checkout-host matching rules and their tests (§3.1). Spec edits marked "proposed, owner confirms at merge".
+- **Acceptance:**
+  - Independent review; the owner confirms the proposed details at merge; D-136 is numbered at merge (see the open item in the cards PR).
+
+#### BIZ-a · business link v2: codec, pairing at the inviter, limits and link ops (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Repo/path:** agentlink · `packages/core/src/pairing.ts` and neighbours, vectors, tests; changeset
+- **Depends on:** BIZ-SPEC, M1-7c
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §3.6; 04 §2.5.1, §3.6
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Invite `v: 2` business links (multi-use): codec, pairing at the inviter, limits, `link.create` and `link.revoke` owner operations, vectors. Safety-code rule for business links as BIZ-SPEC fixes it.
+- **Acceptance:**
+  - Tests first (RED commit); new vectors; owner presence on `link.create`/`link.revoke`; full threat note; Fable audit; owner "merge".
+
+#### BIZ-b · domain claim: sign, verify at accept, pause on lapse (covers the core of M2-12) (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Repo/path:** agentlink · `packages/core/**` (`DomainClaim`), `packages/node/**` (DoH and SSRF-safe fetch), tests; changeset
+- **Depends on:** BIZ-SPEC, M1-15
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §4.2, §6; 04 §2.7, §4
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - `DomainClaim` struct decoupled from the Registry, signed on owner pages; client check at accept (DoH and SSRF-safe fetch); public-suffix refusal; badge rules; a contact whose check lapses is paused, never downgraded to self-declared. Covers the core of M2-12 without the Registry.
+- **Acceptance:**
+  - Tests first (RED commit); SSRF and DNS-rebinding fixtures; lapsed claim pauses; no "official" or "verified company" wording; full threat note; Fable audit (keys and owner presence); owner "merge".
+
+#### BIZ-c · business link page and short address on the invite host; directory store (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1
+- **Repo/path:** agentlink · `apps/invite/**`, directory store (public payloads only), tests
+- **Depends on:** BIZ-a, BIZ-DESIGN
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §4, §6; 08 §4, §6
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - The business link page and short address; a directory of public payloads only. Nothing secret reaches the invite host (the payload stays in the URL fragment).
+- **Acceptance:**
+  - Tests first (RED commit); no secret or private key in the directory; untrusted fields rendered as text; axe and vocabulary lint; no test weakened.
+
+#### BIZ-d · cloud agent business mode: tables, raised limits, link-contact counters, pause switch (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent/**`, tests
+- **Depends on:** M2-3a, BIZ-a
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §4; 07 §3, §3.2; 08 §3
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Business-mode tables, raised limits, link-contact counters, a pause switch; at 10 000 contacts within the BIZ-0 measurements.
+- **Acceptance:**
+  - Tests first (RED commit); limits enforced; pause stops answers; full threat note; independent review; owner "merge".
+
+#### BIZ-e · policy: per-link rule for accepts and firm offers, and answer-only-in-person-started-conversations (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2, Fable (money, owner presence)
+- **Repo/path:** agentlink · `packages/core/**` policy code, tests; changeset
+- **Depends on:** BIZ-SPEC
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §3, §6; 06 §3; D-132
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Per-link rule for auto-agreed commitments (accepts and firm offers): sell-only, hard caps, proof always on, D-132 sheet for limits. "Answer only in conversations the person started", for 14 days after the person's last message (decision 7.1). Policy defaults are never weakened.
+- **Acceptance:**
+  - Tests first (RED commit); caps cannot be exceeded; buy-side never auto-agreed; a message outside a person-started conversation is refused; full threat note; Fable audit; owner "merge".
+
+#### BIZ-f · invoker framework: queue, retries, fixed wake-up text, per-conversation token, grants (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Repo/path:** agentlink · `apps/cloud-agent/**`, `packages/mcp-tools/**` (token scope), tests; changeset
+- **Depends on:** M2-3b, M2-3c, BIZ-d
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5, §6; D-131 (m)
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Invoker queue and retries; a fixed wake-up text carrying only an opaque local contact ID and a token scoped to one conversation (15 minutes); `invoker.authorize` and `invoker.revoke` owner operations (grants at most 30 days, warned a week ahead); the vendor secret sealed. Inbound content, including contact names, never enters the agent's instructions (I-5).
+- **Acceptance:**
+  - Tests first (RED commit); prompt-injection fixtures; the token cannot reach another conversation; expired grants refuse; no secret in logs; full threat note; Fable audit; owner "merge".
+
+#### BIZ-g · Claude invoker (pilot) (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent/**`, tests
+- **Depends on:** BIZ-f, BIZ-0
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - The Claude invoker for the pilot, using the remote MCP per call as BIZ-0 found.
+- **Acceptance:**
+  - Tests first (RED commit); a live-provider test marked for M2-16 credentials; threat note; independent review; owner "merge".
+
+#### BIZ-h · OpenAI invoker (0.5.x) (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent/**`, tests
+- **Depends on:** BIZ-f, BIZ-0
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - The OpenAI invoker behind the same framework.
+- **Acceptance:**
+  - Tests first (RED commit); threat note; independent review; owner "merge".
+
+#### BIZ-i · signed wake-up webhook and A2A invoker (0.5.x) (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent/**`, tests
+- **Depends on:** BIZ-f
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5; 04 §4
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - A signed wake-up webhook and an A2A invoker, with the 04 §4 URL rules (SSRF, realpath) applied to every company-supplied URL.
+- **Acceptance:**
+  - Tests first (RED commit); SSRF fixtures; threat note; independent review; owner "merge".
+
+#### BIZ-DESIGN · design brief and screens: setup wizard, dashboard and business link page (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S0
+- **Repo/path:** agentlink · `docs/design/**`
+- **Depends on:** decisions of 2026-10-28
+- **Spec:** D-116, D-135; docs/process/proposals/BUSINESS-AGENTS.md §5.4
+- **Invariants:** —
+- **Scope:**
+  - Brief and screens for the setup wizard, the business dashboard and the business link page; styled from approved screens (D-116); no invented visuals.
+- **Acceptance:**
+  - Owner approves; vocabulary per 11 §5 (no wallet, gas or transaction words; no "official" or "verified company").
+
+#### BIZ-j · setup wizard on the Worker origin, with the test conversation (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2, Fable
+- **Repo/path:** agentlink · `apps/cloud-agent/**` (wizard), tests
+- **Depends on:** M2-3f-1, BIZ-b, BIZ-f, BIZ-DESIGN
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5.4; 08 §3
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - The no-code setup wizard on the Worker origin (owner presence, 04 §2.5), including the domain check, the invoker connection and a test conversation.
+- **Acceptance:**
+  - Tests first (RED commit); every owner operation needs presence; the test conversation uses no real person's data; full threat note; Fable audit; owner "merge".
+
+#### BIZ-k · business dashboard (extends `/status`, M2-3f-2) (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent/**`, tests
+- **Depends on:** M2-3f-2, BIZ-d, BIZ-DESIGN
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5; 08 §3
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Dashboard with counters, invoker errors, AI cost per conversation and the pause switch.
+- **Acceptance:**
+  - Tests first (RED commit); counts only, no message text; axe and vocabulary lint; independent review; owner "merge".
+
+#### BIZ-l · person side: business badge and label, approval-card domain line, checkout-link host line, local app and CLI copy (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S1 (S2 where `packages/core`)
+- **Repo/path:** agentlink · `apps/local-ui/**`, `packages/ui/**`, `apps/cli/**`, `packages/core/**` (only where needed), tests; changeset
+- **Depends on:** BIZ-b, BIZ-e
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §3, §6; 11 §5
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - "Business" label and badge, the approval card's domain line, the checkout-link host line, the vendor note, local app and CLI copy. No "official" or "verified company".
+- **Acceptance:**
+  - Tests first (RED commit); a contact name or alias cannot imitate the badge; vocabulary lint and axe tests; independent review (S2 on core paths).
+
+#### BIZ-m · Business plan: quotas on relay and drop for a business key, directory entitlement, billing hook (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2, Fable (money)
+- **Repo/path:** agentlink · `apps/drop/**`, `apps/submitter/**` as needed, tests; changeset
+- **Depends on:** decisions 5.1 and 6.1; D-111 for the billing hook
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §7; 12
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - Quotas on relay and drop for a business key, the directory entitlement, and the billing hook once D-111 and the entity (D-15) exist. The pilot is free; no payments between agents; the drop still receives ciphertext only.
+- **Acceptance:**
+  - Tests first (RED commit); quotas enforced; no plaintext or key reaches the drop; full threat note; Fable audit; owner "merge".
+
+#### BIZ-DOCS · company guide "Connect your agent to AgentLink", person guide, README status (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S0
+- **Repo/path:** agentlink · `docs/`, `docs-site/`, `README.md`
+- **Depends on:** BIZ-j
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5
+- **Invariants:** —
+- **Scope:**
+  - Company guide, person guide and README Status line; never claim an unimplemented feature.
+- **Acceptance:**
+  - Docs lint and drift checks green; README Status updated.
+
+#### BIZ-AUDIT · independent Fable audit of the business slice (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Fable · **Security:** S2
+- **Repo/path:** agentlink · `audits/**` (private findings handled per `audit-rules.md` §9)
+- **Depends on:** BIZ-a to BIZ-l, AUDIT-CLOUD
+- **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §6
+- **Invariants:** I-1, I-4, I-5, I-7
+- **Scope:**
+  - An independent Fable audit of BIZ-a to BIZ-l: keys, owner presence, I-5 injection paths, SSRF, the domain claim, the money caps.
+- **Acceptance:**
+  - No I-5 or zero-access finding open; findings closed per `audit-rules.md` §9.
+
+#### BIZ-PILOT · pilot with one travel or booking company (company to be named by the owner) (new, 0.5.0 business agents)
+- **Status:** backlog · **Size:** M · **Tier:** Owner with Sonnet · **Security:** S0
+- **Repo/path:** agentlink · pilot notes
+- **Depends on:** BIZ-AUDIT, M2-3d, M2-3e
+- **Spec:** docs/process/proposals/BUSINESS-AGENTS.md §9 (pilot plan), decision 11 (open)
+- **Invariants:** —
+- **Scope:**
+  - Week 0 agreement (free pilot, their Claude agent, one person for setup, deploy to their own Cloudflare account on a call); week 1 domain verified, Claude invoker, conservative rules (every agreement waits for their approval), business link on a hidden page; weeks 2–3, 10–20 invited testers run the full journey; week 4 review and decide on the public link.
+  - **The pilot company is still to be named by the owner (decision 11).**
+- **Acceptance:**
+  - At least 80% of testers complete find → agreement → checkout without help; time to first answer, agreements reaching checkout, approval delays, invoker errors and AI cost per conversation recorded; no I-5 or zero-access finding open in BIZ-AUDIT.
+
 ### Registry and verified badge
 
 #### M2-4a · contracts: OCCRegistry
@@ -8011,6 +8472,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
   - Tray app hosting the MCP server on the same core and node packages (no second implementation); harness auto-setup reusing `init` detection, with each config change shown and confirmed (D-39).
   - Native approval window: owner operations unlock the owner key from the OS keychain only through Touch ID (passphrase fallback) and produce the same owner-signed actions that core verifies. No login (D-39).
   - Keychain access bound to the app's signing identity and to biometry; no remote content, strict CSP, renderer without direct key access.
+  - Menu-bar / tray popover with the compact view's content (UX2-i; counts, names and pulses only, never message text; Review opens the native approval window).
 - **Acceptance:**
   - The M1-8c same-user script test passes against the running app; a modified (unsigned or re-signed) build cannot unlock the owner key (test on macOS).
   - Harness auto-setup configures Claude Code, Claude Desktop, Codex and Gemini CLI after confirmation; J4 completed with Touch ID; install → first message under 5 minutes on a clean macOS VM.
@@ -8023,6 +8485,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-1, I-4, I-7
 - **Scope:**
   - Windows integration of the shared shell: tray, installer, Windows Hello gating the owner key (mechanism per M2-11a), Credential Manager for agent keys, harness auto-setup.
+  - Menu-bar / tray popover with the compact view's content (UX2-i; counts, names and pulses only, never message text; Review opens the native approval window).
 - **Acceptance:**
   - The same-user script test passes; J4 completed with Windows Hello; install → first message under 5 minutes on a clean Windows VM.
 
@@ -8034,6 +8497,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-1, I-4, I-7
 - **Scope:**
   - Linux integration: tray where the desktop supports it, libsecret keychain (D-54 file KeyStore without Secret Service; the desktop opt-in and unlock through an app prompt are specified in 08 §8 at M2), owner presence via the passphrase or a platform authenticator where M2-11a found one; packaging formats per M2-11a.
+  - Menu-bar / tray popover with the compact view's content (UX2-i; counts, names and pulses only, never message text; Review opens the native approval window).
 - **Acceptance:**
   - The same-user script test passes; the weaker Linux residual risk (no OS biometric binding) is stated in the threat note and the quickstart.
 
