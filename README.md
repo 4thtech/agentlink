@@ -90,7 +90,7 @@ New in 0.4.2 (28 Oct 2026):
 
 - **Approvals in a grid.** On a wide window your requests sit side by side, and a Layout control switches between Grid and List. Text in an approval now wraps instead of being cut off, including on the page your AI links to. Denied approvals fold away, like approved ones.
 - **Choices that look like the switch.** Messages (Inbox and Sent), Files (Received, Sent and Send folders) and the Activity filter share one slider-style control, and Rules shows an "Unsaved" marker when you have changes to save.
-- **Files you can follow.** Files that are sending or arriving show live progress, and a file sent a day ago with no receipt yet says "Sent · no receipt yet".
+- **Files you can follow.** Files you send show live progress until they are delivered, and one sent more than a day ago with no receipt says "Sent · no receipt yet".
 - **Smaller touches.** The Messages count looks like the Approvals one, Settings pages load when you first open them, a new proof no longer celebrates on the wrong row, and the optional "Under the hood" view is more careful about what it leaves out.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
