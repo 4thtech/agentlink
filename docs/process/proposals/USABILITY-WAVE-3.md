@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposal. Nothing here is decided. The owner (Tali) picks the options in §11; the cards in §9 go into `backlog.md` only after that, in a separate cards PR. Spec amendments in §7 are described here and land through cards U3-spec and U3-spec-04, marked "proposed, owner confirms at merge". |
+| **Status** | Owner decisions recorded 2026-10-29 (all recommended options in §11, option 1 each; the live connections map is the owner's idea). The options were picked in §11; the cards in §9 go into `backlog.md` only after that, in a separate cards PR. Spec amendments in §7 are described here and land through cards U3-spec and U3-spec-04, marked "proposed, owner confirms at merge". |
 | **Source** | The owner's own try of 0.4.3 on 28 Oct 2026 (evening): "I'm totally lost", "truly not usable yet". Owner decision 28 (28 Oct): usability comes first, before business agents. Owner input the same evening: a live view of who is talking (§4.1). |
 | **Specs that win on conflict** | 04 (I-1…I-10, §2.3.3 recovery kit, §2.5 owner presence, §2.5.1 owner actions and `agent.revoke`, §2.8 adding an agent, §4 realpath), 06 §6, §7, §8, 07 §3, §9.1, 08 §1, 11 §5, D-39, D-68, D-78, D-116, D-118, D-130, D-133, D-135, D-137 |
 | **Release** | **0.4.4** recommended (decision 1). 0.5.0 stays reserved for the cloud agent and business agents |
@@ -196,31 +196,39 @@ S2 cards: tests first (`RED (expected):` commit), Opus independent review, Fable
 Recommended option first in each.
 
 1. **Release target**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. **0.4.4** with every card; if Remove (U3-e) has not passed its security audit when the rest is ready, 0.4.4 ships without it and Remove follows in 0.4.5 (recommended: the start, switching and connecting fix "lost"; Remove is the riskiest piece).
    2. 0.4.4 only when every card, Remove included, is done.
    3. 0.5.0 (mixes it with the cloud agent; slower).
 2. **Several agents in one app**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. One app, one agent open at a time, switched from the top bar with no Touch ID, because switching only changes what you look at (recommended).
    2. The same, but every switch asks for Touch ID.
    3. A separate browser tab for each agent.
 3. **First screens**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. Name and Touch ID on one screen, one gesture (recommended: shortest, and today's first run is already one gesture).
    2. Touch ID first, then a name screen.
    3. No name at first ("My agent" until renamed).
 4. **Removing an agent**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. Touch ID and the typed name; offer to export history first; the agent is always marked retired, and its contacts are told if it has any; its AI app entries, keys and history are deleted; it cannot be restored (recommended: clean for you and your contacts; your test agents have no contacts).
    2. Hide only ("Archive") in 0.4.4; real removal later.
 5. **Connecting AI apps from the app**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. Show the exact AgentLink entry, then Touch ID, with a backup of the file; Claude Desktop must be closed; moving an app between agents is allowed with the same step (recommended).
    2. Show the entry and an Apply button, without Touch ID (anyone who can open your app page could then rewire your AI apps).
    3. No writes from the app: show a command to copy.
 6. **Your existing agents and the terminal**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. Keep all four; open the last used (else the one an AI app uses); a one-time "Tidy up" note links to Agents; the terminal never asks which agent, and `npx -y @4thtech-io/agentlink` opens the app (recommended: nothing disappears without you).
    2. On first open, the app asks which agents to keep.
 7. **How the new screens are designed**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. Straight from the new b11 sections, styled from the D2 screens, with your screenshot review in each PR, as for wave 2 (D-137) (recommended: fastest to something you can try).
    2. Claude Design screens first (D-116 as written; about a week more).
 8. **Live connections view**
+   - **Decided (Tali, 2026-10-29): option 1**
    1. Agents page map plus the moving-row mark in Messages and Files in 0.4.4; Home, Contacts and compact view in 0.4.5; no preview on hover (recommended: where you asked first, calm and safe to share).
    2. All of it in 0.4.4, no preview.
    3. As option 1, plus a one-line preview on hover, off by default, a switch in Appearance.
