@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ListAnswer } from '../approvals/client.js';
 import type { ContactRow } from '../contacts/data.js';
-import { CONTACTS_STRINGS } from '../contacts/strings.js';
+import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
 import { HomePage, type HomePageProps } from './index.js';
 import { START_STRINGS } from './strings.js';
 import { START_DONE_KEY, type StartHereReads } from './start-here.js';
@@ -193,10 +193,13 @@ describe('Start here: the card', () => {
     expect(step('protect').textContent).toContain('Use Windows Hello');
   });
 
-  it('until the Add contact sheet lands, step 2 points to the existing invite instructions', async () => {
+  it('step 2 opens the Add contact sheet (UX2-d2): one primary Add contact to its marker', async () => {
     await mount(props(reads(fresh())));
-    expect(step('invite').textContent).toContain(CONTACTS_STRINGS.emptyPrompt);
-    expect(step('invite').querySelector('.al-copy')).not.toBeNull();
+    const link = step('invite').querySelector('a');
+    expect(link?.textContent).toBe(START_STRINGS.addContact);
+    expect(link?.getAttribute('href')).toBe(ADD_CONTACT_HREF);
+    expect(link?.classList.contains('al-btn-primary')).toBe(true);
+    expect(step('invite').querySelectorAll('a, button').length).toBe(1);
   });
 
   it('step 4 offers a copyable hello with the owner-confirmed name, and copying does not tick', async () => {

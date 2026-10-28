@@ -1,8 +1,9 @@
 // The empty states on Contacts, Messages and Files point to step 2 of Start here (UX2-g; B-11 §27.4).
-// Until the Add contact sheet (UX2-d1, UX2-d2) lands, "Add contact" goes to Contacts, where the
-// invite prompt is (the Contacts page itself does not show it); the sheet replaces the link then. Once step 2 is done, or while it
-// is not known, the pages keep their own empty states.
+// "Add contact" opens the Add contact sheet on Contacts (UX2-d2, b11 §21.1) through its fixed
+// address marker; Contacts itself opens the sheet directly. Once step 2 is done, or while it is not
+// known, the pages keep their own empty states.
 import type { ReactElement } from 'react';
+import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
 import { inviteStillToDo, useStartHereContext } from './start-here-context.js';
 import { START_STRINGS as T } from './strings.js';
 
@@ -13,7 +14,7 @@ export function useInviteFirst(): boolean {
 
 export function AddContactAction(): ReactElement {
   return (
-    <a className="al-btn al-btn-primary" href="/settings/contacts">
+    <a className="al-btn al-btn-primary" href={ADD_CONTACT_HREF}>
       {T.addContact}
     </a>
   );
