@@ -131,6 +131,9 @@ export {
   type PolicyRecovery,
   type PolicyVersionMark,
   type ReceiptsKeptMark,
+  // U3-d (D-138): the agent's verified label.
+  LABEL_RECORD,
+  type LabelReading,
 } from './owner-actions.js';
 // M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
 // after presence. Owner surfaces only: no MCP tool uses them (I-4).

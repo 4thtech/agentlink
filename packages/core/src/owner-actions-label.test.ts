@@ -122,7 +122,11 @@ describe('agent.label (U3-d; 04 §2.5.1)', () => {
   it('a label that passes the schema but is not restricted is label_invalid', async () => {
     const a = await agentOf(4);
     const outcome = await a.client.ownerActions.apply(await signedLabel(a, 'Work  agent'));
-    expect(outcome).toMatchObject({ status: 'refused', op: 'agent.label', reason: 'label_invalid' });
+    expect(outcome).toMatchObject({
+      status: 'refused',
+      op: 'agent.label',
+      reason: 'label_invalid',
+    });
   });
 
   it('is bound to the agentId: another agent, or a params.agent that differs, is refused', async () => {

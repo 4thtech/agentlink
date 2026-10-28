@@ -61,6 +61,8 @@ export type OwnerActionRefusal =
   | 'contact_revoked'
   | 'alias_invalid'
   | 'alias_taken'
+  // U3-d (D-138): an `agent.label` whose label is not its own restricted form (06 §2.1)
+  | 'label_invalid'
   | 'pairing_unavailable'
   | 'credential_missing'
   | 'credential_mismatch'
@@ -312,7 +314,12 @@ export function verifyOwnerAction(
     case 'backup.export':
     case 'credits.deposit':
     case 'credits.withdraw':
+    case 'agent.label':
+    case 'app.connect':
+    case 'app.disconnect':
     case 'agent.revoke':
+      // agent.label (U3-d): the restricted-label rule and the store record are the store side's;
+      // app.connect and app.disconnect (U3-f): the recomputed changeId is the owner surface's.
       // Their rules need the store (cancel: an approved row; policy.set: the version above, already
       // checked; contact.rename and contact.remove: a stored contact, M1-9za; storage.set: the
       // KeyStore item `s3:<id>` and its digest, storage.remove: the active row, backup.export: none,

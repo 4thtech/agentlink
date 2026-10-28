@@ -27,7 +27,9 @@ import { AGENT_EVM, CONTACT_A, OWNER_NOSTR, SHA, b64u, signed } from './testing/
 
 const NONCE = b64u(16, 'L');
 
-const labelAction = (params: Record<string, unknown> = { agent: AGENT_EVM, label: 'Work agent' }) => ({
+const labelAction = (
+  params: Record<string, unknown> = { agent: AGENT_EVM, label: 'Work agent' },
+) => ({
   v: 1,
   agent: AGENT_EVM,
   owner: OWNER_NOSTR,

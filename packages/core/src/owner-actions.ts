@@ -24,8 +24,15 @@
 // owner key, takes no presence and has no path that decides, widens or creates an approval or a
 // policy without one. Refusals are returned to the surface that delivered the object (the CLI or
 // the local UI shows them; the console path is M1-7e/M1-7h) and logged as fixed codes (I-5, I-7).
-import { canonicalize, decodeHex0x, encodeHex, parseJson } from '@4thtech-io/crypto';
 import {
+  canonicalize,
+  decodeHex0x,
+  encodeHex,
+  parseJson,
+  type JsonObject,
+} from '@4thtech-io/crypto';
+import {
+  agentLabelParamsSchema,
   approvalIdSchema,
   contactRenameParamsSchema,
   evmAddress,
@@ -99,6 +106,15 @@ export interface ReceiptsKeptMark {
   read(): Promise<number | null>;
   write(version: number): Promise<void>;
 }
+
+/** The `local_owner_actions` record of the agent's label (U3-d; 07 §3.4). */
+export const LABEL_RECORD = 'agent.label';
+
+/** The agent's label as loaded (U3-d): only a `verified` label is ever shown. */
+export type LabelReading =
+  | { readonly status: 'verified'; readonly label: string }
+  | { readonly status: 'none' }
+  | { readonly status: 'unverified' };
 
 export type OwnerActionOutcome =
   | {
@@ -323,10 +339,15 @@ export class OwnerActions {
         return this.#applyStorage(text, value, base);
       case 'backup.export':
         return this.#applyBackupExport(value, base);
+      case 'agent.label':
+        return this.#applyLabel(value, base);
+      case 'app.connect':
+      case 'app.disconnect':
       case 'credits.deposit':
       case 'credits.withdraw':
       case 'agent.revoke': {
-        // Verified for the report, applied elsewhere: revocation delivery is M1-7h; the credits ops
+        // Verified for the report, applied elsewhere: app.connect and app.disconnect are card U3-f
+        // (the recomputed changeId and their record); revocation delivery is M1-7h; the credits ops
         // only through ProofService.addReceivedFunds and withdrawCredits (M1-11c-a4c), which check
         // the chain before anything is sent. Nothing is written here, so the nonce stays unused.
         const verdict = verifyOwnerAction(value, base);
@@ -425,6 +446,97 @@ export class OwnerActions {
       return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `agent.label` (U3-d, D-138; 04 §2.5.1; 07 §3.4 `local_owner_actions`; proposed, owner confirms at
+   * merge). The object checks and the nonce first (L(op) = 600 s; the schema already refused a
+   * `params.agent` that is not the body's `agent`, and the body's `agent` must be this agent). Then
+   * the op's rule: the label must already be its own restricted form (06 §2.1), else
+   * `label_invalid`, never normalised. In one store transaction the nonce is checked again and
+   * recorded (the audit row) and the one label row is replaced with the sealed signed object, so the
+   * latest applied label is the label. A refusal writes nothing. Nothing is sent to anyone: the label
+   * is local only, and the caller writes `config.json` `label` only after this applied.
+   */
+  async #applyLabel(value: unknown, base: OwnerActionCheckContext): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'agent.label' || body.params.agent !== base.agent) {
+      return this.#report(refused(body.op, 'agent_mismatch'));
+    }
+    if (!isRestrictedAlias(body.params.label)) {
+      return this.#report(refused('agent.label', 'label_invalid'));
+    }
+    const sealed = await seal(
+      this.#ctx,
+      'local_owner_actions',
+      'signed_json',
+      [LABEL_RECORD],
+      canonicalize(value as JsonObject),
+    );
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused('agent.label', 'nonce_used');
+      }
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      if (tx.get('local_owner_actions', { record: LABEL_RECORD }) !== undefined) {
+        tx.delete('local_owner_actions', { record: LABEL_RECORD });
+      }
+      tx.insert('local_owner_actions', {
+        record: LABEL_RECORD,
+        op: 'agent.label',
+        signed_json: sealed,
+        applied_at: now,
+      });
+      return { status: 'applied', op: 'agent.label' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * The agent's label (U3-d; 04 §2.5.1 "Labels and AI app connections"): the stored `agent.label`,
+   * re-verified on every load (encoding, `sig`, `agent` and `params.agent` against this agent,
+   * `owner` against its card, the schema and the restricted-label rule; the 600 s lifetime is not
+   * checked again). `none`: no label was ever applied. `unverified`: a row exists but does not verify
+   * or cannot be read: the caller never shows it and shows the folder name instead (fail closed).
+   * The label is plain text: callers show it as text only, never as markup.
+   */
+  async loadLabel(): Promise<LabelReading> {
+    const self = await this.#self();
+    if ('refusal' in self) return { status: 'unverified' };
+    let text: string;
+    try {
+      const row = await this.#ctx.store.transaction((tx) =>
+        tx.get('local_owner_actions', { record: LABEL_RECORD }),
+      );
+      if (row === undefined) return { status: 'none' };
+      if (row.op !== 'agent.label') return { status: 'unverified' };
+      text = await open(
+        this.#ctx,
+        'local_owner_actions',
+        'signed_json',
+        [LABEL_RECORD],
+        row.signed_json,
+      );
+    } catch {
+      return { status: 'unverified' };
+    }
+    const verified = verifyStoredOwnerAction(text, self);
+    if (!verified.ok) return { status: 'unverified' };
+    const { body } = verified.signed;
+    if (
+      body.op !== 'agent.label' ||
+      body.params.agent !== self.agent ||
+      !isRestrictedAlias(body.params.label)
+    ) {
+      return { status: 'unverified' };
+    }
+    return { status: 'verified', label: body.params.label };
   }
 
   /**
@@ -1096,6 +1208,25 @@ export class OwnerActions {
     );
     if (others.some((c) => foldName(c.display.name) === wanted)) return refuse('alias_taken');
     return this.#build(signer, 'contact.rename', { contact: contactId, alias });
+  }
+
+  /**
+   * The unsigned `agent.label` for this agent (U3-d, D-138; 04 §2.5.1): `params.agent` is this
+   * agent's `agentId`, never a value from the page. The label must be 1 to 32 code points already in
+   * its own restricted form (06 §2.1), else `label_invalid`, as apply() refuses it. Writes nothing.
+   */
+  async prepareLabel(label: string): Promise<PreparedOwnerAction> {
+    const refuse = (reason: PrepareRefusal) =>
+      ({ status: 'refused', op: 'agent.label', reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (
+      !agentLabelParamsSchema.safeParse({ agent: signer.agent, label }).success ||
+      !isRestrictedAlias(label)
+    ) {
+      return refuse('label_invalid');
+    }
+    return this.#build(signer, 'agent.label', { agent: signer.agent, label });
   }
 
   /**

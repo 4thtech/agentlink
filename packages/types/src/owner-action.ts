@@ -6,6 +6,7 @@
 // are gone after JSON.parse. Parsing the wire bytes strictly (I-JSON) is the caller's job.
 import { z } from 'zod';
 import {
+  AI_APP_IDS,
   APPROVAL_BATCH_MAX_ITEMS,
   APPROVAL_BATCH_MIN_ITEMS,
   APPROVAL_DECISIONS,
@@ -117,6 +118,40 @@ export const contactRenameParamsSchema = z.strictObject({
 /** `contact.remove` params (04 §2.5.1; 07 §3 `removed`; 02 F-14; M1-9za). */
 export const contactRemoveParamsSchema = z.strictObject({
   contact: evmAddress,
+});
+
+// --- local owner actions: agent labels and AI app connections (U3-d, D-138) ----------------------
+
+/** At most 32 code points, as the restricted name (06 §2.1, §6 labels). */
+export const AGENT_LABEL_MAX_CODE_POINTS = 32;
+
+/**
+ * `agent.label` params (04 §2.5.1; 06 §6 labels; U3-d, D-138; proposed, owner confirms at merge):
+ * `agent` is the agent's `agentId` in its one encoding and must equal the body's `agent` (checked
+ * on the action below). `label` is a non-empty string of at most 32 code points; that it is already
+ * its own restricted form (06 §2.1) is the core's rule (`label_invalid`), never normalised.
+ */
+export const agentLabelParamsSchema = z.strictObject({
+  agent: evmAddress,
+  label: z
+    .string()
+    .min(1)
+    .refine(
+      (label) => Array.from(label).length <= AGENT_LABEL_MAX_CODE_POINTS,
+      'label must be at most 32 code points',
+    ),
+});
+
+/**
+ * `app.connect` / `app.disconnect` params (04 §2.5.1; 06 §7; U3-d schema, applied by U3-f): `app`
+ * an id from the fixed harness table, `agent` the agent's `agentId` (equal to the body's `agent`),
+ * `changeId` 64 lowercase hex (SHA-256 of JCS({app, path, oldEntry, newEntry, agent})). The path
+ * and the entries are never params: apply recomputes `changeId` from the file as it is now.
+ */
+export const appChangeParamsSchema = z.strictObject({
+  app: z.enum(AI_APP_IDS),
+  agent: evmAddress,
+  changeId: sha256Hex,
 });
 
 // --- own storage and the recovery kit (M1-9i-a, D-115) --------------------------------------------
@@ -375,6 +410,43 @@ export const creditsWithdrawActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/** `params.agent` names the body's own agent (04 §2.5.1): anything else is refused, never mapped. */
+const selfBound = (a: { agent: string; params: { agent: string } }) => a.params.agent === a.agent;
+const SELF_BOUND_MSG = { message: 'params.agent must equal agent', path: ['params', 'agent'] };
+
+/** Names one agent for its owner (U3-d, D-138). Applied only on the agent's own machine: no envelope. */
+export const agentLabelActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('agent.label'),
+    params: agentLabelParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG)
+  .refine(selfBound, SELF_BOUND_MSG);
+
+/** Writes the one AgentLink entry of an AI app config for this agent (U3-f). Own machine only. */
+export const appConnectActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('app.connect'),
+    params: appChangeParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG)
+  .refine(selfBound, SELF_BOUND_MSG);
+
+/** Removes this agent's AgentLink entry from an AI app config (U3-f). Own machine only. */
+export const appDisconnectActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('app.disconnect'),
+    params: appChangeParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG)
+  .refine(selfBound, SELF_BOUND_MSG);
+
 /** `agent.revoke`: `expiresAt` is exactly 0 (permanent; the core skips expiry and lifetime checks). */
 export const agentRevokeActionSchema = z.strictObject({
   ...head,
@@ -401,6 +473,9 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   backupExportActionSchema,
   creditsDepositActionSchema,
   creditsWithdrawActionSchema,
+  agentLabelActionSchema,
+  appConnectActionSchema,
+  appDisconnectActionSchema,
   agentRevokeActionSchema,
 ]);
 
@@ -416,6 +491,8 @@ export const signedPolicySetSchema = signedOf(policySetActionSchema);
 export const signedAgentRevokeSchema = signedOf(agentRevokeActionSchema);
 /** What `contacts.safety_check` stores (07 §3), re-verified on every load (04 §2.5.1, §3.6.1). */
 export const signedContactCheckSchema = signedOf(contactCheckActionSchema);
+/** What `local_owner_actions.signed_json` stores for the label (07 §3.4), re-verified on load. */
+export const signedAgentLabelSchema = signedOf(agentLabelActionSchema);
 /** What `own_storage.signed_json` stores (07 §3.4), re-verified on every load (04 §2.5.1). */
 export const signedStorageSetSchema = signedOf(storageSetActionSchema);
 /**
@@ -444,6 +521,10 @@ export type BackupExportParams = z.infer<typeof backupExportParamsSchema>;
 export type StorageSetAction = z.infer<typeof storageSetActionSchema>;
 export type SignedStorageSet = z.infer<typeof signedStorageSetSchema>;
 export type CreditsDepositParams = z.infer<typeof creditsDepositParamsSchema>;
+export type AgentLabelParams = z.infer<typeof agentLabelParamsSchema>;
+export type AppChangeParams = z.infer<typeof appChangeParamsSchema>;
+export type AgentLabelAction = z.infer<typeof agentLabelActionSchema>;
+export type SignedAgentLabel = z.infer<typeof signedAgentLabelSchema>;
 export type CreditsWithdrawParams = z.infer<typeof creditsWithdrawParamsSchema>;
 export type ApprovalDecideAction = z.infer<typeof approvalDecideActionSchema>;
 export type ApprovalDecideBatchAction = z.infer<typeof approvalDecideBatchActionSchema>;
