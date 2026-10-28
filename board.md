@@ -11,7 +11,7 @@ _Updated 2026-10-27T17:09Z by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.0 released 27 Oct; local app visual refresh merged (UI-REFRESH a–t); owner visual QA, then release | 2026-10-28 |
+| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.1 released 28 Oct (visual refresh); follow-ups merging; UX-WAVE-2 and BUSINESS-AGENTS proposals merged; 0.4.2 polish next | 2026-10-28 |
 | Cloud agent as 0.5.0 | @talirezun (agents) | ready | groundwork merged (D-131 spec #541, core M2-3a #548); starts after the visual refresh | 2026-10-27 |
 | Release 0.4.0 | @talirezun | done 27 Oct | npm latest 0.4.0; GitHub Release v0.4.0 with signed desktop bundles (macOS arm64/x64, Windows) | 2026-10-27 |
 
