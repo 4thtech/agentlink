@@ -468,7 +468,8 @@ describe('U3 route stubs (U3-c review note c)', () => {
       expect(res.status, path).toBe(501);
       expect(JSON.parse(res.body), path).toEqual({ error: 'not_available' });
     }
-    for (const path of ['/api/ui/apps', '/api/ui/apps/preview', '/api/ui/flow']) {
+    // U3-flow replaced its stub: `/api/ui/flow` is a live read (see the U3-flow block below).
+    for (const path of ['/api/ui/apps', '/api/ui/apps/preview']) {
       const res = await send(h.port, path, {
         headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
       });
@@ -687,6 +688,22 @@ describe('a switch shows the other agent’s own contacts and messages (U3-c)', 
                   ]
                 : [],
           }),
+        // U3-flow: one inbound message a few seconds ago; a hostile store field never leaves.
+        flowEvents: (since: number, until: number) =>
+          Promise.resolve({
+            events: [
+              {
+                contactId,
+                direction: 'in',
+                kind: 'message',
+                state: 'received',
+                at: Math.min(until, Math.max(since, Math.floor(Date.now() / 1000) - 5)),
+                text: `${text} (flow)`,
+                name,
+              },
+            ],
+            capped: false,
+          }),
       },
     }) as never;
 
@@ -739,6 +756,7 @@ describe('a switch shows the other agent’s own contacts and messages (U3-c)', 
         await read('/api/ui/messages'),
         await read(`/api/ui/messages/${ANNA}?box=in`),
         await read(`/api/ui/messages/${BORIS}?box=in`),
+        await read('/api/ui/flow'),
       ].join('\n');
 
     const before = await everything();
@@ -775,9 +793,44 @@ describe('a switch shows the other agent’s own contacts and messages (U3-c)', 
       ],
     });
     expect(after).toContain('History of agent B');
+    // U3-flow: the live connections read follows the open agent, metadata only.
+    const flow = await send(port, '/api/ui/flow', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
+    expect(flow.headers['x-agentlink-generation']).toBe('2');
+    expect(
+      (JSON.parse(flow.body) as { items: { contactId: string }[] }).items.map((i) => i.contactId),
+    ).toEqual([BORIS]);
+    expect(flow.body).not.toMatch(/Boris|History|\(flow\)/);
     // Nothing of agent A is left in any answer.
     expect(after).not.toMatch(/Anna|History of agent A/);
     expect(after).not.toContain(ANNA);
+  });
+});
+
+describe('GET /api/ui/flow behind the app host guards (U3-flow)', () => {
+  it('needs the session and CSRF, refuses other methods, and is stamped with the generation', async () => {
+    const h = await harness();
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    expect((await send(h.port, '/api/ui/flow', { headers: { 'X-AgentLink-CSRF': csrf } })).status).toBe(
+      401,
+    );
+    expect((await send(h.port, '/api/ui/flow', { headers: { Cookie: cookie } })).status).toBe(403);
+    const post = await send(h.port, '/api/ui/flow', {
+      method: 'POST',
+      headers: h.write(cookie, csrf, { 'X-AgentLink-Generation': '1' }),
+      body: encodeUtf8('1234'),
+    });
+    expect(post.status).toBe(405);
+    // These agents have no client: the read answers not_set_up, still stamped (08 §1).
+    const res = await send(h.port, '/api/ui/flow?since=1', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf },
+    });
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'not_set_up' });
+    expect(res.headers['x-agentlink-generation']).toBe('1');
+    expect(h.ownerStores).toEqual([]);
   });
 });
 
