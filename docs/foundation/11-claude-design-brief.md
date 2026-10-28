@@ -394,7 +394,7 @@ Local app pages that hold several agents and connect AI apps (08 §1; design b11
 
 **Rules.**
 - Say "AI app", never "harness" (§5.1). "Keys" appears only in the remove sheet, which says what goes.
-- An agent's label is the owner's own text: shown as plain text, never as a heading style or a label of ours (§5.2).
+- An agent's label is the owner's own text: 1 to 32 characters in the restricted form of the §5.2 name rule (letters, digits, spaces, `.`, `'` and `-`); anything else is refused with "Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters." It is shown as plain text, never as a heading style or a label of ours (§5.2).
 - The live connections view shows names, activity and direction only, never message text or file names.
 - An AI app change shows only the `agentlink` entry, never the rest of the file.
 
