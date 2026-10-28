@@ -99,7 +99,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 > **Version:** v0.4.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-27
 >
 > - **Components:** 75 merged, 15 in progress, 7 planned
-> - **Next:** The visual refresh of the local app comes next, then the cloud agent as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+> - **Next:** The local app's visual refresh is merged and ships in the next release (not released yet). Then the cloud agent as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->

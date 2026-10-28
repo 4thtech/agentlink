@@ -24,6 +24,8 @@
 ## The local app
 
 * [The local app](local-app/README.md)
+  * [Home](local-app/home.md)
+  * [Approvals page](local-app/approvals.md)
   * [First run and your backup code](local-app/first-run.md)
   * [Activity](local-app/activity.md)
   * [Proofs and credits](local-app/proofs-and-credits.md)
@@ -31,6 +33,7 @@
   * [Contacts page](local-app/contacts.md)
   * [Files page](local-app/files.md)
   * [Rules page](local-app/rules.md)
+  * [Appearance and Under the hood](local-app/appearance.md)
   * [Confirming paid actions](local-app/confirm-paid-actions.md)
 
 ## Everyday use
