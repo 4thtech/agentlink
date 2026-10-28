@@ -263,6 +263,32 @@
   animation-play-state: paused;
 }
 
+/* UX2-e1: the waiting mark (B-11 §23.3). Only the diamond turns, about its own centre: a quarter
+   turn over the first half of each ambient cycle, still for the second half, so it always rests in
+   the normal pose. Transform only; the brackets never move. Brand exception, decision 3.1. */
+.al-waiting-diamond {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: al-waiting-turn var(--al-duration-ambient) var(--al-easing-standard) infinite;
+}
+@keyframes al-waiting-turn {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(90deg);
+  }
+  100% {
+    transform: rotate(90deg);
+  }
+}
+.al-waiting-mark.is-resting .al-waiting-diamond {
+  animation: none;
+}
+.al-waiting-mark[data-paused='true'] .al-waiting-diamond {
+  animation-play-state: paused;
+}
+
 /* Reduced motion (system setting and the app's own): fills jump, loops become still states with the
    word, the content swaps without a fade, the error has no nudge. */
 @media (prefers-reduced-motion: reduce) {
@@ -274,7 +300,8 @@
   .al-pb-step.is-unknown .al-pb-seg::after,
   .al-skeleton-line::after,
   .al-skeleton-reveal,
-  .al-inline-error {
+  .al-inline-error,
+  .al-waiting-diamond {
     animation: none;
   }
   .al-skeleton-line::after {
@@ -289,7 +316,8 @@
 :root[data-motion='reduced'] .al-pb-step.is-unknown .al-pb-seg::after,
 :root[data-motion='reduced'] .al-skeleton-line::after,
 :root[data-motion='reduced'] .al-skeleton-reveal,
-:root[data-motion='reduced'] .al-inline-error {
+:root[data-motion='reduced'] .al-inline-error,
+:root[data-motion='reduced'] .al-waiting-diamond {
   animation: none;
 }
 :root[data-motion='reduced'] .al-skeleton-line::after {

@@ -58,6 +58,7 @@ endorsement/              the 4thTech logo as supplied (reference only)
 - **"by 4thTech"** appears on sign-in, onboarding, About, desktop first run, installer and update screens, the marketing site, and page footers. Never in app chrome, approval cards, tray icons, app icons, favicons, proof stamps or printed records.
 - **Never redraw the 4thTech hexagon.** Use the original file from 4thTech. Its green `#2CD8A7` is not an AgentLink colour.
 - **Don't:** recolour the diamond, outline the brackets, rotate or stretch, add glow, gradient or shadow, put the mark inside a hexagon, or combine it with chains, coins, padlocks or blocks.
+- **Exception: the waiting mark** (owner decision, 2026-10-28). In the AgentLink app's "Waiting for your funds" step, and nowhere else, the diamond may turn about its own centre: a quarter turn every 2 seconds, resting in its normal pose between turns. The brackets never move. Nothing else changes: no recolour, glow, scaling or outline. It is not a loading indicator and is not used for any other waiting or loading state, in tray or app icons, favicons, marketing, video or print, or at 20 px and below. With reduced motion the mark is still.
 - The name is **AgentLink**: one word, capital A and L. The trademark check is still running; keep the mark usable on its own.
 
 ## Fonts
