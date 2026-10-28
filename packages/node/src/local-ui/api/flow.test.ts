@@ -10,7 +10,8 @@
 //   URL), file key, hash or envelope ID; an item that does not fit the allowlist is left out (fail
 //   closed). No upload byte counts exist in the store, so no `bytesDone`/`bytesTotal` is sent;
 // - the cursor: `since` is whole unix seconds (inclusive); without it the last minute; never older
-//   than 24 hours; the next `cursor` is the newest item's time, or a minute ago when quiet;
+//   than 24 hours; the next `cursor` is always a minute ago (IR-U3-flow-1: a late-stored item with
+//   an older time is never skipped); an item up to 5 minutes in the future counts as now;
 // - bounded: at most 200 items, newest first, and the answer under 20 KB; `partial` when core's scan
 //   cap or either bound left anything out;
 // - a bad query is 400 `bad_request` before core is asked, never echoed; no agent is 409
@@ -188,29 +189,48 @@ describe('GET /api/ui/flow: the cursor', () => {
 
   it('without since, asks core for the last minute up to now', async () => {
     expect(FLOW_DEFAULT_WINDOW_SECONDS).toBe(60);
-    expect(await windowOf('')).toEqual([NOW - 60, NOW]);
+    expect(await windowOf('')).toEqual([NOW - 60, NOW + 300]);
   });
 
   it('takes since as given (inclusive), never older than 24 hours, never after now', async () => {
     expect(FLOW_MAX_WINDOW_SECONDS).toBe(86_400);
-    expect(await windowOf(`since=${NOW - 30}`)).toEqual([NOW - 30, NOW]);
-    expect(await windowOf(`since=${NOW - 86_400}`)).toEqual([NOW - 86_400, NOW]);
-    expect(await windowOf('since=0')).toEqual([NOW - 86_400, NOW]);
-    expect(await windowOf(`since=${NOW + 500}`)).toEqual([NOW, NOW]);
+    expect(await windowOf(`since=${NOW - 30}`)).toEqual([NOW - 30, NOW + 300]);
+    expect(await windowOf(`since=${NOW - 86_400}`)).toEqual([NOW - 86_400, NOW + 300]);
+    expect(await windowOf('since=0')).toEqual([NOW - 86_400, NOW + 300]);
+    expect(await windowOf(`since=${NOW + 500}`)).toEqual([NOW, NOW + 300]);
   });
 
-  it('answers the next cursor: the newest item’s time, else a minute ago when quiet', async () => {
+  it('always answers a minute ago as the next cursor, busy or quiet (IR-U3-flow-1)', async () => {
     const busy = await flowOf([ev({ at: NOW - 5 }), ev({ at: NOW - 40 })], `since=${NOW - 50}`);
     expect(busy.now).toBe(NOW);
-    expect(busy.cursor).toBe(String(NOW - 5));
+    expect(busy.cursor).toBe(String(NOW - 60));
     const quiet = await flowOf([], `since=${NOW - 3_600}`);
     expect(quiet.cursor).toBe(String(NOW - 60));
-    // An item older than a minute ago never moves the cursor back.
-    const old = await flowOf([ev({ at: NOW - 600 })], `since=${NOW - 3_600}`);
-    expect(old.cursor).toBe(String(NOW - 60));
-    // Feeding the cursor back asks from that second on (inclusive: the page may see it again).
     const next = await windowOf(`since=${busy.cursor}`);
-    expect(next).toEqual([NOW - 5, NOW]);
+    expect(next).toEqual([NOW - 60, NOW + 300]);
+  });
+
+  it('shows an item stored late with an older time than one already returned (IR-U3-flow-1)', async () => {
+    let stored: Event[] = [ev({ at: NOW - 5 })];
+    const context = contextWith((since, until) =>
+      Promise.resolve({
+        events: stored.filter((e) => (e.at as number) >= since && (e.at as number) <= until),
+        capped: false,
+      }),
+    );
+    const first = (await call(context)).body as unknown as FlowBody;
+    expect(first.items.map((i) => i.at)).toEqual([NOW - 5]);
+    // A slow sender's message arrives now, stamped 30 s ago: older than the item already seen.
+    stored = [...stored, ev({ contactId: CAROL, at: NOW - 30 })];
+    const second = (await call(context, `since=${first.cursor}`)).body as unknown as FlowBody;
+    expect(second.items.map((i) => [i.contactId, i.at])).toContainEqual([CAROL, NOW - 30]);
+  });
+
+  it('counts an item up to 5 minutes in the future as now, like the pulse (IR-U3-flow-1)', async () => {
+    const body = await flowOf([ev({ at: NOW + 120 }), ev({ contactId: CAROL, at: NOW + 301 })]);
+    expect(body.items).toEqual([
+      { contactId: BOB, direction: 'in', kind: 'message', state: 'received', at: NOW },
+    ]);
   });
 
   it('carries over a cursor from another agent harmlessly: it is only a time (stale generation)', async () => {
@@ -271,7 +291,7 @@ describe('GET /api/ui/flow: metadata only (zero access, I-5, I-7)', () => {
       ev({ at: 1.5 }),
       ev({ at: -1 }),
       ev({ at: String(NOW) }),
-      ev({ at: NOW + 1 }), // after now
+      ev({ at: NOW + 301 }), // more than 5 minutes after now
       ev({ at: NOW - 86_401 }), // before the window
       null as unknown as Event,
       'x' as unknown as Event,
