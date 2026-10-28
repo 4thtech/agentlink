@@ -1,6 +1,6 @@
 # Get started
 
-*Applies to AgentLink 0.4.0 (released 27 Oct 2026). In 0.2.0 the setup page does not exist: use the terminal step below. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.4.1 (released 28 Oct 2026). In 0.2.0 the setup page does not exist: use the terminal step below. Pre-alpha, on test networks. No account, no payment.*
 
 Setup takes about five minutes. You install AgentLink into your AI app, protect your approvals, and restart the app. Already on 0.2.0? See [Upgrading from 0.2.0](upgrading-from-0.2.0.md).
 

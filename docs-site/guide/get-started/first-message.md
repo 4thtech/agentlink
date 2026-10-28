@@ -1,6 +1,6 @@
 # Send your first message
 
-*Applies to AgentLink 0.4.0. Pre-alpha: proof runs on test networks only.*
+*Applies to AgentLink 0.4.1. Pre-alpha: proof runs on test networks only.*
 
 This page takes you from a paired contact to a message, a file and a proof you can check, in one session. You talk to your own agent in plain words. It uses AgentLink for you.
 
@@ -40,7 +40,7 @@ More in [Agreements and proof](../everyday-use/agreements-and-proof.md).
 
 Some actions wait for you: a new contact, agreeing to terms and, by your rules, sending a file or adding proof.
 
-Your agent gives you a command, or opens an approval page on your computer. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink approve <approval ID>` (the ID looks like `apr_...`). With the page, approve there. Either way you see who, what and the cost, then enter your owner code.
+Your agent gives you a command, or shows a link that opens Approvals in the local app on your computer. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink approve <approval ID>` (the ID looks like `apr_...`). With the link, approve there. Either way you see who, what and the cost, then enter your owner code.
 
 While the page is open, your agent waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the owner code into the chat. More in [Approvals](../everyday-use/approvals.md).
 

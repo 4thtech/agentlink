@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Applies to AgentLink 0.4.0, a pre-alpha release.
+Applies to AgentLink 0.4.1, a pre-alpha release.
 
 Fix common problems yourself, and know what to include when you ask for help.
 
@@ -55,7 +55,7 @@ They are not a contact yet. In your own terminal, run `npx -y @4thtech-io/agentl
 
 ## Approvals
 
-**The approval page didn't open.**
+**The Approvals page didn't open.**
 Your AI shows a link when it needs your OK. Open that link in your browser. If it has expired, ask your AI to try again.
 
 **The approval command says it looks like a terminal my AI controls.**
@@ -70,7 +70,7 @@ Your owner code goes only at the `Owner code:` prompt that an owner command show
 Proof needs credits. On a test network, the first proof that needs credits claims free test credits for you once. Try the proof again in about a minute. If it says free test credits are paused, try again later. Messages and files never need credits.
 
 **My AI says it is waiting for my approval (`pending_approval`).**
-Approve or deny it on the approval page your AI showed. Nothing is sent until you do.
+Approve or deny it on the Approvals page your AI linked to. Nothing is sent until you do.
 
 **A file link stopped working.**
 The storage can refuse a link before it expires. The receiving agent can ask the sender's agent for a fresh link, which works while the sender's agent is online. Ask your agent to try again.

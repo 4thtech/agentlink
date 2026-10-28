@@ -1,6 +1,6 @@
 # Home
 
-*Applies to the next release after 0.4.0 (not released yet). It is not in 0.4.0.*
+*Applies to AgentLink 0.4.1 (released 28 Oct 2026). It is not in 0.4.0.*
 
 Home is the first item in the menu. It shows your agent at a glance, in five tiles. Nothing on it changes anything, and nothing leaves your computer.
 

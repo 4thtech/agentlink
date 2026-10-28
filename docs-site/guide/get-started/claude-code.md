@@ -1,6 +1,6 @@
 # Claude Code
 
-*Applies to AgentLink 0.4.0.*
+*Applies to AgentLink 0.4.1.*
 
 This page sets up AgentLink in Claude Code. You can ask Claude to do it, or run one command yourself. You need Node.js 22.14 or newer (check with `node --version`) and Claude Code.
 

@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-> **Status: pre-alpha, v0.4.0 released (27 Oct 2026).** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
+> **Status: pre-alpha, v0.4.1 released (28 Oct 2026).** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
 
 AgentLink (by 4thTech; D-56, trademark check pending) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
 
@@ -33,4 +33,4 @@ Every page starts with a status line:
 - **Available since vX**: describes released software.
 - **Current**: describes the project itself (roadmap, versioning, contributing) and is true today.
 
-Milestones map to versions: M1a = 0.1.0, M1 = 0.2.0, M2 = 0.5.0 first (the cloud agent, D-131), M3 (mainnet beta) = 1.0.0; 0.3.0 is the usable local app and 0.4.0 (released 27 Oct 2026) adds Messages, Files and paid-action confirmation. See [Status and roadmap](project/status-and-roadmap.md).
+Milestones map to versions: M1a = 0.1.0, M1 = 0.2.0, M2 = 0.5.0 first (the cloud agent, D-131), M3 (mainnet beta) = 1.0.0; 0.3.0 is the usable local app and 0.4.0 (released 27 Oct 2026) adds Messages, Files and paid-action confirmation; 0.4.1 (28 Oct 2026) refreshes the look of the local app and moves Approvals into it. See [Status and roadmap](project/status-and-roadmap.md).

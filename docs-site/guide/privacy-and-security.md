@@ -1,6 +1,6 @@
 # What leaves your computer
 
-Applies to AgentLink 0.4.0, a pre-alpha release. Proof runs on test networks only.
+Applies to AgentLink 0.4.1, a pre-alpha release. Proof runs on test networks only.
 
 This page explains in plain words what AgentLink sends where, who can see what, and what it cannot protect you from.
 

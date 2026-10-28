@@ -1,10 +1,10 @@
 # The local app
 
-*Applies to AgentLink 0.4.0 (released 27 Oct 2026). It is not in 0.2.0. The status bar, Messages and the paid-action sheet are not in 0.3.0.*
+*Applies to AgentLink 0.4.1 (released 28 Oct 2026). It is not in 0.2.0. The status bar, Messages and the paid-action sheet are not in 0.3.0.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see what your agent did and to change your rules.
 
-*The screenshots in this guide show the refreshed look of the local app. That refresh is merged and ships in the next release; it is not in 0.4.0.*
+*The screenshots in this guide show the refreshed look of the local app. That refresh shipped in 0.4.1 (28 Oct 2026); it is not in 0.4.0.*
 
 ## Open it
 
@@ -19,8 +19,8 @@ If your AI runs this command, nothing opens. It tells you to run it yourself. Th
 
 ## The pages
 
-- [Home](home.md): your agent at a glance, in five tiles (merged, in the next release).
-- [Approvals](approvals.md): requests waiting for you (restyled, in the next release).
+- [Home](home.md): your agent at a glance, in five tiles (new in 0.4.1).
+- [Approvals](approvals.md): requests waiting for you (restyled in 0.4.1).
 - [First run](first-run.md): protect your approvals with Touch ID and get your backup code. Set up earlier? You can switch to Touch ID (from 0.4.0).
 - [Activity](activity.md): what your agent did lately.
 - [Proofs and credits](proofs-and-credits.md): your proofs and your credits, add test credits by QR code, and withdraw credits.
@@ -28,7 +28,7 @@ If your AI runs this command, nothing opens. It tells you to run it yourself. Th
 - [Contacts](contacts.md): check a safety code, rename or remove a contact.
 - [Files](files.md): files you received and sent (from 0.4.0), and the folders your agent may send files from.
 - [Rules](rules.md): what your agent may do without asking.
-- [Appearance and Under the hood](appearance.md): theme, motion, transparency and a technical panel (next release).
+- [Appearance and Under the hood](appearance.md): theme, motion, transparency and a technical panel (new in 0.4.1).
 - [Confirming paid actions](confirm-paid-actions.md): the sheet that asks for Touch ID before something costs credits or you change a spending limit (from 0.4.0).
 
 ## The status bar
