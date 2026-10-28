@@ -632,3 +632,151 @@ describe('POST /api/ui/agents/switch (U3-c, the switch kind)', () => {
     expect(h.world.log).toEqual(['close default', 'open work']);
   });
 });
+
+// U3-c (owner request 2026-10-29, existing users): a switch shows the chosen agent's own contacts and
+// message history, and nothing of the previous agent is left in any answer.
+describe('a switch shows the other agent’s own contacts and messages (U3-c)', () => {
+  const ANNA = `0x${'a1'.repeat(20)}`;
+  const BORIS = `0x${'b2'.repeat(20)}`;
+
+  /** A fake core client of one agent: one contact, one conversation, one inbound message. */
+  const fakeClient = (contactId: string, name: string, text: string) =>
+    ({
+      agentId: `0x${contactId.slice(2, 4).repeat(20)}`,
+      contacts: {
+        list: () =>
+          Promise.resolve([
+            {
+              id: contactId,
+              agentNostr: 'ee'.repeat(32),
+              display: { name, label: 'self-declared', nameSource: 'owner' },
+              keyEpoch: 0,
+              ownerFingerprint: { short: '7F3A·19C2', long: '7F3A·19C2·5D0E·88B1' },
+              status: 'active',
+              pairing: 'complete',
+              safetyCodeChecked: false,
+              createdAt: 1_759_449_600,
+              updatedAt: 1_759_449_600,
+            },
+          ]),
+      },
+      messages: {
+        conversations: () =>
+          Promise.resolve([
+            {
+              contactId,
+              display: { name, nameSource: 'owner', label: 'self-declared' },
+              lastAt: 1_800_000_100,
+              lastInAt: 1_800_000_100,
+            },
+          ]),
+        list: (id: string) =>
+          Promise.resolve({
+            items:
+              id === contactId
+                ? [
+                    {
+                      id: 'env_AAAAAAAAAAAAAAAAAAAAAA',
+                      at: 1_800_000_100,
+                      type: 'text',
+                      text,
+                      files: [],
+                      proof: false,
+                      size: text.length,
+                    },
+                  ]
+                : [],
+          }),
+      },
+    }) as never;
+
+  it('before the switch every read is agent A’s; after it, agent B’s only', async () => {
+    const world = agents();
+    const clients: Record<string, unknown> = {
+      default: fakeClient(ANNA, 'Anna', 'History of agent A'),
+      work: fakeClient(BORIS, 'Boris', 'History of agent B'),
+    };
+    const withClient = (name: string): AppHostAgent => ({
+      ...world.agent(name),
+      localUi: { client: clients[name] as never },
+    });
+    const opened: string[] = [];
+    const server = await startApprovalServerWith(
+      {
+        source: world.agent('default').source,
+        localUi: { assets: bundle() },
+        host: {
+          directory: world.directory,
+          initial: withClient('default'),
+          open: (name) => Promise.resolve(withClient(name)),
+        },
+      },
+      {
+        opener: (url) => {
+          opened.push(url);
+          return Promise.resolve(true);
+        },
+        notifier: () => Promise.resolve(true),
+      },
+    );
+    servers.push(server);
+    const port = server.port;
+    await server.open();
+    const t = new URL(opened[0] ?? '').searchParams.get('t') ?? '';
+    const cookie =
+      ((await send(port, `/?t=${t}`)).headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
+    const page = await send(port, '/', { headers: { Cookie: cookie } });
+    const csrf =
+      /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(page.body)?.[1] ?? '';
+    const read = async (path: string): Promise<string> => {
+      const res = await send(port, path, { headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf } });
+      expect(res.status, path).toBe(200);
+      return res.body;
+    };
+    const everything = async (): Promise<string> =>
+      [
+        await read('/api/ui/contacts'),
+        await read('/api/ui/messages'),
+        await read(`/api/ui/messages/${ANNA}?box=in`),
+        await read(`/api/ui/messages/${BORIS}?box=in`),
+      ].join('\n');
+
+    const before = await everything();
+    expect(JSON.parse(await read('/api/ui/contacts'))).toMatchObject({
+      contacts: [{ ref: ANNA, name: 'Anna' }],
+    });
+    expect(JSON.parse(await read('/api/ui/messages'))).toEqual({
+      conversations: [
+        { contactId: ANNA, name: 'Anna', lastAt: 1_800_000_100, lastInAt: 1_800_000_100 },
+      ],
+    });
+    expect(before).toContain('History of agent A');
+    expect(before).not.toMatch(/Boris|History of agent B/);
+
+    const switched = await send(port, '/api/ui/agents/switch', {
+      method: 'POST',
+      headers: {
+        Cookie: cookie,
+        Origin: server.origin,
+        'X-AgentLink-CSRF': csrf,
+        'Content-Type': 'application/octet-stream',
+      },
+      body: json({ name: 'work', generation: 1 }),
+    });
+    expect(switched.status).toBe(200);
+
+    const after = await everything();
+    expect(JSON.parse(await read('/api/ui/contacts'))).toMatchObject({
+      contacts: [{ ref: BORIS, name: 'Boris' }],
+    });
+    expect(JSON.parse(await read('/api/ui/messages'))).toEqual({
+      conversations: [
+        { contactId: BORIS, name: 'Boris', lastAt: 1_800_000_100, lastInAt: 1_800_000_100 },
+      ],
+    });
+    expect(after).toContain('History of agent B');
+    // Nothing of agent A is left in any answer.
+    expect(after).not.toMatch(/Anna|History of agent A/);
+    expect(after).not.toContain(ANNA);
+  });
+});
