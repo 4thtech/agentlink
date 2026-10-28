@@ -1,31 +1,60 @@
-/* eslint-disable boundaries/no-bypass -- a contract test: it runs the page's reads against the real route handlers of packages/node, which have no public entry for them */
 // @vitest-environment node
 // U3-j CONTRACT (S1): the Start here reads against the REAL handlers of packages/node (the Agents
 // list, the AI apps list, the Messages list), not hand-written answer shapes. The page's client is
 // pointed at a fetch that hands each request to the real route handler and returns exactly the
 // status and JSON the server would send. The assertions are that the page parses what the real
 // handlers answer, and that a stub (`not_available`) or an empty list is "not done", never "done".
-import type { Conversation } from '@4thtech-io/core';
-import { describe, expect, it } from 'vitest';
-import { agentsRoutes } from '../../../../../packages/node/src/local-ui/api/agents.js';
-import { appsRoutes } from '../../../../../packages/node/src/local-ui/api/apps.js';
-import { messagesRoutes } from '../../../../../packages/node/src/local-ui/api/messages.js';
-import type {
-  LocalUiAgentView,
-  LocalUiAgentsDesk,
-  LocalUiContext,
-  LocalUiReadClient,
-} from '../../../../../packages/node/src/local-ui/context.js';
-import type {
-  LocalUiReadRoute,
-  LocalUiResult,
-} from '../../../../../packages/node/src/local-ui/route-types.js';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { createApiClient } from '../../api/client.js';
 import { parseAgentSignal, readAgentSignal, readReplied } from './start-here-api.js';
 
+// The node package is loaded by path at run time: apps/local-ui does not depend on it (package
+// layering), and its sources lie outside this package's TypeScript root. Shapes below are the
+// minimum this test builds; the handlers themselves are the real ones.
+interface Route {
+  readonly method: string;
+  readonly path: string;
+  readonly handler?: (
+    context: unknown,
+    request: { params: Record<string, string>; query: URLSearchParams },
+  ) => Promise<{ status: number; body: unknown }>;
+}
+const NODE = new URL('../../../../../packages/node/src/local-ui/api/', import.meta.url).href;
+/* eslint-disable boundaries/no-bypass -- a contract test: it loads the real route handlers of packages/node by path (no public entry; the layering forbids a dependency) */
+let routes: readonly Route[] = [];
+beforeAll(async () => {
+  const load = async (name: string, key: string): Promise<readonly Route[]> =>
+    ((await import(/* @vite-ignore */ `${NODE}${name}.ts`)) as Record<string, readonly Route[]>)[
+      key
+    ] ?? [];
+  routes = [
+    ...(await load('agents', 'agentsRoutes')),
+    ...(await load('apps', 'appsRoutes')),
+    ...(await load('messages', 'messagesRoutes')),
+  ].filter((r) => r.method === 'GET' && r.handler !== undefined);
+});
+
+type Context = Record<string, unknown>;
+interface AgentRow {
+  name: string;
+  label: string;
+  current: boolean;
+  available: boolean;
+  removing: boolean;
+  contacts: number | null;
+  running: boolean;
+  apps: readonly string[];
+}
+interface Conversation {
+  contactId: string;
+  display: { name: string; nameSource: string; label: string };
+  lastAt: number | null;
+  lastInAt: number | null;
+}
+
 const BOB = `0x${'b0'.repeat(20)}`;
 
-function row(over: Partial<LocalUiAgentView> & { name: string }): LocalUiAgentView {
+function row(over: Partial<AgentRow> & { name: string }): AgentRow {
   return {
     label: over.name,
     current: false,
@@ -38,9 +67,9 @@ function row(over: Partial<LocalUiAgentView> & { name: string }): LocalUiAgentVi
   };
 }
 
-function context(rows: readonly LocalUiAgentView[], conversations: readonly Conversation[]) {
+function context(rows: readonly AgentRow[], conversations: readonly Conversation[]): Context {
   const current = rows.find((r) => r.current);
-  const desk: LocalUiAgentsDesk = {
+  const desk = {
     list: () =>
       Promise.resolve({
         generation: 3,
@@ -48,7 +77,7 @@ function context(rows: readonly LocalUiAgentView[], conversations: readonly Conv
         label: current?.label ?? null,
         agents: rows,
       }),
-  } as unknown as LocalUiAgentsDesk;
+  };
   const client = {
     agentId: 'a',
     getProof: () => Promise.reject(new Error('unused')),
@@ -56,31 +85,24 @@ function context(rows: readonly LocalUiAgentView[], conversations: readonly Conv
       conversations: () => Promise.resolve(conversations),
       list: () => Promise.reject(new Error('unused')),
     },
-  } as unknown as LocalUiReadClient;
+  };
   return {
     agents: desk,
     client,
     ownerContext: () => Promise.resolve(undefined),
     applyOwnerAction: () => Promise.reject(new Error('no')),
     now: () => 0,
-  } as unknown as LocalUiContext;
+  };
 }
 
 /** A fetch that gives each GET to the real handler and answers as the server would. */
-function realFetch(ctx: LocalUiContext, only?: readonly string[]): typeof fetch {
-  const routes = [...agentsRoutes, ...appsRoutes, ...messagesRoutes].filter(
-    (r): r is LocalUiReadRoute => r.method === 'GET' && 'handler' in r,
-  );
+function realFetch(ctx: Context): typeof fetch {
   return (async (input: RequestInfo | URL) => {
     const url = new URL(String(input), 'http://127.0.0.1');
-    if (only !== undefined && !only.includes(url.pathname))
-      return new Response('{}', { status: 404 });
     const found = routes.find((r) => r.path === url.pathname);
     if (found === undefined) return new Response('{}', { status: 404 });
-    const result: LocalUiResult = await found.handler(ctx, {
-      params: {},
-      query: url.searchParams,
-    });
+    const result = await found.handler?.(ctx, { params: {}, query: url.searchParams });
+    if (result === undefined) return new Response('{}', { status: 404 });
     return new Response(JSON.stringify(result.body), {
       status: result.status,
       headers: { 'content-type': 'application/json' },
@@ -88,7 +110,7 @@ function realFetch(ctx: LocalUiContext, only?: readonly string[]): typeof fetch 
   }) as typeof fetch;
 }
 
-const client = (ctx: LocalUiContext) => createApiClient({ fetch: realFetch(ctx), token: 't' });
+const client = (ctx: Context) => createApiClient({ fetch: realFetch(ctx), token: 't' });
 
 describe('contract: the agent signal from the real GET /api/ui/agents and /api/ui/apps', () => {
   it('a new agent with a label and no AI app: named, not connected (apps stub is not_available)', async () => {
@@ -141,7 +163,7 @@ describe('contract: the agent signal from the real GET /api/ui/agents and /api/u
   });
 
   it('outside the app host (switchable false) or with no answer there is no signal, never "done"', async () => {
-    const ctx = { ...context([], []), agents: undefined } as unknown as LocalUiContext;
+    const ctx = { ...context([], []), agents: undefined };
     expect(await readAgentSignal(client(ctx))).toBeUndefined();
     const down = createApiClient({
       fetch: (() => Promise.reject(new Error('offline'))) as typeof fetch,
@@ -200,13 +222,12 @@ describe('the apps list shape of GET /api/ui/apps (U3-f, 08 §1) enriches the ag
 });
 
 describe('contract: the reply from the real GET /api/ui/messages', () => {
-  const conv = (lastInAt: number | null): Conversation =>
-    ({
-      contactId: BOB,
-      display: { name: 'Bob', nameSource: 'owner', label: 'self-declared' },
-      lastAt: 1_800_000_100,
-      lastInAt,
-    }) as unknown as Conversation;
+  const conv = (lastInAt: number | null): Conversation => ({
+    contactId: BOB,
+    display: { name: 'Bob', nameSource: 'owner', label: 'self-declared' },
+    lastAt: 1_800_000_100,
+    lastInAt,
+  });
 
   it('true when a conversation has a stored inbound message', async () => {
     expect(await readReplied(client(context([], [conv(1_800_000_050)])))).toBe(true);

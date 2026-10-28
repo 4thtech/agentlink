@@ -92,15 +92,24 @@
   transition: transform var(--al-duration-moment) var(--al-easing-emphasized);
 }
 .hm-start-fill[data-n='1'] {
-  transform: scaleX(0.25);
+  transform: scaleX(0.1429);
 }
 .hm-start-fill[data-n='2'] {
-  transform: scaleX(0.5);
+  transform: scaleX(0.2857);
 }
 .hm-start-fill[data-n='3'] {
-  transform: scaleX(0.75);
+  transform: scaleX(0.4286);
 }
 .hm-start-fill[data-n='4'] {
+  transform: scaleX(0.5714);
+}
+.hm-start-fill[data-n='5'] {
+  transform: scaleX(0.7143);
+}
+.hm-start-fill[data-n='6'] {
+  transform: scaleX(0.8571);
+}
+.hm-start-fill[data-n='7'] {
   transform: scaleX(1);
 }
 .hm-start-steps {
@@ -135,6 +144,51 @@
 .hm-start-action {
   justify-self: start;
   text-decoration: none;
+}
+.hm-start-app {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.hm-start-app-name {
+  color: var(--al-color-fg-default);
+}
+.hm-start-app-state.is-running {
+  color: var(--al-color-status-success-fg, var(--al-color-fg-default));
+}
+.hm-start-app-state.is-running::before {
+  content: '';
+  display: inline-block;
+  inline-size: 8px;
+  block-size: 8px;
+  margin-inline-end: var(--al-space-2);
+  border-radius: 50%;
+  background: var(--al-color-status-success-icon);
+}
+.hm-app-mark {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 20px;
+  block-size: 20px;
+  border: 1px solid var(--al-color-border-default);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+}
+.hm-start-quiet {
+  margin: 0;
+}
+.hm-start-link {
+  color: var(--al-color-fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.hm-start-link:hover {
+  color: var(--al-color-fg-default);
+}
+.hm-start-not {
+  display: block;
 }
 .hm-start-mark {
   display: inline-grid;

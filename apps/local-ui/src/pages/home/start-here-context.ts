@@ -16,6 +16,8 @@ export interface StartHereModel {
   readonly inviteDone: boolean | undefined;
   /** Steps that became done while you watch (they draw their check once). */
   readonly fresh?: readonly StepId[];
+  /** Read everything again now (the AI apps "Try again"). */
+  readonly retry?: () => void;
 }
 
 export const StartHereContext = createContext<StartHereModel | null>(null);

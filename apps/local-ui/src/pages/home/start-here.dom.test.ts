@@ -220,7 +220,7 @@ describe('Start here: the card', () => {
     expect(link?.textContent).toBe(START_STRINGS.addContact);
     expect(link?.getAttribute('href')).toBe(ADD_CONTACT_HREF);
     expect(link?.classList.contains('al-btn-primary')).toBe(true);
-    expect(step('invite').querySelectorAll('a, button').length).toBe(1);
+    expect(step('invite').querySelectorAll('.al-btn-primary').length).toBe(1);
   });
 
   it('step 4 offers a copyable hello with the owner-confirmed name, and copying does not tick', async () => {
@@ -277,7 +277,7 @@ describe('Start here: the card', () => {
   });
 
   it('step 5 uses the recovery kit action', async () => {
-    const live = fresh({ contacts: [contact()], sent: true });
+    const live = fresh({ contacts: [contact()], sent: true, replied: true });
     await mount(props(reads(live)));
     const a = step('kit').querySelector('a.al-btn-primary');
     expect(a?.textContent).toBe('Save it now');

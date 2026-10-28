@@ -2,8 +2,9 @@
 //
 // The shell (Layout) runs this once and shares it through StartHereContext, so the Home dot, the
 // card and the empty states agree. A lone Home (tests) runs its own. Reads are plain GETs on routes
-// that exist: the passkey state, the contacts list, the Messages list (Sent) and the kit flag. They
-// run on mount, when the page changes, and then every 14 s while the tab is visible. A failed read
+// that exist: the passkey state, the open agent and its AI app (U3-j), the contacts list, the
+// Messages list (Sent and Inbox) and the kit flag.
+// They run on mount, when the page changes, and then every 14 s while the tab is visible. A failed read
 // keeps the last known answer and adds nothing alarming.
 //
 // Nothing here ticks a step: only an answer from a read does (copying a prompt does not).
@@ -15,12 +16,14 @@ import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { passkeysAvailable } from '../first-run/passkey.js';
 import { createUpgradeApi } from '../first-run/setup-api.js';
 import { createMessagesApi } from '../messages/api.js';
+import { readAgentSignal, readReplied } from './start-here-api.js';
 import type { StartHereModel, StartPhase } from './start-here-context.js';
 import {
   COUNTED,
   deriveStart,
   loadDone,
   saveDone,
+  type AgentSignal,
   type Signals,
   type StartHereReads,
   type StepId,
@@ -36,11 +39,16 @@ const SENT_LOOKUPS = 10;
 
 const STEP_TITLE: Readonly<Record<StepId, string>> = {
   protect: T.protect,
+  name: T.name,
+  connect: T.connect,
   invite: T.invite,
   check: T.check,
   send: T.send,
+  reply: T.reply,
   kit: T.kit,
 };
+/** Remembered steps that must all be there for the card to stay hidden before the first read. */
+const HIDE_EARLY: readonly StepId[] = COUNTED.filter((id) => id !== 'kit' && id !== 'connect');
 
 /** Approvals are protected: a passkey is registered, or this browser has no passkey to offer. */
 async function defaultProtect(): Promise<boolean | undefined> {
@@ -74,6 +82,9 @@ async function defaultSent(): Promise<boolean | undefined> {
   }
   return unanswered ? undefined : false;
 }
+
+const defaultAgent = (): Promise<AgentSignal | undefined> => readAgentSignal();
+const defaultReplied = (): Promise<boolean | undefined> => readReplied();
 
 const defaultKit = (): boolean => !recoveryKitPending();
 
@@ -118,21 +129,29 @@ export function useStartHere(
     reading.current = true;
     try {
       const r = readsRef.current;
-      const [protect, contacts, kit] = await Promise.all([
+      const [protect, agent, contacts, kit] = await Promise.all([
         attempt(r.protect ?? defaultProtect),
+        attempt(r.agent ?? defaultAgent),
         attempt(r.contacts ?? defaultContacts),
         attempt(r.kitSaved ?? defaultKit),
       ]);
       let sent: boolean | undefined;
-      if (!rememberedRef.current.has('send') && contacts !== undefined && contacts.length > 0) {
+      let replied: boolean | undefined;
+      const known = contacts !== undefined && contacts.length > 0;
+      if (!rememberedRef.current.has('send') && known) {
         sent = await attempt(() => (r.sent ?? defaultSent)(contacts));
+      }
+      if (!rememberedRef.current.has('reply') && known) {
+        replied = await attempt(() => (r.replied ?? defaultReplied)(contacts));
       }
       if (!live.current) return;
       // A failed read keeps the answer from before.
       setSignals((s) => ({
         protect: protect ?? s.protect,
+        agent: agent ?? s.agent,
         contacts: contacts ?? s.contacts,
         sent: sent ?? s.sent,
+        replied: replied ?? s.replied,
         kitSaved: kit ?? s.kitSaved,
       }));
       setLoaded(true);
@@ -163,8 +182,8 @@ export function useStartHere(
   } catch {
     kitNow = false;
   }
-  const rememberedComplete =
-    kitNow && COUNTED.filter((id) => id !== 'kit').every((id) => remembered.has(id));
+  // Connect follows the open agent and cannot be remembered, so it does not count here.
+  const rememberedComplete = kitNow && HIDE_EARLY.every((id) => remembered.has(id));
 
   // Remember what has happened once; a step never unticks.
   useEffect(() => {
@@ -242,5 +261,6 @@ export function useStartHere(
     announce,
     inviteDone,
     fresh,
+    retry: () => void readAll(),
   };
 }

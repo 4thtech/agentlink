@@ -73,19 +73,33 @@ export const START_STRINGS = {
   loading: 'Loading Start here…',
   protect: 'Protect approvals',
   protectBody: 'Approve with a quick touch instead of a code.',
+  name: 'Name your agent',
+  nameBody: 'Give this agent a name you will recognise.',
+  nameAction: 'Name it',
+  connect: 'Connect your AI app',
+  connectBody: 'Connect the AI app you work with, so it can use this agent.',
+  connectAny: 'Connect an AI app',
+  notConnected: 'Not connected to an AI app.',
+  running: 'Running',
+  checkFailed: "Couldn't check your AI apps.",
+  tryAgain: 'Try again',
   invite: 'Invite your first contact',
   inviteBody: 'Create an invite and send it to someone you work with.',
+  noOneYet: 'No one to invite yet?',
+  secondAgent: 'Try it with a second agent of your own',
   check: 'Check the safety code with them',
   recommended: '(recommended)',
   compare: 'Compare safety code',
-  send: 'Send your first message',
+  send: 'Say hello',
   sendBody: 'Ask your AI to say hello.',
+  reply: 'See the reply arrive',
+  openConversation: 'Open the conversation',
   kit: 'Save your recovery kit',
   kitBody: 'It lets you get back in if this computer is lost.',
   kitAction: 'Save it now',
   allSet: "You're all set.",
   addContact: 'Add contact',
-  // Empty states elsewhere point to step 2.
+  // Empty states elsewhere point to the invite step.
   emptyContacts: 'No contacts yet. Invite someone to start.',
   emptyMessages: 'No messages yet. Invite someone first, then ask your AI to say hello.',
   emptyFiles: 'No files yet. Invite someone first.',
@@ -93,6 +107,13 @@ export const START_STRINGS = {
   stateDone: 'Done',
   stateNext: 'Next',
   stateLater: 'Not yet',
+} as const;
+
+/** The pages Start here links to (b11 §29, §30). */
+export const START_LINKS = {
+  agents: '/settings/agents',
+  apps: '/settings/apps',
+  messages: '/settings/messages',
 } as const;
 
 /** `{n} of {total}` */
@@ -109,6 +130,19 @@ export function startHello(name: string | null): string {
   return name === null
     ? 'Say hello to my new contact on AgentLink.'
     : `Say hello to ${name} on AgentLink.`;
+}
+
+export function startConnectName(app: string): string {
+  return `Connect ${app}`;
+}
+
+export function startRestart(app: string): string {
+  return `Restart ${app} to finish`;
+}
+
+/** The reply row's status word; the name is the owner-confirmed alias only. */
+export function startWaitingReply(name: string | null): string {
+  return name === null ? 'Waiting for their reply' : `Waiting for ${name}'s reply`;
 }
 
 export function startStepDone(step: string, done: number, total: number): string {
