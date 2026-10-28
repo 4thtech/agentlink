@@ -230,8 +230,11 @@ export interface AddCreditsTracker {
   readonly hidden: boolean;
   /** The owner opened Add credits: start from the top-up read the page holds. */
   start(net: AddressNetwork): void;
-  /** The owner pressed Add: remember the credits balance from before the owner operation. */
-  arm(balance: string | undefined): void;
+  /**
+   * The owner pressed Add: forget any older value and take one fresh credits read, the balance from
+   * before the owner operation. It counts only while still on Arrived (before the submit).
+   */
+  arm(): void;
   /** The owner operation succeeded: wait for the credits read. */
   submitted(): void;
   /** After checking stopped: one read at once, and checking starts over. */
@@ -322,9 +325,25 @@ export function useAddCreditsTracker(
     session.current += 1;
     setState(openTrack(net, Date.now()));
   }, []);
-  const arm = useCallback((balance: string | undefined) => {
-    setState((s) => (s === undefined ? s : track(s, { type: 'armed', balance })));
-  }, []);
+  const arm = useCallback(() => {
+    const id = session.current;
+    const set = (balance: string | undefined): void => {
+      if (id === session.current) {
+        setState((s) => (s === undefined ? s : track(s, { type: 'armed', balance })));
+      }
+    };
+    set(undefined);
+    void api.get(CREDITS_PATH).then(
+      (res) => {
+        const answer = res.kind === 'ok' ? parseCredits(res.data) : undefined;
+        const ok = answer?.kind === 'ok' ? answer : undefined;
+        if (ok !== undefined && id === session.current) credits.current(ok);
+        // Unknown stays unknown: the tracker then never claims Added (never early).
+        set(ok?.balance);
+      },
+      () => set(undefined),
+    );
+  }, [api]);
   const submitted = useCallback(() => {
     setState((s) => (s === undefined ? s : track(s, { type: 'submitted', now: Date.now() })));
   }, []);
@@ -586,7 +605,13 @@ export function AddCreditsTrack({
           n={3}
           state={s.step === 'added' ? 'done' : s.step === 'adding' ? 'current' : 'pending'}
           marker={s.step === 'added' ? <DrawnCheck /> : after ? <Solid /> : <Hollow />}
-          word={s.step === 'added' && s.added !== undefined ? addedNow(s.added) : S.stepAdded}
+          word={
+            s.step === 'added' && s.added !== undefined
+              ? addedNow(s.added)
+              : s.step === 'adding'
+                ? S.stepAdding
+                : S.stepAdded
+          }
           at={s.addedAt}
         >
           {s.step === 'adding' ? (

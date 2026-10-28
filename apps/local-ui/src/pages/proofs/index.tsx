@@ -539,9 +539,11 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
                 if (move.kind === 'deposit' && ok) {
                   // Submitted, not added: the tracker stays open on "Adding to your credits…"
                   // until the credits read shows the new value (B-11 §23.1).
+                  // No account re-read here (IR-UX2-e2 M-1): a failed one would unmount the
+                  // panel and lose the tracker. The tracker reads the credits itself and hands
+                  // each ok answer to the credits card.
                   tracker.submitted();
                   setMove(undefined);
-                  readMoney();
                   return;
                 }
                 setMove(undefined);
@@ -558,8 +560,9 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
               hidden={tracker.hidden}
               onTurn={(m) => {
                 setNotice(undefined);
-                // The credits before the owner operation: step 3 needs a read above this.
-                tracker.arm(credits.kind === 'ok' ? credits.balance : undefined);
+                // The credits before the owner operation, from a fresh read (IR-UX2-e2 L-1):
+                // step 3 needs a credits read above this.
+                tracker.arm();
                 setMove(m);
               }}
               onCheckAgain={tracker.checkAgain}

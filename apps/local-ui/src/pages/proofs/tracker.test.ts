@@ -625,10 +625,10 @@ describe('axe', () => {
 
 // ------------------------------------------------------------------ IR-UX2-e2 (Fable audit) fixes
 
-const word = (i: number): string =>
-  steps()
-    [i]?.querySelector('.pf-step-word')
-    ?.textContent?.replace(/, step \d of 3$/, '') ?? '';
+const word = (i: number): string => {
+  const el = steps()[i]?.querySelector('.pf-step-word');
+  return el?.textContent?.replace(/, step \d of 3$/, '') ?? '';
+};
 
 describe('M-1: the tracker survives a failed account re-read after a successful add', () => {
   it('stays on "Adding…" with the panel open, then reaches Added on the credits read', async () => {

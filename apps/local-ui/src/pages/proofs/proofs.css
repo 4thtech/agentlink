@@ -243,3 +243,32 @@
     background: CanvasText;
   }
 }
+
+/* IR-UX2-e2 L-2: while adding, the step word says "Adding to your credits…"; the bar keeps it as its
+   accessible name but does not show it a second time. */
+.pf-step .al-pb-head {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.pf-step-body .al-pb {
+  inline-size: 100%;
+}
+
+/* IR-UX2-e2 L-3: at phone width the Add button takes the full row and the time sits under the word. */
+@media (max-width: 480px) {
+  .pf-step {
+    grid-template-columns: calc(var(--al-space-9) + var(--al-space-1)) minmax(0, 1fr);
+  }
+  .pf-step-time {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .pf-step-body .al-btn {
+    inline-size: 100%;
+  }
+}
