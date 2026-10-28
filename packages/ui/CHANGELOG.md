@@ -1,5 +1,14 @@
 # @4thtech-io/ui
 
+## 0.4.2
+
+### Patch Changes
+
+- 77282d9: UI-REFRESH-e4: hardening of the Under the hood allowlist. Ids made of several parts are judged by their combined length, the split-value check handles shorter pieces and more separators, the sensitive-label list also covers salt, private, recovery and mnemonic wording, and look-alike spellings of the labels are treated like the plain ones.
+- 386887e: UI-REFRESH-e5: further hardening of the Under the hood filter. Split values are now cut on any character outside the allowed piece characters instead of a fixed list of separators, and the table of look-alike letters in labels covers more alphabets and small capitals.
+- cca491d: UI-REFRESH-o-b: Approvals follow-ups. Under the hood shows the approval ID (through the shared `id` kind); an approved card collapses out after the check and leaves its result as a line of text; the sidebar Approvals badge uses the shared tick badge (AppShell `NavItem.countLabel`) and counts down when a request is decided. What is approved, the presence steps and the requests sent are unchanged.
+- b2d1dcc: UX2-b: the segmented control takes the Under the hood switch's look (recessed track, sliding thumb, check icon on the chosen option, ring on the focused option) and can carry tab semantics and count badges. The Switch can show a quiet note beside it. Messages Inbox/Sent and Files Received/Sent/Send folders are tabs, the Activity filter is a radio group, and Rules shows "Unsaved" beside a buy or sell switch that is not saved yet.
+
 ## 0.4.1
 
 ### Patch Changes

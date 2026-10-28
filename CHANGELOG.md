@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-28
+
+### Changed
+
+- The release now fails before packing if the CLI does not embed the local UI (index.html, JavaScript and CSS), so a published CLI can never answer the approval pages with the fixed 503 page (CHORE-LOCALUI-EMBED-NONEMPTY, S1).
+- Docs and status now say AgentLink 0.4.1 was released on 28 Oct 2026 (the refreshed local app and Approvals inside the app). The user guide applies to 0.4.1, the Claude Desktop page links the 0.4.1 extension files, the guide's approval wording points to the app, and the UX wave and the cloud agent with business agents (0.5.0, a pilot) are named as planned next (DOCS-041-RELEASED).
+- Decision log: UX wave 2 screens are built from the b11 brief with screenshot review in each build PR, and "Active now" is a static dot (DOCS-D-137, D-137, extends D-135).
+- Decision log: Business agents are logged as D-136 (Decision 20, DOCS-D-137).
+- Under the hood panels are more robust about what they leave out (UI-REFRESH-e4, S1): more label wordings and look-alike spellings of them are held back, and split-up values are caught more reliably. Nothing changes for normal values.
+- Under the hood panels get further hardening (UI-REFRESH-e5, S1): split-up values are checked in a more general way and the table of look-alike label spellings is wider. Nothing changes for normal values.
+- Approvals: the sidebar shows how many requests are waiting for you and counts down as you decide them. After you approve a request, its card shows the check and then slides away, leaving a short line that says what was approved. Under the hood also shows each request's ID. What you approve and how you confirm it are unchanged (UI-REFRESH-o-b).
+- Approvals: after you deny a request, its card now slides away just like an approved one, leaving a short line that says what was denied. If the denial does not go through, the card stays. What you deny and how you confirm it are unchanged (UI-REFRESH-o-c).
+- Messages: the sidebar count now looks and ticks like the Approvals one, and a screen reader says "3 new" (UI-REFRESH-o-d).
+- The local app loads faster: the Settings pages and the Under the hood panel are fetched when first needed, so the first screen carries less code. A part that cannot be fetched shows a plain message and a Try again button (UI-REFRESH-u).
+- Approvals: on a wide window your approval cards now sit side by side in a grid (two or three columns), so you see more at once. A new Layout control at the top lets you switch between Grid and List; your choice is remembered in this browser. On a narrow window you get one column as before. A long note from the AI now wraps instead of being cut off. What you approve and how you confirm it are unchanged (UX2-a).
+- Choices now look and move like the Under the hood switch: Messages Inbox/Sent, Files Received/Sent/Send folders and the Activity filter share one slider-style control, and Rules shows "Unsaved" next to a switch until it is saved (UX2-b, S1, b11 §22).
+- Design brief B-11 now has a control map (a switch for on/off settings, a segmented control in the switch's style for views, buttons for actions) and the Approvals grid with a Grid/List choice, waiting for the owner's approval (UX2-brief-0, docs only, nothing built yet).
+- Design brief B-11 now describes the rest of UX wave 2, waiting for the owner's approval: Add contact with Copy, Share and a QR code; the three-step "Waiting for your funds" tracker with the turning diamond (the one brand exception); the per-contact activity pulse with "Active now", "Today" and "Quiet"; the compact view and the later menu-bar popover; and the Start here checklist on Home (UX2-brief, docs only, nothing built yet).
+- The Sent list on the Files page follows the real delivery (UX2-c, S1): a file that is waiting to send, or sent and waiting for a receipt, moves on by itself while the page is open and visible, slowing down after two minutes and stopping after half an hour. A file sent more than a day ago with no receipt ends at "Sent · no receipt yet".
+
+### Fixed
+
+- Proofs list: a new proof arriving in the same second no longer plays the "recorded" celebration on the wrong row (UI-REFRESH-r-b).
+
 ## [0.4.1] - 2026-10-28
 
 ### Added
@@ -698,7 +722,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/4thtech/agentlink/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/4thtech/agentlink/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/4thtech/agentlink/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/4thtech/agentlink/compare/v0.2.0...v0.3.0
