@@ -19,6 +19,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  readFile,
   readdir,
   realpath,
   rename,
@@ -1551,4 +1552,138 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
       expect(await realpath(join(real, 'AgentLink', name))).toBe(join(real, 'AgentLink', name));
     }
   });
+});
+
+// U3-d (S2; D-138, U3-spec-04; 08 §1 first run v3; 04 §2.5 "One entry", §2.5.1 `agent.label`;
+// proposed, owner confirms at merge): first run with a name. `begin` and `finish` also take
+// `{label}` (operation input); the one gesture also signs the agent's first `agent.label`, which core
+// stores and re-verifies. A label that is not its own restricted form is refused before any seed
+// exists (`label_invalid`); `finish` must carry the label `begin` was given. `finish` never writes an
+// AI app config.
+describe('U3-d: first run with a name (one gesture, the first agent.label)', () => {
+  const home = (): string => join(dir, 'home');
+  const input = (value: unknown): string => encodeBase64url(encodeUtf8(JSON.stringify(value)));
+  const withPolicy = (agent: Agent): FirstAgentCard => ({
+    ...firstCardOf(agent),
+    firstPolicy: { actions: agent.client.ownerActions, home: home() },
+  });
+
+  /** Every path under `root`, relative, sorted (folders end in `/`). */
+  async function tree(root: string): Promise<string[]> {
+    const out: string[] = [];
+    const walk = async (rel: string): Promise<void> => {
+      for (const entry of await readdir(join(root, rel), { withFileTypes: true })) {
+        const path = rel === '' ? entry.name : `${rel}/${entry.name}`;
+        if (entry.isDirectory()) {
+          out.push(`${path}/`);
+          await walk(path);
+        } else out.push(path);
+      }
+    };
+    await walk('');
+    return out.sort();
+  }
+
+  async function namedSetup(
+    agent: Agent,
+    labels: { begin?: unknown; finish?: unknown },
+  ): Promise<{ h: Harness; beginRes: Response; res?: Response }> {
+    const h = await harness(agent, { firstCard: withPolicy(agent) });
+    const s = await h.session();
+    const beginRes = await post(
+      h,
+      BEGIN,
+      s,
+      new Uint8Array(0),
+      labels.begin === undefined ? {} : { 'X-AgentLink-Input': input(labels.begin) },
+    );
+    if (beginRes.status !== 200) return { h, beginRes };
+    const begun = JSON.parse(beginRes.body) as BeginBody;
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator().create(begun.publicKey, { origin: h.origin }),
+      labels.finish === undefined ? {} : { 'X-AgentLink-Input': input(labels.finish) },
+    );
+    return { h, beginRes, res };
+  }
+
+  it('signs the first label with the card and the policy; core stores and verifies it', async () => {
+    await mkdir(home(), { recursive: true });
+    const agent = await initAgent();
+    const { res } = await namedSetup(agent, {
+      begin: { label: 'Claude Code agent' },
+      finish: { label: 'Claude Code agent' },
+    });
+    expect(res?.status).toBe(200);
+    const done = JSON.parse(res?.body ?? '{}') as { status: string; label?: string };
+    expect(done.status).toBe('done');
+    expect(done.label).toBe('saved');
+    expect(await agent.client.ownerActions.loadLabel()).toEqual({
+      status: 'verified',
+      label: 'Claude Code agent',
+    });
+    expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('signed');
+  }, 60_000);
+
+  for (const label of ['', 'Work  agent', 'Work‮agent', '<b>x</b>', 'a'.repeat(33), 7]) {
+    it(`refuses begin with a label that is not restricted, before any seed: ${JSON.stringify(label)}`, async () => {
+      await mkdir(home(), { recursive: true });
+      const agent = await initAgent();
+      const { h, beginRes } = await namedSetup(agent, { begin: { label } });
+      expect(beginRes.status).toBe(400);
+      expect(JSON.parse(beginRes.body)).toEqual({ status: 'label_invalid' });
+      expect(h.seeds).toEqual([]);
+    });
+  }
+
+  it('refuses a begin input with other keys', async () => {
+    await mkdir(home(), { recursive: true });
+    const agent = await initAgent();
+    const { h, beginRes } = await namedSetup(agent, { begin: { label: 'Work', app: 'codex' } });
+    expect(beginRes.status).toBe(400);
+    expect(h.seeds).toEqual([]);
+  });
+
+  it('refuses a finish whose label is not the one begin was given; nothing is set up', async () => {
+    await mkdir(home(), { recursive: true });
+    const agent = await initAgent();
+    const { res } = await namedSetup(agent, {
+      begin: { label: 'Personal' },
+      finish: { label: 'Someone else' },
+    });
+    expect(res?.status).toBe(400);
+    expect(JSON.parse(res?.body ?? '{}')).toEqual({ status: 'label_invalid' });
+    expect(await agent.client.identity.get()).toBeUndefined();
+    expect(await agent.client.ownerActions.loadLabel()).toEqual({ status: 'unverified' });
+  });
+
+  it('finish never writes an AI app config: only the AgentLink folders appear in the home', async () => {
+    await mkdir(join(home(), 'Library', 'Application Support', 'Claude'), { recursive: true });
+    await writeFile(join(home(), '.claude.json'), '{"mcpServers":{}}\n');
+    await writeFile(
+      join(home(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'),
+      '{"mcpServers":{}}\n',
+    );
+    await mkdir(join(home(), '.codex'), { recursive: true });
+    await writeFile(join(home(), '.codex', 'config.toml'), '');
+    const before = await tree(home());
+    const agent = await initAgent();
+    const { res } = await namedSetup(agent, {
+      begin: { label: 'Claude Code agent' },
+      finish: { label: 'Claude Code agent' },
+    });
+    expect(res?.status).toBe(200);
+    const added = (await tree(home())).filter((p) => !before.includes(p));
+    expect(added.every((p) => p.startsWith('AgentLink/'))).toBe(true);
+    expect(added).toContain('AgentLink/Send/');
+    for (const file of [
+      '.claude.json',
+      join('Library', 'Application Support', 'Claude', 'claude_desktop_config.json'),
+    ]) {
+      expect(await readFile(join(home(), file), 'utf8')).toBe('{"mcpServers":{}}\n');
+    }
+    expect(await readFile(join(home(), '.codex', 'config.toml'), 'utf8')).toBe('');
+  }, 60_000);
 });
