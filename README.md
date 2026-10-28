@@ -7,7 +7,7 @@
 
 # AgentLink by 4thTech: encrypted, provable exchange between AI agents
 
-[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.4.0-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
+[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.4.1-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
 
 **Docs:** [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [4thTech Docs home](https://wiki.4thtech.io/)
 
@@ -17,7 +17,7 @@
 
 AgentLink lets AI agents send each other private messages and files, even when they run in different tools and belong to different people. When it matters, you can add proof: a public record that an exact document or set of terms existed at a specific time, which anyone can check without taking either side's word for it. 4thTech never sees your keys, your messages or your files.
 
-AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.0, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
+AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.1, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
 
 ## Get started
 
@@ -65,24 +65,31 @@ Proof is public by design, so AgentLink tells you in plain words what a proof ma
 
 ## What you can do today
 
-Version 0.4.0 (27 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.0). Earlier versions have their own release pages, such as [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
+Version 0.4.1 (28 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.1). Earlier versions have their own release pages, such as [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
 - You can **send files** from folders you allow. Larger ones, up to about 100 MB, go through the encrypted drop, with no storage to set up.
 - You can **add proof** to messages and terms, **export a proof pack** and **check one** with `agentlink verify`. On test networks, the first proof claims free test credits for you.
-- You **approve actions** from your own terminal, or from the approval page that opens when your AI needs you.
+- You **approve actions** from your own terminal, or from Approvals inside the local app, which your AI links to when it needs you.
 
-The local app arrived in 0.3.0 (26 Oct 2026): `init` and the `ui` command open it in your browser, and first run uses one Touch ID or passkey and then shows your backup code once. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet. New in 0.4.0 (27 Oct 2026):
+The local app arrived in 0.3.0 (26 Oct 2026): `init` and the `ui` command open it in your browser, and first run uses one Touch ID or passkey and then shows your backup code once. On the test network, **Add credits** shows a QR code and **Withdraw credits** (under Advanced) sends credits back to your agent's own account; adding real credits is not available yet. Added in 0.4.0 (27 Oct 2026):
 
 - **Messages.** See what you and each contact wrote, read-only. To reply, ask your AI.
 - **Files.** Tabs for files you received and sent, and the folders your AI may send from. A received file has Show in Finder.
 - **Confirm paid actions.** A proof that costs more than your limit, or a change to your spending limits, asks for Touch ID, Windows Hello or your passkey first.
 - **Switch to Touch ID** if you set up before 0.3.0, a **status bar** that shows whether AgentLink is running, and a notice when you paired twice with the same person.
 
+New in 0.4.1 (28 Oct 2026):
+
+- **A refreshed local app.** A calmer look in light and dark, a Home page that shows your agent at a glance, an Appearance page (theme, reduce motion, transparency) and an optional "Under the hood" view for technical details, smoother page changes, and better keyboard and screen-reader use.
+- **Approvals inside the app.** Requests waiting for you now open in the same window as everything else, and the old stand-alone approval page is gone. If the app can't open, the `approve` command in your own terminal still works.
+- **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
+
 ## What is coming
 
-- **A visual refresh of the local app**, next.
+- **A UX wave for the local app**, planned.
+- **The cloud agent and business agents** (0.5.0), planned as a pilot.
 - **Confirming a verified registration**, not available yet.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
 - **Proof on main networks**, after an external audit of the contracts.
@@ -96,10 +103,10 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-27
+> **Version:** v0.4.1 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-28
 >
 > - **Components:** 75 merged, 15 in progress, 7 planned
-> - **Next:** The local app's visual refresh is merged and ships in the next release (not released yet). Then the cloud agent as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+> - **Next:** A UX wave for the local app (planned), then the cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
@@ -111,7 +118,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0, v0.3.0 and v0.4.0 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0 and v0.4.1 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.5.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

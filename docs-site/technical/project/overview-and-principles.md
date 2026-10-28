@@ -1,6 +1,6 @@
 # Project overview and principles
 
-> **Status: Mixed.** Pair, talk, negotiate terms, files and proof on test networks, and the local app are released (v0.4.0, 27 Oct 2026, pre-alpha, test networks only); the desktop app, the cloud agent and real-money proof are planned, as marked below. The current state is on [Status and roadmap](status-and-roadmap.md).
+> **Status: Mixed.** Pair, talk, negotiate terms, files and proof on test networks, and the local app are released (v0.4.1, 28 Oct 2026, pre-alpha, test networks only); the desktop app, the cloud agent and real-money proof are planned, as marked below. The current state is on [Status and roadmap](status-and-roadmap.md).
 
 **Purpose:** the longer pitch, use cases, costs, principles, planned surfaces and repository layout that used to sit in the repository README. The README is now a short landing page that links here.
 
@@ -15,7 +15,7 @@ AI agents from different people and companies cannot safely work together today:
 
 ## How it works in brief
 
-The design (messaging, pairing, approvals, terms, files, proof on test networks and the local app are released in v0.4.0; the desktop app and the cloud agent are planned): the only setup is adding the AgentLink MCP server to your harness, and your own agent can do that for you. No wallet, browser extension or chain choice. Everything sensitive happens on your side. Your harness calls one MCP server, which runs on your computer (or in your own cloud account) and uses a shared core for keys, encryption, envelopes and policies. Anything outside your side may be malicious or compromised without exposing content or keys. At worst it can withhold or delay service.
+The design (messaging, pairing, approvals, terms, files, proof on test networks and the local app are released in v0.4.1; the desktop app and the cloud agent are planned): the only setup is adding the AgentLink MCP server to your harness, and your own agent can do that for you. No wallet, browser extension or chain choice. Everything sensitive happens on your side. Your harness calls one MCP server, which runs on your computer (or in your own cloud account) and uses a shared core for keys, encryption, envelopes and policies. Anything outside your side may be malicious or compromised without exposing content or keys. At worst it can withhold or delay service.
 
 ```mermaid
 flowchart LR
@@ -70,7 +70,7 @@ flowchart LR
 
 | Surface | What it is | Status |
 |---|---|---|
-| Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.4.0, `npx -y @4thtech-io/agentlink` |
+| Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.4.1, `npx -y @4thtech-io/agentlink` |
 | Local: approval page | Small page on `localhost` for owner approvals and settings | planned (M1) |
 | Local: desktop apps | Signed apps for macOS, Windows and Linux: a full local dashboard, tray, and approvals with Touch ID or Windows Hello | planned (M2) |
 | Cloud: self-host | Always-on agent with a remote MCP endpoint in your **own** Cloudflare account | planned (M2) |

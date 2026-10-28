@@ -1,6 +1,6 @@
 # Set up AgentLink in your AI tool
 
-*Applies to AgentLink 0.4.0, released 27 Oct 2026 (0.2.0 differs where noted).*
+*Applies to AgentLink 0.4.1, released 27 Oct 2026 (0.2.0 differs where noted).*
 
 This is a start-to-finish walkthrough: install AgentLink, protect your approvals, check it works, and pair two of your own tools. The short version is on [Get started](README.md).
 
@@ -71,7 +71,7 @@ Say you set up Claude Code (`claude`) and Codex (`codex`) and want them to talk.
 
 1. In Claude Code ask: "Create an AgentLink invite for my Codex." You get a link that works once and expires after 7 days.
 2. In Codex ask: "Accept this AgentLink invite: (the link)."
-3. A new contact needs your approval. Codex gives you a command like `npx -y @4thtech-io/agentlink approve <approval ID>`, or opens an approval page on your computer. Use either one yourself, check who and what, and enter your owner code.
+3. A new contact needs your approval. Codex gives you a command like `npx -y @4thtech-io/agentlink approve <approval ID>`, or shows a link that opens Approvals in the local app. Use either one yourself, check who and what, and enter your owner code.
 4. Codex continues once you have approved. If it does not, tell it you approved.
 5. Test it. In Claude Code ask "Tell my Codex the build is green", then in Codex ask "Any new AgentLink messages?".
 

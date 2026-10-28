@@ -1,6 +1,6 @@
 # Approvals
 
-*Applies to AgentLink 0.4.0.*
+*Applies to AgentLink 0.4.1.*
 
 Some things your agent should not do alone, like committing you to a deal or adding a new contact. For those it asks you, and only you can say yes. That is what stops your AI from approving things for itself.
 
@@ -22,11 +22,11 @@ Your **rules** set these limits. For example: whether new contacts need approval
 
 Your agent carries on once you approve.
 
-## The approval page
+## Approvals in the app
 
-When something needs your approval, AgentLink opens an approval page in your browser, and your agent shows you its link (it starts with `http://localhost`). The link is for you. Your agent cannot approve with it, and on the page you still confirm with your passkey or your backup code.
+Since 0.4.1, when something needs your approval your agent shows you a link (it starts with `http://localhost`) that opens the Approvals page inside the local app. The link is for you. Your agent cannot approve with it, and you still confirm with your passkey or your backup code. See [Approvals page](../local-app/approvals.md).
 
-While the page is open, your agent waits briefly for your decision. You do not need to tell it "done". If the page does not open, use the `approve` command above.
+While the page is open, your agent waits briefly for your decision. You do not need to tell it "done". If the app does not open, use the `approve` command above. The old stand-alone approval page is gone.
 
 ## Other commands
 

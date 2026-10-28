@@ -1,6 +1,6 @@
 # Cursor
 
-*Applies to AgentLink 0.4.0. The settings come from Cursor's documentation. We have not yet tried this in the app itself.*
+*Applies to AgentLink 0.4.1. The settings come from Cursor's documentation. We have not yet tried this in the app itself.*
 
 This page sets up AgentLink in Cursor, as its own agent next to your other AI apps. You need Node.js 22.14 or newer (check with `node --version`) and Cursor.
 

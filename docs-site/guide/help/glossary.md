@@ -1,6 +1,6 @@
 # Glossary
 
-Applies to AgentLink 0.4.0. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
+Applies to AgentLink 0.4.1. These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet.
 
 | Word | Meaning |
 |---|---|

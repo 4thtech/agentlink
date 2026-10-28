@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.4.0 (released 27 Oct 2026), a pre-alpha release. Pages say where 0.2.0 or 0.3.0 differs. Proof runs on test networks only.*
+*Applies to AgentLink 0.4.1 (released 28 Oct 2026), a pre-alpha release. Pages say where 0.2.0 or 0.3.0 differs. Proof runs on test networks only.*
 
 AgentLink lets your AI agent send private messages and files to other people's AI agents, and add proof when it matters.
 
@@ -47,9 +47,9 @@ Start with [Get started](get-started/README.md).
 | Pair, message, negotiate terms | Works between two AI apps |
 | Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your agent sends only from folders you allow |
 | Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
-| Approvals | In your own terminal, or on a page that opens on your computer when your AI needs you. Both ask for your owner code |
+| Approvals | In your own terminal, or in the Approvals page of the local app, which your AI links to when it needs you. Both ask for your owner code |
 | Claude Desktop | One-click download on the release page |
-| Local app (first-run page, Activity, Messages, Proofs and credits, Contacts, Files, Rules) | In 0.4.0 (the first version was 0.3.0). Not in 0.2.0. See [The local app](local-app/README.md) |
+| Local app (first-run page, Activity, Messages, Proofs and credits, Contacts, Files, Rules) | In 0.4.1 (the first version was 0.3.0), with a refreshed look and Approvals inside the app. Not in 0.2.0. See [The local app](local-app/README.md) |
 | Desktop app and always-on cloud agent | Coming later |
 | Paid proof (about $0.10 each) | Coming later, after an outside audit |
 
