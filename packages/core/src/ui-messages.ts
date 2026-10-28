@@ -301,10 +301,24 @@ class DisplayCache {
 export class MessagesView {
   readonly #ctx: CoreContext;
   readonly #contacts: ContactBook;
+  readonly #pulseScanCap: number;
 
-  constructor(ctx: CoreContext, contacts: ContactBook) {
+  /**
+   * @param options.pulseScanCap test seam: a smaller scan cap for `pulseTimes` (a positive whole
+   *   number, never above PULSE_SCAN_CAP). The client always uses PULSE_SCAN_CAP.
+   */
+  constructor(
+    ctx: CoreContext,
+    contacts: ContactBook,
+    options: { readonly pulseScanCap?: number } = {},
+  ) {
     this.#ctx = ctx;
     this.#contacts = contacts;
+    const cap = options.pulseScanCap ?? PULSE_SCAN_CAP;
+    if (!Number.isSafeInteger(cap) || cap < 1 || cap > PULSE_SCAN_CAP) {
+      throw new RangeError('pulseScanCap must be a whole number from 1 to PULSE_SCAN_CAP');
+    }
+    this.#pulseScanCap = cap;
   }
 
   /** Every contact that is not removed, newest conversation first (none last). */
@@ -353,10 +367,10 @@ export class MessagesView {
         const rows = tx.select(
           'envelopes',
           { ...whereOf(direction, 'any'), created_at: { gte: since, lte: until } },
-          { orderBy: [['created_at', 'desc']], limit: PULSE_SCAN_CAP + 1 },
+          { orderBy: [['created_at', 'desc']], limit: this.#pulseScanCap + 1 },
         );
-        if (rows.length > PULSE_SCAN_CAP) capped = true;
-        for (const row of rows.slice(0, PULSE_SCAN_CAP)) {
+        if (rows.length > this.#pulseScanCap) capped = true;
+        for (const row of rows.slice(0, this.#pulseScanCap)) {
           const contactId = row.contact_id;
           if (contactId === null || !visible.has(contactId)) continue;
           times.push(Object.freeze({ contactId, at: row.created_at }));

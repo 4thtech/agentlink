@@ -354,37 +354,36 @@ describe('MessagesView.pulseTimes (UX2-f1, b11 §24: GET /api/ui/messages/pulse)
     expect(lines.join('\n')).not.toMatch(/BODY-PLAINTEXT/);
   });
 
+  it('caps the scan at PULSE_SCAN_CAP per direction: 10 000 (UX2-f1)', () => {
+    expect(PULSE_SCAN_CAP).toBe(10_000);
+    // The seam only lowers the cap, never raises it or turns it off.
+    for (const pulseScanCap of [0, -1, 1.5, PULSE_SCAN_CAP + 1, Number.NaN]) {
+      expect(() => new MessagesView(ctxOf(a), a.client.contacts, { pulseScanCap })).toThrow(
+        RangeError,
+      );
+    }
+  });
+
   it('caps the scan per direction, newest first, and says so', async () => {
-    const rows = PULSE_SCAN_CAP + 5;
-    await a.store.transaction((tx) => {
-      for (let i = 0; i < rows; i += 1) {
-        tx.insert('envelopes', {
-          envelope_id: `cap${String(i).padStart(8, '0')}`,
-          envelope_hash: `0x${'ab'.repeat(32)}`,
-          thread_id: `t${i}`,
-          direction: 'in',
-          contact_id: b.id,
-          from_key: 'f'.repeat(64),
-          type: 'text',
-          state: 'ok',
-          refused_reason: null,
-          created_at: T0 + i,
-          envelope_json: null,
-          payload_json: null,
-          read_at: null,
-          delivery: null,
-          refused_at: null,
-          request_accepted_at: null,
-        });
-      }
-    });
-    const pulse = await a.client.messages.pulseTimes(T0, T0 + rows);
+    const cap = 20;
+    const view = new MessagesView(ctxOf(a), a.client.contacts, { pulseScanCap: cap });
+    const rows = cap + 5;
+    for (let i = 0; i < rows; i += 1) await put({ contact: b.id, createdAt: T0 + i });
+    // The cap is per direction: three sent messages are all read next to the capped inbound ones.
+    for (let i = 0; i < 3; i += 1) {
+      await put({ contact: c.id, createdAt: T0 + i, direction: 'out' });
+    }
+    const pulse = await view.pulseTimes(T0, T0 + rows);
     expect(pulse.capped).toBe(true);
-    expect(pulse.times).toHaveLength(PULSE_SCAN_CAP);
-    // Newest first: the oldest five are the ones left out.
-    expect(pulse.times.reduce((m, t) => Math.min(m, t.at), Infinity)).toBe(T0 + 5);
-    const under = await a.client.messages.pulseTimes(T0 + 6, T0 + rows);
+    const inbound = pulse.times.filter((t) => t.contactId === b.id);
+    expect(inbound).toHaveLength(cap);
+    expect(pulse.times.filter((t) => t.contactId === c.id)).toHaveLength(3);
+    // Newest first: the oldest five inbound are the ones left out.
+    expect(inbound.reduce((m, t) => Math.min(m, t.at), Infinity)).toBe(T0 + 5);
+    // Exactly at the cap is not capped.
+    const under = await view.pulseTimes(T0 + 5, T0 + rows);
     expect(under.capped).toBe(false);
+    expect(under.times.filter((t) => t.contactId === b.id)).toHaveLength(cap);
   });
 
   it('refuses a window that is not two whole times in order', async () => {
