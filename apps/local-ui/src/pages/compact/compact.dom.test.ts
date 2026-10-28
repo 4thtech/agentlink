@@ -387,9 +387,9 @@ describe('Compact: accessibility and motion', () => {
     const result = await axe.run(host, {
       rules: { 'color-contrast': { enabled: false }, region: { enabled: false } },
     });
-    expect(result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(' ')}`)).toEqual(
-      [],
-    );
+    expect(
+      result.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.html).join(' ')}`),
+    ).toEqual([]);
   });
 
   it('has one main landmark and a heading', async () => {

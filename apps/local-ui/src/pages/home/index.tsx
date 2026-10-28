@@ -37,6 +37,8 @@ import {
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { subscribeHealth } from '../../layout/health-feed.js';
 import { HEALTH_PATH } from '../../layout/health.js';
+import { COMPACT_STRINGS } from '../compact/strings.js';
+import { openCompactWindow } from '../compact/open.js';
 import { createApprovalsClient, type ListAnswer } from '../approvals/client.js';
 import { ACTIVITY_STRINGS as A } from '../activity/strings.js';
 import { detectPlatform } from '../first-run/passkey.js';
@@ -80,6 +82,8 @@ export interface HomePageProps {
   readonly startHere?: StartHereReads;
   readonly platform?: Platform;
   readonly now?: () => Date;
+  /** Open the compact window (UX2-h); a small browser window by default. */
+  readonly openCompact?: () => void;
 }
 
 const EVENT_TEXT: Readonly<Record<EventKind, string>> = {
@@ -273,6 +277,7 @@ export function HomePage({
   startHere,
   platform: givenPlatform,
   now = () => new Date(),
+  openCompact = () => openCompactWindow(),
 }: HomePageProps): ReactElement {
   const client = useRef<ApiClient>(api ?? createApiClient());
   const approvalsClient = useRef(approvals ?? createApprovalsClient());
@@ -385,7 +390,17 @@ export function HomePage({
           {DAY.format(today)}
         </time>
         <h1 className="al-text-title-1">{S.title}</h1>
-        <p className="hm-greeting al-text-body al-muted">{greeting(today)}</p>
+        <div className="hm-greeting-row">
+          <p className="hm-greeting al-text-body al-muted">{greeting(today)}</p>
+          <button
+            type="button"
+            className="al-btn al-btn-secondary al-btn-sm hm-compact"
+            onClick={openCompact}
+          >
+            <Icon name="external-link" size={16} />
+            {COMPACT_STRINGS.openCompact}
+          </button>
+        </div>
       </header>
       <StartHere model={start} platform={platform} />
       {model.offline ? (

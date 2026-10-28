@@ -5,15 +5,14 @@
 // - The opener is window.open with a small size; no server route, no token in the address (08 §1).
 import { describe, expect, it, vi } from 'vitest';
 import compactCss from './compact.css?raw';
+import { PULSE_PATH, barHeights, parsePulse, pulseTotal, rankByActivity, TOP_N } from './data.js';
 import {
-  PULSE_PATH,
-  barHeights,
-  parsePulse,
-  pulseTotal,
-  rankByActivity,
-  TOP_N,
-} from './data.js';
-import { COMPACT_FEATURES, COMPACT_NAME, COMPACT_PATH, openCompactWindow, openInMainApp } from './open.js';
+  COMPACT_FEATURES,
+  COMPACT_NAME,
+  COMPACT_PATH,
+  openCompactWindow,
+  openInMainApp,
+} from './open.js';
 import { COMPACT_STRINGS as S, moreContacts, pulseLabel } from './strings.js';
 import type { ContactRow } from '../contacts/data.js';
 
@@ -31,16 +30,21 @@ describe('parsePulse', () => {
       contacts: [{ contactId: ref(1), counts, lastAt: 999_900, activity: 'active_now' }],
     });
     expect(out?.now).toBe(1_000_000);
-    expect(out?.rows).toEqual([
-      { ref: ref(1), counts, lastAt: 999_900, activity: 'active_now' },
-    ]);
+    expect(out?.rows).toEqual([{ ref: ref(1), counts, lastAt: 999_900, activity: 'active_now' }]);
   });
 
   it('drops anything else in an item, such as message text', () => {
     const out = parsePulse({
       now: 5,
       contacts: [
-        { contactId: ref(1), counts: flat(), lastAt: 1, activity: 'today', text: 'SECRET', name: 'x' },
+        {
+          contactId: ref(1),
+          counts: flat(),
+          lastAt: 1,
+          activity: 'today',
+          text: 'SECRET',
+          name: 'x',
+        },
       ],
     });
     expect(JSON.stringify(out)).not.toContain('SECRET');
@@ -95,7 +99,10 @@ describe('rankByActivity', () => {
         { contactId: ref(3), counts: c3, lastAt: 90, activity: 'today' },
       ],
     });
-    const ranked = rankByActivity([contact(4, 'Zed'), contact(1), contact(2), contact(3)], pulse?.rows ?? []);
+    const ranked = rankByActivity(
+      [contact(4, 'Zed'), contact(1), contact(2), contact(3)],
+      pulse?.rows ?? [],
+    );
     expect(ranked.map((r) => r.contact.name)).toEqual(['C2', 'C3', 'C1', 'Zed']);
     expect(pulseTotal(ranked[0]?.pulse?.counts ?? [])).toBe(5);
   });
@@ -150,7 +157,8 @@ describe('copy', () => {
   });
 
   it('uses none of the never-say words (11 §5.1)', () => {
-    const NEVER = /wallet|seed phrase|transaction|\bgas\b|blockchain|on-chain|relay|nostr|hash|token|mcp|online/i;
+    const NEVER =
+      /wallet|seed phrase|transaction|\bgas\b|blockchain|on-chain|relay|nostr|hash|token|mcp|online/i;
     const all = [...Object.values(S), moreContacts(3), pulseLabel(2)].join(' | ');
     expect(all).not.toMatch(NEVER);
   });
@@ -173,7 +181,12 @@ describe('opening the window', () => {
   });
 
   it('openInMainApp uses the opener when it is open, else a named window', () => {
-    const assignTarget = { history: { pushState: vi.fn() }, dispatchEvent: vi.fn(), focus: vi.fn(), closed: false };
+    const assignTarget = {
+      history: { pushState: vi.fn() },
+      dispatchEvent: vi.fn(),
+      focus: vi.fn(),
+      closed: false,
+    };
     const withOpener = { opener: assignTarget, open: vi.fn() } as unknown as Window;
     openInMainApp('/', withOpener);
     expect(assignTarget.history.pushState).toHaveBeenCalled();
@@ -190,6 +203,8 @@ describe('stylesheet', () => {
   it('uses tokens only: no literal durations, no looping animation, no inline-style hooks', () => {
     expect(compactCss).not.toMatch(/(?:transition|animation)[^;]*\b\d+m?s\b/);
     expect(compactCss).not.toMatch(/infinite/);
-    expect(compactCss).not.toMatch(/(?:transition|animation)[^;]*\b(?:width|height|top|left|margin)\b/);
+    expect(compactCss).not.toMatch(
+      /(?:transition|animation)[^;]*\b(?:width|height|top|left|margin)\b/,
+    );
   });
 });

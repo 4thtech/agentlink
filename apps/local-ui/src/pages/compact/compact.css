@@ -1,0 +1,171 @@
+/* Compact view (UX2-h; B-11 §25): five blocks on level 1, `--al-space-3` apart, `--al-space-4`
+   padding. Fixed row heights so live reads never move anything (agent row 44, contact rows 32).
+   Tokens only; nothing here animates, so reduced motion needs no override. Fluid down to 320 px. */
+.cp {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--al-space-3);
+  align-content: start;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  min-block-size: 100dvh;
+  padding: var(--al-space-4);
+  background: var(--al-color-bg-default);
+  color: var(--al-color-fg-default);
+}
+.cp-block {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  display: grid;
+  gap: var(--al-space-2);
+  list-style: none;
+}
+.cp-block p {
+  margin: 0;
+}
+
+/* 1. Agent row, 44 px, reserved as a list for a later second agent (§25.3). */
+.cp-agents {
+  padding-block: 0;
+}
+.cp-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-block-size: 44px;
+  min-inline-size: 0;
+  flex-wrap: wrap;
+}
+.cp-agent-name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-agent-line {
+  flex: 1 0 100%;
+}
+
+/* 2. Needs you: an orange left edge when not zero, as the Home tile. */
+.cp-block[data-attention='true'] {
+  border-inline-start: var(--al-space-2) solid var(--al-color-accent-default);
+}
+.cp-needs-head {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  color: var(--al-color-fg-muted);
+}
+.cp-soonest {
+  overflow-wrap: anywhere;
+}
+
+/* 3. Contacts by activity: five rows of 32 px, then one "+n more" line. */
+.cp-caption {
+  margin: 0;
+}
+.cp-contacts {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cp-contact {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  block-size: 32px;
+  min-inline-size: 0;
+}
+.cp-contact-name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Marker: a shape in a fixed 8 px slot, so words line up (never colour alone, §24.3). */
+.cp-marker {
+  flex: none;
+  box-sizing: border-box;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+}
+.cp-marker[data-marker='filled'] {
+  background: var(--al-color-status-success-icon);
+}
+.cp-marker[data-marker='ring'] {
+  border: 1.5px solid var(--al-color-fg-muted);
+}
+.cp-word {
+  flex: none;
+  color: var(--al-color-fg-muted);
+}
+.cp-word[data-activity='active_now'] {
+  color: var(--al-color-fg-default);
+}
+.cp-word[data-activity='quiet'] {
+  color: var(--al-color-fg-subtle);
+}
+/* The pulse: 47 x 16, no orange and no status colour (orange means "this needs you"). */
+.cp-pulse {
+  flex: none;
+}
+.cp-bar {
+  fill: var(--al-color-fg-muted);
+}
+.cp-bar.is-now {
+  fill: var(--al-color-fg-default);
+}
+.cp-more {
+  display: flex;
+  align-items: center;
+  min-block-size: 32px;
+  color: var(--al-color-fg-muted);
+}
+
+/* 4. Credits, one line; 5. footer, the one full-width button. */
+.cp-footer {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.cp .al-btn {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+.cp-footer .al-btn {
+  inline-size: 100%;
+}
+.cp-asof {
+  margin: 0;
+}
+.cp-note,
+.cp-gone {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  margin: 0;
+  color: var(--al-color-fg-muted);
+}
+
+@media (forced-colors: active), (prefers-contrast: more) {
+  .cp-bar,
+  .cp-bar.is-now {
+    fill: CanvasText;
+  }
+  .cp-marker[data-marker='filled'] {
+    background: CanvasText;
+  }
+  .cp-marker[data-marker='ring'] {
+    border-color: CanvasText;
+  }
+}
