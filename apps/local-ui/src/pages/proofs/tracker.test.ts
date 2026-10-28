@@ -622,3 +622,113 @@ describe('axe', () => {
     expect((await run()).violations).toEqual([]);
   });
 });
+
+// ------------------------------------------------------------------ IR-UX2-e2 (Fable audit) fixes
+
+const word = (i: number): string =>
+  steps()
+    [i]?.querySelector('.pf-step-word')
+    ?.textContent?.replace(/, step \d of 3$/, '') ?? '';
+
+describe('M-1: the tracker survives a failed account re-read after a successful add', () => {
+  it('stays on "Adding…" with the panel open, then reaches Added on the credits read', async () => {
+    const m = await mount({ [TOP_UP]: topUp(NET5) });
+    vi.spyOn(m.api, 'owner').mockResolvedValue({ kind: 'ok', status: 202, data: {} } as never);
+    await press('Add credits');
+    await press('Add $4.99 to your credits');
+    await typeCode('7K2M-9QXA');
+    // From here every top-up read fails.
+    m.routes[TOP_UP] = FAIL;
+    await press('Confirm');
+    await tick(0);
+    expect(host.querySelector('section[aria-label="Add credits"]')).not.toBeNull();
+    expect(states()).toEqual(['done', 'done', 'current']);
+    expect(word(2)).toBe('Adding to your credits…');
+    await tick(30_000);
+    expect(host.querySelector('section[aria-label="Add credits"]')).not.toBeNull();
+    expect(states()).toEqual(['done', 'done', 'current']);
+    m.routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 98, balance: '$9.79' };
+    await tick(5_000);
+    expect(states()).toEqual(['done', 'done', 'done']);
+    expect(word(2)).toBe('Added to credits · $9.79 now');
+  });
+});
+
+describe('L-1: the credits from before the add come from a fresh read, not the page load', () => {
+  it('credits that rose during Waiting do not count as added', async () => {
+    const m = await mount();
+    await press('Add credits');
+    // Free test credits arrive while waiting; the page still holds $4.80 from its load.
+    m.routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 60, balance: '$6.00' };
+    m.routes[TOP_UP] = topUp(NET5);
+    await tick(5_000);
+    expect(states()).toEqual(['done', 'current', 'pending']);
+    vi.spyOn(m.api, 'owner').mockResolvedValue({ kind: 'ok', status: 202, data: {} } as never);
+    await press('Add $4.99 to your credits');
+    await typeCode('7K2M-9QXA');
+    await press('Confirm');
+    await tick(60_000);
+    expect(states()).toEqual(['done', 'done', 'current']);
+    expect(text()).not.toContain('Added to credits ·');
+    m.routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 109, balance: '$10.99' };
+    await tick(15_000);
+    expect(word(2)).toBe('Added to credits · $10.99 now');
+  });
+
+  it('credits that fell during Waiting still let the add show once it lands', async () => {
+    const m = await mount();
+    await press('Add credits');
+    m.routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 0, balance: '$0.00' };
+    m.routes[TOP_UP] = topUp(NET5);
+    await tick(5_000);
+    vi.spyOn(m.api, 'owner').mockResolvedValue({ kind: 'ok', status: 202, data: {} } as never);
+    await press('Add $4.99 to your credits');
+    await typeCode('7K2M-9QXA');
+    await press('Confirm');
+    m.routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 40, balance: '$4.00' };
+    await tick(5_000);
+    expect(states()).toEqual(['done', 'done', 'done']);
+    expect(word(2)).toBe('Added to credits · $4.00 now');
+  });
+});
+
+describe('L-2: step 3 words (11 §5)', () => {
+  it('pending "Added to credits", current "Adding to your credits…", done with the amount', async () => {
+    const m = await mount({ [TOP_UP]: topUp(NET5) });
+    await press('Add credits');
+    expect(word(2)).toBe('Added to credits');
+    vi.spyOn(m.api, 'owner').mockResolvedValue({ kind: 'ok', status: 202, data: {} } as never);
+    await press('Add $4.99 to your credits');
+    await typeCode('7K2M-9QXA');
+    await press('Confirm');
+    expect(word(2)).toBe('Adding to your credits…');
+    expect(steps()[2]?.textContent).not.toMatch(/Added to credits/);
+    // The bar keeps its accessible name; its own visible label is not shown a second time.
+    expect(steps()[2]?.querySelector('[role="progressbar"]')?.getAttribute('aria-label')).toBe(
+      'Adding to your credits…',
+    );
+    expect(proofsCss).toMatch(/\.pf-step \.al-pb-head\s*\{[^}]*clip/);
+    m.routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 98, balance: '$9.79' };
+    await tick(5_000);
+    expect(word(2)).toBe('Added to credits · $9.79 now');
+  });
+});
+
+describe('L-3: phone width, 360 px (stylesheet)', () => {
+  const css = proofsCss.replace(/\/\*[\s\S]*?\*\//g, '');
+  it('the step columns can shrink: the text column is minmax(0, 1fr) and its body min 0', () => {
+    expect(css).toMatch(/\.pf-step\s*\{[^}]*grid-template-columns:[^;]*minmax\(0, 1fr\)/);
+    expect(css).toMatch(/\.pf-step-body\s*\{[^}]*min-inline-size:\s*0/);
+  });
+  it('no tracker rule sets a fixed size wider than a phone', () => {
+    for (const m of css.matchAll(/\.pf-(?:track|step|details)[^{]*\{([^}]*)\}/g)) {
+      expect(m[1]).not.toMatch(/\b(?:[4-9]\d\d|\d{4,})px\b/);
+    }
+  });
+  it('at phone width the Add button takes the full row and the step time wraps under', () => {
+    expect(css).toMatch(
+      /@media \(max-width: [^)]+\)\s*\{[\s\S]*\.pf-step-body \.al-btn[\s\S]*inline-size:\s*100%/,
+    );
+    expect(css).toMatch(/@media \(max-width: [^)]+\)\s*\{[\s\S]*\.pf-step-time[\s\S]*grid-column/);
+  });
+});
