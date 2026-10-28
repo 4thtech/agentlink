@@ -594,20 +594,22 @@ describe('axe', () => {
     axe.run(host, {
       runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
     });
-  it('finds no violation on Waiting, Arrived and Adding', async () => {
-    const m = await mount({}, false);
+  it('finds no violation on Waiting', async () => {
+    await mount({}, false);
     await press('Add credits', false);
+    expect(states()).toEqual(['current', 'pending', 'pending']);
     expect((await run()).violations).toEqual([]);
-    m.routes[TOP_UP] = topUp(NET5);
-    act(() => root.unmount());
-    root = createRoot(host);
-    await act(async () => {
-      root.render(h<ProofsPageProps>(ProofsPage, { api: m.api }));
-      await settle(false);
-    });
+  });
+  it('finds no violation on Arrived', async () => {
+    await mount({ [TOP_UP]: topUp(NET5) }, false);
     await press('Add credits', false);
     expect(states()).toEqual(['done', 'current', 'pending']);
     expect((await run()).violations).toEqual([]);
+  });
+  it('finds no violation on Adding', async () => {
+    const m = await mount({ [TOP_UP]: topUp(NET5) }, false);
+    await press('Add credits', false);
+    expect(states()).toEqual(['done', 'current', 'pending']);
     vi.spyOn(m.api, 'owner').mockResolvedValue({ kind: 'ok', status: 202, data: {} } as never);
     await press('Add $4.99 to your credits', false);
     await act(async () => {
