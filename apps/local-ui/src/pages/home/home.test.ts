@@ -20,6 +20,7 @@ import { HoodProvider, HOOD_STRINGS } from '@4thtech-io/ui';
 import { Layout } from '../../layout/index.js';
 import { HomePage, type HomePageProps } from './index.js';
 import { HOME_STRINGS as S } from './strings.js';
+import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -264,7 +265,8 @@ describe('Home: the Next step card', () => {
     expect(cards.length).toBe(1);
     expect(cards[0]?.textContent).toContain(S.nextContactTitle);
     expect(cards[0]?.querySelectorAll('a, button').length).toBe(1);
-    expect(cards[0]?.querySelector('a')?.getAttribute('href')).toBe('/settings/contacts');
+    // UX2-d2: the contact step opens the Add contact sheet on Contacts.
+    expect(cards[0]?.querySelector('a')?.getAttribute('href')).toBe(ADD_CONTACT_HREF);
   });
 
   it('puts the passkey step before the recovery kit and the contact', async () => {
