@@ -23,7 +23,7 @@ Node.js is the program AgentLink runs on, and yours is too old. Update it from n
 Restart the app after setup, then run `doctor`. If setup could not find your app, name it: `npx -y @4thtech-io/agentlink init --harness <app>`.
 
 **This computer has more than one AgentLink agent.**
-AgentLink needs to know which one you mean. Name it: `npx -y @4thtech-io/agentlink init --agent <name>`.
+`init` and `ui` never ask which one. To switch agents, use the agent switcher in the app. They use the agent you opened last, else the one an AI app already starts, else the first by name. To pick another on purpose, add `--agent <name>`, for example `npx -y @4thtech-io/agentlink init --agent <name>`. The owner commands in the terminal, such as approve, still ask which agent when you have several.
 
 **How do I open the AgentLink app?**
 From 0.3.0, run `npx -y @4thtech-io/agentlink ui`. In 0.2.0, the only page that opens in your browser is the approval page, when your agent needs your OK.

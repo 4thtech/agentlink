@@ -81,7 +81,8 @@ import { INSTALL_COMMAND, installGlobally, isAgentlinkOnPath } from './global-in
 import { sanitizeTerminalText } from '../terminal/sanitize.js';
 import { copy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { firstRunStep } from './first-run.js';
-import { AGENT_CHOICE_TEXT, pickAgent, validAgentNames } from './agent-choice.js';
+import { appServes, chooseCurrentAgent } from './current-agent.js';
+import { readAppCurrent } from '../runtime/agent-dir.js';
 
 /** The Node pieces `init` uses. Tests pass doubles; production uses `nodeInitDeps()`. */
 export interface InitDeps {
@@ -266,8 +267,6 @@ export const INIT_TEXT = Object.freeze({
   ownerStepAdd:
     "One step left, and you must do it yourself: run `{prefix} owner add-agent --agent {name}` in your own terminal, so this agent gets a card from your owner. Don't let your AI run it or see what you type.",
   configPlace: '<the same path>',
-  chooseAgent:
-    'This computer has more than one AgentLink agent, so AgentLink won’t pick one for you. Run `{prefix} init --agent <name>` with the agent this app should use. Nothing was changed.',
   // M1-36b (D1). Fixed text: the command is a constant, nothing from a file or the user.
   installOffer:
     'Recommended: install AgentLink on this computer. Your AI apps then start it faster, and the commands AgentLink shows you are shorter.',
@@ -305,20 +304,25 @@ async function knownAgents(deps: InitDeps): Promise<readonly string[] | undefine
 /**
  * D5 (IR-M1-36b-1): an existing agent is always reused, never a second one created without
  * `--agent`. `default` when it exists; else the only agent on this computer; with several and no
- * `default`, undefined (the owner must name one). Only a computer with no agent yet gets a new one:
+ * `default`, the current agent (U3-b: never asked; the last used one in app.json, else the one an AI
+ * app serves, else the first by name). Only a computer with no agent yet gets a new one:
  * named after the app when the run is for exactly one app, otherwise `default`. Agents that can't be
  * listed: `default`, as before M1-36b.
  */
 async function defaultAgentName(
   deps: InitDeps,
   apps: readonly HarnessDef[] | undefined,
-): Promise<string | undefined> {
+  context: HarnessContext,
+): Promise<string> {
   const known = await knownAgents(deps);
   if (known === undefined) return DEFAULT_AGENT_NAME;
   const valid = known.filter((n) => isAgentName(n));
   if (valid.includes(DEFAULT_AGENT_NAME)) return DEFAULT_AGENT_NAME;
-  if (valid.length === 1) return valid[0];
-  if (valid.length > 1) return undefined;
+  if (valid.length > 0) {
+    const last = await readAppCurrent(deps.home, deps.uid === undefined ? {} : { uid: deps.uid });
+    const current = await chooseCurrentAgent(valid, last, appServes(context, apps));
+    if (current !== undefined) return current;
+  }
   const [app] = apps ?? [];
   if (apps?.length !== 1 || app === undefined) return DEFAULT_AGENT_NAME;
   return agentNameForApp(app);
@@ -723,23 +727,10 @@ export function createInitHandler(deps: InitDeps = nodeInitDeps()): CommandHandl
     else targets = await detectHarnesses(baseContext);
 
     // D5: named after the app unless `--agent` says otherwise.
-    const defaultName =
-      parsed.agent ?? (await defaultAgentName(deps, harnessValue === 'none' ? undefined : targets));
-    let picked: string | undefined;
-    if (defaultName === undefined) {
-      // M1-UX-MULTI-AGENT: the names (checked 06 §6 names only, agent-choice.ts) are listed; in the
-      // owner's own terminal one is picked by number. Nothing else about an agent is shown.
-      const names = validAgentNames((await knownAgents(deps)) ?? []);
-      if (checkOwnerTerminal(terminal).ok && confirmValue === undefined) {
-        picked = await pickAgent((text) => output.print(text), names, deps.readLine);
-      }
-      if (picked === undefined) {
-        output.printError(initText(INIT_TEXT.chooseAgent, startPrefix));
-        output.printError(AGENT_CHOICE_TEXT.namesLine(names));
-        return EXIT_USAGE;
-      }
-    }
-    const name: string = defaultName ?? picked ?? DEFAULT_AGENT_NAME;
+    // U3-b: never asked which agent; with several, the current one (defaultAgentName).
+    const name: string =
+      parsed.agent ??
+      (await defaultAgentName(deps, harnessValue === 'none' ? undefined : targets, baseContext));
     const existing = await readAgentConfig(
       deps.home,
       name,
