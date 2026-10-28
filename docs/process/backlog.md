@@ -5125,7 +5125,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit): no step advances on a timer or before a read; failed read keeps the step; reduced-motion; vocabulary lint and axe tests; no test weakened.
 
 #### UX2-f1 · node: per-contact activity pulse route (new, UX-WAVE-2 item 4, decision 4.1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (by path; read-only) · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (by path; read-only) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new `GET /api/ui/messages/pulse`), tests; changeset; 08 §1 edit marked "proposed, owner confirms at merge"
 - **Depends on:** —
 - **Spec:** 07 §3; 08 §1; B-11 §17.4
