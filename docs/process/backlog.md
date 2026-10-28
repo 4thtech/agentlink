@@ -5369,19 +5369,19 @@ Items from the orchestrator follow-up list of 28 Oct that no card covered yet. P
 - **Acceptance:**
   - Tests first (RED commit) for (b) and (c); no duplicated copy of the shared functions remains; behaviour of both views unchanged otherwise; reduced-motion and axe tests; no test weakened.
 
-#### DOCS-CHANGELOG-0.4.2-FIX · docs: fix stale 0.4.2 lines in the changelog and update README Status and Roadmap (new, low)
+#### DOCS-CHANGELOG-0.4.2-FIX · docs: the UX2-brief changelog line still says "planned (not built yet)" (new, low)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
-- **Repo/path:** agentlink · `CHANGELOG.md`, `README.md` (Status, Roadmap)
-- **Depends on:** the 0.4.2 release
+- **Repo/path:** agentlink · `CHANGELOG.md` (the UX2-brief line, about line 43)
+- **Depends on:** —
 - **Spec:** `docs/process/versioning.md`
 - **Invariants:** —
 - **Scope:**
-  - The released changelog lines for UX2-brief-0 ("waiting for owner approval, nothing built") and UX2-brief ("waiting for owner approval") are stale: both were approved, and UX2-a and UX2-b were built. Correct them without rewriting history beyond those lines, and bring README Status and Roadmap up to 0.4.2.
+  - The UX2-brief line says the rest of UX wave 2 is "planned (not built yet)", but parts of it have since shipped. Correct only that line to say what shipped and in which release. The UX2-brief-0 line and README Status and Roadmap are already current on main.
 - **Acceptance:**
-  - `node tools/docs-status/index.mjs --check` passes; no unimplemented feature claimed.
+  - Every feature named as shipped exists in a released version; `node tools/docs-status/index.mjs --check` passes.
 
 #### DOCS-UPGRADING-0.2.0-FEATURES · docs: upgrading-from-0.2.0 lists new features only up to 0.4.0 (new, low, pre-existing)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
+- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`docs-site/**`) · **Phase:** M1b
 - **Repo/path:** agentlink · `docs-site/guide/get-started/upgrading-from-0.2.0.md`
 - **Depends on:** DOCS-UPGRADING-0.2.0-FIX
 - **Spec:** `CHANGELOG.md`
@@ -5391,16 +5391,16 @@ Items from the orchestrator follow-up list of 28 Oct that no card covered yet. P
 - **Acceptance:**
   - Every listed feature exists in a released version; `node tools/docs-status/index.mjs --check` passes.
 
-#### CHORE-WIKI-SYNC-AFTER-0.4.3 · docs: re-run the wiki sync after v0.4.3 and fix the sync script (new, low)
+#### CHORE-WIKI-SYNC-AFTER-0.4.3 · wiki sync: test for the tag check, and re-sync from main after the 0.4.3 README update (new, low)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
-- **Repo/path:** agentlink · the wiki sync script (`sync-agentlink.mjs`) and its test; GitBook `wiki.4thtech.io` through the change-request flow
-- **Depends on:** the v0.4.3 tag
+- **Repo/path:** 4thtech/wiki.4thtech.io · `scripts/sync-agentlink.mjs` and its test
+- **Depends on:** wiki.4thtech.io PR #13 (tag check via `--points-at HEAD`, v0.4.3 sync, stray period removed); README Status update for 0.4.3 (#661)
 - **Spec:** DOCS-PUB; 26 Oct owner decision (one GitBook space)
 - **Invariants:** —
 - **Scope:**
-  - After the v0.4.3 tag, re-run the sync so synced pages stop linking to 0.4.1 bundles. Fix the script's tag check to use `git tag --points-at HEAD`. Remove the stray period in the 24 Oct news entry.
+  - Add a test for the tag check. After #661, re-sync with `--source` from main so synced pages carry the 0.4.3 Status. Edits go through a GitBook change request, never directly on published content.
 - **Acceptance:**
-  - The script test covers the tag check; synced pages link to the current release; edits go through a GitBook change request, never directly on published content.
+  - The test fails with the old tag check and passes with the new one; synced pages match main.
 
 ### Design system from the design (`packages/ui`, D-116)
 
