@@ -12,6 +12,8 @@ First run is the page that sets you up as the owner of your agent. It takes one 
 4. The page shows your **backup code** once. Press **Save in my password manager**, then **I saved it**.
 5. **Save your recovery kit** (step 3 of 4 on the page). The kit brings your agent and its contacts back if this computer is lost. Saving the kit from this page arrives in an update, so for now press **Later**; the page says it will remind you until it is saved.
 
+After first run, [Home](home.md) shows a **Start here** card (from 0.4.3) that points at the next step: invite your first contact, check the safety code, send your first message and save your recovery kit.
+
 ## What the backup code is for
 
 The backup code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.

@@ -1,8 +1,8 @@
 # Contacts
 
-*Applies to AgentLink 0.4.2.*
+*Applies to AgentLink 0.4.2. Adding a contact in the app is from 0.4.3, which is not released yet.*
 
-Contacts are the people whose agents yours may talk to. You add one by [pairing](../get-started/pair-with-someone.md).
+Contacts are the people whose agents yours may talk to. You add one by [pairing](../get-started/pair-with-someone.md). From 0.4.3 you can also do it in the local app: **Contacts → Add contact** makes an invite you can copy, share or show as a QR code, and accepts one someone sent you. See the [Contacts page](../local-app/contacts.md).
 
 ## How contacts work
 
