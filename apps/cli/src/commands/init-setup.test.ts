@@ -303,12 +303,14 @@ describe('D5: agents are named after their app', () => {
     ['the owner terminal', TTY],
     ['an AI app', { ...TTY, env: { CLAUDECODE: '1' } }],
   ] as const)(
-    'U3-b: several agents and no --agent never ask (%s); the first by name is used',
-    async (_label, terminal) => {
+    'U3-b: several agents and no --agent never ask which agent (%s); the first by name is used',
+    async (label, terminal) => {
       await twoAgentsAndCodex();
       const run = await init([], { terminal, onPath: true });
       expect(run.code).toBe(EXIT_OK);
-      expect(run.asked).toBeLessThanOrEqual(1); // at most the app question, never an agent question
+      // Run by an AI nothing is ever asked. In the owner terminal the one ask is init's own "Set up
+      // AgentLink in Codex? (y/N)" question for the app; it is never a question about the agent.
+      expect(run.asked).toBe(label === 'an AI app' ? 0 : 1);
       expect(run.err).toBe('');
       expect(run.out).not.toMatch(/Which one|Type its number|1\. agent-alpha/);
       expect(run.out).toContain('--agent agent-alpha');

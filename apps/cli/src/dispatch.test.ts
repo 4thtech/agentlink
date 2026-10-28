@@ -74,24 +74,24 @@ describe('--help (06 §8)', () => {
       'agentlink accept <url>',
       'agentlink contacts',
       // M1-9za.
-      'agentlink contacts rename <contactId> <name>',
-      'agentlink contacts remove <contactId>',
+      'agentlink contacts rename <contactId> <name> [--agent <name>]',
+      'agentlink contacts remove <contactId> [--agent <name>]',
       'agentlink requests [accept | ignore | block <requestId>]',
       // M1-9m.
-      'agentlink policy show',
-      'agentlink policy allow-folder <path>',
-      'agentlink policy remove-folder <path>',
+      'agentlink policy show [--agent <name>]',
+      'agentlink policy allow-folder <path> [--agent <name>]',
+      'agentlink policy remove-folder <path> [--agent <name>]',
       // M1-9m-b (D-100).
-      'agentlink policy recover',
+      'agentlink policy recover [--agent <name>]',
       // M1-36b-2-c.
-      'agentlink policy allow-send-folder',
+      'agentlink policy allow-send-folder [--agent <name>]',
       // M1-9h.
-      'agentlink credits [--topup]',
-      'agentlink verify <proof.json>',
-      'agentlink approve <approvalId>',
-      'agentlink approve',
-      'agentlink deny <approvalId>',
-      'agentlink cancel <approvalId>',
+      'agentlink credits [--topup] [--agent <name>]',
+      'agentlink verify <proof.json> [--agent <name>]',
+      'agentlink approve <approvalId> [--agent <name>]',
+      'agentlink approve [--agent <name>]',
+      'agentlink deny <approvalId> [--agent <name>]',
+      'agentlink cancel <approvalId> [--agent <name>]',
       'agentlink doctor',
       'agentlink mcp [--advanced]',
       // M1-11b-9.
@@ -118,15 +118,18 @@ describe('--help (06 §8)', () => {
     }
   });
 
-  it('U3-b: --agent is listed once, under Advanced, not on every command', () => {
-    const help = helpText();
-    const lines = help.split('\n');
+  it('U3-b: init and ui do not show --agent by default; the owner commands still do', () => {
+    const lines = helpText().split('\n');
     const advanced = lines.findIndex((l) => l.startsWith('Advanced'));
     expect(advanced).toBeGreaterThan(0);
-    // The only default-view lines with --agent are the ones that cannot work without it.
-    const before = lines.slice(0, advanced).filter((l) => l.includes('--agent'));
-    expect(before).toEqual(['  agentlink owner add-agent --agent <name>   †']);
-    expect(lines.slice(advanced).join('\n')).toContain('--agent <name>');
+    const shown = lines.slice(0, advanced);
+    for (const l of shown.filter((x) => /^ {2}agentlink (init|ui)\b/.test(x))) {
+      expect(l).not.toContain('--agent');
+    }
+    expect(shown.filter((l) => l.includes('agentlink approve'))[0]).toContain('[--agent <name>]');
+    const note = lines.slice(advanced).join('\n');
+    expect(note).toContain('never ask which one');
+    expect(note).toContain('still ask which agent');
   });
 
   it('U3-b: bare `agentlink` is the ui command with no arguments', async () => {

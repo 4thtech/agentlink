@@ -274,6 +274,10 @@ const HELP_GROUPS: readonly { readonly title: string; readonly names: readonly C
   { title: 'More:', names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'ui', 'mcp'] },
 ];
 
+/** U3-b: `init` and `ui` never ask which agent, so their `--agent` is not shown by default. */
+const hideAgentFlag = (line: string): string =>
+  /^agentlink (init|ui)\b/.test(line) ? line.replace(/ ?\[--agent <name>\]/, '') : line;
+
 /** The `--help` text: exactly the registered commands of 06 §8, grouped. */
 export function helpText(): string {
   const lines = [
@@ -289,15 +293,15 @@ export function helpText(): string {
     lines.push('', group.title);
     for (const name of group.names) {
       const spec = COMMANDS.find((command) => command.name === name);
-      for (const line of spec?.usage ?? [])
-        lines.push(`  ${line.replace(/ ?\[--agent <name>\]/, '')}`);
+      for (const line of spec?.usage ?? []) lines.push(`  ${hideAgentFlag(line)}`);
     }
   }
   // U3-b: AgentLink never asks which agent; `--agent` is for people who run several on purpose.
   lines.push(
     '',
     'Advanced:',
-    '  Add --agent <name> to a command to use a specific agent. Without it AgentLink uses your last used agent.',
+    '  `init` and `ui` use your last used agent, so they never ask which one. Add --agent <name> to use a specific agent.',
+    '  The owner commands marked † still ask which agent when you have several.',
   );
   lines.push('', 'Options: --help, --version');
   return lines.join('\n');
