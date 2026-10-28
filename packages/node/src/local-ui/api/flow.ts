@@ -13,14 +13,16 @@
 //   newest per line). Without it, the last minute (FLOW_DEFAULT_WINDOW_SECONDS); never older than 24
 //   hours, never after now. Any other query parameter, a repeated `since` or one that is not 1 to 12
 //   digits is 400 `bad_request`, never echoed.
-// - `cursor`: what to send as `since` next: the newest item's time, or a minute ago when that is
-//   later (a quiet poll moves on). It is only a time: it names no agent, contact or row, so a cursor
+// - `cursor`: what to send as `since` next: always a minute ago (IR-U3-flow-1). Never the newest
+//   item's time: a message stored late with an older time (a slow sender's clock) would then be
+//   skipped. Each poll sees the last minute again; the page keeps the newest per line, and the
+//   bounds below still hold. It is only a time: it names no agent, contact or row, so a cursor
 //   the page kept across an agent switch (a stale generation) only asks the new agent from that
 //   second on.
 // - `items`: newest first (then by contact, direction, kind, state); `direction` `in` or `out`;
 //   `kind` `message` or `file`; `state` `received` for an inbound one, else the delivery state
-//   (`queued`, `sent`, `not_delivered`); `at` the envelope's time. An item stamped after now
-//   (another agent's clock) is left out until its time comes, then listed.
+//   (`queued`, `sent`, `not_delivered`); `at` the envelope's time. An item stamped up to 5 minutes
+//   after now (another agent's clock) counts as now, like the pulse; a later one is left out.
 // - No progress: the store keeps no upload or download byte counts (07 §3; UX2-c found none), so
 //   no `bytesDone`/`bytesTotal` is sent and the page shows an indeterminate fill. None is invented.
 // - Bounded: at most FLOW_MAX_ITEMS items and FLOW_MAX_BYTES of JSON (a full item is about 127
@@ -49,6 +51,8 @@ export const FLOW_MAX_WINDOW_SECONDS = 86_400;
 /** A contact's ID: its agent's EVM address, lowercase (04 §2.9). */
 const CONTACT = /^0x[0-9a-f]{40}$/;
 const SINCE = /^[0-9]{1,12}$/;
+/** How far in the future another agent's clock may put an item and still count (as now). */
+const MAX_SKEW_SECONDS = 300;
 const IN_STATES: readonly string[] = Object.freeze(['received']);
 const OUT_STATES: readonly string[] = Object.freeze(['queued', 'sent', 'not_delivered']);
 const KINDS: readonly string[] = Object.freeze(['message', 'file']);
@@ -74,6 +78,7 @@ interface FlowItem {
 
 /** The allowlisted copy of one core event, or undefined when it does not fit (fail closed). */
 function itemOf(e: unknown, since: number, now: number): FlowItem | undefined {
+  const until = now + MAX_SKEW_SECONDS;
   if (typeof e !== 'object' || e === null) return undefined;
   const { contactId, direction, kind, state, at } = e as Record<string, unknown>;
   if (typeof contactId !== 'string' || !CONTACT.test(contactId)) return undefined;
@@ -81,8 +86,8 @@ function itemOf(e: unknown, since: number, now: number): FlowItem | undefined {
   if (typeof kind !== 'string' || !KINDS.includes(kind)) return undefined;
   const states = direction === 'in' ? IN_STATES : OUT_STATES;
   if (typeof state !== 'string' || !states.includes(state)) return undefined;
-  if (!isTime(at) || at < since || at > now) return undefined;
-  return { contactId, direction, kind, state, at };
+  if (!isTime(at) || at < since || at > until) return undefined;
+  return { contactId, direction, kind, state, at: Math.min(at, now) };
 }
 
 const order = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -104,7 +109,7 @@ export const flowRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
     const since = Math.max(0, now - FLOW_MAX_WINDOW_SECONDS, Math.min(asked, now));
     let read: unknown;
     try {
-      read = await client.messages.flowEvents(since, now);
+      read = await client.messages.flowEvents(since, now + MAX_SKEW_SECONDS);
     } catch {
       return UNAVAILABLE;
     }
@@ -131,11 +136,10 @@ export const flowRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
       partial = true;
     }
     // The size bound: drop the oldest until the whole answer fits (ASCII only: length is bytes).
-    const cursorOf = (): string =>
-      String(Math.max(items[0]?.at ?? 0, now - FLOW_DEFAULT_WINDOW_SECONDS, 0));
+    const cursor = String(Math.max(now - FLOW_DEFAULT_WINDOW_SECONDS, 0));
     const bodyOf = (): JsonObject => ({
       now,
-      cursor: cursorOf(),
+      cursor,
       items: items.map((i) => ({ ...i })),
       partial,
     });
