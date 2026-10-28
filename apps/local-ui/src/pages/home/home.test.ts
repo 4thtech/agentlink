@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// UI-REFRESH-g (S1): Home, five live tiles and the Next step card (B-11 §4, §7, §16, §17.4; plan §6).
+// UI-REFRESH-g (S1): Home, five live tiles and the Start here card (UX2-g replaced the Next step card) (B-11 §4, §7, §16, §17.4; plan §6).
 //
 // - It reads only existing read routes (health, activity, credits, contacts, the approvals list),
 //   shows a skeleton on first load, and every §4 state: first visit, fine, approvals waiting,
@@ -121,7 +121,12 @@ function setup(answers: Answers = {}): {
   const props: HomePageProps = {
     api: { get, post: vi.fn(), owner: vi.fn() } as unknown as ApiClient,
     approvals: { list },
-    nextStep: { passkey: async () => false, recoveryKit: () => false },
+    startHere: {
+      protect: async () => true,
+      contacts: async () => [],
+      sent: async () => true,
+      kitSaved: () => true,
+    },
     platform: 'mac',
     now: () => NOW,
   };
@@ -231,9 +236,10 @@ describe('Home: everything fine', () => {
     expect(tile('activity').textContent).not.toContain('You blocked a contact');
   });
 
-  it('has no Next step card when setup is complete', async () => {
+  it('has no Start here card when setup is complete', async () => {
     const { props } = setup();
     await mount(props);
+    expect(host.querySelector('[data-start-here]')).toBeNull();
     expect(host.querySelector('[data-next-step]')).toBeNull();
   });
 
@@ -253,58 +259,6 @@ describe('Home: everything fine', () => {
     const { props } = setup({ approvals: { kind: 'ok', items: [approval()] } });
     await mount(props);
     expect(host.querySelectorAll('[style]').length).toBe(0);
-  });
-});
-
-describe('Home: the Next step card', () => {
-  it('first visit with no contacts: the contact step, one button, one card', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount(props);
-    const cards = host.querySelectorAll('[data-next-step]');
-    expect(cards.length).toBe(1);
-    expect(cards[0]?.textContent).toContain(S.nextContactTitle);
-    expect(cards[0]?.querySelectorAll('a, button').length).toBe(1);
-    expect(cards[0]?.querySelector('a')?.getAttribute('href')).toBe('/settings/contacts');
-  });
-
-  it('puts the passkey step before the recovery kit and the contact', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount({
-      ...props,
-      nextStep: { passkey: async () => true, recoveryKit: () => true },
-    });
-    const card = host.querySelector('[data-next-step]');
-    expect(card?.textContent).toContain('Switch to Touch ID');
-    expect(card?.querySelector('a')?.getAttribute('href')).toBe('/first-run');
-    expect(host.querySelectorAll('[data-next-step]').length).toBe(1);
-  });
-
-  it('then the recovery kit', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount({ ...props, nextStep: { passkey: async () => false, recoveryKit: () => true } });
-    const card = host.querySelector('[data-next-step]');
-    expect(card?.textContent).toContain(S.nextKitTitle);
-    expect(card?.querySelector('a')?.getAttribute('href')).toBe('/settings/backup');
-  });
-
-  it('sits above the tiles', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount(props);
-    const card = host.querySelector('[data-next-step]') as HTMLElement;
-    const grid = host.querySelector('[data-tiles]') as HTMLElement;
-    expect(card.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('shows no step if a step check fails or the contacts cannot be read', async () => {
-    const { props } = setup({ contacts: { kind: 'error', status: 500 } });
-    await mount({
-      ...props,
-      nextStep: {
-        passkey: () => Promise.reject(new Error('x')),
-        recoveryKit: () => false,
-      },
-    });
-    expect(host.querySelector('[data-next-step]')).toBeNull();
   });
 });
 
@@ -598,6 +552,7 @@ describe('Home: one health poller with the shell', () => {
             path: '/settings/home',
             readHealth: shellRead,
             nextStep: async () => false,
+            startHere: { protect: async () => true, contacts: async () => [], sent: async () => true, kitSaved: () => true },
             unseenMessages: async () => 0,
           },
           h(HomePage, props),
