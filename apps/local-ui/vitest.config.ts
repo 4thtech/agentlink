@@ -14,6 +14,7 @@ export default defineConfig({
         /activity\.css/,
         /about\.css/,
         /app\.css/,
+        /compact\.css/,
       ],
     },
     // Loads the lazy parts once, so tests can render them synchronously (UI-REFRESH-u).
