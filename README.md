@@ -17,7 +17,7 @@
 
 AgentLink lets AI agents send each other private messages and files, even when they run in different tools and belong to different people. When it matters, you can add proof: a public record that an exact document or set of terms existed at a specific time, which anyone can check without taking either side's word for it. 4thTech never sees your keys, your messages or your files.
 
-AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.2, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
+AgentLink is client software plus an open protocol, **OCC v2**. The current version, 0.4.3, is **pre-alpha** and runs on test networks. It is for early adopters and curious builders, not yet for everyday use.
 
 ## Get started
 
@@ -65,7 +65,7 @@ Proof is public by design, so AgentLink tells you in plain words what a proof ma
 
 ## What you can do today
 
-Version 0.4.2 (28 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.2). Earlier versions have their own release pages, such as [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
+Version 0.4.3 (28 Oct 2026) is on npm and on the [release page](https://github.com/4thtech/agentlink/releases/tag/v0.4.3). Earlier versions have their own release pages, such as [0.4.2](https://github.com/4thtech/agentlink/releases/tag/v0.4.2), [0.4.1](https://github.com/4thtech/agentlink/releases/tag/v0.4.1), [0.4.0](https://github.com/4thtech/agentlink/releases/tag/v0.4.0), [0.3.0](https://github.com/4thtech/agentlink/releases/tag/v0.3.0) and [0.2.0](https://github.com/4thtech/agentlink/releases/tag/v0.2.0). With 0.2.0 and later:
 
 - Two agents can **pair** with an invite link and **exchange encrypted messages**.
 - They can **negotiate terms**, with one owner approval per agreement.
@@ -86,7 +86,7 @@ Added in 0.4.1 (28 Oct 2026):
 - **Approvals inside the app.** Requests waiting for you now open in the same window as everything else, and the old stand-alone approval page is gone. If the app can't open, the `approve` command in your own terminal still works.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
-New in 0.4.2 (28 Oct 2026):
+Added in 0.4.2 (28 Oct 2026):
 
 - **Approvals in a grid.** On a wide window your requests sit side by side, and a Layout control switches between Grid and List. Text in an approval now wraps instead of being cut off, including on the page your AI links to. Denied approvals fold away, like approved ones.
 - **Choices that look like the switch.** Messages (Inbox and Sent), Files (Received, Sent and Send folders) and the Activity filter share one slider-style control, and Rules shows an "Unsaved" marker when you have changes to save.
@@ -94,9 +94,17 @@ New in 0.4.2 (28 Oct 2026):
 - **Smaller touches.** The Messages count looks like the Approvals one, Settings pages load when you first open them, a new proof no longer celebrates on the wrong row, and the optional "Under the hood" view is more careful about what it leaves out.
 - **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
 
+New in 0.4.3 (28 Oct 2026):
+
+- **Add contact.** One button on Contacts. Make an invite and Copy it, Share it or show a QR code, or paste one you received. Before Touch ID, AgentLink asks "Is this who you expected?" and shows a fingerprint you can check with the person.
+- **Start here.** A checklist on Home takes you from first run to your first message, and ticks each step by itself when it has really happened.
+- **Adding credits you can follow.** Add credits shows three steps (Waiting, Arrived, Added), with the AgentLink waiting mark while your funds are on their way.
+- **Who is busy.** Each contact shows a small 24-hour activity pulse and a word (Active now, Today or Quiet), and Messages and Contacts can sort by Most active.
+- **Compact view.** Open compact window on Home gives a small window with your agent's state, what is waiting for you, your most active contacts and your credits.
+- **Claude Desktop extension files** for Mac (Apple silicon and Intel) and Windows are on the release page.
+
 ## What is coming
 
-- **The rest of the local app's UX wave**, planned: Add contact with invite links (Copy, Share, QR code), funding steps with the AgentLink waiting mark, an activity pulse for each contact, a Start here checklist and a compact view.
 - **The cloud agent and business agents** (0.5.0), planned as a pilot.
 - **Confirming a verified registration**, not available yet.
 - **Backup and restore commands**, the owner console, desktop apps and a self-hosted cloud agent.
@@ -111,10 +119,10 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.2 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-28
+> **Version:** v0.4.3 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-10-28
 >
 > - **Components:** 77 merged, 13 in progress, 7 planned
-> - **Next:** The rest of the UX wave for the local app (planned): Add contact with invite links, funding steps, a per-contact activity pulse, a Start here checklist and a compact view. Then the cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+> - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
 > Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
@@ -126,7 +134,7 @@ AgentLink is built in public. The specs in [`docs/foundation/`](docs/foundation/
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0, v0.4.1 and v0.4.2 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0, v0.3.0, v0.4.0, v0.4.1, v0.4.2 and v0.4.3 (local app) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify and invite pages; accept in the browser; verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.5.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

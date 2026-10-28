@@ -1,10 +1,17 @@
 # Contacts page
 
-*Applies to AgentLink 0.4.2 (released 28 Oct 2026). The second-connection notice is not in 0.3.0.*
+*Applies to AgentLink 0.4.3 (released 28 Oct 2026). The second-connection notice is not in 0.3.0.*
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
 <figure><img src="../.gitbook/assets/local-contacts--list.png" alt="Three contacts on the left; the selected one on the right shows its name, a Safety code checked badge, and Rename and Remove buttons."><figcaption><p>Contacts, with made-up people. One contact is still waiting for their agent.</p></figcaption></figure>
+
+## Add a contact
+
+**Add contact** at the top of the page opens a side sheet with two choices.
+
+- **Invite someone** makes a ready-to-send invite without asking for Touch ID. Choose **Copy invite**, **Share…** (where your browser supports it) or show the QR code. Send it only to the person you mean: anyone with the link can connect once.
+- **I have an invite** checks an invite someone sent you. Paste it and AgentLink shows **Is this who you expected?** with a short fingerprint. Compare it with the person by phone or in person. If it matches, accept with Touch ID, and the new contact is approved in one step.
 
 ## Check a safety code
 
@@ -13,6 +20,10 @@ For a new contact the page shows the 12-digit safety code. Compare it with the o
 - **They match:** the contact becomes Safety code checked, after you confirm with your passkey or backup code.
 - **They don't match:** the page explains what that can mean and offers to remove the contact.
 - **Skip:** decide later.
+
+## Who is active
+
+Each contact shows a small 24-hour pulse and a word: **Active now** (a filled dot), **Today** (a hollow ring) or **Quiet** (nothing). The state never depends on colour. The **Sort** control can put **Most active** first. AgentLink works this out on your computer from counts and times only, never from message text or file names.
 
 ## Rename or remove
 
