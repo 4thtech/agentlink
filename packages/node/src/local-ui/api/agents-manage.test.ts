@@ -167,13 +167,12 @@ function owner(addOutcome: 'done' | 'failed' = 'done'): Owner {
   return { operation, reviews, requests, added };
 }
 
-const run = (
-  r: LocalUiOwnerRoute,
-  w: World,
-  o: Owner,
-  input: unknown,
-): Promise<LocalUiResult> =>
-  r.handler(w.context, { params: {}, query: new URLSearchParams(), input: input as never }, o.operation);
+const run = (r: LocalUiOwnerRoute, w: World, o: Owner, input: unknown): Promise<LocalUiResult> =>
+  r.handler(
+    w.context,
+    { params: {}, query: new URLSearchParams(), input: input as never },
+    o.operation,
+  );
 
 describe('the U3-d routes are registered once and replace the U3-c stubs', () => {
   it('registers label-check, create and rename; none is a stub', () => {
@@ -215,9 +214,13 @@ describe('GET /api/ui/agents/label-check', () => {
       ['label', 'a'],
       ['label', 'b'],
     ]);
-    expect((await labelCheck.handler(world().context, { params: {}, query: twice })).status).toBe(400);
+    expect((await labelCheck.handler(world().context, { params: {}, query: twice })).status).toBe(
+      400,
+    );
     const extra = new URLSearchParams({ label: 'a', name: 'x' });
-    expect((await labelCheck.handler(world().context, { params: {}, query: extra })).status).toBe(400);
+    expect((await labelCheck.handler(world().context, { params: {}, query: extra })).status).toBe(
+      400,
+    );
   });
 });
 
@@ -284,8 +287,7 @@ describe('POST /api/ui/agents/label (rename; signs agent.label)', () => {
     const client = w.context.client as unknown as {
       agent: { prepareLabel: (l: string) => Promise<PreparedOwnerAction> };
     };
-    client.agent.prepareLabel = (label) =>
-      Promise.resolve(prepared(label, '0x' + '77'.repeat(20)));
+    client.agent.prepareLabel = (label) => Promise.resolve(prepared(label, '0x' + '77'.repeat(20)));
     const o = owner();
     const result = await run(rename, w, o, { name: 'personal', label: 'Home' });
     expect(result.status).toBeGreaterThanOrEqual(400);

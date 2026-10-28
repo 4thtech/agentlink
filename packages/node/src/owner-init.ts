@@ -43,7 +43,12 @@ import {
   type KeyStoreBackendKind,
   type KeychainBackend,
 } from './keychain.js';
-import { FirstCardSession, type FirstAgentCard } from './owner-first-card.js';
+import type { FirstAgentCard } from './owner-first-card.js';
+import {
+  signFirstParts,
+  type FirstLabelResult,
+  type FirstPartsResult,
+} from './owner-first-label.js';
 import {
   keepsFolder,
   notAttempted,
@@ -51,7 +56,6 @@ import {
   removeCreated,
   sendFolderOutcome,
   sendFolderReview,
-  signFirstPolicy,
   type SendFolderPlan,
   type SendFolderResult,
 } from './owner-first-policy.js';
@@ -320,6 +324,8 @@ export type FirstCardOutcome =
       readonly card: AgentCard;
       /** M1-36b-2: the first rules, when a ready Send folder plan was given. */
       readonly sendFolder?: SendFolderResult;
+      /** U3-d: the first label, when the card carried `firstLabel`. */
+      readonly label?: FirstLabelResult;
     }
   /** No verified card naming this owner is stored: the caller rolls the new owner back. */
   | { readonly kind: 'not_signed' }
@@ -342,7 +348,7 @@ export async function signFirstCardWith(
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
   plan?: SendFolderPlan,
 ): Promise<FirstCardOutcome> {
-  let sendFolder: SendFolderResult | undefined;
+  let parts: FirstPartsResult = {};
   try {
     const store = await KeychainOwnerKeyStore.open(keychain, owner, { timeoutMs });
     try {
@@ -351,22 +357,13 @@ export async function signFirstCardWith(
         { kind: 'passphrase', secret: secret.slice() },
         { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
       );
-      const session = new FirstCardSession(inner, first.agent, owner);
       try {
-        await first.identity.init({
-          owner: session,
-          ownerKeys: owner,
-          name: first.name,
-          relays: first.relays,
-        });
-        // M1-36b-2: the first rules, with the same unlocked owner session (one entry), only after
-        // the card is stored and verified (signFirstPolicy checks it again).
-        const { firstPolicy } = first;
-        if (plan?.status === 'ready' && firstPolicy !== undefined) {
-          sendFolder = await signFirstPolicy(inner, { ...first, firstPolicy }, plan, owner);
-        }
+        // The card through the restricted one-card session; then, with the same unlocked owner
+        // session (one entry), the first rules (M1-36b-2) and the first label (U3-d), each only
+        // after the card is stored and verified, and each checked byte for byte before signing.
+        parts = await signFirstParts(inner, owner, first, plan);
       } finally {
-        await session.close();
+        await inner.close();
       }
     } finally {
       await store.close();
@@ -374,6 +371,7 @@ export async function signFirstCardWith(
   } catch {
     // Decided below from what core stored, never from the error (whose text is not shown).
   }
+  const { sendFolder, label } = parts;
   let stored: Awaited<ReturnType<FirstAgentCard['identity']['get']>>;
   try {
     stored = await first.identity.get();
@@ -385,6 +383,7 @@ export async function signFirstCardWith(
       kind: 'signed',
       card: stored.card,
       ...(sendFolder === undefined ? {} : { sendFolder }),
+      ...(label === undefined ? {} : { label }),
     };
   }
   return { kind: 'not_signed' };

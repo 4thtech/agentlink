@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { agentSlug, createAgentFolder, discardNewAgentFolder } from './agent-create.js';
-import { readAgentConfig, writeAgentConfig } from './agent-dir.js';
+import { agentDirectory, readAgentConfig, writeAgentConfig } from './agent-dir.js';
 import { isAgentName } from './agent-name.js';
 
 const newId = (): string => `0x${encodeHex(randomBytes(20))}`;
@@ -58,7 +58,9 @@ describe('createAgentFolder and discardNewAgentFolder (U3-d)', () => {
   it('creates a keychain agent in a new folder named from the label, with no label yet', async () => {
     await writeAgentConfig(home, { v: 1, name: 'work', agentId: newId(), keyStore: 'keychain' });
     const agentId = newId();
-    const name = await createAgentFolder(home, 'Work', { createAgent: () => Promise.resolve(agentId) });
+    const name = await createAgentFolder(home, 'Work', {
+      createAgent: () => Promise.resolve(agentId),
+    });
     expect(name).toBe('work-2');
     const found = await readAgentConfig(home, name);
     expect(found?.config).toEqual({ v: 1, name: 'work-2', agentId, keyStore: 'keychain' });
@@ -83,7 +85,9 @@ describe('createAgentFolder and discardNewAgentFolder (U3-d)', () => {
     const other = newId();
     await writeAgentConfig(home, { v: 1, name: 'personal', agentId: other, keyStore: 'keychain' });
     const agentId = newId();
-    const name = await createAgentFolder(home, 'Work', { createAgent: () => Promise.resolve(agentId) });
+    const name = await createAgentFolder(home, 'Work', {
+      createAgent: () => Promise.resolve(agentId),
+    });
     const discarded: string[] = [];
     await discardNewAgentFolder(home, name, {
       discardKeys: (id) => {
@@ -94,5 +98,34 @@ describe('createAgentFolder and discardNewAgentFolder (U3-d)', () => {
     expect(discarded).toEqual([agentId]);
     expect(await readdir(join(home, '.agentlink', 'agents'))).toEqual(['personal']);
     expect((await readAgentConfig(home, 'personal'))?.config.agentId).toBe(other);
+  });
+});
+
+describe('agentDirectory create and discardNew (U3-d)', () => {
+  it('discardNew removes only an agent this directory created, once', async () => {
+    const existing = newId();
+    await writeAgentConfig(home, {
+      v: 1,
+      name: 'personal',
+      agentId: existing,
+      keyStore: 'keychain',
+    });
+    const discarded: string[] = [];
+    const made = newId();
+    const directory = agentDirectory(home, {
+      createAgent: () => Promise.resolve(made),
+      discardKeys: (id) => {
+        discarded.push(id);
+        return Promise.resolve();
+      },
+    });
+    await expect(directory.discardNew?.('personal')).rejects.toBeDefined();
+    expect(discarded).toEqual([]);
+    const name = await directory.create?.('Work agent');
+    expect(name).toBe('work-agent');
+    await directory.discardNew?.(name ?? '');
+    expect(discarded).toEqual([made]);
+    await expect(directory.discardNew?.(name ?? '')).rejects.toBeDefined();
+    expect(await readdir(join(home, '.agentlink', 'agents'))).toEqual(['personal']);
   });
 });

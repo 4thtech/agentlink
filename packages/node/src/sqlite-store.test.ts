@@ -530,6 +530,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     expect(v7.length).toBeGreaterThan(0);
     expect(v7.every((st) => st.includes('"local_owner_actions"'))).toBe(true);
     expect(v7[0]).toMatch(/^CREATE TABLE "local_owner_actions" \(/);
+    expect(digestOf(6)).toBe('4a2c345f5568856e05a29aeef0996efa642dbdeb2c50fe09bffb894ef709a32a');
   });
 
   it('migrates a version 6 file to version 7 (U3-d): every row kept, local_owner_actions added', async () => {
@@ -807,12 +808,12 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const v1 = await SqliteStore.open(path());
     await v1.transaction((tx) => tx.insert('seen', seen('kept')));
     await v1.close();
-    const v7: StoreMigration = {
-      version: 7,
+    const next: StoreMigration = {
+      version: STORE_SCHEMA_VERSION + 1,
       statements: ['CREATE INDEX "seen__by_time" ON "seen" ("first_seen_at")'],
     };
-    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, v7] });
-    expect(migrated.schemaVersion).toBe(7);
+    const migrated = await SqliteStore.open(path(), { migrations: [...MIGRATIONS, next] });
+    expect(migrated.schemaVersion).toBe(STORE_SCHEMA_VERSION + 1);
     expect(await migrated.transaction((tx) => tx.count('seen'))).toBe(1);
     const check = new Database(path(), { readonly: true });
     expect(
@@ -828,7 +829,7 @@ describe('SqliteStore: file, schema and migrations (07 §3.7)', () => {
     const error = await rejects(SqliteStore.open(path()));
     expect((error as NodeStoreError).code).toBe('store_too_new');
     const raw = new Database(path(), { readonly: true });
-    expect(raw.pragma('user_version', { simple: true })).toBe(7);
+    expect(raw.pragma('user_version', { simple: true })).toBe(STORE_SCHEMA_VERSION + 1);
     raw.close();
   });
 

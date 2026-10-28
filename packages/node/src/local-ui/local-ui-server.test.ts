@@ -912,6 +912,8 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     // M1-11c-a1 adds the activity feed read, M1-11c-a2 the contacts read, M1-11c-a4 the proofs read (context.ts).
     // MSG-FILES-IO-c adds the read-only messages view.
     expect(Object.keys(client as object).sort()).toEqual([
+      // U3-d: the verified label and the unsigned agent.label (reads and prepare only).
+      'agent',
       'agentId',
       'contacts',
       'files',

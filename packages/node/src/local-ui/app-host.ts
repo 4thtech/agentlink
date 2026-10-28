@@ -35,6 +35,7 @@
 // items (04 §2.8 "Logical isolation", G-1).
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiOptions } from './context.js';
+import type { FirstAgentCard } from '../owner-first-card.js';
 
 /** One agent folder as the directory reports it. Never a path. */
 export interface AgentDirectoryEntry {
@@ -67,6 +68,17 @@ export interface AgentDirectory {
   stats(name: string): Promise<AgentDirectoryStats | undefined>;
   /** Card U3-d: writes the verified label into config.json (07 §9.1). */
   writeLabel(name: string, label: string): Promise<void>;
+  /**
+   * Card U3-d: creates a keychain agent in a new folder whose name is a slug of `label` (06 §6), made
+   * unique with a suffix; config.json holds no label yet (it is written only after the signed
+   * `agent.label` was verified). Returns the folder name.
+   */
+  create?(label: string): Promise<string>;
+  /**
+   * Card U3-d: removes an agent that `create` made and that was not completed (all or nothing): its
+   * keychain items and its folder. Only ever called for an agent this process just created.
+   */
+  discardNew?(name: string): Promise<void>;
   /** Card U3-e: writes `removing: true` into config.json before anything is deleted. */
   markRemoving(name: string): Promise<void>;
   /** Card U3-e: deletes the agent folder's known files and the folder (no recursive delete). */
@@ -85,6 +97,11 @@ export interface AppHostAgent {
   readonly source: ApprovalServerSource;
   /** The per-agent local UI options; `assets` are the server's and never change on a switch. */
   readonly localUi: Omit<LocalUiOptions, 'assets'>;
+  /**
+   * U3-d: the agent's own card parts with its core actions (the CLI wiring), for the first card of
+   * an agent created from the app. Absent: this agent cannot be given its first parts here.
+   */
+  readonly firstCard?: FirstAgentCard;
   /** Closes the agent: relay connections, store, KeyStore and its shared folder lock. Idempotent. */
   close(): Promise<void>;
 }
@@ -150,6 +167,17 @@ export class AppHostSlot {
   /** The open agent's name, or undefined when none is open. */
   get current(): string | undefined {
     return this.#agent?.name;
+  }
+
+  /**
+   * U3-d: opens an agent this host just created, for its first parts only, without switching to it
+   * (the open agent and the generation stay). The caller closes it. Undefined when it cannot open.
+   */
+  openNew(name: string): Promise<AppHostAgent | undefined> {
+    if (!HOST_AGENT_NAME.test(name) || name === this.#agent?.name) {
+      return Promise.resolve(undefined);
+    }
+    return this.#options.open(name).catch(() => undefined);
   }
 
   get directory(): AgentDirectory {

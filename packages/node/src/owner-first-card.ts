@@ -23,9 +23,11 @@ import type {
   InitIdentityInput,
   OwnerActionOutcome,
   PolicyEditOptions,
+  PreparedOwnerAction,
   PreparedPolicyEdit,
 } from '@4thtech-io/core';
 import { allowedTypedData, ownerOperationRefused } from './owner-allowlist.js';
+import type { FirstLabel, FirstLabelActions } from './owner-first-label.js';
 
 /** What `owner init` needs of core's IdentityService (`client.identity`). */
 export interface FirstCardIdentity {
@@ -50,6 +52,11 @@ export interface FirstAgentCard {
    * (owner-first-policy.ts). Omitted: only the card is signed.
    */
   readonly firstPolicy?: FirstPolicy;
+  /**
+   * U3-d (D-138): the agent's first `agent.label`, signed after the card (and the first rules) in the
+   * same gesture (owner-first-label.ts). Omitted: no label is signed (the folder name is shown).
+   */
+  readonly firstLabel?: FirstLabel;
 }
 
 /** What the first rules need of core's OwnerActions (`client.ownerActions`). */
@@ -58,6 +65,23 @@ export interface FirstPolicyActions {
   preparePolicyEdit(patch: unknown, options?: PolicyEditOptions): Promise<PreparedPolicyEdit>;
   /** Verifies and applies one SignedOwnerAction (owner signature, nonce, version). */
   apply(input: object): Promise<OwnerActionOutcome>;
+  /**
+   * U3-d: builds the unsigned `agent.label` (core `prepareLabel`), for the first label signed with
+   * the first rules (first run with a name, Add an agent). Absent: no first label can be signed.
+   */
+  prepareLabel?(label: string): Promise<PreparedOwnerAction>;
+}
+
+/** U3-d: the first-label actions of `actions`, when it can prepare one (core OwnerActions can). */
+export function labelActionsOf(
+  actions: FirstPolicyActions | undefined,
+): FirstLabelActions | undefined {
+  const prepare = actions?.prepareLabel;
+  if (actions === undefined || prepare === undefined) return undefined;
+  return Object.freeze<FirstLabelActions>({
+    prepareLabel: (label) => prepare.call(actions, label),
+    apply: (input) => actions.apply(input),
+  });
 }
 
 /** M1-36b-2: the first rules: the 06 §3 defaults plus the empty `~/AgentLink/Send` folder. */

@@ -13,6 +13,7 @@
 // I-7: no name, label or path is logged; failures are a plain `undefined`.
 import type { AgentDirectory, AppHostAgent, LocalUiOptions } from '@4thtech-io/node';
 import { createUiApprovalSource } from '../approval/ui-source.js';
+import { newAgentFirstCard } from '../mcp/local-ui-wiring.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
 
 /** The per-agent part of the local UI options: everything but the app's files. */
@@ -59,6 +60,8 @@ export async function openUiHostAgent(
       label: entry.label,
       source,
       localUi,
+      // U3-d: its card parts, used only when the app just created this agent (first parts).
+      firstCard: newAgentFirstCard(agent),
       close: () => agent.close(),
     });
   } catch {

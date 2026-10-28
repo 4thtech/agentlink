@@ -20,7 +20,6 @@ import {
 } from '@4thtech-io/core';
 import {
   encodeHex,
-  type JsonObject,
   type KeyStore,
   type OwnerPublicKeys,
   type OwnerSession,
@@ -34,6 +33,9 @@ import { signNewAgent } from './owner-add-agent.js';
 import type { FirstAgentCard } from './owner-first-card.js';
 import { signFirstLabel, type FirstLabelActions } from './owner-first-label.js';
 import { prepareSendFolder } from './owner-first-policy.js';
+
+/** A mutable copy of a prepared body, for the tamper cases. */
+type Mut = Record<string, unknown>;
 
 const RELAYS = ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'];
 
@@ -234,11 +236,11 @@ describe('signFirstLabel (U3-d): only exactly this agent, owner and label', () =
 
   it('refuses a prepared body that is wider than the label the page showed', async () => {
     const { agent, keys, session, signed } = await carded();
-    const tamper = (edit: (body: JsonObject) => void): FirstLabelActions => ({
+    const tamper = (edit: (body: Mut) => void): FirstLabelActions => ({
       prepareLabel: async (label) => {
         const prepared = await agent.client.ownerActions.prepareLabel(label);
         if (prepared.status !== 'prepared') return prepared;
-        const body = JSON.parse(JSON.stringify(prepared.body)) as JsonObject;
+        const body = JSON.parse(JSON.stringify(prepared.body)) as Mut;
         edit(body);
         return { ...prepared, body } as unknown as PreparedOwnerAction;
       },
@@ -246,13 +248,13 @@ describe('signFirstLabel (U3-d): only exactly this agent, owner and label', () =
     });
     const other = '0x' + '77'.repeat(20);
     for (const edit of [
-      (b: JsonObject) => void ((b['params'] as JsonObject)['label'] = 'Other'),
-      (b: JsonObject) => void ((b['params'] as JsonObject)['agent'] = other),
-      (b: JsonObject) => void (b['agent'] = other),
-      (b: JsonObject) => void (b['op'] = 'contact.rename'),
-      (b: JsonObject) => void (b['expiresAt'] = Number(b['issuedAt']) + 601),
-      (b: JsonObject) => void (b['owner'] = 'ab'.repeat(32)),
-      (b: JsonObject) => void (b['extra'] = 1),
+      (b: Mut) => void ((b['params'] as Mut)['label'] = 'Other'),
+      (b: Mut) => void ((b['params'] as Mut)['agent'] = other),
+      (b: Mut) => void (b['agent'] = other),
+      (b: Mut) => void (b['op'] = 'contact.rename'),
+      (b: Mut) => void (b['expiresAt'] = Number(b['issuedAt']) + 601),
+      (b: Mut) => void (b['owner'] = 'ab'.repeat(32)),
+      (b: Mut) => void (b['extra'] = 1),
     ]) {
       const before = signed.length;
       const result = await signFirstLabel(session, agent.agentId, keys, {

@@ -45,6 +45,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
+      // U3-d: removes the keychain items of an agent the app just created (agentId-derived names
+      // only; never the owner's items), when it could not be completed.
+      'discardNewOsKeychainAgent',
       // M1-9x: a store-only boolean (owner item present); no bytes, no secret, nothing unlocked.
       'hasOwnerOnMachine',
       // M1-9z: a store-only boolean (a leftover owner-code change); nothing unlocked.
