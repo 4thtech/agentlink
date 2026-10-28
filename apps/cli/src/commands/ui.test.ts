@@ -36,9 +36,12 @@ interface Script {
   readonly opens?: boolean | 'throws';
   readonly stop?: 'soon' | 'never';
   readonly waitMs?: number;
-  /** M1-UX-MULTI-AGENT: the local agent names on this computer. */
+  /** The local agent names on this computer. */
   readonly agents?: readonly string[];
-  readonly answers?: readonly string[];
+  /** U3-b: the last used agent (app.json). */
+  readonly last?: string;
+  /** U3-b: the agents an AI app serves. */
+  readonly serves?: readonly string[];
 }
 
 function fakeDeps(script: Script) {
@@ -49,14 +52,14 @@ function fakeDeps(script: Script) {
     unsubscribed: 0,
     names: [] as (string | undefined)[],
   };
-  const answers = [...(script.answers ?? [])];
   let stop: (() => void) | undefined;
   const deps: UiDeps = {
     ...(script.agents === undefined
       ? {}
       : {
           agents: () => Promise.resolve(script.agents ?? []),
-          readLine: () => Promise.resolve(answers.shift() ?? ''),
+          lastUsed: () => Promise.resolve(script.last),
+          serves: (name: string) => Promise.resolve((script.serves ?? []).includes(name)),
         }),
     start: (name) => {
       calls.start += 1;
@@ -220,47 +223,46 @@ describe('agentlink ui is not an MCP tool (M1-11b-9)', () => {
   });
 });
 
-describe('agentlink ui on a computer with several agents (M1-UX-MULTI-AGENT)', () => {
-  const TWO = ['agent-alpha', 'agent-beta'];
+describe('agentlink ui never asks which agent (U3-b)', () => {
+  const FOUR = ['agent-a', 'agent-b', 'agent-c', 'agent-d'];
 
-  it('without --agent it lists the names and offers a numbered pick, then opens that agent', async () => {
+  it.each([[[]], [['solo']], [FOUR]])('with %j nothing is asked', async (agents) => {
     const p = probe(TTY);
-    const { deps, calls } = fakeDeps({ agents: TWO, answers: ['2'] });
-    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
-    expect(calls.names).toEqual(['agent-beta']);
-    const all = p.out.join('\n');
-    expect(all).toContain('1. agent-alpha');
-    expect(all).toContain('2. agent-beta');
-    expect(p.err).toEqual([]);
+    const { deps } = fakeDeps({ agents, start: agents.length === 0 ? 'none' : undefined });
+    await uiStep(p.context, deps, PREFIX);
+    expect(p.out.join('\n')).not.toMatch(/Which one|Type its number|1\. /);
+    expect(p.err.join('\n')).not.toMatch(/more than one|--agent <name>/);
   });
 
-  it.each(['', '0', '3', 'agent-gamma', 'x'])(
-    'a bad pick (%j) starts nothing, says "more than one agent" and names the --agent command',
-    async (answer) => {
-      const p = probe(TTY);
-      const { deps, calls } = fakeDeps({ agents: TWO, answers: [answer] });
-      await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
-      expect(calls.start).toBe(0);
-      const err = p.err.join('\n');
-      expect(err).toContain('more than one');
-      expect(err).toContain(`${PREFIX} ui --agent <name>`);
-      expect(err).not.toContain(UI_TEXT.notReady(PREFIX));
-    },
-  );
-
-  it('with --agent nothing is asked and the name is used', async () => {
-    const p = probe(TTY, 'agent-alpha');
-    const { deps, calls } = fakeDeps({ agents: TWO });
+  it('opens the last used agent (app.json)', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ agents: FOUR, last: 'agent-c', serves: ['agent-b'] });
     await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
-    expect(calls.names).toEqual(['agent-alpha']);
-    expect(p.out.join('\n')).not.toContain('1. agent-alpha');
+    expect(calls.names).toEqual(['agent-c']);
   });
 
-  it('a default agent is used without asking', async () => {
+  it('else the agent an AI app serves, default first', async () => {
     const p = probe(TTY);
-    const { deps, calls } = fakeDeps({ agents: ['default', 'agent-beta'] });
+    const { deps, calls } = fakeDeps({
+      agents: ['agent-a', 'agent-b', 'default'],
+      serves: ['agent-b', 'default'],
+    });
     await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
     expect(calls.names).toEqual([undefined]);
+  });
+
+  it('else the first by name', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ agents: FOUR });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls.names).toEqual(['agent-a']);
+  });
+
+  it('with --agent the name is used', async () => {
+    const p = probe(TTY, 'agent-b');
+    const { deps, calls } = fakeDeps({ agents: FOUR, last: 'agent-c' });
+    await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls.names).toEqual(['agent-b']);
   });
 
   it('no agent at all keeps the "not set up here yet" line', async () => {
@@ -270,12 +272,18 @@ describe('agentlink ui on a computer with several agents (M1-UX-MULTI-AGENT)', (
     expect(p.err).toEqual([UI_TEXT.notReady(PREFIX)]);
   });
 
-  it('run by an AI the fixed line stays and no names are listed', async () => {
+  it('run by an AI the fixed line stays and nothing is looked up', async () => {
     const p = probe(AGENT);
-    const { deps, calls } = fakeDeps({ agents: TWO });
+    const { deps, calls } = fakeDeps({ agents: FOUR });
     await expect(uiStep(p.context, deps, PREFIX)).resolves.toBe(EXIT_FAILED);
     expect(calls.start).toBe(0);
     expect(p.err).toEqual([UI_TEXT.agentRun(PREFIX)]);
     expect(p.out).toEqual([]);
   });
+
+  it('the picker is gone', async () => {
+    const dir = fileURLToPath(new URL('.', import.meta.url));
+    await expect(readFile(join(dir, 'agent-choice.ts'), 'utf8')).rejects.toThrow();
+  });
 });
+

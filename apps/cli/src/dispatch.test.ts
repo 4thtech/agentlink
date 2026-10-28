@@ -64,38 +64,38 @@ describe('--help (06 §8)', () => {
     ]);
     const help = helpText();
     for (const usage of [
-      'agentlink init [--agent <name>]',
+      'agentlink init',
       'agentlink owner init',
       'agentlink owner add-agent --agent <name>',
       'agentlink owner change-code',
-      'agentlink init [--agent <name>] [--harness <id|none>] [--config <path>]',
+      'agentlink init [--harness <id|none>] [--config <path>]',
       'agentlink status [--brief]',
       'agentlink invite',
       'agentlink accept <url>',
       'agentlink contacts',
       // M1-9za.
-      'agentlink contacts rename <contactId> <name> [--agent <name>]',
-      'agentlink contacts remove <contactId> [--agent <name>]',
+      'agentlink contacts rename <contactId> <name>',
+      'agentlink contacts remove <contactId>',
       'agentlink requests [accept | ignore | block <requestId>]',
       // M1-9m.
-      'agentlink policy show [--agent <name>]',
-      'agentlink policy allow-folder <path> [--agent <name>]',
-      'agentlink policy remove-folder <path> [--agent <name>]',
+      'agentlink policy show',
+      'agentlink policy allow-folder <path>',
+      'agentlink policy remove-folder <path>',
       // M1-9m-b (D-100).
-      'agentlink policy recover [--agent <name>]',
+      'agentlink policy recover',
       // M1-36b-2-c.
-      'agentlink policy allow-send-folder [--agent <name>]',
+      'agentlink policy allow-send-folder',
       // M1-9h.
-      'agentlink credits [--topup] [--agent <name>]',
-      'agentlink verify <proof.json> [--agent <name>]',
-      'agentlink approve <approvalId> [--agent <name>]',
-      'agentlink approve [--agent <name>]',
-      'agentlink deny <approvalId> [--agent <name>]',
-      'agentlink cancel <approvalId> [--agent <name>]',
+      'agentlink credits [--topup]',
+      'agentlink verify <proof.json>',
+      'agentlink approve <approvalId>',
+      'agentlink approve',
+      'agentlink deny <approvalId>',
+      'agentlink cancel <approvalId>',
       'agentlink doctor',
       'agentlink mcp [--advanced]',
       // M1-11b-9.
-      'agentlink ui [--agent <name>]',
+      'agentlink ui',
     ]) {
       expect(help).toContain(usage);
     }
@@ -109,13 +109,51 @@ describe('--help (06 §8)', () => {
     expect(commandLines).toHaveLength(26);
   });
 
-  it('prints help for no arguments, --help, -h and help', async () => {
+  it('prints help for --help, -h and help', async () => {
     const dispatch = createDispatcher();
-    for (const argv of [[], ['--help'], ['-h'], ['help']]) {
+    for (const argv of [['--help'], ['-h'], ['help']]) {
       const t = io();
       expect(await dispatch(argv, t.value)).toBe(EXIT_OK);
       expect(t.out).toEqual([helpText()]);
     }
+  });
+
+  it('U3-b: --agent is listed once, under Advanced, not on every command', () => {
+    const help = helpText();
+    const lines = help.split('\n');
+    const advanced = lines.findIndex((l) => l.startsWith('Advanced'));
+    expect(advanced).toBeGreaterThan(0);
+    // The only default-view lines with --agent are the ones that cannot work without it.
+    const before = lines.slice(0, advanced).filter((l) => l.includes('--agent'));
+    expect(before).toEqual(['  agentlink owner add-agent --agent <name>   †']);
+    expect(lines.slice(advanced).join('\n')).toContain('--agent <name>');
+  });
+
+  it('U3-b: bare `agentlink` is the ui command with no arguments', async () => {
+    const r = recorder();
+    const t = io();
+    expect(await createDispatcher({ ui: r.handler })([], t.value)).toBe(EXIT_OK);
+    expect(r.calls).toHaveLength(1);
+    expect(r.calls[0]?.command).toBe('ui');
+    expect(r.calls[0]?.parsed.positionals).toEqual([]);
+    expect(r.calls[0]?.parsed.agent).toBeUndefined();
+    expect(t.out).toEqual([]);
+  });
+
+  it('U3-b: bare `agentlink` run by an AI prints the fixed ui line and opens nothing', async () => {
+    const { uiHandler, UI_TEXT } = await import('./commands/ui.js');
+    const { cliPrefix } = await import('./runtime/cli-prefix.js');
+    const t = io({ stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } });
+    expect(await createDispatcher({ ui: uiHandler })([], t.value)).toBe(EXIT_FAILED);
+    expect(t.err).toEqual([UI_TEXT.agentRun(cliPrefix())]);
+    expect(t.out).toEqual([]);
+  });
+
+  it('U3-b: `help` stays the help text even with a ui handler', async () => {
+    const r = recorder();
+    const t = io();
+    await createDispatcher({ ui: r.handler })(['help'], t.value);
+    expect(r.calls).toHaveLength(0);
   });
 
   it('prints the version', async () => {
