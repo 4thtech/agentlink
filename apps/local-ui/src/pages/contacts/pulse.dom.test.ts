@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../api/client.js';
 import { resetPrefsForTests } from '../../prefs/store.js';
-import { ContactsPage } from './index.js';
+import { ContactsPage, type ContactsPageProps } from './index.js';
 import { createOwnerClient } from './owner.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -74,7 +74,9 @@ function fetchFor(pulse: () => Response): typeof fetch {
       return pulse();
     }
     if (url === '/api/owner/passkey') {
-      return json({ passkey: { registered: false, rpId: 'localhost', userId: 'AA', prfSalt: 'AA' } });
+      return json({
+        passkey: { registered: false, rpId: 'localhost', userId: 'AA', prfSalt: 'AA' },
+      });
     }
     return new Response('{}', { status: 404 });
   }) as typeof fetch;
@@ -98,7 +100,7 @@ async function mount(pulse: () => Response = okPulse): Promise<void> {
   const api = createApiClient({ fetch: f, token: 't' });
   const owner = createOwnerClient({ fetch: f, token: 't' });
   await act(async () => {
-    root.render(createElement(ContactsPage, { api, owner }));
+    root.render(createElement<ContactsPageProps>(ContactsPage, { api, owner }));
     await Promise.resolve();
   });
   await settle();
@@ -131,17 +133,19 @@ describe('Contacts rows', () => {
   });
 
   it('reads once for the whole list and again after 60 seconds, not while hidden', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: false });
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
     await mount();
     expect(pulseReads).toBe(1);
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
+      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
     });
     expect(pulseReads).toBe(2);
     Object.defineProperty(document, 'hidden', { value: true, configurable: true });
     await act(async () => {
       document.dispatchEvent(new Event('visibilitychange'));
-      await vi.advanceTimersByTimeAsync(240_000);
+      vi.advanceTimersByTime(240_000);
+      await Promise.resolve();
     });
     expect(pulseReads).toBe(2);
   });
@@ -151,7 +155,9 @@ describe('Most active in Contacts', () => {
   it('sorts by activity then the last exchange, and Recent restores the list order', async () => {
     await mount();
     const radios = (): HTMLElement[] => [
-      ...host.querySelectorAll<HTMLElement>('[role="radiogroup"][aria-label="Sort"] [role="radio"]'),
+      ...host.querySelectorAll<HTMLElement>(
+        '[role="radiogroup"][aria-label="Sort"] [role="radio"]',
+      ),
     ];
     expect(radios().map((r) => r.textContent)).toEqual(['Recent', 'Most active']);
     await act(async () => {

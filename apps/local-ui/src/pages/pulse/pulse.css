@@ -1,0 +1,105 @@
+/* Activity pulse (UX2-f2; b11 §24): a shaped marker and word, and a 47 x 16 px pulse of 12 bars.
+   Tokens only. No orange (that means "this needs you") and no status colours on the bars. The one
+   motion is the arrival ring, played once by script; nothing in this file moves. */
+.act-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  flex: 0 0 auto;
+}
+.act-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-width: 6.5em;
+  white-space: nowrap;
+}
+.act-marker {
+  display: inline-block;
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  overflow: visible;
+}
+.act-word {
+  color: var(--al-color-fg-muted);
+}
+.act-status[data-activity='active_now'] .act-word {
+  color: var(--al-color-fg-default);
+}
+.act-status[data-activity='quiet'] .act-word {
+  color: var(--al-color-fg-subtle);
+}
+.act-dot {
+  fill: var(--al-color-status-success-icon);
+}
+.act-ring-pulse {
+  fill: none;
+  stroke: var(--al-color-status-success-icon);
+  stroke-width: 1;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.act-ring {
+  fill: none;
+  stroke: var(--al-color-fg-muted);
+  stroke-width: 1.5;
+}
+.act-spark {
+  display: block;
+  flex: 0 0 47px;
+  width: 47px;
+  height: 16px;
+}
+.act-bar {
+  fill: var(--al-color-fg-muted);
+}
+.act-bar.is-empty {
+  fill: var(--al-color-fg-subtle);
+}
+.act-bar.is-now {
+  fill: var(--al-color-fg-default);
+}
+
+.act-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+
+/* Narrow: the pulse stays on the right; the word drops to its own line under the name. */
+@media (max-width: 479px) {
+  .ms-row,
+  .ct-row {
+    flex-wrap: wrap;
+  }
+  .ms-row-main,
+  .ct-row .al-contact-main {
+    flex: 1 1 8em;
+  }
+  .act-cell {
+    display: contents;
+  }
+  .act-status {
+    order: 9;
+    flex: 1 0 100%;
+    min-width: 0;
+  }
+  .act-spark {
+    order: 2;
+  }
+}
+
+@media (forced-colors: active) {
+  .act-bar,
+  .act-bar.is-now,
+  .act-bar.is-empty,
+  .act-dot {
+    fill: CanvasText;
+  }
+  .act-ring,
+  .act-ring-pulse {
+    stroke: CanvasText;
+  }
+}

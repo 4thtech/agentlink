@@ -4,10 +4,12 @@
 // attribute, so the system's own light/dark, reduced-motion and reduced-transparency settings decide.
 // Nothing here is secret: values come from fixed lists, anything else in storage is ignored.
 // UX2-a: the Approvals Grid/List layout (B-11 §26.2) is a view choice, kept here too; default Grid.
+// UX2-f2: so is the Messages and Contacts sort (Recent or Most active, B-11 §24.5); default Recent.
 export type MotionPref = 'system' | 'on' | 'off';
 export type TransparencyPref = 'system' | 'reduce';
 export type ThemePref = 'system' | 'light' | 'dark';
 export type ApprovalsLayoutPref = 'grid' | 'list';
+export type ActivitySortPref = 'recent' | 'active';
 
 export interface Prefs {
   /** Under the hood: the global switch and its default (off). */
@@ -17,6 +19,8 @@ export interface Prefs {
   theme: ThemePref;
   /** Approvals: cards in a grid, or today's single column (B-11 §26). */
   approvalsLayout: ApprovalsLayoutPref;
+  /** Messages and Contacts: Recent, or Most active (UX2-f2, B-11 §24.5). */
+  activitySort: ActivitySortPref;
 }
 
 export const PREFS_KEY = 'agentlink.prefs';
@@ -26,6 +30,7 @@ export const DEFAULT_PREFS: Prefs = {
   transparency: 'system',
   theme: 'system',
   approvalsLayout: 'grid',
+  activitySort: 'recent',
 };
 
 const CHOICES = {
@@ -33,6 +38,7 @@ const CHOICES = {
   transparency: ['system', 'reduce'],
   theme: ['system', 'light', 'dark'],
   approvalsLayout: ['grid', 'list'],
+  activitySort: ['recent', 'active'],
 } as const;
 
 function parse(raw: string | null): Prefs {
@@ -54,6 +60,9 @@ function parse(raw: string | null): Prefs {
   if (CHOICES.theme.includes(d['theme'] as ThemePref)) out.theme = d['theme'] as ThemePref;
   if (CHOICES.approvalsLayout.includes(d['approvalsLayout'] as ApprovalsLayoutPref)) {
     out.approvalsLayout = d['approvalsLayout'] as ApprovalsLayoutPref;
+  }
+  if (CHOICES.activitySort.includes(d['activitySort'] as ActivitySortPref)) {
+    out.activitySort = d['activitySort'] as ActivitySortPref;
   }
   return out;
 }

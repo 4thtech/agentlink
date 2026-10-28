@@ -249,7 +249,9 @@ describe('polling', () => {
 describe('Most active', () => {
   const group = (): HTMLElement | null =>
     host.querySelector('[role="radiogroup"][aria-label="Sort"]');
-  const radios = (): HTMLElement[] => [...(group()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? [])];
+  const radios = (): HTMLElement[] => [
+    ...(group()?.querySelectorAll<HTMLElement>('[role="radio"]') ?? []),
+  ];
   const pick = async (label: string): Promise<void> => {
     const r = radios().find((x) => x.textContent === label);
     await act(async () => {
@@ -288,7 +290,10 @@ describe('Most active', () => {
 
 describe('axe and scale', () => {
   it('finds no WCAG A/AA violation on the list with pulses and the sort', async () => {
-    await mount(api(() => ok(BASE)), true);
+    await mount(
+      api(() => ok(BASE)),
+      true,
+    );
     const r = await axe.run(host, {
       runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
       rules: { 'color-contrast': { enabled: false } },

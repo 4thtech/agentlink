@@ -93,7 +93,8 @@ describe('Messages: Inbox / Sent', () => {
     const list = host.querySelector('[role="tablist"]');
     expect(list?.classList.contains('al-seg')).toBe(true);
     expect(list?.getAttribute('aria-label')).toBe(M.boxLabel);
-    expect(host.querySelector('[role="radiogroup"]')).toBeNull();
+    // The list's own Sort control (UX2-f2) is a radiogroup; Inbox / Sent must not be one.
+    expect(host.querySelector(`[role="radiogroup"][aria-label="${M.boxLabel}"]`)).toBeNull();
     const tabs = all('[role="tab"]');
     const panel = host.querySelector('[role="tabpanel"]');
     expect(panel).not.toBeNull();

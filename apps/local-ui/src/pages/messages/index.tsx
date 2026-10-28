@@ -32,6 +32,15 @@ import {
   type Problem,
 } from './api.js';
 import { AddContactAction, useInviteFirst } from '../home/start-here-empty.js';
+import { usePrefs } from '../../prefs/index.js';
+import {
+  ActivityCell,
+  ActivitySort,
+  compareMostActive,
+  sortKey,
+  usePulse,
+  type Pulse,
+} from '../pulse/index.js';
 import { START_STRINGS } from '../home/strings.js';
 import './messages.css';
 import { countUnseen, loadSeen, markSeen, type Seen } from './seen.js';
@@ -337,9 +346,14 @@ function ContactRow({
   isNew,
   fresh,
   selected,
+  pulse,
+  arrival,
   onOpen,
 }: {
   c: Conversation;
+  pulse: Pulse | undefined;
+  /** Non-zero when this row just became Active now. */
+  arrival: number;
   /** Something newer than this browser has seen. */
   isNew: boolean;
   /** The contact arrived after the first load: the row enters. */
@@ -366,6 +380,7 @@ function ContactRow({
           </span>
         </span>
         {isNew ? <span className="al-chip al-tone-info al-text-label">{S.newMessages}</span> : null}
+        <ActivityCell pulse={pulse} contactId={c.contactId} arrival={arrival} />
       </button>
     </li>
   );
@@ -377,7 +392,8 @@ export interface MessagesPageProps {
 }
 
 export function MessagesPage({ api }: MessagesPageProps): ReactElement {
-  const messages = useRef<MessagesApi>(createMessagesApi(api ?? createApiClient()));
+  const apiClient = useRef<ApiClient>(api ?? createApiClient()).current;
+  const messages = useRef<MessagesApi>(createMessagesApi(apiClient));
   const inviteFirst = useInviteFirst();
   const [view, setView] = useState<ListState>({ state: 'loading' });
   const [selected, setSelected] = useState<string | undefined>(undefined);
@@ -385,6 +401,8 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
   const live = useRef(true);
   const listRef = useRef<HTMLUListElement>(null);
   const lastOpened = useRef<string | undefined>(undefined);
+  const activity = usePulse(apiClient);
+  const { activitySort } = usePrefs();
   // Contacts that showed up after the first load (they enter); the first list never animates.
   const known = useRef<Set<string> | undefined>(undefined);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
@@ -429,6 +447,18 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
 
   const current =
     view.state === 'ready' ? view.list.find((c) => c.contactId === selected) : undefined;
+  // Most active: by activity, then the last exchange. Recent keeps the list's own order.
+  const ordered: readonly Conversation[] =
+    view.state !== 'ready'
+      ? []
+      : activitySort === 'active'
+        ? [...view.list].sort((a, b) =>
+            compareMostActive(
+              sortKey(activity.pulse, a.contactId, a.lastAt),
+              sortKey(activity.pulse, b.contactId, b.lastAt),
+            ),
+          )
+        : view.list;
 
   return (
     <>
@@ -459,18 +489,27 @@ export function MessagesPage({ api }: MessagesPageProps): ReactElement {
               <span className="al-text-body-sm al-muted">
                 {countUnseen(view.list, seen) > 0 ? S.newMessages : ''}
               </span>
-              <Button size="sm" onClick={() => void loadList()}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  void loadList();
+                  activity.refresh();
+                }}
+              >
                 {S.refresh}
               </Button>
             </div>
+            <ActivitySort />
             <Surface level={1} className="ms-list-surface">
               <ul className="ms-list" aria-label={S.listLabel} ref={listRef}>
-                {view.list.map((c) => (
+                {ordered.map((c) => (
                   <ContactRow
                     key={c.contactId}
                     c={c}
                     isNew={c.lastInAt > (seen[c.contactId] ?? 0)}
                     fresh={fresh.has(c.contactId)}
+                    pulse={activity.pulse}
+                    arrival={activity.arrivals.has(c.contactId) ? activity.seq : 0}
                     selected={c.contactId === selected}
                     onOpen={() => {
                       lastOpened.current = c.contactId;

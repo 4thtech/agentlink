@@ -5136,7 +5136,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); no message text, file name or size in the response; the caps hold at 10 000 contacts with a measured time recorded in the PR; session gate as the other read routes; short threat note; independent review (S2); no test weakened.
 
 #### UX2-f2 · local-ui: pulse and activity word in Messages and Contacts, "Most active" sort (new, UX-WAVE-2 item 4)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{messages,contacts}/**`, `packages/ui/src/**` (sparkline, only if shared), tests
 - **Depends on:** UX2-f1; B-11 §24
 - **Spec:** B-11 §24; UX-WAVE-2 §6

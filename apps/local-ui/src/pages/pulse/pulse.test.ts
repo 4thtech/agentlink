@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // UX2-f2: the pulse read, the 24-hour bars, the words and the "Most active" order (b11 §24; D-137).
 import { lintVocabulary } from '@4thtech-io/ui';
 import { describe, expect, it } from 'vitest';
