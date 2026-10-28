@@ -10,6 +10,7 @@ import { PrefsHood } from '../prefs/index.js';
 import { PAGE_TITLES, SHELL_STRINGS } from '../strings.js';
 import { TopBarControls } from './top-bar.js';
 import { useUnseenMessages } from '../pages/messages/badge.js';
+import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
@@ -138,6 +139,8 @@ export interface LayoutProps {
   readonly platform?: Platform;
   /** Test seam: the Messages badge count. Default: read from the local app. */
   readonly unseenMessages?: () => Promise<number>;
+  /** Test seam: the Approvals badge count. Default: read from the local app. */
+  readonly waitingApprovals?: () => Promise<number>;
   /** Test seam: the health read (M1-11s-a-d). Default: GET /api/ui/health. */
   readonly readHealth?: () => Promise<ApiResult<unknown>>;
 }
@@ -148,11 +151,13 @@ export function Layout({
   nextStep = needsPasskeySwitch,
   platform: givenPlatform,
   unseenMessages,
+  waitingApprovals,
   readHealth,
 }: LayoutProps): ReactElement {
   const connection = useConnectionState();
   const version = useHealth(readHealth);
   const unseen = useUnseenMessages(path, unseenMessages);
+  const waiting = useApprovalsWaiting(path, waitingApprovals);
   const settings = inSettings(path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [switchNeeded, setSwitchNeeded] = useState(false);
@@ -181,6 +186,10 @@ export function Layout({
     href: item.path,
     active: item.routed && (item.label === SETTINGS_LABEL ? settings : item.path === path),
     ...(item.id === 'messages' && unseen > 0 ? { count: unseen } : {}),
+    // UI-REFRESH-o-b: the shared tick badge; it counts down as requests are decided.
+    ...(item.id === 'approvals' && waiting > 0
+      ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
+      : {}),
   }));
   return (
     <PrefsHood>

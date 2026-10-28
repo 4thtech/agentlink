@@ -15,8 +15,11 @@
 // - UI-REFRESH-o (visual only): cards on level 1, the one being decided on level 2; the shared
 //   Skeleton on first load; the approved moment after a review that approved something. What is
 //   sent, when presence is asked and what the owner sees are unchanged (approvals.test.ts).
+// - UI-REFRESH-o-b: an approved card collapses out and leaves its result as a line of text; the
+//   sidebar badge is told how many still wait (a number only; badge.ts).
 import { Button, Skeleton, Surface, UnderTheHood, type PayPlatform } from '@4thtech-io/ui';
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import { announceDecided, announceWaiting } from './badge.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import {
   ApprovalFacts,
@@ -119,6 +122,35 @@ export function OwnerPanel({
       <p>{S.noPasskeys}</p>
       <p className="al-note">{S.desktopNote}</p>
     </Surface>
+  );
+}
+
+/**
+ * What an approved card left behind once it collapsed out (UI-REFRESH-o-b): plain text a screen
+ * reader can reach. Not a live region: the card's own status line already said it. When the card
+ * took the focus with it, the focus lands on the line, never on a button.
+ */
+export function Results({ lines }: { lines: readonly string[] }): ReactElement | null {
+  const last = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (lines.length === 0) return;
+    const active = document.activeElement;
+    if (active === null || active === document.body) last.current?.focus();
+  }, [lines.length]);
+  if (lines.length === 0) return null;
+  return (
+    <>
+      {lines.map((line, i) => (
+        <p
+          key={i}
+          ref={i === lines.length - 1 ? last : undefined}
+          className="al-status ap-result"
+          tabIndex={-1}
+        >
+          {line}
+        </p>
+      ))}
+    </>
   );
 }
 
@@ -225,17 +257,17 @@ function ReviewStep({
   owner: OwnerState;
   client: ApprovalsClient;
   onBack: () => void;
-  onFinished: (notice: string, approved: number) => void;
+  onFinished: (notice: string, approved: number, applied: number) => void;
 }): ReactElement {
   const [lines, setLines] = useState<readonly string[]>([]);
   const say = (text: string): void => setLines((l) => [...l, text]);
   const answer = (a: DecideAnswer): void => {
     if (a.kind === 'status' && a.status === 'applied') {
-      onFinished(doneText(counts(kept)), counts(kept).approve);
+      onFinished(doneText(counts(kept)), counts(kept).approve, kept.length);
       return;
     }
     say(listText(a));
-    if (a.kind === 'status' && !RETRY.has(a.status)) onFinished(listText(a), 0);
+    if (a.kind === 'status' && !RETRY.has(a.status)) onFinished(listText(a), 0, 0);
   };
   return (
     <Surface level={2} className="al-panel">
@@ -293,6 +325,8 @@ function ApprovalsList({
   const [checking, setChecking] = useState(false);
   const [kept, setKept] = useState<readonly ReviewPick[] | undefined>(undefined);
   const [moment, setMoment] = useState(false);
+  const [decided, setDecided] = useState<ReadonlySet<string>>(new Set());
+  const [results, setResults] = useState<readonly string[]>([]);
   const notice = (text: string): void => setNotices((n) => [...n, text]);
 
   useEffect(() => {
@@ -302,6 +336,7 @@ function ApprovalsList({
       setChoices({});
       setKept(undefined);
       setChecking(false);
+      setDecided(new Set());
       setList(
         answer.kind === 'ok'
           ? { kind: 'ok', all: [...answer.items].sort(byExpiry) }
@@ -313,6 +348,20 @@ function ApprovalsList({
     };
   }, [client, round]);
   const reload = useCallback(() => setRound((r) => r + 1), []);
+
+  // The sidebar badge: what still waits, leaving out what was decided here (a number only).
+  const waiting =
+    list.kind === 'ok' ? list.all.filter((i) => !decided.has(i.approvalId)).length : undefined;
+  useEffect(() => {
+    if (waiting !== undefined) announceWaiting(waiting);
+  }, [waiting]);
+  const onDecided = (approvalId: string): void => setDecided((d) => new Set([...d, approvalId]));
+  const onLeft = (approvalId: string, line: string): void => {
+    setResults((r) => [...r, line]);
+    setList((l) =>
+      l.kind === 'ok' ? { kind: 'ok', all: l.all.filter((i) => i.approvalId !== approvalId) } : l,
+    );
+  };
 
   if (list.kind === 'loading') {
     return (
@@ -369,6 +418,7 @@ function ApprovalsList({
     <>
       <div className="al-notices">
         {moment ? <ApprovedMoment /> : null}
+        <Results lines={results} />
         <Statuses lines={notices} />
       </div>
       <div className="al-list">
@@ -382,6 +432,8 @@ function ApprovalsList({
               owner={owner}
               client={client}
               sheet={sheet}
+              onDecided={() => onDecided(item.approvalId)}
+              onLeft={(line) => onLeft(item.approvalId, line)}
             />
           ) : (
             <Surface
@@ -432,7 +484,8 @@ function ApprovalsList({
                 owner={owner}
                 client={client}
                 onBack={() => setKept(undefined)}
-                onFinished={(text, approved) => {
+                onFinished={(text, approved, applied) => {
+                  announceDecided(applied);
                   notice(text);
                   setMoment(approved > 0);
                   reload();

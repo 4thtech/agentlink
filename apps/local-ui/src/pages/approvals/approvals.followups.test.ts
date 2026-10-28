@@ -10,6 +10,7 @@
 //     as text a screen reader can reach. A refused attempt, a denial and an open sheet keep the card.
 // (c) The sidebar Approvals badge shows how many requests wait, with the shared tick, and counts
 //     down when one is decided; a failed decision changes nothing.
+import axe from 'axe-core';
 import { HoodProvider, PAY_CONFIRM_STRINGS as P, acceptHoodField } from '@4thtech-io/ui';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -294,7 +295,9 @@ describe('(b) an approved card collapses out after the check', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reduced();
     await mount({
-      [LIST]: [ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] })],
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
       [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
     });
     await approveOwn('D');
@@ -311,7 +314,9 @@ describe('(b) an approved card collapses out after the check', () => {
     const animate = vi.fn();
     (Element.prototype as { animate?: unknown }).animate = animate;
     await mount({
-      [LIST]: [ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] })],
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
       [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
     });
     await approveOwn('D');
@@ -364,7 +369,9 @@ describe('(b) an approved card collapses out after the check', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reduced();
     await mount({
-      [LIST]: [ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] })],
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
       [`/api/approvals/${id('D')}/approve`]: [
         { status: 403, body: { status: 'presence_rejected' } },
       ],
@@ -431,7 +438,9 @@ describe('(b) an approved card collapses out after the check', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reduced();
     await mount({
-      [LIST]: [ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] })],
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
       [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
     });
     expect(host.querySelector('[autofocus]')).toBeNull();
@@ -567,5 +576,60 @@ describe('(c) the sidebar Approvals badge', () => {
     expect(badge?.textContent).not.toContain(CANARY);
     expect(badge?.textContent).not.toContain('Ana');
     expect(badge?.querySelector('.al-count-in')?.textContent).toMatch(/^\d+$/);
+  });
+});
+
+// --------------------------------------------------------------------------------------- axe
+
+describe('axe (WCAG 2.1 A/AA; colour contrast is a visual check, jsdom has no layout)', () => {
+  const run = (): Promise<axe.AxeResults> =>
+    axe.run(host, {
+      runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+      rules: { 'color-contrast': { enabled: false } },
+    });
+
+  it('finds no violation with the badge, the cards and Under the hood on', async () => {
+    const { props } = pageProps({
+      [LIST]: [
+        ok({
+          approvals: [item('A'), item('C', { paid: true }), item('D', { commitment: true })],
+        }),
+      ],
+    });
+    act(() =>
+      root.render(
+        h(
+          Layout,
+          {
+            path: '/',
+            nextStep: async () => false,
+            unseenMessages: async () => 0,
+            waitingApprovals: async () => 3,
+            readHealth: () => new Promise<never>(() => undefined),
+          } as never,
+          h(HoodProvider, { value: true }, h<ApprovalsPageProps>(ApprovalsPage, props)) as never,
+        ),
+      ),
+    );
+    await flush();
+    expect(host.querySelector('.al-nav .al-count')).not.toBeNull();
+    expect(host.querySelector('.al-hood')).not.toBeNull();
+    expect((await run()).violations.map((v) => v.id)).toEqual([]);
+  });
+
+  it('finds no violation after an approved card has collapsed out', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
+      [`/api/approvals/${id('D')}/approve`]: [ok({ status: 'applied', decision: 'approve' })],
+    });
+    await approveOwn('D');
+    await advance(APPROVED_HOLD_MS + 10);
+    vi.useRealTimers();
+    expect(host.querySelector('.ap-result')).not.toBeNull();
+    expect((await run()).violations.map((v) => v.id)).toEqual([]);
   });
 });
