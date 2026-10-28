@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ### Added
 
-- A new Appearance page (theme, reduce motion, transparency) and an optional "Under the hood" view that shows technical details in a clearly marked panel, off by default and never showing keys, codes or private links (UI-REFRESH-e). The page and the top bar switch are in the app's menu.
+- A new Appearance page (theme, reduce motion, transparency) and an optional "Under the hood" view that shows technical details in a clearly marked panel, off by default and never showing keys, codes or private links (UI-REFRESH-e). The page is in the app's menu; the switch is in the top bar.
 - The Files page looks and moves like the rest of the refreshed app: the Received list sits on a raised card, files still arriving or sending show a short stepped bar with plain words, the tabs show how many files wait, a file that arrives while the page is open gets a small "File received" moment, and the Under the hood panel lists how many files and how much data (UI-REFRESH-j).
 - The local app has an About page under Settings: the AgentLink mark with "by 4thTech", your version, the licence, and links to the guides and to support. It shows nothing private.
 

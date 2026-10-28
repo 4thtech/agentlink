@@ -345,9 +345,9 @@ areas:
         prs: [172, 178]
         summary: "One owner key shared by several local agents, each on its own harness: `owner add-agent` and `init --harness` (M1-9t, D-78). Agents under one OS user are kept apart logically, not by a security boundary."
       - name: "Local approval page"
-        state: in-progress
+        state: done
         prs: [207, 225, 247, 256, 267]
-        summary: "The localhost server behind it is merged (see the Node runtime), with a functional, unstyled page: first run with a localhost passkey (M1-8e), approval cards with who, what, cost and the rule, and review together, where one passkey gesture or owner code entry confirms exactly the listed approvals while terms stay single (M1-11a). Session links open once and repeated wrong owner codes make you wait. When your AI needs an approval, `agentlink mcp` opens the page in your browser and the AI shows you its link, next to the `agentlink approve` command (M1-11a-b). The design (M1-11b), \"Remember for this contact\" and `agentlink ui` are still to build (M1b)."
+        summary: "Released. Approvals open inside the local app (the list, review together, one request from a link and the paid-action confirmation sheet) and the old stand-alone approval page is gone (v0.4.1, 28 Oct 2026). The localhost server behind it is part of the Node runtime."
       - name: "Local app pages (in 0.3.0)"
         state: done
         prs: [407, 428, 417, 500, 418, 429, 430, 432, 520, 542, 547, 549]
@@ -357,9 +357,9 @@ areas:
         prs: [570, 575, 576, 577, 578, 579, 581, 582, 583, 584, 587]
         summary: "Released in 0.4.0 (27 Oct 2026), not in 0.3.0. A Messages page shows the Inbox and Sent messages per contact, read-only: other people's words appear as plain text, looking never marks a message read for your AI, and replying is done by asking your AI (MSG-FILES-IO-a, -c, -e). The Files page gains the tabs Received, Sent and Send folders, with the name a received file was saved under and Show in Finder (Show in folder elsewhere) (MSG-FILES-IO-b, -d, -f, -h). An owner set up before 0.3.0 can switch to Touch ID or a passkey once, with the backup code, and the backup code keeps working (M1-UX-FIRSTRUN-V2-c). The status bar at the bottom shows whether AgentLink is running, paused, not running or needs setup, read from your own computer (M1-11s-a-c, M1-11s-a-d). Paid actions above your limits, and any change to your spending limits, now open one confirmation sheet with the amount, \"Your credits stay yours; 4thTech never holds them.\" and your computer's own check (Touch ID, Windows Hello or your passkey); the backup code stays a small link and the sheet closes itself when done. Proofs inside your limits stay automatic. Verified registration will use the same sheet when it is built (M1-PAY-CONFIRM-a, M1-PAY-CONFIRM-b, #581, #584). When you pair again with the same person, the newer contact shows a notice with Keep both and Remove older; removing still asks for Touch ID or your backup code (M1-UX3-DUP-CONTACTS, #587)."
       - name: "Claude Desktop extension"
-        state: in-progress
+        state: done
         prs: [514, 517]
-        summary: "An optional Claude Desktop extension bundle (macOS and Windows) that starts AgentLink with no questions asked, and a release job that builds, checksums and attaches it to the GitHub Release after a stable release (M1-9f, D-91). Merged, so it comes with the next release, signed with the 4thTech certificate (#517). Not available in v0.1.2."
+        summary: "An optional Claude Desktop extension bundle (macOS and Windows) that starts AgentLink with no questions asked, built, checksummed and attached to the GitHub Release by a release job (M1-9f, D-91). The bundles for macOS (Apple silicon and Intel) and Windows are on the v0.4.1 release page, signed with the 4thTech certificate (#517)."
       - name: "Beginner setup page"
         state: done
         prs: [234]

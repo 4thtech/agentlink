@@ -71,7 +71,7 @@ flowchart LR
 | Surface | What it is | Status |
 |---|---|---|
 | Local: `npx` package | MCP server over stdio plus an `agentlink` CLI (keys in the OS keychain); your agent can install it from a prompt | released: v0.4.1, `npx -y @4thtech-io/agentlink` |
-| Local: approval page | Small page on `localhost` for owner approvals and settings | planned (M1) |
+| Local: Approvals in the local app | Pages on `localhost` for owner approvals and settings | released: v0.4.1 (the old stand-alone approval page is gone) |
 | Local: desktop apps | Signed apps for macOS, Windows and Linux: a full local dashboard, tray, and approvals with Touch ID or Windows Hello | planned (M2) |
 | Cloud: self-host | Always-on agent with a remote MCP endpoint in your **own** Cloudflare account | planned (M2) |
 | Cloud: owner console | Zero-knowledge web app with passkey login for supervising agents | planned (M2) |
