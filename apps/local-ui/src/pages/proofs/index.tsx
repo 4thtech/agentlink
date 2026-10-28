@@ -77,16 +77,25 @@ function When({ seconds }: { seconds: number }): ReactElement {
 
 /**
  * One key per row, unique even when several proofs share a second: time and direction, plus how many
- * rows before it (from the top) have the same pair.
+ * rows after it (counted from the bottom, the oldest) have the same pair. The feed has no row ID, and
+ * new rows land at the top, so counting from the bottom keeps every existing row's key when one arrives.
+ * The oldest group on a page that has more below it may be cut short; `trusted` is false for those.
  */
-function keysOf(items: readonly ProofRow[]): string[] {
+function keysOf(
+  items: readonly ProofRow[],
+  hasMore = false,
+): { readonly key: string; readonly trusted: boolean }[] {
   const counts = new Map<string, number>();
-  return items.map((item) => {
+  const oldest = items.length === 0 ? 0 : (items[items.length - 1]?.createdAt ?? 0);
+  const out: { key: string; trusted: boolean }[] = [];
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    const item = items[i] as ProofRow;
     const base = `${String(item.createdAt)}-${item.direction}`;
     const n = counts.get(base) ?? 0;
     counts.set(base, n + 1);
-    return `${base}-${String(n)}`;
-  });
+    out[i] = { key: `${base}-${String(n)}`, trusted: !(hasMore && item.createdAt === oldest) };
+  }
+  return out;
 }
 
 /** The newest page from a quiet re-read on top, then the older rows already loaded below it. */
@@ -112,7 +121,7 @@ function ProofTable({
   items: readonly ProofRow[];
   moments: ReadonlySet<string>;
 }): ReactElement {
-  const keys = keysOf(items);
+  const keys = keysOf(items).map((k) => k.key);
   return (
     <div className="pf-table-wrap" role="region" tabIndex={0} aria-label={S.listCaption}>
       <table className="pf-table">
@@ -286,12 +295,20 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
     void api.get(listPath()).then((res) => {
       const answer = res.kind === 'ok' ? parseList(res.data) : undefined;
       if (answer?.kind !== 'ok') return;
-      const keys = keysOf(answer.items);
+      const keys = keysOf(answer.items, answer.next !== undefined);
       const done = answer.items
-        .map((r, i) => [r, keys[i] ?? ''] as const)
-        .filter(([r, k]) => r.state === 'recorded' && inFlight(seen.current.get(k) ?? ''))
-        .map(([, k]) => k);
-      answer.items.forEach((r, i) => seen.current.set(keys[i] ?? '', r.state));
+        .map((r, i) => [r, keys[i]] as const)
+        .filter(
+          ([r, k]) =>
+            k?.trusted === true &&
+            r.state === 'recorded' &&
+            inFlight(seen.current.get(k.key) ?? ''),
+        )
+        .map(([, k]) => k?.key ?? '');
+      answer.items.forEach((r, i) => {
+        const k = keys[i];
+        if (k?.trusted === true) seen.current.set(k.key, r.state);
+      });
       if (done.length > 0) setMoments((m) => new Set([...m, ...done]));
       setList((old) =>
         old.phase === 'ok' ? { ...old, items: mergeNewest(answer.items, old.items) } : old,
@@ -326,8 +343,11 @@ export function ProofsPage({ api: given }: ProofsPageProps = {}): ReactElement {
       if (!live) return;
       const answer = res.kind === 'ok' ? parseList(res.data) : problem(res);
       if (answer.kind === 'ok') {
-        const keys = keysOf(answer.items);
-        answer.items.forEach((r, i) => seen.current.set(keys[i] ?? '', r.state));
+        const keys = keysOf(answer.items, answer.next !== undefined);
+        answer.items.forEach((r, i) => {
+          const k = keys[i];
+          if (k?.trusted === true) seen.current.set(k.key, r.state);
+        });
         setList({
           phase: 'ok',
           items: answer.items,

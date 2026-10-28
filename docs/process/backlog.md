@@ -4986,7 +4986,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit) for (a) to (d); each refused kind stays refused; no allowed shape becomes refused except the ones above; no test weakened.
 
 #### UI-REFRESH-r-b · local-ui: Proofs row key can fire the success moment on the wrong row (new, low, #620)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/proofs/**`, tests
 - **Depends on:** UI-REFRESH-r
 - **Spec:** B-11 §14, §15, §16
