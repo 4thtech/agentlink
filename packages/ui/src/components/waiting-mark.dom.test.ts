@@ -208,15 +208,17 @@ describe('waiting mark styles (progress.css)', () => {
 });
 
 describe('the waiting mark is used in no other loading state', () => {
-  it('appears only in its own component, styles, exports and tests', () => {
+  it('appears only in its own component, styles, exports, tests and Add credits (UX2-e2)', () => {
     const hits = Object.entries(files)
       .filter(([k]) => /\.(tsx?|css)$/.test(k) && !k.includes('node_modules'))
       .filter(([, text]) => /WaitingMark|al-waiting/.test(text))
       .map(([k]) => k.split('/').pop() as string)
       .sort();
     expect(Object.keys(files).some((k) => k.includes('apps/local-ui'))).toBe(true);
+    // B-11 §23.3: the one consumer is the Add credits tracker's "Waiting for your funds" step.
     expect(hits.filter((f) => !f.endsWith('.test.ts'))).toEqual([
       'progress.css',
+      'top-up.tsx',
       'waiting-mark.tsx',
     ]);
   });

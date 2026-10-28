@@ -4,7 +4,7 @@
 // - Credits sit on a level-2 card as a ring meter that fills on load; the words stay, the amounts
 //   never count up and there are no charts.
 // - Skeletons on first load (no "Loading…" paragraph); an in-flight proof that finishes gets the
-//   proof success moment; "Waiting for your credits…" after adding credits.
+//   proof success moment; after adding credits, the Add credits tracker (UX2-e2, B-11 §23).
 // - Under the hood (shared panel): only fields the page already receives; no address, key, code,
 //   token, session, drop or presigned link; no record link (not served yet).
 // - Reduced motion: the attribute and the media query reach the success moment; the page CSS has
@@ -188,7 +188,7 @@ describe('new proofs and waiting for credits', () => {
     expect(host.querySelector('.al-moment')).toBeNull();
   });
 
-  it('after adding credits: "Waiting for your credits…" until the credits arrive', async () => {
+  it('after adding credits: "Adding to your credits…" until the credits arrive (UX2-e2, B-11 §23)', async () => {
     const routes: Routes = { ...EMPTY, [TOP_UP]: { status: 'ok', networks: [GNOSIS] } };
     const api = createApiClient({ fetch: server(routes), token: 't' });
     const owner = vi
@@ -198,15 +198,16 @@ describe('new proofs and waiting for credits', () => {
       root.render(h<ProofsPageProps>(ProofsPage, { api }));
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(PROOFS_STRINGS.waiting).toBe('Waiting for your credits…');
-    expect(host.textContent).not.toContain(PROOFS_STRINGS.waiting);
+    // B-11 §23 replaces §15.3's "Waiting for your credits…" bar inside Add credits.
+    expect(host.textContent).not.toContain('Waiting for your credits…');
+    expect(host.textContent).not.toContain('Adding to your credits…');
     const press = (label: string) =>
       act(async () => {
         button(label)?.click();
         await vi.advanceTimersByTimeAsync(0);
       });
     await press(PROOFS_STRINGS.addCredits);
-    await press(PROOFS_STRINGS.turnIntoCredits);
+    await press('Add $4.99 to your credits');
     await act(async () => {
       const input = host.querySelector<HTMLInputElement>('input[type="password"]');
       const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -216,14 +217,13 @@ describe('new proofs and waiting for credits', () => {
     });
     await press(PROOFS_STRINGS.confirm);
     expect(owner).toHaveBeenCalledTimes(1);
-    const waiting = [...host.querySelectorAll('[role="status"]')].find((n) =>
-      (n.textContent ?? '').includes(PROOFS_STRINGS.waiting),
-    );
-    expect(waiting).toBeDefined();
+    expect(host.textContent).toContain('Adding to your credits…');
+    expect(host.textContent).not.toContain('Waiting for your credits…');
     routes[CREDITS] = { ...OK_CREDITS, proofsLeft: 68, balance: '$6.80' };
     await tick(11_000);
     await tick(100);
-    expect(host.textContent).not.toContain(PROOFS_STRINGS.waiting);
+    expect(host.textContent).not.toContain('Adding to your credits…');
+    expect(host.textContent).toContain('Added to credits · $6.80 now');
     expect(meter()).toBe('68');
   });
 });
