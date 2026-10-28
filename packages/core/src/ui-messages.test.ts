@@ -445,8 +445,9 @@ describe('MessagesView.flowEvents (U3-flow, USABILITY-WAVE-3 §4.1: GET /api/ui/
 
   it('never carries a name, subject, file name, link, key or hash, even hostile ones in the store', async () => {
     // Hostile names everywhere the store keeps one: the contact's name, the file's name, a subject.
+    const hostileName = await seal(ctxOf(a), 'contacts', 'name', [b.id], HOSTILE);
     await a.store.transaction((tx) =>
-      tx.update('contacts', { contact_id: b.id }, { name: `sealed-${HOSTILE}` }),
+      tx.update('contacts', { contact_id: b.id }, { name: hostileName }),
     );
     const id = await put({
       contact: b.id,

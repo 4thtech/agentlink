@@ -122,7 +122,12 @@ describe('GET /api/ui/flow: the route', () => {
     expect(flowRoute).toMatchObject({ method: 'GET', path: FLOW_PATH, presence: false });
     const registry = createLocalUiRoutes();
     const hit = registry.match('GET', FLOW_PATH);
-    expect(hit !== undefined && hit !== 'method' ? hit.route : undefined).toBe(flowRoute);
+    const found = hit !== undefined && hit !== 'method' ? hit.route : undefined;
+    expect(found).toMatchObject({ method: 'GET', path: FLOW_PATH, presence: false });
+    // The registry keeps a frozen copy: the same handler, not U3-c's stub.
+    expect(found !== undefined && 'handler' in found ? found.handler : undefined).toBe(
+      flowRoute.handler,
+    );
     expect(registry.match('POST', FLOW_PATH)).toBe('method');
     expect(registry.routes().filter((r) => r.path === FLOW_PATH)).toHaveLength(1);
     // Not the stub any more.

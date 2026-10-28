@@ -813,9 +813,9 @@ describe('GET /api/ui/flow behind the app host guards (U3-flow)', () => {
     const h = await harness();
     const cookie = await h.cookie();
     const csrf = await h.csrf(cookie);
-    expect((await send(h.port, '/api/ui/flow', { headers: { 'X-AgentLink-CSRF': csrf } })).status).toBe(
-      401,
-    );
+    expect(
+      (await send(h.port, '/api/ui/flow', { headers: { 'X-AgentLink-CSRF': csrf } })).status,
+    ).toBe(401);
     expect((await send(h.port, '/api/ui/flow', { headers: { Cookie: cookie } })).status).toBe(403);
     const post = await send(h.port, '/api/ui/flow', {
       method: 'POST',

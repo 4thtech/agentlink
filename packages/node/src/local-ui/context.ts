@@ -25,6 +25,7 @@ import type {
   CreditsView,
   EffectivePolicy,
   ExchangeTimes,
+  FlowEvents,
   MessageBox,
   MessageItem,
   OwnerActionOutcome,
@@ -161,6 +162,12 @@ export interface LocalUiReadClient {
      * a contact ID and a time each, never content. Store only, bounded, writes nothing.
      */
     pulseTimes(since: number, until: number): Promise<ExchangeTimes>;
+    /**
+     * U3-flow (USABILITY-WAVE-3 §4.1): who exchanged a message or file when, which way and in what
+     * state, in a window (core `MessagesView.flowEvents`): metadata only, never content, names,
+     * links, keys, hashes or envelope IDs. Store only, bounded, writes nothing.
+     */
+    flowEvents(since: number, until: number): Promise<FlowEvents>;
   };
   /**
    * MSG-FILES-IO-d (Files, Received and Sent): one page of core's `FilesIoView`, store only. Never
@@ -212,6 +219,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
         client.messages.list(contactId, box, query),
       // UX2-f1: the activity pulse's exchange times.
       pulseTimes: (since: number, until: number) => client.messages.pulseTimes(since, until),
+      // U3-flow: the live connections map's flow events.
+      flowEvents: (since: number, until: number) => client.messages.flowEvents(since, until),
     }),
     filesIo: Object.freeze({
       received: (query: PageQuery) => client.filesIo.received(query),

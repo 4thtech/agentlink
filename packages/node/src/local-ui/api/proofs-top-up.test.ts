@@ -82,6 +82,7 @@ function fakeClient(topUp: () => Promise<TopUpView>): LocalUiReadClient {
       conversations: () => Promise.reject(new Error('not used')),
       list: () => Promise.reject(new Error('not used')),
       pulseTimes: () => Promise.reject(new Error('not used')),
+      flowEvents: () => Promise.reject(new Error('not used')),
     },
     filesIo: {
       received: () => Promise.reject(new Error('not used')),

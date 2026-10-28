@@ -389,6 +389,11 @@ export {
   MessagesView,
   // UX2-f1: the activity pulse's exchange times (a contact and a time each, no content).
   PULSE_SCAN_CAP,
+  // U3-flow: the live connections map's flow events (metadata only, no content).
+  FLOW_SCAN_CAP,
+  type FlowEvent,
+  type FlowEvents,
+  type FlowState,
   type Conversation,
   type ExchangeTime,
   type ExchangeTimes,
