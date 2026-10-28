@@ -117,7 +117,10 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
       },
       check: (link) => {
         checked.push(link);
-        return Promise.resolve<LocalUiCheckedInvite>({ contact: CONTACT, expiresAt: 1_793_786_400 });
+        return Promise.resolve<LocalUiCheckedInvite>({
+          contact: CONTACT,
+          expiresAt: 1_793_786_400,
+        });
       },
       ...over,
     },

@@ -345,9 +345,9 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
     const mismatched = new LocalUiRouteRegistry();
     expect(() => mismatched.register(route({ step: 'check' }))).toThrow(/invite/);
     expect(() => mismatched.register(route({ step: 'accept' }))).toThrow(/invite/);
-    expect(() =>
-      mismatched.register(route({ path: INVITE_CHECK_PATH, step: 'create' })),
-    ).toThrow(/invite/);
+    expect(() => mismatched.register(route({ path: INVITE_CHECK_PATH, step: 'create' }))).toThrow(
+      /invite/,
+    );
     expect(() => mismatched.register(route({ handler: undefined }))).toThrow(/handler/);
     const registry = new LocalUiRouteRegistry();
     registry.register(route({}));

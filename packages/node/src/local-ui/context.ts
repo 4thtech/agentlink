@@ -7,6 +7,15 @@
 // `LocalUiOwnerOperation` that the central presence gate hands to a `presence: true` route
 // (route-types.ts). Policy is read and changed the same way (read through the client, changed by a
 // signed `policy.set` applied by core).
+import {
+  CoreError,
+  acceptInviteAction,
+  decodeInviteLink,
+  evaluate,
+  type AcceptInviteAction,
+  type PendingContact,
+  type PolicyDecision,
+} from '@4thtech-io/core';
 import type {
   ActivityEntry,
   AgentLinkClient,
@@ -34,6 +43,7 @@ import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
+import type { LocalUiInviteDesk } from './route-types.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -228,11 +238,109 @@ export function creditsPort(client: AgentLinkClient): LocalUiCreditsPort {
   });
 }
 
+/**
+ * UX2-d1: the invite desk of the `presence: 'invite'` routes over `client` (a fresh frozen object):
+ * core `createInvite`, and core's accept step 1 with the link's expiry. Nothing here signs, pairs,
+ * stores a pairing or logs the link (I-7); `check` stores nothing at all.
+ */
+export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
+  return Object.freeze<LocalUiInviteDesk>({
+    create: (input) => client.pairing.createInvite(input),
+    async check(link) {
+      const checked = await client.pairing.acceptInvite({ link });
+      // The same codec again for the expiry only (the link was just decoded and checked above).
+      const { expiresAt } = await decodeInviteLink(link);
+      return Object.freeze({ contact: checked.contact, expiresAt });
+    },
+  });
+}
+
+/** UX2-d1: how accepting ended after the owner's decision was applied. */
+export type LocalUiAcceptOutcome =
+  | {
+      readonly status: 'started';
+      readonly contact: PendingContact;
+      /** False when the handshake could not be sent yet (the outbox keeps it for later). */
+      readonly sent: boolean;
+    }
+  /** Core would not use the approval (void, expired, denied, or the rule is now `deny`). */
+  | { readonly status: 'refused' };
+
+/**
+ * UX2-d1: accepting an invite, for the `presence: true` accept route only (04 §3.6 Accept; 06 §2.1).
+ * Each step is core's own: the codec and step 1 (`check`), the `contacts.acceptInvites` decision, the
+ * one accept action (`action`, shared with the MCP tool and the CLI), the owner request for it
+ * (`openRequest`: the open pending one for that same action, or a new one). `acceptApproved` pairs
+ * only through core's `use` of an approval the owner signed and core applied (I-4): it never sets
+ * `allowed` from anything else, so nothing here can pair without the owner's verified decision.
+ */
+export interface LocalUiInviteAcceptPort {
+  check(link: string): Promise<PendingContact>;
+  decision(): Promise<PolicyDecision>;
+  action(link: string): Promise<AcceptInviteAction>;
+  openRequest(
+    action: AcceptInviteAction,
+    summary: string,
+  ): Promise<{ readonly approvalId: string; readonly expiresAt: number }>;
+  acceptApproved(
+    link: string,
+    approvalId: string,
+    action: AcceptInviteAction,
+  ): Promise<LocalUiAcceptOutcome>;
+}
+
+/** Core errors that only mean "the outbox could not publish right now" (as the MCP tool). */
+const OFFLINE_CODES: ReadonlySet<string> = new Set(['transport_unavailable']);
+
+/** The accept port over `client` (a fresh frozen object of bound core calls). */
+export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPort {
+  const decision = async (): Promise<PolicyDecision> =>
+    evaluate(await client.ownerActions.loadPolicy(), { kind: 'invite.accept' });
+  return Object.freeze<LocalUiInviteAcceptPort>({
+    async check(link) {
+      return (await client.pairing.acceptInvite({ link })).contact;
+    },
+    decision,
+    action: (link) => acceptInviteAction(link),
+    async openRequest(action, summary) {
+      const open = await client.approvalService.findOpen(action);
+      if (open?.status === 'pending') {
+        return { approvalId: open.approvalId, expiresAt: open.expiresAt };
+      }
+      const pending = await client.approvalService.request({ action, summary });
+      return { approvalId: pending.approvalId, expiresAt: pending.expiresAt };
+    },
+    async acceptApproved(link, approvalId, action) {
+      // Policy is evaluated again at use (04 §3.4.1): a rule now `deny` refuses it.
+      const used = await client.approvalService.use(approvalId, action, await decision());
+      if (used.status !== 'used') return { status: 'refused' };
+      const started = await client.pairing.acceptInvite({ link, allowed: true });
+      // `allowed` was set, so this does not happen; fail closed if it ever does.
+      if (started.status !== 'pending') {
+        throw new CoreError('approval_action_invalid', 'The pairing could not be started.');
+      }
+      let sent = false;
+      try {
+        const summary = await client.outbox.processDue();
+        sent = summary.sent > 0 && summary.failed === 0 && summary.notDelivered === 0;
+      } catch (error) {
+        if (!(error instanceof CoreError) || !OFFLINE_CODES.has(error.code)) throw error;
+      }
+      return { status: 'started', contact: started.contact, sent };
+    },
+  });
+}
+
 export interface LocalUiContext {
   /** Read-only access to the agent's core; undefined when not set up. */
   readonly client: LocalUiReadClient | undefined;
   /** M1-11c-a4c: the credits moves for the owner routes; undefined when not set up. */
   readonly credits?: LocalUiCreditsPort;
+  /**
+   * UX2-d1: accepting an invite, for the accept owner route only; undefined when not set up. Its
+   * pairing step runs only after core used an owner-signed, applied approval (I-4).
+   */
+  readonly invites?: LocalUiInviteAcceptPort;
   /** The agent and its owner; undefined when no identity or owner is set up. */
   ownerContext(): Promise<ApprovalContext | undefined>;
   /** core `ownerActions.apply`: verifies the owner signature, then applies (I-4). */

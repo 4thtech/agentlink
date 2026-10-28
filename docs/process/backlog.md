@@ -5077,7 +5077,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Owner approves each section; sections follow 11 §5 words (no wallet, gas or transaction words); the brand exception is written once and used in one place.
 
 #### UX2-d1 · node: local API routes to create and accept an invite (new, UX-WAVE-2 item 1, decision 1.1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new routes `POST /api/ui/invites`, `POST /api/ui/invites/accept`, `route-types.ts`), tests; changeset; 08 §1 and 06 §7.1 edits marked "proposed, owner confirms at merge"
 - **Depends on:** —
 - **Spec:** 04 §3.6, §3.6.1, §4; 06 §2.1, §7.1; 08 §1; D-69
