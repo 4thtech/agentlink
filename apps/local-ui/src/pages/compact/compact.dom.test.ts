@@ -444,6 +444,13 @@ describe('Home: Open compact window', () => {
             contacts: async () => [],
             sent: async () => true,
             kitSaved: () => true,
+            agent: async () => ({
+              named: true,
+              connected: true,
+              appName: 'Claude Code',
+              running: true,
+            }),
+            replied: async () => true,
           },
           platform: 'mac',
           now: props.now,
