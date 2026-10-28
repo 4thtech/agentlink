@@ -5065,13 +5065,13 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit): rows move without a reload, polling stops when hidden, after backoff and at 30 minutes; no step advances on a timer alone; reduced-motion and axe tests; no test weakened.
 
 #### UX2-brief · design brief: b11 §21, §23, §24, §25 and §27 (new, UX-WAVE-2 §10)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/b11-local-app.md`
 - **Depends on:** UX2-brief-0; owner decisions of 2026-10-28 (recorded above)
 - **Spec:** D-116, D-135; UX-WAVE-2 §3, §5, §6, §7, §9.2
 - **Invariants:** —
 - **Scope:**
-  - §21 Add contact sheet (both choices, the share options, the "Send it only to {name}. Anyone with this link can connect once." line, pending-row hand-off; 1280 and 360). §23 Waiting for funds (three steps, the diamond's motion about its own centre, reduced-motion still, the 10-minute message, and the brand guideline exception text, decision 3.1). §24 Activity pulse (sparkline size and scale, the three activity words and marker shapes, the heartbeat, at 50+ contacts). §25 Compact view and §25.2 menu-bar popover (content order, sizes, states fine/waiting/paused/offline, many-agent overflow, a reserved agent row). §27 Start here (steps, ticking, not dismissible per decision 7.1, the Home dot).
+  - §21 Add contact sheet (both choices, the share options, the "Send it only to {name}. Anyone with this link can connect once." line, pending-row hand-off; 1280 and 360). §23 Waiting for funds (three steps, the diamond's motion about its own centre, reduced-motion still, the 10-minute message, and the brand guideline exception text, decision 3.1). §24 Activity pulse (sparkline size and scale, the three activity words and marker shapes, the Active now pulse, at 50+ contacts). §25 Compact view and §25.2 menu-bar popover (content order, sizes, states fine/waiting/paused/offline, many-agent overflow, a reserved agent row). §27 Start here (steps, ticking, not dismissible per decision 7.1, the Home dot).
   - Order inside the card: §21, §23 and §27 first (they unblock group 2), then §24 and §25.
 - **Acceptance:**
   - Owner approves each section; sections follow 11 §5 words (no wallet, gas or transaction words); the brand exception is written once and used in one place.
@@ -5099,7 +5099,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Add contact button on Contacts and as the Home Next step action; a level-3 side sheet (full page at 360) with "Invite someone" (optional name, Create invite, then Copy invite as primary, Share… through `navigator.share` only where supported, and Show QR code) and "I have an invite" (paste field to the accept route). After creation the sheet closes into the pending row.
   - The sheet says: "Send it only to {name}. Anyone with this link can connect once." No email button and no `mailto:` (decision 2.1). The invite is shown only in the sheet and leaves only through Copy, Share or QR.
 - **Acceptance:**
-  - Tests first (RED commit); the invite is absent from the URL, title, toast, Activity and logs; Share is hidden where unsupported; pending row appears; vocabulary lint, axe and reduced-motion tests; owner confirms fidelity to §21.
+  - Tests first (RED commit); the invite is absent from the URL, title, toast, Activity and logs, and no element attribute holds the link (no `data-value`; B-11 §21.5); Share is hidden where unsupported; pending row appears; vocabulary lint, axe and reduced-motion tests; owner confirms fidelity to §21.
 
 #### UX2-e1 · ui: brand exception and the waiting mark component (new, UX-WAVE-2 item 3, decision 3.1)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
@@ -5142,9 +5142,9 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
 - **Spec:** B-11 §24; UX-WAVE-2 §6
 - **Invariants:** —
 - **Scope:**
-  - A 24-hour sparkline of 12 two-hour bars with an accessible summary ("14 messages in the last 24 hours"); an activity word with a shaped marker: Active now (exchange in the last 5 minutes; filled dot with a slow heartbeat), Today (hollow dot), Quiet (no dot); never colour only; the heartbeat stops with reduced motion; sort option "Most active" next to "Recent". We say "Active now", never "Online".
+  - A 24-hour sparkline of 12 two-hour bars with an accessible summary ("14 messages in the last 24 hours"); an activity word with a shaped marker: Active now (exchange in the last 5 minutes; a static filled dot, with one ring pulse (`--al-duration-moment`) when a row becomes Active now, no loop, B-11 §24.4), Today (hollow dot), Quiet (no dot); never colour only; no pulse with reduced motion; sort option "Most active" next to "Recent". We say "Active now", never "Online".
 - **Acceptance:**
-  - Tests first (RED commit); markers differ by shape; heartbeat stops under reduced motion; 50+ contacts render without frame drops under the UI-REFRESH-q gate; vocabulary lint and axe tests; no test weakened.
+  - Tests first (RED commit); markers differ by shape; the Active now pulse plays once and never loops, and not at all under reduced motion; 50+ contacts render without frame drops under the UI-REFRESH-q gate; vocabulary lint and axe tests; no test weakened.
 
 #### UX2-g · local-ui: Start here card on Home, empty states point to it (new, UX-WAVE-2 item 8, decision 7.1)
 - **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
