@@ -16,3 +16,19 @@ export const DEFAULT_AGENT_NAME = 'default';
 export function isAgentName(value: unknown): value is string {
   return typeof value === 'string' && AGENT_NAME_PATTERN.test(value);
 }
+
+/**
+ * U3-c (06 §6 labels; 11 §5.8): the owner's label for an agent: 1 to 32 code points of letters,
+ * digits, spaces, `.`, `'` and `-`, in Unicode NFC, not starting or ending with a space and without
+ * two spaces in a row. Plain text only: no control, format, bidi or combining character can pass.
+ */
+const LABEL_CHARS = /^[\p{L}\p{N} .'-]+$/u;
+
+export function isAgentLabel(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const length = [...value].length;
+  if (length < 1 || length > 32) return false;
+  if (value.normalize('NFC') !== value) return false;
+  if (value.startsWith(' ') || value.endsWith(' ') || value.includes('  ')) return false;
+  return LABEL_CHARS.test(value);
+}

@@ -9,8 +9,12 @@ import * as entry from './index.js';
 describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
   it('exports exactly the opaque entry points', () => {
     expect(Object.keys(entry).sort()).toEqual([
+      // U3-c (06 §6): the agent folder lock's file name (no path).
+      'AGENT_OPEN_LOCK_FILE',
       // M1-8d: the local approval server's address constant (08 §1).
       'APPROVAL_SERVER_HOST',
+      // U3-c: the folder lock's fixed-text error.
+      'AgentFolderLockError',
       // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).
       'AllowedPathError',
       'KEYCHAIN_SERVICE',
@@ -45,6 +49,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'hasOwnerOnMachine',
       // M1-9z: a store-only boolean (a leftover owner-code change); nothing unlocked.
       'hasUnfinishedOwnerCodeChange',
+      // U3-c (06 §6): the shared folder lock while an agent is open (no key, no store).
+      'holdAgentFolderShared',
       'initOwner',
       'nodeHostResolver',
       'nodeNip11Fetcher',
@@ -57,6 +63,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // M1-11b-6: a store-only boolean (no owner anywhere: card, owner items, owner files).
       'ownerSetupAvailable',
       'packageName',
+      // U3-c: counts from clear store columns, read-only (no key, no cipher).
+      'peekAgentStore',
       'performOwnerOperation',
       'probeOsKeychain',
       'resolveAllowedFile',
@@ -67,6 +75,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // M1-8d: the local approval server entry point (no owner-store or opener seam).
       'startApprovalServer',
       'unlockFileKeyStoreAgent',
+      // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
+      'withAgentFolderExclusive',
     ]);
   });
 

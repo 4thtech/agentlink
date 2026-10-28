@@ -16,6 +16,7 @@ import type { KeyStore } from '@4thtech-io/crypto';
 import { encodeBase64url, encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { createLogger } from '@4thtech-io/log';
 import type { AgentStore, KeyStoreBackendKind, KeychainProbe } from '@4thtech-io/node';
+import { AgentFolderLockError, withAgentFolderExclusive } from '@4thtech-io/node';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeAgentConfig } from './agent-dir.js';
 import { RUNTIME_MESSAGES } from './errors.js';
@@ -274,5 +275,50 @@ describe('openAgent (M1-9k)', () => {
     if (result.status !== 'ok') throw new Error('not opened');
     await Promise.all([result.agent.close(), result.agent.close()]);
     expect(rec.closed.sort()).toEqual(['client', 'keyStore', 'store']);
+  });
+});
+
+// U3-c (06 §6 "Open agents and removal"): every process that opens an agent holds the shared folder
+// lock until close, so a removal (exclusive) is refused with in_use while it is open.
+describe('openAgent holds the shared agent folder lock (U3-c)', () => {
+  const exclusive = (dir: string) =>
+    withAgentFolderExclusive(dir, () => 'taken').catch((error: unknown) =>
+      error instanceof AgentFolderLockError ? error.code : error,
+    );
+
+  it('removal is refused while the agent is open, by one process or two, and allowed after close', async () => {
+    const { paths } = await initAgent();
+    const disk = new Disk();
+    const first = await open(processDeps(disk).deps);
+    const second = await open(processDeps(disk).deps);
+    if (first.status !== 'ok' || second.status !== 'ok') throw new Error('not opened');
+    expect(await exclusive(paths.dir)).toBe('in_use');
+    await first.agent.close();
+    expect(await exclusive(paths.dir)).toBe('in_use');
+    await second.agent.close();
+    expect(await exclusive(paths.dir)).toBe('taken');
+  });
+
+  it('the lock is released when opening fails or answers needs_setup', async () => {
+    const { paths } = await initAgent();
+    const noKeychain = processDeps(new Disk(), {
+      probe: { ok: false, reason: 'unavailable', message: 'x', fix: 'y' } as never,
+    });
+    await open(noKeychain.deps).catch(() => undefined);
+    expect(await exclusive(paths.dir)).toBe('taken');
+    const wrongKeys = processDeps(new Disk(), { clientAgentId: () => newAgentId() });
+    await open(wrongKeys.deps).catch(() => undefined);
+    expect(await exclusive(paths.dir)).toBe('taken');
+  });
+
+  it('an agent being removed (lock held exclusive) does not open', async () => {
+    const { paths } = await initAgent();
+    const code = await withAgentFolderExclusive(paths.dir, () =>
+      open(processDeps(new Disk()).deps).then(
+        () => 'opened',
+        (error: unknown) => (error as { code?: unknown }).code,
+      ),
+    );
+    expect(code).toBe('agent_open_failed');
   });
 });

@@ -108,6 +108,26 @@ export type {
   LocalUiOptions,
   LocalUiOwnerSetup,
 } from './local-ui/context.js';
+// U3-c (D-138, 08 §1): the app host's seams the CLI implements (the agent folders, opening an agent);
+// the generation, the switch gate and the route stubs stay inside the package.
+export type {
+  AgentDirectory,
+  AgentDirectoryEntry,
+  AgentDirectoryStats,
+  AppHostAgent,
+  AppHostOptions,
+} from './local-ui/app-host.js';
+// U3-c (06 §6): the shared agent folder lock every process holds while an agent is open, and the
+// read-only look at an agent's store for the Agents list (clear columns only, no key).
+export {
+  AGENT_OPEN_LOCK_FILE,
+  AgentFolderLockError,
+  holdAgentFolderShared,
+  withAgentFolderExclusive,
+  type AgentFolderLock,
+  type AgentFolderLockErrorCode,
+} from './agent-folder-lock.js';
+export { peekAgentStore, type AgentStorePeek } from './agent-peek.js';
 // M1-11s-a-d: the caller's health source for the status bar's health read.
 export type { LocalUiHealthSnapshot, LocalUiHealthSource } from './local-ui/api/health.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key

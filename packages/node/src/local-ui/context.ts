@@ -363,4 +363,42 @@ export interface LocalUiContext {
    * only; never rejects.
    */
   readonly health?: () => Promise<LocalUiHealthBody>;
+  /**
+   * U3-c (D-138, 08 §1): the Agents list of the app host, for `GET /api/ui/agents` only; absent
+   * outside the app host (an approval page opened by an MCP process stays bound to its agent). Reads
+   * only: it lists, it never opens, switches or writes.
+   */
+  readonly agents?: LocalUiAgentsDesk;
+}
+
+/** U3-c: one agent in `GET /api/ui/agents`. Never a path, an agent ID or a key. */
+export interface LocalUiAgentView {
+  readonly name: string;
+  /** Plain text: the owner's label from config.json (display only), else the name. */
+  readonly label: string;
+  readonly current: boolean;
+  /** False when the agent's config cannot be read: listed, never opened. */
+  readonly available: boolean;
+  /** "Removal not finished" (07 §9.1 `removing`, or in the owner's revoked list). */
+  readonly removing: boolean;
+  /** Active contacts; null when the store cannot be read just now. */
+  readonly contacts: number | null;
+  /** An AI app is running this agent (the publisher lease row, read only, 06 §6). */
+  readonly running: boolean;
+  /** The AI apps whose `agentlink` entry runs this agent (card U3-f fills it; empty until then). */
+  readonly apps: readonly string[];
+}
+
+/** U3-c: the body of `GET /api/ui/agents` in the app host. */
+export interface LocalUiAgentsList {
+  readonly generation: number;
+  /** The open agent's name and label; null when none could be opened. */
+  readonly current: string | null;
+  readonly label: string | null;
+  readonly agents: readonly LocalUiAgentView[];
+}
+
+/** U3-c: what the agents read route may call (built by the server over the app host). */
+export interface LocalUiAgentsDesk {
+  list(): Promise<LocalUiAgentsList>;
 }

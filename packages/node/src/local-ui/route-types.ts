@@ -11,7 +11,11 @@
 // no store write; its handler gets only the checked item ID. UX2-d1 (owner decision 1.1) adds a
 // fifth, `presence: 'invite'`, for creating an invite and checking a pasted one: two fixed POSTs, no
 // presence, no signing; its handler gets only the parsed body and the invite desk. Accepting an
-// invite is an ordinary `presence: true` route.
+// invite is an ordinary `presence: true` route. U3-c (D-138, 08 §1) adds the sixth, `presence:
+// 'switch'`, for switching the open agent in the app host: one fixed POST, no presence, no signing,
+// no handler (the server's switch gate runs it); it writes only `app.json`. U3-c also adds route
+// stubs (`stub: true`) for the U3 routes later cards fill: a stub answers 501 `not_available` before
+// any presence check and never runs its handler.
 import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiContext } from './context.js';
@@ -72,6 +76,12 @@ export interface LocalUiOwnerRoute {
   readonly method: LocalUiOwnerMethod;
   readonly path: string;
   readonly presence: true;
+  /**
+   * U3-c: a reserved route whose card has not landed. The server answers 501 `not_available` after
+   * the session, CSRF, Origin, fetch-metadata, content-type and generation checks, before the
+   * presence gate; the handler never runs.
+   */
+  readonly stub?: true;
   readonly handler: (
     context: LocalUiContext,
     request: LocalUiRequest,
@@ -183,7 +193,26 @@ export interface LocalUiInviteRoute {
   ) => Promise<LocalUiResult>;
 }
 
+/** U3-c: the fixed path of the switch kind (08 §1). */
+export const AGENTS_SWITCH_PATH = '/api/ui/agents/switch';
+
+/**
+ * U3-c (D-138; 08 §1; 04 §2.5 "Several agents in one app"): switching the open agent, the sixth named
+ * route kind. Only `POST /api/ui/agents/switch`, registered once (routes.ts), with no handler: the
+ * server's switch gate runs after the same session, CSRF, Origin, fetch-metadata and octet-stream
+ * checks as every write, refuses a query, an operation input or a presence header, parses the body
+ * itself (exactly `{"name","generation"}`) and asks the app host to switch. It takes no presence,
+ * signs nothing and writes only `~/.agentlink/app.json`. Outside the app host it answers
+ * `not_available`.
+ */
+export interface LocalUiSwitchRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'switch';
+}
+
 export type LocalUiRoute =
+  | LocalUiSwitchRoute
   | LocalUiReadRoute
   | LocalUiOwnerRoute
   | LocalUiSetupRoute
@@ -213,6 +242,34 @@ export const NOT_IMPLEMENTED: LocalUiResult = Object.freeze({
   status: 501,
   body: Object.freeze({ error: 'not_implemented' }),
 });
+
+/** U3-c: the answer of a reserved U3 route until its card fills it (501). */
+export const NOT_AVAILABLE: LocalUiResult = Object.freeze({
+  status: 501,
+  body: Object.freeze({ error: 'not_available' }),
+});
+
+/** U3-c: a reserved read route (`GET`), answering 501 `not_available`. */
+export const readStub = (path: string): LocalUiReadRoute =>
+  Object.freeze<LocalUiReadRoute>({
+    method: 'GET',
+    path,
+    presence: false,
+    handler: () => Promise.resolve(NOT_AVAILABLE),
+  });
+
+/**
+ * U3-c: a reserved owner route (`POST`, presence), answering 501 `not_available` before the presence
+ * gate; its handler is never run (approval-server.ts).
+ */
+export const ownerStub = (path: string): LocalUiOwnerRoute =>
+  Object.freeze<LocalUiOwnerRoute>({
+    method: 'POST',
+    path,
+    presence: true,
+    stub: true,
+    handler: () => Promise.resolve(NOT_AVAILABLE),
+  });
 
 /** A read stub for one page: `GET /api/ui/<page>` answering 501. */
 export const pageStub = (page: string): LocalUiReadRoute =>
