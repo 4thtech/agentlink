@@ -35,6 +35,7 @@ import {
 import {
   FilesIoView,
   MessagesView,
+  PULSE_SCAN_CAP,
   type Conversation,
   type MessageItem,
   type ReceivedFileItem,
@@ -290,6 +291,113 @@ describe('MessagesView.conversations (plan §4 GET /api/ui/messages)', () => {
     expect(list).toEqual([
       expect.objectContaining({ contactId: b.id, lastAt: null, lastInAt: null }),
     ]);
+  });
+});
+
+// ---- Messages: the activity pulse's exchange times (UX2-f1) -------------------------------------
+
+describe('MessagesView.pulseTimes (UX2-f1, b11 §24: GET /api/ui/messages/pulse)', () => {
+  const PULSE_KEYS = ['capped', 'times'];
+  const TIME_KEYS = ['at', 'contactId'];
+
+  it('returns only a contact ID and a time per exchange, both ways, inside [since, until]', async () => {
+    await put({ contact: b.id, createdAt: T0 - 1 }); // before the window
+    await put({ contact: b.id, createdAt: T0 });
+    await put({ contact: b.id, createdAt: T0 + 5, direction: 'out' });
+    await put({ contact: c.id, createdAt: T0 + 9 });
+    await put({ contact: c.id, createdAt: T0 + 10 }); // `until` itself is in
+    await put({ contact: c.id, createdAt: T0 + 11 }); // after the window
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + 10);
+    expect(keys(pulse)).toEqual(PULSE_KEYS);
+    expect(pulse.capped).toBe(false);
+    for (const t of pulse.times) expect(keys(t)).toEqual(TIME_KEYS);
+    expect([...pulse.times].sort((x, y) => x.at - y.at)).toEqual([
+      { contactId: b.id, at: T0 },
+      { contactId: b.id, at: T0 + 5 },
+      { contactId: c.id, at: T0 + 9 },
+      { contactId: c.id, at: T0 + 10 },
+    ]);
+    await expectNoSecrets(pulse);
+  });
+
+  it('counts only messages: never a request, a refused or protocol row, or a removed contact', async () => {
+    await put({ contact: null, createdAt: T0 + 1 }); // a request from an unknown sender
+    await put({ contact: b.id, createdAt: T0 + 2, state: 'refused' });
+    await put({
+      contact: b.id,
+      createdAt: T0 + 3,
+      payload: textPayload({ kind: 'received', envelopeId: newId() }, 'ack'),
+    });
+    await put({ contact: c.id, createdAt: T0 + 5 });
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: c.id }, { status: 'removed' }),
+    );
+    await put({ contact: b.id, createdAt: T0 + 6 });
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + 100);
+    expect(pulse.times).toEqual([{ contactId: b.id, at: T0 + 6 }]);
+  });
+
+  it('never opens a payload, writes nothing and never marks a message read', async () => {
+    const unread = await put({
+      contact: b.id,
+      createdAt: T0,
+      payload: textPayload('BODY-PLAINTEXT'),
+      readAt: null,
+    });
+    const before = await snapshot();
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + 10);
+    expect(JSON.stringify(pulse)).not.toMatch(/BODY-PLAINTEXT|report\.pdf|CANARY/);
+    expect(await snapshot()).toBe(before);
+    expect(
+      await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: unread })?.read_at),
+    ).toBeNull();
+    expect(lines.join('\n')).not.toMatch(/BODY-PLAINTEXT/);
+  });
+
+  it('caps the scan per direction, newest first, and says so', async () => {
+    const rows = PULSE_SCAN_CAP + 5;
+    await a.store.transaction((tx) => {
+      for (let i = 0; i < rows; i += 1) {
+        tx.insert('envelopes', {
+          envelope_id: `cap${String(i).padStart(8, '0')}`,
+          envelope_hash: `0x${'ab'.repeat(32)}`,
+          thread_id: `t${i}`,
+          direction: 'in',
+          contact_id: b.id,
+          from_key: 'f'.repeat(64),
+          type: 'text',
+          state: 'ok',
+          refused_reason: null,
+          created_at: T0 + i,
+          envelope_json: null,
+          payload_json: null,
+          read_at: null,
+          delivery: null,
+          refused_at: null,
+          request_accepted_at: null,
+        });
+      }
+    });
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + rows);
+    expect(pulse.capped).toBe(true);
+    expect(pulse.times).toHaveLength(PULSE_SCAN_CAP);
+    // Newest first: the oldest five are the ones left out.
+    expect(pulse.times.reduce((m, t) => Math.min(m, t.at), Infinity)).toBe(T0 + 5);
+    const under = await a.client.messages.pulseTimes(T0 + 6, T0 + rows);
+    expect(under.capped).toBe(false);
+  });
+
+  it('refuses a window that is not two whole times in order', async () => {
+    for (const [since, until] of [
+      [T0 + 1, T0],
+      [-1, T0],
+      [T0, 1.5],
+      [Number.NaN, T0],
+    ] as const) {
+      await expect(a.client.messages.pulseTimes(since, until)).rejects.toMatchObject({
+        code: 'page_query_invalid',
+      });
+    }
   });
 });
 
