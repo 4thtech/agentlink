@@ -30,6 +30,7 @@ export const PAGE_TITLES = {
   activity: 'Activity',
   messages: 'Messages',
   contacts: 'Contacts',
+  agents: 'Agents',
   files: 'Files',
   storage: 'Storage',
   proofs: 'Proofs & credits',

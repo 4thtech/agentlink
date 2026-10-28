@@ -1,0 +1,168 @@
+// U3-h: the Agents requests (b11 §29; 08 §1). The page never signs. Switching is a plain POST
+// `{name, generation}` with no presence. Add, Rename and Remove are owner operations: the presence
+// proof is the octet-stream body, the operation's input travels base64url JSON in X-AgentLink-Input
+// (never the URL), and the server's central gate checks presence before the route runs. A route that
+// is still a stub answers 501 and becomes `not_available`. The generation is also stamped on every
+// mutating request by the page's generation guard (api/generation.ts).
+import { createApiClient, type ApiClient } from '../../api/client.js';
+import type { PresenceProof } from '../contacts/owner.js';
+import { parseAgents, type AgentsList } from './data.js';
+
+export type ReadOutcome =
+  { readonly kind: 'ok'; readonly list: AgentsList } | { readonly kind: 'error' };
+
+export type SwitchOutcome = {
+  readonly kind: 'done' | 'agent_changed' | 'not_available' | 'offline' | 'failed';
+};
+
+export type OwnerKind =
+  | 'done'
+  | 'rejected'
+  | 'required'
+  | 'wait'
+  | 'busy'
+  | 'agent_changed'
+  | 'in_use'
+  | 'contacts_unreachable'
+  | 'label_invalid'
+  | 'refused'
+  | 'not_available'
+  | 'session'
+  | 'offline'
+  | 'failed';
+export interface OwnerOutcome {
+  readonly kind: OwnerKind;
+}
+
+export interface AgentsApi {
+  list(): Promise<ReadOutcome>;
+  switchTo(name: string, generation: number): Promise<SwitchOutcome>;
+  add(input: { label: string; generation: number }, proof: PresenceProof): Promise<OwnerOutcome>;
+  rename(
+    input: { name: string; label: string; generation: number },
+    proof: PresenceProof,
+  ): Promise<OwnerOutcome>;
+  remove(
+    input: { name: string; typedLabel: string; generation: number; anyway?: boolean },
+    proof: PresenceProof,
+  ): Promise<OwnerOutcome>;
+}
+
+export interface AgentsApiOptions {
+  readonly fetch?: typeof fetch;
+  readonly token?: string;
+}
+
+const AGENTS = '/api/ui/agents';
+const WORDS: ReadonlySet<string> = new Set([
+  'agent_changed',
+  'in_use',
+  'contacts_unreachable',
+  'label_invalid',
+  'refused',
+  'busy',
+]);
+
+function pageToken(): string {
+  if (typeof document === 'undefined') return '';
+  return document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
+}
+
+function base64url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function statusWord(res: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await res.json();
+    const s =
+      typeof body === 'object' && body !== null ? (body as { status?: unknown }).status : undefined;
+    return typeof s === 'string' ? s : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
+  const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  const token = (): string => options.token ?? pageToken();
+  const client: ApiClient = createApiClient({
+    fetch: doFetch,
+    ...(options.token === undefined ? {} : { token: options.token }),
+  });
+
+  async function owner(
+    path: string,
+    input: Record<string, unknown>,
+    generation: number,
+    proof: PresenceProof,
+  ): Promise<OwnerOutcome> {
+    const headers = new Headers({
+      'X-AgentLink-CSRF': token(),
+      'Content-Type': 'application/octet-stream',
+      'X-AgentLink-Input': base64url(JSON.stringify({ ...input, generation: String(generation) })),
+    });
+    if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
+    const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+    let res: Response;
+    try {
+      res = await doFetch(path, {
+        method: 'POST',
+        headers,
+        body: body as BodyInit,
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+    } catch {
+      return { kind: 'offline' };
+    } finally {
+      body.fill(0);
+    }
+    if (res.status === 501) return { kind: 'not_available' };
+    if (res.status === 401) return { kind: 'session' };
+    if (res.status === 429) return { kind: 'wait' };
+    const word = await statusWord(res);
+    if (res.status === 200 && word === 'done') return { kind: 'done' };
+    if (word === 'presence_rejected') return { kind: 'rejected' };
+    if (word === 'presence_required') return { kind: 'required' };
+    if (word === 'wait') return { kind: 'wait' };
+    if (word !== undefined && WORDS.has(word)) return { kind: word as OwnerKind };
+    if (res.status === 403) return { kind: 'session' };
+    return { kind: 'failed' };
+  }
+
+  return {
+    async list() {
+      const result = await client.get(AGENTS);
+      if (result.kind !== 'ok') return { kind: 'error' };
+      const list = parseAgents(result.data);
+      return list === undefined ? { kind: 'error' } : { kind: 'ok', list };
+    },
+    async switchTo(name, generation) {
+      const result = await client.post(`${AGENTS}/switch`, { name, generation });
+      if (result.kind === 'ok') return { kind: 'done' };
+      if (result.kind === 'not_available') return { kind: 'not_available' };
+      if (result.kind === 'offline') return { kind: 'offline' };
+      // 409 is `agent_changed` or a switch already running: either way the page re-reads.
+      if (result.kind === 'error' && result.status === 409) return { kind: 'agent_changed' };
+      return { kind: 'failed' };
+    },
+    add: (input, proof) => owner(AGENTS, { label: input.label }, input.generation, proof),
+    rename: (input, proof) =>
+      owner(`${AGENTS}/label`, { name: input.name, label: input.label }, input.generation, proof),
+    remove: (input, proof) =>
+      owner(
+        `${AGENTS}/remove`,
+        {
+          name: input.name,
+          typedLabel: input.typedLabel,
+          ...(input.anyway === true ? { anyway: true } : {}),
+        },
+        input.generation,
+        proof,
+      ),
+  };
+}

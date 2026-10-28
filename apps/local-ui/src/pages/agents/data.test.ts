@@ -61,7 +61,14 @@ describe('parseAgents', () => {
 });
 
 describe('ordering and wording', () => {
-  const a = (over: Record<string, unknown>) => parseAgents({ switchable: true, generation: 1, current: null, label: null, agents: [row(over)] })!.agents[0]!;
+  const a = (over: Record<string, unknown>) =>
+    parseAgents({
+      switchable: true,
+      generation: 1,
+      current: null,
+      label: null,
+      agents: [row(over)],
+    })!.agents[0]!;
   it('puts the open agent first, then by label, removals last', () => {
     const rows = [
       a({ name: 'z', label: 'Zed' }),

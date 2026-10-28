@@ -17,9 +17,17 @@ function api(status: number, body: unknown) {
       url: String(input),
       method: init?.method ?? 'GET',
       headers: new Headers(init?.headers),
-      body: raw === undefined || raw === null ? '' : ArrayBuffer.isView(raw) ? new TextDecoder().decode(raw) : String(raw),
+      body:
+        raw === undefined || raw === null
+          ? ''
+          : ArrayBuffer.isView(raw)
+            ? new TextDecoder().decode(raw)
+            : String(raw),
     });
-    return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { 'content-type': 'application/json' },
+    });
   }) as typeof fetch;
   return { seen, agents: createAgentsApi({ fetch: fetchFn, token: 't' }) };
 }
@@ -35,8 +43,12 @@ describe('switch', () => {
     expect(t.seen[0]?.headers.get('X-AgentLink-CSRF')).toBe('t');
   });
   it('maps the refusals', async () => {
-    expect(await api(409, { status: 'agent_changed' }).agents.switchTo('w', 1)).toEqual({ kind: 'agent_changed' });
-    expect(await api(404, { status: 'unknown_agent' }).agents.switchTo('w', 1)).toEqual({ kind: 'failed' });
+    expect(await api(409, { status: 'agent_changed' }).agents.switchTo('w', 1)).toEqual({
+      kind: 'agent_changed',
+    });
+    expect(await api(404, { status: 'unknown_agent' }).agents.switchTo('w', 1)).toEqual({
+      kind: 'failed',
+    });
     expect(await api(501, {}).agents.switchTo('w', 1)).toEqual({ kind: 'not_available' });
   });
 });
@@ -45,7 +57,9 @@ describe('owner operations', () => {
   const proof = { kind: 'code', code: '123456' } as const;
   it('rename sends name, label and generation in the input, the code as the body', async () => {
     const t = api(200, { status: 'done' });
-    expect(await t.agents.rename({ name: 'work', label: 'Home', generation: 4 }, proof)).toEqual({ kind: 'done' });
+    expect(await t.agents.rename({ name: 'work', label: 'Home', generation: 4 }, proof)).toEqual({
+      kind: 'done',
+    });
     const s = t.seen[0]!;
     expect(s.url).toBe('/api/ui/agents/label');
     expect(input(s)).toEqual({ name: 'work', label: 'Home', generation: '4' });
@@ -65,11 +79,24 @@ describe('owner operations', () => {
   it('maps each answer to a word', async () => {
     const p = { name: 'w', label: 'L', generation: 1 };
     expect((await api(501, {}).agents.rename(p, proof)).kind).toBe('not_available');
-    expect((await api(409, { status: 'agent_changed' }).agents.rename(p, proof)).kind).toBe('agent_changed');
-    expect((await api(409, { status: 'in_use' }).agents.remove({ name: 'w', typedLabel: 'x', generation: 1 }, proof)).kind).toBe('in_use');
-    expect((await api(403, { status: 'presence_rejected' }).agents.rename(p, proof)).kind).toBe('rejected');
+    expect((await api(409, { status: 'agent_changed' }).agents.rename(p, proof)).kind).toBe(
+      'agent_changed',
+    );
+    expect(
+      (
+        await api(409, { status: 'in_use' }).agents.remove(
+          { name: 'w', typedLabel: 'x', generation: 1 },
+          proof,
+        )
+      ).kind,
+    ).toBe('in_use');
+    expect((await api(403, { status: 'presence_rejected' }).agents.rename(p, proof)).kind).toBe(
+      'rejected',
+    );
     expect((await api(429, {}).agents.rename(p, proof)).kind).toBe('wait');
-    expect((await api(400, { status: 'label_invalid' }).agents.rename(p, proof)).kind).toBe('label_invalid');
+    expect((await api(400, { status: 'label_invalid' }).agents.rename(p, proof)).kind).toBe(
+      'label_invalid',
+    );
     expect((await api(409, { status: 'refused' }).agents.rename(p, proof)).kind).toBe('refused');
     expect((await api(500, {}).agents.rename(p, proof)).kind).toBe('failed');
   });
