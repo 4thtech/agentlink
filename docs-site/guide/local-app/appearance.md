@@ -6,7 +6,7 @@
 
 <figure><img src="../.gitbook/assets/local-appearance--choices.png" alt="The Appearance page with choices for the theme, reduced motion, transparency and showing Under the hood by default."><figcaption><p>Appearance, with made-up data.</p></figcaption></figure>
 
-The choices, in this order. The groups are not all labelled on the page yet.
+The choices, in this order. Each group has its name written above it.
 
 | Choice | Options |
 |---|---|
