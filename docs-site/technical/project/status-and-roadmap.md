@@ -15,7 +15,7 @@
 
 **In progress:** v0.4.0 is on npm `latest` and a GitHub release (27 Oct 2026; v0.3.0 is the one before it). **In 0.4.0:** the local app shows your conversations. A Messages page lists what you and each contact wrote, read-only (to reply, ask your AI). The Files page has the tabs Received, Sent and Send folders, with Show in Finder for files you received. Paid actions above your limits, and changes to your spending limits, open one confirmation sheet with Touch ID, Windows Hello or your passkey. An owner set up before 0.3.0 can switch to Touch ID once. The status bar shows whether AgentLink is running. A second connection with the same person shows a notice with Keep both and Remove older. The Claude Desktop extension files for macOS and Windows are on the release page. Still open from M1a: the two-person dogfood between Tali and Denis (M1-23).
 
-**Next:** The visual refresh of the local app comes next, then the cloud agent as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
+**Next:** The local app's visual refresh is merged and ships in the next release (not released yet). Then the cloud agent as 0.5.0 (planned). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 
 ### Components
 

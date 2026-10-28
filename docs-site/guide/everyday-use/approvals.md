@@ -24,7 +24,7 @@ Your agent carries on once you approve.
 
 ## The approval page
 
-When something needs your approval, AgentLink opens an approval page in your browser, and your agent shows you its link (it starts with `http://localhost`). The link is for you. Your agent cannot approve with it, and on the page you still confirm with your owner code.
+When something needs your approval, AgentLink opens an approval page in your browser, and your agent shows you its link (it starts with `http://localhost`). The link is for you. Your agent cannot approve with it, and on the page you still confirm with your passkey or your backup code.
 
 While the page is open, your agent waits briefly for your decision. You do not need to tell it "done". If the page does not open, use the `approve` command above.
 
