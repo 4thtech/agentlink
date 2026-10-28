@@ -1,5 +1,6 @@
 ---
 '@4thtech-io/local-ui': patch
+'@4thtech-io/types': patch
 '@4thtech-io/agentlink': patch
 ---
 

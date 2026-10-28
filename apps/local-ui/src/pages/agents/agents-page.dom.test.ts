@@ -2,11 +2,11 @@
 // U3-h (b11 §29.2 to §29.8): the Agents page, the Rename, Add and Remove sheets, and the switcher.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { AgentSwitcher } from '../../layout/agent-switcher.js';
 import { createOwnerClient } from '../contacts/owner.js';
 import { createAgentsApi } from './api.js';
-import { AgentsPage } from './index.js';
+import { AgentsPage, type AgentsPageProps } from './index.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -103,9 +103,9 @@ async function settle(): Promise<void> {
 }
 const api = () => createAgentsApi({ fetch: fetchFn, token: 't' });
 const owner = () => createOwnerClient({ fetch: fetchFn, token: 't' });
-async function mountPage(reload = vi.fn()): Promise<ReturnType<typeof vi.fn>> {
+async function mountPage(reload = vi.fn<() => void>()): Promise<Mock<() => void>> {
   await act(async () => {
-    root.render(createElement(AgentsPage, { api: api(), owner: owner(), reload }));
+    root.render(createElement<AgentsPageProps>(AgentsPage, { api: api(), owner: owner(), reload }));
   });
   await settle();
   return reload;
@@ -384,7 +384,7 @@ describe('Add', () => {
 });
 
 describe('the top-bar switcher', () => {
-  const mountSwitcher = async (reload = vi.fn()) => {
+  const mountSwitcher = async (reload = vi.fn<() => void>()) => {
     await act(async () => {
       root.render(createElement(AgentSwitcher, { api: api(), reload }));
     });

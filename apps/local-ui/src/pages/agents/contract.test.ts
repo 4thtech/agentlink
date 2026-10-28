@@ -1,133 +1,169 @@
-/* eslint-disable boundaries/no-bypass -- a contract test: it runs the page against the real server code of packages/node, which has no public entry for it */
 // @vitest-environment node
-// U3-h CONTRACT: the page's own requests against the REAL server code of packages/node (no
-// hand-written answer shapes). The switch goes through the real approval server and app host; Add and
-// Rename go through the real route handlers of api/agents-manage.ts, fed exactly what the gate would
-// hand them (the JSON of X-AgentLink-Input). The assertions are that the page's request is accepted
-// and that the real answer maps to the right outcome word.
-import { afterEach, describe, expect, it } from 'vitest';
+// U3-h CONTRACT, page side: the page's client against the shared Agents wire samples
+// (@4thtech-io/types/ui-contract/agents). The server side
+// (packages/node/src/local-ui/ui-contract-agents.test.ts) runs the REAL app host and route handlers
+// on the same samples and asserts they answer exactly them. Here the client must build exactly each
+// sample request and read each sample answer as the outcome word next to it. apps/local-ui never
+// imports packages/node (package layering, tools/deps-check).
 import {
-  startApprovalServerWith,
-  type ApprovalServer,
-  type ApprovalServerInternals,
-  type ApprovalServerSource,
-} from '../../../../../packages/node/src/approval-server.js';
-import type {
-  AgentDirectory,
-  AgentDirectoryEntry,
-  AppHostAgent,
-} from '../../../../../packages/node/src/local-ui/app-host.js';
+  AGENTS_LABEL_CHECK,
+  AGENTS_LABEL_CHECK_PATH,
+  AGENTS_LABEL_PATH,
+  AGENTS_LIST,
+  AGENTS_OWNER,
+  AGENTS_PATH,
+  AGENTS_REMOVE,
+  AGENTS_REMOVE_PATH,
+  AGENTS_SWITCH,
+  AGENTS_SWITCH_PATH,
+  OCTET_STREAM,
+  type AgentsSwitchBody,
+  type UiAnswer,
+} from '@4thtech-io/types/ui-contract/agents';
+import { describe, expect, it } from 'vitest';
 import { createAgentsApi } from './api.js';
 
-const encodeUtf8 = (text: string): Uint8Array => new TextEncoder().encode(text);
-const INDEX_HTML =
-  '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-  '<meta name="agentlink-csrf" content="" /><title>AgentLink</title>' +
-  '<script type="module" crossorigin src="/assets/index-Bx3f9a2Q.js"></script></head>' +
-  '<body><div id="root"></div></body></html>';
-
-const servers: ApprovalServer[] = [];
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((s) => s.close()));
-});
-
-async function start() {
-  const written: string[] = [];
-  const entries = new Map<string, AgentDirectoryEntry>([
-    ['default', { name: 'default', label: 'Personal', available: true, removing: false }],
-    ['work', { name: 'work', label: 'Work', available: true, removing: false }],
-  ]);
-  const source = (): ApprovalServerSource => ({
-    context: () => Promise.resolve(undefined),
-    list: () => Promise.resolve([]),
-    get: () => Promise.resolve(undefined),
-    apply: () => Promise.reject(new Error('never')),
-  });
-  const agent = (name: string): AppHostAgent => ({
-    name,
-    label: entries.get(name)?.label ?? name,
-    source: source(),
-    localUi: {},
-    close: () => Promise.resolve(),
-  });
-  const directory: AgentDirectory = {
-    list: () => Promise.resolve([...entries.values()]),
-    read: (name) => Promise.resolve(entries.get(name)),
-    stats: () => Promise.resolve({ contacts: 1, running: false }),
-    writeLabel: () => Promise.reject(new Error('never')),
-    markRemoving: () => Promise.reject(new Error('never')),
-    removeFolder: () => Promise.reject(new Error('never')),
-    readCurrent: () => Promise.resolve(undefined),
-    writeCurrent: (name) => {
-      written.push(name);
-      return Promise.resolve();
-    },
-  };
-  const opened: string[] = [];
-  const internals: ApprovalServerInternals = {
-    opener: (url) => {
-      opened.push(url);
-      return Promise.resolve(true);
-    },
-    notifier: () => Promise.resolve(true),
-    openOwnerStore: () => Promise.reject(new Error('no owner store')),
-  };
-  const initial = agent('default');
-  const server = await startApprovalServerWith(
-    {
-      source: initial.source,
-      localUi: {
-        assets: {
-          files: new Map<string, Uint8Array>([
-            ['index.html', encodeUtf8(INDEX_HTML)],
-            ['assets/index-Bx3f9a2Q.js', encodeUtf8('console.log(1);')],
-          ]),
-        },
-      },
-      host: { directory, initial, open: (name) => Promise.resolve(agent(name)) },
-    },
-    internals,
-  );
-  servers.push(server);
-  await server.open();
-  const link = new URL(opened[0] ?? '');
-  const entry = await fetch(`${server.origin}/?t=${link.searchParams.get('t') ?? ''}`, {
-    redirect: 'manual',
-  });
-  const cookie = (entry.headers.get('set-cookie') ?? '').split(';')[0] ?? '';
-  const page = await (await fetch(`${server.origin}/`, { headers: { Cookie: cookie } })).text();
-  const csrf = /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(page)?.[1] ?? '';
-  // The page's fetch, pointed at the real server with the browser's cookie and Origin.
-  const pageFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    const headers = new Headers(init?.headers);
-    headers.set('Cookie', cookie);
-    headers.set('Origin', server.origin);
-    return fetch(`${server.origin}${String(input)}`, { ...init, headers });
-  }) as typeof fetch;
-  return { api: createAgentsApi({ fetch: pageFetch, token: csrf }), written };
+interface Sent {
+  readonly path: string;
+  readonly query: URLSearchParams;
+  readonly method: string;
+  readonly headers: Headers;
+  readonly body: string;
 }
 
-describe('contract: the real server accepts the page', () => {
-  it('lists the agents and parses them', async () => {
-    const { api } = await start();
-    const read = await api.list();
+/** A fetch that records what the page sends and answers with one sample answer. */
+function answering(answer: UiAnswer<unknown> | { readonly status: number }) {
+  const sent: Sent[] = [];
+  const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = new URL(String(input), 'http://127.0.0.1');
+    const raw = init?.body;
+    sent.push({
+      path: url.pathname,
+      query: url.searchParams,
+      method: init?.method ?? 'GET',
+      headers: new Headers(init?.headers),
+      body:
+        raw === undefined || raw === null
+          ? ''
+          : ArrayBuffer.isView(raw)
+            ? new TextDecoder().decode(raw)
+            : String(raw),
+    });
+    const body = 'body' in answer ? answer.body : {};
+    return new Response(JSON.stringify(body), {
+      status: answer.status,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+  return { sent, api: createAgentsApi({ fetch: fetchFn, token: 't' }) };
+}
+
+function only(sent: readonly Sent[]): Sent {
+  expect(sent).toHaveLength(1);
+  return sent[0] as Sent;
+}
+
+/** The X-AgentLink-Input JSON, as the server's presence gate decodes it. */
+function input(s: Sent): unknown {
+  const raw = s.headers.get('X-AgentLink-Input') ?? '';
+  const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+}
+
+const proof = { kind: 'code', code: '123456' } as const;
+
+describe('contract (page): the Agents list and the switch', () => {
+  it('GET /api/ui/agents: the sample answer parses to the agents in order', async () => {
+    const t = answering(AGENTS_LIST.answer);
+    const read = await t.api.list();
+    const s = only(t.sent);
+    expect([s.method, s.path, [...s.query.keys()]]).toEqual(['GET', AGENTS_PATH, []]);
     expect(read.kind).toBe('ok');
     if (read.kind === 'ok') {
       expect(read.list.switchable).toBe(true);
-      expect(read.list.agents.map((a) => a.name)).toEqual(['default', 'work']);
+      expect(read.list.generation).toBe(AGENTS_LIST.answer.body.generation);
+      expect(read.list.agents.map((a) => a.name)).toEqual(AGENTS_LIST.names);
     }
   });
 
-  it('the switch is accepted (octet-stream, {name, generation}) and the app opens the other agent', async () => {
-    const { api, written } = await start();
-    const read = await api.list();
-    if (read.kind !== 'ok' || read.list.generation === undefined) throw new Error('no list');
-    expect(await api.switchTo('work', read.list.generation)).toEqual({ kind: 'done' });
-    expect(written).toEqual(['work']);
+  it('the switch sends octet-stream {name, generation (a number)} and reads 200 as done', async () => {
+    const sample = AGENTS_SWITCH.accepted;
+    const t = answering(sample.answer);
+    expect(await t.api.switchTo(sample.body.name, sample.body.generation)).toEqual({
+      kind: sample.outcome,
+    });
+    const s = only(t.sent);
+    expect([s.method, s.path]).toEqual(['POST', AGENTS_SWITCH_PATH]);
+    expect(s.headers.get('Content-Type')).toBe(OCTET_STREAM);
+    const body = JSON.parse(s.body) as AgentsSwitchBody;
+    expect(body).toEqual(sample.body);
+    expect(typeof body.generation).toBe('number');
   });
 
-  it('a stale generation is agent_changed, not a format error', async () => {
-    const { api } = await start();
-    expect(await api.switchTo('work', 99)).toEqual({ kind: 'agent_changed' });
+  it('a stale generation answer is agent_changed', async () => {
+    const sample = AGENTS_SWITCH.stale;
+    const t = answering(sample.answer);
+    expect(await t.api.switchTo(sample.body.name, sample.body.generation)).toEqual({
+      kind: sample.outcome,
+    });
+    expect(JSON.parse(only(t.sent).body)).toEqual(sample.body);
+  });
+});
+
+describe('contract (page): label-check, Add and Rename (U3-d)', () => {
+  it('label-check sends the label as its one query parameter and reads ok and refused', async () => {
+    for (const sample of [AGENTS_LABEL_CHECK.ok, AGENTS_LABEL_CHECK.refused]) {
+      const t = answering(sample.answer);
+      expect(await t.api.labelCheck(sample.label)).toBe(sample.outcome);
+      const s = only(t.sent);
+      expect([s.method, s.path]).toEqual(['GET', AGENTS_LABEL_CHECK_PATH]);
+      expect([...s.query.keys()]).toEqual(['label']);
+      expect(s.query.get('label')).toBe(sample.label);
+    }
+  });
+
+  it('rename sends exactly {name, label} in X-AgentLink-Input and reads done', async () => {
+    const sample = AGENTS_OWNER.rename;
+    const t = answering(sample.answer);
+    expect(await t.api.rename(sample.input, proof)).toEqual({ kind: sample.outcome });
+    const s = only(t.sent);
+    expect([s.method, s.path]).toEqual(['POST', AGENTS_LABEL_PATH]);
+    expect(s.headers.get('Content-Type')).toBe(OCTET_STREAM);
+    expect(input(s)).toEqual(sample.input);
+  });
+
+  it('add sends exactly {label} in X-AgentLink-Input and reads done', async () => {
+    const sample = AGENTS_OWNER.add;
+    const t = answering(sample.answer);
+    expect(await t.api.add(sample.input, proof)).toEqual({ kind: sample.outcome });
+    const s = only(t.sent);
+    expect([s.method, s.path]).toEqual(['POST', AGENTS_PATH]);
+    expect(s.headers.get('Content-Type')).toBe(OCTET_STREAM);
+    expect(input(s)).toEqual(sample.input);
+  });
+
+  it('the {error} refusals map: label_invalid, and another open agent is agent_changed', async () => {
+    for (const sample of AGENTS_OWNER.refusals) {
+      const t = answering(sample.answer);
+      expect(await t.api.rename(sample.input, proof)).toEqual({ kind: sample.outcome });
+      expect(input(only(t.sent))).toEqual(sample.input);
+    }
+  });
+});
+
+describe('contract (page): Remove (U3-e)', () => {
+  it('sends {name, typedLabel}; the stub is not_available and every documented code maps', async () => {
+    const stub = answering({ status: AGENTS_REMOVE.stub.status });
+    expect(await stub.api.remove(AGENTS_REMOVE.input, proof)).toEqual({
+      kind: AGENTS_REMOVE.stub.outcome,
+    });
+    const s = only(stub.sent);
+    expect([s.method, s.path]).toEqual(['POST', AGENTS_REMOVE_PATH]);
+    expect(input(s)).toEqual(AGENTS_REMOVE.input);
+    for (const sample of AGENTS_REMOVE.documented) {
+      const t = answering(sample.answer);
+      expect(await t.api.remove(AGENTS_REMOVE.input, proof)).toEqual({ kind: sample.outcome });
+    }
   });
 });
