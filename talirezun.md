@@ -1,6 +1,6 @@
 # @talirezun — sync
-**Headline:** 28 Oct: AgentLink 0.4.1 released (local app visual refresh; Approvals in the app). Next: UX wave 2 (0.4.2 polish), then 0.5.0 cloud agent + business agents pilot.
-_Updated 2026-10-28 · claude-code / claude-opus-5-5 · orchestrator, 28 Oct status_
+**Headline:** 28 Oct: AgentLink 0.4.1 and 0.4.2 released (visual refresh; Approvals grid, switch controls, live Files progress). UX wave 2 (Add contact, Start here, funding steps, activity pulse) merging; business agents planned for 0.5.0.
+_Updated 2026-10-28 · claude-code / claude-opus-5-5 · orchestrator, 28 Oct end-of-session_
 
 ## Now
 - 0.4.0 is out: Messages and Files views (read-only, local), Show in Finder, Touch ID upgrade for existing owners, payment confirmation sheet for proofs above limits and limit changes, live status bar, duplicate-contact suggestion.
