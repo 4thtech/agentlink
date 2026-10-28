@@ -5020,7 +5020,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 decisions). Chosen options: **1.1** invites: creating needs no presence as a new named route kind, accepting requires presence (amends 08 §1); **2.1** Copy, Share… and QR; **3.1** one brand exception, only the diamond turns while waiting for funds; **4.1** 24-hour pulse plus Active now / Today / Quiet; **5.1** compact view now, widget in the desktop app, M2-11a framework decision pulled forward; **6.1** "Sent · no receipt yet" after a day, no API change; **7.1** Start here checklist, not dismissible; **8.1** 0.4.2 holds UX2-brief-0, UX2-a, UX2-b and UX2-c only. Group order: 1 (0.4.2) UX2-brief-0 → UX2-a, UX2-b, with UX2-c in parallel; 2 UX2-brief → UX2-d1 → UX2-d2 → UX2-g, UX2-e1 → UX2-e2; 3 UX2-f1 → UX2-f2 → UX2-h; 4 UX2-i inside M2-11. New visuals follow an approved brief (D-116, D-135); no new dependency in any card.
 
 #### UX2-brief-0 · design brief: b11 §22 (control map) and §26 (Approvals grid) for 0.4.2 (new, owner decision 8.1)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S0 · **Phase:** M1b
 - **Repo/path:** agentlink · `docs/design/b11-local-app.md` (§22, §26 only)
 - **Depends on:** — (decisions 7 and 8 not needed)
 - **Spec:** D-116, D-135; UX-WAVE-2 §4, §9.1

@@ -1,6 +1,6 @@
 # B-11 · A state-of-the-art local app: Home, live state, motion, under the hood (design brief)
 
-> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
+> **Status: brief for the owner (DESIGN-B11, S0; amended by DESIGN-B11-v2 on 2026-10-27 with §13 to §18, and by MONEY-CONFIRM-DESIGN on 2026-10-27 with §19 and §20; UX2-brief-0 on 2026-10-28 adds §22 and §26 in Part 4, pending the owner's approval). Nothing here is built.** Per D-116 the design in `docs/design/` is the source of truth and new visuals are approved before they are built. The owner takes this brief to Claude Design; builders style only from the approved screens. Specs win on conflict: 04 §2.5 (presence), 08 §4 (CSP), 11 §5 (vocabulary), 11 §11.6 (motion rules), `docs/design/README.md`. The paste-ready block is §11. **v2 (2026-10-27)** adds depth and materials (§13), motion tokens (§14), progress and state components (§15), per-screen notes (§16), Messages and Files In/Out (§17) and the owner decisions this raised (§18), **all decided by the owner on 2026-10-27 as recommended (D-132)**. **Paying for proof and registration (2026-10-27)** adds §19 (one confirmation sheet for the two paid actions, confirmed with Touch ID, Windows Hello or a passkey; a calm credits line; a receipt row per paid action) and §20 (owner decisions it raises).
 
 ## 1. Why, and what the owner asked for
 
@@ -434,3 +434,159 @@ Never "wallet", "bank", "transaction", "gas", "deposit", "payment method" or "ba
 1. **Which paid actions use the confirmation sheet** (spec: 04 §2.5.3): (a) **verified registration, a proof above the signed limits (or for a contact set to "Ask me"), and any change to the spending limits; proofs inside the signed limits stay automatic** (recommended); (b) as (a), but limits changes keep today's ordinary approval prompt; (c) every proof, including those inside the limits.
 2. **Backup code on the sheet:** (a) **keep "Use backup code instead" as the small secondary link, as on every approval** (recommended: no new friction, and a lost passkey never blocks proofs); (b) paid actions accept only the platform check.
 3. **After Done:** (a) **the sheet closes itself after about 1.2 s** (recommended; with reduced motion it waits for Close); (b) it always waits for Close.
+
+---
+
+# Part 4 · UX wave 2 (owner feedback, 2026-10-28)
+
+Source: `docs/process/proposals/UX-WAVE-2.md` (§4, §9.1) and the owner's decisions of 2026-10-28 (all as recommended; decision 8.1 puts §22 and §26 into 0.4.2). Card UX2-brief-0 adds §22 and §26 here; §21, §23, §24, §25 and §27 follow with card UX2-brief and slot in by number. **Both sections wait for the owner's approval; UX2-a and UX2-b start only after it.** Nothing new is drawn: every control below is an existing `packages/ui` component (`Switch`, `Segmented`, `Button`), restyled only with existing `--al-*` tokens. The screenshots in the UX2-a and UX2-b PRs are the owner's visual review, as for the refresh (D-116, D-135).
+
+## 22. Control map: switch, segmented control, button
+
+**Idea.** The owner likes the Under the hood switch (§7) and wants that feel wherever it fits. It fits where something is *on or off*. Choosing between views gets the same track and sliding marker, as a segmented control. Doing something stays a button: a switch on an action ("Approve") would mislead people and screen readers alike (Apple HIG, Material).
+
+### 22.1 Which control goes where
+
+| Control | Use when | Never for | Semantics (today's components) |
+|---|---|---|---|
+| **Switch** (`Switch`) | A binary setting that takes effect at once, or a draft setting that a Save confirms (Rules, §22.5) | An action; more than two values; a two-way choice where one side is "follow the system" | `role="switch"`, `aria-checked`, label and optional description; the On/Off word stays beside the knob |
+| **Segmented control** (`Segmented`) | Picking one of two to four views, filters or setting values | An action; five or more options (use a list or a menu) | Setting values, filters and layouts: `role="radiogroup"` (today). Views that swap the panel below: tab semantics (`tablist`, `tab`, `tabpanel`, `aria-selected`, `aria-controls`), as Files does today, in the same look |
+| **Button** (`Button`) | Doing something: Approve, Deny, Add contact, Add credits, Copy, Show, Discard, Review and save | A setting or a view | `<button>`; primary only for the one action of the screen (orange rule, §1 Brand) |
+
+### 22.2 Page by page (UX2-b)
+
+| Page | Control | Becomes | Note |
+|---|---|---|---|
+| Top bar | Under the hood | Switch (unchanged) | The reference look |
+| Rules | Everyday choices (Allowed / Ask me / Never; Ask me / Never) | Segmented, radiogroup (role unchanged) | Restyled per §22.3 |
+| Rules | Buy and sell limits | Switch (unchanged) | Draft until saved, §22.5 |
+| Settings › Appearance | Theme (System / Light / Dark), Motion (System / On / Off) | Segmented (unchanged) | Three values |
+| Settings › Appearance | Transparency (System / Reduce) | **Stays segmented** | On a switch, "Off" would read as "never reduce", which is not what System means |
+| Settings › Appearance | Under the hood | Switch (unchanged) | |
+| Rules, "Before you save" confirm step | Keep delivery receipts | Switch (unchanged) | The only receipt setting in the app today; notification settings get a switch when they exist |
+| Messages | Inbox / Sent | Segmented look, **tab** semantics | Today a radiogroup; it swaps the conversation panel |
+| Files | Received / Sent / Send folders | Segmented look, tab semantics (role unchanged) | Replaces today's `fl-tabs` look; the count badges (`CountBadge`) stay inside each option |
+| Activity | All / Approvals / Proofs / Other | Segmented, radiogroup | Today four `aria-pressed` chips; exactly one is always chosen, so a radiogroup is the honest role |
+| Approvals | Grid / List | Segmented, radiogroup | New, §26 |
+| Approvals, Review together | Approve / Deny / Later per card | **Unchanged** (`al-choices`) | A pick that the Review button confirms, not a view |
+| Proofs & credits | — | **No control added** | The proof list and the credits card show together (stacked at 360), so there is no view to choose |
+| Everywhere | Approve, Deny, Add contact, Add credits, Copy, Show, Save | Buttons (unchanged) | |
+
+### 22.3 The look (existing tokens only)
+
+The segmented control takes the switch's language: the same recessed track and a sliding marker. Only `.al-seg` in `components.css` changes; the switch does not.
+
+```text
+Switch (today, unchanged)              Segmented (proposed restyle)
+
+ Under the hood  ┌──────────┐           ┌─────────────────────────────┐
+                 │ ON    ▣  │           │┌───────────┐                │
+                 └──────────┘           ││ ✓ Inbox   │    Sent        │
+                                        │└━━━━━━━━━━━┘                │
+                                        └─────────────────────────────┘
+ track: bg-sunken, border-strong,       track: bg-sunken, border-strong, radius-sm,
+        radius-sm; On: accent-subtle           padding space-1, no dividers
+ knob:  radius-xs; slides 40 px         thumb: accent-subtle, radius-xs, 2 px accent
+        (duration-fast,                        bottom edge (━); slides under the chosen
+        easing-standard)                       option like the knob and the nav slider
+                                        label: chosen fg-default with the check icon;
+                                               the others fg-muted
+```
+
+| Part | Tokens |
+|---|---|
+| Track | `--al-color-bg-sunken`; `--al-border-width-thin` in `--al-color-border-strong`; `--al-radius-sm`; padding `--al-space-1`. Today it has `--al-radius-md` and dividers between options |
+| Option | Height `--al-size-control-md` (32 px), `--al-size-control-lg` at 360 (44 px touch targets, as §19.5); padding `0 --al-space-3`; `al-text-body-sm`; `--al-color-fg-muted` |
+| Thumb (chosen) | `--al-color-accent-subtle`; `--al-radius-xs`; a 2 px `--al-color-accent-default` bottom edge (today's `inset 0 -2px 0` marker); text `--al-color-fg-default`; the existing `check` icon. The same tint marks the switch's On track and the selected nav item, so "chosen" reads the same everywhere |
+| Motion | The thumb moves with `transform` only, `--al-duration-fast`, `--al-easing-standard` (the knob's and the nav slider's values); the label colour cross-fades in the same time |
+
+### 22.4 States and focus
+
+| State | Switch | Segmented |
+|---|---|---|
+| Rest | Off: sunken track, muted knob, "Off". On: tinted track, orange knob, "On" | Thumb under the chosen option |
+| Changed | Knob slides, track tints, the word flips | Thumb slides to the new option; nothing else moves (§14: at most two things) |
+| Keyboard focus | Today's global `:focus-visible` ring (`--al-focus-ring-width`, `--al-color-focus-ring`, `--al-focus-ring-offset`) around the switch | The same ring around the **focused option**, not the whole track |
+| Keyboard | Tab reaches it; Space or Enter toggles | One tab stop; arrow keys move and select, wrapping (today's `Segmented` and Files tabs); with tab semantics, Tab then moves into the panel |
+| Disabled | `--al-opacity-disabled`; the description says why (as Rules does today) | `--al-opacity-disabled` on the group; still readable |
+| Busy (a save in flight) | Disabled until the answer, then shows the real state | Not used |
+| Hover | Nothing added (D-116: no new state) | Nothing added |
+| Reduced motion | No slide: knob and word change at once (the global `transition: none` rule) | The thumb jumps; the check icon and the label carry the choice |
+| Forced colours, increased contrast | 1 px `CanvasText` border (today's rule); the On/Off word carries the state | The same border; the chosen option keeps its check icon, so it never relies on the tint |
+
+Never colour alone: the switch has its On/Off word, the segmented control its check icon. New strings: **"Unsaved"** (§22.5), **"Layout"**, **"Grid"** and **"List"** (§26.2). They are plain words that follow 11 §5, with none of its banned terms. Every other label already exists in its page's `strings.ts`.
+
+### 22.5 Switches that need owner presence (Rules)
+
+A switch in Rules edits the **draft**, never the rules in force. While a switch differs from the saved value, its row shows the word **"Unsaved"** (`al-text-caption`, muted, beside the switch) and today's unsaved-changes bar appears ("1 change", Discard, Review and save). Saving goes through the owner-presence prompt as today; the word goes only once the save has succeeded. Discard puts the switch back. So a Rules switch never shows a state that is not in force without "Unsaved" beside it.
+
+## 26. Approvals grid and the Grid/List control
+
+**Idea.** One narrow column of approval cards leaves most of a wide window empty (UX-WAVE-2 item 7). In Grid view the cards fill the width by themselves; List keeps today's single column. Nothing about deciding changes.
+
+### 26.1 Layout
+
+- **Grid view:** the cards sit in a CSS grid, `grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr))`, gap `--al-space-5` (16 px, today's gap), at most `--al-layout-max-page` (1440 px) wide. The `min(…, 100%)` stops a card overflowing at 360.
+- **List view:** today's layout exactly: one column, at most 480 px.
+- Everything that is not a card (title and lede, owner panel, notices, "Waiting for you ({count})", "{n} more waiting", the Review bar and the Review step) keeps today's 480 px measure, aligned left, above or below the grid. The Review button never stretches across the window.
+- Cards keep their content and order (soonest expiry first). A card's height follows its content; cards in one row align to the top.
+- **Narrower Grid cards never truncate, ellipsize, line-clamp or hide any fact; text wraps.** What the owner approves is exactly what the card shows.
+
+**Columns.** The sidebar is `--al-layout-sidebar-width` (232 px) and the content padding `--al-space-6` (20 px) each side; at 600 px and under, the sidebar becomes the bottom bar and the padding is `--al-space-4` (12 px).
+
+| Window width | Space for cards | Columns |
+|---|---|---|
+| 360 | 336 px | 1, full width |
+| 768 | 496 px | 1 |
+| 1024 | 752 px | 2 (two need 736 px, from a window of about 1008 px) |
+| 1280 | 1008 px | 2 |
+| 1440 | 1168 px | 3 (three need 1112 px, from about 1384 px) |
+| 1920 and wider | 1440 px (capped) | 3 (four would need 1488 px) |
+
+```text
+1440, Grid view
+┌──────────┬────────────────────────────────────────────────────────────────┐
+│ sidebar  │ Approvals                            Layout [ ✓ Grid │ List ]  │
+│          │ Your AI can't approve this for you.                            │
+│          │ WAITING FOR YOU (3)                                            │
+│          │ ┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐ │
+│          │ │ card 1 (soonest) │ │ card 2           │ │ card 3           │ │
+│          │ │ ◔ time left      │ │ ◔ time left      │ │ ◔ time left      │ │
+│          │ └──────────────────┘ │                  │ └──────────────────┘ │
+│          │                      └──────────────────┘                      │
+│          │ ┌──────────────────┐                                           │
+│          │ │ card 4           │                                           │
+│          │ └──────────────────┘                                           │
+│          │ [ Review button, 480 px measure ]                              │
+└──────────┴────────────────────────────────────────────────────────────────┘
+
+360 (one column fits, so the Layout control is hidden)
+┌──────────────────────────────┐
+│ Approvals                    │
+│ WAITING FOR YOU (3)          │
+│ ┌──────────────────────────┐ │
+│ │ card 1                   │ │
+│ └──────────────────────────┘ │
+│ ┌──────────────────────────┐ │
+│ │ card 2                   │ │
+│ └──────────────────────────┘ │
+├──────────────────────────────┤
+│ bottom bar                   │
+└──────────────────────────────┘
+```
+
+### 26.2 The Grid/List control
+
+- A `Segmented` (§22) labelled **"Layout"** with **Grid** and **List**, at the end of the page title row; a radiogroup.
+- **Default Grid.** The choice is remembered per browser in the existing prefs store (`apps/local-ui/src/prefs/store.ts`, reads and writes in try/catch). If storage fails, the page shows Grid and the control still works for the visit.
+- **Hidden while only one column fits** (window under about 1008 px), where both views look the same. The remembered choice is kept and applies again when the window widens.
+- Changing the view changes the layout at once; card positions never animate (only `transform` and `opacity` may, §14). Focus stays on the control.
+
+### 26.3 What does not change
+
+- **Keyboard and reading order run row by row.** The DOM order is the visual order (no `order`, no `grid-auto-flow: dense`), so Tab and screen readers go card 1, 2, 3, then the next row.
+- **The card being decided rises one level** (§13.1, level 1 to 2: background and shadow only, no change of size), as today.
+- **No autofocus on any Approve**, in either view.
+- **At most one presence prompt at a time** (one level-4 layer, §13.1).
+- **A decided card leaves** with today's motion in List. In Grid it fades out (`--al-duration-base`, `--al-easing-exit`) and the cards after it close the gap without sliding (a moving grid would be layout animation and more than two things moving). With reduced motion it goes at once.
+- No change to the data, the decide calls, owner presence or signing. Axe and reduced-motion tests stay as they are.
