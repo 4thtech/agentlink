@@ -183,6 +183,20 @@ export const REMOVE_STATUS: Readonly<Record<RemoveOutcome, number>> = Object.fre
   failed: 500,
 });
 
+/**
+ * The label the statement names (04 §2.5.1 "Labels"): the agent's verified `agent.label` from its own
+ * store (U3-d, core loadLabel), else its folder name. The unsigned config.json label never reaches a
+ * presence statement; the folder name is always shown beside it.
+ */
+export async function statementLabel(client: AgentLinkClient, folder: string): Promise<string> {
+  try {
+    const reading = await client.ownerActions.loadLabel();
+    return reading.status === 'verified' ? reading.label : folder;
+  } catch {
+    return folder;
+  }
+}
+
 /** What the steps after the gesture need (the gate builds it inside the exclusive lock). */
 export interface RemovalSteps {
   readonly name: string;
@@ -243,7 +257,14 @@ export async function runRemovalSteps(steps: RemovalSteps): Promise<'removed' | 
   const body = await step('sign', () => client.removal.prepareRevoke());
   // A refused or cancelled gesture propagates as it is (the gate answers it).
   const signatures = await owner.sign(
-    { lines: removeStatement(steps.label, name, facts.contacts, steps.anyway) },
+    {
+      lines: removeStatement(
+        await statementLabel(client, name),
+        name,
+        facts.contacts,
+        steps.anyway,
+      ),
+    },
     [{ kind: 'owner-action', action: body }],
   );
   const first = signatures[0];
@@ -332,7 +353,8 @@ export async function runFinishSteps(steps: FinishSteps): Promise<'removed'> {
     issuedAt: steps.now(),
   });
   const signatures = await steps.owner.sign(
-    { lines: removeStatement(steps.label, steps.name, 0) },
+    // The store no longer opens, so no verified label can be read: the folder name only.
+    { lines: removeStatement(steps.name, steps.name, 0) },
     [{ kind: 'owner-action', action: body as unknown as JsonObject }],
   );
   const first = signatures[0];

@@ -49,11 +49,14 @@ import process from 'node:process';
 import {
   AGENT_OPEN_LOCK_FILE,
   assertAgentId,
+  createOsKeychainAgent,
+  discardNewOsKeychainAgent,
   peekAgentStore,
   type AgentDirectory,
   type AgentDirectoryEntry,
   type KeyStoreBackendKind,
 } from '@4thtech-io/node';
+import { createAgentFolder, discardNewAgentFolder } from './agent-create.js';
 import { isAgentLabel, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
 
@@ -719,9 +722,19 @@ async function directoryEntry(
  */
 export function agentDirectory(
   home: string,
-  options: OwnerCheck & { readonly now?: () => number } = {},
+  options: OwnerCheck & {
+    readonly now?: () => number;
+    /** U3-d: the keychain side of a new agent (tests pass doubles; default the OS keychain). */
+    readonly createAgent?: () => Promise<string>;
+    readonly discardKeys?: (agentId: string) => Promise<void>;
+  } = {},
 ): AgentDirectory {
   const now = options.now ?? ((): number => Math.floor(Date.now() / 1000));
+  const createAgent = options.createAgent ?? (() => createOsKeychainAgent());
+  const discardKeys =
+    options.discardKeys ?? ((agentId: string) => discardNewOsKeychainAgent(agentId));
+  /** U3-d: the folders this directory created and has not discarded (discardNew refuses others). */
+  const created = new Set<string>();
   const check: OwnerCheck = options.uid === undefined ? {} : { uid: options.uid };
   return Object.freeze<AgentDirectory>({
     list: async () => {
@@ -747,6 +760,18 @@ export function agentDirectory(
       }
     },
     writeLabel: (name, label) => writeAgentLabel(home, name, label, check),
+    // U3-d: a new keychain agent in a folder named from the label, and its removal when the app
+    // could not complete it (all or nothing; only for an agent the app just created).
+    create: async (label) => {
+      const name = await createAgentFolder(home, label, { ...check, createAgent, discardKeys });
+      created.add(name);
+      return name;
+    },
+    discardNew: async (name) => {
+      // Only an agent this directory created in this process: never an existing agent's keys.
+      if (!created.delete(name)) throw new RuntimeError('agent_config_invalid');
+      await discardNewAgentFolder(home, name, { ...check, discardKeys });
+    },
     markRemoving: (name) => markAgentRemoving(home, name, check),
     removeFolder: (name) => removeAgentFolder(home, name, check),
     readCurrent: () => readAppCurrent(home, check),

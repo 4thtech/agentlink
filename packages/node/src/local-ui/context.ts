@@ -25,6 +25,7 @@ import type {
   CreditsView,
   EffectivePolicy,
   ExchangeTimes,
+  FlowEvents,
   MessageBox,
   MessageItem,
   OwnerActionOutcome,
@@ -32,6 +33,7 @@ import type {
   Page,
   PageQuery,
   PolicyEditOptions,
+  LabelReading,
   PreparedOwnerAction,
   PreparedPolicyEdit,
   ProofListItem,
@@ -43,6 +45,7 @@ import type {
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
+import type { SendFolderPlan } from '../owner-first-policy.js';
 import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 
@@ -161,6 +164,12 @@ export interface LocalUiReadClient {
      * a contact ID and a time each, never content. Store only, bounded, writes nothing.
      */
     pulseTimes(since: number, until: number): Promise<ExchangeTimes>;
+    /**
+     * U3-flow (USABILITY-WAVE-3 §4.1): who exchanged a message or file when, which way and in what
+     * state, in a window (core `MessagesView.flowEvents`): metadata only, never content, names,
+     * links, keys, hashes or envelope IDs. Store only, bounded, writes nothing.
+     */
+    flowEvents(since: number, until: number): Promise<FlowEvents>;
   };
   /**
    * MSG-FILES-IO-d (Files, Received and Sent): one page of core's `FilesIoView`, store only. Never
@@ -172,6 +181,16 @@ export interface LocalUiReadClient {
     received(query: PageQuery): Promise<Page<ReceivedFileItem>>;
     sent(query: PageQuery): Promise<Page<SentFileItem>>;
     savedName(itemId: string): Promise<string | null>;
+  };
+  /**
+   * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
+   * `agent.label`, re-verified on every load) and core's prepare helper for a new one. Both write
+   * nothing (I-4): a prepared body changes nothing until the gate's one-use `sign` signed it and core
+   * applied it. Optional so that page fakes without it stay valid; the server always sets it.
+   */
+  readonly agent?: {
+    label(): Promise<LabelReading>;
+    prepareLabel(label: string): Promise<PreparedOwnerAction>;
   };
 }
 
@@ -212,11 +231,18 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
         client.messages.list(contactId, box, query),
       // UX2-f1: the activity pulse's exchange times.
       pulseTimes: (since: number, until: number) => client.messages.pulseTimes(since, until),
+      // U3-flow: the live connections map's flow events.
+      flowEvents: (since: number, until: number) => client.messages.flowEvents(since, until),
     }),
     filesIo: Object.freeze({
       received: (query: PageQuery) => client.filesIo.received(query),
       sent: (query: PageQuery) => client.filesIo.sent(query),
       savedName: (itemId: string) => client.filesIo.savedName(itemId),
+    }),
+    // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
+    agent: Object.freeze({
+      label: () => client.ownerActions.loadLabel(),
+      prepareLabel: (label: string) => client.ownerActions.prepareLabel(label),
     }),
   });
 }
@@ -369,6 +395,13 @@ export interface LocalUiContext {
    * only: it lists, it never opens, switches or writes.
    */
   readonly agents?: LocalUiAgentsDesk;
+  /**
+   * U3-d (D-138, 08 §1): creating an agent and saving a verified label, for the owner routes of
+   * api/agents-manage.ts only; absent outside the app host. It signs nothing: a new agent's first
+   * parts are signed only through the gate's one-use `addAgent`, and a label is written into
+   * config.json only after core applied the signed `agent.label` (07 §9.1).
+   */
+  readonly agentsManage?: LocalUiAgentsManage;
 }
 
 /** U3-c: one agent in `GET /api/ui/agents`. Never a path, an agent ID or a key. */
@@ -401,4 +434,35 @@ export interface LocalUiAgentsList {
 /** U3-c: what the agents read route may call (built by the server over the app host). */
 export interface LocalUiAgentsDesk {
   list(): Promise<LocalUiAgentsList>;
+}
+
+/**
+ * U3-d: an agent this request created (keychain identity and folder, no card, no label yet), opened
+ * for its first parts. Built by the server only; a handler passes it on to the gate's `addAgent` and
+ * then to `settle`, and never reaches its core or its KeyStore through it.
+ */
+export interface LocalUiNewAgent {
+  /** Its folder name (a slug of the label, 06 §6). */
+  readonly name: string;
+  /** The label the page showed, as the request carried it. */
+  readonly label: string;
+  /** The agent's own card parts and core actions (server-held). */
+  readonly first: FirstAgentCard;
+  /** The Send folder for its first policy, checked before the gesture (owner-first-policy.ts). */
+  readonly plan: SendFolderPlan;
+}
+
+/** U3-d: what the create and rename routes may call (built by the server over the app host). */
+export interface LocalUiAgentsManage {
+  /** The open agent's folder name; undefined when none is open. */
+  current(): string | undefined;
+  /** Creates a keychain agent named from `label` and opens it; undefined when that failed. */
+  create(label: string): Promise<LocalUiNewAgent | undefined>;
+  /**
+   * Closes the new agent; when `ok` is false, removes exactly what `create` made (its keychain items
+   * and its folder), all or nothing. Never throws.
+   */
+  settle(agent: LocalUiNewAgent, ok: boolean): Promise<void>;
+  /** After core applied the signed `agent.label`: writes config.json `label` (07 §9.1). */
+  labelSaved(name: string, label: string): Promise<void>;
 }

@@ -43,6 +43,8 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   // M1-11c-a4c: the owner turns received funds into credits, or withdraws credits (local UI).
   'credits.deposit',
   'credits.withdraw',
+  // U3-d (D-138): the owner names an agent from the local app (create an agent, Rename).
+  'agent.label',
 ]);
 
 export const ownerOperationRefused = (): NodeKeyStoreError =>

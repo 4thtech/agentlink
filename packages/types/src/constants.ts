@@ -181,6 +181,11 @@ export const OWNER_ACTION_OPS = freeze([
   // account received into its credits, or withdraws credits, from the local UI with owner presence.
   'credits.deposit',
   'credits.withdraw',
+  // U3-d (D-138, U3-spec-04; proposed, owner confirms at merge): local owner actions, signed and
+  // applied on the agent's own machine from the local app; no envelope carries them.
+  'agent.label',
+  'app.connect',
+  'app.disconnect',
   'agent.revoke',
 ] as const);
 export type OwnerActionOp = (typeof OWNER_ACTION_OPS)[number];
@@ -219,6 +224,22 @@ export type StorageProvider = (typeof STORAGE_PROVIDERS)[number];
 export const BACKUP_KIT_CONTENTS = freeze(['full', 'identity'] as const);
 export type BackupKitContents = (typeof BACKUP_KIT_CONTENTS)[number];
 
+/**
+ * The AI app ids of the fixed harness table (06 §7, D-78): `app.connect` / `app.disconnect` `app`
+ * (04 §2.5.1; U3-d, D-138). The same ids as the CLI's `--harness` values (apps/cli harnesses.ts).
+ */
+export const AI_APP_IDS = freeze([
+  'claude-code',
+  'claude-desktop',
+  'codex',
+  'gemini-cli',
+  'opencode',
+  'antigravity',
+  'cursor',
+  'windsurf',
+] as const);
+export type AiAppId = (typeof AI_APP_IDS)[number];
+
 /** `storage.set` / `storage.remove` `id`: 8 CSPRNG bytes, 16 lowercase hex (04 §2.2, §2.5.1). */
 export const STORAGE_ID_BYTES = 8;
 /** `backup.export` `kitId`: 16 CSPRNG bytes, base64url without padding (04 §2.5.1). */
@@ -254,6 +275,10 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   // M1-11c-a4c: confirmed on one screen and sent at once, like a contact change.
   'credits.deposit': 600,
   'credits.withdraw': 600,
+  // U3-d (D-138): local owner actions, applied within seconds on the agent's own machine.
+  'agent.label': 600,
+  'app.connect': 600,
+  'app.disconnect': 600,
   'agent.revoke': null,
 } as const);
 

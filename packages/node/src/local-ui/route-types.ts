@@ -18,7 +18,8 @@
 // any presence check and never runs its handler.
 import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
-import type { LocalUiContext } from './context.js';
+import type { LocalUiContext, LocalUiNewAgent } from './context.js';
+import type { NewAgentOutcome } from '../owner-add-agent.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
 /**
@@ -70,6 +71,15 @@ export interface LocalUiOwnerOperation {
    * decrypts. Undefined on every other route, before `sign`, and once the gesture has ended.
    */
   carrierKeys?(): EnvelopeKeys | undefined;
+  /**
+   * U3-d (04 §2.8 "From the local app", D-138): the one owner operation of "Add an agent", instead of
+   * `sign` (one or the other, once). With the presence this request carried it signs exactly the new
+   * agent's first card (the restricted one-card session), its first policy (when its Send folder is
+   * ready) and its first `agent.label`, each for that agent only (owner-add-agent.ts signNewAgent);
+   * the handler never sees the owner session. `failed` means the caller must settle the agent as not
+   * kept. Absent outside the app host.
+   */
+  addAgent?(review: OwnerReview, agent: LocalUiNewAgent): Promise<NewAgentOutcome>;
 }
 
 export interface LocalUiReadRoute {

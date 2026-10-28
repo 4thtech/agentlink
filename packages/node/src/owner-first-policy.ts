@@ -240,7 +240,10 @@ async function stillTheCheckedFolder(
 }
 
 /** A verified stored card for exactly this agent naming exactly this owner. */
-async function cardNamesOwner(first: FirstAgentCard, owner: OwnerPublicKeys): Promise<boolean> {
+export async function cardNamesOwner(
+  first: FirstAgentCard,
+  owner: OwnerPublicKeys,
+): Promise<boolean> {
   try {
     const stored = await first.identity.get();
     return (

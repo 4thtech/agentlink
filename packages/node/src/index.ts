@@ -53,6 +53,8 @@ export {
   hasOwnerOnMachine,
   type AddAgentOptions,
   type AddAgentResult,
+  // U3-d: removes the keychain items of an agent the app just created and could not complete.
+  discardNewOsKeychainAgent,
 } from './owner-add-agent.js';
 // M1-9z: `owner change-code` re-wraps the owner seed under a new generated owner code, at the same
 // TTY prompt; the owner identity does not change and nothing secret leaves the package.

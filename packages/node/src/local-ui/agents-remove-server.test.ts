@@ -50,7 +50,12 @@ import { keychainAccount, type KeychainBackend } from '../keychain.js';
 import { initOwnerWith } from '../owner-init.js';
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
 import type { OwnerTerminal } from '../owner-terminal.js';
-import { removeStatement, type AgentRemovalPort, type RemovalAgent } from './api/agents-remove.js';
+import {
+  removeStatement,
+  statementLabel,
+  type AgentRemovalPort,
+  type RemovalAgent,
+} from './api/agents-remove.js';
 import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
 import type { LocalUiAssets } from './context.js';
 
@@ -728,6 +733,22 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
 });
 
 describe('the statement before the gesture (04 §2.5, 11 §5)', () => {
+  it("names the agent's verified label (U3-d), else the folder name; never the unsigned config label", async () => {
+    const client = (reading: unknown) =>
+      ({
+        ownerActions: {
+          loadLabel: () =>
+            reading instanceof Error ? Promise.reject(reading) : Promise.resolve(reading),
+        },
+      }) as unknown as AgentLinkClient;
+    expect(await statementLabel(client({ status: 'verified', label: 'Work' }), 'work')).toBe(
+      'Work',
+    );
+    expect(await statementLabel(client({ status: 'unverified' }), 'work')).toBe('work');
+    expect(await statementLabel(client({ status: 'none' }), 'work')).toBe('work');
+    expect(await statementLabel(client(new Error('store')), 'work')).toBe('work');
+  });
+
   it('names the label and the folder, and says it is retired for good', () => {
     const lines = removeStatement('Work', 'work', 2);
     expect(lines[0]).toContain('Work');
