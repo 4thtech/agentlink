@@ -71,6 +71,8 @@ import {
   waitSeconds,
   waitingFor,
 } from './strings.js';
+import { useInviteFirst } from '../home/start-here-empty.js';
+import { START_STRINGS } from '../home/strings.js';
 import './contacts.css';
 
 type ListState =
@@ -797,6 +799,7 @@ export function ContactsPage({
   }, []);
 
   const title = <h1 className="al-text-title-1">{PAGE_TITLES.contacts}</h1>;
+  const inviteFirst = useInviteFirst();
 
   if (list.phase === 'not_set_up') {
     return (
@@ -831,7 +834,11 @@ export function ContactsPage({
             {S.removed}
           </p>
         ) : null}
-        <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
+        {inviteFirst ? (
+          <EmptyState icon="users" title={START_STRINGS.emptyContacts} prompt={S.emptyPrompt} />
+        ) : (
+          <EmptyState icon="users" title={S.emptyTitle} prompt={S.emptyPrompt} />
+        )}
       </>
     );
   }

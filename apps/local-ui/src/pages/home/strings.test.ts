@@ -1,6 +1,17 @@
 // UI-REFRESH-g: the Home copy follows 11 §5.1 (never say / say instead) in the default view.
 import { describe, expect, it } from 'vitest';
-import { HOME_STRINGS, creditsLine, minutesLeft, routesLine, waitingCount } from './strings.js';
+import {
+  HOME_STRINGS,
+  START_STRINGS,
+  creditsLine,
+  minutesLeft,
+  routesLine,
+  startHello,
+  startProgress,
+  startStepDone,
+  startWaiting,
+  waitingCount,
+} from './strings.js';
 
 const NEVER = [
   'wallet',
@@ -51,6 +62,11 @@ describe('Home copy (11 §5.1)', () => {
       ['creditsLine', creditsLine('$4.80', 48)],
       ['waitingCount', waitingCount(2)],
       ['routesLine', routesLine(2, 3)],
+      ...Object.entries(START_STRINGS),
+      ['startProgress', startProgress(2, 4)],
+      ['startWaiting', startWaiting('Marko')],
+      ['startHello', startHello('Marko')],
+      ['startStepDone', startStepDone('Invite your first contact', 2, 4)],
     ];
     for (const [key, value] of all) {
       for (const word of NEVER) {
@@ -67,5 +83,17 @@ describe('Home copy (11 §5.1)', () => {
     expect(HOME_STRINGS.errorLine).toBe("Couldn't read the latest. Trying again.");
     expect(creditsLine('$4.80', 48)).toBe('$4.80, about 48 proofs');
     expect(minutesLeft(9)).toBe('9 min left');
+  });
+
+  it('has the Start here sentences of B-11 §27', () => {
+    expect(START_STRINGS.title).toBe('Start here');
+    expect(START_STRINGS.allSet).toBe("You're all set.");
+    expect(startProgress(2, 4)).toBe('2 of 4');
+    expect(startWaiting('Marko')).toBe('Waiting for Marko to accept');
+    expect(startHello('Marko')).toBe('Say hello to Marko on AgentLink.');
+    expect(startHello(null)).toBe('Say hello to my new contact on AgentLink.');
+    expect(startStepDone('Invite your first contact', 2, 4)).toBe(
+      'Step done: Invite your first contact. 2 of 4.',
+    );
   });
 });

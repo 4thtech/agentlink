@@ -111,7 +111,10 @@ const id = (h: Hit): string => `${h.file} | ${h.kind} | ${h.where} | ${h.what}`;
 
 /** The row-leave height collapse is the one named property exception. */
 const propertyOk = (prop: string, where: string): boolean =>
-  ALLOWED.has(prop) || (prop === 'height' && /row-leave/.test(where));
+  ALLOWED.has(prop) ||
+  (prop === 'height' && /row-leave/.test(where)) ||
+  // The Start here card's leave collapses by grid rows (UX2-g, B-11 §27.3): the same exception.
+  (prop === 'grid-template-rows' && /start-wrap/.test(where));
 
 function lintMotion(files: Record<string, string>): Hit[] {
   const hits: Hit[] = [];
@@ -276,6 +279,15 @@ describe('motion lint on fixtures', () => {
     expect(run('.al-row-leave { transition: height var(--al-duration-base) ease; }')).toEqual([]);
     expect(run('.al-row { transition: height var(--al-duration-base) ease; }')).toEqual([
       `${FIX} | transition-property | .al-row | height`,
+    ]);
+  });
+
+  it('allows the Start here leave collapse by grid rows and no other grid-template-rows', () => {
+    expect(
+      run('.hm-start-wrap { transition: grid-template-rows var(--al-duration-base) ease; }'),
+    ).toEqual([]);
+    expect(run('.a { transition: grid-template-rows var(--al-duration-base) ease; }')).toEqual([
+      `${FIX} | transition-property | .a | grid-template-rows`,
     ]);
   });
 

@@ -1,8 +1,9 @@
-// Home (UI-REFRESH-g; B-11 §4, §7, §16, §17.4; plan §6; D-135): five live tiles and the Next step card.
+// Home (UI-REFRESH-g; B-11 §4, §7, §16, §17.4; plan §6; D-135): five live tiles and the Start here card (UX2-g; B-11 §27).
 //
 // Served at /settings/home until M1-11b-2 owns `/` for Approvals. Reads only routes that exist:
 // /api/ui/health (the existing health poller: it pauses while the tab is hidden and reads again when
-// shown), /api/ui/activity, /api/ui/proofs/credits, /api/ui/contacts and the approvals list. The
+// shown), /api/ui/activity, /api/ui/proofs/credits and the approvals list. Start here has its own
+// reads (use-start-here.ts: passkey, contacts, Messages, the kit flag), shared with the shell. The
 // other four are read on first load and then at most every SECONDARY_MS from a health tick, so they
 // pause with it. Nothing here changes anything.
 //
@@ -28,6 +29,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useContext,
   useState,
   type ReactElement,
   type ReactNode,
@@ -35,17 +37,13 @@ import {
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { subscribeHealth } from '../../layout/health-feed.js';
 import { HEALTH_PATH } from '../../layout/health.js';
-import { needsPasskeySwitch } from '../../layout/index.js';
-import { recoveryKitPending } from '../../states/recovery-kit.js';
 import { createApprovalsClient, type ListAnswer } from '../approvals/client.js';
 import { ACTIVITY_STRINGS as A } from '../activity/strings.js';
 import { detectPlatform } from '../first-run/passkey.js';
-import { UPGRADE, type Platform } from '../first-run/strings.js';
+import { type Platform } from '../first-run/strings.js';
 import { CREDITS_PATH } from '../proofs/data.js';
 import {
   ACTIVITY_PATH,
-  CONTACTS_PATH,
-  contactCount,
   creditsOf,
   parseEvents,
   parseHealthSnapshot,
@@ -57,6 +55,10 @@ import {
   type WaitingView,
 } from './data.js';
 import './home.css';
+import { StartHere } from './start-here-card.js';
+import { StartHereContext } from './start-here-context.js';
+import type { StartHereReads } from './start-here.js';
+import { useStartHere } from './use-start-here.js';
 import {
   HOME_STRINGS as S,
   creditsLine,
@@ -74,11 +76,8 @@ export interface HomePageProps {
   readonly api?: ApiClient;
   /** The approvals list (the same route the Approvals page reads). */
   readonly approvals?: { list(): Promise<ListAnswer> };
-  /** The two setup checks behind the Next step card. Both default to the app's own. */
-  readonly nextStep?: {
-    readonly passkey?: () => Promise<boolean>;
-    readonly recoveryKit?: () => boolean;
-  };
+  /** The reads behind Start here (UX2-g). Used when the shell does not share its own. */
+  readonly startHere?: StartHereReads;
   readonly platform?: Platform;
   readonly now?: () => Date;
 }
@@ -131,7 +130,6 @@ interface Model {
   readonly waiting: Flag<WaitingView>;
   readonly credits: Flag<CreditsView | 'unavailable'>;
   readonly events: Flag<readonly EventRow[]>;
-  readonly contacts: Flag<number>;
 }
 
 const EMPTY: Model = {
@@ -142,7 +140,6 @@ const EMPTY: Model = {
   waiting: { done: false },
   credits: { done: false },
   events: { done: false },
-  contacts: { done: false },
 };
 
 type Agent = HealthSnapshot['agent'];
@@ -247,60 +244,6 @@ function minutesUntil(expiresAt: number, now: Date): number {
   return Math.max(0, Math.ceil((expiresAt * 1000 - now.getTime()) / 60_000));
 }
 
-type Step = {
-  id: 'passkey' | 'kit' | 'contact';
-  title: string;
-  body: string;
-  action: string;
-  href: string;
-};
-
-function stepFor(
-  passkey: boolean,
-  kit: boolean,
-  contacts: number | undefined,
-  platform: Platform,
-): Step | null {
-  if (passkey) {
-    const title = UPGRADE.title(platform);
-    return { id: 'passkey', title, body: S.nextPasskeyBody, action: title, href: '/first-run' };
-  }
-  if (kit) {
-    return {
-      id: 'kit',
-      title: S.nextKitTitle,
-      body: S.nextKitBody,
-      action: S.nextKitAction,
-      href: '/settings/backup',
-    };
-  }
-  if (contacts === 0) {
-    return {
-      id: 'contact',
-      title: S.nextContactTitle,
-      body: S.nextContactBody,
-      action: S.nextContactAction,
-      href: '/settings/contacts',
-    };
-  }
-  return null;
-}
-
-function NextStep({ step }: { step: Step }): ReactElement {
-  return (
-    <section className="hm-next" data-next-step={step.id} aria-label={S.nextStepLabel}>
-      <div className="hm-next-text">
-        <p className="al-text-label al-muted">{S.nextStepLabel}</p>
-        <h2 className="al-text-title-3">{step.title}</h2>
-        <p className="al-text-body-sm al-muted">{step.body}</p>
-      </div>
-      <a className="al-btn al-btn-primary" href={step.href}>
-        {step.action}
-      </a>
-    </section>
-  );
-}
-
 /**
  * The technical layer (B-11 §7): the global Under the hood panel (card e; it renders only while the
  * switch is on and keeps only allowlisted fields). Version and routes up; nothing else.
@@ -327,7 +270,7 @@ function Hood({ health }: { health: HealthSnapshot | undefined }): ReactElement 
 export function HomePage({
   api,
   approvals,
-  nextStep,
+  startHere,
   platform: givenPlatform,
   now = () => new Date(),
 }: HomePageProps): ReactElement {
@@ -337,8 +280,10 @@ export function HomePage({
   clockNow.current = now;
   const [model, setModel] = useState<Model>(EMPTY);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
-  const [passkeyStep, setPasskeyStep] = useState(false);
-  const [kitStep, setKitStep] = useState(false);
+  const shared = useContext(StartHereContext);
+  // The shell shares one Start here model; a lone Home runs its own.
+  const own = useStartHere(startHere, shared === null);
+  const start = shared ?? own;
   const live = useRef(true);
   const lastSecondary = useRef(0);
   const reading = useRef(false);
@@ -354,23 +299,19 @@ export function HomePage({
     lastSecondary.current = Date.now();
     try {
       const get = (path: string): Promise<ApiResult<unknown>> => client.current.get(path);
-      const [activity, credits, contacts, waiting] = await Promise.all([
+      const [activity, credits, waiting] = await Promise.all([
         get(ACTIVITY_PATH),
         get(CREDITS_PATH),
-        get(CONTACTS_PATH),
         approvalsClient.current.list().catch((): ListAnswer => ({ kind: 'offline' })),
       ]);
       // A failed read keeps the value from before; the first read only marks the tile as settled.
       patch((m) => {
         const events = activity.kind === 'ok' ? parseEvents(activity.data) : undefined;
         const cr = credits.kind === 'ok' ? creditsOf(credits.data) : undefined;
-        const count = contacts.kind === 'ok' ? contactCount(contacts.data) : undefined;
         return {
           events:
             events === undefined ? { ...m.events, done: true } : { done: true, value: events },
           credits: cr === undefined ? { ...m.credits, done: true } : { done: true, value: cr },
-          contacts:
-            count === undefined ? { ...m.contacts, done: true } : { done: true, value: count },
           waiting:
             waiting.kind === 'ok'
               ? { done: true, value: waitingOf(waiting.items) }
@@ -382,7 +323,6 @@ export function HomePage({
       patch((m) => ({
         events: { ...m.events, done: true },
         credits: { ...m.credits, done: true },
-        contacts: { ...m.contacts, done: true },
         waiting: { ...m.waiting, done: true },
       }));
     } finally {
@@ -418,29 +358,11 @@ export function HomePage({
     };
   }, [loadSecondary, patch]);
 
-  useEffect(() => {
-    let current = true;
-    const passkey = nextStep?.passkey ?? needsPasskeySwitch;
-    passkey().then(
-      (needed) => current && setPasskeyStep(needed),
-      () => current && setPasskeyStep(false),
-    );
-    try {
-      setKitStep((nextStep?.recoveryKit ?? recoveryKitPending)());
-    } catch {
-      setKitStep(false);
-    }
-    return () => {
-      current = false;
-    };
-  }, [nextStep]);
-
   const today = now();
   const health = model.health.value;
   const agent: Agent = health?.agent ?? 'not_running';
   const stale = model.offline && model.asOf !== null ? clock(model.asOf) : undefined;
   const quiet = agent === 'not_running' && model.health.done;
-  const step = stepFor(passkeyStep, kitStep, model.contacts.value, platform);
   const waiting = model.waiting.value;
   const soonest = waiting?.soonest ?? null;
 
@@ -465,7 +387,7 @@ export function HomePage({
         <h1 className="al-text-title-1">{S.title}</h1>
         <p className="hm-greeting al-text-body al-muted">{greeting(today)}</p>
       </header>
-      {step === null ? null : <NextStep step={step} />}
+      <StartHere model={start} platform={platform} />
       {model.offline ? (
         <p className="hm-note al-text-body-sm" role="status">
           <Icon name="wifi-off" size={16} />

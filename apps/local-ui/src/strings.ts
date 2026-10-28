@@ -8,6 +8,8 @@ export const SHELL_STRINGS = {
   approvalsWaiting: 'waiting for you',
   /** Read after the Messages badge's number: "3 new" (UI-REFRESH-o-d). */
   messagesNew: 'new',
+  /** The Home item's whole name while Start here is shown (UX2-g, B-11 §27.4). */
+  homeSetup: 'Home, setup not finished',
   notAvailableTitle: "This page isn't available yet.",
   notAvailableHint: 'It arrives in an update. Nothing is lost while you wait.',
   notFoundTitle: "This page isn't here.",

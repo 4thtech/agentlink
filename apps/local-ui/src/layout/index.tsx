@@ -14,6 +14,9 @@ import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import { createUpgradeApi } from '../pages/first-run/setup-api.js';
 import type { Platform } from '../pages/first-run/strings.js';
+import { StartHereContext, startHereShown } from '../pages/home/start-here-context.js';
+import type { StartHereReads } from '../pages/home/start-here.js';
+import { useStartHere } from '../pages/home/use-start-here.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
 import type { ApiResult } from '../api/client.js';
 import { subscribeHealth } from './health-feed.js';
@@ -143,6 +146,8 @@ export interface LayoutProps {
   readonly waitingApprovals?: () => Promise<number>;
   /** Test seam: the health read (M1-11s-a-d). Default: GET /api/ui/health. */
   readonly readHealth?: () => Promise<ApiResult<unknown>>;
+  /** Test seam: the reads behind Start here (UX2-g). Default: the app's own. */
+  readonly startHere?: StartHereReads;
 }
 
 export function Layout({
@@ -153,12 +158,15 @@ export function Layout({
   unseenMessages,
   waitingApprovals,
   readHealth,
+  startHere,
 }: LayoutProps): ReactElement {
   const connection = useConnectionState();
   const version = useHealth(readHealth);
   const unseen = useUnseenMessages(path, unseenMessages);
   const waiting = useApprovalsWaiting(path, waitingApprovals);
   const settings = inSettings(path);
+  // UX2-g: one Start here model for the shell: the Home dot, the card and the empty states.
+  const start = useStartHere(startHere, path !== FIRST_RUN_PATH, path);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [switchNeeded, setSwitchNeeded] = useState(false);
   useEffect(() => {
@@ -189,6 +197,8 @@ export function Layout({
     ...(item.id === 'messages' && unseen > 0
       ? { count: unseen, countLabel: SHELL_STRINGS.messagesNew }
       : {}),
+    // UX2-g (B-11 §27.4): a dot on Home while Start here is shown; it goes with the card.
+    ...(item.id === 'home' && startHereShown(start) ? { dotLabel: SHELL_STRINGS.homeSetup } : {}),
     // UI-REFRESH-o-b: the shared tick badge; it counts down as requests are decided.
     ...(item.id === 'approvals' && waiting > 0
       ? { count: waiting, countLabel: SHELL_STRINGS.approvalsWaiting }
@@ -223,7 +233,7 @@ export function Layout({
             ))}
           </nav>
         ) : null}
-        {children}
+        <StartHereContext.Provider value={start}>{children}</StartHereContext.Provider>
       </AppShell>
     </PrefsHood>
   );
