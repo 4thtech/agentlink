@@ -590,6 +590,39 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     }
   });
 
+  it('gates the activity pulse read like every route: token, CSRF, same-origin; GET only (UX2-f1)', async () => {
+    const h = await harness();
+    const path = '/api/ui/messages/pulse';
+    // No session token (cookie): 401, and a token from somewhere else is no token.
+    expect((await send(h.port, path)).status).toBe(401);
+    expect(
+      (await send(h.port, path, { headers: { Cookie: `agentlink_${h.port}=${'A'.repeat(43)}` } }))
+        .status,
+    ).toBe(401);
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    expect((await send(h.port, path, { headers: { Cookie: cookie } })).status).toBe(403);
+    for (const site of ['cross-site', 'same-site', 'none']) {
+      const res = await send(h.port, path, {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': site },
+      });
+      expect(res.status).toBe(403);
+    }
+    const res = await send(h.port, path, {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
+    });
+    // The handler ran (not the :contactId route's 400): this harness has no agent client.
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'not_set_up' });
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      const other = await send(h.port, path, {
+        method,
+        headers: { Cookie: cookie, Origin: h.origin, 'X-AgentLink-CSRF': csrf },
+      });
+      expect(other.status).toBe(405);
+    }
+  });
+
   /** A presence route whose handler records each call and signs one contact.check. */
   function ownerRoutes(calls: { input: unknown; signed?: OwnerSignature[]; second?: unknown }[]) {
     const routes = createLocalUiRoutes();
@@ -890,6 +923,10 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       'proofs',
     ]);
     expect(Object.isFrozen(client)).toBe(true);
+    // UX2-f1 adds only the pulse's exchange times (contact and time, no content) to the view.
+    const messages = (client as { messages: object }).messages;
+    expect(Object.keys(messages).sort()).toEqual(['conversations', 'list', 'pulseTimes']);
+    expect(Object.isFrozen(messages)).toBe(true);
   });
 });
 

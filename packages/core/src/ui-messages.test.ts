@@ -35,6 +35,7 @@ import {
 import {
   FilesIoView,
   MessagesView,
+  PULSE_SCAN_CAP,
   type Conversation,
   type MessageItem,
   type ReceivedFileItem,
@@ -290,6 +291,112 @@ describe('MessagesView.conversations (plan §4 GET /api/ui/messages)', () => {
     expect(list).toEqual([
       expect.objectContaining({ contactId: b.id, lastAt: null, lastInAt: null }),
     ]);
+  });
+});
+
+// ---- Messages: the activity pulse's exchange times (UX2-f1) -------------------------------------
+
+describe('MessagesView.pulseTimes (UX2-f1, b11 §24: GET /api/ui/messages/pulse)', () => {
+  const PULSE_KEYS = ['capped', 'times'];
+  const TIME_KEYS = ['at', 'contactId'];
+
+  it('returns only a contact ID and a time per exchange, both ways, inside [since, until]', async () => {
+    await put({ contact: b.id, createdAt: T0 - 1 }); // before the window
+    await put({ contact: b.id, createdAt: T0 });
+    await put({ contact: b.id, createdAt: T0 + 5, direction: 'out' });
+    await put({ contact: c.id, createdAt: T0 + 9 });
+    await put({ contact: c.id, createdAt: T0 + 10 }); // `until` itself is in
+    await put({ contact: c.id, createdAt: T0 + 11 }); // after the window
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + 10);
+    expect(keys(pulse)).toEqual(PULSE_KEYS);
+    expect(pulse.capped).toBe(false);
+    for (const t of pulse.times) expect(keys(t)).toEqual(TIME_KEYS);
+    expect([...pulse.times].sort((x, y) => x.at - y.at)).toEqual([
+      { contactId: b.id, at: T0 },
+      { contactId: b.id, at: T0 + 5 },
+      { contactId: c.id, at: T0 + 9 },
+      { contactId: c.id, at: T0 + 10 },
+    ]);
+    await expectNoSecrets(pulse);
+  });
+
+  it('counts only messages: never a request, a refused or protocol row, or a removed contact', async () => {
+    await put({ contact: null, createdAt: T0 + 1 }); // a request from an unknown sender
+    await put({ contact: b.id, createdAt: T0 + 2, state: 'refused' });
+    await put({
+      contact: b.id,
+      createdAt: T0 + 3,
+      payload: textPayload({ kind: 'received', envelopeId: newId() }, 'ack'),
+    });
+    await put({ contact: c.id, createdAt: T0 + 5 });
+    await a.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: c.id }, { status: 'removed' }),
+    );
+    await put({ contact: b.id, createdAt: T0 + 6 });
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + 100);
+    expect(pulse.times).toEqual([{ contactId: b.id, at: T0 + 6 }]);
+  });
+
+  it('never opens a payload, writes nothing and never marks a message read', async () => {
+    const unread = await put({
+      contact: b.id,
+      createdAt: T0,
+      payload: textPayload('BODY-PLAINTEXT'),
+      readAt: null,
+    });
+    const before = await snapshot();
+    const pulse = await a.client.messages.pulseTimes(T0, T0 + 10);
+    expect(JSON.stringify(pulse)).not.toMatch(/BODY-PLAINTEXT|report\.pdf|CANARY/);
+    expect(await snapshot()).toBe(before);
+    expect(
+      await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: unread })?.read_at),
+    ).toBeNull();
+    expect(lines.join('\n')).not.toMatch(/BODY-PLAINTEXT/);
+  });
+
+  it('caps the scan at PULSE_SCAN_CAP per direction: 10 000 (UX2-f1)', () => {
+    expect(PULSE_SCAN_CAP).toBe(10_000);
+    // The seam only lowers the cap, never raises it or turns it off.
+    for (const pulseScanCap of [0, -1, 1.5, PULSE_SCAN_CAP + 1, Number.NaN]) {
+      expect(() => new MessagesView(ctxOf(a), a.client.contacts, { pulseScanCap })).toThrow(
+        RangeError,
+      );
+    }
+  });
+
+  it('caps the scan per direction, newest first, and says so', async () => {
+    const cap = 20;
+    const view = new MessagesView(ctxOf(a), a.client.contacts, { pulseScanCap: cap });
+    const rows = cap + 5;
+    for (let i = 0; i < rows; i += 1) await put({ contact: b.id, createdAt: T0 + i });
+    // The cap is per direction: three sent messages are all read next to the capped inbound ones.
+    for (let i = 0; i < 3; i += 1) {
+      await put({ contact: c.id, createdAt: T0 + i, direction: 'out' });
+    }
+    const pulse = await view.pulseTimes(T0, T0 + rows);
+    expect(pulse.capped).toBe(true);
+    const inbound = pulse.times.filter((t) => t.contactId === b.id);
+    expect(inbound).toHaveLength(cap);
+    expect(pulse.times.filter((t) => t.contactId === c.id)).toHaveLength(3);
+    // Newest first: the oldest five inbound are the ones left out.
+    expect(inbound.reduce((m, t) => Math.min(m, t.at), Infinity)).toBe(T0 + 5);
+    // Exactly at the cap is not capped.
+    const under = await view.pulseTimes(T0 + 5, T0 + rows);
+    expect(under.capped).toBe(false);
+    expect(under.times.filter((t) => t.contactId === b.id)).toHaveLength(cap);
+  });
+
+  it('refuses a window that is not two whole times in order', async () => {
+    for (const [since, until] of [
+      [T0 + 1, T0],
+      [-1, T0],
+      [T0, 1.5],
+      [Number.NaN, T0],
+    ] as const) {
+      await expect(a.client.messages.pulseTimes(since, until)).rejects.toMatchObject({
+        code: 'page_query_invalid',
+      });
+    }
   });
 });
 

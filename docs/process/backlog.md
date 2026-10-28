@@ -5090,7 +5090,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); create works without presence and refuses without session, CSRF or Origin; accept refuses without presence; malformed and SSRF-shaped invites are refused; no secret in any log or error; full threat note; owner "merge" and independent review (S2); no test weakened.
 
 #### UX2-d2 · local-ui: Add contact sheet, create, copy, share, QR and paste an invite (new, UX-WAVE-2 item 1, decisions 1.1 and 2.1)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/contacts/**`, `apps/local-ui/src/pages/home/**` (Next step action), `pages/proofs/qr.tsx` reused, tests
 - **Depends on:** UX2-d1; B-11 §21
 - **Spec:** B-11 §21; UX-WAVE-2 §3; 11 §5, §6.1
@@ -5125,7 +5125,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit): no step advances on a timer or before a read; failed read keeps the step; reduced-motion; vocabulary lint and axe tests; no test weakened.
 
 #### UX2-f1 · node: per-contact activity pulse route (new, UX-WAVE-2 item 4, decision 4.1)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2 (by path; read-only) · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (by path; read-only) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/local-ui/**` (new `GET /api/ui/messages/pulse`), tests; changeset; 08 §1 edit marked "proposed, owner confirms at merge"
 - **Depends on:** —
 - **Spec:** 07 §3; 08 §1; B-11 §17.4

@@ -6,7 +6,7 @@
 // be ticked by hand. Every value is React text (I-5).
 import { CopyPrompt, Icon, Skeleton } from '@4thtech-io/ui';
 import type { ReactElement, ReactNode } from 'react';
-import { CONTACTS_STRINGS } from '../contacts/strings.js';
+import { ADD_CONTACT_HREF } from '../contacts/add-contact-link.js';
 import { FIRST_RUN, type Platform } from '../first-run/strings.js';
 import type { StartHereModel } from './start-here-context.js';
 import type { StartView, StepId, StepView } from './start-here.js';
@@ -60,12 +60,13 @@ function Detail({
         </>
       ) : null;
     case 'invite':
-      // Until the Add contact sheet lands (UX2-d1, UX2-d2) this points to the invite instructions
-      // that exist today: ask your AI to create one.
+      // Step 2's one action opens the Add contact sheet (UX2-d2, b11 §21.1, §27.1).
       return next ? (
         <>
           <p className="al-text-body-sm al-muted">{T.inviteBody}</p>
-          <CopyPrompt prompt={CONTACTS_STRINGS.emptyPrompt} />
+          <a className="al-btn al-btn-primary hm-start-action" href={ADD_CONTACT_HREF}>
+            {T.addContact}
+          </a>
         </>
       ) : null;
     case 'check':
