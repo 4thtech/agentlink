@@ -50,7 +50,7 @@ const PULSE = {
   partial: false,
   contacts: [
     { contactId: C, counts: busy(), lastAt: NOW - 30, activity: 'active_now' },
-    { contactId: B, counts: flat(), lastAt: NOW - 4000, activity: 'today' },
+    { contactId: B, counts: [...flat().slice(0, 10), 4, 4], lastAt: NOW - 4000, activity: 'today' },
   ],
 };
 
@@ -152,7 +152,7 @@ describe('Contacts rows', () => {
 });
 
 describe('Most active in Contacts', () => {
-  it('sorts by activity then the last exchange, and Recent restores the list order', async () => {
+  it('sorts by the 24-hour count then the last exchange (b11 §24.5), and Recent restores the list order', async () => {
     await mount();
     const radios = (): HTMLElement[] => [
       ...host.querySelectorAll<HTMLElement>(
@@ -164,8 +164,8 @@ describe('Most active in Contacts', () => {
       radios()[1]?.click();
     });
     expect(rows().map((r) => r.textContent?.slice(0, 4))).toEqual([
-      expect.stringContaining('Cy'),
       expect.stringContaining('Bo'),
+      expect.stringContaining('Cy'),
       expect.stringContaining('Ana'),
     ]);
     await act(async () => {

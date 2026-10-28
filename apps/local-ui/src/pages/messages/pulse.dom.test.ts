@@ -134,6 +134,10 @@ describe('degrades gracefully', () => {
     await mount(api(() => ({ kind: 'error', status: 503 })));
     expect(order().length).toBe(3);
     expect(host.querySelector('.act-word')).toBeNull();
+    // §24.2: the word falls back to the last-message time the list already has.
+    const time = row('c-marko').querySelector('.act-time');
+    expect(time?.textContent).toMatch(/\d/);
+    expect(row('c-ivo').querySelector('.act-time')?.textContent).toMatch(/\d/);
     expect(row('c-marko').querySelectorAll('.act-bar').length).toBe(12);
     expect(host.querySelector('[role="alert"]')).toBeNull();
   });
@@ -268,7 +272,7 @@ describe('Most active', () => {
     expect(order()).toEqual(['c-ana', 'c-ivo', 'c-marko']);
   });
 
-  it('orders by activity, then the last exchange, and remembers the choice', async () => {
+  it('orders by the 24-hour count, then the last exchange (b11 §24.5), and remembers the choice', async () => {
     await mount(api(() => ok(BASE)));
     await pick('Most active');
     expect(order()).toEqual(['c-marko', 'c-ana', 'c-ivo']);
@@ -278,6 +282,16 @@ describe('Most active', () => {
     resetPrefsForTests();
     await mount(api(() => ok(BASE)));
     expect(order()).toEqual(['c-marko', 'c-ana', 'c-ivo']);
+  });
+
+  it('puts a busy Today contact before a quiet Active now one', async () => {
+    const busyAna = pulseOf([
+      { id: 'c-marko', activity: 'active_now', lastAt: AT - 100, counts: counts(1) },
+      { id: 'c-ana', activity: 'today', lastAt: AT - 5000, counts: counts(4, 9) },
+    ]);
+    await mount(api(() => ok(busyAna)));
+    await pick('Most active');
+    expect(order()).toEqual(['c-ana', 'c-marko', 'c-ivo']);
   });
 
   it('falls back to Recent when storage holds something else', async () => {

@@ -140,15 +140,24 @@ describe('the words and the order', () => {
     expect(activityRank('today')).toBeLessThan(activityRank('quiet'));
   });
 
-  it('orders by activity, then the most recent exchange', () => {
+  it('orders by the 24-hour count, highest first, then the most recent exchange (b11 §24.5)', () => {
+    const k = (
+      id: string,
+      total: number,
+      lastAt: number,
+    ): { id: string; total: number; lastAt: number } => ({
+      id,
+      total,
+      lastAt,
+    });
     const list = [
-      c('quiet-new', 'quiet', NOW - 90_000),
-      c('today-old', 'today', NOW - 5000),
-      c('today-new', 'today', NOW - 900),
-      c('active', 'active_now', NOW - 10),
+      k('quiet-few', 1, NOW - 90_000),
+      k('busy-old', 9, NOW - 5000),
+      k('busy-new', 9, NOW - 900),
+      k('active-few', 2, NOW - 10),
     ];
     list.sort(compareMostActive);
-    expect(list.map((x) => x.contactId)).toEqual(['active', 'today-new', 'today-old', 'quiet-new']);
+    expect(list.map((x) => x.id)).toEqual(['busy-new', 'busy-old', 'active-few', 'quiet-few']);
   });
 });
 
