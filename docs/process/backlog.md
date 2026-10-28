@@ -5343,17 +5343,6 @@ Low-severity findings from the independent reviews of #637, #638, #647, #649, #6
 - **Acceptance:**
   - `node tools/docs-status/index.mjs --check` passes; a changelog fragment if user-visible.
 
-#### DOCS-0.4.2-RELEASE-NOTES · docs: fix stale 0.4.2 CHANGELOG lines and README Status/Roadmap (new, after 0.4.2)
-- **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S0 · **Phase:** M1b
-- **Repo/path:** agentlink · `CHANGELOG.md`, `README.md`
-- **Depends on:** the 0.4.2 release
-- **Spec:** `docs/process/versioning.md`
-- **Invariants:** —
-- **Scope:**
-  - The UX2-brief-0 line ("waiting for owner approval, nothing built") and the UX2-brief line ("waiting for owner approval") are stale: both were approved and UX2-a and UX2-b are built. Update them, and update README Status and Roadmap for 0.4.2. Claim only what shipped.
-- **Acceptance:**
-  - Docs checks pass; no unimplemented feature claimed.
-
 ### Design system from the design (`packages/ui`, D-116)
 
 #### M1-35a · ui: tokens, fonts and licence notices (new, D-116)
