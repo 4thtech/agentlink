@@ -64,12 +64,37 @@ Styled per D-116 from the D2 screens in §2 and existing b11 components; new scr
 
 At 360 the switcher sits in the top bar as the agent's initial with a dot; the menu is a bottom sheet.
 
+### 4.1 Live connections view (owner input, 28 Oct evening)
+
+**Ask.** In Agents, each agent as a box, with live lines between your agents and their contacts while messages or files flow, so someone running many agent sessions sees who is talking at a glance. Refined, and reused where it fits.
+
+**Patterns.** Tailscale's machines list and network map (nodes with a calm online dot, the map secondary to the list); Figma multiplayer presence (small live marks that appear only while something happens, never a constant blink); Vercel and Linear live status (one quiet dot plus a word, motion only on change); Grafana and Datadog service maps (nodes sized by traffic, edges thickened by rate, clustered when large). Adapted: the list stays the main view; the map is an alternate view of the same rows.
+
+**What it shows.** Your agents as boxes on the left (label, live dot, AI apps it serves), contacts as smaller boxes on the right (owner-confirmed name only, as Start here, I-5), and a line between an agent and a contact when they exchanged anything in the last 24 hours. Line weight follows the existing pulse counts (UX2-f1, b11 §24); a **stream** (a short travelling dash, inbound and outbound in their own direction) runs only while a message or file is moving or arrived in the last minute, then settles to a still line. A file transfer in progress shows the same determinate fill as Files (UX2-c). Clicking a box or line opens that contact in Messages.
+
+**Where.** Agents page: a List and Map control (b11 §22 segmented control). Then, where it fits: Home "Last activity" tile as a mini map (top 5 contacts); Contacts as a Map view; Messages and Files as a stream mark on the row that is moving now (no map); the compact view as a one-line strip of active contacts (b11 §25.1). Decision 13 sets how far 0.4.4 goes.
+
+**Data.** Reuses the pulse read (`GET /api/ui/messages/pulse`, counts per two hours, `activity` word) through the shared pulse module (card UX2-pulse-shared, PR #662), so the map, list rows and compact view read one source. "Live" needs fresher signals than the pulse's 60 s poll: one new read, `GET /api/ui/flow?since=<cursor>` (`presence: false`), polled every 3 s while the page is visible and stopped when hidden. It answers events from the local store only: `{contactId, direction: in|out, kind: message|file, state: queued|sent|delivered|received|progress, bytesDone?, bytesTotal?, at}`, at most 200 per answer, for the current agent (with decision 2.1: other agents' lines come from their pulse, read on demand, and show Live only for the open agent; an all-agents live map waits for the all-agents host). SSE was considered and not chosen: polling fits the existing gate and the health poller pattern, with no long-lived socket per tab.
+
+**Glanceable, and private by default.** The owner can always read their own agents' messages: the app already decrypts them locally and shows them in Messages (D-133). The map itself stays glanceable: names, activity and direction, with **no content drawn on the boxes or lines by default** (calm, and safe while screen sharing). Clicking a box or line opens that conversation in Messages, where the content is. So the flow read carries metadata only: who, direction, kind, state, time and sizes the store already keeps in clear (07 §3); never message text, subject, file name, link or envelope. A contact the owner has not named shows as "Unnamed contact" (I-5: a name the other side chose is shown only inside the untrusted container, as in Messages). An optional one-line preview on hover is decision 14; if chosen, it is fetched from the existing Messages read on hover and rendered in the untrusted-content container as plain text (I-5), never part of the flow read. **Zero access is unchanged:** nothing leaves the device for this view, 4thTech never sees content, and it works offline. Logs carry counts only (I-7).
+
+**Scale and calm defaults.** Top 12 contacts by recent activity per agent, the rest folded into "+N more" (a cluster box that expands); up to 8 agents drawn, then the list. Quiet contacts are hidden by default ("Show quiet"). Lines are still unless something moves; at most 6 streams animate at once, the rest show a still highlighted line. No layout physics: a fixed two-column layout sorted by activity, so boxes never jump.
+
+**Reduced motion and transparency.** Under `prefers-reduced-motion` no stream travels: an active line gets a static arrowhead and a "now" label. Under reduced transparency the boxes use solid level-2 surfaces (b11 §13.2). Increased contrast thickens lines and borders.
+
+**Accessibility.** The map is `aria-hidden` decoration over a real list: the text alternative is the List view, and a visually hidden live region announces at most one line per 10 s ("Message from Marko to Work, now."). Every box is reachable by keyboard in list order. Colour is never the only signal (direction arrows, words).
+
+**Performance budget.** One SVG layer, no new dependency, no canvas library; under 8 KB gzipped for the map part, lazy-loaded with the Agents page; flow poll answer under 20 KB; animation on `transform` and `stroke-dashoffset` only, paused when the tab is hidden; 60 fps at 8 agents and 12 contacts each on a 2020 MacBook Air; the perf guard test (`perf-guards.test.ts`) extended.
+
+**Design.** A new brief section **b11 §32 Live connections** (layout, box and line styles, stream motion with tokens from §14, the cluster box, reduced-motion and contrast variants, the mini-map and compact strip, 1280 and 360), approved with screenshots per D-116 and D-137 (decision 11); nothing is drawn ad hoc.
+
 ## 5. New and amended b11 brief sections (card U3-brief, S0)
 
 - **§27 amended, Start here v2:** the steps above; counted steps Protect, Name, Connect, Invite, Say hello, See the reply, Recovery kit ("3 of 7"); "Connect" ticks on a harness entry for this agent, its line shows Running when the AI app has run AgentLink; "See the reply" ticks on the first inbound message. Still not dismissible (UX-WAVE-2 decision 7.1), still one primary button.
 - **§28 Welcome and first run v3:** Welcome; "Set up your agent" with the name field and the platform button; errors and states as today's first run; 1280 and 360.
 - **§29 Agents:** §29.1 top-bar switcher (states: one agent, several, an agent needing setup, loading; overflow after 8 rows with search); §29.2 Agents page; §29.3 Add agent sheet; §29.4 Remove agent sheet (copy, the typed label, the export offer, progress, partial-failure state); §29.5 Rename.
 - **§30 AI apps:** app cards and states (Not found, Not connected, Connected, Connected to {other agent}, Needs restart, Running, Blocked: quit Claude Desktop first, Can't edit this file); the diff panel (from `first-run--ai-app-setup`); the move case ("Claude Code will use Work instead of Personal"); manual steps; 1280 and 360.
+- **§32 Live connections:** as §4.1 (the map, streams, cluster, mini map on Home, compact strip, row stream mark, reduced motion, contrast, the text alternative).
 - **§31 Copy:** every new string, checked against 11 §5 (no wallet, gas, seed phrase, transaction, chain; "keys" only in the remove sheet, where it is the honest word; "AI app", not "harness").
 
 ## 6. How the app holds several agents
@@ -97,6 +122,7 @@ At 360 the switcher sits in the top bar as the agent's initial with a dot; the m
 | `POST /api/ui/apps/preview` `{app, agent}` | `presence: false`, a POST only to carry a body; new kind `preview` or a GET with query (decision 6) | The exact diff and a `changeId` = hash of (app, resolved path, old bytes, new bytes, agent) |
 | `POST /api/ui/apps/apply` `{changeId}` | `presence: true` | Recomputes the change, refuses `changed` if it differs, then writes under the 06 §7 rules |
 | `POST /api/ui/apps/disconnect` `{app}` | `presence: true` | Removes this agent's `agentlink` entry, same diff and rules |
+| `GET /api/ui/flow?since=` | `presence: false` | §4.1: local flow events, metadata only, capped, cursor of at most 256 characters |
 
 All errors are fixed codes; logs carry counts and app ids only (I-7). No route takes a path from the page: AI app files come only from the fixed table (`--config <path>` stays a terminal option under Advanced). No MCP tool is added or changed (I-4).
 
@@ -128,7 +154,7 @@ Steps, all or nothing where possible, in this order, after Touch ID and the type
 
 ### 7.5 Spec text to amend (card U3-spec, all "proposed, owner confirms at merge")
 
-- **08 §1:** the app host and current agent (§6); `agentlink ui` opens Home; the routes of §7.1, the `switch` kind (and `preview` if chosen); first run v3; pages list adds Agents and AI apps.
+- **08 §1:** the app host and current agent (§6); `agentlink ui` opens Home; the routes of §7.1 (with the flow read and its metadata-only allowlist), the `switch` kind (and `preview` if chosen); first run v3; pages list adds Agents and AI apps.
 - **06 §6:** agent labels (owner text, shown as text, never in a prompt to the AI), the app manages agents; **§7:** the app as a second path with the same rules, move and disconnect, the UI's fixed-path limit; **§8:** bare command, `ui` and `init` without a picker.
 - **04 §2.5:** config writes and agent removal as presence-gated local actions with statement binding; the removal order and residuals; **§2.8:** adding an agent from the app.
 - **07 §9.1:** `config.json` gains optional `label`; `app.json`.
@@ -156,6 +182,9 @@ Class per `audit-rules.md` §2 (`packages/node` S2; `apps/local-ui`, `apps/cli` 
 | **U3-h** | Top-bar switcher and Agents page, Add, Rename and Remove sheets | S1 | U3-brief §29, U3-c (then d, e) | `apps/local-ui/src/layout/top-bar.tsx`, `pages/agents/` (new) | Switch reloads data; labels as text; remove sheet copy exact | — |
 | **U3-i** | AI apps page and Connect step | S1 | U3-brief §30, U3-f | `apps/local-ui/src/pages/apps/` (new) | Diff shown before Touch ID; states from reads only | — |
 | **U3-j** | Start here v2 | S1 | U3-brief §27, U3-c (Running read) | `apps/local-ui/src/pages/home/` | Ticks from reads only; "3 of 7"; still not dismissible | — |
+| **U3-flow** | Local API: `GET /api/ui/flow` (metadata-only allowlist, caps, cursor) | S2 | U3-spec | `packages/node/src/local-ui/api/flow.ts` (new), core store read helper | No inbound text or file name in any answer (test with hostile names); caps; RED first | — (Opus IR) |
+| **U3-map** | Live connections map on Agents (List/Map), on the shared pulse module | S1 | U3-brief §32, UX2-pulse-shared, U3-flow, U3-h | `apps/local-ui/src/pages/agents/map/` (new), `pages/pulse/` (shared module only) | Budget met; click opens the conversation in Messages; no content drawn; reduced-motion and contrast variants; List is the text alternative; screenshot review | — |
+| **U3-map-2** | The idea elsewhere: Home mini map, Contacts Map view, row stream mark in Messages and Files, compact strip | S1 | U3-map, decision 13 | `pages/home/`, `pages/contacts/`, `pages/messages/`, `pages/files/`, `pages/compact/` | Same rules; one source (shared module) | — |
 | **U3-k** | End-to-end check of the whole path on a clean macOS user (scripted, two agents, two AI apps), plus README quick start and docs-site "Getting started" | S1 | all above | `docs/runbooks/`, `README.md`, `docs-site/`, `changelog.d/` | Owner can follow it without a terminal after step 0 | — |
 
 ## 10. Ordering (4 to 6 builders, disjoint files)
@@ -165,7 +194,8 @@ Class per `audit-rules.md` §2 (`packages/node` S2; `apps/local-ui`, `apps/cli` 
 | **0** | U3-spec, U3-brief, **U3-a** | Docs and the one change that needs nothing new: the app opens on Home (could ship at once as 0.4.3-patch if wanted) |
 | **1** | U3-c, U3-j (with the Running read stubbed until c lands) | The host is the base of everything else |
 | **2** | U3-b, U3-d, U3-f, U3-h (switch and list parts) | Disjoint: CLI commands; node agents-manage; node apps plus CLI harness; local-ui layout |
-| **3** | U3-e, U3-g, U3-i, U3-h (add, rename, remove parts) | Remove waits for the apps route (entries) |
+| **3** | U3-e, U3-g, U3-i, U3-h (add, rename, remove parts); U3-flow (from group 1 on, its own file) | Remove waits for the apps route (entries) |
+| **3b** | U3-map, then U3-map-2 | After the brief §32, the shared pulse module and the Agents page |
 | **4** | U3-k, then the release | The owner walks the path |
 
 S2 cards follow tests first (`RED (expected):` commit), an independent review (Opus), the Fable audit where marked, and Tali's "merge". UI cards carry screenshots at 1280 and 360, light and dark, for the owner's review (D-137 pattern, decision 11).
@@ -217,6 +247,15 @@ Recommended option first in each.
 12. **Start here v2 steps**
     1. Protect, Name, Connect your AI app, Invite, Check safety code (recommended, not counted), Say hello, See the reply, Save recovery kit; counted "x of 7"; not dismissible (recommended).
     2. The same without "See the reply" (ends at sending).
+13. **Live connections view (§4.1)**
+    1. Agents page Map view plus the row stream mark in Messages and Files in **0.4.4** (U3-flow, U3-map); Home mini map, Contacts Map and the compact strip in 0.4.5 (U3-map-2) (recommended: the place you asked for first, without holding the usability fixes).
+    2. Everything in 0.4.4, including U3-map-2.
+    3. Whole view in 0.4.5, after the usability path is out.
+    4. Pulse-only, no live streams (no new read; lines update once a minute).
+14. **A preview on hover in the map**
+    1. No preview; click opens the conversation in Messages (recommended: the map stays calm and safe to show while screen sharing, and Messages is one click away).
+    2. A one-line preview of the latest message on hover or focus, off by default, a switch in Appearance (fetched from the Messages read on hover, plain text in the untrusted container).
+    3. The preview on by default.
 
 ## 12. Risks
 
@@ -224,4 +263,6 @@ Recommended option first in each.
 - **Config writes as a code path:** fixed content and paths, presence, `changeId`, Fable audit.
 - **Irreversible removal:** typed label, presence, export offer, plain copy that says it cannot be undone; partial-failure state.
 - **The terminal still has to stay open** while `ui` serves (30 minutes). Out of scope here (the desktop app removes it); the Welcome copy says so plainly.
+- **A busy, distracting map:** calm defaults (still lines, 6 streams at most, quiet hidden), the list stays first, reduced-motion variant.
+- **Content on screen by surprise (screen sharing):** the map draws no content by default; the flow read is a metadata allowlist, and tests feed hostile file names and texts and check none appears in it.
 - **Keychain prompts on delete** may differ per macOS version: U3-e checks on a real Mac before review.
