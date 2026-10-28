@@ -7,6 +7,7 @@
 // packages/node/src/local-ui/api/apps.ts (U3-f) answers; the setup calls, the label check and the
 // headers are checked against the real server in packages/node/src/local-ui-first-run-browser.test.ts
 // and packages/node/src/local-ui/first-run-v3-reads.test.ts.
+import { lintVocabulary } from '@4thtech-io/ui';
 import axe from 'axe-core';
 import { act, createElement as h, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -23,6 +24,7 @@ import {
   type PreviewResult,
 } from './apps-api.js';
 import { FirstRunPage, type FirstRunPageProps } from './index.js';
+import { CONNECT, NAME, PICK, SETUP_MESSAGES, WELCOME } from './strings.js';
 import { encodeRegistration } from './passkey.js';
 import {
   createSetupApi,
@@ -105,7 +107,11 @@ interface SetupCalls {
 }
 
 function fakeSetup(
-  o: { check?: (label: string) => 'ok' | 'refused'; status?: StatusResult; finish?: FinishResult } = {},
+  o: {
+    check?: (label: string) => 'ok' | 'refused';
+    status?: StatusResult;
+    finish?: FinishResult;
+  } = {},
 ): SetupApi & SetupCalls {
   const calls: SetupCalls = { begun: [], finished: [], checked: [] };
   return Object.assign(calls, {
@@ -144,7 +150,8 @@ function fakeApps(
   return Object.assign(calls, {
     list: () =>
       Promise.resolve(
-        o.list ?? ({ kind: 'ok', apps: [CODE_APP, DESKTOP, CODEX], desktopRunning: false } as const),
+        o.list ??
+          ({ kind: 'ok', apps: [CODE_APP, DESKTOP, CODEX], desktopRunning: false } as const),
       ),
     currentAgent: () =>
       Promise.resolve(
@@ -158,9 +165,7 @@ function fakeApps(
       return Promise.resolve(typeof p === 'function' ? p() : p);
     },
     passkey: () =>
-      Promise.resolve(
-        o.passkey === false ? undefined : { credentialId: 'AQID', prfSalt: 'BwgJ' },
-      ),
+      Promise.resolve(o.passkey === false ? undefined : { credentialId: 'AQID', prfSalt: 'BwgJ' }),
     apply: (changeId: string, proof: PresenceProof) => {
       calls.applied.push(changeId);
       calls.proofs.push(proof);
@@ -267,11 +272,9 @@ describe('U3-g: pick your AI app (b11 §28.2)', () => {
     const group = host.querySelector('[role="radiogroup"]');
     expect(group).not.toBeNull();
     const radios = [...host.querySelectorAll<HTMLInputElement>('input[type="radio"]')];
-    expect(radios.map((r) => r.closest('label')?.textContent?.replace(/Found/g, '').trim())).toEqual(
-      ['Claude Code', 'Claude Desktop', 'Codex', "I'll choose later"].map((t) =>
-        t === "I'll choose later" ? t : t,
-      ),
-    );
+    expect(
+      radios.map((r) => r.closest('label')?.querySelector('.fr-app-name')?.textContent),
+    ).toEqual(['Claude Code', 'Claude Desktop', 'Codex', "I'll choose later"]);
     expect(radios.map((r) => r.checked)).toEqual([true, false, false, false]);
     expect(text().match(/Found/g)).toHaveLength(3);
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
@@ -325,7 +328,11 @@ describe('U3-g: pick your AI app (b11 §28.2)', () => {
 });
 
 describe('U3-g: name and protect on one screen (b11 §28.3)', () => {
-  const toName = async (setup = fakeSetup(), apps = fakeApps(), extra = {}): Promise<{
+  const toName = async (
+    setup = fakeSetup(),
+    apps = fakeApps(),
+    extra = {},
+  ): Promise<{
     setup: ReturnType<typeof fakeSetup>;
     apps: ReturnType<typeof fakeApps>;
     home: ReturnType<typeof vi.fn>;
@@ -470,7 +477,10 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
   }
 
   it('with no app chosen, "I saved it" lands on Home and remembers the kit as later', async () => {
-    const { home } = await mount(fakeSetup(), fakeApps({ list: { kind: 'ok', apps: [], desktopRunning: false } }));
+    const { home } = await mount(
+      fakeSetup(),
+      fakeApps({ list: { kind: 'ok', apps: [], desktopRunning: false } }),
+    );
     await click('Get started');
     await settle();
     await click('Continue');
@@ -552,12 +562,19 @@ describe('U3-g: the end of first run (b11 §28.3, §28.4)', () => {
     const quit = { kind: 'status', status: 'quit_first' } as const;
     let calls = 0;
     const apps = fakeApps({
-      list: { kind: 'ok', apps: [app('claude-desktop', 'Claude Desktop', { quitFirst: true })], desktopRunning: true },
+      list: {
+        kind: 'ok',
+        apps: [app('claude-desktop', 'Claude Desktop', { quitFirst: true })],
+        desktopRunning: true,
+      },
       preview: () => {
         calls += 1;
         return calls === 1
           ? quit
-          : { kind: 'change', change: { ...CHANGE, app: 'claude-desktop', name: 'Claude Desktop' } };
+          : {
+              kind: 'change',
+              change: { ...CHANGE, app: 'claude-desktop', name: 'Claude Desktop' },
+            };
       },
     });
     await toBackupCode(apps);
@@ -730,21 +747,34 @@ describe('U3-g: the clients speak what the server parses', () => {
       '/api/ui/apps': json(200, {
         desktopRunning: false,
         apps: [
-          { app: 'claude-code', name: 'Claude Code', path: '~/.claude.json', state: 'not_connected', quitFirst: false },
+          {
+            app: 'claude-code',
+            name: 'Claude Code',
+            path: '~/.claude.json',
+            state: 'not_connected',
+            quitFirst: false,
+          },
           { app: 'nope', name: 'x', path: 'y', state: 'bogus', quitFirst: false },
         ],
       }),
     };
     const apps = createAppsApi({
       token: 't',
-      fetch: (path) => Promise.resolve(answers[String(path)] ?? json(501, { error: 'not_available' })),
+      fetch: (path) =>
+        Promise.resolve(answers[String(path)] ?? json(501, { error: 'not_available' })),
     });
     const listed = await apps.list();
     expect(listed).toEqual({
       kind: 'ok',
       desktopRunning: false,
       apps: [
-        { id: 'claude-code', name: 'Claude Code', path: '~/.claude.json', state: 'not_connected', quitFirst: false },
+        {
+          id: 'claude-code',
+          name: 'Claude Code',
+          path: '~/.claude.json',
+          state: 'not_connected',
+          quitFirst: false,
+        },
       ],
     });
     expect(await apps.preview('claude-code', 'default')).toEqual({ kind: 'not_available' });
@@ -784,6 +814,27 @@ describe('U3-g: the clients speak what the server parses', () => {
     }
     status = 403;
     body = { status: 'presence_rejected' };
-    expect(await apps.apply('b'.repeat(64), { kind: 'code', code: 'x' })).toEqual({ kind: 'rejected' });
+    expect(await apps.apply('b'.repeat(64), { kind: 'code', code: 'x' })).toEqual({
+      kind: 'rejected',
+    });
+  });
+});
+
+describe('U3-g: the new copy passes lintVocabulary (11 §5.1)', () => {
+  it('every Welcome, pick, name and connect string, filled in', () => {
+    const texts: string[] = [];
+    const walk = (value: unknown): void => {
+      if (typeof value === 'string') texts.push(value);
+      else if (typeof value === 'function') {
+        texts.push(
+          String(
+            (value as (a: string, b: string, c: string) => string)('Claude Code', 'Work', 'Home'),
+          ),
+        );
+      } else if (typeof value === 'object' && value !== null) Object.values(value).forEach(walk);
+    };
+    for (const group of [WELCOME, PICK, NAME, CONNECT]) walk(group);
+    texts.push(SETUP_MESSAGES.label_invalid, SETUP_MESSAGES.cancelled);
+    for (const t of texts) expect([t, lintVocabulary(t)]).toEqual([t, []]);
   });
 });

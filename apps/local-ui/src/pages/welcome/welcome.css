@@ -1,0 +1,54 @@
+/* Welcome (U3-g; B-11 §28.1): one sentence, one button, a quiet link. A centred column of 480 px on the
+   page background, the Mark still. The content fades in once (base duration, enter easing); nothing
+   loops. Tokens only; only opacity animates. Reduced motion: it appears at once. */
+.wl-wrap {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--al-space-8);
+  max-inline-size: 480px;
+  min-block-size: 60vh;
+  margin-inline: auto;
+  padding: var(--al-space-10) var(--al-space-5);
+  text-align: center;
+  animation: wl-in var(--al-duration-base) var(--al-easing-enter) both;
+}
+.wl-wrap h1 {
+  margin: 0;
+}
+.wl-wrap h1:focus {
+  outline: none;
+}
+.wl-actions {
+  display: grid;
+  justify-items: center;
+  gap: var(--al-space-5);
+  inline-size: 100%;
+}
+.wl-link {
+  color: var(--al-color-fg-muted);
+}
+@keyframes wl-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 480px) {
+  .wl-wrap {
+    padding-inline: 0;
+  }
+  .wl-actions .al-btn {
+    inline-size: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wl-wrap {
+    animation: none;
+  }
+}
+[data-motion='reduced'] .wl-wrap {
+  animation: none;
+}

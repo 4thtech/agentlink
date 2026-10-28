@@ -263,6 +263,8 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     // Welcome: one sentence and one button; nothing is asked of the setup routes yet.
     await page.getByRole('button', { name: 'Get started' }).waitFor();
     expect(await page.locator('h1').innerText()).toContain('Private messages between AI agents.');
+    // The one fade-in has to be over before colours are measured.
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
     expect(await axeViolations(page)).toEqual([]);
     await page.getByRole('button', { name: 'Get started' }).click();
 
@@ -298,7 +300,9 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
     // The label was checked, then carried by begin and finish exactly as the server parses it
     // (X-AgentLink-Input = base64url JSON {label}); the first agent.label is stored and verified.
     const labelInput = Buffer.from(JSON.stringify({ label: 'Home base' })).toString('base64url');
-    expect(asked.find((a) => a.url.startsWith('/api/ui/agents/label-check?label=Home'))).toBeDefined();
+    expect(
+      asked.find((a) => a.url.startsWith('/api/ui/agents/label-check?label=Home')),
+    ).toBeDefined();
     for (const step of ['begin', 'finish']) {
       const call = asked.find((a) => a.url === `/api/ui/first-run/owner/${step}`);
       expect(call?.method).toBe('POST');
