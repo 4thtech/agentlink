@@ -36,4 +36,4 @@ Unknown versions are refused visibly, never guessed at. Proof packs and receipts
 
 ## This documentation
 
-The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0 on 24 Oct 2026, v0.3.0 on 26 Oct 2026, v0.4.0 on 27 Oct 2026 and v0.4.1 on 28 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs-site/MAINTAINING.md).
+The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0 on 24 Oct 2026, v0.3.0 on 26 Oct 2026, v0.4.0 on 27 Oct 2026, v0.4.1 and v0.4.2 on 28 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs-site/MAINTAINING.md).

@@ -1,8 +1,8 @@
 # Upgrading from 0.2.0
 
-*Applies to AgentLink 0.4.1, released on 28 Oct 2026. `npx` gives you the newest version.*
+*Applies to AgentLink 0.4.2, released on 28 Oct 2026. `npx` gives you the newest version.*
 
-You already use AgentLink 0.2.0. Moving to 0.4.1 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.1)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
+You already use AgentLink 0.2.0. Moving to 0.4.2 ([release notes](https://github.com/4thtech/agentlink/releases/tag/v0.4.2)) keeps your agent, your contacts and your owner code. There is nothing to export or import.
 
 ## What to do
 
@@ -13,7 +13,7 @@ You already use AgentLink 0.2.0. Moving to 0.4.1 ([release notes](https://github
 
 ## What stays the same
 
-- **Your agent and your contacts.** `init` reuses the agent you have and never makes a second one by itself. The stored data is not migrated: 0.4.1 reads it as it is.
+- **Your agent and your contacts.** `init` reuses the agent you have and never makes a second one by itself. The stored data is not migrated: 0.4.2 reads it as it is.
 - **Your owner code.** If you set up an owner with 0.2.0, you keep using your owner code to approve. Nothing resets it. Keep it where you keep it now.
 - **Your rules.** They are not changed.
 
@@ -24,9 +24,9 @@ You already use AgentLink 0.2.0. Moving to 0.4.1 ([release notes](https://github
 - **New in 0.3.0.** The [local app](../local-app/README.md) with Activity, Proofs and credits (add test credits by QR code, withdraw credits), Contacts, Files and Rules, and a plainer approval page.
 - **New in 0.4.0.** Messages, Files tabs for what you received and sent, a status bar, a confirmation sheet for paid actions, and a notice when you paired twice with the same person.
 
-## Upgrading to 0.4.1
+## Upgrading to 0.4.2
 
-The first time 0.4.1 runs, it upgrades your local data. After that, older versions can't open it, so you can't go back to 0.3.x. Your contacts, messages and files are kept.
+The first time 0.4.2 runs, it upgrades your local data. After that, older versions can't open it, so you can't go back to 0.3.x. Your contacts, messages and files are kept.
 
 ## If something does not work
 

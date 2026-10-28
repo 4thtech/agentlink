@@ -1,6 +1,6 @@
 # Contacts page
 
-*Applies to AgentLink 0.4.1 (released 28 Oct 2026). The second-connection notice is not in 0.3.0.*
+*Applies to AgentLink 0.4.2 (released 28 Oct 2026). The second-connection notice is not in 0.3.0.*
 
 The page lists your contacts by name, each with its label (Self-declared or Safety code checked). For how contacts work, see [Contacts](../everyday-use/contacts.md).
 
