@@ -81,17 +81,21 @@ function scriptedTools({
     join(bin, 'curl'),
     [
       '#!/usr/bin/env bash',
+      // Bash builtins only (no wc, sed, cp or echo-to-file subprocesses): a health check that
+      // gives up after 60 attempts runs this 120 times, and on a loaded CI runner five extra
+      // processes per call took the whole test past its 20 s limit (CHORE-DEPLOY-SUBMITTER-TLS-FLAKE).
       'out=""',
       'while [ $# -gt 0 ]; do if [ "$1" = "-o" ]; then out="$2"; shift; fi; shift; done',
       `calls=${q(join(dir, 'calls'))}`,
       'echo x >> "$calls"',
-      'n="$(wc -l < "$calls" | tr -d " ")"',
-      `script=${q(join(dir, 'curl.txt'))}`,
-      'total="$(wc -l < "$script" | tr -d " ")"',
+      'n=0; while IFS= read -r _; do n=$((n + 1)); done < "$calls"',
+      'lines=(); while IFS= read -r l || [ -n "$l" ]; do lines+=("$l"); done < ' +
+        q(join(dir, 'curl.txt')),
+      'total="${#lines[@]}"',
       'if [ "$n" -gt "$total" ]; then n="$total"; fi',
-      'line="$(sed -n "${n}p" "$script")"',
+      'line="${lines[$((n - 1))]}"',
       'code="${line%% *}"; rc="${line##* }"',
-      `if [ -n "$out" ] && [ "$out" != /dev/null ]; then cp ${q(dir)}/body-$n.json "$out"; fi`,
+      `if [ -n "$out" ] && [ "$out" != /dev/null ]; then printf '%s' "$(<${q(dir)}/body-$n.json)" > "$out"; fi`,
       'printf "%s" "$code"',
       'exit "$rc"',
     ].join('\n'),
