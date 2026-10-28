@@ -16,6 +16,7 @@ import { deflateRawSync } from 'node:zlib';
 import {
   INVITE_LINK_PREFIX,
   CoreError,
+  acceptInviteSummary,
   decodeInviteLink,
   type CreatedInvite,
   type PendingContact,
@@ -414,9 +415,11 @@ describe('accept an invite: owner presence (UX2-d1, decision 1.1)', () => {
       body: { status: 'pending', contact: CONTACT_OUT, sent: true },
     });
     expect(w.seen.checked).toEqual([LINK]);
-    expect(w.seen.requested).toEqual([
-      { action: ACTION, summary: 'Accept an invite from “Marko” (self-declared)' },
-    ]);
+    expect(w.seen.requested).toEqual([{ action: ACTION, summary: acceptInviteSummary(CONTACT) }]);
+    // IR UX2-d1 M: the same summary as the MCP tool and the CLI, with the owner fingerprint.
+    expect(w.seen.requested[0]?.summary).toBe(
+      'Accept an invite from “Marko” (self-declared) (owner AB12·CD34)',
+    );
     expect(w.seen.signed).toHaveLength(1);
     const [request] = w.seen.signed[0] ?? [];
     expect(request?.kind).toBe('owner-action');
@@ -525,5 +528,30 @@ describe('accept an invite: owner presence (UX2-d1, decision 1.1)', () => {
     const w = acceptWorld({ noPort: true });
     expect(await run(w, { invite: LINK })).toBe(UI_NOT_SET_UP);
     expect(w.seen.signed).toHaveLength(0);
+  });
+});
+
+// IR UX2-d1 L: check and accept share one bound, the longest link the accept route's input header
+// (`X-AgentLink-Input`, at most 8 192 base64url characters) can carry as `{"invite":"<link>"}`.
+describe('one invite size bound for check and accept (IR UX2-d1 L)', () => {
+  const headerChars = (link: string): number =>
+    encodeBase64url(encodeUtf8(JSON.stringify({ invite: link }))).length;
+
+  it('the longest link fits the accept input header, and one more character does not', () => {
+    expect(headerChars('a'.repeat(INVITE_LINK_MAX_CHARS))).toBeLessThanOrEqual(8192);
+    expect(headerChars('a'.repeat(INVITE_LINK_MAX_CHARS + 1))).toBeGreaterThan(8192);
+  });
+
+  it('check refuses a link accept could not carry, with the same fixed code as accept', async () => {
+    const tooLong = { invite: `${INVITE_LINK_PREFIX}${'a'.repeat(INVITE_LINK_MAX_CHARS)}` };
+    const d = desk();
+    expect(await inviteCheckRoute.handler(context(), tooLong, d.desk)).toEqual({
+      status: 400,
+      body: { error: 'invalid_invite' },
+    });
+    expect(d.checked).toHaveLength(0);
+    const w = acceptWorld();
+    expect(await run(w, tooLong)).toEqual({ status: 400, body: { error: 'invalid_invite' } });
+    expect(w.seen.checked).toHaveLength(0);
   });
 });

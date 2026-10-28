@@ -35,6 +35,7 @@ import {
 import { ownerSigValid, ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
 import type { LocalUiAssets } from './context.js';
+import { INVITE_LINK_MAX_CHARS } from './api/invites.js';
 import { INVITE_ACCEPT_PATH, INVITE_CHECK_PATH, INVITE_CREATE_PATH } from './invite-paths.js';
 
 const hex = (n: number, pair: string): string => pair.repeat(n);
@@ -455,6 +456,23 @@ describe('accept an invite: owner presence required (UX2-d1, decision 1.1)', () 
     expect(JSON.parse(res.body)).toEqual({ status: 'refused' });
     expect(h.core.applied).toHaveLength(0);
     expect(h.core.requested).toHaveLength(0);
+  });
+});
+
+// IR UX2-d1 L: what check takes, accept can carry; anything longer is refused by both alike.
+describe('one size bound for check and accept (IR UX2-d1 L)', () => {
+  it('a link at the bound reaches the accept presence gate; one longer is refused by check', async () => {
+    const h = await harness();
+    const atBound = 'a'.repeat(INVITE_LINK_MAX_CHARS);
+    const accept = await h.post(INVITE_ACCEPT_PATH, undefined, {
+      'X-AgentLink-Input': input({ invite: atBound }),
+    });
+    // The input header was taken; the presence gate answered (no proof sent).
+    expect(accept.status).toBe(403);
+    const check = await h.post(INVITE_CHECK_PATH, json({ invite: `${atBound}a` }));
+    expect(check.status).toBe(400);
+    expect(JSON.parse(check.body)).toEqual({ error: 'invalid_invite' });
+    expect(h.core.accepted).toHaveLength(0);
   });
 });
 

@@ -8,8 +8,10 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptInviteAction,
   acceptInviteApprovalSummary,
+  acceptInviteSummary,
   inviteShareText,
 } from './invite-accept-action.js';
+import type { PendingContact } from './pairing.js';
 import { INVITE_LINK_PREFIX, encodeInviteLink } from './invite-link.js';
 import { makeAgent } from './testing/envelopes.js';
 import { FakeClock, RELAYS, passphrase, seed } from './testing/fixtures.js';
@@ -82,5 +84,28 @@ describe('inviteShareText (UX2-d1, 11 §6.1 J7)', () => {
     expect(inviteShareText(link, 1_793_786_400)).toBe(
       `Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 4 Nov 2026: ${link}`,
     );
+  });
+});
+
+describe('acceptInviteSummary (IR UX2-d1 M: 04 §3.6 Accept step 2)', () => {
+  const contact = (name: string): PendingContact => ({
+    id: `0x${'3d'.repeat(20)}`,
+    display: { name, label: 'self-declared', nameSource: 'counterparty' } as never,
+    ownerFingerprint: { short: 'AB12·CD34', long: 'AB12CD34'.repeat(8) },
+    pairing: 'pending',
+    safetyCodeChecked: false,
+  });
+
+  it('names the contact under the name rule, its label and the short owner fingerprint', () => {
+    expect(acceptInviteSummary(contact('Marko'))).toBe(
+      'Accept an invite from “Marko” (self-declared) (owner AB12·CD34)',
+    );
+    expect(acceptInviteSummary(contact('Marko'))).toContain('AB12·CD34');
+  });
+
+  it('is one line: control characters and line breaks become spaces', () => {
+    const text = acceptInviteSummary(contact('Mar\nko\u2028x\u0007'));
+    expect(text).not.toMatch(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/);
+    expect(text).toContain('(owner AB12·CD34)');
   });
 });
