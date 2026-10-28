@@ -20,7 +20,7 @@ The recommended design (§5.3: our remote `/mcp` as the only tool surface, plus 
 | OpenAI Responses API `mcp` tool | **Works** | `server_url` with `authorization` on every request; OpenAI runs the tool calls. Approval is required by default, so the invoker must set `require_approval: "never"`. |
 | OpenAI Agents API (sessions) | **Works** (beta header) | Per-session `transport.authorization`; the API encrypts it and leaves it out of returned resources. Not eligible for ZDR. |
 | OpenAI Agents SDK | **Partly** | Same as the Agent SDK: a library the company hosts. Its `hostedMcpTool` is the Responses API tool. |
-| A2A | **Partly** | Spec 1.0.0 under the Linux Foundation, with bearer, OAuth 2.0, API key, OIDC and mTLS schemes. Served by Google's agent runtime (preview) and announced by Microsoft; neither Anthropic's nor OpenAI's first-party APIs serve it. |
+| A2A | **Partly** | Spec 1.0.0 under the Agentic AI Foundation (Linux Foundation), with bearer, OAuth 2.0, API key, OIDC and mTLS schemes. Served by Google's agent runtime (preview) and announced by Microsoft; neither Anthropic's nor OpenAI's first-party APIs serve it. |
 | Signed webhook | **Works** | Plain HTTPS POST; the company's code calls `/mcp` itself. No vendor dependency. |
 
 ## 2. Anthropic
@@ -59,7 +59,15 @@ Sources: platform.claude.com/docs/en/managed-agents/mcp-connector, …/managed-a
   - its agent ID, with our `/mcp` URL added to the agent and our toolset set to `always_allow`;
   - an environment, whose networking allows our host (or `allow_mcp_servers: true`);
   - a Console API key that our invoker can use to create sessions and vault credentials.
-- **Fit with the 15-minute token scoped to one contact.** Before each session, the invoker must create or rotate a vault credential holding the fresh token. A long-lived session per contact keeps the vault it started with. Its token would then expire unless we offer `mcp_oauth` with a refresh grant, which is a larger surface than the proposal assumes. **Recommendation:** one short session per wake-up, each with a vault credential made for it.
+- **Credential rotation** (source: platform.claude.com/docs/en/managed-agents/vaults).
+  - A credential's secret value can be updated in place.
+  - Running sessions re-resolve their credentials periodically, without a restart. Rotation, archival or deletion therefore reaches a session that is already running.
+  - The docs do not say how often credentials are re-resolved.
+- **Vaults are scoped to the workspace.** Any API key with access to the workspace can reference them when creating a session, and access is revoked by deleting the vault or the credential. BIZ-f should give the business agent its own workspace and key in the company's Console organization.
+- **Fit with the 15-minute token scoped to one contact.** Before each wake-up, the invoker writes the fresh token into a vault credential, either a new one or an in-place update.
+  - A long-lived session per contact could in principle keep running on rotated tokens.
+  - Because the re-resolve timing is undocumented and our token lives only 15 minutes, a session could still present an expired token in the middle of a turn.
+  - **Recommendation:** one short session per wake-up, which starts with the token it was given.
 
 ### 2.3 Claude Agent SDK
 
@@ -114,7 +122,7 @@ Source: openai.github.io/openai-agents-js/guides/mcp.
 
 Sources: a2a-protocol.org/latest/specification and Google Cloud docs (the "Use an A2A agent" page of the agent runtime).
 
-- **Spec 1.0.0**, governed under the Linux Foundation.
+- **Spec 1.0.0**, governed under the Agentic AI Foundation (Linux Foundation).
 - **Bindings:** JSON-RPC, gRPC and HTTP+JSON. The client sends `SendMessage`.
 - **Agent Card security schemes:** API key, HTTP bearer, OAuth 2.0, OIDC and mTLS.
 - **Async by design:** `returnImmediately`, then poll, subscribe or receive a push notification.
@@ -150,15 +158,20 @@ A content-free POST `{event, opaque contact ID, time}` with an HMAC signature wo
    - (b) a vendor-side state object, such as a Managed Agents session or an OpenAI conversation. That moves conversation data into vendor storage.
    - (c) a read-only "recent conversation" view in `agentlink_inbox`. That would change the frozen tool surface, so it needs an owner decision.
    - Recommendation: (a).
-3. **Turn off vendor approvals for our server only.** OpenAI: `require_approval: "never"`. Managed Agents: `always_allow` on our toolset. Our core remains the single approval boundary (§5.3 item 1). Approvals for the company's own MCP servers stay as the company sets them.
+3. **Turn off vendor approvals for our server only, and only together with a tool allowlist.**
+   - OpenAI: `require_approval: "never"`. Managed Agents: `always_allow` on our toolset.
+   - Each setting is paired with `allowed_tools` (OpenAI) or a `default_config: {enabled: false}` allowlist (Anthropic) that lists only the AgentLink tools.
+   - This is safe **only because our policy engine gates every action that has a side effect**: send, propose, respond and proof. Our core remains the single approval boundary (§5.3 item 1, I-4).
+   - Dependency: turning off vendor approval also removes the vendor's review of company data the agent forwards into `agentlink_send`. What leaves the company is then bounded only by our policy engine and the company's own instructions. BIZ-e and BIZ-f must keep that gate covering every outbound call, and BIZ-DOCS must tell the company so.
+   - Approvals for the company's own MCP servers stay as the company sets them.
 4. **Approval waits and the token's lifetime.** A wake-up that leads to `pending_approval` ends the vendor call; the owner's approval later triggers a new wake-up with a new token. The 15-minute token is then long enough for one wake-up. No longer-lived token is needed.
 5. **The vendor host list is fixed:** `api.anthropic.com` and `api.openai.com`. Tokens go only to the company's chosen vendor, never to 4thTech (I-1 holds). The vendor's servers connect to the company's public `/mcp`, so no IP allowlist can be assumed.
 6. **Data-retention note in the setup UI and guide.** Anthropic's MCP connector is not ZDR-eligible, and OpenAI logs MCP data for 30 days with `store=true`. Inbound customer text reaches the company's AI vendor as that company's processor. BIZ-DOCS should say so in plain words.
-7. **Consumer plan sign-in is not an option for business agents.** Anthropic does not permit routing requests through Free, Pro or Max credentials on behalf of others (code.claude.com/docs/en/legal-and-compliance). The setup wizard asks for an API key only.
+7. **Consumer plan sign-in is not an option for business agents.** Anthropic does not permit routing requests through Free, Pro or Max credentials on behalf of their users (code.claude.com/docs/en/legal-and-compliance). The setup wizard asks for an API key only.
 8. **No OpenAI prompt IDs**, because they are being retired (§3.1).
 
 ## 7. Open items for BIZ-SPEC and the invoker cards
 
 - **Live checks.** Confirm the documented behaviour with one call per vendor against a staging `/mcp`, once BIZ-f exists. Measure: wake-up to first `agentlink_inbox` call, total wall time, and token use per turn.
-- **Vault credential rotation.** Whether Managed Agents allows updating a vault credential in place, rather than creating one per wake-up, is not documented in the pages read.
+- **Vault re-resolve timing.** Credentials can be rotated in place, and running sessions re-resolve them periodically without a restart. The interval is undocumented. Measure it before considering a long-lived session per contact; until then, use one short session per wake-up (§2.2).
 - **Microsoft's A2A.** GA status of A2A in Microsoft Foundry and Copilot Studio still needs an official Microsoft Learn source.
