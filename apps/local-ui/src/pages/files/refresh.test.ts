@@ -178,6 +178,10 @@ describe('progress on rows in flight', () => {
   });
 
   it('a queued file waits to send, a sent one waits for delivery, a delivered one shows none', async () => {
+    // UX2-c: a sent file gives up waiting for a receipt after a day, so the clock is fixed here
+    // to an hour after the rows were sent (only Date is faked; timers stay real).
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime((1_792_000_100 + 3_600) * 1000);
     await mount({
       [RECEIVED]: page([]),
       [SENT]: page([
@@ -194,6 +198,7 @@ describe('progress on rows in flight', () => {
     expect(bar(rows[2])).toBeNull();
     expect(bar(rows[3])).toBeNull();
     expect(bar(rows[0])?.getAttribute('aria-label')).toBe('File sending');
+    vi.useRealTimers();
   });
 });
 
