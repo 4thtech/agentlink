@@ -179,6 +179,37 @@ describe('row keys', () => {
     expect(trs[1]).toBe(before);
   });
 
+  it('a new same-second row landing BELOW an in-flight row gives no moment', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': { status: 'ok', items: [row(T, 'recording')] },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    // Same-second rows are ordered by a hash, so the new finished proof can sort below the old one.
+    routes['/api/ui/proofs?limit=20'] = {
+      status: 'ok',
+      items: [row(T, 'recording'), row(T, 'recorded')],
+    };
+    await tick(5_000);
+    expect(host.querySelectorAll('tbody .al-moment').length).toBe(0);
+  });
+
+  it('a row disappearing from a same-second group gives no moment', async () => {
+    const routes: Routes = {
+      '/api/ui/proofs?limit=20': {
+        status: 'ok',
+        items: [row(T, 'recording'), row(T, 'recording')],
+      },
+      [CREDITS]: OK_CREDITS,
+      [TOP_UP]: {},
+    };
+    await mount(routes);
+    routes['/api/ui/proofs?limit=20'] = { status: 'ok', items: [row(T, 'recorded')] };
+    await tick(5_000);
+    expect(host.querySelectorAll('tbody .al-moment').length).toBe(0);
+  });
+
   it('renders rows in one second without a duplicate-key warning', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await mount({
