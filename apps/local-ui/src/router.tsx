@@ -8,7 +8,9 @@ import { withRouteTransition } from './layout/transition.js';
 import { ApprovalsPage } from './pages/approvals/index.js';
 import { ApprovePage, approvalIdOf } from './pages/approve/index.js';
 import { FirstRunPage } from './pages/first-run/index.js';
+import { lazyPart } from './lazy/index.js';
 import { PAGE_PARTS, loadRoutePage } from './lazy/pages.js';
+import { COMPACT_PATH } from './pages/compact/open.js';
 import { PASSKEYS_LABEL, REDIRECTS } from './nav.js';
 import { NotAvailablePage, NotFoundPage } from './states/index.js';
 
@@ -43,6 +45,12 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/settings/advanced', page: lazyPage('/settings/advanced') },
   { path: '/settings/about', page: lazyPage('/settings/about') },
 ];
+
+/**
+ * UX2-h: the compact view (B-11 §25) is a small window of its own: no sidebar, no status bar, so it is
+ * not one of the shell's routes or nav items. Fetched on first visit, like the Settings pages.
+ */
+const CompactPart = lazyPart(async () => (await import('./pages/compact/index.js')).CompactPage);
 
 /** The longest a route change waits for a page that is still loading. */
 const LAZY_WAIT_MS = 200;
@@ -133,6 +141,7 @@ export function AppRoutes(): ReactElement {
     if (path === SETTINGS) navigate(SETTINGS_HOME, true);
     else if (path in REDIRECTS) navigate(REDIRECTS[path] as string, true);
   }, [path]);
+  if (path === COMPACT_PATH) return <CompactPart.Part key={path} />;
   const shown = path === SETTINGS ? SETTINGS_HOME : (REDIRECTS[path] ?? path);
   // One request belongs to Approvals: the same sidebar item is current.
   const oneRequest = approvalIdOf(shown) !== undefined;

@@ -233,3 +233,16 @@ describe('nav', () => {
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 });
+
+describe('compact view route (UX2-h)', () => {
+  it('serves /settings/compact without the shell, so a small window has no sidebar', () => {
+    mountAt('/settings/compact');
+    expect(host.querySelector('nav[aria-label="Main"]')).toBeNull();
+    expect(host.querySelector('footer.al-statusbar')).toBeNull();
+  });
+
+  it('adds no route to the shell list or the navigation', () => {
+    expect(ROUTES.some((r) => r.path.includes('compact'))).toBe(false);
+    expect(NAV_ITEMS.some((i) => i.path.includes('compact'))).toBe(false);
+  });
+});

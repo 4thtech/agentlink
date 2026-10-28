@@ -11,6 +11,13 @@
 .hm-greeting {
   margin: 0;
 }
+.hm-greeting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-4);
+  flex-wrap: wrap;
+}
 .hm-date {
   color: var(--al-color-fg-muted);
   text-transform: uppercase;

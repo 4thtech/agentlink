@@ -5159,7 +5159,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); steps tick only from real reads; no dismiss control; the card disappears when done; vocabulary lint and axe tests; no test weakened.
 
 #### UX2-h · local-ui: compact view and "Open compact window" (new, UX-WAVE-2 item 5, option A, decision 5.1)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/compact/**`, router and shell entry, tests
 - **Depends on:** UX2-f1, UX2-f2; B-11 §25
 - **Spec:** B-11 §25; UX-WAVE-2 §7; 08 §1; D-79
