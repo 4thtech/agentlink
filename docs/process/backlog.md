@@ -4972,7 +4972,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - Tests first (RED commit) for (a) to (c); all M1-11a, M1-11b-2 and UI-REFRESH-o approval flows unchanged; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
 
 #### UI-REFRESH-e4 · ui: Under the hood filter robustness follow-ups (new, low, #619)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/ui/src/components/**` (Under the hood filter), tests; changeset
 - **Depends on:** UI-REFRESH-e3
 - **Spec:** B-11 §7; 04 §4

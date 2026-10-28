@@ -66,7 +66,9 @@ const LINK_MAX = 300;
 
 /** A label that names something secret or private is refused, whatever its value looks like. */
 const FORBIDDEN_LABEL =
-  /key|code|token|secret|passphrase|password|passkey|seed|session|link|url|presign|signature|upload|download|\bdrop\b|credential|cookie|authori[sz]/i;
+  /key|code|token|secret|passphrase|password|passkey|seed|session|link|url|presign|signature|upload|download|credential|cookie|authori[sz]|salt|private|recover|mnemonic/i;
+/** `drop` as a word of its own (kept apart: as a substring it would refuse ordinary words). */
+const DROP_WORD = /\bdrop\b/i;
 const BLOB_RULE = /[A-Za-z0-9_\-+/=]{24,}/;
 /** Values that look like a link, a scheme, a key or blob, a code, a token or a signed URL. */
 const FORBIDDEN_VALUE: readonly RegExp[] = [
@@ -104,11 +106,12 @@ const LOOKALIKE = /[\u2044\u2215\u29F8\u2236\uA789\u0589\u05C3\uFE13\uFE30\u02D0
 /** Control (C0, DEL, C1), format (bidi, zero-width, soft hyphen, BOM) and line/paragraph separators. */
 const HIDDEN_CHAR = /[\p{Cc}\p{Cf}\u2028\u2029]/u;
 /**
- * A key cut into pieces: three or more chunks of four or more key characters, each mixing letters
- * and digits, joined by separators, adding up to 24 or more key characters.
+ * A key cut into pieces: three or more chunks of three or more key characters, each mixing letters
+ * and digits, joined by separators, adding up to 24 or more key characters. Shorter chunks are left
+ * alone, so ordinary text with short codes ("a1 b2 c3") is not refused.
  */
-const CHUNK = /^[A-Za-z0-9_+=]{4,}$/;
-const SEPARATORS = /[\s/\\.,:;|-]+/;
+const CHUNK = /^[A-Za-z0-9_+=]{3,}$/;
+const SEPARATORS = /[\s/\\.,:;|~*#@!?$^&()[\]{}<>"'`-]+/;
 function splitBlob(value: string, separators: RegExp = SEPARATORS): boolean {
   let run = 0;
   let total = 0;
@@ -176,7 +179,13 @@ function refusedForm(v: string, kind: HoodTextKind): boolean {
   // already inside the run rule.
   if (kind === 'id') {
     const rest = v.replace(/^[a-z]{2,8}_/, '');
-    if (BLOB_RULE.test(rest) || splitBlob(rest, /[.:]+/)) return true;
+    // The parts of a dotted or colon-joined id add up like one piece: their total is held to the same run rule.
+    if (
+      BLOB_RULE.test(rest) ||
+      BLOB_RULE.test(rest.replace(/[.:]+/g, '')) ||
+      splitBlob(rest, /[.:]+/)
+    )
+      return true;
     return FORBIDDEN_VALUE.some((re) => re !== BLOB_RULE && re.test(v));
   }
   return FORBIDDEN_VALUE.some((re) => re.test(v));
@@ -187,12 +196,88 @@ function valueAllowed(value: string, kind: HoodTextKind): boolean {
   return forms !== null && !forms.some((v) => refusedForm(v, kind));
 }
 
+/** Letters from other scripts (and a few Latin variants) that read as plain Latin letters. */
+const CONFUSABLE: Readonly<Record<string, string>> = {
+  '\u0430': 'a',
+  '\u0435': 'e',
+  '\u043E': 'o',
+  '\u0440': 'p',
+  '\u0441': 'c',
+  '\u0445': 'x',
+  '\u0443': 'y',
+  '\u0455': 's',
+  '\u0456': 'i',
+  '\u0458': 'j',
+  '\u043A': 'k',
+  '\u0501': 'd',
+  '\u04CF': 'l',
+  '\u0442': 't',
+  '\u043D': 'h',
+  '\u0432': 'b',
+  '\u043C': 'm',
+  '\u03B1': 'a',
+  '\u03B5': 'e',
+  '\u03BF': 'o',
+  '\u03C1': 'p',
+  '\u03BA': 'k',
+  '\u03B9': 'i',
+  '\u03C4': 't',
+  '\u03BD': 'v',
+  '\u03C5': 'u',
+  '\u03C7': 'x',
+  '\u03C3': 's',
+  '\u03B7': 'n',
+  '\u0131': 'i',
+  '\u0261': 'g',
+  '\u0269': 'i',
+  '\u01C0': 'l',
+  '\u0142': 'l',
+  '\u00F8': 'o',
+  '\u0111': 'd',
+  '\u0127': 'h',
+};
+const LEET: Readonly<Record<string, string>> = {
+  '0': 'o',
+  '3': 'e',
+  '4': 'a',
+  '5': 's',
+  '7': 't',
+  '8': 'b',
+  '9': 'g',
+  '@': 'a',
+  $: 's',
+  '!': 'i',
+  '|': 'l',
+};
+
+/**
+ * Every reading of a label that a person would take for the same words: accents dropped,
+ * look-alike letters and digit or symbol stand-ins folded to letters. `1` may stand for `i` or `l`.
+ */
+function labelReadings(form: string): string[] {
+  const base = Array.from(form.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase())
+    .map((c) => CONFUSABLE[c] ?? c)
+    .join('');
+  const leet = (one: string): string =>
+    Array.from(base)
+      .map((c) => (c === '1' ? one : (LEET[c] ?? c)))
+      .join('');
+  return [base, leet('i'), leet('l')];
+}
+
+function labelRefused(form: string): boolean {
+  if (HIDDEN_CHAR.test(form) || LOOKALIKE.test(form) || FORBIDDEN_LABEL.test(form)) return true;
+  return labelReadings(form).some((r) => {
+    if (FORBIDDEN_LABEL.test(r) || DROP_WORD.test(r)) return true;
+    // Spaces, dots, dashes and underscores between letters do not change the word.
+    const squashed = r.replace(/[^a-z0-9]+/g, '');
+    return FORBIDDEN_LABEL.test(squashed) || squashed === 'drop';
+  });
+}
+
 function labelAllowed(label: string): boolean {
   const forms = variants(label);
-  return (
-    forms !== null &&
-    !forms.some((l) => HIDDEN_CHAR.test(l) || LOOKALIKE.test(l) || FORBIDDEN_LABEL.test(l))
-  );
+  return forms !== null && !forms.some(labelRefused);
 }
 
 function isRecord(x: unknown): x is Record<string, unknown> {
