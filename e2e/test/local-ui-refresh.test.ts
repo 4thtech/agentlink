@@ -186,15 +186,7 @@ interface AxeViolation {
  * fixes no page code). Each entry is exact: rule, page and element. Delete the entry with the fix;
  * anything not listed here fails.
  */
-const KNOWN_AXE: readonly { rule: string; path: string; target: string; followUp: string }[] = [
-  {
-    // At 360 px the proofs table scrolls sideways in a wrapper that Tab cannot reach.
-    rule: 'scrollable-region-focusable',
-    path: '/settings/proofs',
-    target: '.pf-table-wrap',
-    followUp: 'UI-REFRESH-t (Proofs & credits, keyboard access to the table at 360 px)',
-  },
-];
+const KNOWN_AXE: readonly { rule: string; path: string; target: string; followUp: string }[] = [];
 
 const isKnown = (where: string, v: AxeViolation): boolean =>
   KNOWN_AXE.some(
