@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// UI-REFRESH-g (S1): Home, five live tiles and the Next step card (B-11 §4, §7, §16, §17.4; plan §6).
+// UI-REFRESH-g (S1): Home, five live tiles and the Start here card (UX2-g replaced the Next step card) (B-11 §4, §7, §16, §17.4; plan §6).
 //
 // - It reads only existing read routes (health, activity, credits, contacts, the approvals list),
 //   shows a skeleton on first load, and every §4 state: first visit, fine, approvals waiting,
@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import homeCss from './home.css?raw';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { ApprovalItem, ListAnswer } from '../approvals/client.js';
+import type { ContactRow } from '../contacts/data.js';
 import { PAGE_PARTS } from '../../lazy/pages.js';
 import { ROUTES } from '../../router.js';
 import { HoodProvider, HOOD_STRINGS } from '@4thtech-io/ui';
@@ -77,6 +78,7 @@ const CONTACT = {
   since: NOW_SECONDS - 86_400,
 };
 const CONTACTS = { status: 'ok', contacts: [CONTACT] };
+const CONTACT_ROW = { ...CONTACT, since: NOW_SECONDS - 86_400 } as ContactRow;
 
 function approval(over: Partial<ApprovalItem> = {}): ApprovalItem {
   return {
@@ -121,7 +123,12 @@ function setup(answers: Answers = {}): {
   const props: HomePageProps = {
     api: { get, post: vi.fn(), owner: vi.fn() } as unknown as ApiClient,
     approvals: { list },
-    nextStep: { passkey: async () => false, recoveryKit: () => false },
+    startHere: {
+      protect: async () => true,
+      contacts: async () => [CONTACT_ROW],
+      sent: async () => true,
+      kitSaved: () => true,
+    },
     platform: 'mac',
     now: () => NOW,
   };
@@ -199,7 +206,7 @@ describe('Home: loading', () => {
     await mount(props);
     const paths = get.mock.calls.map((c) => String(c[0]).split('?')[0]);
     expect(new Set(paths)).toEqual(
-      new Set(['/api/ui/health', '/api/ui/activity', '/api/ui/proofs/credits', '/api/ui/contacts']),
+      new Set(['/api/ui/health', '/api/ui/activity', '/api/ui/proofs/credits']),
     );
     expect(list).toHaveBeenCalled();
   });
@@ -231,9 +238,10 @@ describe('Home: everything fine', () => {
     expect(tile('activity').textContent).not.toContain('You blocked a contact');
   });
 
-  it('has no Next step card when setup is complete', async () => {
+  it('has no Start here card when setup is complete', async () => {
     const { props } = setup();
     await mount(props);
+    expect(host.querySelector('[data-start-here]')).toBeNull();
     expect(host.querySelector('[data-next-step]')).toBeNull();
   });
 
@@ -253,58 +261,6 @@ describe('Home: everything fine', () => {
     const { props } = setup({ approvals: { kind: 'ok', items: [approval()] } });
     await mount(props);
     expect(host.querySelectorAll('[style]').length).toBe(0);
-  });
-});
-
-describe('Home: the Next step card', () => {
-  it('first visit with no contacts: the contact step, one button, one card', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount(props);
-    const cards = host.querySelectorAll('[data-next-step]');
-    expect(cards.length).toBe(1);
-    expect(cards[0]?.textContent).toContain(S.nextContactTitle);
-    expect(cards[0]?.querySelectorAll('a, button').length).toBe(1);
-    expect(cards[0]?.querySelector('a')?.getAttribute('href')).toBe('/settings/contacts');
-  });
-
-  it('puts the passkey step before the recovery kit and the contact', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount({
-      ...props,
-      nextStep: { passkey: async () => true, recoveryKit: () => true },
-    });
-    const card = host.querySelector('[data-next-step]');
-    expect(card?.textContent).toContain('Switch to Touch ID');
-    expect(card?.querySelector('a')?.getAttribute('href')).toBe('/first-run');
-    expect(host.querySelectorAll('[data-next-step]').length).toBe(1);
-  });
-
-  it('then the recovery kit', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount({ ...props, nextStep: { passkey: async () => false, recoveryKit: () => true } });
-    const card = host.querySelector('[data-next-step]');
-    expect(card?.textContent).toContain(S.nextKitTitle);
-    expect(card?.querySelector('a')?.getAttribute('href')).toBe('/settings/backup');
-  });
-
-  it('sits above the tiles', async () => {
-    const { props } = setup({ contacts: ok({ status: 'ok', contacts: [] }) });
-    await mount(props);
-    const card = host.querySelector('[data-next-step]') as HTMLElement;
-    const grid = host.querySelector('[data-tiles]') as HTMLElement;
-    expect(card.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('shows no step if a step check fails or the contacts cannot be read', async () => {
-    const { props } = setup({ contacts: { kind: 'error', status: 500 } });
-    await mount({
-      ...props,
-      nextStep: {
-        passkey: () => Promise.reject(new Error('x')),
-        recoveryKit: () => false,
-      },
-    });
-    expect(host.querySelector('[data-next-step]')).toBeNull();
   });
 });
 
@@ -598,6 +554,12 @@ describe('Home: one health poller with the shell', () => {
             path: '/settings/home',
             readHealth: shellRead,
             nextStep: async () => false,
+            startHere: {
+              protect: async () => true,
+              contacts: async () => [CONTACT_ROW],
+              sent: async () => true,
+              kitSaved: () => true,
+            },
             unseenMessages: async () => 0,
           },
           h(HomePage, props),
@@ -665,5 +627,17 @@ describe('Home: layout at 1280 and 360 (stylesheet)', () => {
       /@media \(max-width: [^)]+\)\s*\{[\s\S]*\[data-tile='waiting'\][\s\S]*order:\s*-1/,
     );
     expect(homeCss).toMatch(/prefers-reduced-motion|data-motion='reduced'/);
+  });
+
+  it('Start here leaves with fade plus collapse (base duration, exit easing), instant when reduced', () => {
+    const css = homeCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(css).toMatch(/\.hm-start-wrap\.is-leaving\s*\{[^}]*grid-template-rows:\s*0fr/);
+    const wrap = css.match(/\.hm-start-wrap\s*\{[^}]*\}/)?.[0] ?? '';
+    expect(wrap).toMatch(/grid-template-rows var\(--al-duration-base\) var\(--al-easing-exit\)/);
+    expect(wrap).toMatch(/opacity var\(--al-duration-base\) var\(--al-easing-exit\)/);
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{[\s\S]*?\.hm-start-wrap,[\s\S]*?transition:\s*none/,
+    );
+    expect(css).toMatch(/\[data-motion='reduced'\] \.hm-start-wrap,[\s\S]*?transition:\s*none/);
   });
 });

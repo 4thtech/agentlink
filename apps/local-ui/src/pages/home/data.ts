@@ -5,11 +5,9 @@
 import type { ApiResult } from '../../api/client.js';
 import { parseHealth, type HealthState } from '../../layout/health.js';
 import type { ApprovalItem } from '../approvals/client.js';
-import { parseList } from '../contacts/data.js';
 import { parseCredits } from '../proofs/data.js';
 
 export const ACTIVITY_PATH = '/api/ui/activity?limit=3';
-export const CONTACTS_PATH = '/api/ui/contacts';
 export const SUMMARY_MAX = 80;
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -140,12 +138,6 @@ export function creditsOf(data: unknown): CreditsView | 'unavailable' {
   return answer.kind === 'ok'
     ? { proofsLeft: answer.proofsLeft, balance: answer.balance }
     : 'unavailable';
-}
-
-/** The number of contacts, or undefined when the answer is not a contact list. */
-export function contactCount(data: unknown): number | undefined {
-  const answer = parseList(data);
-  return answer.kind === 'ok' ? answer.contacts.length : undefined;
 }
 
 export interface WaitingView {

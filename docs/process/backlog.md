@@ -5147,7 +5147,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
   - Tests first (RED commit); markers differ by shape; the Active now pulse plays once and never loops, and not at all under reduced motion; 50+ contacts render without frame drops under the UI-REFRESH-q gate; vocabulary lint and axe tests; no test weakened.
 
 #### UX2-g · local-ui: Start here card on Home, empty states point to it (new, UX-WAVE-2 item 8, decision 7.1)
-- **Status:** backlog · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** M · **Tier:** Sonnet build, Opus review · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{home,contacts,messages,files}/**`, `apps/local-ui/src/shell/**` (Home dot), tests
 - **Depends on:** UX2-d2; B-11 §27
 - **Spec:** B-11 §8 screen 3, §27; brief §4; UX-WAVE-2 §9.2
