@@ -183,6 +183,8 @@ function useFeed<T extends { readonly id: string; readonly at: number }>(
   inFlight?: (item: T) => boolean,
 ): { state: FeedState<T>; retry: () => void; more: () => void } {
   const [state, setState] = useState<FeedState<T>>({ phase: 'loading' });
+  // Bumped when the tab comes back, so a polling window that ran out while hidden starts again.
+  const [epoch, setEpoch] = useState(0);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -244,7 +246,9 @@ function useFeed<T extends { readonly id: string; readonly at: number }>(
   // Coming back to the page looks for anything new (no timer, no stream).
   useEffect(() => {
     const onShown = (): void => {
-      if (document.visibilityState === 'visible') void run(null);
+      if (document.visibilityState !== 'visible') return;
+      setEpoch((e) => e + 1);
+      void run(null);
     };
     document.addEventListener('visibilitychange', onShown);
     return () => document.removeEventListener('visibilitychange', onShown);
@@ -270,7 +274,7 @@ function useFeed<T extends { readonly id: string; readonly at: number }>(
     };
     arm();
     return () => clearTimeout(timer);
-  }, [pending, run]);
+  }, [pending, run, epoch]);
 
   return {
     state,

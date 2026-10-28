@@ -4,6 +4,7 @@
 // receipt and younger than a day, the first page is re-read every 5 s while the tab is visible,
 // slower after 2 minutes and not at all after 30 minutes. A day without a receipt ends at
 // "Sent · no receipt yet" (owner decision 6.1). Steps move only when the served state moves.
+import axe from 'axe-core';
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -179,5 +180,66 @@ describe('a day without a receipt', () => {
     await mount([sent({ receipt: true })]);
     expect(host.textContent).not.toContain(NO_RECEIPT);
     expect(host.querySelector('[data-receipt="true"]')).not.toBeNull();
+  });
+});
+
+describe('coming back to a hidden tab', () => {
+  it('restarts the polling window while a row is still in flight', async () => {
+    const s = await mount([sent({ status: 'queued' })]);
+    visible = false;
+    await tick(31 * 60_000);
+    visible = true;
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await tick(0);
+    const n = s.sentCalls();
+    await tick(10_000);
+    expect(s.sentCalls()).toBeGreaterThanOrEqual(n + 2);
+  });
+});
+
+describe('reduced motion and accessibility', () => {
+  afterEach(() => {
+    delete (Element.prototype as { animate?: unknown }).animate;
+    delete (window as { matchMedia?: unknown }).matchMedia;
+  });
+
+  it('with reduced motion the word changes and nothing is animated', async () => {
+    const animate = vi.fn();
+    (Element.prototype as { animate?: unknown }).animate = animate;
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes('prefers-reduced-motion'),
+      media: q,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      onchange: null,
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+    const s = await mount([sent({ status: 'queued' })]);
+    const before = host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuetext');
+    s.routes[SENT] = { items: [sent({ status: 'sent' })] };
+    await tick(5_000);
+    const after = host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuetext');
+    expect(after).not.toBe(before);
+    expect(animate).not.toHaveBeenCalled();
+  });
+
+  it('axe finds no violation with rows in flight, confirmed and giving up', async () => {
+    vi.setSystemTime(AT * 1000 + DAY_MS + 60_000);
+    await mount([
+      sent({ id: 'a.00', status: 'queued', at: AT + DAY_MS / 1000 }),
+      sent({ id: 'b.00', receipt: true }),
+      sent({ id: 'c.00' }),
+    ]);
+    expect(host.textContent).toContain(NO_RECEIPT);
+    vi.useRealTimers();
+    const res = await axe.run(host, {
+      runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+      rules: { 'color-contrast': { enabled: false } },
+    });
+    expect(res.violations.map((v) => v.id)).toEqual([]);
   });
 });
