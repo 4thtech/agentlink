@@ -371,6 +371,33 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 - No "Reply", "Send", "Compose" or "Forward" control. The only path is "To reply, ask your AI."
 - Errors say what failed, never what a message said.
 
+### 5.8 Agents and AI apps (D-138)
+
+Local app pages that hold several agents and connect AI apps (08 §1; design b11 §28 to §32).
+
+| Where | String |
+|---|---|
+| Welcome | One sentence and "Get started" |
+| First run v3 | "Name your agent" (prefilled "My agent") · "Use Touch ID" (or the platform's name, 08 §1) |
+| Start here | "Connect your AI app" · "Invite your first contact" · "Say hello" · "See the reply arrive" · "Save your recovery kit" |
+| No one to invite | "Try it with a second agent of your own" |
+| AI app states | "Not connected" · "Connected to {label}" · "Connected to another agent" · "Needs restart" · "Running" |
+| AI app change | "Review change" · "Apply with Touch ID" · "Restart {app} to finish" |
+| Move | "{app} will use {newLabel} instead of {oldLabel}" |
+| Claude Desktop open | "Quit Claude Desktop first" |
+| Switcher | "Add agent" · "Manage agents"; on an approval page opened by an AI app: "Open the AgentLink app to switch" |
+| Agent in use | "Quit the AI app that uses {label} first." |
+| Remove sheet | "Export history first" · "Remove with Touch ID"; if contacts can't be reached: "Remove anyway? Your contacts can't be told now." |
+| Unfinished removal | "Removal not finished" · "Try again" |
+| Existing agents | One-time "Tidy up" note on Home, linking to Agents |
+| Live connections | A contact with no owner-confirmed name: "Unnamed contact" |
+
+**Rules.**
+- Say "AI app", never "harness" (§5.1). "Keys" appears only in the remove sheet, which says what goes.
+- An agent's label is the owner's own text: 1 to 32 characters in the restricted form of the §5.2 name rule (letters, digits, spaces, `.`, `'` and `-`); anything else is refused with "Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters." It is shown as plain text, never as a heading style or a label of ours (§5.2).
+- The live connections view shows names, activity and direction only, never message text or file names.
+- An AI app change shows only the `agentlink` entry, never the rest of the file.
+
 ## 6. Surfaces and information architecture
 
 ### 6.0 Surface map
