@@ -450,7 +450,8 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     const calls = await mount(base({ [`POST ${TOP_UP}`]: { status: 'done' } }));
     await click(PROOFS_STRINGS.addCredits);
     expect(text()).toContain('$4.99');
-    await click(PROOFS_STRINGS.turnIntoCredits);
+    // UX2-e2 (B-11 §23.1): the Arrived step's one button names the amount.
+    await click('Add $4.99 to your credits');
     const confirm = host.querySelector('section[aria-label="Confirm"]');
     expect(confirm?.textContent).toContain('$4.99');
     expect(confirm?.textContent).toContain('Gnosis test network');
@@ -468,7 +469,9 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     // The owner code is the body only, never in the URL or the input header.
     expect(post?.body).toBe('7K2M-9QXA');
     expect(post?.url).not.toContain('7K2M');
-    expect(text()).toContain(PROOFS_STRINGS.done);
+    // UX2-e2 (B-11 §23.1): submitted is not added; the tracker waits for the credits read.
+    expect(text()).toContain('Adding to your credits…');
+    expect(text()).not.toContain(PROOFS_STRINGS.done);
   });
 
   it('withdraws credits to the agent own account after a confirm screen', async () => {
@@ -499,13 +502,13 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     await click(PROOFS_STRINGS.cancel);
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
     await click(PROOFS_STRINGS.addCredits);
-    await click(PROOFS_STRINGS.turnIntoCredits);
+    await click('Add $4.99 to your credits');
     await typeCode('0000-0000');
     await click(PROOFS_STRINGS.confirm);
     expect(text()).toContain(PROOFS_STRINGS.wrongCode);
   });
 
-  it('nothing received yet: no button to add, a check-again button instead', async () => {
+  it('nothing received yet: no button to add; the tracker waits for the funds (UX2-e2)', async () => {
     await mount(
       base({
         [TOP_UP]: {
@@ -515,7 +518,9 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
       }),
     );
     await click(PROOFS_STRINGS.addCredits);
-    expect(button(PROOFS_STRINGS.turnIntoCredits)).toBeUndefined();
-    expect(button(PROOFS_STRINGS.checkAgain)).toBeDefined();
+    expect(
+      [...host.querySelectorAll('button')].some((b) => /^Add \$/.test(b.textContent ?? '')),
+    ).toBe(false);
+    expect(text()).toContain('Waiting for your funds');
   });
 });

@@ -14,6 +14,7 @@ export default defineConfig({
         /activity\.css/,
         /pulse\.css/,
         /about\.css/,
+        /proofs\.css/,
         /app\.css/,
         /compact\.css/,
       ],

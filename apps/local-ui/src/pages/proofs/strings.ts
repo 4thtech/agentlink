@@ -14,7 +14,6 @@ export const PROOFS_STRINGS = {
   listUnavailable: "Your proofs can't be loaded right now. Try again in a minute.",
   notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
   creditsLabel: 'Credits',
-  waiting: 'Waiting for your credits…',
   testCreditsLabel: 'Test credits',
   testCredits: 'During the beta, proofs use free test credits.',
   firstProofFree: 'Free test credits arrive automatically with your first proof.',
@@ -38,11 +37,8 @@ export const PROOFS_STRINGS = {
   // 11 §5.6 "Top-up (each method, once)", verbatim.
   privacy:
     'The account you add credits from is publicly linked to your agent. For more privacy, use free test credits or a separate account only for AgentLink.',
-  turnIntoCredits: 'Turn received funds into credits',
-  nothingYet: 'Nothing to add yet. After you send, check again.',
   checkAgain: 'Check again',
   reserveNote: 'A little stays with your agent to cover network costs.',
-  notReadable: "Your agent's account can't be checked right now. Try again in a minute.",
   advanced: 'Advanced',
   withdraw: 'Withdraw credits',
   withdrawNote:
@@ -66,6 +62,19 @@ export const PROOFS_STRINGS = {
   amountChanged: 'The amount changed. Check again.',
   noFundsForFee: "Your agent's account needs a little more to cover network costs.",
   moveFailed: "That didn't go through. Try again in a minute.",
+  // UX2-e2: the Add credits tracker (B-11 §23.1, D-137). Funds, account, credits; never "wallet",
+  // "deposit", "transaction" or "address" in these steps.
+  trackLabel: 'Adding credits, step by step',
+  detailsLabel: 'Where to send your funds',
+  stepWaiting: 'Waiting for your funds',
+  stepWaitingHint: 'Usually takes about a minute.',
+  stepWaitingLong: 'Still waiting. Check that you sent it to this account.',
+  showDetails: 'Show details again',
+  stepArrived: 'Arrived',
+  stepAdding: 'Adding to your credits…',
+  stepAdded: 'Added to credits',
+  readFailed: "Couldn't check. Trying again.",
+  stoppedChecking: 'Stopped checking.',
 } as const;
 
 /** The networks the page names, by the server's fixed word (11 §5: plain words). */
@@ -78,12 +87,28 @@ export function comingSoon(network: string): string {
   return `${network}: coming soon`;
 }
 
-export function readyToAdd(usd: string): string {
-  return `${usd} received and ready to add.`;
-}
-
 export function addAmount(usd: string): string {
   return `Add ${usd} to your credits`;
+}
+
+/** The Arrived step with the `received` value of the read that proved it. */
+export function arrivedAmount(usd: string): string {
+  return `Arrived · ${usd}`;
+}
+
+/** The Added step with the credits read after the owner operation succeeded. */
+export function addedNow(usd: string): string {
+  return `Added to credits · ${usd} now`;
+}
+
+/** Read after the step word by screen readers ("Waiting for your funds, step 1 of 3"). */
+export function stepOf(n: number): string {
+  return `, step ${String(n)} of 3`;
+}
+
+/** The polite announcement when funds arrive. */
+export function fundsArrived(usd: string): string {
+  return `Your funds arrived: ${usd}`;
 }
 
 export function withdrawAmount(usd: string): string {
