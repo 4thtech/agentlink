@@ -4959,7 +4959,7 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
   - axe: 0 serious or critical on all pages and modes; no test weakened.
 
 #### UI-REFRESH-o-b · local-ui: Approvals restyle follow-ups, ID in Under the hood, decided-card state, nav badge (new, low, S2 by content, #616)
-- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus review · **Security:** S2 (approval UI) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, `apps/local-ui/src/shell/**` (the approvals badge only), `apps/local-ui/src/strings.ts`, tests; `packages/ui/src/**` only for the ID-kind part, together with UI-REFRESH-e3; changeset if `packages/ui` changes
 - **Depends on:** UI-REFRESH-o; UI-REFRESH-e3 (for part a)
 - **Spec:** B-11 §7, §16 (Approvals); 08 §1; 04 §2.5

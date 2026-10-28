@@ -3,12 +3,18 @@
 import { useRef, type KeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import { Icon, Lockup } from './brand.js';
 import { Kbd } from './forms.js';
+import { CountBadge } from './motion.js';
 import { cx } from './util.js';
 
 export interface NavItem {
   icon: string;
   label: string;
   count?: number;
+  /**
+   * With a label, the count is the shared tick badge (CountBadge; UI-REFRESH-o-b), read as
+   * "<count> <label>". Without one it stays the plain badge.
+   */
+  countLabel?: string;
   active?: boolean;
   /** Where the link goes; the app routes it. */
   href?: string;
@@ -119,7 +125,14 @@ export function AppShell({
                   >
                     <Icon name={item.icon} size={16} />
                     <span className="al-text-body">{item.label}</span>
-                    {item.count === undefined || item.count === 0 ? null : (
+                    {item.count === undefined || item.count === 0 ? null : item.countLabel !==
+                      undefined ? (
+                      <CountBadge
+                        count={item.count}
+                        label={item.countLabel}
+                        className="al-nav-count al-text-code"
+                      />
+                    ) : (
                       <span className="al-nav-count al-text-code">{item.count}</span>
                     )}
                   </a>

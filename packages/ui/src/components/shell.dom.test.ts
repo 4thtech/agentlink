@@ -126,3 +126,38 @@ describe('AppShell nav highlight', () => {
     expect(host.querySelectorAll('[aria-current="page"]').length).toBe(1);
   });
 });
+
+describe('AppShell nav count (UI-REFRESH-o-b)', () => {
+  it('a count with a label is the shared tick badge, named for screen readers', () => {
+    render(
+      h(AppShell, {
+        nav: NAV.map((n, i) => (i === 1 ? { ...n, count: 3, countLabel: 'waiting for you' } : n)),
+        pageTitle: 'Approvals',
+      }),
+    );
+    const badge = host.querySelector('.al-nav .al-count') as HTMLElement;
+    expect(badge).not.toBeNull();
+    expect(badge.classList.contains('al-nav-count')).toBe(true);
+    expect(badge.querySelector('.al-count-in')?.textContent).toBe('3');
+    expect(badge.querySelector('.al-visually-hidden')?.textContent).toBe('3 waiting for you');
+    render(
+      h(AppShell, {
+        nav: NAV.map((n, i) => (i === 1 ? { ...n, count: 120, countLabel: 'waiting for you' } : n)),
+        pageTitle: 'Approvals',
+      }),
+    );
+    expect(host.querySelector('.al-nav .al-count-in')?.textContent).toBe('99+');
+  });
+
+  it('a count without a label keeps the plain badge', () => {
+    render(
+      h(AppShell, {
+        nav: NAV.map((n, i) => (i === 2 ? { ...n, count: 2 } : n)),
+        pageTitle: 'Approvals',
+      }),
+    );
+    const plain = host.querySelector('.al-nav .al-nav-count') as HTMLElement;
+    expect(plain.textContent).toBe('2');
+    expect(plain.classList.contains('al-count')).toBe(false);
+  });
+});

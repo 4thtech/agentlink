@@ -4,6 +4,8 @@ export const SHELL_STRINGS = {
   appName: 'AgentLink',
   navLabel: 'Main',
   skipToContent: 'Skip to content',
+  /** Read after the Approvals badge's number: "3 waiting for you" (UI-REFRESH-o-b). */
+  approvalsWaiting: 'waiting for you',
   notAvailableTitle: "This page isn't available yet.",
   notAvailableHint: 'It arrives in an update. Nothing is lost while you wait.',
   notFoundTitle: "This page isn't here.",
