@@ -7,7 +7,10 @@
 //     decides; the page offers only a well-formed `apr_` ID).
 // (b) After an applied approval the card holds "Approved." and every fact while the check draws,
 //     then collapses out (reduced motion: removed without animation). The result stays on the page
-//     as text a screen reader can reach. A refused attempt, a denial and an open sheet keep the card.
+//     as text a screen reader can reach. A refused attempt and an open sheet keep the card.
+// (d) UI-REFRESH-o-c: an applied denial leaves the same way ("Denied." held with every fact, then
+//     the shared row leave, then "Denied: <summary>" as text). A refused, expired or failed denial
+//     keeps the card, and so does an open sheet.
 // (c) The sidebar Approvals badge shows how many requests wait, with the shared tick, and counts
 //     down when one is decided; a failed decision changes nothing.
 import axe from 'axe-core';
@@ -365,7 +368,8 @@ describe('(b) an approved card collapses out after the check', () => {
     );
   });
 
-  it('a refused attempt and a denial keep the card', async () => {
+  // UI-REFRESH-o-c: a denial now leaves as an approval does ((d) below); a refused attempt stays.
+  it('a refused attempt keeps the card; an applied denial leaves its line', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     reduced();
     await mount({
@@ -383,9 +387,11 @@ describe('(b) an approved card collapses out after the check', () => {
     await click(buttonNamed(S.confirmDenial));
     await advance(APPROVED_HOLD_MS * 3);
     expectAllFacts(cardOf('D'), 'D');
-    expectAllFacts(cardOf('E'), 'E');
-    expect(cardOf('E')?.getAttribute('data-outcome')).toBe('denied');
-    expect(host.querySelector('.ap-result')).toBeNull();
+    expect(cardOf('D')?.hasAttribute('data-outcome')).toBe(false);
+    expect(cardOf('E')).toBeNull();
+    expect([...host.querySelectorAll('.ap-result')].map((n) => n.textContent)).toEqual([
+      fmt(S.deniedLine, { summary: 'Send a message to Ana (E)' }),
+    ]);
   });
 
   it('a paid approval stays while the sheet is open and collapses out after Close', async () => {
@@ -447,6 +453,272 @@ describe('(b) an approved card collapses out after the check', () => {
     await approveOwn('D');
     await advance(APPROVED_HOLD_MS + 10);
     expect(document.activeElement?.tagName).not.toBe('BUTTON');
+  });
+});
+
+// ------------------------------------------------------------------------------------------- (d)
+
+describe('(d) a denied card leaves like an approved one (UI-REFRESH-o-c)', () => {
+  const denyOwn = async (c: string): Promise<void> => {
+    await click(buttonNamed(S.deny, cardOf(c) as ParentNode));
+    setValue(cardOf(c)?.querySelector<HTMLInputElement>('input[type="password"]'), 'owner-code');
+    await click(buttonNamed(S.confirmDenial, cardOf(c) as ParentNode));
+  };
+  const deniedLine = (c: string): string =>
+    fmt(S.deniedLine, { summary: `Send a message to Ana (${c})` });
+  const results = (): (string | null)[] =>
+    [...host.querySelectorAll('.ap-result')].map((n) => n.textContent);
+
+  it('the result line is plain words (11 §5) built from the trusted summary only', () => {
+    expect(S.deniedLine).toBe('Denied: {summary}');
+  });
+
+  it('holds "Denied." and every fact, then (reduced motion) is removed without animation', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    const animate = vi.fn();
+    (Element.prototype as { animate?: unknown }).animate = animate;
+    await mount({
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
+      [`/api/approvals/${id('D')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    await denyOwn('D');
+    expect(statuses()).toContain(S.denied);
+    expect(cardOf('D')?.getAttribute('data-outcome')).toBe('denied');
+    expectAllFacts(cardOf('D'), 'D');
+    await advance(APPROVED_HOLD_MS - 50);
+    expectAllFacts(cardOf('D'), 'D');
+    expect(results()).toEqual([]);
+    await advance(60);
+    expect(cardOf('D')).toBeNull();
+    expect(animate).not.toHaveBeenCalled();
+    expect(results()).toEqual([deniedLine('D')]);
+    const result = host.querySelector('.ap-result');
+    // Reachable by reading, not announced a second time (the card's status line already was).
+    expect(result?.closest('[role="status"], [aria-live]')).toBeNull();
+    expect(result?.closest('[aria-hidden="true"]')).toBeNull();
+    // Plain text: nothing the agent wrote, no markup.
+    expect(result?.textContent).not.toContain(CANARY);
+    expect(result?.children.length).toBe(0);
+    expectAllFacts(cardOf('E'), 'E');
+    expect(host.textContent).toContain(fmt(S.waiting, { count: 1 }));
+  });
+
+  it('with full motion it fades and collapses its height (the shared row leave), then goes', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const anims: { frames: Keyframe[]; anim: { onfinish: (() => void) | null } }[] = [];
+    (Element.prototype as { animate?: unknown }).animate = vi.fn(function (frames: Keyframe[]) {
+      const anim = {
+        onfinish: null as (() => void) | null,
+        cancel: vi.fn(),
+        reverse: vi.fn(),
+        finished: Promise.resolve(),
+      };
+      anims.push({ frames, anim });
+      return anim;
+    });
+    await mount({
+      [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
+      [`/api/approvals/${id('D')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    await denyOwn('D');
+    await advance(APPROVED_HOLD_MS + 10);
+    const collapse = anims.find((a) => a.frames.some((f) => f['height'] === '0px'));
+    expect(collapse).toBeDefined();
+    expect(collapse?.frames.at(-1)).toMatchObject({ height: '0px', opacity: 0 });
+    expect(cardOf('D')).not.toBeNull();
+    act(() => collapse?.anim.onfinish?.());
+    await flush();
+    expect(cardOf('D')).toBeNull();
+    expect(results()).toEqual([deniedLine('D')]);
+    expect(host.textContent).toContain(fmt(S.waiting, { count: 0 }));
+  });
+
+  it('a refused, an expired and a failed denial keep the card, with every fact', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [
+        ok({
+          approvals: [
+            item('D', { commitment: true }),
+            item('E', { commitment: true }),
+            item('F', { commitment: true }),
+          ],
+        }),
+      ],
+      [`/api/approvals/${id('D')}/deny`]: [{ status: 403, body: { status: 'presence_rejected' } }],
+      [`/api/approvals/${id('E')}/deny`]: [{ status: 409, body: { status: 'not_pending' } }],
+      [`/api/approvals/${id('F')}/deny`]: [{ status: 500, body: {} }],
+    });
+    await denyOwn('D');
+    expect(statuses()).toContain(S.presenceRejected);
+    await denyOwn('E');
+    expect(statuses()).toContain(S.notPending);
+    await denyOwn('F');
+    await advance(APPROVED_HOLD_MS * 3);
+    for (const c of ['D', 'E', 'F']) {
+      expectAllFacts(cardOf(c), c);
+      expect(cardOf(c)?.getAttribute('data-outcome')).toBeNull();
+    }
+    expect(results()).toEqual([]);
+    expect(host.textContent).toContain(fmt(S.waiting, { count: 3 }));
+  });
+
+  it('a request that has run out of time keeps its card when the deny is refused', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [ok({ approvals: [item('D', { commitment: true, expiresAt: NOW_S - 5 })] })],
+      [`/api/approvals/${id('D')}/deny`]: [{ status: 409, body: { status: 'not_pending' } }],
+    });
+    await denyOwn('D');
+    await advance(APPROVED_HOLD_MS * 3);
+    expectAllFacts(cardOf('D'), 'D');
+    expect(results()).toEqual([]);
+  });
+
+  it('stays while the sheet is open, and leaves once it is closed', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [ok({ approvals: [item('C', { paid: true })] })],
+      [BEGIN]: [ok(PROOF_READY)],
+      [`/api/approvals/${id('C')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    await click(buttonNamed(S.approve, cardOf('C') as ParentNode));
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    // A denial applied while the sheet is up (a scripted click; the page is inert to people): the
+    // card does not move until the sheet is closed.
+    await denyOwn('C');
+    expect(cardOf('C')?.getAttribute('data-outcome')).toBe('denied');
+    await advance(APPROVED_HOLD_MS * 3);
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(cardOf('C')).not.toBeNull();
+    expect(results()).toEqual([]);
+    await click(buttonNamed(P.cancel));
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(cardOf('C')).not.toBeNull();
+    await advance(APPROVED_HOLD_MS + 10);
+    expect(cardOf('C')).toBeNull();
+    expect(results()).toEqual([deniedLine('C')]);
+  });
+
+  it('a paid request denied through the plain owner step leaves too', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [ok({ approvals: [item('C', { paid: true })] })],
+      [`/api/approvals/${id('C')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    await denyOwn('C');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    await advance(APPROVED_HOLD_MS + 10);
+    expect(cardOf('C')).toBeNull();
+    expect(results()).toEqual([deniedLine('C')]);
+  });
+
+  it('the deep link card leaves too, leaving "Denied: <summary>"', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    history.replaceState(null, '', `/approve/${id('B')}`);
+    const { props } = pageProps({
+      [`/api/approvals/${id('B')}`]: [ok({ approval: item('B', { commitment: true }) })],
+      [`/api/approvals/${id('B')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    act(() => root.render(h<ApprovalsPageProps>(ApprovePage, props)));
+    await flush();
+    await denyOwn('B');
+    expectAllFacts(cardOf('B'), 'B');
+    await advance(APPROVED_HOLD_MS + 10);
+    expect(cardOf('B')).toBeNull();
+    expect(results()).toEqual([deniedLine('B')]);
+    expect(host.textContent).not.toContain(S.notPending);
+  });
+
+  it('no autofocus on Approve; after the leave the focus is on the result, never a button', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
+      [`/api/approvals/${id('D')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    expect(host.querySelector('[autofocus]')).toBeNull();
+    await denyOwn('D');
+    await advance(APPROVED_HOLD_MS + 10);
+    expect(document.activeElement?.tagName).not.toBe('BUTTON');
+    expect(document.activeElement?.classList.contains('ap-result')).toBe(true);
+    expect(document.activeElement?.textContent).toBe(deniedLine('D'));
+  });
+
+  it('the badge and the count tick down only after an applied denial', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    const navCount = (): string | null | undefined =>
+      [...host.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Main"] a')]
+        .find((a) => a.getAttribute('href') === '/')
+        ?.querySelector('.al-count-in')?.textContent;
+    const { props } = pageProps({
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
+      [`/api/approvals/${id('D')}/deny`]: [
+        { status: 403, body: { status: 'presence_rejected' } },
+        ok({ status: 'applied', decision: 'deny' }),
+      ],
+    });
+    act(() =>
+      root.render(
+        h(
+          Layout,
+          {
+            path: '/',
+            nextStep: async () => false,
+            unseenMessages: async () => 0,
+            waitingApprovals: async () => 2,
+            readHealth: () => new Promise<never>(() => undefined),
+          } as never,
+          h<ApprovalsPageProps>(ApprovalsPage, props) as never,
+        ),
+      ),
+    );
+    await flush();
+    expect(navCount()).toBe('2');
+    await denyOwn('D');
+    await advance(APPROVED_HOLD_MS * 2);
+    expect(navCount()).toBe('2');
+    expect(host.textContent).toContain(fmt(S.waiting, { count: 2 }));
+    expect(cardOf('D')).not.toBeNull();
+    await denyOwn('D');
+    expect(navCount()).toBe('1');
+    await advance(APPROVED_HOLD_MS + 10);
+    expect(cardOf('D')).toBeNull();
+    expect(navCount()).toBe('1');
+    expect(host.textContent).toContain(fmt(S.waiting, { count: 1 }));
+  });
+
+  it('axe finds no violation after a denied card has left', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    reduced();
+    await mount({
+      [LIST]: [
+        ok({ approvals: [item('D', { commitment: true }), item('E', { commitment: true })] }),
+      ],
+      [`/api/approvals/${id('D')}/deny`]: [ok({ status: 'applied', decision: 'deny' })],
+    });
+    await denyOwn('D');
+    await advance(APPROVED_HOLD_MS + 10);
+    vi.useRealTimers();
+    expect(host.querySelector('.ap-result')).not.toBeNull();
+    const out = await axe.run(host, {
+      runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'],
+      rules: { 'color-contrast': { enabled: false } },
+    });
+    expect(out.violations.map((v) => v.id)).toEqual([]);
   });
 });
 

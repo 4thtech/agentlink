@@ -5186,7 +5186,7 @@ Source: `docs/process/proposals/UX-WAVE-2.md` (§10 cards, §11 ordering, §12 d
 Low-severity findings from the independent reviews of #619, #620, #616, #627, #628, #629 and #630. Phrased neutrally on this public repo: the cases live in the tests.
 
 #### CHORE-LOCALUI-EMBED-NONEMPTY · release-time check that the CLI's embedded local-ui bundle is not empty (new, low, from the refresh follow-ups)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Audit:** Fable · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build, Opus review · **Security:** S1 (CI and supply chain; sensitive path if `.github/**` changes, then the owner's "merge") · **Audit:** Fable · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/cli/test/local-ui-embed.test.ts`, the release/pack workflow step or script that builds the CLI (`.github/**` if needed), tests
 - **Depends on:** —
 - **Spec:** release-and-deployment; 08 §1
@@ -5219,7 +5219,7 @@ Low-severity findings from the independent reviews of #619, #620, #616, #627, #6
   - Tests first (RED commit); each refused kind stays refused; no allowed shape becomes refused except the ones above; no test weakened.
 
 #### UI-REFRESH-o-c · local-ui: denied approval cards leave like approved ones (new, low, from #629)
-- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (approval UI) · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (approval UI) · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/{approvals,approve}/**`, tests
 - **Depends on:** UI-REFRESH-o-b (#629)
 - **Spec:** B-11 §16, §6 row 4; 08 §1; 04 §2.5
@@ -5230,7 +5230,7 @@ Low-severity findings from the independent reviews of #619, #620, #616, #627, #6
   - Tests first (RED commit); the approvals count and badge tick down only after a successful deny; no autofocus on Approve; reduced-motion and axe tests; short threat note (S2); no test weakened.
 
 #### UI-REFRESH-o-d · local-ui: Messages nav badge uses the shared CountBadge (new, low, from #629)
-- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink · `apps/local-ui/src/shell/**` (Messages badge), tests
 - **Depends on:** UI-REFRESH-o-b (#629)
 - **Spec:** B-11 §7
@@ -8068,7 +8068,7 @@ Goal (10 M2): owner console, signed desktop apps for macOS, Windows and Linux (D
 Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions). Part of the 0.5.0 milestone with the cloud agent (D-131, D-135); the business slice ships behind a pilot switch. **Owner decisions 1–10 and 12 accepted by Tali, 2026-10-28 (every recommended option):** 1.1 the company hosts the business agent in its own Cloudflare account (4thTech hosts no keys); 2.1 one tool surface (remote MCP) plus invokers, 15-minute token per conversation; 3.1 Claude invoker for the pilot, then OpenAI, then webhook and A2A; 4.1 0.5.0 carries the foundations behind a pilot switch, general availability in 0.5.x; 5.1 monthly Business plan, proofs at the standard fee paid by the company, users free; 6.1 pilot free, billing when D-111 and D-15 exist; 7.1 only answers inside a conversation the person started, for 14 days after their last message; 8.1 verified domain required; 9.1 keep 60-second sync and measure; 10.1 invoker-driven answers in business mode only (amends 08 §3.4); 12.1 invoker grants at most 30 days (D-131 (m)). **Open: decision 11, the pilot company, to be named by the owner** (one travel or booking company). **Fable audits (`Audit: Fable` field; keys, owner presence, money), per the proposal §9:** BIZ-b, BIZ-e and BIZ-m (named in the card owner's request), plus BIZ-a, BIZ-f and BIZ-j, which the proposal also marks; BIZ-AUDIT is the independent Fable audit of the whole slice. Order: BIZ-0 alongside M2-3b and M2-3c; BIZ-SPEC → BIZ-a, BIZ-b, BIZ-e in parallel → BIZ-d → BIZ-f → BIZ-g and BIZ-j → BIZ-c, BIZ-k, BIZ-l → BIZ-AUDIT → BIZ-PILOT. BIZ-h, BIZ-i and BIZ-m may follow in 0.5.x. Nothing here blocks the person-facing 0.5.0 cloud release.
 
 #### BIZ-0 · spikes for business agents (new, 0.5.0 business agents)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S0 (spike notes)
+- **Status:** in review (connector spike; DO and alarm measurements open) · **Size:** M · **Tier:** Opus · **Security:** S1 (spike notes under docs/process)
 - **Repo/path:** agentlink · `docs/process/` (spike notes)
 - **Depends on:** M2-3a, M2-3b
 - **Spec:** D-136 (proposed; number assigned at merge); BUSINESS-AGENTS §5, §6

@@ -141,6 +141,25 @@ export function sizeText(bytes: number): string {
   return `${value >= 100 ? Math.round(value) : Math.round(value * 10) / 10} ${units[i]}`;
 }
 
+const POLL_MS = 5_000;
+const POLL_SLOW_MS = 15_000;
+const POLL_BACKOFF_AFTER_MS = 2 * 60_000;
+const POLL_STOP_MS = 30 * 60_000;
+/** A sent file without a receipt after this long stops waiting for one (owner decision 6.1). */
+const RECEIPT_WAIT_MS = 24 * 60 * 60_000;
+
+/** Sent, available, and no receipt, but a day has passed: the wait is over. */
+const receiptGaveUp = (i: SentItem): boolean =>
+  i.status === 'sent' &&
+  !i.receipt &&
+  i.state === 'available' &&
+  Date.now() - i.at * 1000 >= RECEIPT_WAIT_MS;
+
+/** Rows the Sent list keeps re-reading for: queued, or sent and still waiting for a receipt. */
+const sentInFlight = (i: SentItem): boolean =>
+  i.status === 'queued' ||
+  (i.status === 'sent' && !i.receipt && i.state === 'available' && !receiptGaveUp(i));
+
 type FeedState<T> =
   | { readonly phase: 'loading' }
   | { readonly phase: 'not_set_up' }
@@ -161,8 +180,11 @@ function useFeed<T extends { readonly id: string; readonly at: number }>(
   get: Getter,
   base: string,
   parse: (json: unknown) => Feed<T> | undefined,
+  inFlight?: (item: T) => boolean,
 ): { state: FeedState<T>; retry: () => void; more: () => void } {
   const [state, setState] = useState<FeedState<T>>({ phase: 'loading' });
+  // Bumped when the tab comes back, so a polling window that ran out while hidden starts again.
+  const [epoch, setEpoch] = useState(0);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -224,11 +246,35 @@ function useFeed<T extends { readonly id: string; readonly at: number }>(
   // Coming back to the page looks for anything new (no timer, no stream).
   useEffect(() => {
     const onShown = (): void => {
-      if (document.visibilityState === 'visible') void run(null);
+      if (document.visibilityState !== 'visible') return;
+      setEpoch((e) => e + 1);
+      void run(null);
     };
     document.addEventListener('visibilitychange', onShown);
     return () => document.removeEventListener('visibilitychange', onShown);
   }, [run]);
+
+  // While any row is still moving, look again every few seconds, slower after 2 minutes and not at
+  // all after 30 minutes. A hidden tab is not polled; coming back looks once (above).
+  const pending = inFlight !== undefined && state.phase === 'ok' && state.items.some(inFlight);
+  useEffect(() => {
+    if (!pending) return undefined;
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = (): void => {
+      const age = Date.now() - started;
+      if (age >= POLL_STOP_MS) return;
+      timer = setTimeout(
+        () => {
+          if (document.visibilityState === 'visible') void run(null);
+          arm();
+        },
+        age >= POLL_BACKOFF_AFTER_MS ? POLL_SLOW_MS : POLL_MS,
+      );
+    };
+    arm();
+    return () => clearTimeout(timer);
+  }, [pending, run, epoch]);
 
   return {
     state,
@@ -497,6 +543,7 @@ function ReceivedRow({
 }
 
 function SentRow({ item }: { readonly item: SentItem }): ReactElement {
+  const quiet = receiptGaveUp(item);
   return (
     <Row arrived={false}>
       <div className="fl-item-head">
@@ -513,11 +560,13 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
       {item.status === 'queued' ? (
         <ProgressBar label={IO.progressSending} steps={IO.sendingSteps} current={0} />
       ) : null}
-      {item.status === 'sent' && !item.receipt && item.state === 'available' ? (
+      {item.status === 'sent' && !item.receipt && item.state === 'available' && !quiet ? (
         <ProgressBar label={IO.progressSending} steps={IO.sendingSteps} current={1} />
       ) : null}
       <p className="fl-chips">
-        {item.status === 'sent' ? <StatusChip status="sent">{IO.statusSent}</StatusChip> : null}
+        {item.status === 'sent' ? (
+          <StatusChip status="sent">{quiet ? IO.statusSentNoReceipt : IO.statusSent}</StatusChip>
+        ) : null}
         {item.status === 'queued' ? (
           <StatusChip status="waiting-to-post">{IO.statusQueued}</StatusChip>
         ) : null}
@@ -529,7 +578,7 @@ function SentRow({ item }: { readonly item: SentItem }): ReactElement {
             <Icon name="receipt-delivered" size={14} />
             <span className="al-text-body-sm">{IO.receiptConfirmed}</span>
           </span>
-        ) : item.status === 'not_delivered' ? null : (
+        ) : item.status === 'not_delivered' || quiet ? null : (
           <span className="fl-receipt al-muted" data-receipt="false">
             <Icon name="clock" size={14} />
             <span className="al-text-body-sm">{IO.receiptNone}</span>
@@ -616,7 +665,7 @@ export function SentPanel({
   readonly get: Getter;
   readonly onWaiting?: (n: number) => void;
 }): ReactElement {
-  const feed = useFeed(get, SENT_PATH, parseSent);
+  const feed = useFeed(get, SENT_PATH, parseSent, sentInFlight);
   useWaiting(feed.state, (i: SentItem) => i.status === 'queued', onWaiting);
   const items = feed.state.phase === 'ok' ? feed.state.items : [];
   return (

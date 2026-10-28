@@ -289,6 +289,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # CHORE-LOCALUI-EMBED-NONEMPTY: an empty embedded local UI would publish a CLI whose approval
+      # pages answer 503. Fails the release before anything is packed or published.
+      - name: Check the CLI embeds the local UI
+        run: node apps/cli/scripts/check-embedded-ui.mjs
+
       - name: Pack publishable packages
         id: pack
         uses: changesets/action/pack@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
