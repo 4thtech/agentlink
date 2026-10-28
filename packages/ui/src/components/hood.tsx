@@ -94,7 +94,8 @@ const HIDDEN_CHAR = /[\p{Cc}\p{Cf}\u2028\u2029]/u;
  * alone, so ordinary text with short codes ("a1 b2 c3") is not refused.
  */
 const CHUNK = /^[A-Za-z0-9_+=]{3,}$/;
-const SEPARATORS = /[\s/\\.,:;|~*#@!?$^&()[\]{}<>"'`-]+/;
+// Pieces are cut on anything outside the chunk characters, not on a fixed list of separators.
+const SEPARATORS = /[^A-Za-z0-9_+=]+/;
 function splitBlob(value: string, separators: RegExp = SEPARATORS): boolean {
   let run = 0;
   let total = 0;
@@ -218,6 +219,58 @@ const CONFUSABLE: Readonly<Record<string, string>> = {
   '\u00F8': 'o',
   '\u0111': 'd',
   '\u0127': 'h',
+  // Armenian, Cyrillic and Latin letters that read as plain Latin ones.
+  '\u0585': 'o',
+  '\u057D': 'u',
+  '\u0578': 'n',
+  '\u0581': 'g',
+  '\u0570': 'h',
+  '\u0561': 'a',
+  '\u04AF': 'y',
+  '\u04BB': 'h',
+  '\u051B': 'q',
+  '\u051D': 'w',
+  '\u0251': 'a',
+  '\u0252': 'a',
+  '\u0263': 'g',
+  '\u0266': 'h',
+  '\u028B': 'v',
+  '\u027C': 'r',
+  '\u01AD': 't',
+  '\u0290': 'z',
+  '\u0192': 'f',
+  '\u0271': 'm',
+  '\u0272': 'n',
+  '\u0273': 'n',
+  '\u0280': 'r',
+  '\u0282': 's',
+  '\u0283': 's',
+  '\u03B3': 'y',
+  '\u03B2': 'b',
+  '\u03C9': 'w',
+  // Latin small capitals.
+  '\u1D00': 'a',
+  '\u0299': 'b',
+  '\u1D04': 'c',
+  '\u1D05': 'd',
+  '\u1D07': 'e',
+  '\u0262': 'g',
+  '\u029C': 'h',
+  '\u026A': 'i',
+  '\u1D0A': 'j',
+  '\u1D0B': 'k',
+  '\u029F': 'l',
+  '\u1D0D': 'm',
+  '\u0274': 'n',
+  '\u1D0F': 'o',
+  '\u1D18': 'p',
+  '\u1D1B': 't',
+  '\u1D1C': 'u',
+  '\u1D20': 'v',
+  '\u1D21': 'w',
+  '\u028F': 'y',
+  '\u1D22': 'z',
+  '\uA731': 's',
 };
 const LEET: Readonly<Record<string, string>> = {
   '0': 'o',

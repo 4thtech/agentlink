@@ -66,9 +66,26 @@ describe('(b) a wider table of look-alike letters in labels', () => {
       .map((c) => (map[c] !== undefined ? cp(map[c]) : c))
       .join('');
   const smallCaps: Record<string, number> = {
-    a: 0x1d00, b: 0x0299, c: 0x1d04, d: 0x1d05, e: 0x1d07, g: 0x0262, h: 0x029c, i: 0x026a,
-    k: 0x1d0b, l: 0x029f, m: 0x1d0d, n: 0x0274, o: 0x1d0f, p: 0x1d18, r: 0x0280, t: 0x1d1b,
-    u: 0x1d1c, v: 0x1d20, w: 0x1d21, y: 0x028f,
+    a: 0x1d00,
+    b: 0x0299,
+    c: 0x1d04,
+    d: 0x1d05,
+    e: 0x1d07,
+    g: 0x0262,
+    h: 0x029c,
+    i: 0x026a,
+    k: 0x1d0b,
+    l: 0x029f,
+    m: 0x1d0d,
+    n: 0x0274,
+    o: 0x1d0f,
+    p: 0x1d18,
+    r: 0x0280,
+    t: 0x1d1b,
+    u: 0x1d1c,
+    v: 0x1d20,
+    w: 0x1d21,
+    y: 0x028f,
   };
   it.each(['secret', 'token', 'password', 'private', 'recover', 'signature', 'cookie', 'key'])(
     'refuses %s spelled in small capitals',
