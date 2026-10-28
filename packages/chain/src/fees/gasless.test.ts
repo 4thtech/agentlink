@@ -6,6 +6,7 @@
 // Keys here are test values built at run time (a repeated byte), never a real secret.
 import {
   decodeEcdsaSignature,
+  decodeHex0x,
   encodeHex0x,
   hashTypedData,
   recoverEvmAddress,
@@ -198,17 +199,26 @@ function fakeState(
 /** A KeyStore double: sign712 signs the digest with `key` (the agent's EVM key by default). */
 function fakeSigner(key: ViemHex = AGENT_KEY, agentId: string = AGENT) {
   const signed: TypedData[] = [];
+  const address = privateKeyToAccount(key).address.toLowerCase();
   return {
     signed,
     getPublicBundle: vi.fn(() => Promise.resolve({ agentId })),
     sign712: vi.fn(async (td: TypedData) => {
       signed.push(td);
       const { digest } = hashTypedData(td);
-      return (await sign({
+      const signature = (await sign({
         hash: encodeHex0x(digest) as ViemHex,
         privateKey: key,
         to: 'hex',
       })) as string;
+      if (recovery.memo) {
+        // This key signed this digest, so real recovery returns this key's address.
+        recovery.known.set(
+          `${encodeHex0x(digest)}:${encodeHex0x(decodeEcdsaSignature(signature))}`,
+          decodeHex0x(address, { length: 20 }),
+        );
+      }
+      return signature;
     }),
   };
 }
@@ -450,6 +460,7 @@ describe('buildReceiveWithAuthorization', () => {
     const signer = fakeSigner();
     const token = fakeToken();
     const ethCall = ethCallOf(token);
+    recovery.memo = true;
     const auths: Awaited<ReturnType<typeof buildReceiveWithAuthorization>>['auth'][] = [];
     for (let i = 0; i < 1_000; i += 1) {
       const req = await buildReceiveWithAuthorization(
