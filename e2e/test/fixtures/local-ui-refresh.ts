@@ -207,6 +207,7 @@ export const APPROVALS = {
 export const OWNER_PASSKEY = { passkey: { rpId: 'localhost', registered: false } };
 
 export const ROUTES: Readonly<Record<string, unknown>> = {
+  '/api/ui/first-run': { owner: 'missing' },
   '/api/ui/contacts': CONTACTS,
   '/api/ui/activity': ACTIVITY_200,
   '/api/ui/proofs': PROOFS,
