@@ -948,6 +948,14 @@ The expiry and nonce checks of 04 §2.5.1 applied once, when the core used the a
 
 `init` records the backend in the agent's local config (`keyStore: "keychain" | "file"`). Every later start uses only the recorded backend: no fallback, no switch and no new identity when the other backend appears or the file is missing. Moving an agent between backends goes through `backup export` / `restore` (†, 06 §8, M1b; 04 §2.3.3, step 4: restore uses the backend this machine selects); a dedicated move command is out of scope for now. The recorded value is not owner-signed. Changing it can only make the agent fail to start; it can never weaken the key protection.
 
+**Labels, removal and the app's choice of agent (D-138; decided by the owner, 2026-10-29; 08 §1).** The agent's `config.json` also holds:
+- `label`: the owner's display text for the agent (06 §6), written only after the server has verified an `agent.label` owner action (04 §2.5.1). An agent without it shows its name. Like `keyStore` it is not signed in the file: a same-user process that changes it can mislabel the agent in the app, nothing more (G-1).
+- `removing: true`: written before anything of the agent is deleted (08 §1, 04 §2.5). An agent with the mark is listed as "Removal not finished" with Try again and is never opened as usable.
+
+Two owner-level files sit beside the agent folders:
+- `~/.agentlink/app.json` `{"v": 1, "current": "<name>"}`, mode 0600: the agent the app opens first. Not signed: it only picks which agent opens, like `config.json`; a name that fails the agent-name rule (06 §6) or names no agent is ignored.
+- `~/.agentlink/revoked/<agentId>.json`, mode 0600: the owner's revoked list, one file per removed agent, recording its signed `agent.revoke`. `backup restore` refuses to restore an agent in it (04 §2.3.3): it comes back only as a new identity.
+
 ### 9.2 Unlocking a file KeyStore
 
 | Source | Where | Notes |
